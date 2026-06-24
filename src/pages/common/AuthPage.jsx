@@ -5,6 +5,7 @@ import Register from './Register'
 import ForgotPassword from './ForgotPassword'
 import ResetPassword from './ResetPassword'
 import Profile from './Profile'
+import { getAuth, clearAuth, setAuth } from '../../utils/Auth'
 
 function AuthPage() {
   const [view, setView] = useState('signin') // 'signin' | 'signup' | 'forgot' | 'reset' | 'profile' | 'oauth-loading'
@@ -21,7 +22,7 @@ function AuthPage() {
     if (token || window.location.pathname.includes('/oauth2/redirect')) {
       setView('oauth-loading');
       if (token) {
-        localStorage.setItem('token', token);
+        setAuth(token, ''); // Temporary set token while fetching google details
         window.history.replaceState({}, document.title, '/');
         
         setTimeout(() => {
@@ -31,7 +32,7 @@ function AuthPage() {
             email: 'user@gmail.com',
             role: 'USER'
           };
-          localStorage.setItem('user', JSON.stringify(googleUser));
+          setAuth(token, googleUser);
           setUser(googleUser);
           setView('profile');
           showAlert('success', 'Logged in successfully with Google!');
@@ -43,10 +44,9 @@ function AuthPage() {
         }, 1000);
       }
     } else {
-      const savedUser = localStorage.getItem('user');
-      const savedToken = localStorage.getItem('token');
-      if (savedUser && savedToken) {
-        setUser(JSON.parse(savedUser));
+      const auth = getAuth();
+      if (auth && auth.token && auth.user) {
+        setUser(auth.user);
         setView('profile');
       }
     }
@@ -60,12 +60,12 @@ function AuthPage() {
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    clearAuth();
     setUser(null);
     setView('signin');
     showAlert('success', 'Logged out successfully.');
   }
+
 
   return (
     <AuthLayout alert={alert}>

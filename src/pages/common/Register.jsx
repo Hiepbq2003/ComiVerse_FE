@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { registerApi } from '../../services/api/AuthApi'
+import { setAuth } from '../../utils/Auth'
 
 function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoading }) {
   const [form, setForm] = useState({ username: '', fullName: '', email: '', phone: '', password: '', confirmPassword: '' })
@@ -11,41 +13,32 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
     }
     setLoading(true)
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: form.username,
-          fullName: form.fullName,
-          email: form.email,
-          phone: form.phone,
-          password: form.password
-        })
+      const data = await registerApi({
+        username: form.username,
+        fullName: form.fullName,
+        email: form.email,
+        phone: form.phone,
+        password: form.password
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('token', data.token);
-        const userData = {
-          userId: data.userId,
-          username: data.username,
-          fullName: data.fullName,
-          email: data.email,
-          role: data.role
-        };
-        localStorage.setItem('user', JSON.stringify(userData));
-        onRegisterSuccess(userData);
-        showAlert('success', 'Account registered successfully!');
-      } else {
-        const errData = await response.json().catch(() => ({}));
-        showAlert('error', errData.message || 'Registration failed.');
-      }
+      const userData = {
+        userId: data.userId,
+        username: data.username,
+        fullName: data.fullName,
+        email: data.email,
+        role: data.role
+      };
+      setAuth(data.token, userData);
+      onRegisterSuccess(userData);
+      showAlert('success', 'Account registered successfully!');
     } catch (err) {
-      showAlert('error', 'Connection failed. Verify server status.');
+      const errMessage = err.response?.data?.message || 'Registration failed.';
+      showAlert('error', errMessage);
     } finally {
       setLoading(false)
     }
   }
+
 
   return (
     <div className="auth-form-card fade-in">

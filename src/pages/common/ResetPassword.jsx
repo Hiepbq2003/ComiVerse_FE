@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { resetPasswordApi } from '../../services/api/AuthApi'
 
 function ResetPassword({ email, onNavigate, showAlert, loading, setLoading }) {
   const [form, setForm] = useState({ otp: '', newPassword: '', confirmNewPassword: '' })
@@ -11,29 +12,17 @@ function ResetPassword({ email, onNavigate, showAlert, loading, setLoading }) {
     }
     setLoading(true)
     try {
-      const response = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          otp: form.otp,
-          newPassword: form.newPassword
-        })
-      });
-
-      if (response.ok) {
-        onNavigate('signin');
-        showAlert('success', 'Password reset successfully! You can now log in.');
-      } else {
-        const errData = await response.json().catch(() => ({}));
-        showAlert('error', errData.message || 'Reset failed. Verify OTP code.');
-      }
+      await resetPasswordApi(email, form.otp, form.newPassword);
+      onNavigate('signin');
+      showAlert('success', 'Password reset successfully! You can now log in.');
     } catch (err) {
-      showAlert('error', 'Connection failed.');
+      const errMessage = err.response?.data?.message || 'Reset failed. Verify OTP code.';
+      showAlert('error', errMessage);
     } finally {
       setLoading(false)
     }
   }
+
 
   return (
     <div className="auth-form-card fade-in">

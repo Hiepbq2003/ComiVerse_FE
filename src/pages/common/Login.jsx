@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { loginApi } from '../../services/api/AuthApi'
+import { setAuth } from '../../utils/Auth'
 
 function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
   const [form, setForm] = useState({ username: '', password: '', rememberMe: false })
@@ -8,38 +10,25 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
     e.preventDefault()
     setLoading(true)
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: form.username,
-          password: form.password
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('token', data.token);
-        const userData = {
-          userId: data.userId,
-          username: data.username,
-          fullName: data.fullName,
-          email: data.email,
-          role: data.role
-        };
-        localStorage.setItem('user', JSON.stringify(userData));
-        onLoginSuccess(userData);
-        showAlert('success', 'Welcome back to ComiVerse!');
-      } else {
-        const errData = await response.json().catch(() => ({}));
-        showAlert('error', errData.message || 'Invalid username or password.');
-      }
+      const data = await loginApi(form.username, form.password);
+      const userData = {
+        userId: data.userId,
+        username: data.username,
+        fullName: data.fullName,
+        email: data.email,
+        role: data.role
+      };
+      setAuth(data.token, userData);
+      onLoginSuccess(userData);
+      showAlert('success', 'Welcome back to ComiVerse!');
     } catch (err) {
-      showAlert('error', 'Connection to server failed. Ensure backend is running.');
+      const errMessage = err.response?.data?.message || 'Invalid username or password.';
+      showAlert('error', errMessage);
     } finally {
       setLoading(false)
     }
   }
+
 
   const handleGoogleLogin = () => {
     window.location.href = '/api/oauth2/authorization/google';

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { forgotPasswordApi } from '../../services/api/AuthApi'
 
 function ForgotPassword({ onNavigate, onOTPSent, showAlert, loading, setLoading }) {
   const [email, setEmail] = useState('')
@@ -7,25 +8,17 @@ function ForgotPassword({ onNavigate, onOTPSent, showAlert, loading, setLoading 
     e.preventDefault()
     setLoading(true)
     try {
-      const response = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
-
-      if (response.ok) {
-        onOTPSent(email);
-        showAlert('success', 'OTP code sent! Please check your email.');
-      } else {
-        const errData = await response.json().catch(() => ({}));
-        showAlert('error', errData.message || 'Email not found.');
-      }
+      await forgotPasswordApi(email);
+      onOTPSent(email);
+      showAlert('success', 'OTP code sent! Please check your email.');
     } catch (err) {
-      showAlert('error', 'Connection failed.');
+      const errMessage = err.response?.data?.message || 'Email not found.';
+      showAlert('error', errMessage);
     } finally {
       setLoading(false)
     }
   }
+
 
   return (
     <div className="auth-form-card fade-in">
