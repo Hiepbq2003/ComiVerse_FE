@@ -38,8 +38,9 @@ function AccountManagement() {
   const [confirmAction, setConfirmAction] = useState(null) // { type: 'ban'|'unban'|'reset-pw', account }
 
   // Create staff form
-  const [staffForm, setStaffForm] = useState({ username: '', password: '', fullName: '', email: '' })
+  const [staffForm, setStaffForm] = useState({ username: '', password: '', fullName: '', email: '', role: 'STAFF' })
   const [staffFormErrors, setStaffFormErrors] = useState({})
+  const [modalError, setModalError] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Inline alert
@@ -67,7 +68,10 @@ function AccountManagement() {
         fullName: acc.fullName || acc.name || acc.username,
         username: acc.username,
         email: acc.email,
-        role: acc.role?.roleName || acc.role || acc.roleName || 'Reader',
+        role: acc.role?.roleName === 'STAFF' ? 'Staff' :
+              acc.role?.roleName === 'ADMIN' ? 'Admin' :
+              acc.role?.roleName === 'USER' ? 'User' :
+              acc.role?.roleName || acc.role || acc.roleName || 'Reader',
         status: acc.status || (acc.banned ? 'Banned' : 'Active'),
         createdDate: acc.createdDate || acc.createdAt || '-',
         lastActive: acc.lastActive || acc.lastLogin || '-',
@@ -100,7 +104,10 @@ function AccountManagement() {
         searchTerm === '' || name.includes(search) || email.includes(search) || uid.includes(search) || uname.includes(search)
 
       const matchesRole =
-        roleFilter === 'All Roles' || (account.role || '').toLowerCase() === roleFilter.toLowerCase()
+        roleFilter === 'All Roles' ||
+        (account.role || '').toLowerCase() === roleFilter.toLowerCase() ||
+        (roleFilter.toLowerCase() === 'moderator' && (account.role || '').toLowerCase() === 'staff') ||
+        (roleFilter.toLowerCase() === 'reader' && (account.role || '').toLowerCase() === 'user')
 
       const matchesStatus =
         statusFilter === 'All Status' || (account.status || '').toLowerCase() === statusFilter.toLowerCase()
@@ -148,6 +155,13 @@ function AccountManagement() {
   }
 
   // ── CREATE STAFF ──────────────────────────────────
+  const handleInputChange = (field, value) => {
+    setStaffForm((prev) => ({ ...prev, [field]: value }))
+    if (staffFormErrors[field]) {
+      setStaffFormErrors((prev) => ({ ...prev, [field]: null }))
+    }
+  }
+
   const validateStaffForm = () => {
     const errors = {}
     if (!staffForm.username.trim()) errors.username = 'Username is required'
@@ -162,7 +176,12 @@ function AccountManagement() {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(staffForm.email)) errors.email = 'Invalid email format'
 
     setStaffFormErrors(errors)
-    return Object.keys(errors).length === 0
+    if (Object.keys(errors).length > 0) {
+      setModalError('Validation failed. Please correct the errors below.')
+      return false
+    }
+    setModalError(null)
+    return true
   }
 
   const handleCreateStaff = async () => {
@@ -174,27 +193,40 @@ function AccountManagement() {
         password: staffForm.password.trim(),
         fullName: staffForm.fullName.trim(),
         email: staffForm.email.trim(),
+        role: staffForm.role,
       })
       // Add to local list
+      const displayRole = result?.role === 'STAFF' ? 'Staff' :
+                          result?.role === 'ADMIN' ? 'Admin' :
+                          result?.role === 'USER' ? 'User' :
+                          result?.role || (staffForm.role === 'STAFF' ? 'Staff' : staffForm.role === 'ADMIN' ? 'Admin' : 'User')
+      
       const newAccount = {
         id: result?.userId || result?.id || Date.now(),
         userId: result?.userId || `USR-${String(result?.id || Date.now()).padStart(4, '0')}`,
         fullName: result?.fullName || staffForm.fullName,
         username: result?.username || staffForm.username,
         email: result?.email || staffForm.email,
-        role: result?.role || 'Moderator',
+        role: displayRole,
         status: 'Active',
         createdDate: new Date().toISOString().split('T')[0],
         lastActive: 'Just now',
       }
       setAccounts((prev) => [newAccount, ...prev])
       setShowCreateModal(false)
-      setStaffForm({ username: '', password: '', fullName: '', email: '' })
+      setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'STAFF' })
       setStaffFormErrors({})
+      setModalError(null)
       showAlert('success', `Staff account "${newAccount.fullName}" created successfully!`)
     } catch (err) {
-      const errorMsg = err.response?.data?.message || 'Failed to create staff account. Please try again.'
-      showAlert('error', errorMsg)
+      const validationErrors = err.response?.data?.errors
+      if (validationErrors) {
+        setStaffFormErrors(validationErrors)
+        setModalError('Validation failed. Please correct the errors below.')
+      } else {
+        const errorMsg = err.response?.data?.message || 'Failed to create staff account. Please try again.'
+        setModalError(errorMsg)
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -202,8 +234,9 @@ function AccountManagement() {
 
   const handleCloseCreateModal = () => {
     setShowCreateModal(false)
-    setStaffForm({ username: '', password: '', fullName: '', email: '' })
+    setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'STAFF' })
     setStaffFormErrors({})
+    setModalError(null)
   }
 
   // ── BAN / UNBAN ───────────────────────────────────
@@ -313,7 +346,9 @@ function AccountManagement() {
           <option>Translator</option>
           <option>Author</option>
           <option>Moderator</option>
+          <option>Staff</option>
           <option>Admin</option>
+          <option>User</option>
         </select>
 
         <select className="admin-filter-select" value={statusFilter} onChange={handleStatusChange}>
@@ -456,6 +491,12 @@ function AccountManagement() {
             </div>
 
             <div className="admin-modal-body">
+              {modalError && (
+                <div className="admin-inline-alert admin-inline-alert--error" style={{ marginBottom: '20px' }}>
+                  ✕ {modalError}
+                </div>
+              )}
+
               <div className="admin-form-group">
                 <label className="admin-form-label">
                   Username <span className="required">*</span>
@@ -465,7 +506,7 @@ function AccountManagement() {
                   type="text"
                   placeholder="Enter username"
                   value={staffForm.username}
-                  onChange={(e) => setStaffForm({ ...staffForm, username: e.target.value })}
+                  onChange={(e) => handleInputChange('username', e.target.value)}
                 />
                 {staffFormErrors.username && (
                   <div className="admin-form-error">{staffFormErrors.username}</div>
@@ -481,7 +522,7 @@ function AccountManagement() {
                   type="text"
                   placeholder="Enter full name"
                   value={staffForm.fullName}
-                  onChange={(e) => setStaffForm({ ...staffForm, fullName: e.target.value })}
+                  onChange={(e) => handleInputChange('fullName', e.target.value)}
                 />
                 {staffFormErrors.fullName && (
                   <div className="admin-form-error">{staffFormErrors.fullName}</div>
@@ -497,11 +538,27 @@ function AccountManagement() {
                   type="email"
                   placeholder="staff@comiverse.com"
                   value={staffForm.email}
-                  onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
                 />
                 {staffFormErrors.email && (
                   <div className="admin-form-error">{staffFormErrors.email}</div>
                 )}
+              </div>
+
+              <div className="admin-form-group">
+                <label className="admin-form-label">
+                  Role <span className="required">*</span>
+                </label>
+                <select
+                  className="admin-form-input"
+                  value={staffForm.role}
+                  onChange={(e) => handleInputChange('role', e.target.value)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <option value="STAFF" style={{ background: '#1f1a24' }}>Staff (Moderator)</option>
+                  <option value="ADMIN" style={{ background: '#1f1a24' }}>Admin (Administrator)</option>
+                  <option value="USER" style={{ background: '#1f1a24' }}>User (Reader)</option>
+                </select>
               </div>
 
               <div className="admin-form-group">
@@ -513,7 +570,7 @@ function AccountManagement() {
                   type="password"
                   placeholder="Min. 6 characters"
                   value={staffForm.password}
-                  onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })}
+                  onChange={(e) => handleInputChange('password', e.target.value)}
                 />
                 {staffFormErrors.password && (
                   <div className="admin-form-error">{staffFormErrors.password}</div>

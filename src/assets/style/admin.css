@@ -478,7 +478,8 @@
   border: 1px solid transparent;
 }
 
-.role-badge.reader {
+.role-badge.reader,
+.role-badge.user {
   background: rgba(59, 130, 246, 0.12);
   color: #93c5fd;
   border-color: rgba(59, 130, 246, 0.25);
@@ -496,7 +497,8 @@
   border-color: rgba(6, 182, 212, 0.25);
 }
 
-.role-badge.moderator {
+.role-badge.moderator,
+.role-badge.staff {
   background: rgba(168, 85, 247, 0.12);
   color: #d8b4fe;
   border-color: rgba(168, 85, 247, 0.25);
