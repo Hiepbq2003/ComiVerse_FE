@@ -68,10 +68,7 @@ function AccountManagement() {
         fullName: acc.fullName || acc.name || acc.username,
         username: acc.username,
         email: acc.email,
-        role: acc.role?.roleName === 'STAFF' ? 'Staff' :
-              acc.role?.roleName === 'ADMIN' ? 'Admin' :
-              acc.role?.roleName === 'USER' ? 'User' :
-              acc.role?.roleName || acc.role || acc.roleName || 'Reader',
+        role: acc.role?.roleName || acc.role || acc.roleName || 'USER',
         status: acc.status || (acc.banned ? 'Banned' : 'Active'),
         createdDate: acc.createdDate || acc.createdAt || '-',
         lastActive: acc.lastActive || acc.lastLogin || '-',
@@ -196,10 +193,7 @@ function AccountManagement() {
         role: staffForm.role,
       })
       // Add to local list
-      const displayRole = result?.role === 'STAFF' ? 'Staff' :
-                          result?.role === 'ADMIN' ? 'Admin' :
-                          result?.role === 'USER' ? 'User' :
-                          result?.role || (staffForm.role === 'STAFF' ? 'Staff' : staffForm.role === 'ADMIN' ? 'Admin' : 'User')
+      const displayRole = result?.role || staffForm.role
       
       const newAccount = {
         id: result?.userId || result?.id || Date.now(),
@@ -217,9 +211,9 @@ function AccountManagement() {
       setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'STAFF' })
       setStaffFormErrors({})
       setModalError(null)
-      showAlert('success', `Staff account "${newAccount.fullName}" created successfully!`)
+      showAlert('success', `Account "${newAccount.fullName}" created successfully!`)
     } catch (err) {
-      let errorMsg = 'Failed to create staff account. Please try again.'
+      let errorMsg = 'Failed to create account. Please try again.'
       const validationErrors = err.response?.data?.errors
       
       if (validationErrors) {
@@ -322,7 +316,7 @@ function AccountManagement() {
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
-          Create Staff Account
+          Create New Account
         </button>
       </div>
 
@@ -344,13 +338,13 @@ function AccountManagement() {
 
         <select className="admin-filter-select" value={roleFilter} onChange={handleRoleChange}>
           <option>All Roles</option>
+          <option>ADMIN</option>
+          <option>STAFF</option>
+          <option>USER</option>
           <option>Reader</option>
           <option>Translator</option>
           <option>Author</option>
           <option>Moderator</option>
-          <option>Staff</option>
-          <option>Admin</option>
-          <option>User</option>
         </select>
 
         <select className="admin-filter-select" value={statusFilter} onChange={handleStatusChange}>
@@ -488,7 +482,7 @@ function AccountManagement() {
         <div className="admin-modal-overlay" onClick={handleCloseCreateModal}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-header">
-              <h2 className="admin-modal-title">Create Staff Account</h2>
+              <h2 className="admin-modal-title">Create New Account</h2>
               <button className="admin-modal-close" onClick={handleCloseCreateModal}>×</button>
             </div>
 
@@ -557,9 +551,9 @@ function AccountManagement() {
                   onChange={(e) => handleInputChange('role', e.target.value)}
                   style={{ cursor: 'pointer' }}
                 >
-                  <option value="STAFF" style={{ background: '#1f1a24' }}>Staff (Moderator)</option>
-                  <option value="ADMIN" style={{ background: '#1f1a24' }}>Admin (Administrator)</option>
-                  <option value="USER" style={{ background: '#1f1a24' }}>User (Reader)</option>
+                  <option value="STAFF" style={{ background: '#1f1a24' }}>STAFF</option>
+                  <option value="ADMIN" style={{ background: '#1f1a24' }}>ADMIN</option>
+                  <option value="USER" style={{ background: '#1f1a24' }}>USER</option>
                 </select>
               </div>
 
