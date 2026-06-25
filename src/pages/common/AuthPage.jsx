@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import AuthLayout from '../../components/layout/AuthLayout'
 import Login from './Login'
 import Register from './Register'
@@ -12,6 +13,7 @@ import TranslatorDashboard from '../translator/TranslatorDashboard'
 import { getAuth, clearAuth, setAuth } from '../../utils/Auth'
 
 function AuthPage() {
+  const navigate = useNavigate()
   const [view, setView] = useState('signin') // 'signin' | 'signup' | 'forgot' | 'reset' | 'profile' | 'oauth-loading'
   const [alert, setAlert] = useState({ type: '', message: '' })
   const [loading, setLoading] = useState(false)
@@ -50,6 +52,12 @@ function AuthPage() {
     } else {
       const auth = getAuth();
       if (auth && auth.token && auth.user) {
+        // ADMIN users go directly to admin portal
+        const roleUpper = (auth.user.role || '').toUpperCase();
+        if (roleUpper === 'ADMIN') {
+          navigate('/admin/account-management', { replace: true });
+          return;
+        }
         setUser(auth.user);
         setView('profile');
       }
@@ -109,6 +117,12 @@ function AuthPage() {
         <Login 
           onNavigate={setView} 
           onLoginSuccess={(userData) => {
+            // ADMIN users redirect to admin portal
+            const roleUpper = (userData.role || '').toUpperCase();
+            if (roleUpper === 'ADMIN') {
+              navigate('/admin/account-management', { replace: true });
+              return;
+            }
             setUser(userData);
             setView('profile');
           }} 

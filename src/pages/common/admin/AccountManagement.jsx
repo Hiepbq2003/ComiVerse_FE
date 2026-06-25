@@ -1,57 +1,122 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import AdminLayout from '../../../components/layout/AdminLayout'
+import { getAllAccountsApi, registerStaffApi, banUserApi, unbanUserApi, resetUserPasswordApi } from '../../../services/api/AccountApi'
 
-// Mock data matching the screenshot
+// Fallback mock data when API is not available
 const MOCK_ACCOUNTS = [
-  { id: 'USR-0001', name: 'John Doe', email: 'john@gmail.com', role: 'Reader', status: 'Active', createdDate: 'Jan 15, 2023', lastActive: 'Today' },
-  { id: 'USR-0002', name: 'Spirit Group', email: 'spirit@gmail.com', role: 'Translator', status: 'Active', createdDate: 'Mar 02, 2023', lastActive: '2 days ago' },
-  { id: 'USR-0003', name: 'Author X', email: 'authorx@gmail.com', role: 'Author', status: 'Active', createdDate: 'Apr 18, 2023', lastActive: 'Yesterday' },
-  { id: 'USR-0004', name: 'Mod Y', email: 'mody@gmail.com', role: 'Moderator', status: 'Active', createdDate: 'May 10, 2023', lastActive: 'Today' },
-  { id: 'USR-0005', name: 'Sarah Chen', email: 'sarah@gmail.com', role: 'Reader', status: 'Active', createdDate: 'Jun 01, 2023', lastActive: '3 hours ago' },
-  { id: 'USR-0006', name: 'Dragon Scans', email: 'dragon@group.com', role: 'Translator', status: 'Banned', createdDate: 'Jul 22, 2023', lastActive: '1 month ago' },
-  { id: 'USR-0007', name: 'NoviceWriter', email: 'novice@mail.com', role: 'Author', status: 'Active', createdDate: 'Aug 05, 2023', lastActive: '5 days ago' },
-  { id: 'USR-0008', name: 'ContentMod', email: 'cmod@site.com', role: 'Moderator', status: 'Active', createdDate: 'Sep 14, 2023', lastActive: 'Today' },
-  { id: 'USR-0009', name: 'MangaFan99', email: 'manga99@mail.com', role: 'Reader', status: 'Active', createdDate: 'Oct 03, 2023', lastActive: '1 hour ago' },
-  { id: 'USR-0010', name: 'TranslateHQ', email: 'thq@group.com', role: 'Translator', status: 'Active', createdDate: 'Nov 11, 2023', lastActive: '4 days ago' },
-  { id: 'USR-0011', name: 'ProArtist', email: 'artist@mail.com', role: 'Author', status: 'Banned', createdDate: 'Dec 20, 2023', lastActive: '2 weeks ago' },
-  { id: 'USR-0012', name: 'SuperAdmin', email: 'admin@comiverse.com', role: 'Moderator', status: 'Active', createdDate: 'Jan 01, 2023', lastActive: 'Today' },
+  { id: 1, userId: 'USR-0001', fullName: 'John Doe', username: 'johndoe', email: 'john@gmail.com', role: 'Reader', status: 'Active', createdDate: '2023-01-15', lastActive: 'Today' },
+  { id: 2, userId: 'USR-0002', fullName: 'Spirit Group', username: 'spiritgroup', email: 'spirit@gmail.com', role: 'Translator', status: 'Active', createdDate: '2023-03-02', lastActive: '2 days ago' },
+  { id: 3, userId: 'USR-0003', fullName: 'Author X', username: 'authorx', email: 'authorx@gmail.com', role: 'Author', status: 'Active', createdDate: '2023-04-18', lastActive: 'Yesterday' },
+  { id: 4, userId: 'USR-0004', fullName: 'Mod Y', username: 'mody', email: 'mody@gmail.com', role: 'Moderator', status: 'Active', createdDate: '2023-05-10', lastActive: 'Today' },
+  { id: 5, userId: 'USR-0005', fullName: 'Sarah Chen', username: 'sarahchen', email: 'sarah@gmail.com', role: 'Reader', status: 'Active', createdDate: '2023-06-01', lastActive: '3 hours ago' },
+  { id: 6, userId: 'USR-0006', fullName: 'Dragon Scans', username: 'dragonscans', email: 'dragon@group.com', role: 'Translator', status: 'Banned', createdDate: '2023-07-22', lastActive: '1 month ago' },
+  { id: 7, userId: 'USR-0007', fullName: 'NoviceWriter', username: 'novicewriter', email: 'novice@mail.com', role: 'Author', status: 'Active', createdDate: '2023-08-05', lastActive: '5 days ago' },
+  { id: 8, userId: 'USR-0008', fullName: 'ContentMod', username: 'contentmod', email: 'cmod@site.com', role: 'Moderator', status: 'Active', createdDate: '2023-09-14', lastActive: 'Today' },
+  { id: 9, userId: 'USR-0009', fullName: 'MangaFan99', username: 'mangafan99', email: 'manga99@mail.com', role: 'Reader', status: 'Active', createdDate: '2023-10-03', lastActive: '1 hour ago' },
+  { id: 10, userId: 'USR-0010', fullName: 'TranslateHQ', username: 'translatehq', email: 'thq@group.com', role: 'Translator', status: 'Active', createdDate: '2023-11-11', lastActive: '4 days ago' },
+  { id: 11, userId: 'USR-0011', fullName: 'ProArtist', username: 'proartist', email: 'artist@mail.com', role: 'Author', status: 'Banned', createdDate: '2023-12-20', lastActive: '2 weeks ago' },
+  { id: 12, userId: 'USR-0012', fullName: 'SuperAdmin', username: 'superadmin', email: 'admin@comiverse.com', role: 'Admin', status: 'Active', createdDate: '2023-01-01', lastActive: 'Today' },
 ]
 
 const ITEMS_PER_PAGE = 8
 
 function AccountManagement() {
+  // Data states
+  const [accounts, setAccounts] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isMockData, setIsMockData] = useState(false)
+
+  // Filter states
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('All Roles')
   const [statusFilter, setStatusFilter] = useState('All Status')
   const [currentPage, setCurrentPage] = useState(1)
 
+  // Modal states
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmAction, setConfirmAction] = useState(null) // { type: 'ban'|'unban'|'reset-pw', account }
+
+  // Create staff form
+  const [staffForm, setStaffForm] = useState({ username: '', password: '', fullName: '', email: '' })
+  const [staffFormErrors, setStaffFormErrors] = useState({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Inline alert
+  const [alert, setAlert] = useState(null) // { type: 'success'|'error', message }
+
+  // Action loading (track which row is being acted upon)
+  const [actionLoadingId, setActionLoadingId] = useState(null)
+
+  // Show alert with auto-dismiss
+  const showAlert = useCallback((type, message) => {
+    setAlert({ type, message })
+    setTimeout(() => setAlert(null), 4000)
+  }, [])
+
+  // Fetch accounts from API
+  const fetchAccounts = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const data = await getAllAccountsApi()
+      // Normalize the response — handle both array and paginated responses
+      const accountsList = Array.isArray(data) ? data : (data?.content || data?.data || [])
+      const normalized = accountsList.map((acc) => ({
+        id: acc.id || acc.userId,
+        userId: acc.userId || `USR-${String(acc.id).padStart(4, '0')}`,
+        fullName: acc.fullName || acc.name || acc.username,
+        username: acc.username,
+        email: acc.email,
+        role: acc.role?.roleName || acc.role || acc.roleName || 'Reader',
+        status: acc.status || (acc.banned ? 'Banned' : 'Active'),
+        createdDate: acc.createdDate || acc.createdAt || '-',
+        lastActive: acc.lastActive || acc.lastLogin || '-',
+      }))
+      setAccounts(normalized)
+      setIsMockData(false)
+    } catch (err) {
+      console.warn('API not available, using mock data:', err.message)
+      setAccounts(MOCK_ACCOUNTS)
+      setIsMockData(true)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchAccounts()
+  }, [fetchAccounts])
+
   // Filter and search logic
   const filteredAccounts = useMemo(() => {
-    return MOCK_ACCOUNTS.filter((account) => {
+    return accounts.filter((account) => {
+      const name = (account.fullName || '').toLowerCase()
+      const email = (account.email || '').toLowerCase()
+      const uid = (account.userId || '').toLowerCase()
+      const uname = (account.username || '').toLowerCase()
+      const search = searchTerm.toLowerCase()
+
       const matchesSearch =
-        searchTerm === '' ||
-        account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        account.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        account.id.toLowerCase().includes(searchTerm.toLowerCase())
+        searchTerm === '' || name.includes(search) || email.includes(search) || uid.includes(search) || uname.includes(search)
 
       const matchesRole =
-        roleFilter === 'All Roles' || account.role === roleFilter
+        roleFilter === 'All Roles' || (account.role || '').toLowerCase() === roleFilter.toLowerCase()
 
       const matchesStatus =
-        statusFilter === 'All Status' || account.status === statusFilter
+        statusFilter === 'All Status' || (account.status || '').toLowerCase() === statusFilter.toLowerCase()
 
       return matchesSearch && matchesRole && matchesStatus
     })
-  }, [searchTerm, roleFilter, statusFilter])
+  }, [accounts, searchTerm, roleFilter, statusFilter])
 
   // Pagination
-  const totalPages = Math.ceil(filteredAccounts.length / ITEMS_PER_PAGE)
+  const totalPages = Math.max(1, Math.ceil(filteredAccounts.length / ITEMS_PER_PAGE))
   const paginatedAccounts = filteredAccounts.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   )
 
-  const startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1
+  const startItem = filteredAccounts.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0
   const endItem = Math.min(currentPage * ITEMS_PER_PAGE, filteredAccounts.length)
 
   // Reset page when filters change
@@ -70,15 +135,154 @@ function AccountManagement() {
     setCurrentPage(1)
   }
 
+  // Format date for display
+  const formatDate = (dateStr) => {
+    if (!dateStr || dateStr === '-') return '-'
+    try {
+      const date = new Date(dateStr)
+      if (isNaN(date.getTime())) return dateStr
+      return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+    } catch {
+      return dateStr
+    }
+  }
+
+  // ── CREATE STAFF ──────────────────────────────────
+  const validateStaffForm = () => {
+    const errors = {}
+    if (!staffForm.username.trim()) errors.username = 'Username is required'
+    else if (staffForm.username.trim().length < 3) errors.username = 'At least 3 characters'
+
+    if (!staffForm.password.trim()) errors.password = 'Password is required'
+    else if (staffForm.password.trim().length < 6) errors.password = 'At least 6 characters'
+
+    if (!staffForm.fullName.trim()) errors.fullName = 'Full name is required'
+
+    if (!staffForm.email.trim()) errors.email = 'Email is required'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(staffForm.email)) errors.email = 'Invalid email format'
+
+    setStaffFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleCreateStaff = async () => {
+    if (!validateStaffForm()) return
+    setIsSubmitting(true)
+    try {
+      const result = await registerStaffApi({
+        username: staffForm.username.trim(),
+        password: staffForm.password.trim(),
+        fullName: staffForm.fullName.trim(),
+        email: staffForm.email.trim(),
+      })
+      // Add to local list
+      const newAccount = {
+        id: result?.userId || result?.id || Date.now(),
+        userId: result?.userId || `USR-${String(result?.id || Date.now()).padStart(4, '0')}`,
+        fullName: result?.fullName || staffForm.fullName,
+        username: result?.username || staffForm.username,
+        email: result?.email || staffForm.email,
+        role: result?.role || 'Moderator',
+        status: 'Active',
+        createdDate: new Date().toISOString().split('T')[0],
+        lastActive: 'Just now',
+      }
+      setAccounts((prev) => [newAccount, ...prev])
+      setShowCreateModal(false)
+      setStaffForm({ username: '', password: '', fullName: '', email: '' })
+      setStaffFormErrors({})
+      showAlert('success', `Staff account "${newAccount.fullName}" created successfully!`)
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || 'Failed to create staff account. Please try again.'
+      showAlert('error', errorMsg)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleCloseCreateModal = () => {
+    setShowCreateModal(false)
+    setStaffForm({ username: '', password: '', fullName: '', email: '' })
+    setStaffFormErrors({})
+  }
+
+  // ── BAN / UNBAN ───────────────────────────────────
+  const openConfirm = (type, account) => {
+    setConfirmAction({ type, account })
+    setShowConfirmModal(true)
+  }
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction) return
+    const { type, account } = confirmAction
+    setShowConfirmModal(false)
+    setActionLoadingId(account.id)
+
+    try {
+      if (type === 'ban') {
+        await banUserApi(account.id)
+        setAccounts((prev) =>
+          prev.map((a) => (a.id === account.id ? { ...a, status: 'Banned' } : a))
+        )
+        showAlert('success', `"${account.fullName}" has been banned.`)
+      } else if (type === 'unban') {
+        await unbanUserApi(account.id)
+        setAccounts((prev) =>
+          prev.map((a) => (a.id === account.id ? { ...a, status: 'Active' } : a))
+        )
+        showAlert('success', `"${account.fullName}" has been unbanned.`)
+      } else if (type === 'reset-pw') {
+        await resetUserPasswordApi(account.id)
+        showAlert('success', `Password reset email sent to "${account.email}".`)
+      }
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || `Failed to ${type} user. Please try again.`
+      showAlert('error', errorMsg)
+    } finally {
+      setActionLoadingId(null)
+      setConfirmAction(null)
+    }
+  }
+
+  // ── RENDER ────────────────────────────────────────
+  const renderSkeletonRows = () => (
+    Array.from({ length: 6 }).map((_, i) => (
+      <tr key={`skel-${i}`}>
+        <td><div className="admin-skeleton-cell admin-skeleton-cell--sm" /></td>
+        <td><div className="admin-skeleton-cell admin-skeleton-cell--md" /></td>
+        <td><div className="admin-skeleton-cell admin-skeleton-cell--lg" /></td>
+        <td><div className="admin-skeleton-cell admin-skeleton-cell--badge" /></td>
+        <td><div className="admin-skeleton-cell admin-skeleton-cell--sm" /></td>
+        <td><div className="admin-skeleton-cell admin-skeleton-cell--md" /></td>
+        <td><div className="admin-skeleton-cell admin-skeleton-cell--sm" /></td>
+        <td><div className="admin-skeleton-cell admin-skeleton-cell--actions" /></td>
+      </tr>
+    ))
+  )
+
   return (
     <AdminLayout activeNav="account-management">
+      {/* Inline Alert */}
+      {alert && (
+        <div className={`admin-inline-alert admin-inline-alert--${alert.type}`}>
+          {alert.type === 'success' ? '✓' : '✕'} {alert.message}
+        </div>
+      )}
+
+      {/* Mock data indicator */}
+      {isMockData && !isLoading && (
+        <div className="admin-inline-alert admin-inline-alert--info">
+          ⓘ API is unavailable — displaying demo data. Connect the backend to see real accounts.
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="admin-page-header">
         <div className="admin-page-header-info">
           <h1>Account Management</h1>
-          <p>{filteredAccounts.length} accounts found</p>
+          <p>{filteredAccounts.length} account{filteredAccounts.length !== 1 ? 's' : ''} found</p>
         </div>
-        <button className="btn-create-staff">
+        <button className="btn-create-staff" onClick={() => setShowCreateModal(true)}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
@@ -97,29 +301,22 @@ function AccountManagement() {
           <input
             type="text"
             className="admin-search-input"
-            placeholder="Search by name, email, ID..."
+            placeholder="Search by name, email, username..."
             value={searchTerm}
             onChange={handleSearchChange}
           />
         </div>
 
-        <select
-          className="admin-filter-select"
-          value={roleFilter}
-          onChange={handleRoleChange}
-        >
+        <select className="admin-filter-select" value={roleFilter} onChange={handleRoleChange}>
           <option>All Roles</option>
           <option>Reader</option>
           <option>Translator</option>
           <option>Author</option>
           <option>Moderator</option>
+          <option>Admin</option>
         </select>
 
-        <select
-          className="admin-filter-select"
-          value={statusFilter}
-          onChange={handleStatusChange}
-        >
+        <select className="admin-filter-select" value={statusFilter} onChange={handleStatusChange}>
           <option>All Status</option>
           <option>Active</option>
           <option>Banned</option>
@@ -142,73 +339,267 @@ function AccountManagement() {
             </tr>
           </thead>
           <tbody>
-            {paginatedAccounts.map((account) => (
-              <tr key={account.id}>
-                <td className="cell-user-id">{account.id}</td>
-                <td className="cell-name">{account.name}</td>
-                <td className="cell-email">{account.email}</td>
-                <td>
-                  <span className={`role-badge ${account.role.toLowerCase()}`}>
-                    {account.role}
-                  </span>
-                </td>
-                <td>
-                  <span className={`status-badge ${account.status.toLowerCase()}`}>
-                    {account.status}
-                  </span>
-                </td>
-                <td>{account.createdDate}</td>
-                <td>{account.lastActive}</td>
-                <td>
-                  <div className="table-actions">
-                    <button className="btn-table-action reset-pw">Reset PW</button>
-                    {account.status === 'Banned' ? (
-                      <button className="btn-table-action unban">Unban</button>
-                    ) : (
-                      <button className="btn-table-action ban">Ban</button>
-                    )}
+            {isLoading ? (
+              renderSkeletonRows()
+            ) : paginatedAccounts.length === 0 ? (
+              <tr>
+                <td colSpan="8">
+                  <div className="admin-empty-state">
+                    <div className="admin-empty-icon">🔍</div>
+                    <h3>No accounts found</h3>
+                    <p>Try adjusting your search or filter criteria to find what you're looking for.</p>
                   </div>
                 </td>
               </tr>
-            ))}
+            ) : (
+              paginatedAccounts.map((account) => (
+                <tr key={account.id}>
+                  <td className="cell-user-id">{account.userId}</td>
+                  <td className="cell-name">{account.fullName}</td>
+                  <td className="cell-email">{account.email}</td>
+                  <td>
+                    <span className={`role-badge ${(account.role || '').toLowerCase()}`}>
+                      {account.role}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`status-badge ${(account.status || '').toLowerCase()}`}>
+                      {account.status}
+                    </span>
+                  </td>
+                  <td>{formatDate(account.createdDate)}</td>
+                  <td>{account.lastActive}</td>
+                  <td>
+                    <div className="table-actions">
+                      {actionLoadingId === account.id ? (
+                        <span className="admin-spinner-sm" />
+                      ) : (
+                        <>
+                          <button
+                            className="btn-table-action reset-pw"
+                            onClick={() => openConfirm('reset-pw', account)}
+                          >
+                            Reset PW
+                          </button>
+                          {(account.status || '').toLowerCase() === 'banned' ? (
+                            <button
+                              className="btn-table-action unban"
+                              onClick={() => openConfirm('unban', account)}
+                            >
+                              Unban
+                            </button>
+                          ) : (
+                            <button
+                              className="btn-table-action ban"
+                              onClick={() => openConfirm('ban', account)}
+                            >
+                              Ban
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
 
         {/* Table Footer with Pagination */}
-        <div className="admin-table-footer">
-          <span className="showing-info">
-            Showing {startItem}-{endItem} of {filteredAccounts.length}
-          </span>
+        {!isLoading && filteredAccounts.length > 0 && (
+          <div className="admin-table-footer">
+            <span className="showing-info">
+              Showing {startItem}-{endItem} of {filteredAccounts.length}
+            </span>
 
-          <div className="admin-pagination">
-            <button
-              className="page-nav"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => p - 1)}
-            >
-              ← Prev
-            </button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+            <div className="admin-pagination">
               <button
-                key={page}
-                className={currentPage === page ? 'active' : ''}
-                onClick={() => setCurrentPage(page)}
+                className="page-nav"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => p - 1)}
               >
-                {page}
+                ← Prev
               </button>
-            ))}
 
-            <button
-              className="page-nav"
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((p) => p + 1)}
-            >
-              Next →
-            </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  className={currentPage === page ? 'active' : ''}
+                  onClick={() => setCurrentPage(page)}
+                >
+                  {page}
+                </button>
+              ))}
+
+              <button
+                className="page-nav"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => p + 1)}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ═══════════════════════════════════════════════
+          CREATE STAFF MODAL
+          ═══════════════════════════════════════════════ */}
+      {showCreateModal && (
+        <div className="admin-modal-overlay" onClick={handleCloseCreateModal}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <h2 className="admin-modal-title">Create Staff Account</h2>
+              <button className="admin-modal-close" onClick={handleCloseCreateModal}>×</button>
+            </div>
+
+            <div className="admin-modal-body">
+              <div className="admin-form-group">
+                <label className="admin-form-label">
+                  Username <span className="required">*</span>
+                </label>
+                <input
+                  className={`admin-form-input ${staffFormErrors.username ? 'error' : ''}`}
+                  type="text"
+                  placeholder="Enter username"
+                  value={staffForm.username}
+                  onChange={(e) => setStaffForm({ ...staffForm, username: e.target.value })}
+                />
+                {staffFormErrors.username && (
+                  <div className="admin-form-error">{staffFormErrors.username}</div>
+                )}
+              </div>
+
+              <div className="admin-form-group">
+                <label className="admin-form-label">
+                  Full Name <span className="required">*</span>
+                </label>
+                <input
+                  className={`admin-form-input ${staffFormErrors.fullName ? 'error' : ''}`}
+                  type="text"
+                  placeholder="Enter full name"
+                  value={staffForm.fullName}
+                  onChange={(e) => setStaffForm({ ...staffForm, fullName: e.target.value })}
+                />
+                {staffFormErrors.fullName && (
+                  <div className="admin-form-error">{staffFormErrors.fullName}</div>
+                )}
+              </div>
+
+              <div className="admin-form-group">
+                <label className="admin-form-label">
+                  Email <span className="required">*</span>
+                </label>
+                <input
+                  className={`admin-form-input ${staffFormErrors.email ? 'error' : ''}`}
+                  type="email"
+                  placeholder="staff@comiverse.com"
+                  value={staffForm.email}
+                  onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })}
+                />
+                {staffFormErrors.email && (
+                  <div className="admin-form-error">{staffFormErrors.email}</div>
+                )}
+              </div>
+
+              <div className="admin-form-group">
+                <label className="admin-form-label">
+                  Password <span className="required">*</span>
+                </label>
+                <input
+                  className={`admin-form-input ${staffFormErrors.password ? 'error' : ''}`}
+                  type="password"
+                  placeholder="Min. 6 characters"
+                  value={staffForm.password}
+                  onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })}
+                />
+                {staffFormErrors.password && (
+                  <div className="admin-form-error">{staffFormErrors.password}</div>
+                )}
+              </div>
+            </div>
+
+            <div className="admin-modal-footer">
+              <button
+                className="admin-btn admin-btn--secondary"
+                onClick={handleCloseCreateModal}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className="admin-btn admin-btn--primary"
+                onClick={handleCreateStaff}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <><span className="admin-spinner-sm" /> Creating...</>
+                ) : (
+                  'Create Account'
+                )}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════
+          CONFIRMATION MODAL
+          ═══════════════════════════════════════════════ */}
+      {showConfirmModal && confirmAction && (
+        <div className="admin-modal-overlay" onClick={() => setShowConfirmModal(false)}>
+          <div className="admin-modal admin-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-body" style={{ paddingTop: '32px', paddingBottom: '28px' }}>
+              <div className={`admin-confirm-icon ${
+                confirmAction.type === 'ban' ? 'admin-confirm-icon--danger' :
+                confirmAction.type === 'unban' ? 'admin-confirm-icon--info' :
+                'admin-confirm-icon--warning'
+              }`}>
+                {confirmAction.type === 'ban' ? '🚫' : confirmAction.type === 'unban' ? '✅' : '🔑'}
+              </div>
+
+              <div className="admin-confirm-text">
+                <h3>
+                  {confirmAction.type === 'ban' && 'Ban this account?'}
+                  {confirmAction.type === 'unban' && 'Unban this account?'}
+                  {confirmAction.type === 'reset-pw' && 'Reset password?'}
+                </h3>
+                <p>
+                  {confirmAction.type === 'ban' &&
+                    `"${confirmAction.account.fullName}" will be banned and unable to access the platform.`}
+                  {confirmAction.type === 'unban' &&
+                    `"${confirmAction.account.fullName}" will regain access to the platform.`}
+                  {confirmAction.type === 'reset-pw' &&
+                    `A password reset email will be sent to "${confirmAction.account.email}".`}
+                </p>
+              </div>
+
+              <div className="admin-confirm-footer">
+                <button
+                  className="admin-btn admin-btn--secondary"
+                  onClick={() => setShowConfirmModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className={`admin-btn ${
+                    confirmAction.type === 'ban' ? 'admin-btn--danger' :
+                    confirmAction.type === 'unban' ? 'admin-btn--success' :
+                    'admin-btn--primary'
+                  }`}
+                  onClick={handleConfirmAction}
+                >
+                  {confirmAction.type === 'ban' && 'Yes, Ban'}
+                  {confirmAction.type === 'unban' && 'Yes, Unban'}
+                  {confirmAction.type === 'reset-pw' && 'Send Reset Email'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   )
 }

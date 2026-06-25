@@ -1,8 +1,19 @@
 import { Link, useNavigate } from 'react-router-dom'
+import { getAuth, clearAuth } from '../../utils/Auth'
 import '../../assets/style/admin.css'
 
 function AdminLayout({ children, activeNav = 'account-management' }) {
   const navigate = useNavigate()
+
+  // Get current admin user info from localStorage
+  const auth = getAuth()
+  const adminUser = auth?.user || {}
+  const adminName = adminUser.fullName || adminUser.username || 'Admin'
+
+  const handleLogout = () => {
+    clearAuth()
+    navigate('/', { replace: true })
+  }
 
   const navItems = [
     { id: 'statistics', label: 'Statistics Dashboard', icon: 'chart', path: '/admin/statistics' },
@@ -108,17 +119,19 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
 
             <div className="topbar-divider" />
 
-            {/* Profile */}
-            <button className="admin-topbar-btn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {/* Admin Info */}
+            <span className="admin-topbar-user-info">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
-              Profile
-            </button>
+              {adminName}
+            </span>
+
+            <div className="topbar-divider" />
 
             {/* Logout */}
-            <button className="admin-topbar-btn logout">
+            <button className="admin-topbar-btn logout" onClick={handleLogout}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                 <polyline points="16 17 21 12 16 7" />
