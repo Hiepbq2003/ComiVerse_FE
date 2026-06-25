@@ -1,38 +1,38 @@
 import DashboardLayout from '../../components/layout/DashboardLayout'
 
-function Profile({ user, onLogout }) {
+function TranslatorDashboard({ user, onLogout }) {
   return (
     <DashboardLayout 
       user={user} 
       onLogout={onLogout} 
-      badgeClass="reader-badge" 
-      badgeLabel="READER PORTAL"
+      badgeClass="translator-badge" 
+      badgeLabel="TRANSLATION LAB"
     >
       <div className="dashboard-welcome-banner">
-        <h2>My Reader Profile</h2>
-        <p>Resume reading, browse the comic catalog, and manage your bookmarks.</p>
+        <h2>Localization Hub</h2>
+        <p>Translate chapters, manage active translation requests, and maintain glossaries.</p>
       </div>
 
       <div className="dashboard-grid-layout">
         <div className="dashboard-action-card">
-          <div className="card-icon reader">📖</div>
-          <h3>Comic Catalog</h3>
-          <p>Explore 50,000+ comic books, manga, and manhwa titles.</p>
-          <button className="btn-primary card-btn">Browse Catalog</button>
+          <div className="card-icon translator">🌐</div>
+          <h3>Active Projects</h3>
+          <p>Read assigned chapters and upload localized translation assets.</p>
+          <button className="btn-primary card-btn">Open Editor</button>
         </div>
 
         <div className="dashboard-action-card">
-          <div className="card-icon reader">⏳</div>
-          <h3>Reading History</h3>
-          <p>Resume reading: Battle Chronicles (Chapter 184).</p>
-          <button className="btn-primary card-btn">Resume Reading</button>
+          <div className="card-icon translator">📫</div>
+          <h3>License Requests</h3>
+          <p>Coordinate translation permissions requests sent from foreign publishers.</p>
+          <button className="btn-primary card-btn">View Inbound</button>
         </div>
 
         <div className="dashboard-action-card">
-          <div className="card-icon reader">🔖</div>
-          <h3>My Bookmarks</h3>
-          <p>You have 12 saved series bookmarks.</p>
-          <button className="btn-primary card-btn">Manage Bookmarks</button>
+          <div className="card-icon translator">📖</div>
+          <h3>Glossary Database</h3>
+          <p>Collaboratively compile name translations and specific settings sheets.</p>
+          <button className="btn-primary card-btn">Open Database</button>
         </div>
       </div>
 
@@ -50,7 +50,7 @@ function Profile({ user, onLogout }) {
           </div>
           <div className="profile-detail-cell">
             <span className="cell-label">Access Level</span>
-            <span className="cell-value role-text reader">{user.role}</span>
+            <span className="cell-value role-text translator">{user.role}</span>
           </div>
         </div>
       </div>
@@ -58,4 +58,4 @@ function Profile({ user, onLogout }) {
   )
 }
 
-export default Profile
+export default TranslatorDashboard

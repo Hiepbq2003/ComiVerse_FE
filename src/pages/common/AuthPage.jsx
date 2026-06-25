@@ -5,6 +5,10 @@ import Register from './Register'
 import ForgotPassword from './ForgotPassword'
 import ResetPassword from './ResetPassword'
 import Profile from './Profile'
+import AdminDashboard from '../admin/AdminDashboard'
+import AuthorDashboard from '../author/AuthorDashboard'
+import ModeratorDashboard from '../moderator/ModeratorDashboard'
+import TranslatorDashboard from '../translator/TranslatorDashboard'
 import { getAuth, clearAuth, setAuth } from '../../utils/Auth'
 
 function AuthPage() {
@@ -67,6 +71,30 @@ function AuthPage() {
   }
 
 
+  const renderProfileDashboard = () => {
+    if (!user) return null;
+    const roleUpper = (user.role || '').toUpperCase();
+    switch (roleUpper) {
+      case 'ADMIN':
+        return <AdminDashboard user={user} onLogout={handleLogout} />;
+      case 'AUTHOR':
+        return <AuthorDashboard user={user} onLogout={handleLogout} />;
+      case 'MODERATOR':
+      case 'STAFF':
+        return <ModeratorDashboard user={user} onLogout={handleLogout} />;
+      case 'TRANSLATOR':
+        return <TranslatorDashboard user={user} onLogout={handleLogout} />;
+      case 'READER':
+      case 'USER':
+      default:
+        return <Profile user={user} onLogout={handleLogout} />;
+    }
+  };
+
+  if (view === 'profile' && user) {
+    return renderProfileDashboard();
+  }
+
   return (
     <AuthLayout alert={alert}>
       {view === 'oauth-loading' && (
@@ -75,10 +103,6 @@ function AuthPage() {
           <h2>Verifying OAuth2 Session</h2>
           <p>Please wait while we log you in securely...</p>
         </div>
-      )}
-
-      {view === 'profile' && user && (
-        <Profile user={user} onLogout={handleLogout} />
       )}
 
       {view === 'signin' && (

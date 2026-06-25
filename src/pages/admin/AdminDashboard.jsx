@@ -1,38 +1,38 @@
 import DashboardLayout from '../../components/layout/DashboardLayout'
 
-function Profile({ user, onLogout }) {
+function AdminDashboard({ user, onLogout }) {
   return (
     <DashboardLayout 
       user={user} 
       onLogout={onLogout} 
-      badgeClass="reader-badge" 
-      badgeLabel="READER PORTAL"
+      badgeClass="admin-badge" 
+      badgeLabel="ADMIN CONSOLE"
     >
       <div className="dashboard-welcome-banner">
-        <h2>My Reader Profile</h2>
-        <p>Resume reading, browse the comic catalog, and manage your bookmarks.</p>
+        <h2>System Control Console</h2>
+        <p>Manage system configurations, user privileges, and core system health checks.</p>
       </div>
 
       <div className="dashboard-grid-layout">
         <div className="dashboard-action-card">
-          <div className="card-icon reader">📖</div>
-          <h3>Comic Catalog</h3>
-          <p>Explore 50,000+ comic books, manga, and manhwa titles.</p>
-          <button className="btn-primary card-btn">Browse Catalog</button>
+          <div className="card-icon admin">👥</div>
+          <h3>User Management</h3>
+          <p>Create, verify, suspend, or delete reader and creator credentials.</p>
+          <button className="btn-primary card-btn">Launch Console</button>
         </div>
 
         <div className="dashboard-action-card">
-          <div className="card-icon reader">⏳</div>
-          <h3>Reading History</h3>
-          <p>Resume reading: Battle Chronicles (Chapter 184).</p>
-          <button className="btn-primary card-btn">Resume Reading</button>
+          <div className="card-icon admin">📝</div>
+          <h3>System Audit Logs</h3>
+          <p>Audit user actions, track DDL database schemas, and monitor SMTP transactions.</p>
+          <button className="btn-primary card-btn">Open Audit Logs</button>
         </div>
 
         <div className="dashboard-action-card">
-          <div className="card-icon reader">🔖</div>
-          <h3>My Bookmarks</h3>
-          <p>You have 12 saved series bookmarks.</p>
-          <button className="btn-primary card-btn">Manage Bookmarks</button>
+          <div className="card-icon admin">⚙️</div>
+          <h3>Global Settings</h3>
+          <p>Configure Google client IDs, JWT token lifespan, and environment variables.</p>
+          <button className="btn-primary card-btn">Adjust Settings</button>
         </div>
       </div>
 
@@ -50,7 +50,7 @@ function Profile({ user, onLogout }) {
           </div>
           <div className="profile-detail-cell">
             <span className="cell-label">Access Level</span>
-            <span className="cell-value role-text reader">{user.role}</span>
+            <span className="cell-value role-text admin">{user.role}</span>
           </div>
         </div>
       </div>
@@ -58,4 +58,4 @@ function Profile({ user, onLogout }) {
   )
 }
 
-export default Profile
+export default AdminDashboard
