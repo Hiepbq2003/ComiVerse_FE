@@ -1,38 +1,38 @@
 import DashboardLayout from '../../components/layout/DashboardLayout'
 
-function Profile({ user, onLogout }) {
+function ModeratorDashboard({ user, onLogout }) {
   return (
     <DashboardLayout 
       user={user} 
       onLogout={onLogout} 
-      badgeClass="reader-badge" 
-      badgeLabel="READER PORTAL"
+      badgeClass="moderator-badge" 
+      badgeLabel="MODERATION CENTER"
     >
       <div className="dashboard-welcome-banner">
-        <h2>My Reader Profile</h2>
-        <p>Resume reading, browse the comic catalog, and manage your bookmarks.</p>
+        <h2>Community Moderation Center</h2>
+        <p>Review flagged posts, approve new chapter submissions, and coordinate guidelines checks.</p>
       </div>
 
       <div className="dashboard-grid-layout">
         <div className="dashboard-action-card">
-          <div className="card-icon reader">📖</div>
-          <h3>Comic Catalog</h3>
-          <p>Explore 50,000+ comic books, manga, and manhwa titles.</p>
-          <button className="btn-primary card-btn">Browse Catalog</button>
+          <div className="card-icon moderator">🛡️</div>
+          <h3>Approvals Queue</h3>
+          <p>Review new comic chapters submitted by creators for licensing checks.</p>
+          <button className="btn-primary card-btn">Launch Queue</button>
         </div>
 
         <div className="dashboard-action-card">
-          <div className="card-icon reader">⏳</div>
-          <h3>Reading History</h3>
-          <p>Resume reading: Battle Chronicles (Chapter 184).</p>
-          <button className="btn-primary card-btn">Resume Reading</button>
+          <div className="card-icon moderator">💬</div>
+          <h3>Reported Comments</h3>
+          <p>Read flagged comments and take appropriate community behavior actions.</p>
+          <button className="btn-primary card-btn">Manage Flags</button>
         </div>
 
         <div className="dashboard-action-card">
-          <div className="card-icon reader">🔖</div>
-          <h3>My Bookmarks</h3>
-          <p>You have 12 saved series bookmarks.</p>
-          <button className="btn-primary card-btn">Manage Bookmarks</button>
+          <div className="card-icon moderator">📜</div>
+          <h3>Terms Config</h3>
+          <p>Update guidelines rules for comic submissions and comment policies.</p>
+          <button className="btn-primary card-btn">Edit Rules</button>
         </div>
       </div>
 
@@ -50,7 +50,7 @@ function Profile({ user, onLogout }) {
           </div>
           <div className="profile-detail-cell">
             <span className="cell-label">Access Level</span>
-            <span className="cell-value role-text reader">{user.role}</span>
+            <span className="cell-value role-text moderator">{user.role}</span>
           </div>
         </div>
       </div>
@@ -58,4 +58,4 @@ function Profile({ user, onLogout }) {
   )
 }
 
-export default Profile
+export default ModeratorDashboard
