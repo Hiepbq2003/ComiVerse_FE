@@ -193,7 +193,14 @@ function AccountManagement() {
       setStaffFormErrors({})
       showAlert('success', `Staff account "${newAccount.fullName}" created successfully!`)
     } catch (err) {
-      const errorMsg = err.response?.data?.message || 'Failed to create staff account. Please try again.'
+      let errorMsg = 'Failed to create staff account. Please try again.';
+      if (err.response?.data) {
+        if (err.response.data.errors) {
+          errorMsg = Object.values(err.response.data.errors).join(', ');
+        } else if (err.response.data.message) {
+          errorMsg = err.response.data.message;
+        }
+      }
       showAlert('error', errorMsg)
     } finally {
       setIsSubmitting(false)
