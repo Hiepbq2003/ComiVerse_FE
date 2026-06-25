@@ -219,14 +219,16 @@ function AccountManagement() {
       setModalError(null)
       showAlert('success', `Staff account "${newAccount.fullName}" created successfully!`)
     } catch (err) {
+      let errorMsg = 'Failed to create staff account. Please try again.'
       const validationErrors = err.response?.data?.errors
+      
       if (validationErrors) {
         setStaffFormErrors(validationErrors)
-        setModalError('Validation failed. Please correct the errors below.')
-      } else {
-        const errorMsg = err.response?.data?.message || 'Failed to create staff account. Please try again.'
-        setModalError(errorMsg)
+        errorMsg = err.response.data.message || 'Validation failed. Please correct the errors below.'
+      } else if (err.response?.data?.message) {
+        errorMsg = err.response.data.message
       }
+      setModalError(errorMsg)
     } finally {
       setIsSubmitting(false)
     }

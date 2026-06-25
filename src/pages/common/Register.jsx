@@ -14,10 +14,10 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
     setLoading(true)
     try {
       const data = await registerApi({
-        username: form.username,
-        fullName: form.fullName,
-        email: form.email,
-        phone: form.phone,
+        username: form.username.trim(),
+        fullName: form.fullName.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim() ? form.phone.trim() : null,
         password: form.password
       });
 
@@ -32,7 +32,14 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
       onRegisterSuccess(userData);
       showAlert('success', 'Account registered successfully!');
     } catch (err) {
-      const errMessage = err.response?.data?.message || 'Registration failed.';
+      let errMessage = 'Registration failed.';
+      if (err.response?.data) {
+        if (err.response.data.errors) {
+          errMessage = Object.values(err.response.data.errors).join(', ');
+        } else if (err.response.data.message) {
+          errMessage = err.response.data.message;
+        }
+      }
       showAlert('error', errMessage);
     } finally {
       setLoading(false)
