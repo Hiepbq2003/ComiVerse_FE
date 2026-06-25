@@ -36,7 +36,7 @@ function AuthPage() {
             username: 'google_user',
             fullName: 'Google Authenticated User',
             email: 'user@gmail.com',
-            role: 'USER'
+            role: 'Reader'
           };
           setAuth(token, googleUser);
           setUser(googleUser);

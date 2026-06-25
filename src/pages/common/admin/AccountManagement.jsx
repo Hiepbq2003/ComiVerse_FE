@@ -38,7 +38,7 @@ function AccountManagement() {
   const [confirmAction, setConfirmAction] = useState(null) // { type: 'ban'|'unban'|'reset-pw', account }
 
   // Create staff form
-  const [staffForm, setStaffForm] = useState({ username: '', password: '', fullName: '', email: '', role: 'STAFF' })
+  const [staffForm, setStaffForm] = useState({ username: '', password: '', fullName: '', email: '', role: 'Moderator' })
   const [staffFormErrors, setStaffFormErrors] = useState({})
   const [modalError, setModalError] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -68,7 +68,7 @@ function AccountManagement() {
         fullName: acc.fullName || acc.name || acc.username,
         username: acc.username,
         email: acc.email,
-        role: acc.role?.roleName || acc.role || acc.roleName || 'USER',
+        role: acc.role?.roleName || acc.role || acc.roleName || 'Reader',
         status: acc.status || (acc.banned ? 'Banned' : 'Active'),
         createdDate: acc.createdDate || acc.createdAt || '-',
         lastActive: acc.lastActive || acc.lastLogin || '-',
@@ -208,7 +208,7 @@ function AccountManagement() {
       }
       setAccounts((prev) => [newAccount, ...prev])
       setShowCreateModal(false)
-      setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'STAFF' })
+      setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'Moderator' })
       setStaffFormErrors({})
       setModalError(null)
       showAlert('success', `Account "${newAccount.fullName}" created successfully!`)
@@ -230,7 +230,7 @@ function AccountManagement() {
 
   const handleCloseCreateModal = () => {
     setShowCreateModal(false)
-    setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'STAFF' })
+    setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'Moderator' })
     setStaffFormErrors({})
     setModalError(null)
   }
@@ -338,13 +338,11 @@ function AccountManagement() {
 
         <select className="admin-filter-select" value={roleFilter} onChange={handleRoleChange}>
           <option>All Roles</option>
-          <option>ADMIN</option>
-          <option>STAFF</option>
-          <option>USER</option>
-          <option>Reader</option>
-          <option>Translator</option>
-          <option>Author</option>
+          <option>Admin</option>
           <option>Moderator</option>
+          <option>Author</option>
+          <option>Translator</option>
+          <option>Reader</option>
         </select>
 
         <select className="admin-filter-select" value={statusFilter} onChange={handleStatusChange}>
@@ -551,9 +549,11 @@ function AccountManagement() {
                   onChange={(e) => handleInputChange('role', e.target.value)}
                   style={{ cursor: 'pointer' }}
                 >
-                  <option value="STAFF" style={{ background: '#1f1a24' }}>STAFF</option>
-                  <option value="ADMIN" style={{ background: '#1f1a24' }}>ADMIN</option>
-                  <option value="USER" style={{ background: '#1f1a24' }}>USER</option>
+                  <option value="Moderator" style={{ background: '#1f1a24' }}>Moderator</option>
+                  <option value="Author" style={{ background: '#1f1a24' }}>Author</option>
+                  <option value="Translator" style={{ background: '#1f1a24' }}>Translator</option>
+                  <option value="Admin" style={{ background: '#1f1a24' }}>Admin</option>
+                  <option value="Reader" style={{ background: '#1f1a24' }}>Reader</option>
                 </select>
               </div>
 

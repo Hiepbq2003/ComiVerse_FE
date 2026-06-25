@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getAuth, clearAuth } from '../../utils/Auth'
 import '../../assets/style/admin.css'
@@ -9,6 +10,12 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
   const auth = getAuth()
   const adminUser = auth?.user || {}
   const adminName = adminUser.fullName || adminUser.username || 'Admin'
+
+  useEffect(() => {
+    if (!auth || !auth.token || !auth.user || auth.user.role?.toLowerCase() !== 'admin') {
+      navigate('/', { replace: true })
+    }
+  }, [auth, navigate])
 
   const handleLogout = () => {
     clearAuth()
