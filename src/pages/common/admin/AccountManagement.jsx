@@ -316,7 +316,7 @@ function AccountManagement() {
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
-          Create New Account
+          Create User Account
         </button>
       </div>
 
@@ -388,7 +388,7 @@ function AccountManagement() {
                   <td className="cell-email">{account.email}</td>
                   <td>
                     <span className={`role-badge ${(account.role || '').toLowerCase()}`}>
-                      {account.role}
+                      {account.role ? (account.role.charAt(0).toUpperCase() + account.role.slice(1).toLowerCase()) : ''}
                     </span>
                   </td>
                   <td>
@@ -480,7 +480,7 @@ function AccountManagement() {
         <div className="admin-modal-overlay" onClick={handleCloseCreateModal}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-header">
-              <h2 className="admin-modal-title">Create New Account</h2>
+              <h2 className="admin-modal-title">Create User Account</h2>
               <button className="admin-modal-close" onClick={handleCloseCreateModal}>×</button>
             </div>
 
