@@ -10,7 +10,8 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
     e.preventDefault()
     setLoading(true)
     try {
-      const data = await loginApi(form.username, form.password);
+      const response = await loginApi(form.username.trim(), form.password)
+      const data = response.data || response
       const userData = {
         userId: data.userId,
         username: data.username,
