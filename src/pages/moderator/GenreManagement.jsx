@@ -1,20 +1,29 @@
-import { useState } from 'react'
-
-const INITIAL_GENRES = [
-  { name: 'Action', count: 245 },
-  { name: 'Adventure', count: 189 },
-  { name: 'Fantasy', count: 312 },
-  { name: 'Romance', count: 156 },
-  { name: 'Mystery', count: 98 },
-  { name: 'Cultivation', count: 201 },
-  { name: 'Drama', count: 134 },
-  { name: 'Comedy', count: 87 }
-]
+import { useState, useEffect } from 'react'
+import { getAllGenresApi, createGenreApi, updateGenreApi, deleteGenreApi } from '../../services/api/GenreApi'
+import { toast } from 'react-toastify'
 
 function GenreManagement() {
-  const [genres, setGenres] = useState(INITIAL_GENRES)
+  const [genres, setGenres] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const handleAddGenre = () => {
+  useEffect(() => {
+    fetchGenres()
+  }, [])
+
+  const fetchGenres = async () => {
+    try {
+      setLoading(true)
+      const data = await getAllGenresApi()
+      setGenres(data || [])
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to load genres!')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAddGenre = async () => {
     const newName = prompt('Enter new genre name:')
     if (newName && newName.trim()) {
       const exists = genres.find(g => g.name.toLowerCase() === newName.trim().toLowerCase())
@@ -22,22 +31,49 @@ function GenreManagement() {
         alert('Genre already exists!')
         return
       }
-      setGenres(prev => [...prev, { name: newName.trim(), count: 0 }])
+      try {
+        const newGenre = await createGenreApi({
+          name: newName.trim(),
+          slug: newName.trim().toLowerCase().replace(/\s+/g, '-')
+        })
+        setGenres(prev => [...prev, newGenre])
+        toast.success('Genre added successfully!')
+      } catch (err) {
+        console.error(err)
+        toast.error('Failed to add genre!')
+      }
     }
   }
 
-  const handleEditGenre = (genre) => {
+  const handleEditGenre = async (genre) => {
     const newName = prompt('Edit genre name:', genre.name)
     if (newName && newName.trim() && newName.trim() !== genre.name) {
-      setGenres(prev =>
-        prev.map(g => (g.name === genre.name ? { ...g, name: newName.trim() } : g))
-      )
+      try {
+        const updated = await updateGenreApi(genre.id, {
+          name: newName.trim(),
+          slug: newName.trim().toLowerCase().replace(/\s+/g, '-')
+        })
+        setGenres(prev =>
+          prev.map(g => (g.id === genre.id ? updated : g))
+        )
+        toast.success('Genre updated successfully!')
+      } catch (err) {
+        console.error(err)
+        toast.error('Failed to update genre!')
+      }
     }
   }
 
-  const handleDeleteGenre = (name) => {
-    if (window.confirm(`Are you sure you want to delete the genre "${name}"?`)) {
-      setGenres(prev => prev.filter(g => g.name !== name))
+  const handleDeleteGenre = async (genre) => {
+    if (window.confirm(`Are you sure you want to delete the genre "${genre.name}"?`)) {
+      try {
+        await deleteGenreApi(genre.id)
+        setGenres(prev => prev.filter(g => g.id !== genre.id))
+        toast.success('Genre deleted successfully!')
+      } catch (err) {
+        console.error(err)
+        toast.error('Failed to delete genre!')
+      }
     }
   }
 
@@ -57,32 +93,38 @@ function GenreManagement() {
         </button>
       </div>
 
-      <div className="genres-list-grid">
-        {genres.map((g, idx) => (
-          <div className="genre-mgmt-card" key={idx}>
-            <div className="genre-mgmt-info">
-              <h4>{g.name}</h4>
-              <p>{g.count} comics</p>
+      {loading ? (
+        <div className="moderator-empty-state">
+          <p>Loading genres...</p>
+        </div>
+      ) : (
+        <div className="genres-list-grid">
+          {genres.map((g, idx) => (
+            <div className="genre-mgmt-card" key={g.id || idx}>
+              <div className="genre-mgmt-info">
+                <h4>{g.name}</h4>
+                <p>{g.count || 0} comics</p>
+              </div>
+              <div className="genre-mgmt-actions">
+                <button 
+                  className="comic-btn-action" 
+                  onClick={() => handleEditGenre(g)}
+                  title="Edit Genre"
+                >
+                  ✏️ Edit
+                </button>
+                <button 
+                  className="comic-btn-action archive" 
+                  onClick={() => handleDeleteGenre(g)}
+                  title="Delete Genre"
+                >
+                  🗑️
+                </button>
+              </div>
             </div>
-            <div className="genre-mgmt-actions">
-              <button 
-                className="comic-btn-action" 
-                onClick={() => handleEditGenre(g)}
-                title="Edit Genre"
-              >
-                ✏️ Edit
-              </button>
-              <button 
-                className="comic-btn-action archive" 
-                onClick={() => handleDeleteGenre(g.name)}
-                title="Delete Genre"
-              >
-                🗑️
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

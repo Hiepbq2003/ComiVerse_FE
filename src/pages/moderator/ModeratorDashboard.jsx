@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import '../../assets/style/moderator.css'
 import ReviewQueue from './ReviewQueue'
 import ComicManagement from './ComicManagement'
@@ -6,239 +6,10 @@ import GenreManagement from './GenreManagement'
 import ProjectTeams from './ProjectTeams'
 import ChatMonitor from './ChatMonitor'
 import ForumModeration from './ForumModeration'
-
-const INITIAL_SUBMISSIONS = [
-  // Translator Queue (Group submissions)
-  {
-    id: 'trans-1',
-    title: 'Invincible Sword God',
-    chapter: 'Chapter 46',
-    submittedBy: 'Dragon Group',
-    queueType: 'translator',
-    timeLabel: '2 hours ago',
-    timestamp: Date.now() - 2 * 60 * 60 * 1000,
-    words: '3,200 words',
-    priority: 'High',
-    flags: 0,
-    status: 'pending',
-    cover: '⚔️',
-    content: `Chapter 46: The Sword Sect's Challenge\n\nIn the depths of the Sword Sect, the sword Qi raged like a tempest. Xiao Chen stood at the center, holding his rusted blade. The disciples around him laughed, whispering about his lack of talent.\n\n"You think you can challenge the first disciple with that garbage?" one mocked.\n\nXiao Chen didn't answer. Slowly, he unsheathed his sword. In an instant, a blinding light filled the courtyard, and the laughter ceased...`
-  },
-  {
-    id: 'trans-2',
-    title: 'Spirit Recovery',
-    chapter: 'Chapter 33',
-    submittedBy: 'Jade Group',
-    queueType: 'translator',
-    timeLabel: '5 hours ago',
-    timestamp: Date.now() - 5 * 60 * 60 * 1000,
-    words: '2,800 words',
-    priority: 'Medium',
-    flags: 0,
-    status: 'pending',
-    cover: '🔮',
-    content: `Chapter 33: Unleashing the Seal\n\nThe ancient seal on the cavern wall began to crack. A dark violet aura leaked through, filling the cave with a suffocating chill. Ye Fan braced himself, chanting the spiritual purification mantra.\n\n"Hold the line!" he shouted to his team. The spirit beasts were waking up, and there was no turning back...`
-  },
-  {
-    id: 'trans-3',
-    title: 'Demon King Reborn',
-    chapter: 'Chapter 19',
-    submittedBy: 'Phoenix Group',
-    queueType: 'translator',
-    timeLabel: '1 day ago',
-    timestamp: Date.now() - 24 * 60 * 60 * 1000,
-    words: '3,500 words',
-    priority: 'Low',
-    flags: 2,
-    status: 'pending',
-    cover: '👑',
-    content: `Chapter 19: Whispers of Treason\n\nLord Kael sat on the iron throne, staring at the empty hall. His shadow guards reported that the southern dukes were secretly gathering troops. The rebel army was forming.\n\n"Let them come," the Demon King whispered. "They forgot who ruled this continent for a thousand years..."`
-  },
-  {
-    id: 'trans-approved-1',
-    title: 'Apotheosis',
-    chapter: 'Chapter 800',
-    submittedBy: 'Valkyrie Scans',
-    queueType: 'translator',
-    timeLabel: '12 hours ago',
-    timestamp: Date.now() - 12 * 60 * 60 * 1000,
-    words: '4,100 words',
-    priority: 'High',
-    flags: 0,
-    status: 'approved',
-    cover: '⚡',
-    content: `Chapter 800: Ascending the Divine Realm...`
-  },
-  {
-    id: 'trans-rejected-1',
-    title: 'Trash Novel Hero',
-    chapter: 'Chapter 3',
-    submittedBy: 'MangaMinds',
-    queueType: 'translator',
-    timeLabel: '3 days ago',
-    timestamp: Date.now() - 3 * 24 * 60 * 60 * 1000,
-    words: '1,900 words',
-    priority: 'Medium',
-    flags: 5,
-    status: 'rejected',
-    cover: '🗑️',
-    rejectionReason: 'Machine translation with multiple grammar violations and illegible formatting.',
-    content: `Chapter 3: System Awakening...`
-  },
-
-  // Author Queue (Original Creator submissions)
-  {
-    id: 'auth-1',
-    title: 'Martial Emperor',
-    chapter: 'Chapter 110',
-    submittedBy: 'Author: SwordMaster',
-    queueType: 'author',
-    timeLabel: '1 hour ago',
-    timestamp: Date.now() - 1 * 60 * 60 * 1000,
-    words: '4,200 words',
-    priority: 'High',
-    flags: 0,
-    status: 'pending',
-    cover: '☯️',
-    content: `Chapter 110: Grand Cultivation Stage\n\nThe sky split open, revealing a celestial gate. The thunder tribulation descended upon Lin Feng. Six lightning strikes had already hit, leaving his body charred but his resolve unshaken.\n\n"Is this the limit of the heavens?" Lin Feng roared, raising both fists to meet the final thunderbolt...`
-  },
-  {
-    id: 'auth-2',
-    title: 'Rebirth of the Urban Immortal',
-    chapter: 'Chapter 14',
-    submittedBy: 'Author: CultivatorFan',
-    queueType: 'author',
-    timeLabel: '3 hours ago',
-    timestamp: Date.now() - 3 * 60 * 60 * 1000,
-    words: '3,100 words',
-    priority: 'Medium',
-    flags: 0,
-    status: 'pending',
-    cover: '🏢',
-    content: `Chapter 14: Confronting the Young Master\n\nIn the luxury VIP room of the Dragon Club, Young Master Zhao sneered as he tapped his fingers. "A poor student like you dares to talk back to me?"\n\nChen Fan smiled faintly. "In my eyes, you and your family are nothing more than dust on the road..."`
-  },
-  {
-    id: 'auth-3',
-    title: 'Supreme God Domain',
-    chapter: 'Chapter 5',
-    submittedBy: 'Author: GodRealm',
-    queueType: 'author',
-    timeLabel: '2 days ago',
-    timestamp: Date.now() - 2 * 24 * 60 * 60 * 1000,
-    words: '2,500 words',
-    priority: 'Low',
-    flags: 1,
-    status: 'pending',
-    cover: '🛡️',
-    content: `Chapter 5: The Forbidden Zone\n\nEntering the valley of skeletons, the air smelled of ash and copper. Every step Ye Chen took echoed through the silent rocks. A dragon skull lay half-buried in the sand...`
-  },
-  {
-    id: 'auth-approved-1',
-    title: 'Peerless Battle God',
-    chapter: 'Chapter 5',
-    submittedBy: 'Author: BattleKing',
-    queueType: 'author',
-    timeLabel: '2 days ago',
-    timestamp: Date.now() - 2 * 24 * 60 * 60 * 1000,
-    words: '2,200 words',
-    priority: 'Medium',
-    flags: 0,
-    status: 'approved',
-    cover: '🔥',
-    content: `Chapter 5: Gathering Power...`
-  }
-]
-
-const INITIAL_COMICS = [
-  {
-    id: 'comic-1',
-    title: 'Invincible Sword God',
-    author: 'Wu Xing',
-    projectTeam: 'Dragon Group',
-    chapters: 45,
-    views: '1.2M',
-    status: 'Ongoing',
-    genres: ['Action', 'Fantasy']
-  },
-  {
-    id: 'comic-2',
-    title: 'Spirit Recovery',
-    author: 'Chen Wei',
-    projectTeam: 'Jade Group',
-    chapters: 32,
-    views: '890K',
-    status: 'Ongoing',
-    genres: ['Adventure', 'Mystery']
-  },
-  {
-    id: 'comic-3',
-    title: 'Demon King Reborn',
-    author: 'Li Ming',
-    projectTeam: 'Phoenix Group',
-    chapters: 18,
-    views: '654K',
-    status: 'Paused',
-    genres: ['Fantasy', 'Drama']
-  },
-  {
-    id: 'comic-4',
-    title: 'Heavenly Dao',
-    author: 'Zhang Yu',
-    projectTeam: 'Dragon Group',
-    chapters: 120,
-    views: '2.5M',
-    status: 'Completed',
-    genres: ['Cultivation', 'Action']
-  }
-]
-
-const INITIAL_PROJECT_TEAMS = [
-  {
-    id: 'team-1',
-    title: 'Dragon Group',
-    comicName: 'Invincible Sword God',
-    status: 'Active',
-    membersCount: 7,
-    chaptersCount: 45,
-    progress: 68,
-    leaderName: 'John Smith',
-    leaderInitials: 'JS',
-    deadline: 'Jul 15, 2024',
-    sourceLang: 'Japanese',
-    targetLang: 'English',
-    priority: 'High'
-  },
-  {
-    id: 'team-2',
-    title: 'Jade Group',
-    comicName: 'Spirit Recovery',
-    status: 'Active',
-    membersCount: 5,
-    chaptersCount: 32,
-    progress: 42,
-    leaderName: 'Emily Brown',
-    leaderInitials: 'EB',
-    deadline: 'Aug 1, 2024',
-    sourceLang: 'Chinese',
-    targetLang: 'English',
-    priority: 'Medium'
-  },
-  {
-    id: 'team-3',
-    title: 'Phoenix Group',
-    comicName: 'Demon King Reborn',
-    status: 'Paused',
-    membersCount: 4,
-    chaptersCount: 18,
-    progress: 25,
-    leaderName: 'Li Ming',
-    leaderInitials: 'LM',
-    deadline: 'Sep 10, 2024',
-    sourceLang: 'Korean',
-    targetLang: 'English',
-    priority: 'Low'
-  }
-]
+import { getAllComicsApi, updateComicApi, deleteComicApi } from '../../services/api/ComicApi'
+import { getAllProjectTeamsApi, createProjectTeamApi, deleteProjectTeamApi } from '../../services/api/ProjectTeamApi'
+import { getAllSubmissionsApi, approveSubmissionApi, rejectSubmissionApi } from '../../services/api/SubmissionApi'
+import { toast } from 'react-toastify'
 
 const AVAILABLE_TRANSLATORS = [
   { name: 'John Smith', initials: 'JS' },
@@ -251,10 +22,11 @@ const AVAILABLE_TRANSLATORS = [
 function ModeratorDashboard({ user, onLogout }) {
   const [activeNav, setActiveNav] = useState('review-queue') // 'dashboard' | 'review-queue' | 'comic-management' | etc.
   
-  // Decoupled shared states
-  const [submissions, setSubmissions] = useState(INITIAL_SUBMISSIONS)
-  const [comics, setComics] = useState(INITIAL_COMICS)
-  const [projectTeams, setProjectTeams] = useState(INITIAL_PROJECT_TEAMS)
+  // Dynamic API backed states
+  const [submissions, setSubmissions] = useState([])
+  const [comics, setComics] = useState([])
+  const [projectTeams, setProjectTeams] = useState([])
+  const [loading, setLoading] = useState(true)
 
   // Creation Team Modal Shared triggers
   const [showCreateTeamModal, setShowCreateTeamModal] = useState(false)
@@ -271,6 +43,29 @@ function ModeratorDashboard({ user, onLogout }) {
 
   const userName = user.fullName || user.username || 'Moderator'
 
+  useEffect(() => {
+    fetchAllData()
+  }, [])
+
+  const fetchAllData = async () => {
+    try {
+      setLoading(true)
+      const [comicsData, teamsData, submissionsData] = await Promise.all([
+        getAllComicsApi(),
+        getAllProjectTeamsApi(),
+        getAllSubmissionsApi()
+      ])
+      setComics(comicsData || [])
+      setProjectTeams(teamsData || [])
+      setSubmissions(submissionsData || [])
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to retrieve control panel data from server.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const getNavBadgeCount = (nav) => {
     if (nav === 'review-queue') {
       return submissions.filter(item => item.status === 'pending').length
@@ -280,69 +75,50 @@ function ModeratorDashboard({ user, onLogout }) {
     return 0
   }
 
-  // State setters passed down
-  const handleApprove = (id) => {
-    let approvedItem = null
-    setSubmissions(prev =>
-      prev.map(item => {
-        if (item.id === id) {
-          approvedItem = item
-          return { ...item, status: 'approved' }
-        }
-        return item
-      })
-    )
-
-    setTimeout(() => {
-      const itemToProcess = approvedItem || submissions.find(item => item.id === id)
-      if (itemToProcess && itemToProcess.queueType === 'author') {
-        setComics(prevComics => {
-          const exists = prevComics.find(c => c.title.toLowerCase() === itemToProcess.title.toLowerCase())
-          if (exists) {
-            return prevComics.map(c =>
-              c.title.toLowerCase() === itemToProcess.title.toLowerCase()
-                ? { ...c, chapters: c.chapters + 1 }
-                : c
-            )
-          } else {
-            return [
-              ...prevComics,
-              {
-                id: `comic-${Date.now()}`,
-                title: itemToProcess.title,
-                author: itemToProcess.submittedBy.replace('Author: ', ''),
-                projectTeam: '-',
-                chapters: 1,
-                views: '0',
-                status: 'Ongoing',
-                genres: ['Action', 'Fantasy']
-              }
-            ]
-          }
-        })
-      }
-    }, 50)
+  // API Call Integration Handlers
+  const handleApprove = async (id) => {
+    try {
+      await approveSubmissionApi(id)
+      toast.success('Submission approved!')
+      await fetchAllData() // Reload lists to sync all changes
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to approve submission.')
+    }
   }
 
-  const handleConfirmReject = (id, reason) => {
-    setSubmissions(prev =>
-      prev.map(item =>
-        item.id === id
-          ? { ...item, status: 'rejected', rejectionReason: reason.trim() || 'No reason provided.' }
-          : item
-      )
-    )
+  const handleConfirmReject = async (id, reason) => {
+    try {
+      await rejectSubmissionApi(id, reason)
+      toast.success('Submission rejected.')
+      await fetchAllData()
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to reject submission.')
+    }
   }
 
-  const handleSaveEditComic = (id, updatedFields) => {
-    setComics(prev =>
-      prev.map(c => (c.id === id ? { ...c, ...updatedFields } : c))
-    )
+  const handleSaveEditComic = async (id, updatedFields) => {
+    try {
+      await updateComicApi(id, updatedFields)
+      toast.success('Comic updated successfully.')
+      await fetchAllData()
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to save comic updates.')
+    }
   }
 
-  const handleArchiveComic = (id) => {
+  const handleArchiveComic = async (id) => {
     if (window.confirm('Are you sure you want to archive this comic?')) {
-      setComics(prev => prev.filter(c => c.id !== id))
+      try {
+        await deleteComicApi(id)
+        toast.success('Comic archived successfully.')
+        await fetchAllData()
+      } catch (err) {
+        console.error(err)
+        toast.error('Failed to archive comic.')
+      }
     }
   }
 
@@ -360,10 +136,9 @@ function ModeratorDashboard({ user, onLogout }) {
     setShowCreateTeamModal(true)
   }
 
-  const handleCreateProjectTeam = () => {
+  const handleCreateProjectTeam = async () => {
     const leaderObj = AVAILABLE_TRANSLATORS.find(t => t.name === createTeamForm.leaderName) || { name: 'John Smith', initials: 'JS' }
     const newTeam = {
-      id: `team-${Date.now()}`,
       title: createTeamForm.title.trim() || `${createTeamForm.comicName} Team`,
       comicName: createTeamForm.comicName,
       status: 'Active',
@@ -375,30 +150,53 @@ function ModeratorDashboard({ user, onLogout }) {
       deadline: createTeamForm.deadline || 'unspecified',
       sourceLang: createTeamForm.sourceLang,
       targetLang: createTeamForm.targetLang,
-      priority: createTeamForm.priority
+      priority: createTeamForm.priority,
+      cover: '🔮',
+      description: `Official translation team for ${createTeamForm.comicName}.`,
+      assignedToMe: true
     }
 
-    setProjectTeams(prev => [newTeam, ...prev])
-    
-    setComics(prevComics =>
-      prevComics.map(c =>
-        c.title.toLowerCase() === createTeamForm.comicName.toLowerCase()
-          ? { ...c, projectTeam: createTeamForm.title.trim() || `${createTeamForm.comicName} Team` }
-          : c
-      )
-    )
+    try {
+      await createProjectTeamApi(newTeam)
+      
+      // Also update the comic's projectTeam field dynamically in the database
+      const comicToUpdate = comics.find(c => c.title.toLowerCase() === createTeamForm.comicName.toLowerCase())
+      if (comicToUpdate) {
+        await updateComicApi(comicToUpdate.id, {
+          ...comicToUpdate,
+          projectTeam: newTeam.title
+        })
+      }
 
-    setShowCreateTeamModal(false)
+      toast.success('Project team created successfully!')
+      setShowCreateTeamModal(false)
+      await fetchAllData()
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to create translation project team.')
+    }
   }
 
-  const handleRemoveProjectTeam = (id, teamTitle, comicName) => {
+  const handleRemoveProjectTeam = async (id, teamTitle, comicName) => {
     if (window.confirm(`Are you sure you want to remove ${teamTitle}?`)) {
-      setProjectTeams(prev => prev.filter(t => t.id !== id))
-      setComics(prevComics =>
-        prevComics.map(c =>
-          c.title === comicName ? { ...c, projectTeam: '-' } : c
-        )
-      )
+      try {
+        await deleteProjectTeamApi(id)
+        
+        // Reset the comic's projectTeam indicator
+        const comicToUpdate = comics.find(c => c.title.toLowerCase() === comicName.toLowerCase())
+        if (comicToUpdate) {
+          await updateComicApi(comicToUpdate.id, {
+            ...comicToUpdate,
+            projectTeam: '-'
+          })
+        }
+        
+        toast.success('Project team removed successfully.')
+        await fetchAllData()
+      } catch (err) {
+        console.error(err)
+        toast.error('Failed to remove project team.')
+      }
     }
   }
 
@@ -473,7 +271,6 @@ function ModeratorDashboard({ user, onLogout }) {
               <span className="moderator-nav-icon">💬</span>
               Chat Monitor
             </span>
-            <span className="moderator-nav-badge">2</span>
           </button>
 
           <button 
@@ -484,7 +281,6 @@ function ModeratorDashboard({ user, onLogout }) {
               <span className="moderator-nav-icon">#</span>
               Forum
             </span>
-            <span className="moderator-nav-badge">2</span>
           </button>
         </nav>
 
@@ -531,98 +327,110 @@ function ModeratorDashboard({ user, onLogout }) {
         {/* Content Render Area */}
         <div className="moderator-page-content">
           
-          {/* VIEW: DASHBOARD */}
-          {activeNav === 'dashboard' && (
-            <div className="fade-in animate-slide-up">
-              <div className="moderator-page-header">
-                <h1>Moderator Control Console</h1>
-                <p>Monitor community activities, review chapter translations, and moderate forum topics.</p>
-              </div>
-
-              <div className="placeholder-grid" style={{ marginBottom: '24px' }}>
-                <div className="placeholder-card" style={{ borderLeft: '4px solid var(--mod-purple)' }}>
-                  <h4>Pending Reviews</h4>
-                  <p style={{ fontSize: '28px', fontWeight: '700', margin: '10px 0 4px', color: 'var(--mod-purple)' }}>
-                    {submissions.filter(i => i.status === 'pending').length} Chapters
-                  </p>
-                  <p>Author queue: {submissions.filter(i => i.status === 'pending' && i.queueType === 'author').length} | Translator queue: {submissions.filter(i => i.status === 'pending' && i.queueType === 'translator').length}</p>
-                </div>
-                <div className="placeholder-card" style={{ borderLeft: '4px solid var(--mod-green)' }}>
-                  <h4>Active Moderators</h4>
-                  <p style={{ fontSize: '28px', fontWeight: '700', margin: '10px 0 4px', color: 'var(--mod-green)' }}>4 Active</p>
-                  <p>Monitoring ComiVerse live servers</p>
-                </div>
-                <div className="placeholder-card" style={{ borderLeft: '4px solid var(--mod-red)' }}>
-                  <h4>Reported Items</h4>
-                  <p style={{ fontSize: '28px', fontWeight: '700', margin: '10px 0 4px', color: 'var(--mod-red)' }}>4 Flagged</p>
-                  <p>2 Chat messages | 2 Forum posts</p>
-                </div>
-              </div>
-
-              <div className="placeholder-card">
-                <h4>Recent Audited Actions</h4>
-                <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ padding: '8px', background: '#f8fafc', borderRadius: '4px', fontSize: '13px' }}>
-                    ✅ Approved chapter <strong>Chapter 800</strong> of <em>Apotheosis</em> (12 hours ago)
-                  </div>
-                  <div style={{ padding: '8px', background: '#f8fafc', borderRadius: '4px', fontSize: '13px' }}>
-                    ❌ Rejected chapter <strong>Chapter 3</strong> of <em>Trash Novel Hero</em> (3 days ago)
-                  </div>
-                </div>
-              </div>
+          {loading ? (
+            <div className="moderator-empty-state">
+              <p>Loading dashboard metrics...</p>
             </div>
-          )}
+          ) : (
+            <>
+              {/* VIEW: DASHBOARD */}
+              {activeNav === 'dashboard' && (
+                <div className="fade-in animate-slide-up">
+                  <div className="moderator-page-header">
+                    <h1>Moderator Control Console</h1>
+                    <p>Monitor community activities, review chapter translations, and moderate forum topics.</p>
+                  </div>
 
-          {/* VIEW: REVIEW QUEUE */}
-          {activeNav === 'review-queue' && (
-            <ReviewQueue 
-              submissions={submissions} 
-              handleApprove={handleApprove} 
-              handleConfirmReject={handleConfirmReject} 
-            />
-          )}
+                  <div className="placeholder-grid" style={{ marginBottom: '24px' }}>
+                    <div className="placeholder-card" style={{ borderLeft: '4px solid var(--mod-purple)' }}>
+                      <h4>Pending Reviews</h4>
+                      <p style={{ fontSize: '28px', fontWeight: '700', margin: '10px 0 4px', color: 'var(--mod-purple)' }}>
+                        {submissions.filter(i => i.status === 'pending').length} Chapters
+                      </p>
+                      <p>Author queue: {submissions.filter(i => i.status === 'pending' && i.queueType === 'author').length} | Translator queue: {submissions.filter(i => i.status === 'pending' && i.queueType === 'translator').length}</p>
+                    </div>
+                    <div className="placeholder-card" style={{ borderLeft: '4px solid var(--mod-green)' }}>
+                      <h4>Active Moderators</h4>
+                      <p style={{ fontSize: '28px', fontWeight: '700', margin: '10px 0 4px', color: 'var(--mod-green)' }}>4 Active</p>
+                      <p>Monitoring ComiVerse live servers</p>
+                    </div>
+                    <div className="placeholder-card" style={{ borderLeft: '4px solid var(--mod-red)' }}>
+                      <h4>Total Comics</h4>
+                      <p style={{ fontSize: '28px', fontWeight: '700', margin: '10px 0 4px', color: 'var(--mod-red)' }}>
+                        {comics.length} Titles
+                      </p>
+                      <p>Active translated and original works</p>
+                    </div>
+                  </div>
 
-          {/* VIEW: COMIC MANAGEMENT */}
-          {activeNav === 'comic-management' && (
-            <ComicManagement 
-              comics={comics} 
-              handleSaveEditComic={handleSaveEditComic} 
-              handleArchiveComic={handleArchiveComic} 
-              handleTriggerAssignTeam={handleTriggerAssignTeam} 
-            />
-          )}
+                  <div className="placeholder-card">
+                    <h4>Recent Audited Actions</h4>
+                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {submissions.filter(s => s.status !== 'pending').slice(0, 5).map(s => (
+                        <div key={s.id} style={{ padding: '8px', background: '#f8fafc', borderRadius: '4px', fontSize: '13px' }}>
+                          {s.status === 'approved' ? '✅ Approved' : '❌ Rejected'} chapter <strong>{s.chapter}</strong> of <em>{s.title}</em> ({s.timeLabel || 'recently'})
+                        </div>
+                      ))}
+                      {submissions.filter(s => s.status !== 'pending').length === 0 && (
+                        <p style={{ fontSize: '13px', color: 'var(--mod-text-secondary)', margin: 0 }}>No audit logs available.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
-          {/* VIEW: GENRE MANAGEMENT */}
-          {activeNav === 'genre-management' && (
-            <GenreManagement />
-          )}
+              {/* VIEW: REVIEW QUEUE */}
+              {activeNav === 'review-queue' && (
+                <ReviewQueue 
+                  submissions={submissions} 
+                  handleApprove={handleApprove} 
+                  handleConfirmReject={handleConfirmReject} 
+                />
+              )}
 
-          {/* VIEW: PROJECT TEAMS */}
-          {activeNav === 'project-teams' && (
-            <ProjectTeams 
-              projectTeams={projectTeams}
-              setProjectTeams={setProjectTeams}
-              comics={comics}
-              availableTranslators={AVAILABLE_TRANSLATORS}
-              showCreateTeamModal={showCreateTeamModal}
-              setShowCreateTeamModal={setShowCreateTeamModal}
-              createTeamStep={createTeamStep}
-              setCreateTeamStep={setCreateTeamStep}
-              createTeamForm={createTeamForm}
-              setCreateTeamForm={setCreateTeamForm}
-              handleCreateProjectTeam={handleCreateProjectTeam}
-              handleRemoveProjectTeam={handleRemoveProjectTeam}
-            />
-          )}
+              {/* VIEW: COMIC MANAGEMENT */}
+              {activeNav === 'comic-management' && (
+                <ComicManagement 
+                  comics={comics} 
+                  handleSaveEditComic={handleSaveEditComic} 
+                  handleArchiveComic={handleArchiveComic} 
+                  handleTriggerAssignTeam={handleTriggerAssignTeam} 
+                />
+              )}
 
-          {/* VIEW: CHAT MONITOR */}
-          {activeNav === 'chat-monitor' && (
-            <ChatMonitor />
-          )}
+              {/* VIEW: GENRE MANAGEMENT */}
+              {activeNav === 'genre-management' && (
+                <GenreManagement />
+              )}
 
-          {/* VIEW: FORUM */}
-          {activeNav === 'forum' && (
-            <ForumModeration />
+              {/* VIEW: PROJECT TEAMS */}
+              {activeNav === 'project-teams' && (
+                <ProjectTeams 
+                  projectTeams={projectTeams}
+                  setProjectTeams={setProjectTeams}
+                  comics={comics}
+                  availableTranslators={AVAILABLE_TRANSLATORS}
+                  showCreateTeamModal={showCreateTeamModal}
+                  setShowCreateTeamModal={setShowCreateTeamModal}
+                  createTeamStep={createTeamStep}
+                  setCreateTeamStep={setCreateTeamStep}
+                  createTeamForm={createTeamForm}
+                  setCreateTeamForm={setCreateTeamForm}
+                  handleCreateProjectTeam={handleCreateProjectTeam}
+                  handleRemoveProjectTeam={handleRemoveProjectTeam}
+                />
+              )}
+
+              {/* VIEW: CHAT MONITOR */}
+              {activeNav === 'chat-monitor' && (
+                <ChatMonitor />
+              )}
+
+              {/* VIEW: FORUM */}
+              {activeNav === 'forum' && (
+                <ForumModeration />
+              )}
+            </>
           )}
 
         </div>

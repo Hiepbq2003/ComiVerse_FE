@@ -1,64 +1,39 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import '../../assets/style/translator.css'
 import TeamProjects from './TeamProjects'
 import Revenue from './Revenue'
 import Payout from './Payout'
-
-const INITIAL_PROJECTS = [
-  {
-    id: 'proj-1',
-    title: 'Invincible Sword God',
-    chaptersCount: 45,
-    lastUpdated: '2 hours ago',
-    status: 'Active',
-    team: 'Dragon Group',
-    cover: '⚔️',
-    description: 'A legendary sword cultivator reincarnates in a waste body and climbs to the peak of martial arts.',
-    assignedToMe: true,
-    chaptersList: [
-      { num: 'Chapter 45', date: '2 hours ago', words: 3200 },
-      { num: 'Chapter 44', date: '1 day ago', words: 2900 },
-      { num: 'Chapter 43', date: '3 days ago', words: 3100 }
-    ]
-  },
-  {
-    id: 'proj-2',
-    title: 'Spirit Recovery',
-    chaptersCount: 32,
-    lastUpdated: '1 day ago',
-    status: 'Active',
-    team: 'Jade Group',
-    cover: '🔮',
-    description: 'An urban student discovers ancient spiritual energy is recovering across the globe.',
-    assignedToMe: true,
-    chaptersList: [
-      { num: 'Chapter 32', date: '1 day ago', words: 2800 },
-      { num: 'Chapter 31', date: '3 days ago', words: 2600 },
-      { num: 'Chapter 30', date: '5 days ago', words: 3000 }
-    ]
-  },
-  {
-    id: 'proj-3',
-    title: 'Demon King Reborn',
-    chaptersCount: 18,
-    lastUpdated: '1 week ago',
-    status: 'Paused',
-    team: 'Phoenix Group',
-    cover: '👑',
-    description: 'The overthrown Demon Monarch wakes up as a low-level guard in a rival human kingdom.',
-    assignedToMe: false,
-    chaptersList: [
-      { num: 'Chapter 18', date: '1 week ago', words: 3500 },
-      { num: 'Chapter 17', date: '2 weeks ago', words: 3300 }
-    ]
-  }
-]
+import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
+import { toast } from 'react-toastify'
 
 function TranslatorDashboard({ user, onLogout }) {
   const [activeNav, setActiveNav] = useState('project-teams') // 'dashboard' | 'project-teams' | 'revenue' | 'payout'
-  const [projects, setProjects] = useState(INITIAL_PROJECTS)
+  const [projects, setProjects] = useState([])
+  const [loading, setLoading] = useState(true)
 
   const userName = user.fullName || user.username || 'Translator'
+
+  useEffect(() => {
+    fetchProjects()
+  }, [])
+
+  const fetchProjects = async () => {
+    try {
+      setLoading(true)
+      const data = await getAllProjectTeamsApi()
+      const mapped = (data || []).map(p => ({
+        ...p,
+        team: p.title,
+        title: p.comicName
+      }))
+      setProjects(mapped)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to load translator project teams.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="translator-layout">
@@ -77,8 +52,6 @@ function TranslatorDashboard({ user, onLogout }) {
             <span className="translator-nav-icon">📊</span>
             Dashboard
           </button>
-
-
 
           <button 
             className={`translator-nav-item ${activeNav === 'project-teams' ? 'active' : ''}`}
@@ -146,63 +119,74 @@ function TranslatorDashboard({ user, onLogout }) {
         {/* Content Render Area */}
         <div className="translator-page-content">
           
-          {/* VIEW: DASHBOARD */}
-          {activeNav === 'dashboard' && (
-            <div className="fade-in">
-              <div className="translator-page-header">
-                <div className="translator-page-header-info">
-                  <h1>Translator Hub Console</h1>
-                  <p>Check translation summaries, cumulative monthly views, and pending clearances.</p>
-                </div>
-              </div>
-
-              <div className="trans-stats-grid" style={{ marginBottom: '24px' }}>
-                <div className="trans-stat-card" style={{ borderTop: '4px solid var(--trans-purple)' }}>
-                  <h4>My Assigned Projects</h4>
-                  <div className="val">{projects.filter(p => p.assignedToMe).length} Projects</div>
-                  <div className="sub">Active translation channels</div>
-                </div>
-                <div className="trans-stat-card" style={{ borderTop: '4px solid var(--trans-green)' }}>
-                  <h4>Active Chapters</h4>
-                  <div className="val">{projects.reduce((sum, p) => sum + p.chaptersCount, 0)} Chapters</div>
-                  <div className="sub">Published across platform catalog</div>
-                </div>
-                <div className="trans-stat-card" style={{ borderTop: '4px solid var(--trans-purple)' }}>
-                  <h4>Cumulative Views</h4>
-                  <div className="val">142.5K Clicks</div>
-                  <div className="sub">Reader clicks count stats</div>
-                </div>
-              </div>
-
-              <div className="placeholder-card">
-                <h4>Recent Upload Audits</h4>
-                <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ padding: '8px', background: '#f8fafc', borderRadius: '4px', fontSize: '13px' }}>
-                    📖 Uploaded draft <strong>Chapter 45</strong> of <em>Invincible Sword God</em> (2 hours ago)
-                  </div>
-                  <div style={{ padding: '8px', background: '#f8fafc', borderRadius: '4px', fontSize: '13px' }}>
-                    📖 Uploaded draft <strong>Chapter 32</strong> of <em>Spirit Recovery</em> (1 day ago)
-                  </div>
-                </div>
-              </div>
+          {loading ? (
+            <div className="moderator-empty-state">
+              <p>Loading workspace...</p>
             </div>
-          )}
+          ) : (
+            <>
+              {/* VIEW: DASHBOARD */}
+              {activeNav === 'dashboard' && (
+                <div className="fade-in">
+                  <div className="translator-page-header">
+                    <div className="translator-page-header-info">
+                      <h1>Translator Hub Console</h1>
+                      <p>Check translation summaries, cumulative monthly views, and pending clearances.</p>
+                    </div>
+                  </div>
 
+                  <div className="trans-stats-grid" style={{ marginBottom: '24px' }}>
+                    <div className="trans-stat-card" style={{ borderTop: '4px solid var(--trans-purple)' }}>
+                      <h4>My Assigned Projects</h4>
+                      <div className="val">{projects.filter(p => p.assignedToMe).length} Projects</div>
+                      <div className="sub">Active translation channels</div>
+                    </div>
+                    <div className="trans-stat-card" style={{ borderTop: '4px solid var(--trans-green)' }}>
+                      <h4>Active Chapters</h4>
+                      <div className="val">{projects.reduce((sum, p) => sum + (p.chaptersCount || 0), 0)} Chapters</div>
+                      <div className="sub">Published across platform catalog</div>
+                    </div>
+                    <div className="trans-stat-card" style={{ borderTop: '4px solid var(--trans-purple)' }}>
+                      <h4>Cumulative Views</h4>
+                      <div className="val">142.5K Clicks</div>
+                      <div className="sub">Reader clicks count stats</div>
+                    </div>
+                  </div>
 
+                  <div className="placeholder-card">
+                    <h4>Recent Translation Releases</h4>
+                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {projects.flatMap(p => (p.chaptersList || []).map(chap => ({
+                        ...chap,
+                        projectTitle: p.title
+                      }))).slice(0, 5).map((chap, idx) => (
+                        <div key={chap.id || idx} style={{ padding: '8px', background: '#f8fafc', borderRadius: '4px', fontSize: '13px' }}>
+                          📖 Released <strong>{chap.num}</strong> of <em>{chap.projectTitle}</em> ({chap.date || 'recently'})
+                        </div>
+                      ))}
+                      {projects.flatMap(p => p.chaptersList || []).length === 0 && (
+                        <p style={{ fontSize: '13px', color: 'var(--trans-text-secondary)', margin: 0 }}>No chapters published yet.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
-          {/* VIEW: PROJECT TEAMS */}
-          {activeNav === 'project-teams' && (
-            <TeamProjects projects={projects} setProjects={setProjects} />
-          )}
+              {/* VIEW: PROJECT TEAMS */}
+              {activeNav === 'project-teams' && (
+                <TeamProjects projects={projects} setProjects={setProjects} />
+              )}
 
-          {/* VIEW: REVENUE */}
-          {activeNav === 'revenue' && (
-            <Revenue />
-          )}
+              {/* VIEW: REVENUE */}
+              {activeNav === 'revenue' && (
+                <Revenue />
+              )}
 
-          {/* VIEW: PAYOUT */}
-          {activeNav === 'payout' && (
-            <Payout />
+              {/* VIEW: PAYOUT */}
+              {activeNav === 'payout' && (
+                <Payout />
+              )}
+            </>
           )}
 
         </div>

@@ -1,26 +1,38 @@
-import { useState } from 'react'
-
-const INITIAL_THREADS = [
-  {
-    id: 'thread-1',
-    title: 'Spam Link Post',
-    author: 'bot_account',
-    content: '"Check out this site for free gift cards: bit.ly/spam-link"'
-  },
-  {
-    id: 'thread-2',
-    title: 'Off-topic Flame War',
-    author: 'angry_user_12',
-    content: '"You guys are all idiots, this series is trash and everyone who likes it has zero braincells!"'
-  }
-]
+import { useState, useEffect } from 'react'
+import { getAllForumThreadsApi, deleteForumThreadApi } from '../../services/api/ForumThreadApi'
+import { toast } from 'react-toastify'
 
 function ForumModeration() {
-  const [threads, setThreads] = useState(INITIAL_THREADS)
+  const [threads, setThreads] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const handleDeleteThread = (id, title) => {
+  useEffect(() => {
+    fetchThreads()
+  }, [])
+
+  const fetchThreads = async () => {
+    try {
+      setLoading(true)
+      const data = await getAllForumThreadsApi()
+      setThreads(data || [])
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to load forum threads!')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteThread = async (id, title) => {
     if (window.confirm(`Are you sure you want to delete the thread "${title}"?`)) {
-      setThreads(prev => prev.filter(t => t.id !== id))
+      try {
+        await deleteForumThreadApi(id)
+        setThreads(prev => prev.filter(t => t.id !== id))
+        toast.success(`Thread "${title}" deleted successfully.`)
+      } catch (err) {
+        console.error(err)
+        toast.error('Failed to delete thread!')
+      }
     }
   }
 
@@ -31,32 +43,38 @@ function ForumModeration() {
         <p>Moderate user posts and replies in the platform community forum.</p>
       </div>
 
-      <div className="moderator-cards-list">
-        {threads.length === 0 ? (
-          <div className="moderator-empty-state">
-            <h3>No flagged forum posts</h3>
-            <p>Forum community board is fully peaceful!</p>
-          </div>
-        ) : (
-          threads.map(t => (
-            <div className="submission-card" key={t.id}>
-              <div className="submission-info">
-                <h3 className="submission-title">{t.title}</h3>
-                <p className="submission-meta">Submitted by: <strong>{t.author}</strong></p>
-                <p className="submission-meta">Content: <em>{t.content}</em></p>
-              </div>
-              <div className="submission-actions">
-                <button 
-                  className="mod-btn reject"
-                  onClick={() => handleDeleteThread(t.id, t.title)}
-                >
-                  🗑️ Delete Thread
-                </button>
-              </div>
+      {loading ? (
+        <div className="moderator-empty-state">
+          <p>Loading forum threads...</p>
+        </div>
+      ) : (
+        <div className="moderator-cards-list">
+          {threads.length === 0 ? (
+            <div className="moderator-empty-state">
+              <h3>No flagged forum posts</h3>
+              <p>Forum community board is fully peaceful!</p>
             </div>
-          ))
-        )}
-      </div>
+          ) : (
+            threads.map(t => (
+              <div className="submission-card" key={t.id}>
+                <div className="submission-info">
+                  <h3 className="submission-title">{t.title}</h3>
+                  <p className="submission-meta">Submitted by: <strong>{t.author}</strong></p>
+                  <p className="submission-meta">Content: <em>{t.content}</em></p>
+                </div>
+                <div className="submission-actions">
+                  <button 
+                    className="mod-btn reject"
+                    onClick={() => handleDeleteThread(t.id, t.title)}
+                  >
+                    🗑️ Delete Thread
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   )
 }

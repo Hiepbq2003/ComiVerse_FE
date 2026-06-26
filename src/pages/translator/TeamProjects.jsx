@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
+import { createSubmissionApi } from '../../services/api/SubmissionApi'
+import { toast } from 'react-toastify'
 
 function TeamProjects({ projects, setProjects }) {
   const [searchTerm, setSearchTerm] = useState('')
@@ -17,57 +20,71 @@ function TeamProjects({ projects, setProjects }) {
     e.stopPropagation()
     setSelectedEdit(project)
     setEditForm({
-      description: project.description,
-      status: project.status,
-      team: project.team
+      description: project.description || '',
+      status: project.status || 'Active',
+      team: project.title || '' // project title matches the team name column
     })
   }
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!selectedEdit) return
-    setProjects(prev =>
-      prev.map(proj =>
-        proj.id === selectedEdit.id
-          ? { 
-              ...proj, 
-              description: editForm.description, 
-              status: editForm.status, 
-              team: editForm.team 
-            }
-          : proj
+    try {
+      const updated = await updateProjectTeamApi(selectedEdit.id, {
+        id: selectedEdit.id,
+        title: editForm.team,
+        comicName: selectedEdit.title,
+        status: editForm.status,
+        description: editForm.description,
+        deadline: selectedEdit.deadline,
+        sourceLang: selectedEdit.sourceLang,
+        targetLang: selectedEdit.targetLang,
+        priority: selectedEdit.priority,
+        cover: selectedEdit.cover
+      })
+      const mappedUpdated = {
+        ...updated,
+        team: updated.title,
+        title: updated.comicName
+      }
+      setProjects(prev =>
+        prev.map(proj => (proj.id === selectedEdit.id ? mappedUpdated : proj))
       )
-    )
-    setSelectedEdit(null)
+      toast.success('Project details updated successfully!')
+      setSelectedEdit(null)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to save project updates.')
+    }
   }
 
-  const handleUploadChapter = () => {
+  const handleUploadChapter = async () => {
     if (!selectedDetails || !uploadData.chapterTitle.trim()) return
 
-    const newChapter = {
-      num: uploadData.chapterTitle.trim(),
-      date: 'Just now',
-      words: Number(uploadData.wordsCount) || 3000
+    const submission = {
+      title: selectedDetails.comicName,
+      chapter: uploadData.chapterTitle.trim(),
+      submittedBy: selectedDetails.title,
+      queueType: 'translator',
+      timeLabel: 'Just now',
+      timestamp: Date.now(),
+      words: Number(uploadData.wordsCount) || 3000,
+      priority: selectedDetails.priority || 'Medium',
+      flags: 0,
+      status: 'pending',
+      cover: selectedDetails.cover || '🔮',
+      content: uploadData.chapterContent
     }
 
-    setProjects(prev =>
-      prev.map(proj => {
-        if (proj.id === selectedDetails.id) {
-          const updatedProj = {
-            ...proj,
-            chaptersCount: proj.chaptersCount + 1,
-            lastUpdated: 'Just now',
-            chaptersList: [newChapter, ...proj.chaptersList]
-          }
-          // Sync details modal
-          setSelectedDetails(updatedProj)
-          return updatedProj
-        }
-        return proj
-      })
-    )
+    try {
+      await createSubmissionApi(submission)
+      toast.success('Chapter uploaded successfully and sent for review!')
 
-    setUploadData({ chapterTitle: '', chapterContent: '', wordsCount: 3000 })
-    setShowUploadForm(false)
+      setUploadData({ chapterTitle: '', chapterContent: '', wordsCount: 3000 })
+      setShowUploadForm(false)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to submit chapter.')
+    }
   }
 
   const teamProjectsList = projects.filter(proj => {
