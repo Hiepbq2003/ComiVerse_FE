@@ -52,10 +52,14 @@ function AuthPage() {
     } else {
       const auth = getAuth();
       if (auth && auth.token && auth.user) {
-        // ADMIN users go directly to admin portal
+        // ADMIN/AUTHOR users go directly to their respective portals
         const roleUpper = (auth.user.role || '').toUpperCase();
         if (roleUpper === 'ADMIN') {
           navigate('/admin/account-management', { replace: true });
+          return;
+        }
+         if (roleUpper === 'AUTHOR') {
+          navigate('/author/overview', { replace: true });
           return;
         }
         setUser(auth.user);
@@ -117,10 +121,14 @@ function AuthPage() {
         <Login 
           onNavigate={setView} 
           onLoginSuccess={(userData) => {
-            // ADMIN users redirect to admin portal
+            // ADMIN/AUTHOR users redirect to their respective portals
             const roleUpper = (userData.role || '').toUpperCase();
             if (roleUpper === 'ADMIN') {
               navigate('/admin/account-management', { replace: true });
+              return;
+            }
+             if (roleUpper === 'AUTHOR') {
+              navigate('/author/overview', { replace: true });
               return;
             }
             setUser(userData);
