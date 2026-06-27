@@ -38,7 +38,7 @@ function AccountManagement() {
   const [confirmAction, setConfirmAction] = useState(null) // { type: 'ban'|'unban'|'reset-pw', account }
 
   // Create staff form
-  const [staffForm, setStaffForm] = useState({ username: '', password: '', fullName: '', email: '', role: 'Moderator' })
+  const [staffForm, setStaffForm] = useState({ username: '', password: '', fullName: '', email: '', role: 'Reader' })
   const [staffFormErrors, setStaffFormErrors] = useState({})
   const [modalError, setModalError] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -208,7 +208,7 @@ function AccountManagement() {
       }
       setAccounts((prev) => [newAccount, ...prev])
       setShowCreateModal(false)
-      setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'Moderator' })
+      setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'Reader' })
       setStaffFormErrors({})
       setModalError(null)
       showAlert('success', `Account "${newAccount.fullName}" created successfully!`)
@@ -230,7 +230,7 @@ function AccountManagement() {
 
   const handleCloseCreateModal = () => {
     setShowCreateModal(false)
-    setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'Moderator' })
+    setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'Reader' })
     setStaffFormErrors({})
     setModalError(null)
   }
