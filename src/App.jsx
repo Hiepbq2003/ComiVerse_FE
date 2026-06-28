@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AuthPage from './pages/common/AuthPage'
 import AccountManagement from './pages/admin/AccountManagement'
 import BroadcastManagement from './pages/admin/BroadcastManagement'
@@ -9,6 +9,21 @@ import AuthorDashboard from './pages/author/AuthorDashboard'
 import AuthorComics from './pages/author/AuthorComics'
 import AuthorEarnings from './pages/author/AuthorEarnings'
 import AuthorSettings from './pages/author/AuthorSettings'
+import Profile from './pages/common/Profile'
+import { getAuth, clearAuth } from './utils/Auth'
+
+function ProfileRouteWrapper() {
+  const auth = getAuth()
+  if (!auth || !auth.user) {
+    return <Navigate to="/" replace />
+  }
+  const handleLogout = () => {
+    clearAuth()
+    window.location.href = '/'
+  }
+  return <Profile user={auth.user} onLogout={handleLogout} />
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -16,6 +31,7 @@ function App() {
         {/* Auth */}
         <Route path="/" element={<AuthPage />} />
         <Route path="/oauth2/redirect" element={<AuthPage />} />
+        <Route path="/profile" element={<ProfileRouteWrapper />} />
         {/* Admin */}
         <Route path="/admin/statistics" element={<StatisticsDashboard />} />
         <Route path="/admin/revenue" element={<RevenueManagement />} />

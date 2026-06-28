@@ -1,406 +1,416 @@
 import { useState } from 'react'
-import '../../assets/style/reader.css'
+import '../../assets/style/profile.css'
+
+// ── ROLE-SPECIFIC STATISTICS COMPONENTS ────────────────────────────
+
+function ReaderStats() {
+  return (
+    <div className="profile-stats-list">
+      <div className="profile-stats-row">
+        <span>Comics saved</span>
+        <span className="profile-stats-value">24</span>
+      </div>
+      <div className="profile-stats-row">
+        <span>Chapters read</span>
+        <span className="profile-stats-value">1,482</span>
+      </div>
+      <div className="profile-stats-row">
+        <span>Comments</span>
+        <span className="profile-stats-value">63</span>
+      </div>
+    </div>
+  )
+}
+
+function TranslatorStats() {
+  return (
+    <div className="profile-stats-list">
+      <div className="profile-stats-row">
+        <span>Comics translated</span>
+        <span className="profile-stats-value">12</span>
+      </div>
+      <div className="profile-stats-row">
+        <span>Chapters translated</span>
+        <span className="profile-stats-value">128</span>
+      </div>
+      <div className="profile-stats-row">
+        <span>Group members</span>
+        <span className="profile-stats-value">6</span>
+      </div>
+    </div>
+  )
+}
+
+function AuthorStats() {
+  return (
+    <div className="profile-stats-list">
+      <div className="profile-stats-row">
+        <span>Comics published</span>
+        <span className="profile-stats-value">3</span>
+      </div>
+      <div className="profile-stats-row">
+        <span>Total views</span>
+        <span className="profile-stats-value">254K</span>
+      </div>
+      <div className="profile-stats-row">
+        <span>Subscribers</span>
+        <span className="profile-stats-value">15.2K</span>
+      </div>
+    </div>
+  )
+}
+
+function ModeratorStats() {
+  return (
+    <div className="profile-stats-list">
+      <div className="profile-stats-row">
+        <span>Reports resolved</span>
+        <span className="profile-stats-value">412</span>
+      </div>
+      <div className="profile-stats-row">
+        <span>Comics checked</span>
+        <span className="profile-stats-value">84</span>
+      </div>
+      <div className="profile-stats-row">
+        <span>Banned users</span>
+        <span className="profile-stats-value">15</span>
+      </div>
+    </div>
+  )
+}
+
+function AdminStats() {
+  return (
+    <div className="profile-stats-list">
+      <div className="profile-stats-row">
+        <span>Total users managed</span>
+        <span className="profile-stats-value">15.2K</span>
+      </div>
+      <div className="profile-stats-row">
+        <span>Global logs audited</span>
+        <span className="profile-stats-value">2,450</span>
+      </div>
+      <div className="profile-stats-row">
+        <span>Settings updated</span>
+        <span className="profile-stats-value">38</span>
+      </div>
+    </div>
+  )
+}
+
+// ── MAIN PROFILE PAGE COMPONENT ────────────────────────────────────
 
 function Profile({ user, onLogout }) {
-  const [activeNav, setActiveNav] = useState('home') // 'home' | 'explore' | 'library' | 'forum' | 'settings'
-  const [selectedGenre, setSelectedGenre] = useState('All')
+  const [activeTab, setActiveTab] = useState('info') // 'info' | 'password'
 
-  const userName = user.fullName || user.username || 'Reader'
-  const userInitials = userName.substring(0, 2).toUpperCase()
+  // Form states for Basic Info
+  const [firstName, setFirstName] = useState('Minh')
+  const [lastName, setLastName] = useState('Khoa')
+  const [username, setUsername] = useState(user.username || 'minhkhoa_dev')
+  const [email, setEmail] = useState(user.email || 'minhkhoa@gmail.com')
+  const [dateOfBirth, setDateOfBirth] = useState('1999-05-15')
+  const [bio, setBio] = useState('')
 
-  const genres = ['All', 'Action', 'Romance', 'Fantasy', 'Horror', 'Sci-Fi', 'Comedy', 'Isekai']
+  // Password change states
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
 
-  const recommendedComics = [
-    { id: 1, title: 'Sword God Unrivaled', chapter: 'Ch 320', badge: 'HOT', cover: '🗡️' },
-    { id: 2, title: 'Spiritual Energy Resur...', chapter: 'Ch 88', badge: 'NEW', cover: '🔮' },
-    { id: 3, title: 'Demon King Reborn', chapter: 'Ch 214', badge: 'TOP', cover: '😈' },
-    { id: 4, title: 'Galactic Bloodwar', chapter: 'Ch 156', badge: 'NEW', cover: '🌌' },
-    { id: 5, title: 'Dao Patriarch\'s Heir', chapter: 'Ch 142', badge: 'HOT', cover: '📜' },
-    { id: 6, title: 'Immortal Cultivation C...', chapter: 'Ch 77', badge: 'TOP', cover: '🧬' }
-  ]
+  const roleName = user.role || 'Reader'
+  const roleUpper = roleName.toUpperCase()
 
-  const updatedTodayComics = [
-    { id: 7, title: 'Supreme Alchemist', chapter: 'Ch 55', cover: '🧪' },
-    { id: 8, title: 'Shadow Monarch', chapter: 'Ch 190', cover: '👥' },
-    { id: 9, title: 'Level Up Solo', chapter: 'Ch 299', cover: '🎮' },
-    { id: 10, title: 'Tomb Raider King', chapter: 'Ch 412', cover: '🏺' },
-    { id: 11, title: 'Martial Peak', chapter: 'Ch 3200', cover: '🏔️' },
-    { id: 12, title: 'Apotheosis', chapter: 'Ch 980', cover: '⚡' }
-  ]
+  const handleSaveInfo = (e) => {
+    e.preventDefault()
+    alert('Basic Info changes saved successfully!')
+  }
 
-  const communityPosts = [
-    { id: 1, name: 'Agatsuma Zenitsu', time: '16 min', text: 'new chapter dropped, let\'s go!' },
-    { id: 2, name: 'Yami', time: '14 min', text: 'just finished reading, that plot twist though' },
-    { id: 3, name: 'Van Linh', time: '8 min', text: 'anyone know when the next chapter releases?' },
-    { id: 4, name: 'T.ynyang', time: '7 min', text: 'this arc is getting so good omg' },
-    { id: 5, name: 'SkyReader', time: '5 min', text: 'Group SkyScans translation is top tier as always' },
-    { id: 6, name: 'Duong', time: '4 min', text: 'finally caught up after 2 weeks' }
-  ]
+  const handleSavePassword = (e) => {
+    e.preventDefault()
+    if (newPassword !== confirmPassword) {
+      alert('New password and confirm password do not match!')
+      return
+    }
+    alert('Password updated successfully!')
+    setCurrentPassword('')
+    setNewPassword('')
+    setConfirmPassword('')
+  }
+
+  // Render stats dynamically based on role
+  const renderStats = () => {
+    switch (roleUpper) {
+      case 'ADMIN':
+        return <AdminStats />
+      case 'AUTHOR':
+        return <AuthorStats />
+      case 'MODERATOR':
+      case 'STAFF':
+        return <ModeratorStats />
+      case 'TRANSLATOR':
+        return <TranslatorStats />
+      case 'READER':
+      case 'USER':
+      default:
+        return <ReaderStats />
+    }
+  }
+
+  // Helper for role details
+  const getRoleInfo = () => {
+    switch (roleUpper) {
+      case 'ADMIN':
+        return { label: 'Admin', className: 'admin', icon: '🛡️' }
+      case 'AUTHOR':
+        return { label: 'Author', className: 'author', icon: '✍️' }
+      case 'MODERATOR':
+      case 'STAFF':
+        return { label: 'Moderator', className: 'moderator', icon: '⚖️' }
+      case 'TRANSLATOR':
+        return { label: 'Translator', className: 'translator', icon: '🌐' }
+      case 'READER':
+      case 'USER':
+      default:
+        return { label: 'Reader', className: 'reader', icon: '📖' }
+    }
+  }
+
+  const roleInfo = getRoleInfo()
+  const displayUserName = `${firstName} ${lastName}`.trim() || user.fullName || 'Minh Khoa'
+  const userInitials = displayUserName.substring(0, 2).toUpperCase()
 
   return (
-    <div className="reader-layout">
-      {/* ── SIDEBAR ─────────────────────────────────── */}
-      <aside className="reader-sidebar">
-        <div className="reader-sidebar-brand">
-          <h2>ComiVerse</h2>
-          <span>Reader Portal</span>
+    <div className="profile-page-wrapper">
+      {/* ── TOP SITE HEADER ──────────────────────────────── */}
+      <header className="profile-site-header">
+        <div className="profile-brand">
+          <div className="profile-brand-icon">📚</div>
+          <span>ComiVerse</span>
         </div>
 
-        <nav className="reader-sidebar-nav">
-          <button 
-            className={`reader-nav-item ${activeNav === 'home' ? 'active' : ''}`}
-            onClick={() => setActiveNav('home')}
-          >
-            <span className="reader-nav-icon">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                <polyline points="9 22 9 12 15 12 15 22"/>
-              </svg>
-            </span>
-            Home
-          </button>
-
-          <button 
-            className={`reader-nav-item ${activeNav === 'explore' ? 'active' : ''}`}
-            onClick={() => setActiveNav('explore')}
-          >
-            <span className="reader-nav-icon">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-              </svg>
-            </span>
-            Explore
-          </button>
-
-          <button 
-            className={`reader-nav-item ${activeNav === 'library' ? 'active' : ''}`}
-            onClick={() => setActiveNav('library')}
-          >
-            <span className="reader-nav-icon">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
-              </svg>
-            </span>
-            Library
-          </button>
-
-          <button 
-            className={`reader-nav-item ${activeNav === 'forum' ? 'active' : ''}`}
-            onClick={() => setActiveNav('forum')}
-          >
-            <span className="reader-nav-icon">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-              </svg>
-            </span>
-            Forum
-          </button>
+        <nav className="profile-site-nav">
+          <a href="#home" className="profile-nav-link active">Home</a>
+          <a href="#explore" className="profile-nav-link">Explore</a>
+          <a href="#ranking" className="profile-nav-link">Ranking</a>
+          <a href="#library" className="profile-nav-link">Library</a>
+          <a href="#forum" className="profile-nav-link">Forum</a>
         </nav>
 
-        <div className="reader-sidebar-footer">
-          <button className="reader-nav-item" onClick={onLogout}>
-            <span className="reader-nav-icon">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-              </svg>
-            </span>
-            ← Sign Out
+        <div className="profile-header-actions">
+          <div className="profile-search-bar">
+            <input type="text" placeholder="Search..." className="profile-search-input" />
+          </div>
+
+          <button className="profile-picture-upload-btn" style={{ background: '#f8fafc' }}>
+            👑 Premium
+          </button>
+
+          {roleUpper !== 'READER' && roleUpper !== 'USER' && (
+            <button className="profile-workspace-btn">
+              Workspace
+            </button>
+          )}
+
+          <button className="profile-user-menu" onClick={onLogout}>
+            <div className="profile-user-avatar">{userInitials}</div>
+            <span>{displayUserName}</span>
           </button>
         </div>
-      </aside>
+      </header>
 
-      {/* ── MAIN WORKSPACE ──────────────────────────── */}
-      <main className="reader-main">
-        {/* Top Navbar */}
-        <header className="reader-topbar">
-          <div className="reader-topbar-left">
-            <span>Welcome, {userName}!</span>
-          </div>
+      {/* ── SUB BACK-BAR ─────────────────────────────────── */}
+      <div className="profile-back-bar">
+        <button className="profile-back-btn" onClick={() => window.history.back()}>
+          &larr; Back
+        </button>
+        <span>/</span>
+        <span className="profile-page-title">My Profile</span>
+      </div>
 
-          <div className="reader-topbar-right">
-            <button className="reader-icon-btn" title="Search Comics">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-            </button>
-
-            <button className="reader-icon-btn" title="Notifications">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-              </svg>
-              <span className="notif-dot" />
-            </button>
-
-            <div className="reader-topbar-divider" />
-
-            <button className="reader-profile-btn">
-              <div className="reader-profile-avatar">{userInitials}</div>
-              <span>{userName}</span>
-            </button>
-          </div>
-        </header>
-
-        {/* Content Render Area */}
-        <div className="reader-page-content">
-          
-          {/* VIEW 1: HOME */}
-          {activeNav === 'home' && (
-            <div className="fade-in">
-              {/* Hero Featured Comic Banner */}
-              <div className="reader-hero-banner">
-                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--reader-cyan)', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                  Action / Fantasy / Ch 320
-                </span>
-                <h1 style={{ marginTop: '8px', marginBottom: '12px' }}>Sword God Unrivaled</h1>
-                <p>
-                  An unknown swordsman emerges from the wastelands, carrying an unsolved mystery. 
-                  On his journey to reclaim his memories, he faces the strongest enemies in the world.
-                </p>
-                <div style={{ marginTop: '20px', display: 'flex', gap: '12px' }}>
-                  <button className="trans-btn primary" style={{ padding: '10px 24px' }}>Read Now</button>
-                  <button className="trans-btn secondary" style={{ padding: '10px 24px' }}>🔖 Bookmark</button>
-                </div>
+      {/* ── GRID LAYOUT ──────────────────────────────────── */}
+      <div className="profile-grid-container">
+        {/* Left Column: Sidebar Cards */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="profile-sidebar-card">
+            <div className="profile-avatar-container">
+              <div className="profile-avatar-main">
+                {userInitials}
               </div>
-
-              {/* Genre Selection Filter Pills */}
-              <div className="reader-genre-pills">
-                {genres.map((g) => (
-                  <button 
-                    key={g} 
-                    className={`reader-genre-pill ${selectedGenre === g ? 'active' : ''}`}
-                    onClick={() => setSelectedGenre(g)}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
-
-              {/* Two-Column split structure */}
-              <div className="reader-two-col">
-                {/* Left Column: Recommended & Updated Lists */}
-                <div>
-                  {/* Recommended Section */}
-                  <div className="reader-section-header">
-                    <h2>Recommended Comics</h2>
-                    <button className="reader-see-all-btn">
-                      View all <span>&rsaquo;</span>
-                    </button>
-                  </div>
-
-                  <div className="reader-comic-grid">
-                    {recommendedComics.map((comic) => (
-                      <div key={comic.id} className="reader-comic-card">
-                        <div className="reader-comic-cover">
-                          <span style={{ fontSize: '32px' }}>{comic.cover}</span>
-                          <span className={`comic-badge ${comic.badge.toLowerCase()}`}>{comic.badge}</span>
-                        </div>
-                        <div className="reader-comic-info">
-                          <h4>{comic.title}</h4>
-                          <span>{comic.chapter}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Updated Today Section */}
-                  <div className="reader-section-header" style={{ marginTop: '24px' }}>
-                    <h2>Updated Today</h2>
-                    <button className="reader-see-all-btn">
-                      View all <span>&rsaquo;</span>
-                    </button>
-                  </div>
-
-                  <div className="reader-comic-grid">
-                    {updatedTodayComics.map((comic) => (
-                      <div key={comic.id} className="reader-comic-card">
-                        <div className="reader-comic-cover">
-                          <span style={{ fontSize: '32px' }}>{comic.cover}</span>
-                        </div>
-                        <div className="reader-comic-info">
-                          <h4>{comic.title}</h4>
-                          <span>{comic.chapter}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Right Column: Community Chat / Feed */}
-                <div>
-                  <div className="reader-feed-card">
-                    <h3>
-                      <span>Community Feed</span>
-                      <span className="feed-badge">Main Hall</span>
-                    </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {communityPosts.map((post) => (
-                        <div key={post.id} className="feed-message">
-                          <div className="feed-avatar">
-                            {post.name.substring(0, 1).toUpperCase()}
-                          </div>
-                          <div className="feed-content">
-                            <div>
-                              <span className="feed-name">{post.name}</span>
-                              <span className="feed-time">{post.time}</span>
-                            </div>
-                            <p className="feed-text">{post.text}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Connected Session Details Panel */}
-                  <div className="reader-session-card">
-                    <h3>Connected Profile</h3>
-                    <div className="reader-session-grid">
-                      <div className="reader-session-item">
-                        <span className="session-label">Email Address</span>
-                        <span className="session-value" style={{ wordBreak: 'break-all' }}>{user.email}</span>
-                      </div>
-                      <div className="reader-session-item">
-                        <span className="session-label">Access Level</span>
-                        <div style={{ marginTop: '4px' }}>
-                          <span className="reader-role-tag">
-                            🛡️ {user.role}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <label className="profile-avatar-upload-icon" title="Upload Photo">
+                📷
+              </label>
             </div>
-          )}
 
-          {/* VIEW 2: EXPLORE */}
-          {activeNav === 'explore' && (
+            <h3 className="profile-sidebar-name">{displayUserName}</h3>
+            <span className="profile-sidebar-joined">Member since 2023</span>
+
+            <span className={`profile-role-badge ${roleInfo.className}`}>
+              {roleInfo.icon} {roleInfo.label}
+            </span>
+
+            <div className="profile-sidebar-nav">
+              <button 
+                className={`profile-sidebar-nav-btn ${activeTab === 'info' ? 'active' : ''}`}
+                onClick={() => setActiveTab('info')}
+              >
+                👤 Basic Info
+              </button>
+              <button 
+                className={`profile-sidebar-nav-btn ${activeTab === 'password' ? 'active' : ''}`}
+                onClick={() => setActiveTab('password')}
+              >
+                🔒 Change Password
+              </button>
+            </div>
+
+            {/* Stats Block */}
+            <div className="profile-stats-card">
+              <h4 className="profile-stats-title">Stats</h4>
+              {renderStats()}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Dynamic Form Panels */}
+        <div className="profile-content-card">
+          {activeTab === 'info' ? (
             <div className="fade-in">
-              <div className="reader-hero-banner" style={{ padding: '24px 32px', marginBottom: '24px' }}>
-                <h2>Explore Series</h2>
-                <p>Browse all available comic series, manhwa, and manga across ComiVerse.</p>
-                <div style={{ marginTop: '16px', display: 'flex', gap: '12px', maxWidth: '500px' }}>
+              <h2 className="profile-content-title">Basic Info</h2>
+              
+              <form onSubmit={handleSaveInfo}>
+                {/* Profile Picture Upload row */}
+                <div className="profile-picture-edit-sec">
+                  <div className="profile-picture-edit-avatar">
+                    {userInitials}
+                  </div>
+                  <div>
+                    <button type="button" className="profile-picture-upload-btn">
+                      Upload photo
+                    </button>
+                    <p className="profile-picture-upload-text">PNG, JPG up to 2MB</p>
+                  </div>
+                </div>
+
+                {/* Names row */}
+                <div className="profile-form-grid">
+                  <div className="profile-input-group">
+                    <label>First Name</label>
+                    <input 
+                      type="text" 
+                      value={firstName} 
+                      onChange={(e) => setFirstName(e.target.value)} 
+                      required 
+                    />
+                  </div>
+                  <div className="profile-input-group">
+                    <label>Last Name</label>
+                    <input 
+                      type="text" 
+                      value={lastName} 
+                      onChange={(e) => setLastName(e.target.value)} 
+                      required 
+                    />
+                  </div>
+                </div>
+
+                {/* Username */}
+                <div className="profile-input-group">
+                  <label>Username</label>
                   <input 
                     type="text" 
-                    placeholder="Search titles, authors, or genres..." 
-                    style={{
-                      flex: 1, padding: '10px 16px', background: 'rgba(7, 4, 13, 0.6)', 
-                      border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', 
-                      color: 'white', outline: 'none'
-                    }}
+                    value={username} 
+                    onChange={(e) => setUsername(e.target.value)} 
+                    required 
                   />
-                  <button className="trans-btn primary" style={{ padding: '0 20px' }}>Search</button>
+                  <p className="profile-input-desc">Can only be changed once every 30 days</p>
                 </div>
-              </div>
 
-              <div className="reader-section-header">
-                <h2>All Available Series</h2>
-              </div>
-
-              <div className="reader-comic-grid">
-                {[...recommendedComics, ...updatedTodayComics].map((comic) => (
-                  <div key={comic.id} className="reader-comic-card">
-                    <div className="reader-comic-cover">
-                      <span style={{ fontSize: '32px' }}>{comic.cover}</span>
-                    </div>
-                    <div className="reader-comic-info">
-                      <h4>{comic.title}</h4>
-                      <span>{comic.chapter}</span>
-                    </div>
+                {/* Email (verified) */}
+                <div className="profile-input-group">
+                  <label>Email</label>
+                  <div className="profile-email-container">
+                    <input 
+                      type="email" 
+                      value={email} 
+                      onChange={(e) => setEmail(e.target.value)} 
+                      required 
+                    />
+                    <span className="profile-email-badge">Verified</span>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                </div>
 
-          {/* VIEW 3: LIBRARY */}
-          {activeNav === 'library' && (
+                {/* Date of Birth */}
+                <div className="profile-input-group">
+                  <label>Date of Birth</label>
+                  <input 
+                    type="date" 
+                    value={dateOfBirth} 
+                    onChange={(e) => setDateOfBirth(e.target.value)} 
+                    required 
+                  />
+                </div>
+
+                {/* Bio */}
+                <div className="profile-input-group">
+                  <label>Bio</label>
+                  <textarea 
+                    rows="4" 
+                    placeholder="Write a few lines about yourself..." 
+                    value={bio} 
+                    onChange={(e) => setBio(e.target.value)}
+                  />
+                </div>
+
+                <button type="submit" className="profile-save-btn">
+                  Save Changes
+                </button>
+              </form>
+            </div>
+          ) : (
             <div className="fade-in">
-              <div className="reader-hero-banner" style={{ padding: '24px 32px', marginBottom: '24px' }}>
-                <h2>My Reading Library</h2>
-                <p>Track your bookmarks and resume reading your saved series.</p>
-              </div>
+              <h2 className="profile-content-title">Change Password</h2>
+              
+              <form onSubmit={handleSavePassword}>
+                <div className="profile-input-group">
+                  <label>Current Password</label>
+                  <input 
+                    type="password" 
+                    placeholder="Enter current password" 
+                    value={currentPassword} 
+                    onChange={(e) => setCurrentPassword(e.target.value)} 
+                    required 
+                  />
+                </div>
 
-              <div className="reader-section-header">
-                <h2>Bookmarked series (2)</h2>
-              </div>
+                <div className="profile-input-group">
+                  <label>New Password</label>
+                  <input 
+                    type="password" 
+                    placeholder="Enter new password (min. 8 chars)" 
+                    value={newPassword} 
+                    onChange={(e) => setNewPassword(e.target.value)} 
+                    required 
+                  />
+                </div>
 
-              <div className="reader-comic-grid" style={{ marginBottom: '32px' }}>
-                {recommendedComics.slice(0, 2).map((comic) => (
-                  <div key={comic.id} className="reader-comic-card">
-                    <div className="reader-comic-cover">
-                      <span style={{ fontSize: '32px' }}>{comic.cover}</span>
-                      <span className="comic-badge hot">SAVED</span>
-                    </div>
-                    <div className="reader-comic-info">
-                      <h4>{comic.title}</h4>
-                      <span style={{ color: 'var(--reader-cyan)' }}>Resume: {comic.chapter}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                <div className="profile-input-group">
+                  <label>Confirm New Password</label>
+                  <input 
+                    type="password" 
+                    placeholder="Confirm new password" 
+                    value={confirmPassword} 
+                    onChange={(e) => setConfirmPassword(e.target.value)} 
+                    required 
+                  />
+                </div>
 
-              <div className="reader-section-header">
-                <h2>Recently Viewed</h2>
-              </div>
-
-              <div className="reader-comic-grid">
-                {updatedTodayComics.slice(0, 3).map((comic) => (
-                  <div key={comic.id} className="reader-comic-card">
-                    <div className="reader-comic-cover">
-                      <span style={{ fontSize: '32px' }}>{comic.cover}</span>
-                    </div>
-                    <div className="reader-comic-info">
-                      <h4>{comic.title}</h4>
-                      <span>Last read: {comic.chapter}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                <button type="submit" className="profile-save-btn">
+                  Change Password
+                </button>
+              </form>
             </div>
           )}
-
-          {/* VIEW 4: FORUM */}
-          {activeNav === 'forum' && (
-            <div className="fade-in">
-              <div className="reader-hero-banner" style={{ padding: '24px 32px', marginBottom: '24px' }}>
-                <h2>ComiVerse Community Forum</h2>
-                <p>Discuss latest releases, translation requests, and chat with fellow readers.</p>
-              </div>
-
-              <div className="reader-feed-card" style={{ background: 'var(--reader-card-bg)', border: '1px solid var(--reader-border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3>General Discussions</h3>
-                  <button className="trans-btn primary" style={{ fontSize: '12px', padding: '6px 12px' }}>+ New Thread</button>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {[
-                    { title: 'Sword God Unrivaled Ch 320 discussion group', posts: 142, author: 'DaoMaster' },
-                    { title: 'Any scanlation group picking up Demon King?', posts: 89, author: 'MangaLover' },
-                    { title: 'ComiVerse website feedback and suggestions', posts: 24, author: 'Minh Khoa' }
-                  ].map((thread, index) => (
-                    <div key={index} style={{
-                      padding: '12px 16px', background: 'rgba(255,255,255,0.02)', 
-                      border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px',
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                    }}>
-                      <div>
-                        <h4 style={{ margin: '0 0 4px', color: 'white', fontSize: '14px' }}>{thread.title}</h4>
-                        <span style={{ fontSize: '12px', color: 'var(--reader-text-muted)' }}>Created by {thread.author}</span>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '13px', color: 'var(--reader-cyan)', fontWeight: '600' }}>{thread.posts} replies</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
         </div>
-      </main>
+      </div>
     </div>
   )
 }
