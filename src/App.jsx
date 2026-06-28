@@ -15,6 +15,7 @@ function App() {
       <Routes>
         {/* Auth */}
         <Route path="/" element={<AuthPage />} />
+        <Route path="/oauth2/redirect" element={<AuthPage />} />
         {/* Admin */}
         <Route path="/admin/statistics" element={<StatisticsDashboard />} />
         <Route path="/admin/revenue" element={<RevenueManagement />} />
