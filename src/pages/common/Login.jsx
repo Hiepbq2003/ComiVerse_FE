@@ -42,12 +42,6 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
         <p>Sign in and continue your story.</p>
       </div>
 
-      {/* View Toggle tabs */}
-      <div className="form-toggle-tabs">
-        <button className="tab-btn active">Sign In</button>
-        <button className="tab-btn" onClick={() => onNavigate('signup')}>Sign Up</button>
-      </div>
-
       {/* Google Button */}
       <button className="btn-google-oauth" onClick={handleGoogleLogin}>
         <svg className="google-icon-svg" viewBox="0 0 24 24" width="18" height="18">

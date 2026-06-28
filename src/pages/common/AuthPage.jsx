@@ -11,6 +11,7 @@ import AuthorDashboard from '../author/AuthorDashboard'
 import ModeratorDashboard from '../moderator/ModeratorDashboard'
 import TranslatorDashboard from '../translator/TranslatorDashboard'
 import { getAuth, clearAuth, setAuth } from '../../utils/Auth'
+import { getMeApi } from '../../services/api/AuthApi'
 
 function AuthPage() {
   const navigate = useNavigate()
@@ -31,18 +32,19 @@ function AuthPage() {
         setAuth(token, ''); // Temporary set token while fetching google details
         window.history.replaceState({}, document.title, '/');
         
-        setTimeout(() => {
-          const googleUser = {
-            username: 'google_user',
-            fullName: 'Google Authenticated User',
-            email: 'user@gmail.com',
-            role: 'Reader'
-          };
-          setAuth(token, googleUser);
-          setUser(googleUser);
-          setView('profile');
-          showAlert('success', 'Logged in successfully with Google!');
-        }, 1500);
+        getMeApi()
+          .then((userData) => {
+            setAuth(token, userData);
+            setUser(userData);
+            setView('profile');
+            showAlert('success', 'Logged in successfully with Google!');
+          })
+          .catch((err) => {
+            console.error('Failed to load OAuth profile details:', err);
+            clearAuth();
+            setView('signin');
+            showAlert('error', 'Failed to retrieve Google user details.');
+          });
       } else {
         setTimeout(() => {
           setView('signin');
@@ -108,7 +110,7 @@ function AuthPage() {
   }
 
   return (
-    <AuthLayout alert={alert}>
+    <AuthLayout alert={alert} isWide={view === 'signup'}>
       {view === 'oauth-loading' && (
         <div className="loading-state-wrapper">
           <div className="spinner"></div>

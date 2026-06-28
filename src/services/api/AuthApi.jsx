@@ -15,3 +15,7 @@ export const forgotPasswordApi = (email) => {
 export const resetPasswordApi = (email, otp, newPassword) => {
   return AxiosClient.post('/auth/reset-password', { email, otp, newPassword });
 };
+
+export const getMeApi = () => {
+  return AxiosClient.get('/auth/me');
+};
