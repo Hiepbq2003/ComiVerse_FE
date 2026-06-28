@@ -38,6 +38,7 @@ function AuthPage() {
             setAuth(token, userData);
             setUser(userData);
             setView('profile');
+            navigate('/', { replace: true });
             showAlert('success', 'Logged in successfully with Google!');
           })
           .catch((err) => {

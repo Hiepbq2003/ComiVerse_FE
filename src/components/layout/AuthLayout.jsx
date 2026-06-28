@@ -1,7 +1,7 @@
 import comicAction from '../../assets/comic_action.png'
 import comicAdventure from '../../assets/comic_adventure.png'
 import comicScifi from '../../assets/comic_scifi.png'
-import '../../assets/style/App.css'
+import '../../assets/style/auth.css'
 
 function AuthLayout({ children, alert, isWide }) {
   return (
@@ -11,7 +11,7 @@ function AuthLayout({ children, alert, isWide }) {
         <div className="left-branding-pane">
           <div className="brand-header">
             <div className="brand-logo-icon">
-              <svg viewBox="0 0 24 24" width="24" height="24">
+              <svg viewBox="0 0 24 24" width="22" height="22">
                 <path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2zm-4 8H7v-2h6v2z"/>
               </svg>
             </div>
@@ -60,14 +60,25 @@ function AuthLayout({ children, alert, isWide }) {
         {/* Toast Alert Banner */}
         {alert && alert.message && (
           <div className={`alert-banner ${alert.type}`}>
-            <span className="alert-icon">
-              {alert.type === 'success' ? '✅' : '❌'}
+            <span className="alert-icon" style={{ fontSize: '16px', lineHeight: 1, flexShrink: 0 }}>
+              {alert.type === 'success' ? (
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="15" y1="9" x2="9" y2="15"/>
+                  <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+              )}
             </span>
             <span className="alert-text">{alert.message}</span>
           </div>
         )}
 
-        <div className="form-wrapper-inner" style={{ maxWidth: isWide ? '820px' : '400px' }}>
+        <div className="form-wrapper-inner" style={{ maxWidth: isWide ? '820px' : '420px' }}>
           {children}
         </div>
       </div>
@@ -76,3 +87,4 @@ function AuthLayout({ children, alert, isWide }) {
 }
 
 export default AuthLayout
+

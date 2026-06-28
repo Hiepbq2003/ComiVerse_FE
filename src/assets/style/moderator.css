@@ -6,24 +6,26 @@
   --mod-sidebar-w: 240px;
   --mod-topbar-h: 56px;
 
-  --mod-bg: #f8fafc;
-  --mod-sidebar-bg: #0d0b16; /* Dark slate-violet background */
+  --mod-bg: #0f0b18;
+  --mod-sidebar-bg: #0a0714;
+  --mod-topbar-bg: #13101e;
+  --mod-card-bg: #151120;
   --mod-sidebar-text: #94a3b8;
   --mod-sidebar-active: #ffffff;
   
-  --mod-text-primary: #0f172a;
-  --mod-text-secondary: #475569;
-  --mod-text-muted: #94a3b8;
-  --mod-border: #e2e8f0;
+  --mod-text-primary: #f1f5f9;
+  --mod-text-secondary: #94a3b8;
+  --mod-text-muted: #64748b;
+  --mod-border: rgba(255, 255, 255, 0.06);
   
-  --mod-purple: #8b5cf6;
-  --mod-purple-hover: #7c3aed;
+  --mod-purple: #a855f7;
+  --mod-purple-hover: #c084fc;
   --mod-green: #10b981;
-  --mod-green-hover: #059669;
+  --mod-green-hover: #34d399;
   --mod-red: #ef4444;
-  --mod-red-hover: #dc2626;
+  --mod-red-hover: #f87171;
   --mod-gray: #64748b;
-  --mod-gray-hover: #475569;
+  --mod-gray-hover: #4b5563;
 }
 
 /* ── LAYOUT STRUCTURE ────────────────────────────── */
@@ -50,7 +52,7 @@
 }
 
 .moderator-sidebar-brand {
-  padding: 24px 20px;
+  padding: 24px 20px 28px;
   border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
@@ -58,16 +60,18 @@
   font-size: 18px;
   font-weight: 700;
   margin: 0;
-  color: #ffffff;
+  background: linear-gradient(135deg, #c084fc, #ec4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   letter-spacing: 0.3px;
 }
 
 .moderator-sidebar-brand span {
   display: block;
   font-size: 11px;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.35);
   letter-spacing: 0.5px;
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 .moderator-sidebar-nav {
@@ -99,13 +103,16 @@
 }
 
 .moderator-nav-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(168, 85, 247, 0.06);
   color: #ffffff;
 }
 
 .moderator-nav-item.active {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(168, 85, 247, 0.12);
   color: #ffffff;
+  border-left: 3px solid var(--mod-purple);
+  padding-left: 11px;
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.06);
 }
 
 .moderator-nav-label-group {
@@ -115,9 +122,13 @@
 }
 
 .moderator-nav-icon {
-  width: 16px;
-  height: 16px;
-  opacity: 0.7;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  flex-shrink: 0;
 }
 
 .moderator-nav-item.active .moderator-nav-icon,
@@ -125,16 +136,27 @@
   opacity: 1;
 }
 
+.moderator-nav-item.active .moderator-nav-icon svg {
+  filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.5));
+}
+
 .moderator-nav-badge {
-  background: var(--mod-red);
+  background: linear-gradient(135deg, #ef4444, #f97316);
   color: #ffffff;
   font-size: 10px;
   font-weight: 700;
-  padding: 2px 6px;
+  padding: 2px 7px;
   border-radius: 10px;
   min-width: 10px;
   text-align: center;
   line-height: 1;
+  animation: mod-badge-pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+}
+
+@keyframes mod-badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
 }
 
 .moderator-sidebar-footer {
@@ -154,7 +176,9 @@
 /* ── TOPBAR ──────────────────────────────────────── */
 .moderator-topbar {
   height: var(--mod-topbar-h);
-  background: #ffffff;
+  background: var(--mod-topbar-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--mod-border);
   padding: 0 24px;
   display: flex;
@@ -191,7 +215,8 @@
 }
 
 .moderator-icon-btn:hover {
-  background: #f1f5f9;
+  background: rgba(168, 85, 247, 0.08);
+  color: var(--mod-purple);
 }
 
 .moderator-icon-btn svg {
@@ -221,7 +246,7 @@
 }
 
 .moderator-profile-btn:hover {
-  background: #f1f5f9;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .moderator-logout-btn {
@@ -240,7 +265,7 @@
 }
 
 .moderator-logout-btn:hover {
-  background: #fef2f2;
+  background: rgba(239, 68, 68, 0.08);
 }
 
 /* ── CONTENT AREA ────────────────────────────────── */
@@ -1196,3 +1221,93 @@
   gap: 4px;
 }
 
+
+/* Premium Dark Theme Overrides to Match Admin */
+.moderator-layout {
+  background-color: var(--mod-bg) !important;
+  color: var(--mod-text-primary) !important;
+}
+
+.moderator-topbar {
+  background-color: var(--mod-topbar-bg) !important;
+  border-bottom: 1px solid var(--mod-border) !important;
+}
+
+.moderator-topbar-right span {
+  color: var(--mod-text-primary) !important;
+}
+
+.mod-stat-card, 
+.mod-table-container, 
+.mod-modal-card,
+.mod-card,
+.comic-details-card,
+.comic-meta-section,
+.detail-card,
+.project-team-card {
+  background-color: var(--mod-card-bg) !important;
+  border: 1px solid var(--mod-border) !important;
+  color: var(--mod-text-primary) !important;
+}
+
+.mod-table th {
+  border-bottom: 1px solid var(--mod-border) !important;
+  color: var(--mod-text-muted) !important;
+  background: var(--mod-topbar-bg) !important;
+}
+
+.mod-table td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03) !important;
+  color: var(--mod-text-primary) !important;
+  background: var(--mod-card-bg) !important;
+}
+
+.mod-table tr:hover td {
+  background-color: rgba(168, 85, 247, 0.04) !important;
+}
+
+.mod-form-input, 
+.mod-textarea,
+select.mod-form-input,
+.genre-form-container input,
+.genre-form-container textarea {
+  background-color: rgba(7, 4, 13, 0.7) !important;
+  border: 1px solid var(--mod-border) !important;
+  color: #f8fafc !important;
+}
+
+.mod-form-input:focus, .genre-form-container input:focus, .genre-form-container textarea:focus {
+  border-color: var(--mod-purple) !important;
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.15) !important;
+}
+
+.mod-text-secondary, .mod-text-muted {
+  color: var(--mod-text-secondary) !important;
+}
+
+/* Modals background overlay dark */
+.mod-modal-overlay {
+  background: rgba(10, 7, 20, 0.8) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+/* Empty states */
+.moderator-empty-state, .genre-empty-state {
+  background-color: var(--mod-card-bg) !important;
+  border: 1px solid var(--mod-border) !important;
+  color: var(--mod-text-secondary) !important;
+}
+
+.moderator-empty-state h3, .genre-empty-state h3 {
+  color: var(--mod-text-primary) !important;
+}
+
+.mod-btn.secondary {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: var(--mod-text-primary) !important;
+}
+
+.mod-btn.secondary:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}

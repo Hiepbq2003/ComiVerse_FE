@@ -23,6 +23,19 @@ function ForgotPassword({ onNavigate, onOTPSent, showAlert, loading, setLoading 
   return (
     <div className="auth-form-card fade-in">
       <div className="form-header-group">
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+          <div style={{
+            width: '56px', height: '56px', borderRadius: '16px',
+            background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(236, 72, 153, 0.1))',
+            border: '1px solid rgba(168, 85, 247, 0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#c084fc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          </div>
+        </div>
         <h2>Reset password</h2>
         <p>Enter your email to receive a recovery OTP code.</p>
       </div>

@@ -23,7 +23,6 @@ body {
   color: #e2e8f0;
   overflow-x: hidden;
 }
-
 /* Page Layout */
 .auth-page-container {
   display: flex;
@@ -704,6 +703,8 @@ body {
   color: #94a3b8;
   font-size: 14px;
 }
+
+/* ── REGULAR STYLES & CENTRAL PORTAL ──────────────── */
 
 /* User Profile card styling */
 .profile-dashboard-card {

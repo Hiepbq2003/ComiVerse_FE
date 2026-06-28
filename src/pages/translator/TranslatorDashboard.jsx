@@ -49,7 +49,11 @@ function TranslatorDashboard({ user, onLogout }) {
             className={`translator-nav-item ${activeNav === 'dashboard' ? 'active' : ''}`}
             onClick={() => setActiveNav('dashboard')}
           >
-            <span className="translator-nav-icon">📊</span>
+            <span className="translator-nav-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+              </svg>
+            </span>
             Dashboard
           </button>
 
@@ -57,7 +61,11 @@ function TranslatorDashboard({ user, onLogout }) {
             className={`translator-nav-item ${activeNav === 'project-teams' ? 'active' : ''}`}
             onClick={() => setActiveNav('project-teams')}
           >
-            <span className="translator-nav-icon">📖</span>
+            <span className="translator-nav-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              </svg>
+            </span>
             Project Teams
           </button>
 
@@ -65,7 +73,11 @@ function TranslatorDashboard({ user, onLogout }) {
             className={`translator-nav-item ${activeNav === 'revenue' ? 'active' : ''}`}
             onClick={() => setActiveNav('revenue')}
           >
-            <span className="translator-nav-icon">💰</span>
+            <span className="translator-nav-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+            </span>
             Revenue
           </button>
 
@@ -73,14 +85,22 @@ function TranslatorDashboard({ user, onLogout }) {
             className={`translator-nav-item ${activeNav === 'payout' ? 'active' : ''}`}
             onClick={() => setActiveNav('payout')}
           >
-            <span className="translator-nav-icon">💳</span>
+            <span className="translator-nav-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+              </svg>
+            </span>
             Payout
           </button>
         </nav>
 
         <div className="translator-sidebar-footer">
           <button className="translator-nav-item" onClick={onLogout}>
-            <span className="translator-nav-icon">🚪</span>
+            <span className="translator-nav-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </span>
             ← Back to Home
           </button>
         </div>
@@ -160,7 +180,7 @@ function TranslatorDashboard({ user, onLogout }) {
                         ...chap,
                         projectTitle: p.title
                       }))).slice(0, 5).map((chap, idx) => (
-                        <div key={chap.id || idx} style={{ padding: '8px', background: '#f8fafc', borderRadius: '4px', fontSize: '13px' }}>
+                        <div key={chap.id || idx} style={{ padding: '10px 12px', background: 'rgba(168, 85, 247, 0.06)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', fontSize: '13px', color: 'var(--trans-text-primary)' }}>
                           📖 Released <strong>{chap.num}</strong> of <em>{chap.projectTitle}</em> ({chap.date || 'recently'})
                         </div>
                       ))}
