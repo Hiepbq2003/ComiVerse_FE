@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { registerApi } from '../../services/api/AuthApi'
 import { setAuth } from '../../utils/Auth'
 
-function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoading }) {
+function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoading, onOpenModal }) {
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -299,7 +299,7 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
             onChange={(e) => setForm({ ...form, agreeTerms: e.target.checked })}
           />
           <span>
-            I agree to the <a href="#terms" className="terms-link" onClick={(e) => e.stopPropagation()}>Terms of Service</a> and <a href="#privacy" className="terms-link" onClick={(e) => e.stopPropagation()}>Privacy Policy</a>
+            I agree to the <a href="#terms" className="terms-link" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenModal('terms'); }}>Terms of Service</a> and <a href="#privacy" className="terms-link" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenModal('privacy'); }}>Privacy Policy</a>
           </span>
         </label>
 
