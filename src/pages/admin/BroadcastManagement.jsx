@@ -377,13 +377,13 @@ function BroadcastManagement() {
                     <span>·</span>
                     <span>{formatCount(item.recipientCount)} users</span>
                   </div>
-                  <button 
-                    className="admin-action-btn admin-action-btn--delete" 
+                  <button
+                    className="admin-action-btn admin-action-btn--delete"
                     onClick={() => handleRecallClick(item)}
                     disabled={isRecalling}
-                    style={{ 
-                      background: 'rgba(239, 68, 68, 0.1)', 
-                      color: '#f87171', 
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      color: '#f87171',
                       border: '1px solid rgba(239, 68, 68, 0.2)',
                       padding: '4px 10px',
                       borderRadius: '4px',
