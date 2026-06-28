@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import AdminLayout from '../../../components/layout/AdminLayout'
-import { getAllAccountsApi, registerStaffApi, banUserApi, unbanUserApi, resetUserPasswordApi } from '../../../services/api/AccountApi'
+import AdminLayout from '../../components/layout/AdminLayout'
+import { getAllAccountsApi, registerStaffApi, banUserApi, unbanUserApi, resetUserPasswordApi } from '../../services/api/AccountApi'
 
 // Fallback mock data when API is not available
 const MOCK_ACCOUNTS = [

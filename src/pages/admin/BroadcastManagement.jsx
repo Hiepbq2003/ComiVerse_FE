@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import AdminLayout from '../../../components/layout/AdminLayout'
-import { sendBroadcastApi, getBroadcastHistoryApi, revokeBroadcastApi } from '../../../services/api/BroadcastApi'
+import AdminLayout from '../../components/layout/AdminLayout'
+import { sendBroadcastApi, getBroadcastHistoryApi, revokeBroadcastApi } from '../../services/api/BroadcastApi'
 
 // Fallback mock data when API is not available
 const MOCK_HISTORY = [
