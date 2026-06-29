@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import '../../assets/style/profile.css'
+import '../../assets/style/reader/profile.css'
 
 // ── ROLE-SPECIFIC STATISTICS COMPONENTS ────────────────────────────
 

@@ -4,6 +4,10 @@ export const getAllProjectTeamsApi = () => {
   return AxiosClient.get('/project-teams/all');
 };
 
+export const getProjectTeamsPageApi = (page = 1, size = 10, search = '') => {
+  return AxiosClient.get('/project-teams', { params: { page, size, search } });
+};
+
 export const createProjectTeamApi = (data) => {
   return AxiosClient.post('/project-teams', data);
 };

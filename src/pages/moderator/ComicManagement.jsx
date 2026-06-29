@@ -13,6 +13,10 @@ function ComicManagement({ comics, projectTeams, handleSaveEditComic, handleArch
   const [comicAuthorFilter, setComicAuthorFilter] = useState('All Authors')
   const [comicTeamFilter, setComicTeamFilter] = useState('All Project Teams')
 
+  // Archive confirmation modal states
+  const [showArchiveModal, setShowArchiveModal] = useState(false)
+  const [comicToArchive, setComicToArchive] = useState(null)
+
   // Edit modal local states
   const [editingComic, setEditingComic] = useState(null)
   const [editComicForm, setEditComicForm] = useState({
@@ -181,6 +185,26 @@ function ComicManagement({ comics, projectTeams, handleSaveEditComic, handleArch
         </div>
       </div>
 
+      {/* Statistics overview cards row */}
+      <div className="mod-stats-cards-row" style={{ marginBottom: '24px', gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        <div className="mod-stat-overview-card">
+          <span className="stat-label">Total Comics</span>
+          <span className="stat-value">{comics.length}</span>
+        </div>
+        <div className="mod-stat-overview-card">
+          <span className="stat-label">Ongoing</span>
+          <span className="stat-value active-count">{comics.filter(c => c.status === 'Ongoing').length}</span>
+        </div>
+        <div className="mod-stat-overview-card">
+          <span className="stat-label">Completed</span>
+          <span className="stat-value" style={{ color: '#3b82f6' }}>{comics.filter(c => c.status === 'Completed').length}</span>
+        </div>
+        <div className="mod-stat-overview-card">
+          <span className="stat-label">Paused</span>
+          <span className="stat-value paused-count">{comics.filter(c => c.status === 'Paused').length}</span>
+        </div>
+      </div>
+
       <div className="comic-search-filter-row">
         <div className="comic-search-input-wrapper">
           <input 
@@ -324,7 +348,7 @@ function ComicManagement({ comics, projectTeams, handleSaveEditComic, handleArch
                       </button>
                       <button 
                         className="comic-btn-action archive"
-                        onClick={() => handleArchiveComic(comic.id)}
+                        onClick={() => { setComicToArchive(comic); setShowArchiveModal(true); }}
                         title="Archive Comic"
                       >
                         🗑️ Archive
@@ -628,6 +652,44 @@ function ComicManagement({ comics, projectTeams, handleSaveEditComic, handleArch
               >
                 Confirm Assignment
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── MODAL: ARCHIVE COMIC CONFIRMATION ───────── */}
+      {showArchiveModal && comicToArchive && (
+        <div className="mod-modal-overlay" style={{ zIndex: 9999 }}>
+          <div className="mod-modal-card" style={{ maxWidth: '420px', textAlign: 'center' }}>
+            <div className="mod-modal-body" style={{ padding: '28px 20px' }}>
+              <div style={{ fontSize: '42px', marginBottom: '16px' }}>🗑️</div>
+              <h3 style={{ margin: '0 0 10px', fontSize: '18px', color: 'white' }}>Archive Comic</h3>
+              <p style={{ margin: '0 0 24px', fontSize: '14px', color: 'var(--mod-text-secondary)', lineHeight: '1.5' }}>
+                Are you sure you want to archive the comic <strong style={{ color: 'white' }}>"{comicToArchive.title}"</strong>?
+                This will soft-delete the comic catalog entry.
+              </p>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                <button 
+                  className="mod-btn" 
+                  style={{ background: 'rgba(255,255,255,0.05)', color: 'white', padding: '8px 20px' }}
+                  onClick={() => {
+                    setShowArchiveModal(false)
+                    setComicToArchive(null)
+                  }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  className="mod-btn reject" 
+                  style={{ padding: '8px 20px' }}
+                  onClick={() => {
+                    handleArchiveComic(comicToArchive.id)
+                    setShowArchiveModal(false)
+                    setComicToArchive(null)
+                  }}
+                >
+                  Archive
+                </button>
+              </div>
             </div>
           </div>
         </div>

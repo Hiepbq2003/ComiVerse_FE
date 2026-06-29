@@ -13,8 +13,8 @@ export const createTranslationRequestApi = (data) => {
 };
 
 // Translator: Get all unclaimed translation projects (Job Pool)
-export const getAllUnclaimedProjectsApi = () => {
-  return AxiosClient.get('/translation-pool/unclaimed');
+export const getAllUnclaimedProjectsApi = (page = 1, size = 9, search = '') => {
+  return AxiosClient.get('/translation-pool/unclaimed', { params: { page, size, search } });
 };
 
 // Translator Leader: Claim a project from the pool

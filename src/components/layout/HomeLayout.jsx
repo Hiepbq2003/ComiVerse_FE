@@ -7,12 +7,12 @@ import {
   markAsReadApi,
   markAllAsReadApi,
 } from '../../services/api/NotificationApi'
-import '../../assets/style/home.css'
+import '../../assets/style/reader/home.css'
 
 function HomeLayout({ children }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const [authState, setAuthState] = useState(null)
+  const [authState, setAuthState] = useState(() => getAuth())
 
   // Notification State
   const [notifications, setNotifications] = useState([])
@@ -23,11 +23,7 @@ function HomeLayout({ children }) {
   // Load auth status
   useEffect(() => {
     const auth = getAuth()
-    if (auth && auth.token && auth.user) {
-      setAuthState(auth)
-    } else {
-      setAuthState(null)
-    }
+    setAuthState(auth)
   }, [location])
 
   // Load notifications if logged in
@@ -142,19 +138,21 @@ function HomeLayout({ children }) {
             <span className="home-brand-logo-text">ComiVerse</span>
           </Link>
 
-          {/* Nav Links */}
           <nav className="home-nav-links">
             <Link to="/" className={`home-nav-item ${location.pathname === '/' ? 'active' : ''}`}>
               Home
             </Link>
             <Link to="/genres" className={`home-nav-item ${location.pathname === '/genres' ? 'active' : ''}`}>
-              Genres
+              Explore
             </Link>
             <Link to="/trending" className={`home-nav-item ${location.pathname === '/trending' ? 'active' : ''}`}>
-              Trending
+              Ranking
             </Link>
-            <Link to="/new-releases" className={`home-nav-item ${location.pathname === '/new-releases' ? 'active' : ''}`}>
-              New Releases
+            <Link to="/library" className={`home-nav-item ${location.pathname === '/library' ? 'active' : ''}`}>
+              Library
+            </Link>
+            <Link to="/forum" className={`home-nav-item ${location.pathname === '/forum' ? 'active' : ''}`}>
+              Forum
             </Link>
           </nav>
         </div>

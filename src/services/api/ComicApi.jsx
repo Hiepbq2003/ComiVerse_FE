@@ -4,6 +4,10 @@ export const getAllComicsApi = () => {
   return AxiosClient.get('/comics/all');
 };
 
+export const getComicsPageApi = (page = 1, size = 10, search = '') => {
+  return AxiosClient.get('/comics', { params: { page, size, search } });
+};
+
 export const updateComicApi = (id, data) => {
   return AxiosClient.put(`/comics/${id}`, data);
 };

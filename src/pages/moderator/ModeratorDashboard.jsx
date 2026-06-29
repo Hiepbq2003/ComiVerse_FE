@@ -104,15 +104,13 @@ function ModeratorDashboard({ user, onLogout }) {
   }
 
   const handleArchiveComic = async (id) => {
-    if (window.confirm('Are you sure you want to archive this comic?')) {
-      try {
-        await deleteComicApi(id)
-        toast.success('Comic archived successfully.')
-        await fetchAllData()
-      } catch (err) {
-        console.error(err)
-        toast.error('Failed to archive comic.')
-      }
+    try {
+      await deleteComicApi(id)
+      toast.success('Comic archived successfully.')
+      await fetchAllData()
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to archive comic.')
     }
   }
 

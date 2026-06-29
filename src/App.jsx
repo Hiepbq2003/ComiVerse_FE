@@ -3,7 +3,8 @@ import AuthPage from './pages/common/AuthPage'
 import Home from './pages/common/Home'
 import Genres from './pages/common/Genres'
 import Trending from './pages/common/Trending'
-import NewReleases from './pages/common/NewReleases'
+import Library from './pages/common/Library'
+import Forum from './pages/common/Forum'
 import ComicDetail from './pages/common/ComicDetail'
 import AccountManagement from './pages/admin/AccountManagement'
 import BroadcastManagement from './pages/admin/BroadcastManagement'
@@ -43,7 +44,8 @@ function App() {
         {/* Public Reader Pages */}
         <Route path="/genres" element={<Genres />} />
         <Route path="/trending" element={<Trending />} />
-        <Route path="/new-releases" element={<NewReleases />} />
+        <Route path="/library" element={<Library />} />
+        <Route path="/forum" element={<Forum />} />
         <Route path="/comic/:id" element={<ComicDetail />} />
         {/* Admin */}
         <Route path="/admin/statistics" element={<StatisticsDashboard />} />

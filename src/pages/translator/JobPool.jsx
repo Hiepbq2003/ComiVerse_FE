@@ -17,10 +17,13 @@ function JobPool({ fetchProjects }) {
   const [claimingId, setClaimingId] = useState(null)
   const [confirmJob, setConfirmJob] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalElements, setTotalElements] = useState(0)
+  const ITEMS_PER_PAGE = 9
 
   useEffect(() => {
     fetchJobs()
-  }, [])
+  }, [currentPage])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -29,8 +32,13 @@ function JobPool({ fetchProjects }) {
   const fetchJobs = async () => {
     try {
       setLoading(true)
-      const data = await getAllUnclaimedProjectsApi()
-      setJobs(data || [])
+      const response = await getAllUnclaimedProjectsApi(currentPage, ITEMS_PER_PAGE)
+      // response = { data: [...], metadata: { page, size, totalElements, totalPages, isLastPage } }
+      setJobs(response.data || [])
+      if (response.metadata) {
+        setTotalPages(response.metadata.totalPages || 1)
+        setTotalElements(response.metadata.totalElements || 0)
+      }
     } catch (err) {
       console.error(err)
       toast.error('Failed to load available translation projects.')
@@ -44,8 +52,8 @@ function JobPool({ fetchProjects }) {
       setClaimingId(job.id)
       await claimProjectApi(job.id)
       toast.success(`Successfully claimed: ${job.comicTitle} (${job.targetLang})`)
-      // Remove from the list immediately
-      setJobs(prev => prev.filter(j => j.id !== job.id))
+      // Re-fetch current page from server after claim
+      await fetchJobs()
       if (fetchProjects) {
         await fetchProjects(true)
       }
@@ -57,14 +65,14 @@ function JobPool({ fetchProjects }) {
     }
   }
 
+  // Client-side filters on already-fetched page data
   const filteredJobs = jobs.filter(job => {
     const matchesLang = langFilter === 'All Languages' || job.targetLang === langFilter
     const matchesPriority = priorityFilter === 'All Priorities' || job.priority === priorityFilter
     return matchesLang && matchesPriority
   })
 
-  const totalPages = Math.ceil(filteredJobs.length / 9)
-  const paginatedJobs = filteredJobs.slice((currentPage - 1) * 9, currentPage * 9)
+  const paginatedJobs = filteredJobs
 
   const uniqueLangs = [...new Set(jobs.map(j => j.targetLang))]
 
