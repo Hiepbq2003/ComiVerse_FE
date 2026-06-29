@@ -68,9 +68,14 @@ function AuthPage() {
         }
         setUser(auth.user);
         setView('profile');
+      } else {
+        const mode = urlParams.get('mode');
+        if (mode && ['signin', 'signup', 'forgot'].includes(mode)) {
+          setView(mode);
+        }
       }
     }
-  }, []);
+  }, [navigate, window.location.search]);
 
   const showAlert = (type, message) => {
     setAlert({ type, message })

@@ -1,5 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AuthPage from './pages/common/AuthPage'
+import Home from './pages/common/Home'
+import Genres from './pages/common/Genres'
+import Trending from './pages/common/Trending'
+import NewReleases from './pages/common/NewReleases'
+import ComicDetail from './pages/common/ComicDetail'
 import AccountManagement from './pages/admin/AccountManagement'
 import BroadcastManagement from './pages/admin/BroadcastManagement'
 import StatisticsDashboard from './pages/admin/StatisticsDashboard'
@@ -28,10 +33,18 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Public Home */}
+        <Route path="/" element={<Home />} />
         {/* Auth */}
         <Route path="/" element={<AuthPage />} />
         <Route path="/oauth2/redirect" element={<AuthPage />} />
         <Route path="/profile" element={<ProfileRouteWrapper />} />
+        <Route path="/auth" element={<AuthPage />} />
+        {/* Public Reader Pages */}
+        <Route path="/genres" element={<Genres />} />
+        <Route path="/trending" element={<Trending />} />
+        <Route path="/new-releases" element={<NewReleases />} />
+        <Route path="/comic/:id" element={<ComicDetail />} />
         {/* Admin */}
         <Route path="/admin/statistics" element={<StatisticsDashboard />} />
         <Route path="/admin/revenue" element={<RevenueManagement />} />
