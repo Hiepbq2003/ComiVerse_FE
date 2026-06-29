@@ -9,16 +9,22 @@ const PRIORITY_CONFIG = {
   Low: { emoji: '🟢', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)' }
 }
 
-function JobPool() {
+function JobPool({ fetchProjects }) {
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [langFilter, setLangFilter] = useState('All Languages')
   const [priorityFilter, setPriorityFilter] = useState('All Priorities')
   const [claimingId, setClaimingId] = useState(null)
+  const [confirmJob, setConfirmJob] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     fetchJobs()
   }, [])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [langFilter, priorityFilter])
 
   const fetchJobs = async () => {
     try {
@@ -34,14 +40,15 @@ function JobPool() {
   }
 
   const handleClaimProject = async (job) => {
-    if (!window.confirm(`Claim "${job.comicTitle}" (${job.sourceLang} → ${job.targetLang}) for your team?`)) return
-
     try {
       setClaimingId(job.id)
       await claimProjectApi(job.id)
       toast.success(`Successfully claimed: ${job.comicTitle} (${job.targetLang})`)
       // Remove from the list immediately
       setJobs(prev => prev.filter(j => j.id !== job.id))
+      if (fetchProjects) {
+        await fetchProjects(true)
+      }
     } catch (err) {
       console.error(err)
       toast.error('Failed to claim this project. It may have already been taken.')
@@ -55,6 +62,9 @@ function JobPool() {
     const matchesPriority = priorityFilter === 'All Priorities' || job.priority === priorityFilter
     return matchesLang && matchesPriority
   })
+
+  const totalPages = Math.ceil(filteredJobs.length / 9)
+  const paginatedJobs = filteredJobs.slice((currentPage - 1) * 9, currentPage * 9)
 
   const uniqueLangs = [...new Set(jobs.map(j => j.targetLang))]
 
@@ -111,55 +121,130 @@ function JobPool() {
           }</p>
         </div>
       ) : (
-        <div className="job-pool-grid">
-          {filteredJobs.map(job => {
-            const pri = PRIORITY_CONFIG[job.priority] || PRIORITY_CONFIG.Medium
-            return (
-              <div className="job-pool-card" key={job.id}>
-                <div className="job-pool-card-header">
-                  <h3 className="job-pool-card-title">{job.comicTitle}</h3>
-                  <span 
-                    className="job-pool-priority-badge"
-                    style={{ background: pri.bg, color: pri.color, borderColor: pri.color }}
-                  >
-                    {pri.emoji} {job.priority}
-                  </span>
-                </div>
-
-                <div className="job-pool-card-body">
-                  <div className="job-pool-lang-row">
-                    <span className="job-pool-lang-badge source">{job.sourceLang}</span>
-                    <span className="job-pool-lang-arrow">→</span>
-                    <span className="job-pool-lang-badge target">{job.targetLang}</span>
+        <>
+          <div className="job-pool-grid">
+            {paginatedJobs.map(job => {
+              const pri = PRIORITY_CONFIG[job.priority] || PRIORITY_CONFIG.Medium
+              return (
+                <div className="job-pool-card" key={job.id}>
+                  <div className="job-pool-card-header">
+                    <h3 className="job-pool-card-title">{job.comicTitle}</h3>
+                    <span 
+                      className="job-pool-priority-badge"
+                      style={{ background: pri.bg, color: pri.color, borderColor: pri.color }}
+                    >
+                      {pri.emoji} {job.priority}
+                    </span>
                   </div>
 
-                  {job.deadline && (
-                    <div className="job-pool-detail-row">
-                      <span className="job-pool-detail-label">📅 Deadline</span>
-                      <span className="job-pool-detail-value">{job.deadline}</span>
+                  <div className="job-pool-card-body">
+                    <div className="job-pool-lang-row">
+                      <span className="job-pool-lang-badge source">{job.sourceLang}</span>
+                      <span className="job-pool-lang-arrow">→</span>
+                      <span className="job-pool-lang-badge target">{job.targetLang}</span>
                     </div>
-                  )}
 
-                  {job.notes && (
-                    <div className="job-pool-notes">
-                      <span className="job-pool-detail-label">📝 Notes</span>
-                      <p>{job.notes}</p>
-                    </div>
-                  )}
-                </div>
+                    {job.deadline && (
+                      <div className="job-pool-detail-row">
+                        <span className="job-pool-detail-label">📅 Deadline</span>
+                        <span className="job-pool-detail-value">{job.deadline}</span>
+                      </div>
+                    )}
 
-                <div className="job-pool-card-footer">
-                  <button
-                    className="job-pool-claim-btn"
-                    onClick={() => handleClaimProject(job)}
-                    disabled={claimingId === job.id}
-                  >
-                    {claimingId === job.id ? '⏳ Claiming...' : '📥 Claim Project'}
-                  </button>
+                    {job.notes && (
+                      <div className="job-pool-notes">
+                        <span className="job-pool-detail-label">📝 Notes</span>
+                        <p>{job.notes}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="job-pool-card-footer">
+                    <button
+                      className="job-pool-claim-btn"
+                      onClick={() => setConfirmJob(job)}
+                      disabled={claimingId === job.id}
+                    >
+                      {claimingId === job.id ? '⏳ Claiming...' : '📥 Claim Project'}
+                    </button>
+                  </div>
                 </div>
+              )
+            })}
+          </div>
+
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '24px' }}>
+              <button 
+                className="trans-btn secondary" 
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                style={{ padding: '6px 12px', fontSize: '12.5px' }}
+              >
+                Previous
+              </button>
+              <span style={{ fontSize: '13px', color: 'var(--trans-text-secondary)' }}>
+                Page <strong>{currentPage}</strong> of <strong>{totalPages || 1}</strong>
+              </span>
+              <button 
+                className="trans-btn secondary" 
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages || totalPages === 0}
+                style={{ padding: '6px 12px', fontSize: '12.5px' }}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* CUSTOM CONFIRM MODAL */}
+      {confirmJob && (
+        <div className="trans-modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="trans-modal-card" style={{ maxWidth: '450px', background: 'rgba(23, 23, 37, 0.95)', border: '1px solid rgba(255, 255, 255, 0.08)', backdropFilter: 'blur(20px)', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+            <div className="trans-modal-header" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--trans-text-primary)', fontWeight: '700' }}>Confirm Claim</h3>
+              <button className="trans-modal-close-btn" style={{ color: 'var(--trans-text-secondary)', background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }} onClick={() => setConfirmJob(null)}>×</button>
+            </div>
+            <div className="trans-modal-body" style={{ padding: '20px 0', color: 'var(--trans-text-primary)' }}>
+              <p style={{ margin: '0 0 16px', fontSize: '14.5px', lineHeight: '1.5', color: 'var(--trans-text-secondary)' }}>
+                Are you sure you want to claim <strong style={{ color: '#ffffff' }}>"{confirmJob.comicTitle}"</strong> for your team?
+              </p>
+              <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', fontSize: '13px' }}>
+                <div style={{ flex: 1 }}>
+                  <span style={{ display: 'block', color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', marginBottom: '2px' }}>Language Route</span>
+                  <span style={{ fontWeight: '600' }}>{confirmJob.sourceLang} → {confirmJob.targetLang}</span>
+                </div>
+                {confirmJob.deadline && (
+                  <div style={{ flex: 1, borderLeft: '1px solid rgba(255,255,255,0.06)', paddingLeft: '12px' }}>
+                    <span style={{ display: 'block', color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', marginBottom: '2px' }}>Deadline</span>
+                    <span style={{ fontWeight: '600', color: 'var(--trans-yellow)' }}>{confirmJob.deadline}</span>
+                  </div>
+                )}
               </div>
-            )
-          })}
+            </div>
+            <div className="trans-modal-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '14px' }}>
+              <button 
+                className="trans-btn secondary" 
+                style={{ padding: '8px 16px', fontSize: '13px' }}
+                onClick={() => setConfirmJob(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="trans-btn primary" 
+                style={{ padding: '8px 16px', fontSize: '13px' }}
+                onClick={() => {
+                  const jobToClaim = confirmJob
+                  setConfirmJob(null)
+                  handleClaimProject(jobToClaim)
+                }}
+              >
+                Claim Project
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import '../../assets/style/translator/team-projects.css'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { createSubmissionApi } from '../../services/api/SubmissionApi'
@@ -15,8 +15,9 @@ import {
   deleteTeamRequestApi
 } from '../../services/api/TeamWorkspaceApi'
 import { toast } from 'react-toastify'
+import JobPool from './JobPool'
 
-function TeamProjects({ projects, setProjects }) {
+function TeamProjects({ projects, setProjects, fetchProjects, user }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDetails, setSelectedDetails] = useState(null)
   const [selectedEdit, setSelectedEdit] = useState(null)
@@ -26,6 +27,7 @@ function TeamProjects({ projects, setProjects }) {
   const [editForm, setEditForm] = useState({ description: '', status: 'Active', team: '' })
 
   // ── Workspace State ──────────────────────────────
+  const [activeProjectTab, setActiveProjectTab] = useState('my-projects') // 'my-projects' | 'job-pool'
   const [workspaceTab, setWorkspaceTab] = useState('home') // 'home' | 'members' | 'requests' | 'tasks' | 'settings'
   const [loadingWorkspace, setLoadingWorkspace] = useState(false)
   
@@ -38,15 +40,112 @@ function TeamProjects({ projects, setProjects }) {
   const [tasks, setTasks] = useState([])
   
   // Dynamic user mapping from auth token
-  const authStr = localStorage.getItem('auth')
-  const authUser = authStr ? JSON.parse(authStr) : null
-  const userFullName = authUser?.fullName || authUser?.username || 'Translator'
+  const authStr = localStorage.getItem('user')
+  const authUser = authStr ? JSON.parse(authStr) : user
+  const userFullName = authUser?.fullName || authUser?.username || user?.fullName || user?.username || 'Translator'
 
-  // Default members list (seeded details, status active/inactive)
+  const parseTaskTitle = (title) => {
+    const match = (title || '').match(/^\[(URGENT|HIGH|MEDIUM|LOW)\]\s*(?:\[([^\]]+)\])?\s*(.*)$/i)
+    if (match) {
+      return {
+        priority: match[1].toUpperCase(),
+        comicProject: match[2] || selectedDetails?.comicName || selectedDetails?.title || 'Unknown Comic',
+        cleanTitle: match[3]
+      }
+    }
+    return {
+      priority: 'MEDIUM',
+      comicProject: selectedDetails?.comicName || selectedDetails?.title || 'Unknown Comic',
+      cleanTitle: title
+    }
+  }
+
   const [members, setMembers] = useState([])
+  const [claimedCurrentPage, setClaimedCurrentPage] = useState(1)
+
+  useEffect(() => {
+    setClaimedCurrentPage(1)
+  }, [selectedDetails?.id])
   const [memberSearch, setMemberSearch] = useState('')
   const [showCreateTask, setShowCreateTask] = useState(false)
-  const [newTaskData, setNewTaskData] = useState({ title: '', column: 'backlog', progress: 0, assignee: 'MC', dueDate: '' })
+  const [newTaskData, setNewTaskData] = useState({ 
+    title: '', 
+    column: 'backlog', 
+    assignee: '', 
+    dueDate: '', 
+    priority: 'Medium',
+    comic: ''
+  })
+
+  const openCreateTaskModal = () => {
+    const claimedComics = projects.filter(p => 
+      p.status === 'ACTIVE' && 
+      (p.leaderName === userFullName || p.leaderName === authUser?.fullName || p.leaderName === authUser?.username) &&
+      p.title && p.title !== '-'
+    )
+    setNewTaskData({
+      title: '',
+      column: 'backlog',
+      assignee: selectedDetails?.leaderInitials || 'TL',
+      dueDate: '',
+      priority: 'Medium',
+      comic: claimedComics[0]?.title || selectedDetails?.comicName || selectedDetails?.title || ''
+    })
+    setShowCreateTask(true)
+  }
+
+  const openCreateTaskModalWithComic = (comicName) => {
+    setNewTaskData({
+      title: '',
+      column: 'backlog',
+      assignee: selectedDetails?.leaderInitials || 'TL',
+      dueDate: '',
+      priority: 'Medium',
+      comic: comicName
+    })
+    setShowCreateTask(true)
+  }
+
+  const claimedProjects = projects.filter(proj => {
+    const isNotUnclaimed = !proj.status || proj.status.toUpperCase() !== 'UNCLAIMED'
+    const isUserLeader = proj.leaderName && (
+      proj.leaderName === userFullName || 
+      proj.leaderName === authUser?.fullName || 
+      proj.leaderName === authUser?.username ||
+      proj.leaderName.toLowerCase() === userFullName.toLowerCase() ||
+      proj.leaderName.toLowerCase() === authUser?.username?.toLowerCase() ||
+      proj.leaderName.toLowerCase() === user?.username?.toLowerCase() ||
+      proj.leaderName.toLowerCase() === user?.fullName?.toLowerCase()
+    )
+    return isNotUnclaimed && isUserLeader
+  })
+
+  const claimedJobsWithTaskStatus = claimedProjects.map(proj => {
+    const hasTasks = tasks.some(t => {
+      const parsed = parseTaskTitle(t.title)
+      const taskComic = (parsed.comicProject || '').toLowerCase().trim()
+      const projTitle = (proj.title || '').toLowerCase().trim()
+      const projComicName = (proj.comicName || '').toLowerCase().trim()
+      return taskComic === projTitle || taskComic === projComicName
+    })
+
+    return {
+      ...proj,
+      hasTasks,
+      displayStatus: hasTasks ? 'Active' : 'Pending Task'
+    }
+  })
+
+  const claimedTotalPages = Math.ceil(claimedJobsWithTaskStatus.length / 10)
+  const paginatedClaimedJobs = claimedJobsWithTaskStatus.slice((claimedCurrentPage - 1) * 10, claimedCurrentPage * 10)
+  useEffect(() => {
+    if (selectedDetails) {
+      const updated = projects.find(p => p.id === selectedDetails.id)
+      if (updated) {
+        setSelectedDetails(updated)
+      }
+    }
+  }, [projects])
 
   // ── Handlers ─────────────────────────────────────
   const handleOpenDetails = async (project) => {
@@ -64,12 +163,7 @@ function TeamProjects({ projects, setProjects }) {
       contributions: `${project.chaptersCount || 0} chapters`,
       avatar: project.leaderInitials || 'TL'
     }
-    setMembers([
-      actualLeader,
-      { name: 'Emily Brown', role: 'Member', status: 'Active', joinDate: '01/20/2024', contributions: '98 chapters', avatar: 'EB' },
-      { name: 'Michael Chen', role: 'Member', status: 'Active', joinDate: '02/05/2024', contributions: '67 chapters', avatar: 'MC' },
-      { name: 'Sarah Davis', role: 'Member', status: 'Active', joinDate: '02/10/2024', contributions: '53 chapters', avatar: 'SD' }
-    ])
+    setMembers([actualLeader])
 
     try {
       const [annList, msgList, taskList, reqList] = await Promise.all([
@@ -296,16 +390,17 @@ function TeamProjects({ projects, setProjects }) {
   // Action: Create Kanban Task
   const handleCreateTask = async () => {
     if (!newTaskData.title.trim()) return
+    const formattedTitle = `[${newTaskData.priority.toUpperCase()}] [${newTaskData.comic}] ${newTaskData.title.trim()}`
     try {
       const created = await createTeamTaskApi(selectedDetails.id, {
-        title: newTaskData.title.trim(),
+        title: formattedTitle,
         columnName: newTaskData.column,
-        progress: Number(newTaskData.progress) || 0,
+        progress: 0,
         assignees: newTaskData.assignee,
-        dueDate: newTaskData.dueDate || '06/25/2024'
+        dueDate: newTaskData.dueDate || new Date().toISOString().split('T')[0]
       })
       setTasks([...tasks, created])
-      setNewTaskData({ title: '', column: 'backlog', progress: 0, assignee: 'MC', dueDate: '' })
+      setNewTaskData({ title: '', column: 'backlog', assignee: '', dueDate: '', priority: 'Medium', comic: '' })
       setShowCreateTask(false)
       toast.success('Task saved to database!')
     } catch (err) {
@@ -335,10 +430,30 @@ function TeamProjects({ projects, setProjects }) {
     }
   }
 
+  const seenLeaders = new Set()
   const teamProjectsList = projects.filter(proj => {
     const isNotUnclaimed = !proj.status || proj.status.toUpperCase() !== 'UNCLAIMED'
     const matchesSearch = proj.title.toLowerCase().includes(searchTerm.toLowerCase())
-    return isNotUnclaimed && matchesSearch
+    if (!isNotUnclaimed || !matchesSearch) return false
+
+    const isUserLeader = proj.leaderName && (
+      proj.leaderName === userFullName || 
+      proj.leaderName === authUser?.fullName || 
+      proj.leaderName === authUser?.username ||
+      proj.leaderName.toLowerCase() === userFullName.toLowerCase() ||
+      proj.leaderName.toLowerCase() === authUser?.username?.toLowerCase() ||
+      proj.leaderName.toLowerCase() === user?.username?.toLowerCase() ||
+      proj.leaderName.toLowerCase() === user?.fullName?.toLowerCase()
+    )
+
+    if (isUserLeader) {
+      if (seenLeaders.has(proj.leaderName.toLowerCase())) {
+        // Already showed their first team card, hide subsequent ones so claiming doesn't spawn duplicate team cards
+        return false
+      }
+      seenLeaders.add(proj.leaderName.toLowerCase())
+    }
+    return true
   })
 
   // ── WORKSPACE DETAIL VIEW ────────────────────────
@@ -350,6 +465,14 @@ function TeamProjects({ projects, setProjects }) {
         </div>
       )
     }
+
+    const isCurrentLeader = selectedDetails.leaderName === userFullName || 
+      selectedDetails.leaderName === authUser?.fullName || 
+      selectedDetails.leaderName === authUser?.username ||
+      (selectedDetails.leaderName && selectedDetails.leaderName.toLowerCase() === userFullName.toLowerCase()) ||
+      (selectedDetails.leaderName && selectedDetails.leaderName.toLowerCase() === authUser?.username?.toLowerCase()) ||
+      (selectedDetails.leaderName && selectedDetails.leaderName.toLowerCase() === user?.username?.toLowerCase()) ||
+      (selectedDetails.leaderName && selectedDetails.leaderName.toLowerCase() === user?.fullName?.toLowerCase())
 
     const activeTasks = tasks.filter(t => t.columnName !== 'paused')
     const pausedTasks = tasks.filter(t => t.columnName === 'paused')
@@ -380,24 +503,44 @@ function TeamProjects({ projects, setProjects }) {
           >
             Members <span className={`tab-badge ${workspaceTab === 'members' ? 'active-badge' : ''}`}>{members.length}</span>
           </button>
-          <button 
-            className={`workspace-tab-btn ${workspaceTab === 'requests' ? 'active' : ''}`}
-            onClick={() => setWorkspaceTab('requests')}
-          >
-            Requests {joinRequests.length > 0 && <span className="tab-badge alert-badge">{joinRequests.length}</span>}
-          </button>
+          {isCurrentLeader && (
+            <button 
+              className={`workspace-tab-btn ${workspaceTab === 'requests' ? 'active' : ''}`}
+              onClick={() => setWorkspaceTab('requests')}
+            >
+              Requests {joinRequests.length > 0 && <span className="tab-badge alert-badge">{joinRequests.length}</span>}
+            </button>
+          )}
           <button 
             className={`workspace-tab-btn ${workspaceTab === 'tasks' ? 'active' : ''}`}
             onClick={() => setWorkspaceTab('tasks')}
           >
             Tasks <span className={`tab-badge ${workspaceTab === 'tasks' ? 'active-badge' : ''}`}>{tasks.length}</span>
           </button>
-          <button 
-            className={`workspace-tab-btn ${workspaceTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setWorkspaceTab('settings')}
-          >
-            Group Settings
-          </button>
+          {isCurrentLeader && (
+            <button 
+              className={`workspace-tab-btn ${workspaceTab === 'claimed-jobs' ? 'active' : ''}`}
+              onClick={() => setWorkspaceTab('claimed-jobs')}
+            >
+              📋 Claimed Jobs
+            </button>
+          )}
+          {isCurrentLeader && (
+            <button 
+              className={`workspace-tab-btn ${workspaceTab === 'job-pool' ? 'active' : ''}`}
+              onClick={() => setWorkspaceTab('job-pool')}
+            >
+              🌐 Job Pool
+            </button>
+          )}
+          {isCurrentLeader && (
+            <button 
+              className={`workspace-tab-btn ${workspaceTab === 'settings' ? 'active' : ''}`}
+              onClick={() => setWorkspaceTab('settings')}
+            >
+              Group Settings
+            </button>
+          )}
         </div>
 
         {/* Tab 1: HOME WORKSPACE */}
@@ -652,7 +795,7 @@ function TeamProjects({ projects, setProjects }) {
               <div className="taskboard-summary">
                 <strong>{activeTasks.length}</strong> active · <strong>{pausedTasks.length}</strong> paused · <strong>{tasks.filter(t => t.columnName === 'completed').length}</strong> completed
               </div>
-              <button className="trans-btn primary" onClick={() => setShowCreateTask(true)}>
+              <button className="trans-btn primary" onClick={openCreateTaskModal}>
                 + Create Task
               </button>
             </div>
@@ -666,26 +809,32 @@ function TeamProjects({ projects, setProjects }) {
                   <h4>Backlog</h4>
                   <span className="column-card-count">{tasks.filter(t => t.columnName === 'backlog').length}</span>
                 </div>
-                {tasks.filter(t => t.columnName === 'backlog').map(task => (
-                  <div className="task-card-item" key={task.id}>
-                    <span className="task-project-tag">{task.project}</span>
-                    <h5 className="task-title">{task.title}</h5>
-                    <div className="task-card-footer">
-                      <div className="task-assignees-row">
-                        {(task.assignees || 'MC').split(',').map((as, i) => (
-                          <div className="task-assignee-avatar" key={i}>{as}</div>
-                        ))}
+                {tasks.filter(t => t.columnName === 'backlog').map(task => {
+                  const { priority, cleanTitle } = parseTaskTitle(task.title)
+                  return (
+                    <div className="task-card-item" key={task.id}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="task-project-tag">{task.project || selectedDetails?.comicName || selectedDetails?.title}</span>
+                        <span className={`task-priority-badge ${priority.toLowerCase()}`}>{priority}</span>
                       </div>
-                      <div className="task-meta-info">
-                        <span className="task-date-info">📅 {task.dueDate}</span>
+                      <h5 className="task-title">{cleanTitle}</h5>
+                      <div className="task-card-footer">
+                        <div className="task-assignees-row">
+                          {(task.assignees || 'TL').split(',').map((as, i) => (
+                            <div className="task-assignee-avatar" key={i}>{as}</div>
+                          ))}
+                        </div>
+                        <div className="task-meta-info">
+                          <span className="task-date-info">📅 {task.dueDate}</span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                        <button style={{ flex: 1, fontSize: '10px', padding: '2px' }} className="trans-btn primary" onClick={() => handleMoveTask(task.id, 'in_progress')}>Start</button>
+                        <button style={{ fontSize: '10px', padding: '2px 6px' }} className="trans-btn secondary" onClick={() => handleMoveTask(task.id, 'paused')}>⏸</button>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                      <button style={{ flex: 1, fontSize: '10px', padding: '2px' }} className="trans-btn primary" onClick={() => handleMoveTask(task.id, 'in_progress')}>Start</button>
-                      <button style={{ fontSize: '10px', padding: '2px 6px' }} className="trans-btn secondary" onClick={() => handleMoveTask(task.id, 'paused')}>⏸</button>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
               {/* In Progress */}
@@ -694,37 +843,43 @@ function TeamProjects({ projects, setProjects }) {
                   <h4>In Progress</h4>
                   <span className="column-card-count">{tasks.filter(t => t.columnName === 'in_progress').length}</span>
                 </div>
-                {tasks.filter(t => t.columnName === 'in_progress').map(task => (
-                  <div className="task-card-item" key={task.id}>
-                    <span className="task-project-tag">{task.project}</span>
-                    <h5 className="task-title">{task.title}</h5>
-                    
-                    <div className="task-progress-section">
-                      <div className="task-progress-label-row">
-                        <span>Progress</span>
-                        <span>{task.progress}%</span>
+                {tasks.filter(t => t.columnName === 'in_progress').map(task => {
+                  const { priority, cleanTitle } = parseTaskTitle(task.title)
+                  return (
+                    <div className="task-card-item" key={task.id}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="task-project-tag">{task.project || selectedDetails?.comicName || selectedDetails?.title}</span>
+                        <span className={`task-priority-badge ${priority.toLowerCase()}`}>{priority}</span>
                       </div>
-                      <div className="task-progress-bar-bg">
-                        <div className="task-progress-bar-fill" style={{ width: `${task.progress}%` }}></div>
+                      <h5 className="task-title">{cleanTitle}</h5>
+                      
+                      <div className="task-progress-section">
+                        <div className="task-progress-label-row">
+                          <span>Progress</span>
+                          <span>{task.progress}%</span>
+                        </div>
+                        <div className="task-progress-bar-bg">
+                          <div className="task-progress-bar-fill" style={{ width: `${task.progress}%` }}></div>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="task-card-footer">
-                      <div className="task-assignees-row">
-                        {(task.assignees || 'MC').split(',').map((as, i) => (
-                          <div className="task-assignee-avatar" key={i}>{as}</div>
-                        ))}
+                      <div className="task-card-footer">
+                        <div className="task-assignees-row">
+                          {(task.assignees || 'TL').split(',').map((as, i) => (
+                            <div className="task-assignee-avatar" key={i}>{as}</div>
+                          ))}
+                        </div>
+                        <div className="task-meta-info">
+                          <span className="task-date-info">📅 {task.dueDate}</span>
+                        </div>
                       </div>
-                      <div className="task-meta-info">
-                        <span className="task-date-info">📅 {task.dueDate}</span>
+                      <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                        <button style={{ flex: 1, fontSize: '10px', padding: '2px' }} className="trans-btn primary" onClick={() => handleMoveTask(task.id, 'under_review')}>Submit Review</button>
+                        <button style={{ fontSize: '10px', padding: '2px 6px' }} className="trans-btn secondary" onClick={() => handleMoveTask(task.id, 'paused')}>⏸</button>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                      <button style={{ flex: 1, fontSize: '10px', padding: '2px' }} className="trans-btn primary" onClick={() => handleMoveTask(task.id, 'under_review')}>Submit Review</button>
-                      <button style={{ fontSize: '10px', padding: '2px 6px' }} className="trans-btn secondary" onClick={() => handleMoveTask(task.id, 'paused')}>⏸</button>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
               {/* Under Review */}
@@ -733,37 +888,43 @@ function TeamProjects({ projects, setProjects }) {
                   <h4>Under Review</h4>
                   <span className="column-card-count">{tasks.filter(t => t.columnName === 'under_review').length}</span>
                 </div>
-                {tasks.filter(t => t.columnName === 'under_review').map(task => (
-                  <div className="task-card-item" key={task.id}>
-                    <span className="task-project-tag">{task.project}</span>
-                    <h5 className="task-title">{task.title}</h5>
-                    
-                    <div className="task-progress-section">
-                      <div className="task-progress-label-row">
-                        <span>Progress</span>
-                        <span>{task.progress}%</span>
+                {tasks.filter(t => t.columnName === 'under_review').map(task => {
+                  const { priority, cleanTitle } = parseTaskTitle(task.title)
+                  return (
+                    <div className="task-card-item" key={task.id}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="task-project-tag">{task.project || selectedDetails?.comicName || selectedDetails?.title}</span>
+                        <span className={`task-priority-badge ${priority.toLowerCase()}`}>{priority}</span>
                       </div>
-                      <div className="task-progress-bar-bg">
-                        <div className="task-progress-bar-fill" style={{ width: `${task.progress}%`, backgroundColor: '#3b82f6' }}></div>
+                      <h5 className="task-title">{cleanTitle}</h5>
+                      
+                      <div className="task-progress-section">
+                        <div className="task-progress-label-row">
+                          <span>Progress</span>
+                          <span>{task.progress}%</span>
+                        </div>
+                        <div className="task-progress-bar-bg">
+                          <div className="task-progress-bar-fill" style={{ width: `${task.progress}%`, backgroundColor: '#3b82f6' }}></div>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="task-card-footer">
-                      <div className="task-assignees-row">
-                        {(task.assignees || 'MC').split(',').map((as, i) => (
-                          <div className="task-assignee-avatar" key={i}>{as}</div>
-                        ))}
+                      <div className="task-card-footer">
+                        <div className="task-assignees-row">
+                          {(task.assignees || 'TL').split(',').map((as, i) => (
+                            <div className="task-assignee-avatar" key={i}>{as}</div>
+                          ))}
+                        </div>
+                        <div className="task-meta-info">
+                          <span className="task-date-info">📅 {task.dueDate}</span>
+                        </div>
                       </div>
-                      <div className="task-meta-info">
-                        <span className="task-date-info">📅 {task.dueDate}</span>
+                      <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                        <button style={{ flex: 1, fontSize: '10px', padding: '2px' }} className="trans-btn primary" onClick={() => handleMoveTask(task.id, 'completed')}>Approve & Done</button>
+                        <button style={{ flex: 1, fontSize: '10px', padding: '2px' }} className="trans-btn secondary" onClick={() => handleMoveTask(task.id, 'in_progress')}>Reject</button>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                      <button style={{ flex: 1, fontSize: '10px', padding: '2px' }} className="trans-btn primary" onClick={() => handleMoveTask(task.id, 'completed')}>Approve & Done</button>
-                      <button style={{ flex: 1, fontSize: '10px', padding: '2px' }} className="trans-btn secondary" onClick={() => handleMoveTask(task.id, 'in_progress')}>Reject</button>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
               {/* Completed */}
@@ -772,33 +933,39 @@ function TeamProjects({ projects, setProjects }) {
                   <h4>Completed</h4>
                   <span className="column-card-count">{tasks.filter(t => t.columnName === 'completed').length}</span>
                 </div>
-                {tasks.filter(t => t.columnName === 'completed').map(task => (
-                  <div className="task-card-item" key={task.id}>
-                    <span className="task-project-tag">{task.project}</span>
-                    <h5 className="task-title">{task.title}</h5>
-                    
-                    <div className="task-progress-section">
-                      <div className="task-progress-label-row">
-                        <span>Progress</span>
-                        <span>100%</span>
+                {tasks.filter(t => t.columnName === 'completed').map(task => {
+                  const { priority, cleanTitle } = parseTaskTitle(task.title)
+                  return (
+                    <div className="task-card-item" key={task.id}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="task-project-tag">{task.project || selectedDetails?.comicName || selectedDetails?.title}</span>
+                        <span className={`task-priority-badge ${priority.toLowerCase()}`}>{priority}</span>
                       </div>
-                      <div className="task-progress-bar-bg">
-                        <div className="task-progress-bar-fill completed-fill" style={{ width: '100%' }}></div>
+                      <h5 className="task-title">{cleanTitle}</h5>
+                      
+                      <div className="task-progress-section">
+                        <div className="task-progress-label-row">
+                          <span>Progress</span>
+                          <span>100%</span>
+                        </div>
+                        <div className="task-progress-bar-bg">
+                          <div className="task-progress-bar-fill completed-fill" style={{ width: '100%' }}></div>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="task-card-footer">
-                      <div className="task-assignees-row">
-                        {(task.assignees || 'MC').split(',').map((as, i) => (
-                          <div className="task-assignee-avatar" key={i}>{as}</div>
-                        ))}
-                      </div>
-                      <div className="task-meta-info">
-                        <span className="task-date-info">📅 {task.dueDate}</span>
+                      <div className="task-card-footer">
+                        <div className="task-assignees-row">
+                          {(task.assignees || 'TL').split(',').map((as, i) => (
+                            <div className="task-assignee-avatar" key={i}>{as}</div>
+                          ))}
+                        </div>
+                        <div className="task-meta-info">
+                          <span className="task-date-info">📅 {task.dueDate}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
             </div>
@@ -810,92 +977,155 @@ function TeamProjects({ projects, setProjects }) {
                 <p style={{ fontStyle: 'italic', color: 'var(--trans-text-muted)', fontSize: '13px' }}>No paused tasks.</p>
               ) : (
                 <div className="paused-tasks-grid">
-                  {pausedTasks.map(task => (
-                    <div className="paused-task-card" key={task.id}>
-                      <span className="paused-task-badge">Paused</span>
-                      <h5 className="task-title" style={{ margin: '8px 0 4px' }}>{task.title}</h5>
-                      <span style={{ fontSize: '11px', color: 'var(--trans-text-muted)' }}>Project: {task.project}</span>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
-                        <span style={{ fontSize: '11px', color: 'var(--trans-text-secondary)' }}>Due: {task.dueDate}</span>
-                        <button className="trans-btn primary" style={{ fontSize: '9px', padding: '2px 8px' }} onClick={() => handleMoveTask(task.id, 'backlog')}>Resume</button>
+                  {pausedTasks.map(task => {
+                    const { priority, cleanTitle } = parseTaskTitle(task.title)
+                    return (
+                      <div className="paused-task-card" key={task.id}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <span className="paused-task-badge">Paused</span>
+                          <span className={`task-priority-badge ${priority.toLowerCase()}`}>{priority}</span>
+                        </div>
+                        <h5 className="task-title" style={{ margin: '8px 0 4px' }}>{cleanTitle}</h5>
+                        <span style={{ fontSize: '11px', color: 'var(--trans-text-muted)' }}>Project: {task.project || selectedDetails?.comicName || selectedDetails?.title}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--trans-text-secondary)' }}>Due: {task.dueDate}</span>
+                          <button className="trans-btn primary" style={{ fontSize: '9px', padding: '2px 8px' }} onClick={() => handleMoveTask(task.id, 'backlog')}>Resume</button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
 
-            {/* CREATE TASK MODAL */}
-            {showCreateTask && (
-              <div className="trans-modal-overlay">
-                <div className="trans-modal-card">
-                  <div className="trans-modal-header">
-                    <h3>Create New Task</h3>
-                    <button className="trans-modal-close-btn" onClick={() => setShowCreateTask(false)}>×</button>
-                  </div>
-                  <div className="trans-modal-body">
-                    <div className="trans-form-group">
-                      <label className="trans-form-label">Task Name</label>
-                      <input 
-                        type="text" 
-                        className="trans-form-input" 
-                        placeholder="e.g. Chapter 47 - Proofreading"
-                        value={newTaskData.title}
-                        onChange={(e) => setNewTaskData({ ...newTaskData, title: e.target.value })}
-                      />
-                    </div>
-                    <div className="trans-form-group">
-                      <label className="trans-form-label">Kanban Column</label>
-                      <select 
-                        className="trans-form-input"
-                        value={newTaskData.column}
-                        onChange={(e) => setNewTaskData({ ...newTaskData, column: e.target.value })}
-                      >
-                        <option value="backlog">Backlog</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="under_review">Under Review</option>
-                        <option value="completed">Completed</option>
-                      </select>
-                    </div>
-                    <div className="trans-form-group">
-                      <label className="trans-form-label">Initial Progress %</label>
-                      <input 
-                        type="number" 
-                        className="trans-form-input"
-                        value={newTaskData.progress}
-                        onChange={(e) => setNewTaskData({ ...newTaskData, progress: e.target.value })}
-                      />
-                    </div>
-                    <div className="trans-form-group">
-                      <label className="trans-form-label">Assignee</label>
-                      <select 
-                        className="trans-form-input"
-                        value={newTaskData.assignee}
-                        onChange={(e) => setNewTaskData({ ...newTaskData, assignee: e.target.value })}
-                      >
-                        {members.map((m, idx) => (
-                          <option key={idx} value={m.avatar}>{m.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="trans-form-group">
-                      <label className="trans-form-label">Due Date</label>
-                      <input 
-                        type="text" 
-                        className="trans-form-input"
-                        placeholder="MM/DD/YYYY"
-                        value={newTaskData.dueDate}
-                        onChange={(e) => setNewTaskData({ ...newTaskData, dueDate: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="trans-modal-footer">
-                    <button className="trans-btn secondary" onClick={() => setShowCreateTask(false)}>Cancel</button>
-                    <button className="trans-btn primary" onClick={handleCreateTask} disabled={!newTaskData.title.trim()}>Create</button>
-                  </div>
-                </div>
-              </div>
-            )}
+             {/* CREATE TASK MODAL */}
+             {showCreateTask && (
+               <div className="trans-modal-overlay">
+                 <div className="trans-modal-card">
+                   <div className="trans-modal-header">
+                     <h3>Create New Task</h3>
+                     <button className="trans-modal-close-btn" onClick={() => setShowCreateTask(false)}>×</button>
+                   </div>
+                   <div className="trans-modal-body">
+                     <div className="trans-form-group">
+                       <label className="trans-form-label">Comic Project *</label>
+                       <select 
+                         className="trans-form-input"
+                         value={newTaskData.comic}
+                         onChange={(e) => setNewTaskData({ ...newTaskData, comic: e.target.value })}
+                       >
+                         {projects.filter(p => 
+                           p.status === 'ACTIVE' && 
+                           (p.leaderName === userFullName || p.leaderName === authUser?.fullName || p.leaderName === authUser?.username) &&
+                           p.title && p.title !== '-'
+                         ).map((c, idx) => (
+                           <option key={idx} value={c.title}>{c.title} ({c.targetLang})</option>
+                         ))}
+                       </select>
+                     </div>
+                     <div className="trans-form-group">
+                       <label className="trans-form-label">Task Name *</label>
+                       <input 
+                         type="text" 
+                         className="trans-form-input" 
+                         placeholder="e.g. Chapter 47 - Proofreading"
+                         value={newTaskData.title}
+                         onChange={(e) => setNewTaskData({ ...newTaskData, title: e.target.value })}
+                       />
+                     </div>
+                     <div className="trans-form-group">
+                       <label className="trans-form-label">Kanban Column</label>
+                       <select 
+                         className="trans-form-input"
+                         value={newTaskData.column}
+                         onChange={(e) => setNewTaskData({ ...newTaskData, column: e.target.value })}
+                       >
+                         <option value="backlog">Backlog</option>
+                         <option value="in_progress">In Progress</option>
+                         <option value="under_review">Under Review</option>
+                         <option value="completed">Completed</option>
+                       </select>
+                     </div>
+                     <div className="trans-form-group">
+                       <label className="trans-form-label">Priority</label>
+                       <select 
+                         className="trans-form-input"
+                         value={newTaskData.priority}
+                         onChange={(e) => setNewTaskData({ ...newTaskData, priority: e.target.value })}
+                       >
+                         <option value="Urgent">🚨 Urgent</option>
+                         <option value="High">🟠 High</option>
+                         <option value="Medium">🟣 Medium</option>
+                         <option value="Low">⚪ Low</option>
+                       </select>
+                     </div>
+                     <div className="trans-form-group">
+                       <label className="trans-form-label">Assignee</label>
+                       <select 
+                         className="trans-form-input"
+                         value={newTaskData.assignee}
+                         onChange={(e) => setNewTaskData({ ...newTaskData, assignee: e.target.value })}
+                       >
+                         {members.map((m, idx) => (
+                           <option key={idx} value={m.avatar}>{m.name}</option>
+                         ))}
+                       </select>
+                     </div>
+                     <div className="trans-form-group">
+                       <label className="trans-form-label">Due Date</label>
+                       <input 
+                         type="date" 
+                         className="trans-form-input"
+                         value={newTaskData.dueDate}
+                         onChange={(e) => setNewTaskData({ ...newTaskData, dueDate: e.target.value })}
+                       />
+                       <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                         <button 
+                           type="button" 
+                           className="trans-btn secondary" 
+                           style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
+                           onClick={() => {
+                             const d = new Date()
+                             d.setDate(d.getDate() + 3)
+                             setNewTaskData({ ...newTaskData, dueDate: d.toISOString().split('T')[0] })
+                           }}
+                         >
+                           +3 Days
+                         </button>
+                         <button 
+                           type="button" 
+                           className="trans-btn secondary" 
+                           style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
+                           onClick={() => {
+                             const d = new Date()
+                             d.setDate(d.getDate() + 7)
+                             setNewTaskData({ ...newTaskData, dueDate: d.toISOString().split('T')[0] })
+                           }}
+                         >
+                           +1 Week
+                         </button>
+                         <button 
+                           type="button" 
+                           className="trans-btn secondary" 
+                           style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
+                           onClick={() => {
+                             const d = new Date()
+                             d.setDate(d.getDate() + 14)
+                             setNewTaskData({ ...newTaskData, dueDate: d.toISOString().split('T')[0] })
+                           }}
+                         >
+                           +2 Weeks
+                         </button>
+                       </div>
+                     </div>
+                   </div>
+                   <div className="trans-modal-footer">
+                     <button className="trans-btn secondary" onClick={() => setShowCreateTask(false)}>Cancel</button>
+                     <button className="trans-btn primary" onClick={handleCreateTask} disabled={!newTaskData.title.trim()}>Create Task</button>
+                   </div>
+                 </div>
+               </div>
+             )}
 
           </div>
         )}
@@ -965,6 +1195,124 @@ function TeamProjects({ projects, setProjects }) {
             </div>
           </div>
         )}
+        {/* Tab: CLAIMED JOBS WORKSPACE */}
+        {workspaceTab === 'claimed-jobs' && (
+          <div className="fade-in" style={{ marginTop: '20px' }}>
+            <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '16px', padding: '24px', backdropFilter: 'blur(10px)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div>
+                  <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--trans-text-primary)', margin: '0 0 4px' }}>📋 Claimed Jobs</h2>
+                  <p style={{ fontSize: '13px', color: 'var(--trans-text-secondary)', margin: 0 }}>List of translation comics claimed by your team from the pool.</p>
+                </div>
+                <div style={{ background: 'rgba(168, 85, 247, 0.1)', color: 'var(--trans-purple)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600' }}>
+                  Total: {claimedJobsWithTaskStatus.length} claimed
+                </div>
+              </div>
+
+              {claimedJobsWithTaskStatus.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--trans-text-secondary)' }}>
+                  <p style={{ margin: 0, fontSize: '14px' }}>No jobs claimed yet. Go to the <strong>🌐 Job Pool</strong> tab to claim comics!</p>
+                </div>
+              ) : (
+                <>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', color: 'var(--trans-text-secondary)' }}>
+                          <th style={{ padding: '12px 16px', fontWeight: '600' }}>Comic Title</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '600' }}>Target Language</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '600' }}>Deadline</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '600' }}>Status</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedClaimedJobs.map(job => (
+                          <tr key={job.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', color: 'var(--trans-text-primary)' }}>
+                            <td style={{ padding: '16px', fontWeight: '600' }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span>📖</span>
+                                {job.title}
+                              </span>
+                            </td>
+                            <td style={{ padding: '16px' }}>{job.targetLang}</td>
+                            <td style={{ padding: '16px', color: 'var(--trans-text-secondary)' }}>{job.deadline || 'unspecified'}</td>
+                            <td style={{ padding: '16px' }}>
+                              <span className={`status-badge ${job.hasTasks ? 'active' : 'pending'}`} style={{
+                                background: job.hasTasks ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                color: job.hasTasks ? '#10b981' : '#f59e0b',
+                                border: job.hasTasks ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
+                                fontSize: '11px',
+                                fontWeight: '600',
+                                padding: '2px 8px',
+                                borderRadius: '4px'
+                              }}>
+                                {job.displayStatus}
+                              </span>
+                            </td>
+                            <td style={{ padding: '16px', textAlign: 'right' }}>
+                              {job.hasTasks ? (
+                                <button 
+                                  className="trans-btn secondary" 
+                                  style={{ fontSize: '12px', padding: '6px 12px' }}
+                                  onClick={() => setWorkspaceTab('tasks')}
+                                >
+                                  View Tasks
+                                </button>
+                              ) : (
+                                <button 
+                                  className="trans-btn primary" 
+                                  style={{ fontSize: '12px', padding: '6px 12px' }}
+                                  onClick={() => {
+                                    setWorkspaceTab('tasks');
+                                    openCreateTaskModalWithComic(job.title);
+                                  }}
+                                >
+                                  + Set Task
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {claimedTotalPages > 1 && (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '24px' }}>
+                      <button 
+                        className="trans-btn secondary" 
+                        onClick={() => setClaimedCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={claimedCurrentPage === 1}
+                        style={{ padding: '6px 12px', fontSize: '12.5px' }}
+                      >
+                        Previous
+                      </button>
+                      <span style={{ fontSize: '13px', color: 'var(--trans-text-secondary)' }}>
+                        Page <strong>{claimedCurrentPage}</strong> of <strong>{claimedTotalPages || 1}</strong>
+                      </span>
+                      <button 
+                        className="trans-btn secondary" 
+                        onClick={() => setClaimedCurrentPage(prev => Math.min(prev + 1, claimedTotalPages))}
+                        disabled={claimedCurrentPage === claimedTotalPages || claimedTotalPages === 0}
+                        style={{ padding: '6px 12px', fontSize: '12.5px' }}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 6: JOB POOL WORKSPACE */}
+        {workspaceTab === 'job-pool' && (
+          <div className="fade-in">
+            <JobPool fetchProjects={fetchProjects} />
+          </div>
+        )}
 
       </div>
     )
@@ -1005,7 +1353,20 @@ function TeamProjects({ projects, setProjects }) {
                 <p className="trans-project-meta">
                   🧑‍🤝‍🧑 Team: <strong>{proj.team}</strong> · {proj.chaptersCount} chapters published
                 </p>
-                <span className={`status-badge ${proj.status.toLowerCase()}`}>{proj.status}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                  <span className={`status-badge ${proj.status.toLowerCase()}`}>{proj.status}</span>
+                  {proj.leaderName && (
+                    proj.leaderName === userFullName || 
+                    proj.leaderName === authUser?.fullName || 
+                    proj.leaderName === authUser?.username ||
+                    proj.leaderName.toLowerCase() === userFullName.toLowerCase() ||
+                    proj.leaderName.toLowerCase() === authUser?.username?.toLowerCase() ||
+                    proj.leaderName.toLowerCase() === user?.username?.toLowerCase() ||
+                    proj.leaderName.toLowerCase() === user?.fullName?.toLowerCase()
+                  ) && (
+                    <span className="status-badge active" style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.4)', fontSize: '11px', fontWeight: 'bold' }}>⭐ Led by Me</span>
+                  )}
+                </div>
               </div>
               <div className="trans-project-actions">
                 <button className="trans-btn primary" onClick={() => handleOpenDetails(proj)}>

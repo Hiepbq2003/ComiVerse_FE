@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import '../../assets/style/translator.css'
 import '../../assets/style/translator/dashboard.css'
 import TeamProjects from './TeamProjects'
-import JobPool from './JobPool'
 import Revenue from './Revenue'
 import Payout from './Payout'
 import { getAllProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
@@ -25,9 +24,9 @@ function TranslatorDashboard({ user, onLogout }) {
     fetchProjects()
   }, [])
 
-  const fetchProjects = async () => {
+  const fetchProjects = async (silent = false) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       const data = await getAllProjectTeamsApi()
       const mapped = (data || []).map(p => ({
         ...p,
@@ -39,7 +38,7 @@ function TranslatorDashboard({ user, onLogout }) {
       console.error(err)
       toast.error('Failed to load translator project teams.')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
@@ -120,19 +119,6 @@ function TranslatorDashboard({ user, onLogout }) {
             Dashboard
           </button>
 
-          {isLeader && (
-            <button 
-              className={`translator-nav-item ${activeNav === 'job-pool' ? 'active' : ''}`}
-              onClick={() => setActiveNav('job-pool')}
-            >
-              <span className="translator-nav-icon">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
-                </svg>
-              </span>
-              Job Pool
-            </button>
-          )}
 
           <button 
             className={`translator-nav-item ${activeNav === 'project-teams' ? 'active' : ''}`}
@@ -328,14 +314,10 @@ function TranslatorDashboard({ user, onLogout }) {
                 </div>
               )}
 
-              {/* VIEW: JOB POOL */}
-              {activeNav === 'job-pool' && (
-                <JobPool />
-              )}
 
               {/* VIEW: PROJECT TEAMS */}
               {activeNav === 'project-teams' && (
-                <TeamProjects projects={projects} setProjects={setProjects} />
+                <TeamProjects projects={projects} setProjects={setProjects} fetchProjects={fetchProjects} user={user} />
               )}
 
               {/* VIEW: REVENUE */}
