@@ -117,6 +117,7 @@ function ModeratorDashboard({ user, onLogout }) {
   }
 
   const handleTriggerAssignTeam = (comic) => {
+    setActiveNav('project-teams')
     setCreateTeamForm({
       title: `${comic.title} Team`,
       comicName: comic.title,
@@ -420,9 +421,11 @@ function ModeratorDashboard({ user, onLogout }) {
               {activeNav === 'comic-management' && (
                 <ComicManagement 
                   comics={comics} 
+                  projectTeams={projectTeams}
                   handleSaveEditComic={handleSaveEditComic} 
                   handleArchiveComic={handleArchiveComic} 
                   handleTriggerAssignTeam={handleTriggerAssignTeam} 
+                  fetchAllData={fetchAllData}
                 />
               )}
 

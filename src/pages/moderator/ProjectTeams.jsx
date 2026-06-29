@@ -158,13 +158,13 @@ function ProjectTeams({
 
       {/* Project Teams Cards list */}
       <div className="project-team-cards-list">
-        {projectTeams.length === 0 ? (
+        {projectTeams.filter(t => !t.status || t.status.toUpperCase() !== 'UNCLAIMED').length === 0 ? (
           <div className="moderator-empty-state">
             <h3>No translation project teams</h3>
             <p>Click "Create Project Team" on the top right to start a new project team.</p>
           </div>
         ) : (
-          projectTeams.map(team => (
+          projectTeams.filter(t => !t.status || t.status.toUpperCase() !== 'UNCLAIMED').map(team => (
             <div className="project-team-row-card" key={team.id}>
               <div className="project-team-card-header">
                 <div>

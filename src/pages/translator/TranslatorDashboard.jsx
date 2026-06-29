@@ -5,7 +5,8 @@ import TeamProjects from './TeamProjects'
 import JobPool from './JobPool'
 import Revenue from './Revenue'
 import Payout from './Payout'
-import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
+import { getAllProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
+import { getAllComicsApi, updateComicApi } from '../../services/api/ComicApi'
 import { toast } from 'react-toastify'
 
 function TranslatorDashboard({ user, onLogout }) {
@@ -39,6 +40,61 @@ function TranslatorDashboard({ user, onLogout }) {
       toast.error('Failed to load translator project teams.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleAcceptAssignment = async (team) => {
+    try {
+      const originalTeam = projects.find(p => p.id === team.id)
+      if (!originalTeam) return
+
+      const payload = {
+        ...originalTeam,
+        title: originalTeam.team,
+        comicName: originalTeam.title,
+        status: 'ACTIVE'
+      }
+
+      await updateProjectTeamApi(team.id, payload)
+      toast.success(`Approved translation assignment for ${team.title}!`)
+      await fetchProjects()
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to approve assignment.')
+    }
+  }
+
+  const handleRejectAssignment = async (team) => {
+    if (window.confirm(`Are you sure you want to reject translating ${team.title}?`)) {
+      try {
+        const originalTeam = projects.find(p => p.id === team.id)
+        if (!originalTeam) return
+
+        const teamPayload = {
+          ...originalTeam,
+          title: originalTeam.team,
+          comicName: '-',
+          targetLang: '-',
+          status: 'ACTIVE'
+        }
+
+        await updateProjectTeamApi(team.id, teamPayload)
+
+        const allComics = await getAllComicsApi()
+        const comicToReset = allComics.find(c => c.title.toLowerCase() === team.title.toLowerCase())
+        if (comicToReset) {
+          await updateComicApi(comicToReset.id, {
+            ...comicToReset,
+            projectTeam: '-'
+          })
+        }
+
+        toast.info(`Rejected assignment for ${team.title}. The project has been returned.`)
+        await fetchProjects()
+      } catch (err) {
+        console.error(err)
+        toast.error('Failed to reject assignment.')
+      }
     }
   }
 
@@ -175,6 +231,65 @@ function TranslatorDashboard({ user, onLogout }) {
                       <p>Check translation summaries, cumulative monthly views, and pending clearances.</p>
                     </div>
                   </div>
+
+                  {/* Pending Assignments Section */}
+                  {projects.filter(p => p.status === 'PENDING' && (p.leaderName === user.fullName || p.leaderName === user.username)).map(team => (
+                    <div key={team.id} className="pending-assignment-alert" style={{
+                      background: 'rgba(124, 58, 237, 0.1)',
+                      border: '1px solid rgba(124, 58, 237, 0.3)',
+                      borderRadius: '12px',
+                      padding: '16px',
+                      marginBottom: '24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '16px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ fontSize: '24px' }}>📋</span>
+                        <div>
+                          <h4 style={{ margin: 0, color: '#fff', fontSize: '15px' }}>Pending Translation Assignment</h4>
+                          <p style={{ margin: '4px 0 0', color: 'rgba(255, 255, 255, 0.7)', fontSize: '13px' }}>
+                            Moderator has assigned your team <strong>{team.team}</strong> to translate <strong>{team.title}</strong> into <strong>{team.targetLang}</strong> (Deadline: {team.deadline || 'unspecified'}).
+                          </p>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <button 
+                          onClick={() => handleAcceptAssignment(team)}
+                          style={{
+                            background: '#10b981',
+                            color: '#fff',
+                            border: 'none',
+                            padding: '8px 16px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: '600',
+                            fontSize: '13px',
+                            transition: 'opacity 0.2s'
+                          }}
+                        >
+                          Approve
+                        </button>
+                        <button 
+                          onClick={() => handleRejectAssignment(team)}
+                          style={{
+                            background: '#ef4444',
+                            color: '#fff',
+                            border: 'none',
+                            padding: '8px 16px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: '600',
+                            fontSize: '13px',
+                            transition: 'opacity 0.2s'
+                          }}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  ))}
 
                   <div className="trans-stats-grid" style={{ marginBottom: '24px' }}>
                     <div className="trans-stat-card" style={{ borderTop: '4px solid var(--trans-purple)' }}>

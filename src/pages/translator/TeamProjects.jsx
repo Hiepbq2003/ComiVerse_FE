@@ -43,15 +43,7 @@ function TeamProjects({ projects, setProjects }) {
   const userFullName = authUser?.fullName || authUser?.username || 'Translator'
 
   // Default members list (seeded details, status active/inactive)
-  const [members, setMembers] = useState([
-    { name: 'John Smith', role: 'Group Leader', status: 'Active', joinDate: '01/15/2024', contributions: '145 chapters', avatar: 'JS' },
-    { name: 'Emily Brown', role: 'Member', status: 'Active', joinDate: '01/20/2024', contributions: '98 chapters', avatar: 'EB' },
-    { name: 'Michael Chen', role: 'Member', status: 'Active', joinDate: '02/05/2024', contributions: '67 chapters', avatar: 'MC' },
-    { name: 'Sarah Davis', role: 'Member', status: 'Active', joinDate: '02/10/2024', contributions: '53 chapters', avatar: 'SD' },
-    { name: 'David Wilson', role: 'Member', status: 'Inactive', joinDate: '03/01/2024', contributions: '41 chapters', avatar: 'DW' },
-    { name: 'Lisa Martinez', role: 'Member', status: 'Active', joinDate: '03/15/2024', contributions: '28 chapters', avatar: 'LM' },
-    { name: 'Ryan Park', role: 'Member', status: 'Active', joinDate: '04/02/2024', contributions: '19 chapters', avatar: 'RP' }
-  ])
+  const [members, setMembers] = useState([])
   const [memberSearch, setMemberSearch] = useState('')
   const [showCreateTask, setShowCreateTask] = useState(false)
   const [newTaskData, setNewTaskData] = useState({ title: '', column: 'backlog', progress: 0, assignee: 'MC', dueDate: '' })
@@ -62,6 +54,23 @@ function TeamProjects({ projects, setProjects }) {
     setWorkspaceTab('home')
     setShowUploadForm(false)
     setLoadingWorkspace(true)
+    
+    // Sync leader info dynamically in the members list
+    const actualLeader = {
+      name: project.leaderName || 'No Leader',
+      role: 'Group Leader',
+      status: 'Active',
+      joinDate: '01/15/2024',
+      contributions: `${project.chaptersCount || 0} chapters`,
+      avatar: project.leaderInitials || 'TL'
+    }
+    setMembers([
+      actualLeader,
+      { name: 'Emily Brown', role: 'Member', status: 'Active', joinDate: '01/20/2024', contributions: '98 chapters', avatar: 'EB' },
+      { name: 'Michael Chen', role: 'Member', status: 'Active', joinDate: '02/05/2024', contributions: '67 chapters', avatar: 'MC' },
+      { name: 'Sarah Davis', role: 'Member', status: 'Active', joinDate: '02/10/2024', contributions: '53 chapters', avatar: 'SD' }
+    ])
+
     try {
       const [annList, msgList, taskList, reqList] = await Promise.all([
         getTeamAnnouncementsApi(project.id),
@@ -327,7 +336,9 @@ function TeamProjects({ projects, setProjects }) {
   }
 
   const teamProjectsList = projects.filter(proj => {
-    return proj.title.toLowerCase().includes(searchTerm.toLowerCase())
+    const isNotUnclaimed = !proj.status || proj.status.toUpperCase() !== 'UNCLAIMED'
+    const matchesSearch = proj.title.toLowerCase().includes(searchTerm.toLowerCase())
+    return isNotUnclaimed && matchesSearch
   })
 
   // ── WORKSPACE DETAIL VIEW ────────────────────────
@@ -938,10 +949,14 @@ function TeamProjects({ projects, setProjects }) {
             <div className="settings-leader-card">
               <h3 className="settings-section-title">Group Leader</h3>
               <div className="member-cell-info">
-                <div className="chat-avatar" style={{ background: '#f59e0b', color: '#ffffff' }}>JS</div>
+                <div className="chat-avatar" style={{ background: '#f59e0b', color: '#ffffff' }}>
+                  {selectedDetails.leaderInitials || 'TL'}
+                </div>
                 <div className="member-status-details">
-                  <span className="member-name-text">John Smith</span>
-                  <span className="post-time" style={{ textTransform: 'uppercase', fontWeight: '700', fontSize: '9px', color: '#d97706' }}>Group Leader · 145 chapters contributed</span>
+                  <span className="member-name-text">{selectedDetails.leaderName || 'No Leader'}</span>
+                  <span className="post-time" style={{ textTransform: 'uppercase', fontWeight: '700', fontSize: '9px', color: '#d97706' }}>
+                    Group Leader · {selectedDetails.chaptersCount || 0} chapters contributed
+                  </span>
                 </div>
               </div>
               <p style={{ fontSize: '12.5px', color: 'var(--trans-text-muted)', margin: '14px 0 0' }}>

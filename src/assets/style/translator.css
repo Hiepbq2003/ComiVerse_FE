@@ -541,7 +541,7 @@
 .translator-empty-state {
   text-align: center;
   padding: 48px;
-  background: #ffffff;
+  background: var(--trans-card-bg);
   border-radius: 8px;
   border: 1px solid var(--trans-border);
   color: var(--trans-text-secondary);

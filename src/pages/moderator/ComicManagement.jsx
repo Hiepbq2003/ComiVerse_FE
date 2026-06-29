@@ -2,8 +2,10 @@ import { useState } from 'react'
 import '../../assets/style/moderator/comic-management.css'
 import { createTranslationRequestApi } from '../../services/api/TranslationPoolApi'
 import { toast } from 'react-toastify'
+import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
+import { updateComicApi } from '../../services/api/ComicApi'
 
-function ComicManagement({ comics, handleSaveEditComic, handleArchiveComic, handleTriggerAssignTeam }) {
+function ComicManagement({ comics, projectTeams, handleSaveEditComic, handleArchiveComic, handleTriggerAssignTeam, fetchAllData }) {
   // Search & Filters local states
   const [comicSearch, setComicSearch] = useState('')
   const [comicStatusFilter, setComicStatusFilter] = useState('All Status')
@@ -31,6 +33,15 @@ function ComicManagement({ comics, handleSaveEditComic, handleArchiveComic, hand
     deadline: '',
     notes: ''
   })
+
+  // Direct Assignment modal states
+  const [showDirectAssignModal, setShowDirectAssignModal] = useState(false)
+  const [directAssignComic, setDirectAssignComic] = useState(null)
+  const [directAssignForm, setDirectAssignForm] = useState({
+    targetLang: '',
+    deadline: ''
+  })
+  const [selectedTeamId, setSelectedTeamId] = useState('')
 
   const openTranslationRequestModal = (comic) => {
     setTransReqComic(comic)
@@ -70,9 +81,72 @@ function ComicManagement({ comics, handleSaveEditComic, handleArchiveComic, hand
       })
       toast.success(`Translation request submitted for ${transReqForm.targetLanguages.length} language(s)!`)
       setShowTransReqModal(false)
+      if (fetchAllData) {
+        await fetchAllData()
+      }
     } catch (err) {
       console.error(err)
       toast.error('Failed to submit translation request.')
+    }
+  }
+
+  const openDirectAssignModal = (comic) => {
+    const existing = projectTeams
+      ? projectTeams.filter(t => t.comicName && t.comicName.toLowerCase() === comic.title.toLowerCase())
+      : [];
+    const availableLangs = AVAILABLE_LANGUAGES.filter(lang => 
+      !existing.some(t => t.targetLang && t.targetLang.toLowerCase() === lang.toLowerCase())
+    );
+
+    setDirectAssignComic(comic)
+    setDirectAssignForm({
+      targetLang: availableLangs[0] || '',
+      deadline: ''
+    })
+    setSelectedTeamId('')
+    setShowDirectAssignModal(true)
+  }
+
+  const handleSubmitDirectAssignment = async () => {
+    if (!directAssignForm.targetLang) {
+      toast.warn('Please select a target language.')
+      return
+    }
+
+    if (!selectedTeamId) {
+      toast.warn('Please select a project team.')
+      return
+    }
+
+    const selectedTeamObj = projectTeams.find(t => t.id === selectedTeamId)
+    if (!selectedTeamObj) return
+
+    try {
+      await updateProjectTeamApi(selectedTeamId, {
+        ...selectedTeamObj,
+        comicName: directAssignComic.title,
+        targetLang: directAssignForm.targetLang,
+        status: 'PENDING',
+        deadline: directAssignForm.deadline || 'unspecified'
+      })
+
+      await updateComicApi(directAssignComic.id, {
+        ...directAssignComic,
+        projectTeam: selectedTeamObj.title
+      })
+
+      toast.success(`Successfully assigned team ${selectedTeamObj.title} for ${directAssignForm.targetLang} (pending leader approval)!`)
+      setShowDirectAssignModal(false)
+      if (fetchAllData) {
+        await fetchAllData()
+      } else if (handleSaveEditComic) {
+        handleSaveEditComic(directAssignComic.id, { projectTeam: selectedTeamObj.title })
+      } else {
+        window.location.reload()
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to assign project team.')
     }
   }
 
@@ -234,15 +308,13 @@ function ComicManagement({ comics, handleSaveEditComic, handleArchiveComic, hand
                       >
                         📝 Edit
                       </button>
-                      {comic.projectTeam === '-' && (
-                        <button 
-                          className="comic-btn-action assign"
-                          onClick={() => handleTriggerAssignTeam(comic)}
-                          title="Assign Translation Team"
-                        >
-                          🔗 Assign Team
-                        </button>
-                      )}
+                      <button 
+                        className="comic-btn-action assign"
+                        onClick={() => openDirectAssignModal(comic)}
+                        title="Assign Translation Team"
+                      >
+                        🔗 Assign Team
+                      </button>
                       <button 
                         className="comic-btn-action translate"
                         onClick={() => openTranslationRequestModal(comic)}
@@ -377,6 +449,13 @@ function ComicManagement({ comics, handleSaveEditComic, handleArchiveComic, hand
                 <div className="lang-checkbox-grid">
                   {AVAILABLE_LANGUAGES
                     .filter(lang => lang !== transReqForm.sourceLang)
+                    .filter(lang => {
+                      const existing = projectTeams
+                        ? projectTeams.filter(t => t.comicName && transReqComic && t.comicName.toLowerCase() === transReqComic.title.toLowerCase())
+                        : [];
+                      const isAlreadyTranslated = existing.some(t => t.targetLang && t.targetLang.toLowerCase() === lang.toLowerCase());
+                      return !isAlreadyTranslated;
+                    })
                     .map(lang => (
                       <button
                         key={lang}
@@ -443,6 +522,111 @@ function ComicManagement({ comics, handleSaveEditComic, handleArchiveComic, hand
                 disabled={transReqForm.targetLanguages.length === 0}
               >
                 Submit Request ({transReqForm.targetLanguages.length} language{transReqForm.targetLanguages.length !== 1 ? 's' : ''})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: DIRECT ASSIGN TEAM ────────────────── */}
+      {showDirectAssignModal && (
+        <div className="mod-modal-overlay">
+          <div className="mod-modal-card" style={{ maxWidth: '520px' }}>
+            <div className="mod-modal-header">
+              <h3>🔗 Assign Translation Team</h3>
+              <button className="mod-modal-close-btn" onClick={() => setShowDirectAssignModal(false)}>×</button>
+            </div>
+
+            <div className="mod-modal-body">
+              <div className="mod-form-group">
+                <label className="mod-label">Comic / Series Name</label>
+                <input 
+                  type="text" 
+                  className="mod-input" 
+                  value={directAssignComic?.title || ''} 
+                  disabled 
+                  style={{ opacity: 0.7, cursor: 'not-allowed' }}
+                />
+              </div>
+
+              {/* Target Language */}
+              <div className="mod-form-group">
+                <label className="mod-label">Target Language *</label>
+                {AVAILABLE_LANGUAGES.filter(lang => {
+                  const existing = projectTeams
+                    ? projectTeams.filter(t => t.comicName && directAssignComic && t.comicName.toLowerCase() === directAssignComic.title.toLowerCase())
+                    : [];
+                  return !existing.some(t => t.targetLang && t.targetLang.toLowerCase() === lang.toLowerCase());
+                }).length === 0 ? (
+                  <p style={{ color: 'var(--mod-red)', fontSize: '13px', margin: '4px 0 0' }}>
+                    ⚠️ This comic has already been assigned/requested in all available target languages.
+                  </p>
+                ) : (
+                  <select 
+                    className="mod-select-field"
+                    value={directAssignForm.targetLang}
+                    onChange={(e) => setDirectAssignForm({ ...directAssignForm, targetLang: e.target.value })}
+                  >
+                    {AVAILABLE_LANGUAGES.filter(lang => {
+                      const existing = projectTeams
+                        ? projectTeams.filter(t => t.comicName && directAssignComic && t.comicName.toLowerCase() === directAssignComic.title.toLowerCase())
+                        : [];
+                      return !existing.some(t => t.targetLang && t.targetLang.toLowerCase() === lang.toLowerCase());
+                    }).map(lang => (
+                      <option key={lang} value={lang}>{lang}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Deadline */}
+              <div className="mod-form-group">
+                <label className="mod-label">Deadline</label>
+                <input 
+                  type="date" 
+                  className="mod-input"
+                  value={directAssignForm.deadline}
+                  onChange={(e) => setDirectAssignForm({ ...directAssignForm, deadline: e.target.value })}
+                />
+              </div>
+
+              {/* EXISTING TEAM SELECTION */}
+              <div className="mod-form-group">
+                <label className="mod-label">Select Existing Project Team *</label>
+                {projectTeams && projectTeams.length === 0 ? (
+                  <p style={{ color: 'var(--mod-text-secondary)', fontSize: '13px' }}>No teams available.</p>
+                ) : (
+                  <select
+                    className="mod-select-field"
+                    value={selectedTeamId}
+                    onChange={(e) => setSelectedTeamId(e.target.value)}
+                  >
+                    <option value="">-- Choose a Project Team --</option>
+                    {projectTeams && projectTeams
+                      .filter(t => !t.status || t.status.toUpperCase() !== 'UNCLAIMED')
+                      .map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.title} {t.leaderName ? `(Leader: ${t.leaderName})` : '(No Leader)'} {t.comicName && t.comicName !== '-' ? `[translating ${t.comicName}]` : '[Idle]'}
+                        </option>
+                      ))}
+                  </select>
+                )}
+              </div>
+            </div>
+
+            <div className="mod-modal-footer">
+              <button 
+                className="mod-btn review"
+                onClick={() => setShowDirectAssignModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="mod-btn approve"
+                onClick={handleSubmitDirectAssignment}
+                disabled={!directAssignForm.targetLang || !selectedTeamId}
+              >
+                Confirm Assignment
               </button>
             </div>
           </div>
