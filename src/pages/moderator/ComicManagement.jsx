@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import '../../assets/style/moderator/comic-management.css'
+import { createTranslationRequestApi } from '../../services/api/TranslationPoolApi'
+import { toast } from 'react-toastify'
 
 function ComicManagement({ comics, handleSaveEditComic, handleArchiveComic, handleTriggerAssignTeam }) {
   // Search & Filters local states
@@ -16,6 +19,62 @@ function ComicManagement({ comics, handleSaveEditComic, handleArchiveComic, hand
     status: 'Ongoing',
     genres: ''
   })
+
+  // Translation Request modal states
+  const AVAILABLE_LANGUAGES = ['English', 'Vietnamese', 'Japanese', 'Korean', 'Chinese', 'Spanish', 'French', 'Thai']
+  const [showTransReqModal, setShowTransReqModal] = useState(false)
+  const [transReqComic, setTransReqComic] = useState(null)
+  const [transReqForm, setTransReqForm] = useState({
+    sourceLang: 'Japanese',
+    targetLanguages: [],
+    priority: 'Medium',
+    deadline: '',
+    notes: ''
+  })
+
+  const openTranslationRequestModal = (comic) => {
+    setTransReqComic(comic)
+    setTransReqForm({
+      sourceLang: 'Japanese',
+      targetLanguages: [],
+      priority: 'Medium',
+      deadline: '',
+      notes: ''
+    })
+    setShowTransReqModal(true)
+  }
+
+  const toggleTargetLang = (lang) => {
+    setTransReqForm(prev => ({
+      ...prev,
+      targetLanguages: prev.targetLanguages.includes(lang)
+        ? prev.targetLanguages.filter(l => l !== lang)
+        : [...prev.targetLanguages, lang]
+    }))
+  }
+
+  const handleSubmitTranslationRequest = async () => {
+    if (!transReqComic || transReqForm.targetLanguages.length === 0) {
+      toast.warn('Please select at least one target language.')
+      return
+    }
+    try {
+      await createTranslationRequestApi({
+        comicId: transReqComic.id,
+        comicTitle: transReqComic.title,
+        sourceLang: transReqForm.sourceLang,
+        targetLanguages: transReqForm.targetLanguages,
+        priority: transReqForm.priority,
+        deadline: transReqForm.deadline || null,
+        notes: transReqForm.notes.trim() || null
+      })
+      toast.success(`Translation request submitted for ${transReqForm.targetLanguages.length} language(s)!`)
+      setShowTransReqModal(false)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to submit translation request.')
+    }
+  }
 
   const openEditModal = (comic) => {
     setEditingComic(comic)
@@ -185,6 +244,13 @@ function ComicManagement({ comics, handleSaveEditComic, handleArchiveComic, hand
                         </button>
                       )}
                       <button 
+                        className="comic-btn-action translate"
+                        onClick={() => openTranslationRequestModal(comic)}
+                        title="Request Translation"
+                      >
+                        🌐 Translate
+                      </button>
+                      <button 
                         className="comic-btn-action archive"
                         onClick={() => handleArchiveComic(comic.id)}
                         title="Archive Comic"
@@ -269,6 +335,114 @@ function ComicManagement({ comics, handleSaveEditComic, handleArchiveComic, hand
                 disabled={!editComicForm.title.trim()}
               >
                 Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: REQUEST TRANSLATION ─────────────── */}
+      {showTransReqModal && transReqComic && (
+        <div className="mod-modal-overlay">
+          <div className="mod-modal-card" style={{ maxWidth: '560px' }}>
+            <div className="mod-modal-header">
+              <h3>🌐 Request Translation</h3>
+              <button className="mod-modal-close-btn" onClick={() => setShowTransReqModal(false)}>×</button>
+            </div>
+
+            <div className="mod-modal-body">
+              {/* Comic info */}
+              <div className="mod-form-group">
+                <label className="mod-label">Comic</label>
+                <div className="trans-req-comic-name">{transReqComic.title}</div>
+              </div>
+
+              {/* Source Language */}
+              <div className="mod-form-group">
+                <label className="mod-label">Source Language</label>
+                <select 
+                  className="mod-select-field"
+                  value={transReqForm.sourceLang}
+                  onChange={(e) => setTransReqForm({ ...transReqForm, sourceLang: e.target.value })}
+                >
+                  {AVAILABLE_LANGUAGES.map(lang => (
+                    <option key={lang} value={lang}>{lang}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Target Languages - Checkbox Grid */}
+              <div className="mod-form-group">
+                <label className="mod-label">Target Languages <span style={{ fontSize: '11px', color: 'var(--mod-text-secondary)' }}>(select one or more)</span></label>
+                <div className="lang-checkbox-grid">
+                  {AVAILABLE_LANGUAGES
+                    .filter(lang => lang !== transReqForm.sourceLang)
+                    .map(lang => (
+                      <button
+                        key={lang}
+                        type="button"
+                        className={`lang-checkbox-item ${transReqForm.targetLanguages.includes(lang) ? 'checked' : ''}`}
+                        onClick={() => toggleTargetLang(lang)}
+                      >
+                        <span className="lang-checkbox-tick">{transReqForm.targetLanguages.includes(lang) ? '✓' : ''}</span>
+                        {lang}
+                      </button>
+                    ))
+                  }
+                </div>
+              </div>
+
+              {/* Priority & Deadline row */}
+              <div className="mod-form-row">
+                <div className="mod-form-group">
+                  <label className="mod-label">Priority</label>
+                  <select 
+                    className="mod-select-field"
+                    value={transReqForm.priority}
+                    onChange={(e) => setTransReqForm({ ...transReqForm, priority: e.target.value })}
+                  >
+                    <option value="High">🔴 High</option>
+                    <option value="Medium">🟡 Medium</option>
+                    <option value="Low">🟢 Low</option>
+                  </select>
+                </div>
+                <div className="mod-form-group">
+                  <label className="mod-label">Deadline</label>
+                  <input 
+                    type="date" 
+                    className="mod-input"
+                    value={transReqForm.deadline}
+                    onChange={(e) => setTransReqForm({ ...transReqForm, deadline: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="mod-form-group">
+                <label className="mod-label">Notes for Translator (optional)</label>
+                <textarea 
+                  className="mod-textarea"
+                  rows="3"
+                  placeholder="Any special instructions, terminology guides, or context..."
+                  value={transReqForm.notes}
+                  onChange={(e) => setTransReqForm({ ...transReqForm, notes: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="mod-modal-footer">
+              <button 
+                className="mod-btn review"
+                onClick={() => setShowTransReqModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="mod-btn approve"
+                onClick={handleSubmitTranslationRequest}
+                disabled={transReqForm.targetLanguages.length === 0}
+              >
+                Submit Request ({transReqForm.targetLanguages.length} language{transReqForm.targetLanguages.length !== 1 ? 's' : ''})
               </button>
             </div>
           </div>

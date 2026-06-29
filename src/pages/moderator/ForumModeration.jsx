@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import '../../assets/style/moderator/forum-moderation.css'
 import { getAllForumThreadsApi, deleteForumThreadApi } from '../../services/api/ForumThreadApi'
 import { toast } from 'react-toastify'
 

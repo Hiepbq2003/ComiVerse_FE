@@ -1,3 +1,5 @@
+import '../../assets/style/translator/payout.css'
+
 function Payout() {
   return (
     <div className="fade-in">

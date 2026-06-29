@@ -1,0 +1,31 @@
+/* ── MODERATOR DASHBOARD TABS STYLES ──────────────── */
+.placeholder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 18px;
+}
+
+.placeholder-card {
+  padding: 20px;
+}
+
+.placeholder-card h4 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.placeholder-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}

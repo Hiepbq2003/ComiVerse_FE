@@ -1,0 +1,27 @@
+/* ── MODERATOR FORUM MODERATION STYLES ───────────── */
+.submission-card {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.submission-info {
+  flex: 1;
+}
+
+.submission-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.submission-meta {
+  font-size: 13px;
+  margin: 0 0 6px;
+}
+
+.submission-actions {
+  display: flex;
+  gap: 8px;
+}

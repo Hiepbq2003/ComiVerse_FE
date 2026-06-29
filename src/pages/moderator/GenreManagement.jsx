@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import '../../assets/style/moderator/genre-management.css'
 import { getAllGenresApi, createGenreApi, updateGenreApi, deleteGenreApi } from '../../services/api/GenreApi'
 import { toast } from 'react-toastify'
 

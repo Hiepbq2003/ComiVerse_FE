@@ -1,17 +1,24 @@
 import { useState, useEffect } from 'react'
 import '../../assets/style/translator.css'
+import '../../assets/style/translator/dashboard.css'
 import TeamProjects from './TeamProjects'
+import JobPool from './JobPool'
 import Revenue from './Revenue'
 import Payout from './Payout'
 import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
 import { toast } from 'react-toastify'
 
 function TranslatorDashboard({ user, onLogout }) {
-  const [activeNav, setActiveNav] = useState('project-teams') // 'dashboard' | 'project-teams' | 'revenue' | 'payout'
+  const [activeNav, setActiveNav] = useState('dashboard') // 'dashboard' | 'project-teams' | 'revenue' | 'payout'
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
 
   const userName = user.fullName || user.username || 'Translator'
+
+  // A translator is a "Leader" if they are assigned as leaderName in at least one project team
+  const isLeader = projects.some(p => 
+    p.leaderName && (p.leaderName === user.fullName || p.leaderName === user.username)
+  )
 
   useEffect(() => {
     fetchProjects()
@@ -56,6 +63,20 @@ function TranslatorDashboard({ user, onLogout }) {
             </span>
             Dashboard
           </button>
+
+          {isLeader && (
+            <button 
+              className={`translator-nav-item ${activeNav === 'job-pool' ? 'active' : ''}`}
+              onClick={() => setActiveNav('job-pool')}
+            >
+              <span className="translator-nav-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+                </svg>
+              </span>
+              Job Pool
+            </button>
+          )}
 
           <button 
             className={`translator-nav-item ${activeNav === 'project-teams' ? 'active' : ''}`}
@@ -190,6 +211,11 @@ function TranslatorDashboard({ user, onLogout }) {
                     </div>
                   </div>
                 </div>
+              )}
+
+              {/* VIEW: JOB POOL */}
+              {activeNav === 'job-pool' && (
+                <JobPool />
               )}
 
               {/* VIEW: PROJECT TEAMS */}

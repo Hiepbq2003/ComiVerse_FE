@@ -1,0 +1,33 @@
+/* ── MODERATOR GENRE MANAGEMENT STYLES ───────────── */
+.genres-list-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.genre-mgmt-card {
+  border: 1px solid var(--mod-border);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.genre-mgmt-info h4 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  color: var(--mod-text-primary);
+}
+
+.genre-mgmt-info p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--mod-text-secondary);
+}
+
+.genre-mgmt-actions {
+  display: flex;
+  gap: 6px;
+}

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import '../../assets/style/translator/team-projects.css'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { createSubmissionApi } from '../../services/api/SubmissionApi'
 import {

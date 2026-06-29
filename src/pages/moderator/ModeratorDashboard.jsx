@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import '../../assets/style/moderator.css'
+import '../../assets/style/moderator/dashboard.css'
 import ReviewQueue from './ReviewQueue'
 import ComicManagement from './ComicManagement'
 import GenreManagement from './GenreManagement'
@@ -11,16 +12,9 @@ import { getAllProjectTeamsApi, createProjectTeamApi, deleteProjectTeamApi } fro
 import { getAllSubmissionsApi, approveSubmissionApi, rejectSubmissionApi } from '../../services/api/SubmissionApi'
 import { toast } from 'react-toastify'
 
-const AVAILABLE_TRANSLATORS = [
-  { name: 'John Smith', initials: 'JS' },
-  { name: 'Emily Brown', initials: 'EB' },
-  { name: 'Li Ming', initials: 'LM' },
-  { name: 'David Lee', initials: 'DL' },
-  { name: 'Sarah Connor', initials: 'SC' }
-]
 
 function ModeratorDashboard({ user, onLogout }) {
-  const [activeNav, setActiveNav] = useState('review-queue') // 'dashboard' | 'review-queue' | 'comic-management' | etc.
+  const [activeNav, setActiveNav] = useState('dashboard') // 'dashboard' | 'review-queue' | 'comic-management' | etc.
   
   // Dynamic API backed states
   const [submissions, setSubmissions] = useState([])
@@ -129,7 +123,7 @@ function ModeratorDashboard({ user, onLogout }) {
       deadline: '',
       sourceLang: 'Japanese',
       targetLang: 'English',
-      leaderName: 'John Smith',
+      leaderName: '',
       priority: 'High'
     })
     setCreateTeamStep(1)
@@ -137,7 +131,8 @@ function ModeratorDashboard({ user, onLogout }) {
   }
 
   const handleCreateProjectTeam = async () => {
-    const leaderObj = AVAILABLE_TRANSLATORS.find(t => t.name === createTeamForm.leaderName) || { name: 'John Smith', initials: 'JS' }
+    const leaderName = createTeamForm.leaderName.trim() || 'Translator Leader'
+    const leaderInitials = leaderName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     const newTeam = {
       title: createTeamForm.title.trim() || `${createTeamForm.comicName} Team`,
       comicName: createTeamForm.comicName,
@@ -145,8 +140,8 @@ function ModeratorDashboard({ user, onLogout }) {
       membersCount: 1,
       chaptersCount: 0,
       progress: 0,
-      leaderName: leaderObj.name,
-      leaderInitials: leaderObj.initials,
+      leaderName: leaderName,
+      leaderInitials: leaderInitials,
       deadline: createTeamForm.deadline || 'unspecified',
       sourceLang: createTeamForm.sourceLang,
       targetLang: createTeamForm.targetLang,
@@ -400,7 +395,7 @@ function ModeratorDashboard({ user, onLogout }) {
                     <h4>Recent Audited Actions</h4>
                     <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {submissions.filter(s => s.status !== 'pending').slice(0, 5).map(s => (
-                        <div key={s.id} style={{ padding: '8px', background: '#f8fafc', borderRadius: '4px', fontSize: '13px' }}>
+                        <div key={s.id} style={{ padding: '8px', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '4px', fontSize: '13px' }}>
                           {s.status === 'approved' ? '✅ Approved' : '❌ Rejected'} chapter <strong>{s.chapter}</strong> of <em>{s.title}</em> ({s.timeLabel || 'recently'})
                         </div>
                       ))}
@@ -442,7 +437,6 @@ function ModeratorDashboard({ user, onLogout }) {
                   projectTeams={projectTeams}
                   setProjectTeams={setProjectTeams}
                   comics={comics}
-                  availableTranslators={AVAILABLE_TRANSLATORS}
                   showCreateTeamModal={showCreateTeamModal}
                   setShowCreateTeamModal={setShowCreateTeamModal}
                   createTeamStep={createTeamStep}
@@ -450,7 +444,6 @@ function ModeratorDashboard({ user, onLogout }) {
                   createTeamForm={createTeamForm}
                   setCreateTeamForm={setCreateTeamForm}
                   handleCreateProjectTeam={handleCreateProjectTeam}
-                  handleRemoveProjectTeam={handleRemoveProjectTeam}
                 />
               )}
 

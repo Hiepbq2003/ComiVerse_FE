@@ -1479,3 +1479,230 @@ select.trans-form-input {
 .trans-btn.secondary:hover {
   background-color: rgba(255, 255, 255, 0.1) !important;
 }
+
+/* Modal Footer white override */
+.trans-modal-footer {
+  background: var(--trans-card-bg) !important;
+  border-top: 1px solid var(--trans-border) !important;
+}
+
+/* ═══════════════════════════════════════════════════
+   JOB POOL — Translation Pool / Job Board
+   ═══════════════════════════════════════════════════ */
+
+.job-pool-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.job-pool-select {
+  padding: 9px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--trans-border);
+  background: rgba(7, 4, 13, 0.7);
+  color: var(--trans-text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.job-pool-select:focus {
+  border-color: var(--trans-purple);
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.15);
+}
+
+.job-pool-count {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--trans-text-secondary);
+}
+
+.job-pool-count span {
+  font-weight: 700;
+  color: var(--trans-purple);
+}
+
+.job-pool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.job-pool-card {
+  background: var(--trans-card-bg);
+  border: 1px solid var(--trans-border);
+  border-radius: 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  overflow: hidden;
+}
+
+.job-pool-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(168, 85, 247, 0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(168, 85, 247, 0.08);
+}
+
+.job-pool-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 20px 0;
+}
+
+.job-pool-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--trans-text-primary);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.job-pool-priority-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.job-pool-card-body {
+  padding: 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.job-pool-lang-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.job-pool-lang-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+}
+
+.job-pool-lang-badge.source {
+  background: rgba(100, 116, 139, 0.12);
+  color: #94a3b8;
+  border: 1px solid rgba(100, 116, 139, 0.15);
+}
+
+.job-pool-lang-badge.target {
+  background: rgba(168, 85, 247, 0.1);
+  color: var(--trans-purple);
+  border: 1px solid rgba(168, 85, 247, 0.15);
+}
+
+.job-pool-lang-arrow {
+  font-size: 16px;
+  color: var(--trans-text-muted);
+  font-weight: 700;
+}
+
+.job-pool-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.job-pool-detail-label {
+  color: var(--trans-text-muted);
+  font-weight: 500;
+}
+
+.job-pool-detail-value {
+  color: var(--trans-text-primary);
+  font-weight: 600;
+}
+
+.job-pool-notes {
+  font-size: 12px;
+}
+
+.job-pool-notes p {
+  margin: 4px 0 0;
+  color: var(--trans-text-secondary);
+  line-height: 1.5;
+  font-style: italic;
+}
+
+.job-pool-card-footer {
+  padding: 0 20px 18px;
+}
+
+.job-pool-claim-btn {
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  background: rgba(34, 197, 94, 0.06);
+  color: #22c55e;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.job-pool-claim-btn:hover {
+  background: #22c55e;
+  color: #ffffff;
+  border-color: #22c55e;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.25);
+}
+
+.job-pool-claim-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Empty State */
+.job-pool-empty {
+  text-align: center;
+  padding: 60px 20px;
+  background: var(--trans-card-bg);
+  border: 1px solid var(--trans-border);
+  border-radius: 12px;
+}
+
+.job-pool-empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.job-pool-empty h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--trans-text-primary);
+  margin: 0 0 8px;
+}
+
+.job-pool-empty p {
+  font-size: 14px;
+  color: var(--trans-text-secondary);
+  margin: 0;
+  max-width: 400px;
+  margin: 0 auto;
+  line-height: 1.6;
+}

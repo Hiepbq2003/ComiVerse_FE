@@ -24,3 +24,8 @@ export const unbanUserApi = (userId) => {
 export const resetUserPasswordApi = (userId) => {
   return AxiosClient.post(`/admin/users/${userId}/reset-password`);
 };
+
+// Search active translators (moderator & admin accessible)
+export const searchTranslatorsApi = (query) => {
+  return AxiosClient.get('/users/translators', { params: { query } });
+};

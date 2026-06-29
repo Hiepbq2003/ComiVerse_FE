@@ -1,3 +1,5 @@
+import '../../assets/style/translator/revenue.css'
+
 function Revenue() {
   return (
     <div className="fade-in">

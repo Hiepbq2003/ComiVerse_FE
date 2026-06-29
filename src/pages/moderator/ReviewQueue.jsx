@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import '../../assets/style/moderator/review-queue.css'
 
 function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
   const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'approved' | 'rejected'

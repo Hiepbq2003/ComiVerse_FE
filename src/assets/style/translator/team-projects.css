@@ -1,0 +1,85 @@
+/* ── TRANSLATOR TEAM PROJECTS WORKSPACE STYLES ────── */
+.project-detail-workspace {
+  animation: fadeIn 0.3s ease;
+}
+
+.workspace-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--trans-text-secondary);
+  margin-bottom: 24px;
+}
+
+.breadcrumb-back {
+  background: none;
+  border: none;
+  color: var(--trans-purple);
+  cursor: pointer;
+  padding: 0;
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.2s ease;
+}
+
+.breadcrumb-back:hover {
+  color: var(--trans-purple-hover);
+}
+
+.breadcrumb-divider {
+  color: var(--trans-text-muted);
+}
+
+.breadcrumb-current {
+  color: var(--trans-text-primary);
+  font-weight: 700;
+}
+
+.workspace-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--trans-border);
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.workspace-tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 12px 4px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--trans-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspace-tab-btn:hover {
+  color: var(--trans-text-primary);
+}
+
+.workspace-tab-btn.active {
+  color: var(--trans-purple);
+  border-bottom-color: var(--trans-purple);
+  font-weight: 600;
+}
+
+.workspace-home-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 1024px) {
+  .workspace-home-grid {
+    grid-template-columns: 1fr;
+  }
+}
