@@ -15,3 +15,7 @@ export const updateComicApi = (id, data) => {
 export const deleteComicApi = (id) => {
   return AxiosClient.delete(`/comics/${id}`);
 };
+
+export const searchComicsApi = (query) => {
+  return AxiosClient.get(`/comics/search?query=${encodeURIComponent(query)}`);
+};

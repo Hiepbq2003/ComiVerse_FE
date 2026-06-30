@@ -6,6 +6,7 @@ import Ranking from './pages/common/Ranking'
 import Library from './pages/common/Library'
 import Forum from './pages/common/Forum'
 import ComicDetail from './pages/common/ComicDetail'
+import SearchResults from './pages/common/SearchResults'
 import AccountManagement from './pages/admin/AccountManagement'
 import BroadcastManagement from './pages/admin/BroadcastManagement'
 import StatisticsDashboard from './pages/admin/StatisticsDashboard'
@@ -47,6 +48,7 @@ function App() {
         <Route path="/library" element={<Library />} />
         <Route path="/forum" element={<Forum />} />
         <Route path="/comic/:id" element={<ComicDetail />} />
+        <Route path="/search" element={<SearchResults />} />
         {/* Admin */}
         <Route path="/admin/statistics" element={<StatisticsDashboard />} />
         <Route path="/admin/revenue" element={<RevenueManagement />} />
