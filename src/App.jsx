@@ -13,6 +13,7 @@ import RevenueManagement from './pages/admin/RevenueManagement'
 import PayoutManagement from './pages/admin/PayoutManagement'
 import AuthorDashboard from './pages/author/AuthorDashboard'
 import AuthorComics from './pages/author/AuthorComics'
+import AuthorComicDetail from './pages/author/AuthorComicDetail'
 import AuthorEarnings from './pages/author/AuthorEarnings'
 import AuthorSettings from './pages/author/AuthorSettings'
 import Profile from './pages/common/Profile'
@@ -56,6 +57,7 @@ function App() {
       {/* Author */}
         <Route path="/author/overview" element={<AuthorDashboard />} />
         <Route path="/author/comics" element={<AuthorComics />} />
+        <Route path="/author/comics/:id" element={<AuthorComicDetail />} />
         <Route path="/author/earnings" element={<AuthorEarnings />} />
         <Route path="/author/settings" element={<AuthorSettings />} />
       </Routes>

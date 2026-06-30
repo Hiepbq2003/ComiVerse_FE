@@ -71,7 +71,7 @@ function AuthorEarnings() {
                     <tr key={idx}>
                       <td>{payout.date}</td>
                       <td style={{ fontWeight: '600' }}>{payout.amount} VND</td>
-                      <td style={{ color: '#64748b' }}>{payout.method}</td>
+                      <td className="author-cell-muted">{payout.method}</td>
                       <td>
                         <span className={`badge-status-payout ${payout.status}`}>
                           {payout.status}
@@ -90,20 +90,20 @@ function AuthorEarnings() {
             <h2 className="author-section-title">Summary</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <span style={{ fontSize: '13px', color: '#64748b', display: 'block' }}>Next Estimated Payout</span>
-                <span style={{ fontSize: '24px', fontWeight: '700', color: '#0f172a' }}>6,700,000 VND</span>
-                <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginTop: '2px' }}>Scheduled for July 15, 2026</span>
+                <span className="author-summary-label" style={{ fontSize: '13px', display: 'block' }}>Next Estimated Payout</span>
+                <span className="author-summary-value" style={{ fontSize: '24px', fontWeight: '700' }}>6,700,000 VND</span>
+                <span className="author-summary-muted" style={{ fontSize: '12px', display: 'block', marginTop: '2px' }}>Scheduled for July 15, 2026</span>
               </div>
               
-              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
-                <span style={{ fontSize: '13px', color: '#64748b', display: 'block' }}>Lifetime Earnings</span>
-                <span style={{ fontSize: '20px', fontWeight: '600', color: '#0f172a' }}>28,300,000 VND</span>
+              <div className="author-summary-block">
+                <span className="author-summary-label" style={{ fontSize: '13px', display: 'block' }}>Lifetime Earnings</span>
+                <span className="author-summary-value" style={{ fontSize: '20px', fontWeight: '600' }}>28,300,000 VND</span>
               </div>
-              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
-                <span style={{ fontSize: '13px', color: '#64748b', display: 'block' }}>Payout Account</span>
-                <span style={{ fontSize: '14px', fontWeight: '500', color: '#0f172a', display: 'block', marginTop: '4px' }}>MB Bank</span>
-                <span style={{ fontSize: '12px', color: '#64748b' }}>Acc Name: NGUYEN VAN A</span>
-                <span style={{ fontSize: '12px', color: '#64748b', display: 'block' }}>Acc No: **** 4321</span>
+              <div className="author-summary-block">
+                <span className="author-summary-label" style={{ fontSize: '13px', display: 'block' }}>Payout Account</span>
+                <span className="author-summary-value" style={{ fontSize: '14px', fontWeight: '500', display: 'block', marginTop: '4px' }}>MB Bank</span>
+                <span className="author-summary-label" style={{ fontSize: '12px' }}>Acc Name: NGUYEN VAN A</span>
+                <span className="author-summary-label" style={{ fontSize: '12px', display: 'block' }}>Acc No: **** 4321</span>
               </div>
             </div>
           </div>
