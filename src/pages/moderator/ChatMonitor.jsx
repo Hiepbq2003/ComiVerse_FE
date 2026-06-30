@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import '../../assets/style/moderator/chat-monitor.css'
 import { getAllChatFlagsApi, warnChatFlagApi, deleteChatFlagApi } from '../../services/api/ChatFlagApi'
 import { toast } from 'react-toastify'
 

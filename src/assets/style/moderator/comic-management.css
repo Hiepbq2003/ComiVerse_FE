@@ -1,0 +1,314 @@
+/* ── MODERATOR COMIC MANAGEMENT STYLES ───────────── */
+.mod-form-group {
+  margin-bottom: 16px;
+}
+
+.mod-form-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.mod-form-row .mod-form-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.mod-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mod-text-primary);
+  margin-bottom: 6px;
+}
+
+.mod-input,
+.mod-select-field {
+  width: 100%;
+  border: 1px solid var(--mod-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  background: rgba(7, 4, 13, 0.7);
+  box-sizing: border-box;
+  color: #f8fafc;
+  transition: border-color 0.15s ease;
+}
+
+.mod-input:focus,
+.mod-select-field:focus {
+  border-color: var(--mod-purple);
+}
+
+/* Comic Management Header and Tables */
+.comic-mgmt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.comic-search-filter-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.comic-search-input-wrapper {
+  width: 100%;
+}
+
+.comic-search-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--mod-border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  background: rgba(7, 4, 13, 0.7) !important;
+  color: #f8fafc !important;
+}
+
+.comic-filters-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.comic-table-card {
+  border: 1px solid var(--mod-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.comic-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.comic-table th {
+  padding: 14px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--mod-text-secondary);
+  border-bottom: 1px solid var(--mod-border);
+}
+
+.comic-table td {
+  padding: 16px 18px;
+  font-size: 14px;
+  color: var(--mod-text-primary);
+  border-bottom: 1px solid var(--mod-border);
+  vertical-align: middle;
+}
+
+.comic-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.comic-cell-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.comic-cell-thumbnail {
+  width: 40px;
+  height: 52px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+  background: rgba(168, 85, 247, 0.08) !important;
+  border: 1px solid rgba(168, 85, 247, 0.12) !important;
+  color: #ffffff !important;
+}
+
+.comic-cell-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.comic-cell-title {
+  font-weight: 600;
+  color: var(--mod-text-primary);
+}
+
+.comic-cell-genres {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.comic-genre-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: var(--mod-text-secondary) !important;
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
+}
+
+/* Status Badges */
+.comic-status-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 12px;
+  display: inline-block;
+}
+
+.comic-status-badge.ongoing {
+  background: rgba(16, 185, 129, 0.1) !important;
+  color: var(--mod-green) !important;
+}
+
+.comic-status-badge.paused {
+  background: rgba(217, 119, 6, 0.1) !important;
+  color: #d97706 !important;
+}
+
+.comic-status-badge.completed {
+  background: rgba(59, 130, 246, 0.1) !important;
+  color: #3b82f6 !important;
+}
+
+/* Action Buttons */
+.comic-actions-cell {
+  display: flex;
+  gap: 6px;
+}
+
+.comic-btn-action {
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid var(--mod-border);
+  background: rgba(7, 4, 13, 0.7) !important;
+  color: #f8fafc !important;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.comic-btn-action:hover {
+  background-color: rgba(168, 85, 247, 0.08) !important;
+  color: var(--mod-purple) !important;
+  border-color: rgba(168, 85, 247, 0.2) !important;
+}
+
+.comic-btn-action.assign {
+  border-color: rgba(139, 92, 246, 0.2);
+  color: var(--mod-purple);
+  background: rgba(139, 92, 246, 0.04);
+}
+
+.comic-btn-action.assign:hover {
+  background: var(--mod-purple);
+  color: #ffffff;
+  border-color: var(--mod-purple);
+}
+
+.comic-btn-action.translate {
+  border-color: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.04);
+}
+
+.comic-btn-action.translate:hover {
+  background: #22c55e;
+  color: #ffffff;
+  border-color: #22c55e;
+}
+
+.comic-btn-action.archive {
+  border-color: rgba(239, 68, 68, 0.2);
+  color: var(--mod-red);
+}
+
+.comic-btn-action.archive:hover {
+  background: var(--mod-red);
+  color: #ffffff;
+  border-color: var(--mod-red);
+}
+
+/* Request Translation Modal */
+.trans-req-comic-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--mod-purple);
+  padding: 10px 14px;
+  background: rgba(168, 85, 247, 0.06);
+  border: 1px solid rgba(168, 85, 247, 0.12);
+  border-radius: 8px;
+}
+
+.lang-checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.lang-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--mod-border);
+  background: rgba(7, 4, 13, 0.5);
+  color: var(--mod-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.lang-checkbox-item:hover {
+  border-color: rgba(168, 85, 247, 0.3);
+  color: var(--mod-text-primary);
+  background: rgba(168, 85, 247, 0.04);
+}
+
+.lang-checkbox-item.checked {
+  border-color: var(--mod-purple);
+  background: rgba(168, 85, 247, 0.12);
+  color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.2);
+}
+
+.lang-checkbox-tick {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid var(--mod-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.lang-checkbox-item.checked .lang-checkbox-tick {
+  background: var(--mod-purple);
+  border-color: var(--mod-purple);
+  color: #ffffff;
+}

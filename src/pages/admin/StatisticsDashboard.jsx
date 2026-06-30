@@ -1,4 +1,4 @@
-import AdminLayout from '../../../components/layout/AdminLayout'
+import AdminLayout from '../../components/layout/AdminLayout'
 
 // ── Stat cards data ────────────────────────────────
 const STAT_CARDS = [

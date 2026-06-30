@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import '../../assets/style/moderator.css'
+import '../../assets/style/moderator/dashboard.css'
 import ReviewQueue from './ReviewQueue'
 import ComicManagement from './ComicManagement'
 import GenreManagement from './GenreManagement'
@@ -9,23 +10,18 @@ import ForumModeration from './ForumModeration'
 import { getAllComicsApi, updateComicApi, deleteComicApi } from '../../services/api/ComicApi'
 import { getAllProjectTeamsApi, createProjectTeamApi, deleteProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getAllSubmissionsApi, approveSubmissionApi, rejectSubmissionApi } from '../../services/api/SubmissionApi'
+import { getAllGenresApi } from '../../services/api/GenreApi'
 import { toast } from 'react-toastify'
 
-const AVAILABLE_TRANSLATORS = [
-  { name: 'John Smith', initials: 'JS' },
-  { name: 'Emily Brown', initials: 'EB' },
-  { name: 'Li Ming', initials: 'LM' },
-  { name: 'David Lee', initials: 'DL' },
-  { name: 'Sarah Connor', initials: 'SC' }
-]
 
 function ModeratorDashboard({ user, onLogout }) {
-  const [activeNav, setActiveNav] = useState('review-queue') // 'dashboard' | 'review-queue' | 'comic-management' | etc.
+  const [activeNav, setActiveNav] = useState('dashboard') // 'dashboard' | 'review-queue' | 'comic-management' | etc.
   
   // Dynamic API backed states
   const [submissions, setSubmissions] = useState([])
   const [comics, setComics] = useState([])
   const [projectTeams, setProjectTeams] = useState([])
+  const [genres, setGenres] = useState([])
   const [loading, setLoading] = useState(true)
 
   // Creation Team Modal Shared triggers
@@ -50,14 +46,16 @@ function ModeratorDashboard({ user, onLogout }) {
   const fetchAllData = async () => {
     try {
       setLoading(true)
-      const [comicsData, teamsData, submissionsData] = await Promise.all([
+      const [comicsData, teamsData, submissionsData, genresData] = await Promise.all([
         getAllComicsApi(),
         getAllProjectTeamsApi(),
-        getAllSubmissionsApi()
+        getAllSubmissionsApi(),
+        getAllGenresApi()
       ])
       setComics(comicsData || [])
       setProjectTeams(teamsData || [])
       setSubmissions(submissionsData || [])
+      setGenres(genresData?.data || genresData || [])
     } catch (err) {
       console.error(err)
       toast.error('Failed to retrieve control panel data from server.')
@@ -110,26 +108,25 @@ function ModeratorDashboard({ user, onLogout }) {
   }
 
   const handleArchiveComic = async (id) => {
-    if (window.confirm('Are you sure you want to archive this comic?')) {
-      try {
-        await deleteComicApi(id)
-        toast.success('Comic archived successfully.')
-        await fetchAllData()
-      } catch (err) {
-        console.error(err)
-        toast.error('Failed to archive comic.')
-      }
+    try {
+      await deleteComicApi(id)
+      toast.success('Comic archived successfully.')
+      await fetchAllData()
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to archive comic.')
     }
   }
 
   const handleTriggerAssignTeam = (comic) => {
+    setActiveNav('project-teams')
     setCreateTeamForm({
       title: `${comic.title} Team`,
       comicName: comic.title,
       deadline: '',
       sourceLang: 'Japanese',
       targetLang: 'English',
-      leaderName: 'John Smith',
+      leaderName: '',
       priority: 'High'
     })
     setCreateTeamStep(1)
@@ -137,7 +134,8 @@ function ModeratorDashboard({ user, onLogout }) {
   }
 
   const handleCreateProjectTeam = async () => {
-    const leaderObj = AVAILABLE_TRANSLATORS.find(t => t.name === createTeamForm.leaderName) || { name: 'John Smith', initials: 'JS' }
+    const leaderName = createTeamForm.leaderName.trim() || 'Translator Leader'
+    const leaderInitials = leaderName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     const newTeam = {
       title: createTeamForm.title.trim() || `${createTeamForm.comicName} Team`,
       comicName: createTeamForm.comicName,
@@ -145,8 +143,8 @@ function ModeratorDashboard({ user, onLogout }) {
       membersCount: 1,
       chaptersCount: 0,
       progress: 0,
-      leaderName: leaderObj.name,
-      leaderInitials: leaderObj.initials,
+      leaderName: leaderName,
+      leaderInitials: leaderInitials,
       deadline: createTeamForm.deadline || 'unspecified',
       sourceLang: createTeamForm.sourceLang,
       targetLang: createTeamForm.targetLang,
@@ -215,7 +213,11 @@ function ModeratorDashboard({ user, onLogout }) {
             onClick={() => setActiveNav('dashboard')}
           >
             <span className="moderator-nav-label-group">
-              <span className="moderator-nav-icon">📊</span>
+              <span className="moderator-nav-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                </svg>
+              </span>
               Dashboard
             </span>
           </button>
@@ -225,7 +227,11 @@ function ModeratorDashboard({ user, onLogout }) {
             onClick={() => setActiveNav('review-queue')}
           >
             <span className="moderator-nav-label-group">
-              <span className="moderator-nav-icon">📝</span>
+              <span className="moderator-nav-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+                </svg>
+              </span>
               Review Queue
             </span>
             {getNavBadgeCount('review-queue') > 0 && (
@@ -238,7 +244,11 @@ function ModeratorDashboard({ user, onLogout }) {
             onClick={() => setActiveNav('comic-management')}
           >
             <span className="moderator-nav-label-group">
-              <span className="moderator-nav-icon">📚</span>
+              <span className="moderator-nav-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+              </span>
               Comic Management
             </span>
           </button>
@@ -248,7 +258,11 @@ function ModeratorDashboard({ user, onLogout }) {
             onClick={() => setActiveNav('genre-management')}
           >
             <span className="moderator-nav-label-group">
-              <span className="moderator-nav-icon">🏷️</span>
+              <span className="moderator-nav-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
+                </svg>
+              </span>
               Genre Management
             </span>
           </button>
@@ -258,7 +272,11 @@ function ModeratorDashboard({ user, onLogout }) {
             onClick={() => setActiveNav('project-teams')}
           >
             <span className="moderator-nav-label-group">
-              <span className="moderator-nav-icon">👥</span>
+              <span className="moderator-nav-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              </span>
               Project Teams
             </span>
           </button>
@@ -268,7 +286,11 @@ function ModeratorDashboard({ user, onLogout }) {
             onClick={() => setActiveNav('chat-monitor')}
           >
             <span className="moderator-nav-label-group">
-              <span className="moderator-nav-icon">💬</span>
+              <span className="moderator-nav-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+              </span>
               Chat Monitor
             </span>
           </button>
@@ -278,7 +300,11 @@ function ModeratorDashboard({ user, onLogout }) {
             onClick={() => setActiveNav('forum')}
           >
             <span className="moderator-nav-label-group">
-              <span className="moderator-nav-icon">#</span>
+              <span className="moderator-nav-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/>
+                </svg>
+              </span>
               Forum
             </span>
           </button>
@@ -287,12 +313,17 @@ function ModeratorDashboard({ user, onLogout }) {
         <div className="moderator-sidebar-footer">
           <button className="moderator-nav-item" onClick={onLogout}>
             <span className="moderator-nav-label-group">
-              <span>🚪</span>
+              <span className="moderator-nav-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+              </span>
               ← Back to Home
             </span>
           </button>
         </div>
       </aside>
+
 
       {/* ── MAIN WORKSPACE ──────────────────────────── */}
       <main className="moderator-main">
@@ -367,7 +398,7 @@ function ModeratorDashboard({ user, onLogout }) {
                     <h4>Recent Audited Actions</h4>
                     <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {submissions.filter(s => s.status !== 'pending').slice(0, 5).map(s => (
-                        <div key={s.id} style={{ padding: '8px', background: '#f8fafc', borderRadius: '4px', fontSize: '13px' }}>
+                        <div key={s.id} style={{ padding: '8px', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '4px', fontSize: '13px' }}>
                           {s.status === 'approved' ? '✅ Approved' : '❌ Rejected'} chapter <strong>{s.chapter}</strong> of <em>{s.title}</em> ({s.timeLabel || 'recently'})
                         </div>
                       ))}
@@ -392,9 +423,12 @@ function ModeratorDashboard({ user, onLogout }) {
               {activeNav === 'comic-management' && (
                 <ComicManagement 
                   comics={comics} 
+                  projectTeams={projectTeams}
+                  genres={genres}
                   handleSaveEditComic={handleSaveEditComic} 
                   handleArchiveComic={handleArchiveComic} 
                   handleTriggerAssignTeam={handleTriggerAssignTeam} 
+                  fetchAllData={fetchAllData}
                 />
               )}
 
@@ -409,7 +443,6 @@ function ModeratorDashboard({ user, onLogout }) {
                   projectTeams={projectTeams}
                   setProjectTeams={setProjectTeams}
                   comics={comics}
-                  availableTranslators={AVAILABLE_TRANSLATORS}
                   showCreateTeamModal={showCreateTeamModal}
                   setShowCreateTeamModal={setShowCreateTeamModal}
                   createTeamStep={createTeamStep}
@@ -417,7 +450,6 @@ function ModeratorDashboard({ user, onLogout }) {
                   createTeamForm={createTeamForm}
                   setCreateTeamForm={setCreateTeamForm}
                   handleCreateProjectTeam={handleCreateProjectTeam}
-                  handleRemoveProjectTeam={handleRemoveProjectTeam}
                 />
               )}
 

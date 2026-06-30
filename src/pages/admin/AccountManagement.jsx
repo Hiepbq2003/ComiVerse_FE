@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import AdminLayout from '../../../components/layout/AdminLayout'
-import { getAllAccountsApi, registerStaffApi, banUserApi, unbanUserApi, resetUserPasswordApi } from '../../../services/api/AccountApi'
+import AdminLayout from '../../components/layout/AdminLayout'
+import { getAllAccountsApi, registerStaffApi, banUserApi, unbanUserApi, resetUserPasswordApi } from '../../services/api/AccountApi'
 
 // Fallback mock data when API is not available
 const MOCK_ACCOUNTS = [
@@ -31,6 +31,8 @@ function AccountManagement() {
   const [roleFilter, setRoleFilter] = useState('All Roles')
   const [statusFilter, setStatusFilter] = useState('All Status')
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalElements, setTotalElements] = useState(0)
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -38,7 +40,7 @@ function AccountManagement() {
   const [confirmAction, setConfirmAction] = useState(null) // { type: 'ban'|'unban'|'reset-pw', account }
 
   // Create staff form
-  const [staffForm, setStaffForm] = useState({ username: '', password: '', fullName: '', email: '', role: 'Moderator' })
+  const [staffForm, setStaffForm] = useState({ username: '', password: '', fullName: '', email: '', role: 'Reader' })
   const [staffFormErrors, setStaffFormErrors] = useState({})
   const [modalError, setModalError] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -55,13 +57,28 @@ function AccountManagement() {
     setTimeout(() => setAlert(null), 4000)
   }, [])
 
-  // Fetch accounts from API
+  // Fetch accounts from API with paginated backend integration
   const fetchAccounts = useCallback(async () => {
     setIsLoading(true)
     try {
-      const data = await getAllAccountsApi()
-      // Normalize the response — handle both array and paginated responses
-      const accountsList = Array.isArray(data) ? data : (data?.content || data?.data || [])
+      const params = {
+        page: currentPage,
+        size: ITEMS_PER_PAGE,
+      }
+      if (searchTerm.trim()) {
+        params.search = searchTerm.trim()
+      }
+      if (roleFilter !== 'All Roles') {
+        params.role = roleFilter
+      }
+      if (statusFilter !== 'All Status') {
+        params.status = statusFilter === 'Active' ? 'ACTIVE' : 'INACTIVE'
+      }
+
+      const response = await getAllAccountsApi(params)
+      const accountsList = response?.data || []
+      const metadata = response?.metadata || {}
+
       const normalized = accountsList.map((acc) => ({
         id: acc.id || acc.userId,
         userId: acc.userId || `USR-${String(acc.id).padStart(4, '0')}`,
@@ -74,54 +91,54 @@ function AccountManagement() {
         lastActive: acc.lastActive || acc.lastLogin || '-',
       }))
       setAccounts(normalized)
+      setTotalPages(metadata.totalPages || 1)
+      setTotalElements(metadata.totalElements || normalized.length)
       setIsMockData(false)
     } catch (err) {
       console.warn('API not available, using mock data:', err.message)
-      setAccounts(MOCK_ACCOUNTS)
+      // Fallback local search/filter & slicing for Mock Data
+      const filteredMock = MOCK_ACCOUNTS.filter((account) => {
+        const name = (account.fullName || '').toLowerCase()
+        const email = (account.email || '').toLowerCase()
+        const uid = (account.userId || '').toLowerCase()
+        const uname = (account.username || '').toLowerCase()
+        const search = searchTerm.toLowerCase()
+
+        const matchesSearch =
+          searchTerm === '' || name.includes(search) || email.includes(search) || uid.includes(search) || uname.includes(search)
+
+        const matchesRole =
+          roleFilter === 'All Roles' ||
+          (account.role || '').toLowerCase() === roleFilter.toLowerCase() ||
+          (roleFilter.toLowerCase() === 'moderator' && (account.role || '').toLowerCase() === 'staff') ||
+          (roleFilter.toLowerCase() === 'reader' && (account.role || '').toLowerCase() === 'user')
+
+        const matchesStatus =
+          statusFilter === 'All Status' || (account.status || '').toLowerCase() === statusFilter.toLowerCase()
+
+        return matchesSearch && matchesRole && matchesStatus
+      })
+
+      setTotalPages(Math.max(1, Math.ceil(filteredMock.length / ITEMS_PER_PAGE)))
+      setTotalElements(filteredMock.length)
+
+      const paginatedMock = filteredMock.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+      )
+      setAccounts(paginatedMock)
       setIsMockData(true)
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [currentPage, searchTerm, roleFilter, statusFilter])
 
   useEffect(() => {
     fetchAccounts()
   }, [fetchAccounts])
 
-  // Filter and search logic
-  const filteredAccounts = useMemo(() => {
-    return accounts.filter((account) => {
-      const name = (account.fullName || '').toLowerCase()
-      const email = (account.email || '').toLowerCase()
-      const uid = (account.userId || '').toLowerCase()
-      const uname = (account.username || '').toLowerCase()
-      const search = searchTerm.toLowerCase()
-
-      const matchesSearch =
-        searchTerm === '' || name.includes(search) || email.includes(search) || uid.includes(search) || uname.includes(search)
-
-      const matchesRole =
-        roleFilter === 'All Roles' ||
-        (account.role || '').toLowerCase() === roleFilter.toLowerCase() ||
-        (roleFilter.toLowerCase() === 'moderator' && (account.role || '').toLowerCase() === 'staff') ||
-        (roleFilter.toLowerCase() === 'reader' && (account.role || '').toLowerCase() === 'user')
-
-      const matchesStatus =
-        statusFilter === 'All Status' || (account.status || '').toLowerCase() === statusFilter.toLowerCase()
-
-      return matchesSearch && matchesRole && matchesStatus
-    })
-  }, [accounts, searchTerm, roleFilter, statusFilter])
-
-  // Pagination
-  const totalPages = Math.max(1, Math.ceil(filteredAccounts.length / ITEMS_PER_PAGE))
-  const paginatedAccounts = filteredAccounts.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  )
-
-  const startItem = filteredAccounts.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0
-  const endItem = Math.min(currentPage * ITEMS_PER_PAGE, filteredAccounts.length)
+  const startItem = totalElements > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0
+  const endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalElements)
 
   // Reset page when filters change
   const handleSearchChange = (e) => {
@@ -208,7 +225,7 @@ function AccountManagement() {
       }
       setAccounts((prev) => [newAccount, ...prev])
       setShowCreateModal(false)
-      setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'Moderator' })
+      setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'Reader' })
       setStaffFormErrors({})
       setModalError(null)
       showAlert('success', `Account "${newAccount.fullName}" created successfully!`)
@@ -230,7 +247,7 @@ function AccountManagement() {
 
   const handleCloseCreateModal = () => {
     setShowCreateModal(false)
-    setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'Moderator' })
+    setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'Reader' })
     setStaffFormErrors({})
     setModalError(null)
   }
@@ -309,7 +326,7 @@ function AccountManagement() {
       <div className="admin-page-header">
         <div className="admin-page-header-info">
           <h1>Account Management</h1>
-          <p>{filteredAccounts.length} account{filteredAccounts.length !== 1 ? 's' : ''} found</p>
+          <p>{totalElements} account{totalElements !== 1 ? 's' : ''} found</p>
         </div>
         <button className="btn-create-staff" onClick={() => setShowCreateModal(true)}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -370,7 +387,7 @@ function AccountManagement() {
           <tbody>
             {isLoading ? (
               renderSkeletonRows()
-            ) : paginatedAccounts.length === 0 ? (
+            ) : accounts.length === 0 ? (
               <tr>
                 <td colSpan="8">
                   <div className="admin-empty-state">
@@ -381,7 +398,7 @@ function AccountManagement() {
                 </td>
               </tr>
             ) : (
-              paginatedAccounts.map((account) => (
+              accounts.map((account) => (
                 <tr key={account.id}>
                   <td className="cell-user-id">{account.userId}</td>
                   <td className="cell-name">{account.fullName}</td>
@@ -436,10 +453,10 @@ function AccountManagement() {
         </table>
 
         {/* Table Footer with Pagination */}
-        {!isLoading && filteredAccounts.length > 0 && (
+        {!isLoading && totalElements > 0 && (
           <div className="admin-table-footer">
             <span className="showing-info">
-              Showing {startItem}-{endItem} of {filteredAccounts.length}
+              Showing {startItem}-{endItem} of {totalElements}
             </span>
 
             <div className="admin-pagination">

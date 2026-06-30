@@ -22,6 +22,11 @@ AxiosClient.interceptors.request.use(
 
 AxiosClient.interceptors.response.use(
     (response) => {
+        // If the response contains pagination metadata, return the full body
+        // so the caller can read both .data and .metadata
+        if (response.data?.metadata) {
+            return response.data;
+        }
         return response.data?.data !== undefined ? response.data.data : response.data;
     },
     (error) => {

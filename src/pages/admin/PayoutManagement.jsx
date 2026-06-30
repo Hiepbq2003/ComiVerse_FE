@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import AdminLayout from '../../../components/layout/AdminLayout'
+import AdminLayout from '../../components/layout/AdminLayout'
 
 // ── Mock payout data ───────────────────────────────
 const MOCK_PAYOUTS = [
