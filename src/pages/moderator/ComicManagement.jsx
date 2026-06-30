@@ -5,7 +5,7 @@ import { toast } from 'react-toastify'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { updateComicApi } from '../../services/api/ComicApi'
 
-function ComicManagement({ comics, projectTeams, handleSaveEditComic, handleArchiveComic, handleTriggerAssignTeam, fetchAllData }) {
+function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, handleArchiveComic, handleTriggerAssignTeam, fetchAllData }) {
   // Search & Filters local states
   const [comicSearch, setComicSearch] = useState('')
   const [comicStatusFilter, setComicStatusFilter] = useState('All Status')
@@ -188,19 +188,39 @@ function ComicManagement({ comics, projectTeams, handleSaveEditComic, handleArch
       {/* Statistics overview cards row */}
       <div className="mod-stats-cards-row" style={{ marginBottom: '24px', gridTemplateColumns: 'repeat(4, 1fr)' }}>
         <div className="mod-stat-overview-card">
-          <span className="stat-label">Total Comics</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="stat-label">Total Comics</span>
+            <svg viewBox="0 0 100 30" className="stat-sparkline" style={{ width: '50px', height: '18px', color: 'var(--mod-purple)', opacity: 0.7 }}>
+              <path d="M0 20 Q 25 5, 50 15 T 100 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </div>
           <span className="stat-value">{comics.length}</span>
         </div>
         <div className="mod-stat-overview-card">
-          <span className="stat-label">Ongoing</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="stat-label">Ongoing</span>
+            <svg viewBox="0 0 100 30" className="stat-sparkline" style={{ width: '50px', height: '18px', color: 'var(--mod-green)', opacity: 0.7 }}>
+              <path d="M0 25 C 20 25, 40 5, 60 10 C 80 15, 90 2, 100 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </div>
           <span className="stat-value active-count">{comics.filter(c => c.status === 'Ongoing').length}</span>
         </div>
         <div className="mod-stat-overview-card">
-          <span className="stat-label">Completed</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="stat-label">Completed</span>
+            <svg viewBox="0 0 100 30" className="stat-sparkline" style={{ width: '50px', height: '18px', color: '#3b82f6', opacity: 0.7 }}>
+              <path d="M0 25 C 30 25, 50 20, 70 8 C 85 2, 95 10, 100 2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </div>
           <span className="stat-value" style={{ color: '#3b82f6' }}>{comics.filter(c => c.status === 'Completed').length}</span>
         </div>
         <div className="mod-stat-overview-card">
-          <span className="stat-label">Paused</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="stat-label">Paused</span>
+            <svg viewBox="0 0 100 30" className="stat-sparkline" style={{ width: '50px', height: '18px', color: '#d97706', opacity: 0.7 }}>
+              <path d="M0 10 C 20 10, 40 25, 60 20 C 80 15, 90 25, 100 25" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </div>
           <span className="stat-value paused-count">{comics.filter(c => c.status === 'Paused').length}</span>
         </div>
       </div>
@@ -234,8 +254,8 @@ function ComicManagement({ comics, projectTeams, handleSaveEditComic, handleArch
             onChange={(e) => setComicGenreFilter(e.target.value)}
           >
             <option>All Genres</option>
-            {['Action', 'Fantasy', 'Adventure', 'Mystery', 'Cultivation', 'Drama', 'Martial Arts'].map((g, idx) => (
-              <option key={idx} value={g}>{g}</option>
+            {genres && genres.map((g) => (
+              <option key={g.id} value={g.name}>{g.name}</option>
             ))}
           </select>
 
@@ -415,6 +435,64 @@ function ComicManagement({ comics, projectTeams, handleSaveEditComic, handleArch
                   value={editComicForm.genres}
                   onChange={(e) => setEditComicForm({ ...editComicForm, genres: e.target.value })}
                 />
+                {genres && genres.length > 0 && (
+                  <div style={{ marginTop: '12px' }}>
+                    <label className="mod-label" style={{ fontSize: '12px', color: 'var(--mod-text-secondary)', marginBottom: '6px', display: 'block' }}>
+                      Or select from registered genres (Click to toggle):
+                    </label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                      {genres.map((g) => {
+                        const activeGenres = editComicForm.genres
+                          .split(',')
+                          .map((item) => item.trim().toLowerCase())
+                          .filter(Boolean);
+                        const isActive = activeGenres.includes(g.name.toLowerCase());
+                        return (
+                          <span
+                            key={g.id}
+                            onClick={() => {
+                              const currentList = editComicForm.genres
+                                .split(',')
+                                .map((item) => item.trim())
+                                .filter(Boolean);
+                              
+                              let newList;
+                              if (isActive) {
+                                newList = currentList.filter(
+                                  (item) => item.toLowerCase() !== g.name.toLowerCase()
+                                );
+                              } else {
+                                newList = [...currentList, g.name];
+                              }
+                              setEditComicForm({
+                                ...editComicForm,
+                                genres: newList.join(', ')
+                              });
+                            }}
+                            style={{
+                              background: isActive
+                                ? 'rgba(168, 85, 247, 0.2)'
+                                : 'rgba(255, 255, 255, 0.03)',
+                              border: isActive
+                                ? '1px solid #c084fc'
+                                : '1px solid rgba(255, 255, 255, 0.08)',
+                              color: isActive ? '#c084fc' : '#cbd5e1',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              padding: '4px 10px',
+                              borderRadius: '20px',
+                              cursor: 'pointer',
+                              userSelect: 'none',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {g.name}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

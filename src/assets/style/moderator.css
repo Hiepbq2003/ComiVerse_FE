@@ -1296,6 +1296,22 @@
   padding: 20px;
   display: flex;
   flex-direction: column;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.mod-stat-overview-card:hover {
+  transform: translateY(-3px) !important;
+  border-color: var(--mod-purple) !important;
+  box-shadow: 0 12px 28px rgba(168, 85, 247, 0.12) !important;
+}
+
+.stat-sparkline {
+  filter: drop-shadow(0 2px 4px rgba(168, 85, 247, 0.15));
+  transition: transform 0.3s ease;
+}
+
+.mod-stat-overview-card:hover .stat-sparkline {
+  transform: scale(1.08);
 }
 
 .mod-stat-overview-card .stat-label {

@@ -63,7 +63,7 @@ function Explore() {
         setTotalPages(comicsResponse.metadata.totalPages || 1)
         setTotalElements(comicsResponse.metadata.totalElements || 0)
       }
-      setGenres(genresData || [])
+      setGenres(genresData?.data || genresData || [])
     } catch (err) {
       console.error(err)
       toast.error('Failed to retrieve catalog data.')

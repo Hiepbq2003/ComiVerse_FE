@@ -10,6 +10,7 @@ import ForumModeration from './ForumModeration'
 import { getAllComicsApi, updateComicApi, deleteComicApi } from '../../services/api/ComicApi'
 import { getAllProjectTeamsApi, createProjectTeamApi, deleteProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getAllSubmissionsApi, approveSubmissionApi, rejectSubmissionApi } from '../../services/api/SubmissionApi'
+import { getAllGenresApi } from '../../services/api/GenreApi'
 import { toast } from 'react-toastify'
 
 
@@ -20,6 +21,7 @@ function ModeratorDashboard({ user, onLogout }) {
   const [submissions, setSubmissions] = useState([])
   const [comics, setComics] = useState([])
   const [projectTeams, setProjectTeams] = useState([])
+  const [genres, setGenres] = useState([])
   const [loading, setLoading] = useState(true)
 
   // Creation Team Modal Shared triggers
@@ -44,14 +46,16 @@ function ModeratorDashboard({ user, onLogout }) {
   const fetchAllData = async () => {
     try {
       setLoading(true)
-      const [comicsData, teamsData, submissionsData] = await Promise.all([
+      const [comicsData, teamsData, submissionsData, genresData] = await Promise.all([
         getAllComicsApi(),
         getAllProjectTeamsApi(),
-        getAllSubmissionsApi()
+        getAllSubmissionsApi(),
+        getAllGenresApi()
       ])
       setComics(comicsData || [])
       setProjectTeams(teamsData || [])
       setSubmissions(submissionsData || [])
+      setGenres(genresData?.data || genresData || [])
     } catch (err) {
       console.error(err)
       toast.error('Failed to retrieve control panel data from server.')
@@ -420,6 +424,7 @@ function ModeratorDashboard({ user, onLogout }) {
                 <ComicManagement 
                   comics={comics} 
                   projectTeams={projectTeams}
+                  genres={genres}
                   handleSaveEditComic={handleSaveEditComic} 
                   handleArchiveComic={handleArchiveComic} 
                   handleTriggerAssignTeam={handleTriggerAssignTeam} 

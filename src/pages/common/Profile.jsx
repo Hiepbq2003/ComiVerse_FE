@@ -200,7 +200,10 @@ function Profile({ user, onLogout }) {
             <input type="text" placeholder="Search..." className="profile-search-input" />
           </div>
 
-          <button className="profile-picture-upload-btn" style={{ background: '#f8fafc' }}>
+          <button 
+            className="profile-premium-btn"
+            onClick={() => toast.info('Premium page is coming soon!')}
+          >
             👑 Premium
           </button>
 

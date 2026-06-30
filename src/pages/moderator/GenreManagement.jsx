@@ -26,7 +26,7 @@ function GenreManagement() {
     try {
       setLoading(true)
       const data = await getAllGenresApi()
-      setGenres(data || [])
+      setGenres(data?.data || data || [])
     } catch (err) {
       console.error(err)
       toast.error('Failed to load genres!')
@@ -114,10 +114,6 @@ function GenreManagement() {
   }
 
   // Calculate statistics metrics
-  const sortedByCount = [...genres].sort((a, b) => (b.count || 0) - (a.count || 0))
-  const popularGenre = sortedByCount[0]?.count > 0 
-    ? `${sortedByCount[0].name} (${sortedByCount[0].count} titles)` 
-    : 'N/A'
   const emptyGenresCount = genres.filter(g => (g.count || 0) === 0).length
 
   return (
@@ -140,17 +136,23 @@ function GenreManagement() {
       </div>
 
       {/* Statistics Row */}
-      <div className="mod-stats-cards-row" style={{ marginBottom: '24px' }}>
+      <div className="mod-stats-cards-row" style={{ marginBottom: '24px', gridTemplateColumns: 'repeat(2, 1fr)' }}>
         <div className="mod-stat-overview-card">
-          <span className="stat-label">Total Genres</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="stat-label">Total Genres</span>
+            <svg viewBox="0 0 100 30" className="stat-sparkline" style={{ width: '60px', height: '20px', color: 'var(--mod-purple)', opacity: 0.7 }}>
+              <path d="M0 25 C 20 25, 30 10, 50 15 C 70 20, 80 5, 100 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </div>
           <span className="stat-value">{genres.length}</span>
         </div>
         <div className="mod-stat-overview-card">
-          <span className="stat-label">Popular Genre</span>
-          <span className="stat-value active-count" style={{ fontSize: '18px', marginTop: '14px' }}>{popularGenre}</span>
-        </div>
-        <div className="mod-stat-overview-card">
-          <span className="stat-label">Empty Genres</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="stat-label">Empty Genres</span>
+            <svg viewBox="0 0 100 30" className="stat-sparkline" style={{ width: '60px', height: '20px', color: '#d97706', opacity: 0.7 }}>
+              <path d="M0 10 C 20 10, 40 25, 60 20 C 80 15, 90 25, 100 25" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </div>
           <span className="stat-value paused-count">{emptyGenresCount}</span>
         </div>
       </div>
