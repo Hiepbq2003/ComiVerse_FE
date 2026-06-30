@@ -71,7 +71,7 @@ function AuthorSettings() {
                   className="form-control-premium" 
                   value={profile.username} 
                   disabled 
-                  style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
+                  style={{ cursor: 'not-allowed' }}
                 />
               </div>
               <div className="form-group-cell">
