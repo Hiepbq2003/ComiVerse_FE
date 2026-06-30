@@ -10,7 +10,7 @@ import comicAction from '../../assets/comic_action.png'
 import comicAdventure from '../../assets/comic_adventure.png'
 import comicScifi from '../../assets/comic_scifi.png'
 
-function Genres() {
+function Explore() {
   const navigate = useNavigate()
   
   // Data states
@@ -379,7 +379,7 @@ function Genres() {
                 marginBottom: '20px',
                 borderBottom: '1px solid rgba(255,255,255,0.04)',
                 paddingBottom: '14px'
-              }}>
+               }}>
                 <span style={{ fontSize: '13.5px', color: '#cbd5e1' }}>
                   Showing <strong>{processedComics.length}</strong> results
                 </span>
@@ -564,4 +564,4 @@ function Genres() {
   )
 }
 
-export default Genres
+export default Explore

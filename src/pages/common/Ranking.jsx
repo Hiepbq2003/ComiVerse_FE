@@ -6,7 +6,7 @@ import comicAction from '../../assets/comic_action.png'
 import comicAdventure from '../../assets/comic_adventure.png'
 import comicScifi from '../../assets/comic_scifi.png'
 
-function Trending() {
+function Ranking() {
   const navigate = useNavigate()
 
   const trendingComics = [
@@ -116,4 +116,4 @@ function Trending() {
   )
 }
 
-export default Trending
+export default Ranking

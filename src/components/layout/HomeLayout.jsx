@@ -142,10 +142,10 @@ function HomeLayout({ children }) {
             <Link to="/" className={`home-nav-item ${location.pathname === '/' ? 'active' : ''}`}>
               Home
             </Link>
-            <Link to="/genres" className={`home-nav-item ${location.pathname === '/genres' ? 'active' : ''}`}>
+            <Link to="/explore" className={`home-nav-item ${location.pathname === '/explore' ? 'active' : ''}`}>
               Explore
             </Link>
-            <Link to="/trending" className={`home-nav-item ${location.pathname === '/trending' ? 'active' : ''}`}>
+            <Link to="/ranking" className={`home-nav-item ${location.pathname === '/ranking' ? 'active' : ''}`}>
               Ranking
             </Link>
             <Link to="/library" className={`home-nav-item ${location.pathname === '/library' ? 'active' : ''}`}>
@@ -375,9 +375,9 @@ function HomeLayout({ children }) {
               <span className="footer-col-title">Browse</span>
               <div className="footer-links-list">
                 <Link to="/" className="footer-link">Home</Link>
-                <span className="footer-link" style={{ cursor: 'pointer' }}>Popular Comics</span>
-                <span className="footer-link" style={{ cursor: 'pointer' }}>New Releases</span>
-                <span className="footer-link" style={{ cursor: 'pointer' }}>Genres</span>
+                <Link to="/ranking" className="footer-link">Ranking</Link>
+                <Link to="/library" className="footer-link">Library</Link>
+                <Link to="/explore" className="footer-link">Explore</Link>
               </div>
             </div>
 

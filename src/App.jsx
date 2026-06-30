@@ -1,8 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AuthPage from './pages/common/AuthPage'
 import Home from './pages/common/Home'
-import Genres from './pages/common/Genres'
-import Trending from './pages/common/Trending'
+import Explore from './pages/common/Explore'
+import Ranking from './pages/common/Ranking'
 import Library from './pages/common/Library'
 import Forum from './pages/common/Forum'
 import ComicDetail from './pages/common/ComicDetail'
@@ -42,8 +42,8 @@ function App() {
         <Route path="/profile" element={<ProfileRouteWrapper />} />
         <Route path="/auth" element={<AuthPage />} />
         {/* Public Reader Pages */}
-        <Route path="/genres" element={<Genres />} />
-        <Route path="/trending" element={<Trending />} />
+        <Route path="/explore" element={<Explore />} />
+        <Route path="/ranking" element={<Ranking />} />
         <Route path="/library" element={<Library />} />
         <Route path="/forum" element={<Forum />} />
         <Route path="/comic/:id" element={<ComicDetail />} />
