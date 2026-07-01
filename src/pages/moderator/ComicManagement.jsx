@@ -346,25 +346,11 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                   <td>
                     <div className="comic-actions-cell">
                       <button 
-                        className="comic-btn-action"
+                        className="comic-btn-action edit"
                         onClick={() => openEditModal(comic)}
                         title="Edit Info"
                       >
                         📝 Edit
-                      </button>
-                      <button 
-                        className="comic-btn-action assign"
-                        onClick={() => openDirectAssignModal(comic)}
-                        title="Assign Translation Team"
-                      >
-                        🔗 Assign Team
-                      </button>
-                      <button 
-                        className="comic-btn-action translate"
-                        onClick={() => openTranslationRequestModal(comic)}
-                        title="Request Translation"
-                      >
-                        🌐 Translate
                       </button>
                       <button 
                         className="comic-btn-action archive"
