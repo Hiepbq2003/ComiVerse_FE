@@ -20,6 +20,9 @@ function HomeLayout({ children }) {
   const [unreadCount, setUnreadCount] = useState(0)
   const [showNotificationDropdown, setShowNotificationDropdown] = useState(false)
   const notificationRef = useRef(null)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showSignoutConfirm, setShowSignoutConfirm] = useState(false)
+  const userMenuRef = useRef(null)
 
   // Load auth status
   useEffect(() => {
@@ -55,6 +58,9 @@ function HomeLayout({ children }) {
     const handleClickOutside = (event) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target)) {
         setShowNotificationDropdown(false)
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setShowUserMenu(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -96,7 +102,14 @@ function HomeLayout({ children }) {
     setAuthState(null)
     setNotifications([])
     setUnreadCount(0)
+    setShowUserMenu(false)
+    setShowSignoutConfirm(false)
     navigate('/')
+  }
+
+  const handleMenuNavigate = (path) => {
+    setShowUserMenu(false)
+    navigate(path)
   }
 
   const formatTimeAgo = (dateStr) => {
@@ -122,6 +135,12 @@ function HomeLayout({ children }) {
     if (roleUpper === 'ADMIN') return '/admin/account-management'
     if (roleUpper === 'AUTHOR') return '/author/overview'
     return '/auth' // Reader dashboard is handled inside AuthPage
+  }
+
+  const canOpenWorkspace = () => {
+    if (!authState) return false
+    const roleUpper = (authState.user.role || '').toUpperCase()
+    return !['READER', 'USER'].includes(roleUpper)
   }
 
   // Search State
@@ -462,21 +481,72 @@ function HomeLayout({ children }) {
                 )}
               </div>
 
-              <Link to={getDashboardPath()} className="home-user-profile-badge">
-                {authState.user.avatarUrl ? (
-                  <img src={authState.user.avatarUrl} alt="Avatar" className="home-user-avatar-img" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
-                ) : (
-                  <div className="home-user-avatar">
-                    {(authState.user.fullName || authState.user.username || 'U')[0].toUpperCase()}
+              <div className="home-user-menu-container" ref={userMenuRef}>
+                <button
+                  type="button"
+                  className="home-user-profile-badge"
+                  onClick={() => setShowUserMenu((prev) => !prev)}
+                  aria-expanded={showUserMenu}
+                  aria-haspopup="menu"
+                >
+                  {authState.user.avatarUrl ? (
+                    <img src={authState.user.avatarUrl} alt="Avatar" className="home-user-avatar-img" />
+                  ) : (
+                    <div className="home-user-avatar">
+                      {(authState.user.fullName || authState.user.username || 'U')[0].toUpperCase()}
+                    </div>
+                  )}
+                  <span>{authState.user.fullName || authState.user.username}</span>
+                  <svg className={`home-user-menu-chevron ${showUserMenu ? 'open' : ''}`} viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+
+                {showUserMenu && (
+                  <div className="home-user-dropdown" role="menu">
+                    <div className="home-user-dropdown-header">
+                      <div className="home-user-dropdown-avatar">
+                        {authState.user.avatarUrl ? (
+                          <img src={authState.user.avatarUrl} alt="Avatar" />
+                        ) : (
+                          <span>{(authState.user.fullName || authState.user.username || 'U')[0].toUpperCase()}</span>
+                        )}
+                      </div>
+                      <div>
+                        <strong>{authState.user.fullName || authState.user.username}</strong>
+                        <span>{authState.user.email || authState.user.role || 'ComiVerse member'}</span>
+                      </div>
+                    </div>
+
+                    <button type="button" className="home-user-menu-option" onClick={() => handleMenuNavigate('/profile')}>
+                      <span>Profile</span>
+                    </button>
+                    <button type="button" className="home-user-menu-option" onClick={() => handleMenuNavigate('/library?tab=History')}>
+                      <span>Reading History</span>
+                    </button>
+                    <button type="button" className="home-user-menu-option" onClick={() => handleMenuNavigate('/library?tab=Saved')}>
+                      <span>Favorites</span>
+                    </button>
+                    <button type="button" className="home-user-menu-option" onClick={() => handleMenuNavigate('/library?tab=Following')}>
+                      <span>Following</span>
+                    </button>
+                    {canOpenWorkspace() && (
+                      <button type="button" className="home-user-menu-option" onClick={() => handleMenuNavigate(getDashboardPath())}>
+                        <span>Workspace</span>
+                      </button>
+                    )}
+
+                    <div className="home-user-menu-divider" />
+
+                    <button type="button" className="home-user-menu-option danger" onClick={() => {
+                      setShowUserMenu(false)
+                      setShowSignoutConfirm(true)
+                    }}>
+                      <span>Sign Out</span>
+                    </button>
                   </div>
                 )}
-                <span>{authState.user.fullName || authState.user.username}</span>
-              </Link>
-
-              {/* Logout */}
-              <button onClick={handleLogout} className="btn-home-logout">
-                Sign Out
-              </button>
+              </div>
             </>
           ) : (
             <>
@@ -495,6 +565,23 @@ function HomeLayout({ children }) {
       <main style={{ flexGrow: 1 }}>
         {children}
       </main>
+
+      {showSignoutConfirm && (
+        <div className="home-signout-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="home-signout-title">
+          <div className="home-signout-modal">
+            <h3 id="home-signout-title">Sign out?</h3>
+            <p>Your current session will be closed and you will return to the homepage.</p>
+            <div className="home-signout-modal-actions">
+              <button type="button" className="home-signout-cancel-btn" onClick={() => setShowSignoutConfirm(false)}>
+                Cancel
+              </button>
+              <button type="button" className="home-signout-confirm-btn" onClick={handleLogout}>
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FOOTER */}
       <footer className="home-footer">

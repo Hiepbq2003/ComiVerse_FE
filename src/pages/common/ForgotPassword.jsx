@@ -8,8 +8,9 @@ function ForgotPassword({ onNavigate, onOTPSent, showAlert, loading, setLoading 
     e.preventDefault()
     setLoading(true)
     try {
-      await forgotPasswordApi(email);
-      onOTPSent(email);
+      const normalizedEmail = email.trim();
+      await forgotPasswordApi(normalizedEmail);
+      onOTPSent(normalizedEmail);
       showAlert('success', 'OTP code sent! Please check your email.');
     } catch (err) {
       const errMessage = err.response?.data?.message || 'Email not found.';
@@ -49,6 +50,7 @@ function ForgotPassword({ onNavigate, onOTPSent, showAlert, loading, setLoading 
             placeholder="you@example.com" 
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
             required
           />
         </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getComicsPageApi } from '../../services/api/ComicApi'
 import { toast } from 'react-toastify'
@@ -12,6 +12,7 @@ import comicScifi from '../../assets/comic_scifi.png'
 
 function Library() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [comics, setComics] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -29,6 +30,14 @@ function Library() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalElements, setTotalElements] = useState(0)
   const ITEMS_PER_PAGE = 4
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const tab = params.get('tab')
+    if (['Saved', 'Following', 'History'].includes(tab)) {
+      setActiveTab(tab)
+    }
+  }, [location.search])
 
   // Reset page index on tab or filter update
   useEffect(() => {

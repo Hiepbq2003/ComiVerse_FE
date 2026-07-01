@@ -22,6 +22,28 @@ function AuthPage() {
   const [user, setUser] = useState(null)
   const [activeModal, setActiveModal] = useState('none') // 'none' | 'terms' | 'privacy'
 
+  const openRoleDestination = (userData, options = {}) => {
+    const roleUpper = (userData?.role || '').toUpperCase()
+
+    if (roleUpper === 'ADMIN') {
+      navigate('/admin/account-management', options)
+      return
+    }
+
+    if (roleUpper === 'AUTHOR') {
+      navigate('/author/overview', options)
+      return
+    }
+
+    if (roleUpper === 'MODERATOR' || roleUpper === 'STAFF' || roleUpper === 'TRANSLATOR') {
+      setUser(userData)
+      setView('profile')
+      return
+    }
+
+    navigate('/', options)
+  }
+
   // Check URL parameters for OAuth redirect token
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -36,9 +58,7 @@ function AuthPage() {
         getMeApi()
           .then((userData) => {
             setAuth(token, userData);
-            setUser(userData);
-            setView('profile');
-            navigate('/', { replace: true });
+            openRoleDestination(userData, { replace: true });
             showAlert('success', 'Logged in successfully with Google!');
           })
           .catch((err) => {
@@ -56,18 +76,7 @@ function AuthPage() {
     } else {
       const auth = getAuth();
       if (auth && auth.token && auth.user) {
-        // ADMIN/AUTHOR users go directly to their respective portals
-        const roleUpper = (auth.user.role || '').toUpperCase();
-        if (roleUpper === 'ADMIN') {
-          navigate('/admin/account-management', { replace: true });
-          return;
-        }
-         if (roleUpper === 'AUTHOR') {
-          navigate('/author/overview', { replace: true });
-          return;
-        }
-        setUser(auth.user);
-        setView('profile');
+        openRoleDestination(auth.user, { replace: true });
       } else {
         const mode = urlParams.get('mode');
         if (mode && ['signin', 'signup', 'forgot'].includes(mode)) {
@@ -131,18 +140,7 @@ function AuthPage() {
         <Login 
           onNavigate={setView} 
           onLoginSuccess={(userData) => {
-            // ADMIN/AUTHOR users redirect to their respective portals
-            const roleUpper = (userData.role || '').toUpperCase();
-            if (roleUpper === 'ADMIN') {
-              navigate('/admin/account-management', { replace: true });
-              return;
-            }
-             if (roleUpper === 'AUTHOR') {
-              navigate('/author/overview', { replace: true });
-              return;
-            }
-            setUser(userData);
-            setView('profile');
+            openRoleDestination(userData, { replace: true });
           }} 
           showAlert={showAlert} 
           loading={loading}
@@ -154,8 +152,7 @@ function AuthPage() {
         <Register 
           onNavigate={setView} 
           onRegisterSuccess={(userData) => {
-            setUser(userData);
-            setView('profile');
+            openRoleDestination(userData, { replace: true });
           }} 
           showAlert={showAlert} 
           loading={loading}
