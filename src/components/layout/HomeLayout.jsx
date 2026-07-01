@@ -462,11 +462,14 @@ function HomeLayout({ children }) {
                 )}
               </div>
 
-              {/* User Profile Link */}
               <Link to={getDashboardPath()} className="home-user-profile-badge">
-                <div className="home-user-avatar">
-                  {(authState.user.fullName || authState.user.username || 'U')[0].toUpperCase()}
-                </div>
+                {authState.user.avatarUrl ? (
+                  <img src={authState.user.avatarUrl} alt="Avatar" className="home-user-avatar-img" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
+                ) : (
+                  <div className="home-user-avatar">
+                    {(authState.user.fullName || authState.user.username || 'U')[0].toUpperCase()}
+                  </div>
+                )}
                 <span>{authState.user.fullName || authState.user.username}</span>
               </Link>
 

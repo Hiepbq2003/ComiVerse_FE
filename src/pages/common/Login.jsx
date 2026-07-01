@@ -17,7 +17,8 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
         username: data.username,
         fullName: data.fullName,
         email: data.email,
-        role: data.role
+        role: data.role,
+        avatarUrl: data.avatarUrl
       };
       setAuth(data.token, userData);
       onLoginSuccess(userData);

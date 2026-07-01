@@ -19,6 +19,8 @@ import AuthorEarnings from './pages/author/AuthorEarnings'
 import AuthorSettings from './pages/author/AuthorSettings'
 import Profile from './pages/common/Profile'
 import { getAuth, clearAuth } from './utils/Auth'
+import { ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 
 function ProfileRouteWrapper() {
   const auth = getAuth()
@@ -63,6 +65,7 @@ function App() {
         <Route path="/author/earnings" element={<AuthorEarnings />} />
         <Route path="/author/settings" element={<AuthorSettings />} />
       </Routes>
+      <ToastContainer position="top-right" autoClose={3000} theme="dark" />
     </BrowserRouter>
   )
 }

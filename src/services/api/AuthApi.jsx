@@ -19,3 +19,21 @@ export const resetPasswordApi = (email, otp, newPassword) => {
 export const getMeApi = () => {
   return AxiosClient.get('/auth/me');
 };
+
+export const changePasswordApi = (currentPassword, newPassword) => {
+  return AxiosClient.post('/auth/change-password', { currentPassword, newPassword });
+};
+
+export const updateProfileApi = (fullName, avatarUrl) => {
+  return AxiosClient.put('/auth/profile', { fullName, avatarUrl });
+};
+
+export const uploadAvatarApi = (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return AxiosClient.post('/upload/image', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  });
+};

@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import '../../assets/style/reader/profile.css'
+import { changePasswordApi, updateProfileApi, uploadAvatarApi } from '../../services/api/AuthApi'
+import { toast } from 'react-toastify'
+import { setAuth } from '../../utils/Auth'
 
 // ── ROLE-SPECIFIC STATISTICS COMPONENTS ────────────────────────────
 
@@ -103,13 +106,25 @@ function AdminStats() {
 function Profile({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('info') // 'info' | 'password'
 
+  const parseFullName = (fullName) => {
+    if (!fullName) return { first: '', last: '' };
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length === 1) return { first: parts[0], last: '' };
+    const last = parts.pop();
+    const first = parts.join(' ');
+    return { first, last };
+  }
+
+  const initialName = parseFullName(user.fullName || '');
+
   // Form states for Basic Info
-  const [firstName, setFirstName] = useState('Minh')
-  const [lastName, setLastName] = useState('Khoa')
-  const [username, setUsername] = useState(user.username || 'minhkhoa_dev')
-  const [email, setEmail] = useState(user.email || 'minhkhoa@gmail.com')
+  const [firstName, setFirstName] = useState(initialName.first || '')
+  const [lastName, setLastName] = useState(initialName.last || '')
+  const [username, setUsername] = useState(user.username || '')
+  const [email, setEmail] = useState(user.email || '')
   const [dateOfBirth, setDateOfBirth] = useState('1999-05-15')
   const [bio, setBio] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || '')
 
   // Password change states
   const [currentPassword, setCurrentPassword] = useState('')
@@ -119,21 +134,82 @@ function Profile({ user, onLogout }) {
   const roleName = user.role || 'Reader'
   const roleUpper = roleName.toUpperCase()
 
-  const handleSaveInfo = (e) => {
+  const handleSaveInfo = async (e) => {
     e.preventDefault()
-    alert('Basic Info changes saved successfully!')
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
+    try {
+      await updateProfileApi(fullName, avatarUrl)
+      const token = localStorage.getItem('token')
+      const updatedUser = {
+        ...user,
+        fullName,
+        avatarUrl
+      }
+      setAuth(token, updatedUser)
+      toast.success('Basic Info changes saved successfully!')
+      // Refresh the page to reflect in topbars
+      setTimeout(() => window.location.reload(), 1000)
+    } catch (err) {
+      const errMsg = err.response?.data?.message || 'Failed to save changes.'
+      toast.error(errMsg)
+    }
   }
 
-  const handleSavePassword = (e) => {
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('File size exceeds 2MB limit!');
+      return;
+    }
+    
+    try {
+      const uploadToast = toast.info('Uploading avatar...', { autoClose: false });
+      const uploadedUrl = await uploadAvatarApi(file);
+      toast.dismiss(uploadToast);
+      
+      setAvatarUrl(uploadedUrl);
+      
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+      await updateProfileApi(fullName, uploadedUrl);
+      
+      const token = localStorage.getItem('token');
+      const updatedUser = {
+        ...user,
+        fullName,
+        avatarUrl: uploadedUrl
+      };
+      setAuth(token, updatedUser);
+      
+      toast.success('Avatar uploaded successfully!');
+      setTimeout(() => window.location.reload(), 1000)
+    } catch (err) {
+      const errMsg = err.response?.data?.message || 'Failed to upload image.';
+      toast.error(errMsg);
+    }
+  };
+
+  const handleSavePassword = async (e) => {
     e.preventDefault()
-    if (newPassword !== confirmPassword) {
-      alert('New password and confirm password do not match!')
+    if (newPassword.length < 6) {
+      toast.error('New password must have at least 6 characters!')
       return
     }
-    alert('Password updated successfully!')
-    setCurrentPassword('')
-    setNewPassword('')
-    setConfirmPassword('')
+    if (newPassword !== confirmPassword) {
+      toast.error('New password and confirm password do not match!')
+      return
+    }
+    try {
+      await changePasswordApi(currentPassword, newPassword)
+      toast.success('Password updated successfully!')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (err) {
+      const errMsg = err.response?.data?.message || 'Failed to update password. Please try again.'
+      toast.error(errMsg)
+    }
   }
 
   // Render stats dynamically based on role
@@ -214,7 +290,11 @@ function Profile({ user, onLogout }) {
           )}
 
           <button className="profile-user-menu" onClick={onLogout}>
-            <div className="profile-user-avatar">{userInitials}</div>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Avatar" className="profile-user-avatar-img" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.2)' }} />
+            ) : (
+              <div className="profile-user-avatar">{userInitials}</div>
+            )}
             <span>{displayUserName}</span>
           </button>
         </div>
@@ -235,12 +315,23 @@ function Profile({ user, onLogout }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div className="profile-sidebar-card">
             <div className="profile-avatar-container">
-              <div className="profile-avatar-main">
-                {userInitials}
-              </div>
-              <label className="profile-avatar-upload-icon" title="Upload Photo">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Avatar" className="profile-avatar-img" style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--profile-purple)' }} />
+              ) : (
+                <div className="profile-avatar-main">
+                  {userInitials}
+                </div>
+              )}
+              <label className="profile-avatar-upload-icon" title="Upload Photo" htmlFor="avatar-file-input">
                 📷
               </label>
+              <input 
+                type="file" 
+                id="avatar-file-input" 
+                style={{ display: 'none' }} 
+                accept="image/*" 
+                onChange={handleAvatarChange} 
+              />
             </div>
 
             <h3 className="profile-sidebar-name">{displayUserName}</h3>
@@ -282,13 +373,17 @@ function Profile({ user, onLogout }) {
               <form onSubmit={handleSaveInfo}>
                 {/* Profile Picture Upload row */}
                 <div className="profile-picture-edit-sec">
-                  <div className="profile-picture-edit-avatar">
-                    {userInitials}
-                  </div>
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--profile-purple)' }} />
+                  ) : (
+                    <div className="profile-picture-edit-avatar">
+                      {userInitials}
+                    </div>
+                  )}
                   <div>
-                    <button type="button" className="profile-picture-upload-btn">
+                    <label className="profile-picture-upload-btn" htmlFor="avatar-file-input" style={{ cursor: 'pointer', display: 'inline-block', padding: '8px 16px', background: 'var(--profile-purple)', borderRadius: '8px', color: 'white', fontWeight: '600' }}>
                       Upload photo
-                    </button>
+                    </label>
                     <p className="profile-picture-upload-text">PNG, JPG up to 2MB</p>
                   </div>
                 </div>

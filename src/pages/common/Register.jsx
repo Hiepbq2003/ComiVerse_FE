@@ -86,7 +86,8 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
         username: data.username,
         fullName: data.fullName,
         email: data.email,
-        role: data.role
+        role: data.role,
+        avatarUrl: data.avatarUrl
       }
       setAuth(data.token, userData)
       onRegisterSuccess(userData)
