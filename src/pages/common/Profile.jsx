@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import HomeLayout from '../../components/layout/HomeLayout'
 import '../../assets/style/reader/profile.css'
 import { changePasswordApi, updateProfileApi, uploadAvatarApi } from '../../services/api/AuthApi'
 import { toast } from 'react-toastify'
@@ -103,7 +104,7 @@ function AdminStats() {
 
 // ── MAIN PROFILE PAGE COMPONENT ────────────────────────────────────
 
-function Profile({ user, onLogout }) {
+function Profile({ user }) {
   const [activeTab, setActiveTab] = useState('info') // 'info' | 'password'
 
   const parseFullName = (fullName) => {
@@ -255,50 +256,10 @@ function Profile({ user, onLogout }) {
   const userInitials = displayUserName.substring(0, 2).toUpperCase()
 
   return (
-    <div className="profile-page-wrapper">
+    <HomeLayout>
+      <div className="profile-page-wrapper">
       {/* ── TOP SITE HEADER ──────────────────────────────── */}
-      <header className="profile-site-header">
-        <div className="profile-brand">
-          <div className="profile-brand-icon">📚</div>
-          <span>ComiVerse</span>
-        </div>
 
-        <nav className="profile-site-nav">
-          <a href="#home" className="profile-nav-link active">Home</a>
-          <a href="#explore" className="profile-nav-link">Explore</a>
-          <a href="#ranking" className="profile-nav-link">Ranking</a>
-          <a href="#library" className="profile-nav-link">Library</a>
-          <a href="#forum" className="profile-nav-link">Forum</a>
-        </nav>
-
-        <div className="profile-header-actions">
-          <div className="profile-search-bar">
-            <input type="text" placeholder="Search..." className="profile-search-input" />
-          </div>
-
-          <button 
-            className="profile-premium-btn"
-            onClick={() => toast.info('Premium page is coming soon!')}
-          >
-            👑 Premium
-          </button>
-
-          {roleUpper !== 'READER' && roleUpper !== 'USER' && (
-            <button className="profile-workspace-btn">
-              Workspace
-            </button>
-          )}
-
-          <button className="profile-user-menu" onClick={onLogout}>
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="Avatar" className="profile-user-avatar-img" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.2)' }} />
-            ) : (
-              <div className="profile-user-avatar">{userInitials}</div>
-            )}
-            <span>{displayUserName}</span>
-          </button>
-        </div>
-      </header>
 
       {/* ── SUB BACK-BAR ─────────────────────────────────── */}
       <div className="profile-back-bar">
@@ -509,7 +470,8 @@ function Profile({ user, onLogout }) {
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </HomeLayout>
   )
 }
 

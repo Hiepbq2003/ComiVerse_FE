@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import '../../assets/style/translator.css'
 import '../../assets/style/translator/dashboard.css'
 import TeamProjects from './TeamProjects'
@@ -9,6 +10,7 @@ import { getAllComicsApi, updateComicApi } from '../../services/api/ComicApi'
 import { toast } from 'react-toastify'
 
 function TranslatorDashboard({ user, onLogout }) {
+  const navigate = useNavigate()
   const [activeNav, setActiveNav] = useState('dashboard') // 'dashboard' | 'project-teams' | 'revenue' | 'payout'
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
@@ -187,7 +189,7 @@ function TranslatorDashboard({ user, onLogout }) {
 
             <div className="topbar-divider" />
 
-            <button className="translator-profile-btn">
+            <button className="translator-profile-btn" onClick={() => navigate('/profile')} title="My Profile">
               <span>👤</span> {userName}
             </button>
 

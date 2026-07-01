@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import '../../assets/style/moderator.css'
 import '../../assets/style/moderator/dashboard.css'
 import ReviewQueue from './ReviewQueue'
@@ -15,6 +16,7 @@ import { toast } from 'react-toastify'
 
 
 function ModeratorDashboard({ user, onLogout }) {
+  const navigate = useNavigate()
   const [activeNav, setActiveNav] = useState('dashboard') // 'dashboard' | 'review-queue' | 'comic-management' | etc.
   
   // Dynamic API backed states
@@ -343,7 +345,7 @@ function ModeratorDashboard({ user, onLogout }) {
 
             <div className="topbar-divider" />
 
-            <button className="moderator-profile-btn">
+            <button className="moderator-profile-btn" onClick={() => navigate('/profile')} title="My Profile">
               <span>👤</span> {userName}
             </button>
 

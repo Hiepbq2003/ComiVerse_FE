@@ -130,7 +130,7 @@ function AuthorLayout({ children, activeNav = 'overview' }) {
             <div className="topbar-divider" />
 
             {/* Profile Button */}
-            <button className="author-profile-btn" onClick={() => navigate('/author/settings')}>
+            <button className="author-profile-btn" onClick={() => navigate('/profile')}>
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
