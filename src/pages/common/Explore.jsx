@@ -4,6 +4,7 @@ import HomeLayout from '../../components/layout/HomeLayout'
 import { getComicsPageApi } from '../../services/api/ComicApi'
 import { getAllGenresApi } from '../../services/api/GenreApi'
 import { toast } from 'react-toastify'
+import { MOCK_COMICS } from '../../utils/mockComics'
 
 // Import fallback local assets if backend images are not available
 import comicAction from '../../assets/comic_action.png'
@@ -20,27 +21,55 @@ function Explore() {
 
   // Filter & Sort states
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedGenre, setSelectedGenre] = useState('All')
+  const [selectedGenres, setSelectedGenres] = useState(['All'])
   const [selectedStatus, setSelectedStatus] = useState('All')
   const [sortBy, setSortBy] = useState('Default')
+  
+  // Dropdown visibility states & refs
   const [isSortOpen, setIsSortOpen] = useState(false)
+  const [isGenresOpen, setIsGenresOpen] = useState(false)
+  const [isStatusOpen, setIsStatusOpen] = useState(false)
+  
   const sortDropdownRef = useRef(null)
+  const genresDropdownRef = useRef(null)
+  const statusDropdownRef = useRef(null)
 
-  // Close sort dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target)) {
         setIsSortOpen(false)
+      }
+      if (genresDropdownRef.current && !genresDropdownRef.current.contains(event.target)) {
+        setIsGenresOpen(false)
+      }
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target)) {
+        setIsStatusOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Genre multi-select toggler
+  const handleToggleGenre = (genreName) => {
+    if (genreName === 'All') {
+      setSelectedGenres(['All'])
+    } else {
+      setSelectedGenres(prev => {
+        const filtered = prev.filter(g => g !== 'All')
+        if (filtered.includes(genreName)) {
+          const updated = filtered.filter(g => g !== genreName)
+          return updated.length === 0 ? ['All'] : updated
+        } else {
+          return [...filtered, genreName]
+        }
+      })
+    }
+  }
+
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [totalElements, setTotalElements] = useState(0)
   const ITEMS_PER_PAGE = 12
 
   // Hover states for sidebar menu items
@@ -50,7 +79,7 @@ function Explore() {
   // Reset page on filter changes
   useEffect(() => {
     setCurrentPage(1)
-  }, [selectedGenre, selectedStatus, sortBy])
+  }, [selectedGenres, selectedStatus, sortBy])
 
   // Re-fetch when page or search changes
   useEffect(() => {
@@ -63,23 +92,17 @@ function Explore() {
   }, [currentPage])
 
   const fetchData = async (page) => {
-    const targetPage = page || currentPage
     try {
       setLoading(true)
-      const [comicsResponse, genresData] = await Promise.all([
-        getComicsPageApi(targetPage, ITEMS_PER_PAGE, searchQuery),
-        getAllGenresApi()
+      setComics(MOCK_COMICS)
+      setGenres([
+        { id: 1, name: 'Action' },
+        { id: 2, name: 'Adventure' },
+        { id: 3, name: 'Fantasy' },
+        { id: 4, name: 'Sci-Fi' }
       ])
-      // comicsResponse = { data: [...], metadata: { page, size, totalElements, totalPages } }
-      setComics(comicsResponse.data || [])
-      if (comicsResponse.metadata) {
-        setTotalPages(comicsResponse.metadata.totalPages || 1)
-        setTotalElements(comicsResponse.metadata.totalElements || 0)
-      }
-      setGenres(genresData?.data || genresData || [])
     } catch (err) {
-      console.error(err)
-      toast.error('Failed to retrieve catalog data.')
+      console.error('Failed to load mock data:', err)
     } finally {
       setLoading(false)
     }
@@ -118,9 +141,11 @@ function Explore() {
     }
 
     // 2. Genre Filter
-    if (selectedGenre !== 'All') {
+    if (selectedGenres.length > 0 && !selectedGenres.includes('All')) {
       result = result.filter(c => 
-        c.genres && c.genres.some(g => String(g).toLowerCase() === selectedGenre.toLowerCase())
+        c.genres && selectedGenres.every(selectedG => 
+          c.genres.some(g => String(g).toLowerCase() === selectedG.toLowerCase())
+        )
       )
     }
 
@@ -140,10 +165,7 @@ function Explore() {
       result.sort((a, b) => parseChapters(b.chapters) - parseChapters(a.chapters))
     } else if (sortBy === 'Total Views') {
       result.sort((a, b) => parseViews(b.views) - parseViews(a.views))
-    } else if (sortBy === 'Weekly Views') {
-      result.sort((a, b) => parseViews(b.views) * 0.25 - parseViews(a.views) * 0.25)
-    } else if (sortBy === 'Daily Views') {
-      result.sort((a, b) => parseViews(b.views) * 0.04 - parseViews(a.views) * 0.04)
+
     } else if (sortBy === 'Most Liked') {
       // Pseudo-random deterministic sort based on title hash for visual variations
       result.sort((a, b) => (b.title || '').charCodeAt(0) - (a.title || '').charCodeAt(0))
@@ -159,19 +181,13 @@ function Explore() {
   }
 
   const processedComics = getProcessedComics()
+  const totalPages = Math.ceil(processedComics.length / ITEMS_PER_PAGE) || 1
+  const paginatedComics = processedComics.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
 
-  // Calculate dynamic counts based on loaded comics database
-  const getGenreCount = (genreName) => {
-    if (genreName === 'All') return comics.length
-    return comics.filter(c => 
-      c.genres && c.genres.some(g => String(g).toLowerCase() === genreName.toLowerCase())
-    ).length
-  }
 
-  const getStatusCount = (statusName) => {
-    if (statusName === 'All') return comics.length
-    return comics.filter(c => (c.status || '').toLowerCase() === statusName.toLowerCase()).length
-  }
 
   // Cover image fallback picker
   const getCoverImage = (comic) => {
@@ -193,8 +209,6 @@ function Explore() {
     { value: 'Recently Added', label: 'Recently Added' },
     { value: 'Recently Updated', label: 'Recently Updated' },
     { value: 'Total Views', label: 'Total Views' },
-    { value: 'Weekly Views', label: 'Weekly Views' },
-    { value: 'Daily Views', label: 'Daily Views' },
     { value: 'Most Liked', label: 'Most Liked' },
     { value: 'Most Followed', label: 'Most Followed' },
     { value: 'Most Bookmarked', label: 'Most Bookmarked' }
@@ -215,142 +229,317 @@ function Explore() {
           <div style={{ display: 'flex', gap: '32px', marginTop: '10px' }}>
             {/* ── LEFT SIDEBAR FILTERS ────────────────────── */}
             <aside style={{ width: '220px', flexShrink: 0 }}>
-              {/* Search Bar */}
-              <div style={{ position: 'relative', marginBottom: '28px' }}>
-                <input 
-                  type="text"
-                  placeholder="Search comics..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{
-                    width: '100%',
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                    borderRadius: '20px',
-                    padding: '10px 16px 10px 38px',
-                    color: 'white',
-                    fontSize: '13px',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                    transition: 'all 0.2s ease'
-                  }}
-                />
-                <svg 
-                  viewBox="0 0 24 24" 
-                  width="15" 
-                  height="15" 
-                  fill="none" 
-                  stroke="#64748b" 
-                  strokeWidth="2.5" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round"
-                  style={{ position: 'absolute', left: '14px', top: '12px' }}
-                >
-                  <circle cx="11" cy="11" r="8"></circle>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-              </div>
 
-              {/* Genre Filter List */}
-              <div style={{ marginBottom: '28px' }}>
-                <h4 style={{ color: 'white', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', paddingLeft: '8px' }}>
+              {/* Genres Dropdown Selector */}
+              <div ref={genresDropdownRef} style={{ position: 'relative', marginBottom: '28px' }}>
+                <h4 style={{ color: 'white', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', paddingLeft: '8px' }}>
                   Genres
                 </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {/* "All" Option */}
-                  <div
-                    onClick={() => setSelectedGenre('All')}
-                    onMouseEnter={() => setHoveredGenre('All')}
-                    onMouseLeave={() => setHoveredGenre(null)}
+                <div
+                  onClick={() => setIsGenresOpen(!isGenresOpen)}
+                  style={{
+                    width: '100%',
+                    background: isGenresOpen ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.04)',
+                    border: isGenresOpen ? '1px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: '8px',
+                    padding: '10px 14px',
+                    color: '#cbd5e1',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isGenresOpen) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                      e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.6)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isGenresOpen) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'
+                    }
+                  }}
+                >
+                  <span style={{ 
+                    color: isGenresOpen ? 'white' : '#cbd5e1', 
+                    transition: 'color 0.2s',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    marginRight: '8px'
+                  }}>
+                    {selectedGenres.includes('All') ? 'All Genres' : selectedGenres.join(', ')}
+                  </span>
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                     style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      background: selectedGenre === 'All' ? 'rgba(168, 85, 247, 0.1)' : hoveredGenre === 'All' ? 'rgba(255, 255, 255, 0.02)' : 'transparent',
-                      color: selectedGenre === 'All' ? '#c084fc' : '#cbd5e1',
-                      cursor: 'pointer',
-                      fontWeight: selectedGenre === 'All' ? '600' : '500',
-                      fontSize: '13px',
-                      transition: 'all 0.2s ease',
-                      borderLeft: selectedGenre === 'All' ? '3px solid #a855f7' : '3px solid transparent',
-                      paddingLeft: selectedGenre === 'All' ? '12px' : '9px'
+                      transform: isGenresOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      color: isGenresOpen ? '#c084fc' : '#94a3b8',
+                      flexShrink: 0
                     }}
                   >
-                    <span>All</span>
-                    <span style={{ fontSize: '10.5px', color: selectedGenre === 'All' ? '#c084fc' : '#64748b' }}>
-                      {getGenreCount('All')}
-                    </span>
-                  </div>
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </div>
 
-                  {/* Dynamically Loaded Genres */}
-                  {genres.map(g => (
+                {isGenresOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: '0',
+                      right: '0',
+                      marginTop: '6px',
+                      background: 'rgba(13, 9, 25, 0.95)',
+                      backdropFilter: 'blur(12px)',
+                      WebkitBackdropFilter: 'blur(12px)',
+                      border: '1px solid rgba(168, 85, 247, 0.2)',
+                      borderRadius: '10px',
+                      boxShadow: '0 10px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(168, 85, 247, 0.1)',
+                      zIndex: 100,
+                      overflowY: 'auto',
+                      maxHeight: '210px',
+                      scrollbarWidth: 'thin',
+                      scrollbarColor: 'rgba(168, 85, 247, 0.4) transparent',
+                      padding: '4px',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    {/* "All" Option */}
                     <div
-                      key={g.id}
-                      onClick={() => setSelectedGenre(g.name)}
-                      onMouseEnter={() => setHoveredGenre(g.id)}
-                      onMouseLeave={() => setHoveredGenre(null)}
+                      onClick={() => handleToggleGenre('All')}
                       style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '8px 12px',
+                        padding: '10px 12px',
                         borderRadius: '6px',
-                        background: selectedGenre === g.name ? 'rgba(168, 85, 247, 0.1)' : hoveredGenre === g.id ? 'rgba(255, 255, 255, 0.02)' : 'transparent',
-                        color: selectedGenre === g.name ? '#c084fc' : '#cbd5e1',
-                        cursor: 'pointer',
-                        fontWeight: selectedGenre === g.name ? '600' : '500',
+                        color: selectedGenres.includes('All') ? 'white' : '#cbd5e1',
+                        background: selectedGenres.includes('All') ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(236, 72, 153, 0.2) 100%)' : 'transparent',
+                        border: selectedGenres.includes('All') ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid transparent',
                         fontSize: '13px',
-                        transition: 'all 0.2s ease',
-                        borderLeft: selectedGenre === g.name ? '3px solid #a855f7' : '3px solid transparent',
-                        paddingLeft: selectedGenre === g.name ? '12px' : '9px'
+                        fontWeight: selectedGenres.includes('All') ? '600' : '400',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginBottom: '2px',
+                        boxSizing: 'border-box'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!selectedGenres.includes('All')) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'
+                          e.currentTarget.style.color = 'white'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!selectedGenres.includes('All')) {
+                          e.currentTarget.style.background = 'transparent'
+                          e.currentTarget.style.color = '#cbd5e1'
+                        }
                       }}
                     >
-                      <span>{g.name}</span>
-                      <span style={{ fontSize: '10.5px', color: selectedGenre === g.name ? '#c084fc' : '#64748b' }}>
-                        {getGenreCount(g.name)}
-                      </span>
+                      <span>All</span>
+                      {selectedGenres.includes('All') && (
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#c084fc' }}>
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                      )}
                     </div>
-                  ))}
-                </div>
+
+                    {/* Dynamically Loaded Genres */}
+                    {genres.map((g) => {
+                      const isSelected = selectedGenres.includes(g.name)
+                      return (
+                        <div
+                          key={g.id}
+                          onClick={() => handleToggleGenre(g.name)}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: '6px',
+                            color: isSelected ? 'white' : '#cbd5e1',
+                            background: isSelected ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(236, 72, 153, 0.2) 100%)' : 'transparent',
+                            border: isSelected ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid transparent',
+                            fontSize: '13px',
+                            fontWeight: isSelected ? '600' : '400',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: '2px',
+                            boxSizing: 'border-box'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'
+                              e.currentTarget.style.color = 'white'
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.background = 'transparent'
+                              e.currentTarget.style.color = '#cbd5e1'
+                            }
+                          }}
+                        >
+                          <span>{g.name}</span>
+                          {isSelected && (
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#c084fc' }}>
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
-              {/* Status Filter List */}
-              <div style={{ marginBottom: '28px' }}>
-                <h4 style={{ color: 'white', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', paddingLeft: '8px' }}>
+              {/* Status Dropdown Selector */}
+              <div ref={statusDropdownRef} style={{ position: 'relative', marginBottom: '28px' }}>
+                <h4 style={{ color: 'white', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', paddingLeft: '8px' }}>
                   Status
                 </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {['All', 'Ongoing', 'Completed', 'Paused'].map(status => (
-                    <div
-                      key={status}
-                      onClick={() => setSelectedStatus(status)}
-                      onMouseEnter={() => setHoveredStatus(status)}
-                      onMouseLeave={() => setHoveredStatus(null)}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        background: selectedStatus === status ? 'rgba(168, 85, 247, 0.1)' : hoveredStatus === status ? 'rgba(255, 255, 255, 0.02)' : 'transparent',
-                        color: selectedStatus === status ? '#c084fc' : '#cbd5e1',
-                        cursor: 'pointer',
-                        fontWeight: selectedStatus === status ? '600' : '500',
-                        fontSize: '13px',
-                        transition: 'all 0.2s ease',
-                        borderLeft: selectedStatus === status ? '3px solid #a855f7' : '3px solid transparent',
-                        paddingLeft: selectedStatus === status ? '12px' : '9px'
-                      }}
-                    >
-                      <span>{status}</span>
-                      <span style={{ fontSize: '10.5px', color: selectedStatus === status ? '#c084fc' : '#64748b' }}>
-                        {getStatusCount(status)}
-                      </span>
-                    </div>
-                  ))}
+                <div
+                  onClick={() => setIsStatusOpen(!isStatusOpen)}
+                  style={{
+                    width: '100%',
+                    background: isStatusOpen ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.04)',
+                    border: isStatusOpen ? '1px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: '8px',
+                    padding: '10px 14px',
+                    color: '#cbd5e1',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isStatusOpen) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                      e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.6)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isStatusOpen) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'
+                    }
+                  }}
+                >
+                  <span style={{ color: isStatusOpen ? 'white' : '#cbd5e1', transition: 'color 0.2s' }}>
+                    {selectedStatus === 'All' ? 'All Statuses' : selectedStatus}
+                  </span>
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{
+                      transform: isStatusOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      color: isStatusOpen ? '#c084fc' : '#94a3b8'
+                    }}
+                  >
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
                 </div>
+
+                {isStatusOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: '0',
+                      right: '0',
+                      marginTop: '6px',
+                      background: 'rgba(13, 9, 25, 0.95)',
+                      backdropFilter: 'blur(12px)',
+                      WebkitBackdropFilter: 'blur(12px)',
+                      border: '1px solid rgba(168, 85, 247, 0.2)',
+                      borderRadius: '10px',
+                      boxShadow: '0 10px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(168, 85, 247, 0.1)',
+                      zIndex: 100,
+                      overflowY: 'auto',
+                      maxHeight: '210px',
+                      scrollbarWidth: 'thin',
+                      scrollbarColor: 'rgba(168, 85, 247, 0.4) transparent',
+                      padding: '4px',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    {['All', 'Ongoing', 'Completed', 'Paused'].map((status) => {
+                      const isSelected = selectedStatus === status
+                      return (
+                        <div
+                          key={status}
+                          onClick={() => {
+                            setSelectedStatus(status)
+                            setIsStatusOpen(false)
+                          }}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: '6px',
+                            color: isSelected ? 'white' : '#cbd5e1',
+                            background: isSelected ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(236, 72, 153, 0.2) 100%)' : 'transparent',
+                            border: isSelected ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid transparent',
+                            fontSize: '13px',
+                            fontWeight: isSelected ? '600' : '400',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: '2px',
+                            boxSizing: 'border-box'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'
+                              e.currentTarget.style.color = 'white'
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.background = 'transparent'
+                              e.currentTarget.style.color = '#cbd5e1'
+                            }
+                          }}
+                        >
+                          <span>{status}</span>
+                          {isSelected && (
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#c084fc' }}>
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Quick Sort Dropdown Selector */}
@@ -427,7 +616,10 @@ function Explore() {
                       borderRadius: '10px',
                       boxShadow: '0 10px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(168, 85, 247, 0.1)',
                       zIndex: 100,
-                      overflow: 'hidden',
+                      overflowY: 'auto',
+                      maxHeight: '210px',
+                      scrollbarWidth: 'thin',
+                      scrollbarColor: 'rgba(168, 85, 247, 0.4) transparent',
                       padding: '4px',
                       boxSizing: 'border-box'
                     }}
@@ -517,7 +709,7 @@ function Explore() {
                       gap: '24px'
                     }}
                   >
-                    {processedComics.map((comic) => (
+                    {paginatedComics.map((comic) => (
                       <div 
                         key={comic.id}
                         onClick={() => navigate(`/comic/${comic.id}`)}
