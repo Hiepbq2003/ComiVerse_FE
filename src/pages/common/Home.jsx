@@ -203,7 +203,7 @@ function Home() {
               <h2 className="section-title">Trending Comics</h2>
               <span className="section-subtitle">Most read and discussed series this week</span>
             </div>
-            <span style={{ cursor: 'pointer' }} className="section-view-all">
+            <span style={{ cursor: 'pointer' }} className="section-view-all" onClick={() => navigate('/trending')}>
               Full Leaderboard <span>›</span>
             </span>
           </div>
@@ -213,7 +213,7 @@ function Home() {
             <div className="hot-featured-wrapper">
               <div
                 className="hot-featured-card"
-                onClick={() => navigate('/auth')}
+                onClick={() => navigate(`/comic/${hotComics[0].id}`)}
               >
                 <div className="hot-featured-cover">
                   <img src={hotComics[0].cover} alt={hotComics[0].title} />
@@ -238,7 +238,7 @@ function Home() {
                 <div
                   key={comic.id}
                   className="ranking-item"
-                  onClick={() => navigate('/auth')}
+                  onClick={() => navigate(`/comic/${comic.id}`)}
                 >
                   <span className={`rank-number top-${index + 2}`}>
                     0{index + 2}
@@ -271,7 +271,7 @@ function Home() {
               <h2 className="section-title">New Chapters</h2>
               <span className="section-subtitle">Freshly updated series from our creators</span>
             </div>
-            <span style={{ cursor: 'pointer' }} className="section-view-all">
+            <span style={{ cursor: 'pointer' }} className="section-view-all" onClick={() => navigate('/new-releases')}>
               Release Calendar <span>›</span>
             </span>
           </div>
@@ -282,13 +282,13 @@ function Home() {
                 key={comic.id}
                 className="update-card"
               >
-                <div className="update-thumb" onClick={() => navigate('/auth')}>
+                <div className="update-thumb" onClick={() => navigate(`/comic/${comic.id}`)}>
                   <img src={comic.cover} alt={comic.title} />
                   <span className="update-badge-new">NEW</span>
                 </div>
                 <div className="update-info">
                   <div className="update-title-block">
-                    <h3 className="update-title" onClick={() => navigate('/auth')}>{comic.title}</h3>
+                    <h3 className="update-title" onClick={() => navigate(`/comic/${comic.id}`)}>{comic.title}</h3>
                     <span className="update-genre">{comic.genre}</span>
                   </div>
 

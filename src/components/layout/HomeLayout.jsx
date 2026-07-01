@@ -7,6 +7,7 @@ import {
   markAsReadApi,
   markAllAsReadApi,
 } from '../../services/api/NotificationApi'
+import { MOCK_COMICS } from '../../utils/mockComics'
 import '../../assets/style/reader/home.css'
 
 function HomeLayout({ children }) {
@@ -123,6 +124,73 @@ function HomeLayout({ children }) {
     return '/auth' // Reader dashboard is handled inside AuthPage
   }
 
+  // Search State
+  const [searchQuery, setSearchQuery] = useState('')
+  const [suggestions, setSuggestions] = useState([])
+  const [isSearchLoading, setIsSearchLoading] = useState(false)
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false)
+  const searchContainerRef = useRef(null)
+
+  // Sync search input with URL query param if on /search page
+  useEffect(() => {
+    if (location.pathname === '/search') {
+      const params = new URLSearchParams(location.search)
+      const query = params.get('query') || ''
+      setSearchQuery(query)
+    } else {
+      setSearchQuery('')
+    }
+  }, [location])
+
+  // Click outside listener for search dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target)) {
+        setShowSearchDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Debounced search effect (using demo data)
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSuggestions([])
+      setShowSearchDropdown(false)
+      return
+    }
+
+    setIsSearchLoading(true)
+    setShowSearchDropdown(true)
+
+    // Delay 1s before searching demo data
+    const delayDebounceFn = setTimeout(() => {
+      const filtered = MOCK_COMICS.filter(comic =>
+        (comic.title && comic.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (comic.author && comic.author.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (comic.genres && comic.genres.some(g => g.toLowerCase().includes(searchQuery.toLowerCase())))
+      )
+      setSuggestions(filtered)
+      setIsSearchLoading(false)
+    }, 1000)
+
+    return () => clearTimeout(delayDebounceFn)
+  }, [searchQuery])
+
+  const triggerSearch = () => {
+    if (searchQuery.trim()) {
+      setShowSearchDropdown(false)
+      navigate(`/search?query=${encodeURIComponent(searchQuery.trim())}`)
+    }
+  }
+
+  const handleSearchSubmit = (e) => {
+    if (e.key === 'Enter') {
+      triggerSearch()
+    }
+  }
+
   return (
     <div className="home-layout-container">
       {/* HEADER */}
@@ -138,6 +206,7 @@ function HomeLayout({ children }) {
             <span className="home-brand-logo-text">ComiVerse</span>
           </Link>
 
+          {/* Nav Links */}
           <nav className="home-nav-links">
             <Link to="/" className={`home-nav-item ${location.pathname === '/' ? 'active' : ''}`}>
               Home
@@ -148,18 +217,32 @@ function HomeLayout({ children }) {
             <Link to="/ranking" className={`home-nav-item ${location.pathname === '/ranking' ? 'active' : ''}`}>
               Ranking
             </Link>
-            <Link to="/library" className={`home-nav-item ${location.pathname === '/library' ? 'active' : ''}`}>
-              Library
-            </Link>
-            <Link to="/forum" className={`home-nav-item ${location.pathname === '/forum' ? 'active' : ''}`}>
-              Forum
-            </Link>
+            {/*<Link to="/library" className={`home-nav-item ${location.pathname === '/library' ? 'active' : ''}`}>*/}
+            {/*  Library*/}
+            {/*</Link>*/}
+            {authState && (
+              <Link to="/forum" className={`home-nav-item ${location.pathname === '/forum' ? 'active' : ''}`}>
+                Forum
+              </Link>
+            )}
           </nav>
         </div>
 
         {/* Search Bar */}
-        <div className="home-search-wrapper">
-          <svg className="home-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <div className="home-search-wrapper" ref={searchContainerRef}>
+          <svg
+            className="home-search-icon"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ cursor: 'pointer' }}
+            onClick={triggerSearch}
+          >
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
@@ -167,7 +250,64 @@ function HomeLayout({ children }) {
             type="text"
             className="home-search-input"
             placeholder="Search comics, manga, authors..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleSearchSubmit}
+            onFocus={() => {
+              if (searchQuery.trim()) {
+                setShowSearchDropdown(true)
+              }
+            }}
           />
+
+          {/* Search Suggestions Dropdown */}
+          {showSearchDropdown && (
+            <div className="home-search-dropdown">
+              {isSearchLoading ? (
+                <div className="search-dropdown-loading">
+                  <div className="search-spinner"></div>
+                  Searching...
+                </div>
+              ) : suggestions.length === 0 ? (
+                <div className="search-dropdown-no-results">No comics found</div>
+              ) : (
+                <div className="search-dropdown-list">
+                  {suggestions.slice(0, 5).map((comic) => (
+                    <Link
+                      key={comic.id || comic._id}
+                      to={`/comic/${comic.id || comic._id}`}
+                      className="search-dropdown-item"
+                      onClick={() => {
+                        setShowSearchDropdown(false)
+                        setSearchQuery('')
+                      }}
+                    >
+                      <img
+                        src={comic.cover || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=150'}
+                        alt={comic.title}
+                        className="search-dropdown-item-cover"
+                      />
+                      <div className="search-dropdown-item-info">
+                        <span className="search-dropdown-item-title">{comic.title}</span>
+                        <span className="search-dropdown-item-author">{comic.author || 'Unknown'}</span>
+                      </div>
+                    </Link>
+                  ))}
+                  {suggestions.length > 5 && (
+                    <button
+                      className="search-dropdown-see-all"
+                      onClick={() => {
+                        setShowSearchDropdown(false)
+                        navigate(`/search?query=${encodeURIComponent(searchQuery.trim())}`)
+                      }}
+                    >
+                      See all {suggestions.length} results
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Auth Section */}
