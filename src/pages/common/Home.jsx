@@ -203,7 +203,7 @@ function Home() {
               <h2 className="section-title">Trending Comics</h2>
               <span className="section-subtitle">Most read and discussed series this week</span>
             </div>
-            <span style={{ cursor: 'pointer' }} className="section-view-all" onClick={() => navigate('/trending')}>
+            <span style={{ cursor: 'pointer' }} className="section-view-all" onClick={() => navigate('/ranking')}>
               Full Leaderboard <span>›</span>
             </span>
           </div>

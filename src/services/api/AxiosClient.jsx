@@ -34,9 +34,18 @@ AxiosClient.interceptors.response.use(
 
         if (status === 401) {
             // 401: Unauthorized / Session Expired
-            toast.error("Session expired. Please log in again!");
             clearAuth();
-            window.location.href = '/';
+            
+            const privatePaths = ['/profile', '/admin', '/author', '/forum'];
+            const currentPath = window.location.pathname;
+            const isPrivate = privatePaths.some(path => currentPath.startsWith(path));
+            
+            if (isPrivate) {
+                toast.error("Session expired. Please log in again!");
+                window.location.href = '/';
+            } else {
+                window.location.reload();
+            }
         } 
         else if (status === 403) {
             // 403: Forbidden / Access Denied
