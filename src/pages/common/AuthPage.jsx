@@ -46,18 +46,19 @@ function AuthPage() {
 
   // Check URL parameters for OAuth redirect token
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
+    const urlParams = new URLSearchParams(window.location.search)
+    const token = urlParams.get('token')
+    const refreshToken = urlParams.get('refreshToken')
     
     if (token || window.location.pathname.includes('/oauth2/redirect')) {
-      setView('oauth-loading');
+      setView('oauth-loading')
       if (token) {
-        setAuth(token, ''); // Temporary set token while fetching google details
-        window.history.replaceState({}, document.title, '/');
+        setAuth(token, '', refreshToken) // Temporary set token while fetching google details
+        window.history.replaceState({}, document.title, '/')
         
         getMeApi()
           .then((userData) => {
-            setAuth(token, userData);
+            setAuth(token, userData, refreshToken)
             openRoleDestination(userData, { replace: true });
             showAlert('success', 'Logged in successfully with Google!');
           })
@@ -111,16 +112,15 @@ function AuthPage() {
         return <AuthorDashboard user={user} onLogout={handleLogout} />;
       case 'MODERATOR':
       case 'STAFF':
-        return <ModeratorDashboard />;
+        return <ModeratorDashboard user={user} onLogout={handleLogout} />;
       case 'TRANSLATOR':
-        return <TranslatorDashboard />;
+        return <TranslatorDashboard user={user} onLogout={handleLogout} />;
       case 'READER':
       case 'USER':
       default:
         return <Profile user={user} onLogout={handleLogout} />;
     }
   };
-
 
   if (view === 'profile' && user) {
     return renderProfileDashboard();

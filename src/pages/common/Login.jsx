@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { loginApi } from '../../services/api/AuthApi'
+import { loginApi, getMeApi } from '../../services/api/AuthApi'
 import { setAuth } from '../../utils/Auth'
 
 function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
@@ -30,17 +30,26 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
     try {
       const response = await loginApi(form.username.trim(), form.password)
       const data = response.data || response
+
+      // Temporarily store token for getMeApi authentication
+      setAuth(data.token, '', data.refreshToken)
+
+      // Fetch user profile info
+      const meResponse = await getMeApi()
+      const meData = meResponse.data || meResponse
+
       const userData = {
-        userId: data.userId,
-        username: data.username,
-        fullName: data.fullName,
-        email: data.email,
-        role: data.role,
-        avatarUrl: data.avatarUrl
-      };
-      setAuth(data.token, userData);
-      onLoginSuccess(userData);
-      showAlert('success', 'Welcome back to ComiVerse!');
+        userId: meData.userId,
+        username: meData.username,
+        fullName: meData.fullName,
+        email: meData.email,
+        role: meData.role,
+        avatarUrl: meData.avatarUrl
+      }
+
+      setAuth(data.token, userData, data.refreshToken)
+      onLoginSuccess(userData)
+      showAlert('success', 'Welcome back to ComiVerse!')
     } catch (err) {
       const errMessage = err.response?.data?.message || 'Invalid username or password.';
       const isInvalidCredentials = err.response?.status === 401 || /invalid username or password/i.test(errMessage)

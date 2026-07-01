@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { registerApi } from '../../services/api/AuthApi'
+import { registerApi, getMeApi } from '../../services/api/AuthApi'
 import { setAuth } from '../../utils/Auth'
 
 function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoading, onOpenModal }) {
@@ -81,15 +81,22 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
         password: form.password
       })
 
+      // Temporarily store token for getMeApi authentication
+      setAuth(data.token, '', data.refreshToken)
+
+      // Fetch user profile info
+      const meResponse = await getMeApi()
+      const meData = meResponse.data || meResponse
+
       const userData = {
-        userId: data.userId,
-        username: data.username,
-        fullName: data.fullName,
-        email: data.email,
-        role: data.role,
-        avatarUrl: data.avatarUrl
+        userId: meData.userId,
+        username: meData.username,
+        fullName: meData.fullName,
+        email: meData.email,
+        role: meData.role,
+        avatarUrl: meData.avatarUrl
       }
-      setAuth(data.token, userData)
+      setAuth(data.token, userData, data.refreshToken)
       onRegisterSuccess(userData)
       showAlert('success', 'Account registered successfully!')
     } catch (err) {
