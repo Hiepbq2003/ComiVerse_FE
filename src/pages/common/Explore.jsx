@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getComicsPageApi } from '../../services/api/ComicApi'
@@ -23,6 +23,19 @@ function Explore() {
   const [selectedGenre, setSelectedGenre] = useState('All')
   const [selectedStatus, setSelectedStatus] = useState('All')
   const [sortBy, setSortBy] = useState('Default')
+  const [isSortOpen, setIsSortOpen] = useState(false)
+  const sortDropdownRef = useRef(null)
+
+  // Close sort dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target)) {
+        setIsSortOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
@@ -341,31 +354,135 @@ function Explore() {
               </div>
 
               {/* Quick Sort Dropdown Selector */}
-              <div>
+              <div ref={sortDropdownRef} style={{ position: 'relative' }}>
                 <h4 style={{ color: 'white', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', paddingLeft: '8px' }}>
                   Sort By
                 </h4>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
+                <div
+                  onClick={() => setIsSortOpen(!isSortOpen)}
                   style={{
                     width: '100%',
-                    background: 'rgba(255, 255, 255, 0.04)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    background: isSortOpen ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.04)',
+                    border: isSortOpen ? '1px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.08)',
                     borderRadius: '8px',
-                    padding: '8px 12px',
+                    padding: '10px 14px',
                     color: '#cbd5e1',
                     fontSize: '13px',
+                    fontWeight: '500',
                     outline: 'none',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSortOpen) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                      e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.6)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSortOpen) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'
+                    }
                   }}
                 >
-                  {sortOptions.map(opt => (
-                    <option key={opt.value} value={opt.value} style={{ background: '#0f0b1e', color: '#cbd5e1' }}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  <span style={{ color: isSortOpen ? 'white' : '#cbd5e1', transition: 'color 0.2s' }}>
+                    {sortOptions.find(opt => opt.value === sortBy)?.label || 'Default'}
+                  </span>
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{
+                      transform: isSortOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      color: isSortOpen ? '#c084fc' : '#94a3b8'
+                    }}
+                  >
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </div>
+
+                {isSortOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: '0',
+                      right: '0',
+                      marginTop: '6px',
+                      background: 'rgba(13, 9, 25, 0.95)',
+                      backdropFilter: 'blur(12px)',
+                      WebkitBackdropFilter: 'blur(12px)',
+                      border: '1px solid rgba(168, 85, 247, 0.2)',
+                      borderRadius: '10px',
+                      boxShadow: '0 10px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(168, 85, 247, 0.1)',
+                      zIndex: 100,
+                      overflow: 'hidden',
+                      padding: '4px',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    {sortOptions.map((opt) => {
+                      const isSelected = opt.value === sortBy
+                      return (
+                        <div
+                          key={opt.value}
+                          onClick={() => {
+                            setSortBy(opt.value)
+                            setIsSortOpen(false)
+                          }}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: '6px',
+                            color: isSelected ? 'white' : '#cbd5e1',
+                            background: isSelected ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(236, 72, 153, 0.2) 100%)' : 'transparent',
+                            border: isSelected ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid transparent',
+                            fontSize: '13px',
+                            fontWeight: isSelected ? '600' : '400',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: '2px',
+                            boxSizing: 'border-box'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'
+                              e.currentTarget.style.color = 'white'
+                              e.currentTarget.style.paddingLeft = '14px'
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.background = 'transparent'
+                              e.currentTarget.style.color = '#cbd5e1'
+                              e.currentTarget.style.paddingLeft = '12px'
+                            }
+                          }}
+                        >
+                          <span>{opt.label}</span>
+                          {isSelected && (
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#c084fc' }}>
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             </aside>
 

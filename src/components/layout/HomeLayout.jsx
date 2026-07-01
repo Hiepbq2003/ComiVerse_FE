@@ -8,7 +8,6 @@ import {
   markAllAsReadApi,
 } from '../../services/api/NotificationApi'
 import { MOCK_COMICS } from '../../utils/mockComics'
-import '../../assets/style/home.css'
 import '../../assets/style/reader/home.css'
 
 function HomeLayout({ children }) {
@@ -218,12 +217,14 @@ function HomeLayout({ children }) {
             <Link to="/ranking" className={`home-nav-item ${location.pathname === '/ranking' ? 'active' : ''}`}>
               Ranking
             </Link>
-            <Link to="/library" className={`home-nav-item ${location.pathname === '/library' ? 'active' : ''}`}>
-              Library
-            </Link>
-            <Link to="/forum" className={`home-nav-item ${location.pathname === '/forum' ? 'active' : ''}`}>
-              Forum
-            </Link>
+            {/*<Link to="/library" className={`home-nav-item ${location.pathname === '/library' ? 'active' : ''}`}>*/}
+            {/*  Library*/}
+            {/*</Link>*/}
+            {authState && (
+              <Link to="/forum" className={`home-nav-item ${location.pathname === '/forum' ? 'active' : ''}`}>
+                Forum
+              </Link>
+            )}
           </nav>
         </div>
 
