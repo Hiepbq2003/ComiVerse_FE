@@ -111,15 +111,16 @@ function AuthPage() {
         return <AuthorDashboard user={user} onLogout={handleLogout} />;
       case 'MODERATOR':
       case 'STAFF':
-        return <ModeratorDashboard user={user} onLogout={handleLogout} />;
+        return <ModeratorDashboard />;
       case 'TRANSLATOR':
-        return <TranslatorDashboard user={user} onLogout={handleLogout} />;
+        return <TranslatorDashboard />;
       case 'READER':
       case 'USER':
       default:
         return <Profile user={user} onLogout={handleLogout} />;
     }
   };
+
 
   if (view === 'profile' && user) {
     return renderProfileDashboard();
