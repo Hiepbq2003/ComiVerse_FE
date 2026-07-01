@@ -15,7 +15,6 @@ import {
   deleteTeamRequestApi
 } from '../../services/api/TeamWorkspaceApi'
 import { toast } from 'react-toastify'
-import JobPool from './JobPool'
 
 function TeamProjects({ projects, setProjects, fetchProjects, user }) {
   const [searchTerm, setSearchTerm] = useState('')
@@ -430,11 +429,10 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
     }
   }
 
-  const seenLeaders = new Set()
   const teamProjectsList = projects.filter(proj => {
-    const isNotUnclaimed = !proj.status || proj.status.toUpperCase() !== 'UNCLAIMED'
-    const matchesSearch = proj.title.toLowerCase().includes(searchTerm.toLowerCase())
-    if (!isNotUnclaimed || !matchesSearch) return false
+    const matchesSearch = (proj.title || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (proj.comicName || '').toLowerCase().includes(searchTerm.toLowerCase())
+    if (!matchesSearch) return false
 
     const isUserLeader = proj.leaderName && (
       proj.leaderName === userFullName || 
@@ -446,14 +444,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
       proj.leaderName.toLowerCase() === user?.fullName?.toLowerCase()
     )
 
-    if (isUserLeader) {
-      if (seenLeaders.has(proj.leaderName.toLowerCase())) {
-        // Already showed their first team card, hide subsequent ones so claiming doesn't spawn duplicate team cards
-        return false
-      }
-      seenLeaders.add(proj.leaderName.toLowerCase())
-    }
-    return true
+    return isUserLeader
   })
 
   // ── WORKSPACE DETAIL VIEW ────────────────────────
@@ -517,22 +508,6 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
           >
             Tasks <span className={`tab-badge ${workspaceTab === 'tasks' ? 'active-badge' : ''}`}>{tasks.length}</span>
           </button>
-          {isCurrentLeader && (
-            <button 
-              className={`workspace-tab-btn ${workspaceTab === 'claimed-jobs' ? 'active' : ''}`}
-              onClick={() => setWorkspaceTab('claimed-jobs')}
-            >
-              📋 Claimed Jobs
-            </button>
-          )}
-          {isCurrentLeader && (
-            <button 
-              className={`workspace-tab-btn ${workspaceTab === 'job-pool' ? 'active' : ''}`}
-              onClick={() => setWorkspaceTab('job-pool')}
-            >
-              🌐 Job Pool
-            </button>
-          )}
           {isCurrentLeader && (
             <button 
               className={`workspace-tab-btn ${workspaceTab === 'settings' ? 'active' : ''}`}
@@ -1195,125 +1170,6 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
             </div>
           </div>
         )}
-        {/* Tab: CLAIMED JOBS WORKSPACE */}
-        {workspaceTab === 'claimed-jobs' && (
-          <div className="fade-in" style={{ marginTop: '20px' }}>
-            <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '16px', padding: '24px', backdropFilter: 'blur(10px)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <div>
-                  <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--trans-text-primary)', margin: '0 0 4px' }}>📋 Claimed Jobs</h2>
-                  <p style={{ fontSize: '13px', color: 'var(--trans-text-secondary)', margin: 0 }}>List of translation comics claimed by your team from the pool.</p>
-                </div>
-                <div style={{ background: 'rgba(168, 85, 247, 0.1)', color: 'var(--trans-purple)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600' }}>
-                  Total: {claimedJobsWithTaskStatus.length} claimed
-                </div>
-              </div>
-
-              {claimedJobsWithTaskStatus.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--trans-text-secondary)' }}>
-                  <p style={{ margin: 0, fontSize: '14px' }}>No jobs claimed yet. Go to the <strong>🌐 Job Pool</strong> tab to claim comics!</p>
-                </div>
-              ) : (
-                <>
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', color: 'var(--trans-text-secondary)' }}>
-                          <th style={{ padding: '12px 16px', fontWeight: '600' }}>Comic Title</th>
-                          <th style={{ padding: '12px 16px', fontWeight: '600' }}>Target Language</th>
-                          <th style={{ padding: '12px 16px', fontWeight: '600' }}>Deadline</th>
-                          <th style={{ padding: '12px 16px', fontWeight: '600' }}>Status</th>
-                          <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paginatedClaimedJobs.map(job => (
-                          <tr key={job.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', color: 'var(--trans-text-primary)' }}>
-                            <td style={{ padding: '16px', fontWeight: '600' }}>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span>📖</span>
-                                {job.title}
-                              </span>
-                            </td>
-                            <td style={{ padding: '16px' }}>{job.targetLang}</td>
-                            <td style={{ padding: '16px', color: 'var(--trans-text-secondary)' }}>{job.deadline || 'unspecified'}</td>
-                            <td style={{ padding: '16px' }}>
-                              <span className={`status-badge ${job.hasTasks ? 'active' : 'pending'}`} style={{
-                                background: job.hasTasks ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                                color: job.hasTasks ? '#10b981' : '#f59e0b',
-                                border: job.hasTasks ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
-                                fontSize: '11px',
-                                fontWeight: '600',
-                                padding: '2px 8px',
-                                borderRadius: '4px'
-                              }}>
-                                {job.displayStatus}
-                              </span>
-                            </td>
-                            <td style={{ padding: '16px', textAlign: 'right' }}>
-                              {job.hasTasks ? (
-                                <button 
-                                  className="trans-btn secondary" 
-                                  style={{ fontSize: '12px', padding: '6px 12px' }}
-                                  onClick={() => setWorkspaceTab('tasks')}
-                                >
-                                  View Tasks
-                                </button>
-                              ) : (
-                                <button 
-                                  className="trans-btn primary" 
-                                  style={{ fontSize: '12px', padding: '6px 12px' }}
-                                  onClick={() => {
-                                    setWorkspaceTab('tasks');
-                                    openCreateTaskModalWithComic(job.title);
-                                  }}
-                                >
-                                  + Set Task
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {claimedTotalPages > 1 && (
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '24px' }}>
-                      <button 
-                        className="trans-btn secondary" 
-                        onClick={() => setClaimedCurrentPage(prev => Math.max(prev - 1, 1))}
-                        disabled={claimedCurrentPage === 1}
-                        style={{ padding: '6px 12px', fontSize: '12.5px' }}
-                      >
-                        Previous
-                      </button>
-                      <span style={{ fontSize: '13px', color: 'var(--trans-text-secondary)' }}>
-                        Page <strong>{claimedCurrentPage}</strong> of <strong>{claimedTotalPages || 1}</strong>
-                      </span>
-                      <button 
-                        className="trans-btn secondary" 
-                        onClick={() => setClaimedCurrentPage(prev => Math.min(prev + 1, claimedTotalPages))}
-                        disabled={claimedCurrentPage === claimedTotalPages || claimedTotalPages === 0}
-                        style={{ padding: '6px 12px', fontSize: '12.5px' }}
-                      >
-                        Next
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Tab 6: JOB POOL WORKSPACE */}
-        {workspaceTab === 'job-pool' && (
-          <div className="fade-in">
-            <JobPool fetchProjects={fetchProjects} />
-          </div>
-        )}
-
       </div>
     )
   }
