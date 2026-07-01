@@ -31,20 +31,24 @@ AxiosClient.interceptors.response.use(
     },
     (error) => {
         const status = error.response ? error.response.status : null;
+        const requestUrl = error.config?.url || '';
+        const isLoginRequest = requestUrl.includes('/auth/login');
 
         if (status === 401) {
+            if (isLoginRequest) {
+                return Promise.reject(error);
+            }
+
             // 401: Unauthorized / Session Expired
             clearAuth();
             
-            const privatePaths = ['/profile', '/admin', '/author', '/forum'];
+            const privatePaths = ['/profile', '/admin', '/author', '/moderator', '/translator', '/forum'];
             const currentPath = window.location.pathname;
             const isPrivate = privatePaths.some(path => currentPath.startsWith(path));
             
             if (isPrivate) {
                 toast.error("Session expired. Please log in again!");
                 window.location.href = '/';
-            } else {
-                window.location.reload();
             }
         } 
         else if (status === 403) {

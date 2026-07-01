@@ -160,10 +160,10 @@ function TranslatorDashboard({ user, onLogout }) {
         </nav>
 
         <div className="translator-sidebar-footer">
-          <button className="translator-nav-item" onClick={onLogout}>
+          <button className="translator-nav-item" onClick={() => navigate('/')}>
             <span className="translator-nav-icon">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                <path d="M15 18l-6-6 6-6" />
               </svg>
             </span>
             ← Back to Home
@@ -176,7 +176,8 @@ function TranslatorDashboard({ user, onLogout }) {
         {/* Top Navbar */}
         <header className="translator-topbar">
           <div className="translator-topbar-left">
-            <span>Workspace: Translator</span>
+            <span>Workspace:</span>
+            <span className="workspace-label">Translator</span>
           </div>
 
           <div className="translator-topbar-right">
@@ -190,12 +191,21 @@ function TranslatorDashboard({ user, onLogout }) {
             <div className="topbar-divider" />
 
             <button className="translator-profile-btn" onClick={() => navigate('/profile')} title="My Profile">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
               <span>👤</span> {userName}
             </button>
 
             <div className="topbar-divider" />
 
             <button className="translator-logout-btn" onClick={onLogout}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
               <span>📤</span> Logout
             </button>
           </div>

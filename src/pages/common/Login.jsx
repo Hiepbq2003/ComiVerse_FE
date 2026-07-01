@@ -5,9 +5,27 @@ import { setAuth } from '../../utils/Auth'
 function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
   const [form, setForm] = useState({ username: '', password: '', rememberMe: false })
   const [showPassword, setShowPassword] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState({ username: '', password: '' })
+
+  const updateField = (field, value) => {
+    setForm({ ...form, [field]: value })
+    if (fieldErrors[field]) {
+      setFieldErrors({ ...fieldErrors, [field]: '' })
+    }
+  }
 
   const handleSignin = async (e) => {
     e.preventDefault()
+    const nextErrors = {
+      username: form.username.trim() ? '' : 'Email or username is required.',
+      password: form.password ? '' : 'Password is required.'
+    }
+
+    setFieldErrors(nextErrors)
+    if (nextErrors.username || nextErrors.password) {
+      return
+    }
+
     setLoading(true)
     try {
       const response = await loginApi(form.username.trim(), form.password)
@@ -25,6 +43,16 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
       showAlert('success', 'Welcome back to ComiVerse!');
     } catch (err) {
       const errMessage = err.response?.data?.message || 'Invalid username or password.';
+      const isInvalidCredentials = err.response?.status === 401 || /invalid username or password/i.test(errMessage)
+
+      if (isInvalidCredentials) {
+        setFieldErrors({
+          username: '',
+          password: 'Invalid username/email or password.'
+        })
+        return
+      }
+
       showAlert('error', errMessage);
     } finally {
       setLoading(false)
@@ -56,20 +84,27 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
 
       <div className="divider-text-or"><span>OR</span></div>
 
-      <form onSubmit={handleSignin}>
-        <div className="input-field-group">
+      <form onSubmit={handleSignin} noValidate>
+        <div className={`input-field-group ${fieldErrors.username ? 'has-error' : ''}`}>
           <label htmlFor="signin-username">EMAIL OR USERNAME</label>
           <input 
             id="signin-username"
             type="text" 
             placeholder="you@example.com" 
             value={form.username}
-            onChange={(e) => setForm({ ...form, username: e.target.value })}
-            required
+            onChange={(e) => updateField('username', e.target.value)}
+            autoComplete="username"
+            aria-invalid={fieldErrors.username ? 'true' : 'false'}
+            aria-describedby={fieldErrors.username ? 'signin-username-error' : undefined}
           />
+          {fieldErrors.username && (
+            <p id="signin-username-error" className="field-error-message">
+              {fieldErrors.username}
+            </p>
+          )}
         </div>
 
-        <div className="input-field-group">
+        <div className={`input-field-group ${fieldErrors.password ? 'has-error' : ''}`}>
           <label htmlFor="signin-password">PASSWORD</label>
           <div className="password-input-wrapper">
             <input 
@@ -77,8 +112,10 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
               type={showPassword ? "text" : "password"} 
               placeholder="••••••••" 
               value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              required
+              onChange={(e) => updateField('password', e.target.value)}
+              autoComplete="current-password"
+              aria-invalid={fieldErrors.password ? 'true' : 'false'}
+              aria-describedby={fieldErrors.password ? 'signin-password-error' : undefined}
             />
             <button 
               type="button" 
@@ -98,6 +135,11 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
               )}
             </button>
           </div>
+          {fieldErrors.password && (
+            <p id="signin-password-error" className="field-error-message">
+              {fieldErrors.password}
+            </p>
+          )}
         </div>
 
         <div className="form-action-options">
