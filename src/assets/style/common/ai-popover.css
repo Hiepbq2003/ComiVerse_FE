@@ -1,0 +1,1542 @@
+/* ═══ AI POPOVERS STYLESHEET ═══ */
+
+.popover-showcase {
+    --bg: #0B0B0F;
+    --surface: #141418;
+    --primary: #7C6AFF;
+    --primary-glow: rgba(124, 106, 255, 0.12);
+    --accent: #00D4AA;
+    --accent-glow: rgba(0, 212, 170, 0.12);
+    --accent-glow-soft: rgba(0, 212, 170, 0.06);
+    --accent-glow-strong: rgba(0, 212, 170, 0.4);
+    --grad-start: #7C6AFF;
+    --grad-end: #00D4AA;
+    --text: #ECEAF5;
+    --text-muted: #5E5B72;
+    --border: #1F1F28;
+    --glow-top: rgba(124, 106, 255, 0.08);
+    --glow-bottom: rgba(0, 212, 170, 0.05);
+    --shadow: rgba(0, 0, 0, 0.4);
+    --ghost-bg: rgba(255, 255, 255, 0.04);
+    --ghost-bg-hover: rgba(255, 255, 255, 0.08);
+    --hover-bg: linear-gradient(135deg, rgba(124, 106, 255, 0.08), rgba(0, 212, 170, 0.06));
+    --interactive: var(--accent);
+    --interactive-glow: var(--accent-glow);
+    
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.2rem;
+    position: relative;
+    z-index: 1;
+    color: var(--text);
+}
+
+/* Light Theme Variables */
+.popover-showcase.light {
+    --bg: #F4F6FB;
+    --surface: #FFFFFF;
+    --primary: #6B5CE7;
+    --primary-glow: rgba(107, 92, 231, 0.12);
+    --accent: #00B894;
+    --grad-start: #E8457C;
+    --grad-end: #4F6DF5;
+    --text: #1A1A2E;
+    --text-muted: #7E7E9A;
+    --border: #E8E6F0;
+    --shadow: rgba(107, 92, 231, 0.08);
+    --ghost-bg: rgba(107, 92, 231, 0.06);
+    --ghost-bg-hover: rgba(107, 92, 231, 0.12);
+    --accent-glow: rgba(0, 184, 148, 0.12);
+    --accent-glow-soft: rgba(0, 184, 148, 0.06);
+    --accent-glow-strong: rgba(0, 184, 148, 0.35);
+    --hover-bg: linear-gradient(135deg, rgba(232, 69, 124, 0.08), rgba(79, 109, 245, 0.06));
+    --interactive: var(--primary);
+    --interactive-glow: var(--primary-glow);
+    --pop-bg: linear-gradient(135deg, #FFFFFF 0%, #F6F4FF 50%, #FFF5F8 100%);
+}
+
+/* Top bar and branding */
+.popover-showcase .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.popover-showcase .profile-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.popover-showcase .profile {
+    border-radius: 50%;
+    width: 2.2rem;
+    height: 2.2rem;
+    object-fit: cover;
+    border: 2px solid var(--border);
+}
+
+.popover-showcase .title-group {
+    text-align: center;
+    width: 100%;
+    margin-bottom: 12px;
+}
+
+.popover-showcase .title-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    background: linear-gradient(135deg, var(--grad-start), var(--grad-end));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.popover-showcase h2 {
+    font-size: 2.25rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin: 8px 0;
+}
+
+.popover-showcase .title-sub {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.popover-showcase .emph {
+    background: linear-gradient(135deg, var(--grad-start), var(--grad-end));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Specimens Grid */
+.popover-showcase .specimens {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    width: 100%;
+}
+
+.popover-showcase .specimen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 16px 18px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px var(--shadow);
+    transition: border-color 0.3s ease, background 0.4s ease, box-shadow 0.4s ease;
+    position: relative;
+    min-height: 180px;
+}
+
+.popover-showcase .specimen:hover,
+.popover-showcase .specimen:focus-within {
+    border-color: rgba(236, 234, 245, 0.08);
+}
+
+.popover-showcase .specimen:hover .specimen__num,
+.popover-showcase .specimen:focus-within .specimen__num {
+    background: linear-gradient(135deg, var(--grad-start), var(--grad-end));
+    color: white;
+}
+
+.popover-showcase .specimen__label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    align-self: flex-start;
+}
+
+.popover-showcase .specimen__num {
+    width: 1.2rem;
+    height: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: var(--interactive);
+    background: var(--interactive-glow);
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+}
+
+.popover-showcase .specimen__name {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+/* POPOVER WRAP + TRIGGER */
+.popover-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    width: 100%;
+}
+
+.popover-showcase .trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.5rem 1rem;
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text);
+    background: var(--ghost-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    position: relative;
+}
+
+.popover-showcase .trigger:hover {
+    background: var(--ghost-bg-hover);
+    border-color: var(--interactive);
+    box-shadow: 0 0 12px var(--interactive-glow);
+}
+
+.popover-showcase .trigger--danger {
+    color: #F87171;
+    border-color: rgba(248, 113, 113, 0.2);
+}
+
+.popover-showcase .trigger--danger:hover {
+    background: rgba(248, 113, 113, 0.08);
+    border-color: #F87171;
+    box-shadow: 0 0 12px rgba(248, 113, 113, 0.15);
+}
+
+.popover-showcase .trigger__avatar {
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.popover-showcase .trigger__badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    font-size: 0.5rem;
+    font-weight: 700;
+    color: white;
+    background: linear-gradient(135deg, var(--grad-start), var(--grad-end));
+    border-radius: 50%;
+    margin-left: 0.15rem;
+}
+
+/* POPOVER BASE */
+.popover-showcase .pop {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%) scale(0.92) translateY(6px);
+    width: max-content;
+    min-width: 12rem;
+    max-width: 16rem;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow:
+        0 8px 32px var(--shadow),
+        0 0 0 1px var(--interactive-glow);
+    z-index: 200;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+        opacity 0.25s ease,
+        transform 0.35s cubic-bezier(0.22, 0.61, 0.36, 1),
+        visibility 0.25s ease,
+        background 0.4s ease,
+        border-color 0.4s ease;
+    text-align: left;
+}
+
+.popover-showcase.light .pop {
+    background: var(--pop-bg);
+}
+
+.popover-showcase .pop.is-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(-50%) scale(1) translateY(0);
+}
+
+/* Arrow */
+.popover-showcase .pop__arrow {
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 10px;
+    height: 10px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+.popover-showcase.light .pop__arrow {
+    background: #F9F7FF;
+}
+
+/* Shared typography in popovers */
+.popover-showcase .pop__title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.3rem;
+}
+
+.popover-showcase .pop__text {
+    font-size: 0.62rem;
+    font-weight: 400;
+    line-height: 1.55;
+    color: var(--text-muted);
+}
+
+/* Shared buttons */
+.popover-showcase .pop-btn {
+    font-family: inherit;
+    font-size: 0.58rem;
+    font-weight: 600;
+    padding: 0.35rem 0.65rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.popover-showcase .pop-btn--primary {
+    color: white;
+    background: linear-gradient(135deg, var(--grad-start), var(--grad-end));
+    box-shadow: 0 2px 8px var(--primary-glow);
+}
+
+.popover-showcase .pop-btn--primary:hover {
+    box-shadow: 0 4px 16px var(--primary-glow);
+    filter: brightness(1.1);
+}
+
+.popover-showcase .pop-btn--ghost {
+    color: var(--text-muted);
+    background: var(--ghost-bg);
+    border: 1px solid var(--border);
+}
+
+.popover-showcase .pop-btn--ghost:hover {
+    color: var(--text);
+    background: var(--ghost-bg-hover);
+}
+
+.popover-showcase .pop-btn--danger {
+    color: white;
+    background: #EF4444;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+}
+
+.popover-showcase .pop-btn--danger:hover {
+    background: #DC2626;
+}
+
+.popover-showcase .pop-btn--full {
+    width: 100%;
+}
+
+.popover-showcase .pop-btn--gradient {
+    color: white;
+    background: linear-gradient(135deg, var(--grad-start), var(--grad-end));
+    box-shadow: 0 2px 10px var(--primary-glow);
+    width: 100%;
+    padding: 0.4rem 0.65rem;
+}
+
+/* 1. BASIC */
+.popover-showcase .pop--basic {
+    max-width: 14rem;
+}
+
+/* 2. RICH CONTENT */
+.popover-showcase .pop--rich {
+    max-width: 16rem;
+    padding: 0.85rem;
+}
+
+.popover-showcase .pop-rich__header {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+    margin-bottom: 0.65rem;
+}
+
+.popover-showcase .pop-rich__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--grad-start), var(--grad-end));
+    color: white;
+}
+
+.popover-showcase .pop-rich__icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.popover-showcase .pop-rich__heading {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.15rem;
+}
+
+.popover-showcase .pop-rich__desc {
+    font-size: 0.58rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+
+.popover-showcase .pop-rich__actions {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: flex-end;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+}
+
+/* 3. TRAINING STATUS */
+.popover-showcase .pop--status {
+    max-width: 16rem;
+    padding: 0.85rem;
+}
+
+.popover-showcase .pop-status__header {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin-bottom: 0.7rem;
+}
+
+.popover-showcase .pop-status__ring {
+    position: relative;
+    width: 3rem;
+    height: 3rem;
+    flex-shrink: 0;
+}
+
+.popover-showcase .pop-status__svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.popover-showcase .pop-status__track {
+    fill: none;
+    stroke: var(--border);
+    stroke-width: 3;
+}
+
+.popover-showcase .pop-status__fill {
+    fill: none;
+    stroke: var(--interactive);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-dasharray: 100.53;
+    stroke-dashoffset: 27.14;
+    transition: stroke 0.4s ease;
+    animation: statusPulse 2s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.popover-showcase .pop-status__pct {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: var(--interactive);
+}
+
+.popover-showcase .pop-status__info {
+    min-width: 0;
+}
+
+.popover-showcase .pop-status__model {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.popover-showcase .pop-status__state {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.62rem;
+    color: var(--interactive);
+    font-weight: 500;
+    margin-top: 0.15rem;
+}
+
+.popover-showcase .pop-status__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--interactive);
+    animation: dotBlink 1.4s ease-in-out infinite;
+}
+
+@keyframes dotBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+.popover-showcase .pop-status__metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.4rem;
+    padding: 0.55rem 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.6rem;
+}
+
+.popover-showcase .pop-status__metric {
+    text-align: center;
+}
+
+.popover-showcase .pop-status__val {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.popover-showcase .pop-status__lbl {
+    display: block;
+    font-size: 0.55rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.1rem;
+}
+
+.popover-showcase .pop-status__actions {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: flex-end;
+}
+
+.popover-showcase .pop-status__actions .pop-btn--ghost {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+/* 4. USER CARD */
+.popover-showcase .pop--user {
+    max-width: 14rem;
+    padding: 0.85rem;
+}
+
+.popover-showcase .pop-user__top {
+    display: flex;
+    gap: 0.55rem;
+    align-items: center;
+    margin-bottom: 0.6rem;
+}
+
+.popover-showcase .pop-user__avatar {
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border);
+}
+
+.popover-showcase .pop-user__name {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.popover-showcase .pop-user__role {
+    font-size: 0.56rem;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.popover-showcase .pop-user__stats {
+    display: flex;
+    gap: 0.1rem;
+    padding-top: 0.55rem;
+    border-top: 1px solid var(--border);
+}
+
+.popover-showcase .pop-user__stat {
+    flex: 1;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.popover-showcase .pop-user__stat-val {
+    font-size: 0.78rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--grad-start), var(--grad-end));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.popover-showcase .pop-user__stat-lbl {
+    font-size: 0.48rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+/* 5. NESTED MENU */
+.popover-showcase .pop--menu {
+    min-width: 8rem;
+    max-width: 10rem;
+    padding: 0.35rem;
+}
+
+.popover-showcase .pop-menu__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.4rem 0.55rem;
+    font-size: 0.62rem;
+    font-weight: 400;
+    color: var(--text);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    position: relative;
+}
+
+.popover-showcase .pop-menu__item:hover {
+    background: var(--hover-bg);
+    color: var(--interactive);
+}
+
+.popover-showcase .pop-menu__item--danger {
+    color: #F87171;
+}
+
+.popover-showcase .pop-menu__item--danger:hover {
+    background: rgba(248, 113, 113, 0.1);
+}
+
+.popover-showcase .pop-menu__divider {
+    height: 1px;
+    background: var(--border);
+    margin: 0.2rem 0.4rem;
+}
+
+.popover-showcase .pop-sub {
+    position: absolute;
+    left: calc(100% + 4px);
+    top: -0.35rem;
+    min-width: 7rem;
+    padding: 0.35rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px var(--shadow);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-4px);
+    transition: all 0.2s ease;
+}
+
+.popover-showcase .pop-sub.is-open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+}
+
+/* 6. FORM */
+.popover-showcase .pop--form {
+    min-width: 12rem;
+    max-width: 14rem;
+}
+
+.popover-showcase .pop-form__label {
+    display: block;
+    font-size: 0.58rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+}
+
+.popover-showcase .pop-form__input {
+    width: 100%;
+    padding: 0.4rem 0.55rem;
+    font-family: inherit;
+    font-size: 0.62rem;
+    color: var(--text);
+    background: var(--ghost-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    outline: none;
+    margin-bottom: 0.5rem;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.popover-showcase .pop-form__input:focus {
+    border-color: var(--interactive);
+    box-shadow: 0 0 0 2px var(--interactive-glow);
+}
+
+/* 7. NOTIFICATION */
+.popover-showcase .pop--notif {
+    min-width: 14rem;
+    max-width: 16rem;
+    padding: 0;
+    overflow: hidden;
+}
+
+.popover-showcase .pop-notif__title {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--text);
+    padding: 0.6rem 0.75rem 0.4rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.popover-showcase .pop-notif__list {
+    max-height: 10rem;
+    overflow-y: auto;
+}
+
+.popover-showcase .pop-notif__item {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s ease;
+}
+
+.popover-showcase .pop-notif__item:last-child {
+    border-bottom: none;
+}
+
+.popover-showcase .pop-notif__item:hover {
+    background: var(--hover-bg);
+}
+
+.popover-showcase .pop-notif__item:hover .pop-notif__msg {
+    color: var(--interactive);
+}
+
+.popover-showcase .pop-notif__item--unread .pop-notif__dot {
+    display: block;
+}
+
+.popover-showcase .pop-notif__dot {
+    display: none;
+    width: 0.4rem;
+    height: 0.4rem;
+    background: var(--accent);
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 0.3rem;
+    box-shadow: 0 0 6px var(--accent-glow-strong);
+}
+
+.popover-showcase .pop-notif__msg {
+    font-size: 0.58rem;
+    font-weight: 400;
+    color: var(--text);
+    line-height: 1.45;
+}
+
+.popover-showcase .pop-notif__time {
+    font-size: 0.48rem;
+    font-weight: 400;
+    color: var(--text-muted);
+    margin-top: 0.1rem;
+}
+
+/* 8. GRADIENT BORDER */
+.popover-showcase .pop--gradient {
+    background: linear-gradient(135deg, var(--grad-start), var(--grad-end));
+    border: none;
+    padding: 1.5px;
+    border-radius: 10px;
+    box-shadow:
+        0 8px 32px var(--shadow),
+        0 0 20px var(--primary-glow),
+        0 0 40px var(--accent-glow-soft);
+    max-width: 15rem;
+    overflow: visible;
+    animation: gradientShift 3s ease-in-out infinite;
+}
+
+@keyframes gradientShift {
+    0%, 100% {
+        background: linear-gradient(135deg, var(--grad-start), var(--grad-end));
+        box-shadow:
+            0 8px 32px var(--shadow),
+            0 0 20px var(--primary-glow),
+            0 0 40px var(--accent-glow-soft);
+    }
+    50% {
+        background: linear-gradient(315deg, var(--grad-start), var(--grad-end));
+        box-shadow:
+            0 8px 32px var(--shadow),
+            0 0 30px var(--primary-glow),
+            0 0 60px var(--accent-glow);
+    }
+}
+
+.popover-showcase .pop-gradient__inner {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 0.8rem 0.85rem;
+    transition: background 0.4s ease;
+}
+
+.popover-showcase.light .pop-gradient__inner {
+    background: var(--pop-bg);
+}
+
+.popover-showcase .pop-gradient__inner .pop__title {
+    background: linear-gradient(135deg, var(--grad-start), var(--grad-end));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.popover-showcase .pop-gradient__inner .pop__text {
+    margin-bottom: 0.6rem;
+}
+
+.popover-showcase .pop__arrow--gradient {
+    background: linear-gradient(135deg, var(--grad-start), var(--grad-end));
+    border: none;
+    width: 10px;
+    height: 10px;
+    bottom: -5px;
+    box-shadow: 0 0 8px var(--primary-glow);
+}
+
+/* 9. DROPDOWN TRANSITION */
+.popover-showcase .pop--dropdown-transition {
+    min-width: 12rem;
+    max-width: 14rem;
+    padding: 0;
+    overflow: hidden;
+}
+
+.popover-showcase .pop-dt__viewport {
+    display: grid;
+    overflow: hidden;
+}
+
+.popover-showcase .pop-dt__panel {
+    grid-area: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    padding: 0.35rem;
+    transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.popover-showcase .pop-dt__panel--list {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.popover-showcase .pop-dt__panel--list.is-hidden {
+    opacity: 0;
+    transform: translateY(-12px);
+    pointer-events: none;
+    visibility: hidden;
+}
+
+.popover-showcase .pop-dt__panel--detail {
+    padding: 0.55rem;
+    opacity: 0;
+    transform: translateY(12px);
+    pointer-events: none;
+    visibility: hidden;
+    justify-content: space-between;
+    min-height: 100%;
+}
+
+.popover-showcase .pop-dt__panel--detail.is-active {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+    visibility: visible;
+}
+
+.popover-showcase .pop-dt__item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.popover-showcase .pop-dt__item:hover {
+    background: var(--hover-bg);
+}
+
+.popover-showcase .pop-dt__item:active {
+    transform: scale(0.97);
+}
+
+.popover-showcase .pop-dt__item:hover .pop-dt__name {
+    color: var(--interactive);
+}
+
+.popover-showcase .pop-dt__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    flex-shrink: 0;
+    border-radius: 6px;
+    background: var(--interactive-glow);
+    color: var(--interactive);
+}
+
+.popover-showcase .pop-dt__item:hover .pop-dt__icon {
+    background: linear-gradient(135deg, var(--grad-start), var(--grad-end));
+    color: white;
+    box-shadow: 0 2px 8px var(--primary-glow), 0 0 12px var(--accent-glow);
+}
+
+.popover-showcase .pop-dt__info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.popover-showcase .pop-dt__name {
+    font-size: 0.62rem;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.popover-showcase .pop-dt__meta {
+    font-size: 0.48rem;
+    color: var(--text-muted);
+}
+
+.popover-showcase .pop-dt__chevron {
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.popover-showcase .pop-dt__back {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-family: inherit;
+    font-size: 0.55rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.2rem 0.1rem 0.4rem;
+}
+
+.popover-showcase .pop-dt__back:hover {
+    color: var(--interactive);
+}
+
+.popover-showcase .pop-dt__detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.55rem;
+}
+
+.popover-showcase .pop-dt__detail-name {
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--grad-start), var(--grad-end));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.popover-showcase .pop-dt__detail-badge {
+    font-size: 0.45rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: white;
+    background: linear-gradient(135deg, var(--grad-start), var(--grad-end));
+    padding: 0.15rem 0.45rem;
+    border-radius: 2rem;
+}
+
+.popover-showcase .pop-dt__detail-stats {
+    display: flex;
+    gap: 0.1rem;
+    padding: 0.5rem 0;
+    margin-bottom: 0.5rem;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+
+.popover-showcase .pop-dt__stat {
+    flex: 1;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.popover-showcase .pop-dt__stat-val {
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--grad-start), var(--grad-end));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.popover-showcase .pop-dt__stat-lbl {
+    font-size: 0.45rem;
+    color: var(--text-muted);
+}
+
+/* 10. COMMAND PALETTE */
+.popover-showcase .pop--command {
+    min-width: 14rem;
+    max-width: 16rem;
+    padding: 0;
+    overflow: hidden;
+}
+
+.popover-showcase .pop-cmd__kbd-trigger {
+    display: inline-flex;
+    gap: 0.15rem;
+    margin-left: 0.2rem;
+}
+
+.popover-showcase .pop-cmd__kbd-trigger kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1rem;
+    height: 1rem;
+    padding: 0 0.2rem;
+    font-size: 0.48rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--ghost-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+}
+
+.popover-showcase .pop-cmd__search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 0.65rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.popover-showcase .pop-cmd__search-icon {
+    color: var(--text-muted);
+}
+
+.popover-showcase .pop-cmd__input {
+    width: 100%;
+    font-family: inherit;
+    font-size: 0.62rem;
+    color: var(--text);
+    background: transparent;
+    border: none;
+    outline: none;
+}
+
+.popover-showcase .pop-cmd__group-label {
+    font-size: 0.48rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 0.45rem 0.65rem 0.2rem;
+}
+
+.popover-showcase .pop-cmd__list {
+    padding: 0.2rem 0.35rem 0.35rem;
+}
+
+.popover-showcase .pop-cmd__item {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.4rem 0.45rem;
+    font-size: 0.6rem;
+    color: var(--text);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.popover-showcase .pop-cmd__item:hover {
+    background: var(--hover-bg);
+}
+
+.popover-showcase .pop-cmd__item:hover span:nth-child(2) {
+    color: var(--interactive);
+}
+
+.popover-showcase .pop-cmd__item svg {
+    color: var(--text-muted);
+}
+
+.popover-showcase .pop-cmd__item:hover svg {
+    color: var(--interactive);
+}
+
+.popover-showcase .pop-cmd__kbd {
+    display: inline-flex;
+    gap: 0.15rem;
+    margin-left: auto;
+}
+
+.popover-showcase .pop-cmd__kbd kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.1rem;
+    height: 1.1rem;
+    padding: 0 0.2rem;
+    font-size: 0.45rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--ghost-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+}
+
+.popover-showcase .pop-cmd__no-results {
+    padding: 0.75rem 0.65rem;
+    font-size: 0.58rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* 11. TOKEN BREAKDOWN */
+.popover-showcase .pop--tokens {
+    min-width: 14.5rem;
+    max-width: 16rem;
+    padding: 0.85rem;
+}
+
+.popover-showcase .pop-tok__header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 0.65rem;
+}
+
+.popover-showcase .pop-tok__title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.popover-showcase .pop-tok__total {
+    font-size: 0.55rem;
+    color: var(--text-muted);
+}
+
+.popover-showcase .pop-tok__bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.popover-showcase .pop-tok__row-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.2rem;
+}
+
+.popover-showcase .pop-tok__label {
+    font-size: 0.6rem;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.popover-showcase .pop-tok__count {
+    font-size: 0.55rem;
+    color: var(--text-muted);
+}
+
+.popover-showcase .pop-tok__track {
+    width: 100%;
+    height: 6px;
+    background: var(--ghost-bg);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.popover-showcase .pop-tok__bar {
+    height: 100%;
+    border-radius: 3px;
+}
+
+.popover-showcase.light .pop-tok__bar--system {
+    background: linear-gradient(90deg, #7E7E9A, #B8B0D8);
+}
+
+.popover-showcase.light .pop-tok__bar--prompt {
+    background: linear-gradient(90deg, #E8457C, #6B5CE7);
+}
+
+.popover-showcase.light .pop-tok__bar--completion {
+    background: linear-gradient(90deg, #E8457C, #4F6DF5);
+}
+
+.popover-showcase.light .pop-tok__cost-val {
+    background: linear-gradient(135deg, #E8457C, #6B5CE7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.popover-showcase.light .pop-tok__model-badge {
+    background: linear-gradient(135deg, rgba(232, 69, 124, 0.1), rgba(107, 92, 231, 0.1));
+    border-color: #E8457C;
+    color: #E8457C;
+}
+
+.popover-showcase.light .pop-tok__footer {
+    border-top-color: rgba(232, 69, 124, 0.12);
+}
+
+.popover-showcase.light .pop-tok__track {
+    background: linear-gradient(90deg, rgba(232, 69, 124, 0.06), rgba(79, 109, 245, 0.06));
+}
+
+.popover-showcase .pop-tok__bar--system {
+    background: var(--text-muted);
+}
+
+.popover-showcase .pop-tok__bar--prompt {
+    background: linear-gradient(90deg, var(--primary), var(--interactive));
+}
+
+.popover-showcase .pop-tok__bar--completion {
+    background: linear-gradient(90deg, var(--interactive), var(--grad-end));
+}
+
+.popover-showcase .pop-tok__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.7rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+}
+
+.popover-showcase .pop-tok__cost {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.popover-showcase .pop-tok__cost-label {
+    font-size: 0.5rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.popover-showcase .pop-tok__cost-val {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--interactive);
+}
+
+.popover-showcase .pop-tok__model-badge {
+    font-size: 0.5rem;
+    font-weight: 600;
+    color: var(--interactive);
+    background: var(--interactive-glow);
+    padding: 0.2rem 0.5rem;
+    border-radius: 2rem;
+    border: 1px solid var(--interactive);
+}
+
+/* Bottom Bar */
+.popover-showcase .bottom-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    gap: 0.5rem;
+    font-size: 0.72rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--border);
+    margin-top: 16px;
+}
+
+.popover-showcase .modern-frontend-developer {
+    max-width: 14rem;
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    color: var(--text-muted);
+}
+
+/* ── AIPopover Universal Layout Styles & Downward/Right Alignment Overrides ── */
+
+.popover-wrap {
+  width: auto !important;
+  flex: none !important;
+  display: inline-flex !important;
+}
+
+/* Make trigger styling apply generally */
+.popover-wrap .trigger:not(.moderator-icon-btn):not(.translator-icon-btn) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.5rem 1rem;
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text);
+    background: var(--ghost-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    position: relative;
+}
+
+.popover-wrap .trigger:not(.moderator-icon-btn):not(.translator-icon-btn):hover {
+    background: var(--ghost-bg-hover);
+    border-color: var(--interactive);
+    box-shadow: 0 0 12px var(--interactive-glow);
+}
+
+.popover-wrap .pop {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%) scale(0.92) translateY(6px);
+    width: max-content;
+    min-width: 12rem;
+    max-width: 16rem;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow:
+        0 8px 32px var(--shadow),
+        0 0 0 1px var(--interactive-glow);
+    z-index: 200;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+        opacity 0.25s ease,
+        transform 0.35s cubic-bezier(0.22, 0.61, 0.36, 1),
+        visibility 0.25s ease,
+        background 0.4s ease,
+        border-color 0.4s ease;
+    text-align: left;
+}
+
+.popover-wrap .pop.is-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(-50%) scale(1) translateY(0);
+}
+
+/* Downward positioning override */
+.popover-wrap .pop.pop--down {
+    bottom: auto !important;
+    top: calc(100% + 10px) !important;
+    transform: translateX(-50%) scale(0.92) translateY(-6px) !important;
+}
+
+.popover-wrap .pop.pop--down.is-open {
+    transform: translateX(-50%) scale(1) translateY(0) !important;
+}
+
+/* Right alignment override (helpful for topbar right-side items) */
+.popover-wrap .pop.pop--right-align {
+    left: auto !important;
+    right: 0 !important;
+    transform: scale(0.92) translateY(6px) !important;
+}
+
+.popover-wrap .pop.pop--right-align.is-open {
+    transform: scale(1) translateY(0) !important;
+}
+
+.popover-wrap .pop.pop--right-align.pop--down {
+    bottom: auto !important;
+    top: calc(100% + 10px) !important;
+    transform: scale(0.92) translateY(-6px) !important;
+}
+
+.popover-wrap .pop.pop--right-align.pop--down.is-open {
+    transform: scale(1) translateY(0) !important;
+}
+
+/* Arrow styling overrides for downward/right-aligned popovers */
+.popover-wrap .pop__arrow {
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 10px;
+    height: 10px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+.popover-wrap .pop.pop--down .pop__arrow {
+    bottom: auto !important;
+    top: -6px !important;
+    border-right: none !important;
+    border-bottom: none !important;
+    border-left: 1px solid var(--border) !important;
+    border-top: 1px solid var(--border) !important;
+}
+
+.popover-wrap .pop.pop--right-align .pop__arrow {
+    left: auto !important;
+    right: 16px !important;
+    transform: rotate(45deg) !important;
+}
+
+/* Dynamic Trigger Badge styling */
+.trigger__badge {
+    position: absolute !important;
+    top: -2px !important;
+    right: -2px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 14px !important;
+    height: 14px !important;
+    font-size: 8px !important;
+    font-weight: 700 !important;
+    color: white !important;
+    background: #ef4444 !important;
+    border-radius: 50% !important;
+    margin: 0 !important;
+    z-index: 10 !important;
+}
+
+/* Light Theme Variables Sync */
+html.light .popover-wrap,
+html.light .popover-wrap .pop {
+    --bg: #F4F6FB;
+    --surface: #FFFFFF;
+    --primary: #6B5CE7;
+    --primary-glow: rgba(107, 92, 231, 0.12);
+    --accent: #00B894;
+    --grad-start: #E8457C;
+    --grad-end: #4F6DF5;
+    --text: #1A1A2E;
+    --text-muted: #7E7E9A;
+    --border: #E8E6F0;
+    --shadow: rgba(107, 92, 231, 0.08);
+    --ghost-bg: rgba(107, 92, 231, 0.06);
+    --ghost-bg-hover: rgba(107, 92, 231, 0.12);
+    --accent-glow: rgba(0, 184, 148, 0.12);
+    --accent-glow-soft: rgba(0, 184, 148, 0.06);
+    --accent-glow-strong: rgba(0, 184, 148, 0.35);
+    --hover-bg: linear-gradient(135deg, rgba(232, 69, 124, 0.08), rgba(79, 109, 245, 0.06));
+    --interactive: var(--primary);
+    --interactive-glow: var(--primary-glow);
+    --pop-bg: linear-gradient(135deg, #FFFFFF 0%, #F6F4FF 50%, #FFF5F8 100%);
+}
+
+html.light .popover-wrap .pop {
+    background: var(--pop-bg) !important;
+}
+
+html.light .popover-wrap .pop__arrow {
+    background: #F9F7FF !important;
+}
+
+/* General clean styling inside notifications popover */
+.pop-notif__title {
+  color: var(--text) !important;
+  font-weight: 600 !important;
+}
+
+.pop-notif__msg {
+  color: var(--text) !important;
+  font-size: 12px !important;
+}
+
+.pop-notif__time {
+  color: var(--text-muted) !important;
+  font-size: 10px !important;
+}
+
+.pop-notif__item--unread {
+  background: var(--ghost-bg-hover) !important;
+}
+
+.pop-notif__dot {
+  background: var(--interactive) !important;
+}

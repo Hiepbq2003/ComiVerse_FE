@@ -1,0 +1,345 @@
+/* ═══ MODERN PAGINATION COMPONENT SCOPED STYLES ═══ */
+
+.modern-pagination-container {
+  --bg: #F6F8FC;
+  --primary: #705CFF;
+  --primary-dark: #5d48ff;
+  --secondary: #705CFF60;
+  --h2-color: #5B5D72;
+  --white: #FFFFFF;
+  --border-color: #E5E7EB;
+  --text-color: #5B5D72;
+  --hover-bg: rgba(112, 92, 255, 0.08);
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: 'Poppins', sans-serif;
+  user-select: none;
+}
+
+/* Light / Dark overrides based on ComiVerse theme */
+.modern-pagination-container.light {
+  --border-color: #E5E7EB;
+  --text-color: #1F2937;
+}
+
+.modern-pagination-container.dark {
+  --border-color: #374151;
+  --text-color: #D1D5DB;
+  --hover-bg: rgba(112, 92, 255, 0.15);
+}
+
+/* Shared Navigation Elements */
+.modern-pagination-container .pag-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.modern-pagination-container .pag-nav-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--hover-bg);
+}
+
+.modern-pagination-container .pag-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 1. Classic Pagination */
+.modern-pagination-container .pag--classic {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.modern-pagination-container .pag--classic .pag-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--text-color);
+  transition: all 0.25s ease;
+}
+
+.modern-pagination-container .pag--classic .pag-item:hover:not(.active) {
+  background: var(--hover-bg);
+  color: var(--primary);
+}
+
+.modern-pagination-container .pag--classic .pag-item.active {
+  background: var(--primary);
+  color: white;
+}
+
+/* 2. Pills Pagination */
+.modern-pagination-container .pag--pills {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.modern-pagination-container .pag--pills .pag-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-color);
+  transition: all 0.25s ease;
+}
+
+.modern-pagination-container .pag--pills .pag-item:hover:not(.active) {
+  background: var(--hover-bg);
+  color: var(--primary);
+}
+
+.modern-pagination-container .pag--pills .pag-item.active {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 4px 10px rgba(112, 92, 255, 0.3);
+}
+
+/* 3. Dots Pagination */
+.modern-pagination-container .pag--dots {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.modern-pagination-container .pag--dots .pag-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border-color);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modern-pagination-container .pag--dots .pag-dot:hover:not(.active) {
+  background: var(--text-color);
+}
+
+.modern-pagination-container .pag--dots .pag-dot.active {
+  background: var(--primary);
+  transform: scale(1.4);
+  box-shadow: 0 0 8px rgba(112, 92, 255, 0.6);
+}
+
+/* 4. Bordered Pagination */
+.modern-pagination-container .pag--bordered {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.modern-pagination-container .pag--bordered .pag-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: var(--text-color);
+  transition: all 0.2s ease;
+}
+
+.modern-pagination-container .pag--bordered .pag-item:hover:not(.active) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.modern-pagination-container .pag--bordered .pag-item.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: white;
+}
+
+/* 5. Track Pagination */
+.modern-pagination-container .pag--track {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.modern-pagination-container .pag--track .pag-track-area {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 150px;
+  height: 20px;
+}
+
+.modern-pagination-container .pag--track .pag-track-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--border-color);
+  border-radius: 2px;
+}
+
+.modern-pagination-container .pag--track .pag-track-thumb {
+  position: absolute;
+  height: 4px;
+  background: var(--primary);
+  border-radius: 2px;
+  transition: all 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.modern-pagination-container .pag--track .pag-track-nodes {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+}
+
+.modern-pagination-container .pag--track .pag-track-node {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--border-color);
+  border: 2px solid var(--border-color);
+  cursor: pointer;
+  transform: translateY(-4px);
+  transition: all 0.3s ease;
+}
+
+.modern-pagination-container .pag--track .pag-track-node.filled {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.modern-pagination-container .pag--track .pag-track-node.active {
+  background: white;
+  border-color: var(--primary);
+  transform: translateY(-4px) scale(1.3);
+  box-shadow: 0 2px 6px rgba(112, 92, 255, 0.4);
+}
+
+/* 6. Compact Pagination */
+.modern-pagination-container .pag--compact {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.modern-pagination-container .pag--compact .pag-counter {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-color);
+  display: flex;
+  align-items: center;
+}
+
+.modern-pagination-container .pag--compact .pag-current {
+  color: var(--primary);
+  font-size: 1.1rem;
+  display: inline-block;
+  min-width: 12px;
+  text-align: center;
+}
+
+/* 7. Progress Pagination */
+.modern-pagination-container .pag--progress {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+}
+
+.modern-pagination-container .pag--progress .pag-progress-bar {
+  width: 120px;
+  height: 6px;
+  background: var(--border-color);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.modern-pagination-container .pag--progress .pag-progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.modern-pagination-container .pag--progress .pag-counter {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+/* Showcase layout styles */
+.modern-paginations-showcase {
+  max-width: 600px;
+  margin: 2rem auto;
+  padding: 2.5rem 1.5rem;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 1rem;
+  text-align: center;
+}
+
+.modern-paginations-showcase h2 {
+  color: var(--h2-color);
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.modern-paginations-showcase .title-sub {
+  color: var(--h2-color);
+  font-size: 13px;
+  margin-bottom: 2rem;
+  opacity: 0.8;
+}
+
+.modern-paginations-showcase .paginations-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.8rem;
+  align-items: center;
+}
+
+.modern-paginations-showcase .pagination-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.2rem;
+  border: 1px solid #F3F4F6;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.modern-paginations-showcase .pagination-wrapper .label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--h2-color);
+  opacity: 0.5;
+  text-transform: uppercase;
+}

@@ -3,6 +3,7 @@ import HomeLayout from '../../components/layout/HomeLayout'
 import '../../assets/style/reader/profile.css'
 import { changePasswordApi, updateProfileApi, uploadAvatarApi } from '../../services/api/AuthApi'
 import { toast } from 'react-toastify'
+import { useAuth } from '../../context/AuthContext'
 import { setAuth } from '../../utils/Auth'
 
 // ── ROLE-SPECIFIC STATISTICS COMPONENTS ────────────────────────────
@@ -105,6 +106,7 @@ function AdminStats() {
 // ── MAIN PROFILE PAGE COMPONENT ────────────────────────────────────
 
 function Profile({ user }) {
+  const { updateUser } = useAuth()
   const [activeTab, setActiveTab] = useState('info') // 'info' | 'password'
 
   const parseFullName = (fullName) => {
@@ -140,16 +142,13 @@ function Profile({ user }) {
     const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
     try {
       await updateProfileApi(fullName, avatarUrl)
-      const token = localStorage.getItem('token')
       const updatedUser = {
         ...user,
         fullName,
         avatarUrl
       }
-      setAuth(token, updatedUser)
+      updateUser(updatedUser)
       toast.success('Basic Info changes saved successfully!')
-      // Refresh the page to reflect in topbars
-      setTimeout(() => window.location.reload(), 1000)
     } catch (err) {
       const errMsg = err.response?.data?.message || 'Failed to save changes.'
       toast.error(errMsg)
@@ -175,16 +174,14 @@ function Profile({ user }) {
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
       await updateProfileApi(fullName, uploadedUrl);
       
-      const token = localStorage.getItem('token');
       const updatedUser = {
         ...user,
         fullName,
         avatarUrl: uploadedUrl
       };
-      setAuth(token, updatedUser);
+      updateUser(updatedUser);
       
       toast.success('Avatar uploaded successfully!');
-      setTimeout(() => window.location.reload(), 1000)
     } catch (err) {
       const errMsg = err.response?.data?.message || 'Failed to upload image.';
       toast.error(errMsg);

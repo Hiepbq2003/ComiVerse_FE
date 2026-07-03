@@ -71,20 +71,24 @@ h1 {
   font-size: 56px;
   letter-spacing: -1.68px;
   margin: 32px 0;
+
   @media (max-width: 1024px) {
     font-size: 36px;
     margin: 20px 0;
   }
 }
+
 h2 {
   font-size: 24px;
   line-height: 118%;
   letter-spacing: -0.24px;
   margin: 0 0 8px;
+
   @media (max-width: 1024px) {
     font-size: 20px;
   }
 }
+
 p {
   margin: 0;
 }
@@ -102,4 +106,788 @@ code {
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+}
+
+/* ==========================================================================
+   LIGHT MODE STYLE OVERRIDES
+   ========================================================================== */
+html.light {
+  /* Core layout overrides */
+  --text: #4a3e3d !important;
+  --text-h: #2c1d11 !important;
+  --bg: #faf6f0 !important;
+  --border: #e8dfd5 !important;
+  --code-bg: #f3eae0 !important;
+  --accent: #a855f7 !important;
+  --accent-bg: rgba(168, 85, 247, 0.08) !important;
+  --accent-border: rgba(168, 85, 247, 0.4) !important;
+
+  /* Home.css override variables */
+  --color-bg-dark: #faf6f0 !important;
+  --color-pane-dark: #ffffff !important;
+
+  /* Profile panel overrides */
+  --profile-bg: #faf6f0 !important;
+  --profile-header-bg: #ffffff !important;
+  --profile-card-bg: #ffffff !important;
+  --profile-input-bg: #f4ece1 !important;
+  --profile-border: rgba(99, 87, 78, 0.12) !important;
+  --profile-border-hover: rgba(99, 87, 78, 0.24) !important;
+  --profile-text-primary: #2c1d11 !important;
+  --profile-text-secondary: #63574e !important;
+  --profile-text-muted: #8c7f73 !important;
+
+  /* Admin panel overrides */
+  --admin-bg: #faf6f0 !important;
+  --admin-sidebar-bg: #ffffff !important;
+  --admin-topbar-bg: #ffffff !important;
+  --admin-card-bg: #ffffff !important;
+  --admin-border: rgba(99, 87, 78, 0.12) !important;
+  --admin-border-hover: rgba(99, 87, 78, 0.24) !important;
+  --admin-text-primary: #2c1d11 !important;
+  --admin-text-secondary: #63574e !important;
+  --admin-text-muted: #8c7f73 !important;
+
+  /* Translator panel overrides */
+  --trans-bg: #faf6f0 !important;
+  --trans-sidebar-bg: #ffffff !important;
+  --trans-topbar-bg: #ffffff !important;
+  --trans-card-bg: #ffffff !important;
+  --trans-border: rgba(99, 87, 78, 0.12) !important;
+  --trans-text-primary: #2c1d11 !important;
+  --trans-text-secondary: #63574e !important;
+  --trans-text-muted: #8c7f73 !important;
+  --trans-sidebar-text: #4b5563 !important;
+  --trans-sidebar-active: #7c3aed !important;
+  --trans-purple: #7c3aed !important;
+  --trans-purple-hover: #6d28d9 !important;
+  --trans-green: #047857 !important;
+  --trans-green-hover: #065f46 !important;
+  --trans-red: #b91c1c !important;
+  --trans-red-hover: #991b1b !important;
+  --trans-leader-badge-bg: rgba(124, 58, 237, 0.08) !important;
+  --trans-leader-badge-color: #7c3aed !important;
+  --trans-leader-badge-border: rgba(124, 58, 237, 0.2) !important;
+
+  /* Moderator panel overrides */
+  --mod-bg: #faf6f0 !important;
+  --mod-sidebar-bg: #ffffff !important;
+  --mod-topbar-bg: #ffffff !important;
+  --mod-card-bg: #ffffff !important;
+  --mod-border: rgba(99, 87, 78, 0.12) !important;
+  --mod-text-primary: #2c1d11 !important;
+  --mod-text-secondary: #63574e !important;
+  --mod-text-muted: #8c7f73 !important;
+  --mod-sidebar-text: #4b5563 !important;
+  --mod-sidebar-active: #7c3aed !important;
+  --mod-purple: #7c3aed !important;
+  --mod-purple-hover: #6d28d9 !important;
+  --mod-green: #047857 !important;
+  --mod-green-hover: #065f46 !important;
+  --mod-red: #b91c1c !important;
+  --mod-red-hover: #991b1b !important;
+  --mod-sub-tab-active-bg: rgba(124, 58, 237, 0.08) !important;
+  --mod-sub-tab-active-color: #7c3aed !important;
+  --mod-sub-tab-active-border: rgba(124, 58, 237, 0.25) !important;
+  --mod-sub-tab-badge-active-bg: rgba(124, 58, 237, 0.15) !important;
+  --mod-sub-tab-badge-active-color: #7c3aed !important;
+}
+
+/* Body and root container overrides in light mode */
+html.light body,
+html.light #root,
+html.light .home-layout-container {
+  background: #faf6f0 !important;
+  color: #4a3e3d !important;
+}
+
+/* Header & Nav overrides */
+html.light .home-header {
+  background: rgba(250, 246, 240, 0.85) !important;
+  border-bottom: 1px solid rgba(99, 87, 78, 0.12) !important;
+}
+
+html.light .home-brand-logo-text {
+  background: linear-gradient(to right, #0f172a, #6b21a8) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+html.light .home-nav-item {
+  color: #475569 !important;
+}
+
+html.light .home-nav-item:hover,
+html.light .home-nav-item.active {
+  color: #0f172a !important;
+}
+
+/* Search overrides */
+html.light .home-search-input {
+  background: #ffffff !important;
+  border: 1px solid rgba(99, 87, 78, 0.25) !important;
+  color: #2c1d11 !important;
+}
+
+html.light .home-search-input::placeholder {
+  color: #63574e !important;
+}
+
+html.light .home-search-icon {
+  color: #475569 !important;
+}
+
+html.light .home-search-dropdown {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
+}
+
+html.light .search-dropdown-item {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .search-dropdown-item:hover {
+  background: rgba(168, 85, 247, 0.04) !important;
+}
+
+html.light .search-dropdown-item-title {
+  color: #0f172a !important;
+}
+
+html.light .search-dropdown-item-author {
+  color: #64748b !important;
+}
+
+/* Dropdown / User Menu overrides */
+html.light .notification-dropdown,
+html.light .home-user-dropdown {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
+}
+
+html.light .notification-dropdown-header,
+html.light .home-user-dropdown-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+html.light .notification-dropdown-header h3,
+html.light .home-user-dropdown-header strong,
+html.light .notification-dropdown-list h4,
+html.light .home-user-profile-badge span {
+  color: #0f172a !important;
+}
+
+html.light .notification-dropdown-list p,
+html.light .home-user-dropdown-header span,
+html.light .home-user-menu-option {
+  color: #475569 !important;
+}
+
+html.light .home-user-profile-badge {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  color: #0f172a !important;
+}
+
+html.light .home-user-profile-badge:hover {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .home-user-menu-option:hover {
+  background: rgba(0, 0, 0, 0.04) !important;
+  color: #0f172a !important;
+}
+
+html.light .home-user-menu-divider {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Footer overrides */
+html.light .home-footer {
+  background-color: #f1f5f9 !important;
+  border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
+  color: #475569 !important;
+}
+
+html.light .footer-brand-tagline {
+  color: #64748b !important;
+}
+
+html.light .footer-links-col h4 {
+  color: #0f172a !important;
+}
+
+html.light .footer-links-col a {
+  color: #475569 !important;
+}
+
+html.light .footer-links-col a:hover {
+  color: #0f172a !important;
+}
+
+html.light .footer-bottom-row {
+  border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
+  color: #64748b !important;
+}
+
+/* Auth links in home header */
+html.light .btn-home-auth-link {
+  color: #475569 !important;
+}
+
+html.light .btn-home-auth-link:hover {
+  color: #0f172a !important;
+}
+
+/* Generic elements and Page Contents overrides */
+html.light .section-title,
+html.light .hot-featured-title,
+html.light .rank-item-title,
+html.light h1,
+html.light h2,
+html.light h3,
+html.light h4,
+html.light h5,
+html.light h6 {
+  color: #0f172a !important;
+}
+
+html.light .section-subtitle,
+html.light .hot-featured-tagline,
+html.light .rank-item-genre,
+html.light .footer-brand-tagline {
+  color: #64748b !important;
+}
+
+html.light .hot-featured-info {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  border-top: none !important;
+}
+
+html.light .ranking-item {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.08) !important;
+  color: #0f172a !important;
+}
+
+html.light .ranking-item:hover {
+  background: rgba(168, 85, 247, 0.04) !important;
+}
+
+/* Sidebar filters overrides in Light mode */
+html.light aside h4 {
+  color: #0f172a !important;
+  /* Overrides inline style color: 'white' */
+}
+
+/* Selector for the dropdown box */
+html.light aside div[style*="cursor: pointer"] {
+  background-color: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+  color: #0f172a !important;
+}
+
+html.light aside div[style*="cursor: pointer"]:hover {
+  background-color: rgba(0, 0, 0, 0.02) !important;
+}
+
+html.light aside span[style*="color"] {
+  color: #334155 !important;
+}
+
+html.light aside svg {
+  color: #64748b !important;
+}
+
+/* Selector for the dropdown items panel */
+html.light aside div[style*="position: absolute"] {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Selector for the individual item inside the dropdown */
+html.light aside div[style*="position: absolute"]>div {
+  color: #334155 !important;
+}
+
+html.light aside div[style*="position: absolute"]>div:hover {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+/* If the option is selected, override color & gradient */
+html.light aside div[style*="position: absolute"]>div[style*="background: linear-gradient"] {
+  color: #ffffff !important;
+}
+
+/* Automatically fix common inline styles that have bright gray contrast on white bg */
+html.light *[style*="color: white"],
+html.light *[style*="color: rgb(255, 255, 255)"],
+html.light *[style*="color: #cbd5e1"],
+html.light *[style*="color: rgb(203, 213, 225)"],
+html.light *[style*="color: #94a3b8"],
+html.light *[style*="color: rgb(148, 163, 184)"],
+html.light *[style*="color: #e2e8f0"],
+html.light *[style*="color: rgb(226, 232, 240)"] {
+  color: #334155 !important;
+}
+
+html.light *[style*="background: rgba(255, 255, 255, 0.04)"],
+html.light *[style*="background: rgba(255, 255, 255, 0.08)"],
+html.light *[style*="background: rgba(255, 255, 255, 0.03)"],
+html.light *[style*="background: rgba(255, 255, 255, 0.02)"],
+html.light *[style*="background: rgba(255, 255, 255, 0.01)"] {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light *[style*="border: 1px solid rgba(255, 255, 255, 0.08)"],
+html.light *[style*="border: 1px solid rgba(255, 255, 255, 0.06)"] {
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Specific button styles that are styled inline to be dark-ish */
+html.light div[style*="background: rgba(255, 255, 255, 0.03)"] button:not([style*="background: linear-gradient"]) {
+  color: #334155 !important;
+}
+
+/* Library Screen overrides */
+html.light .lib-stat-card {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .lib-stat-value {
+  color: #0f172a !important;
+}
+
+html.light .lib-stat-icon-wrapper {
+  background: rgba(168, 85, 247, 0.08) !important;
+}
+
+html.light .lib-translator-banner {
+  background: #ffffff !important;
+  border-color: rgba(168, 85, 247, 0.25) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .lib-banner-title {
+  color: #0f172a !important;
+}
+
+html.light .lib-banner-desc {
+  color: #475569 !important;
+}
+
+html.light .lib-banner-stat-value {
+  color: #0f172a !important;
+}
+
+html.light .lib-banner-btn {
+  background: #0f172a !important;
+  color: #ffffff !important;
+}
+
+html.light .lib-banner-btn:hover {
+  background: #1e293b !important;
+}
+
+html.light .lib-tabs-row {
+  border-bottom-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .lib-tab-item {
+  color: #64748b !important;
+}
+
+html.light .lib-tab-item:hover,
+html.light .lib-tab-item.active {
+  color: #0f172a !important;
+}
+
+html.light .lib-tab-badge {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #64748b !important;
+}
+
+html.light .lib-tab-item.active .lib-tab-badge {
+  background: rgba(168, 85, 247, 0.1) !important;
+  color: #a855f7 !important;
+}
+
+html.light .lib-sort-btn {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  color: #475569 !important;
+}
+
+html.light .lib-sort-btn:hover {
+  background: rgba(0, 0, 0, 0.02) !important;
+  color: #0f172a !important;
+}
+
+html.light .lib-sort-btn.active {
+  background: #0f172a !important;
+  color: #ffffff !important;
+  border-color: #0f172a !important;
+}
+
+html.light .lib-comic-card {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+html.light .lib-comic-card:hover {
+  border-color: rgba(168, 85, 247, 0.3) !important;
+}
+
+html.light .lib-comic-title {
+  color: #0f172a !important;
+}
+
+/* Forum Screen overrides */
+html.light .forum-stats-card,
+html.light .forum-thread-card {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .forum-stats-card:hover,
+html.light .forum-thread-card:hover {
+  border-color: rgba(168, 85, 247, 0.3) !important;
+}
+
+html.light .forum-stats-card h5 {
+  color: #0f172a !important;
+}
+
+html.light .forum-stat-val {
+  color: #0f172a !important;
+}
+
+html.light .forum-thread-title {
+  color: #0f172a !important;
+}
+
+html.light .forum-thread-title:hover {
+  color: #a855f7 !important;
+}
+
+html.light .forum-thread-body {
+  color: #475569 !important;
+}
+
+html.light .forum-badge.category {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #475569 !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .forum-avatar-placeholder {
+  background: rgba(0, 0, 0, 0.08) !important;
+  color: #0f172a !important;
+}
+
+html.light .forum-author-name {
+  color: #475569 !important;
+}
+
+html.light .forum-search-field,
+html.light .forum-input-field,
+html.light .forum-textarea-field {
+  background: #ffffff !important;
+  border-color: rgba(99, 87, 78, 0.25) !important;
+  color: #2c1d11 !important;
+}
+
+html.light .forum-search-field::placeholder,
+html.light .forum-input-field::placeholder,
+html.light .forum-textarea-field::placeholder {
+  color: #63574e !important;
+}
+
+/* ==========================================================================
+   MODERN & ANIMATED COMPONENT DECORATIONS (BUTTONS & SEARCH BARS)
+   ========================================================================== */
+
+/* ── 1. GLOBAL SEARCH BARS DECORATIONS ── */
+.home-search-input,
+.forum-search-field {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  border-radius: 99px !important; /* Elegant rounded pill */
+}
+
+/* Glowing focus effect on Search Inputs */
+.home-search-input:focus,
+.forum-search-field:focus {
+  border-color: #a855f7 !important;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.25) !important;
+  width: 260px !important; /* Expand slightly for active feel */
+}
+
+/* ── 2. CREATIVE BUTTON UPGRADES (SHINE EFFECT) ── */
+/* Applying to primary buttons in the system */
+.btn-home-primary,
+.lib-banner-btn,
+.home-signout-confirm-btn,
+.mod-btn.approve {
+  position: relative !important;
+  overflow: hidden !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  border-radius: 30px !important; /* Pill style */
+  font-family: 'Poppins', 'Outfit', sans-serif !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.2px !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 15px rgba(168, 85, 247, 0.2) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Shine Swipe Overlay (Based on creative button #6) */
+.btn-home-primary::after,
+.lib-banner-btn::after,
+.home-signout-confirm-btn::after,
+.mod-btn.approve::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: -75% !important;
+  width: 50% !important;
+  height: 100% !important;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0) 100%
+  ) !important;
+  transform: skewX(-25deg) !important;
+  transition: all 0.75s ease !important;
+}
+
+/* Hover effects */
+.btn-home-primary:hover,
+.lib-banner-btn:hover,
+.home-signout-confirm-btn:hover,
+.mod-btn.approve:hover {
+  transform: translateY(-2px) scale(1.02) !important;
+  box-shadow: 0 8px 24px rgba(168, 85, 247, 0.45) !important;
+}
+
+/* Trigger shine swipe on hover */
+.btn-home-primary:hover::after,
+.lib-banner-btn:hover::after,
+.home-signout-confirm-btn:hover::after,
+.mod-btn.approve:hover::after {
+  left: 125% !important;
+}
+
+/* Active pressed state */
+.btn-home-primary:active,
+.lib-banner-btn:active,
+.home-signout-confirm-btn:active,
+.mod-btn.approve:active {
+  transform: translateY(1px) scale(0.98) !important;
+}
+
+/* Adjust colors for Light Mode */
+html.light .lib-banner-btn {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+html.light .lib-banner-btn:hover {
+  background: linear-gradient(135deg, #b86bf7 0%, #f45fa9 100%) !important;
+}
+
+/* ── 3. GHOST & SORT BUTTON ANIMATION UPGRADES (CIRCLE EXPAND STYLE) ── */
+.btn-home-auth-link,
+.lib-sort-btn,
+.home-signout-cancel-btn {
+  border-radius: 20px !important;
+  font-weight: 600 !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+}
+
+.btn-home-auth-link:hover,
+.lib-sort-btn:hover,
+.home-signout-cancel-btn:hover {
+  transform: translateY(-1.5px) !important;
+  border-color: #a855f7 !important;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.15) !important;
+  color: #a855f7 !important;
+}
+
+/* ── 4. WORKSPACE SIDEBAR NAVIGATION ITEMS (CREATIVE ICON SWAP HOVER) ── */
+/* Give lists and dropdown items a slight push on hover */
+.home-user-menu-option {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative !important;
+  padding-left: 16px !important;
+}
+
+.home-user-menu-option:hover {
+  padding-left: 22px !important; /* Slide push effect */
+  background: rgba(168, 85, 247, 0.08) !important;
+  color: #a855f7 !important;
+}
+
+/* Add a tiny dot indicator on hover */
+.home-user-menu-option::before {
+  content: "•" !important;
+  position: absolute !important;
+  left: 6px !important;
+  opacity: 0 !important;
+  transition: all 0.2s ease !important;
+  color: #a855f7 !important;
+}
+
+.home-user-menu-option:hover::before {
+  opacity: 1 !important;
+}
+
+/* ==========================================================================
+   SKELETON LOADING ANIMATIONS
+   ========================================================================== */
+
+/* The Core Shimmer Keyframes */
+@keyframes shimmer-sweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 25%,
+    rgba(255, 255, 255, 0.08) 37%,
+    rgba(255, 255, 255, 0.03) 63%
+  ) !important;
+  background-size: 200% 100% !important;
+  animation: shimmer-sweep 1.4s ease infinite !important;
+}
+
+html.light .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.04) 25%,
+    rgba(0, 0, 0, 0.08) 37%,
+    rgba(0, 0, 0, 0.04) 63%
+  ) !important;
+  background-size: 200% 100% !important;
+}
+
+/* Skeleton shapes */
+.skeleton-img {
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+html.light .skeleton-img {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.skeleton-circle {
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+html.light .skeleton-circle {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.skeleton-line {
+  height: 12px;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.04);
+  margin-bottom: 8px;
+}
+
+html.light .skeleton-line {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.skeleton-line.short { width: 40%; }
+.skeleton-line.medium { width: 70%; }
+.skeleton-line.long { width: 100%; }
+
+/* Skeleton Comic Card Structure */
+.skeleton-comic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+
+.skeleton-comic-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+}
+
+html.light .skeleton-comic-card {
+  background: #ffffff;
+  border-color: rgba(99, 87, 78, 0.12);
+}
+
+.skeleton-comic-card .skeleton-img {
+  width: 100%;
+  height: 240px;
+}
+
+/* Skeleton Forum Card Structure */
+.skeleton-forum-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.skeleton-forum-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+html.light .skeleton-forum-card {
+  background: #ffffff;
+  border-color: rgba(99, 87, 78, 0.12);
+}
+
+.skeleton-forum-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.skeleton-forum-header .skeleton-circle {
+  width: 32px;
+  height: 32px;
+}
+
+.skeleton-forum-header .skeleton-info {
+  flex: 1;
 }

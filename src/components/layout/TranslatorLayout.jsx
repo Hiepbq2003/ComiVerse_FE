@@ -1,25 +1,61 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getAuth, clearAuth } from '../../utils/Auth'
+import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../context/ThemeContext'
+import { useNotification } from '../../context/NotificationContext'
+import { AIPopover } from '../common/AIPopover'
 import '../../assets/style/translator.css'
 
 function TranslatorLayout({ children, activeNav = 'dashboard', onNavChange }) {
   const navigate = useNavigate()
 
-  // Get current user info from localStorage
-  const auth = getAuth()
-  const user = auth?.user || {}
-  const userName = user.fullName || user.username || 'Translator'
+  const { isLoggedIn, user, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
+  const userName = user?.fullName || user?.username || 'Translator'
+
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification()
+
+  const formatTimeAgo = (dateStr) => {
+    if (!dateStr) return ''
+    try {
+      const date = new Date(dateStr)
+      const now = new Date()
+      const diffMs = now - date
+      const diffMins = Math.floor(diffMs / 60000)
+      if (diffMins < 1) return 'Just now'
+      if (diffMins < 60) return `${diffMins}m ago`
+      const diffHrs = Math.floor(diffMins / 60)
+      if (diffHrs < 24) return `${diffHrs}h ago`
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    } catch {
+      return ''
+    }
+  }
+
+  const handleNotificationAction = (actionId) => {
+    if (actionId === 'markAllRead') {
+      markAllAsRead()
+    } else {
+      markAsRead(actionId)
+    }
+  }
+
+  const formattedNotifications = notifications.map(n => ({
+    id: n.id,
+    unread: !n.isRead,
+    msg: `<strong>${n.title || 'Notification'}</strong>: ${n.message || ''}`,
+    time: formatTimeAgo(n.createdAt)
+  }))
 
   useEffect(() => {
-    if (!auth || !auth.token || !auth.user ||
-        auth.user.role?.toLowerCase() !== 'translator') {
+    if (!isLoggedIn || !user ||
+        user.role?.toLowerCase() !== 'translator') {
       navigate('/', { replace: true })
     }
-  }, [auth, navigate])
+  }, [isLoggedIn, user, navigate])
 
   const handleLogout = () => {
-    clearAuth()
+    logout()
     navigate('/', { replace: true })
   }
 
@@ -107,13 +143,41 @@ function TranslatorLayout({ children, activeNav = 'dashboard', onNavChange }) {
           </div>
 
           <div className="translator-topbar-right">
-            {/* Notification Bell */}
-            <button className="translator-icon-btn" title="Notifications">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-              </svg>
+            {/* Theme Toggle */}
+            <button 
+              className="translator-icon-btn" 
+              onClick={toggleTheme}
+              title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              style={{ marginRight: '8px' }}
+            >
+              {theme === 'dark' ? (
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="5"></circle>
+                  <line x1="12" y1="1" x2="12" y2="3"></line>
+                  <line x1="12" y1="21" x2="12" y2="23"></line>
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                  <line x1="1" y1="12" x2="3" y2="12"></line>
+                  <line x1="21" y1="12" x2="23" y2="12"></line>
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+              )}
             </button>
+
+            {/* Notification Bell */}
+            <AIPopover 
+              variant="notif"
+              triggerText=""
+              triggerClass="translator-icon-btn"
+              popoverClass="pop--down pop--right-align"
+              data={{ notifications: formattedNotifications, unreadCount: unreadCount }}
+              onAction={handleNotificationAction}
+            />
 
             <div className="topbar-divider" />
 

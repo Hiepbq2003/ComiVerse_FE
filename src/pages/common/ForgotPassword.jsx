@@ -40,26 +40,26 @@ function ForgotPassword({ onNavigate, onOTPSent, showAlert, loading, setLoading 
         <h2>Reset password</h2>
         <p>Enter your email to receive a recovery OTP code.</p>
       </div>
-
       <form onSubmit={handleForgot}>
-        <div className="input-field-group">
-          <label htmlFor="forgot-email">EMAIL ADDRESS</label>
+        <div className="glass-input-wrapper">
+          <span className="glass-input-label">EMAIL ADDRESS</span>
           <input 
             id="forgot-email"
             type="email" 
             placeholder="you@example.com" 
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            className="glass-input-field"
             autoComplete="email"
             required
           />
         </div>
 
-        <button type="submit" className="btn-primary" disabled={loading}>
-          {loading ? 'Sending Code...' : 'Send OTP Code'} <span className="btn-arrow-icon">›</span>
+        <button type="submit" className="btn-primary" style={{ marginTop: '16px' }} disabled={loading}>
+          <span>{loading ? 'Sending Code...' : 'Send OTP Code'}</span> <span className="btn-arrow-icon">›</span>
         </button>
 
-        <button type="button" className="btn-secondary" onClick={() => onNavigate('signin')}>
+        <button type="button" className="btn-secondary" style={{ marginTop: '12px' }} onClick={() => onNavigate('signin')}>
           Cancel & Go Back
         </button>
       </form>

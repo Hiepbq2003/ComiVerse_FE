@@ -1,0 +1,444 @@
+/* ═══ MODERN BUTTON COMPONENT SCOPED STYLES ═══ */
+
+.modern-btn-container {
+  --bg: #F6F8FC;
+  --primary: #705CFF;
+  --primary-dark: #5d48ff;
+  --secondary: #705CFF60;
+  --h2-color: #5B5D72;
+  --white: #FFFFFF;
+
+  display: inline-block;
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Button 1 - Download with Tooltip */
+.modern-btn-container .btn-1 {
+  --width: 100px;
+  --height: 35px;
+  --tooltip-height: 35px;
+  --tooltip-width: 90px;
+  --gap-between-tooltip-to-button: 18px;
+  --button-color: var(--primary);
+  --tooltip-color: #fff;
+  width: var(--width);
+  height: var(--height);
+  background: var(--button-color);
+  position: relative;
+  text-align: center;
+  border-radius: 10rem;
+  font-family: "Arial";
+  cursor: pointer;
+  transition: background 0.3s;
+  border: none;
+}
+
+.modern-btn-container .btn-1::before {
+  position: absolute;
+  content: attr(data-tooltip);
+  width: var(--tooltip-width);
+  height: var(--tooltip-height);
+  background-color: var(--primary);
+  font-size: 0.9rem;
+  color: white;
+  border-radius: .25em;
+  line-height: var(--tooltip-height);
+  bottom: calc(var(--height) + var(--gap-between-tooltip-to-button) + 10px);
+  left: calc(50% - var(--tooltip-width) / 2);
+}
+
+.modern-btn-container .btn-1::after {
+  position: absolute;
+  content: '';
+  width: 0;
+  height: 0;
+  border: 10px solid transparent;
+  border-top-color: var(--primary);
+  left: calc(50% - 10px);
+  bottom: calc(100% + var(--gap-between-tooltip-to-button) - 10px);
+}
+
+.modern-btn-container .btn-1::after,
+.modern-btn-container .btn-1::before {
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.5s;
+  pointer-events: none;
+}
+
+.modern-btn-container .btn-1 .btn-1-wrapper,
+.modern-btn-container .btn-1 .text,
+.modern-btn-container .btn-1 .icon {
+  overflow: hidden;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  left: 0;
+  color: #fff;
+}
+
+.modern-btn-container .btn-1 .text {
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modern-btn-container .btn-1 .text,
+.modern-btn-container .btn-1 .icon {
+  transition: top 0.5s;
+}
+
+.modern-btn-container .btn-1 .icon {
+  color: #fff;
+  top: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modern-btn-container .btn-1 .icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.modern-btn-container .btn-1:hover {
+  background: var(--primary);
+}
+
+.modern-btn-container .btn-1:hover .text {
+  top: -100%;
+}
+
+.modern-btn-container .btn-1:hover .icon {
+  top: 0;
+}
+
+.modern-btn-container .btn-1:hover::before {
+  opacity: 1;
+  visibility: visible;
+  bottom: calc(var(--height) + var(--gap-between-tooltip-to-button));
+}
+
+.modern-btn-container .btn-1:hover::after {
+  opacity: 1;
+  visibility: visible;
+  bottom: calc(var(--height) + var(--gap-between-tooltip-to-button) - 20px);
+}
+
+
+.modern-btn-container .btn-2 {
+  outline: none;
+  cursor: pointer;
+  border: none;
+  margin: 0;
+  min-height: 36px;
+  max-width: 200px;
+  width: 100px;
+  font-family: inherit;
+  position: relative;
+  display: inline-block;
+  align-items: center;
+  letter-spacing: 0.05rem;
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: 500px;
+  overflow: hidden;
+  background: var(--accent) !important;
+  color: var(--white) !important;
+  padding: 6px 12px;
+}
+
+.modern-btn-container .btn-2 span {
+  position: relative;
+  z-index: 10;
+  transition: color 0.4s;
+}
+
+.modern-btn-container .btn-2::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  background: var(--primary) !important;
+  width: 120%;
+  left: -10%;
+  transform: skew(30deg);
+  transition: transform 0.4s cubic-bezier(0.3, 1, 0.8, 1);
+}
+
+.modern-btn-container .btn-2:hover::before {
+  transform: translate3d(100%, 0, 0);
+}
+
+
+/* Button 3 - Send with Airplane */
+.modern-btn-container .btn-6 {
+  font-size: 15px;
+  background: var(--primary);
+  color: white;
+  padding: 0.5rem 1rem;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  border: none;
+  border-radius: 4rem;
+  overflow: hidden;
+  transition: all 0.2s;
+  cursor: pointer;
+  position: relative;
+}
+
+.modern-btn-container .btn-6 span {
+  display: block;
+  margin-left: 0.3em;
+  transition: all 0.3s ease-in-out;
+}
+
+.modern-btn-container .btn-6 .svg-wrapper-1 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modern-btn-container .btn-6 svg {
+  display: block;
+  transform-origin: center center;
+  transition: transform 0.3s ease-in-out;
+}
+
+.modern-btn-container .btn-6:hover .svg-wrapper {
+  animation: fly-1 0.6s ease-in-out infinite alternate;
+}
+
+.modern-btn-container .btn-6:hover svg {
+  transform: translateX(1.2em) rotate(45deg) scale(1.1);
+}
+
+.modern-btn-container .btn-6:hover span {
+  transform: translateX(5em);
+}
+
+.modern-btn-container .btn-6:active {
+  transform: scale(0.95);
+}
+
+@keyframes fly-1 {
+  from { transform: translateY(0.1em); }
+  to { transform: translateY(-0.1em); }
+}
+
+
+/* Button 4 - Explore All with Double Arrow */
+.modern-btn-container .btn-4 {
+  line-height: 1;
+  text-decoration: none;
+  display: inline-flex;
+  border: none;
+  cursor: pointer;
+  align-items: center;
+  gap: 0.75rem;
+  background: #000000;
+  color: #fff;
+  border-radius: 10rem;
+  font-weight: 600;
+  padding: 0.25rem 1rem;
+  padding-left: 20px;
+  min-height: 38px;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: background-color 0.3s;
+}
+
+.modern-btn-container .btn-4 .button__icon-wrapper {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  position: relative;
+  color: #000;
+  background: #fff;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.modern-btn-container .btn-4:hover {
+  background: var(--primary);
+}
+
+.modern-btn-container .btn-4:hover .button__icon-wrapper {
+  color: var(--primary);
+}
+
+.modern-btn-container .btn-4 .button__icon-svg--copy {
+  position: absolute;
+  fill: #000;
+  transform: translate(-150%, 150%);
+}
+
+.modern-btn-container .btn-4:hover .button__icon-svg:first-child {
+  transition: transform 0.3s ease-in-out;
+  transform: translate(150%, -150%);
+}
+
+.modern-btn-container .btn-4:hover .button__icon-svg--copy {
+  transition: transform 0.3s ease-in-out 0.1s;
+  transform: translate(0);
+}
+
+
+/* Button 5 - Border Fill Signup */
+.modern-btn-container .btn-5 {
+  min-height: 35px;
+  border-radius: 10rem;
+  width: 100px;
+  font-weight: 600;
+  outline: 2px solid var(--primary);
+  outline-offset: 0.15rem;
+  border: none;
+  position: relative;
+  overflow: hidden;
+  background-color: transparent;
+  text-align: center;
+  text-transform: uppercase;
+  font-size: 13px;
+  transition: .3s;
+  z-index: 1;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--primary);
+  padding: 6px 12px;
+}
+
+.modern-btn-container .btn-5::before {
+  content: '';
+  width: 0;
+  height: 300%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: var(--primary);
+  transition: .5s ease;
+  display: block;
+  z-index: -1;
+}
+
+.modern-btn-container .btn-5:hover::before {
+  width: 105%;
+}
+
+.modern-btn-container .btn-5:hover {
+  color: white;
+}
+
+
+/* Button 6 - Back to Top Circle to Capsule */
+.modern-btn-container .btn-3 {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  background: #000;
+  border: none;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition-duration: 0.3s;
+  overflow: hidden;
+  position: relative;
+}
+
+.modern-btn-container .btn-3 .svgIcon {
+  width: 12px;
+  transition-duration: 0.3s;
+}
+
+.modern-btn-container .btn-3 .svgIcon path {
+  fill: white;
+}
+
+.modern-btn-container .btn-3:hover {
+  width: 130px;
+  border-radius: 50px;
+  transition-duration: 0.3s;
+  background: var(--primary);
+}
+
+.modern-btn-container .btn-3:hover .svgIcon {
+  transition-duration: 0.3s;
+  transform: translateY(-200%);
+}
+
+.modern-btn-container .btn-3::before {
+  position: absolute;
+  bottom: -20px;
+  content: "Back to Top";
+  color: white;
+  font-size: 0px;
+}
+
+.modern-btn-container .btn-3:hover::before {
+  font-size: 12px;
+  opacity: 1;
+  bottom: unset;
+  transition-duration: 0.3s;
+}
+
+/* Showcase layout styles */
+.modern-buttons-showcase {
+  max-width: 600px;
+  margin: 2rem auto;
+  padding: 2.5rem 1.5rem;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 1rem;
+  text-align: center;
+}
+
+.modern-buttons-showcase h2 {
+  color: var(--h2-color);
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.modern-buttons-showcase .title-sub {
+  color: var(--h2-color);
+  font-size: 13px;
+  margin-bottom: 2rem;
+  opacity: 0.8;
+}
+
+.modern-buttons-showcase .buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2.5rem;
+  align-items: center;
+  justify-items: center;
+}
+
+.modern-buttons-showcase .button-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid #F3F4F6;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 180px;
+}
+
+.modern-buttons-showcase .button-wrapper .num {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--h2-color);
+  opacity: 0.5;
+}

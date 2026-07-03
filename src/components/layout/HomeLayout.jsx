@@ -1,57 +1,24 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { getAuth, clearAuth } from '../../utils/Auth'
-import {
-  getMyNotificationsApi,
-  getUnreadCountApi,
-  markAsReadApi,
-  markAllAsReadApi,
-} from '../../services/api/NotificationApi'
 import { MOCK_COMICS } from '../../utils/mockComics'
 import '../../assets/style/reader/home.css'
+import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../context/ThemeContext'
+import { useNotification } from '../../context/NotificationContext'
 
 function HomeLayout({ children }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const [authState, setAuthState] = useState(() => getAuth())
+  
+  const { isLoggedIn, user, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
+  const { notifications, unreadCount, loadNotifications, markAsRead, markAllAsRead } = useNotification()
 
-  // Notification State
-  const [notifications, setNotifications] = useState([])
-  const [unreadCount, setUnreadCount] = useState(0)
   const [showNotificationDropdown, setShowNotificationDropdown] = useState(false)
   const notificationRef = useRef(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showSignoutConfirm, setShowSignoutConfirm] = useState(false)
   const userMenuRef = useRef(null)
-
-  // Load auth status
-  useEffect(() => {
-    const auth = getAuth()
-    setAuthState(auth)
-  }, [location])
-
-  // Load notifications if logged in
-  const loadNotifications = async () => {
-    if (!authState) return
-    try {
-      const res = await getMyNotificationsApi()
-      const data = res?.data || res || []
-      setNotifications(data)
-
-      const countRes = await getUnreadCountApi()
-      setUnreadCount(countRes?.data ?? countRes ?? 0)
-    } catch (err) {
-      console.error('Failed to load notifications:', err.message)
-    }
-  }
-
-  useEffect(() => {
-    if (authState) {
-      loadNotifications()
-      const interval = setInterval(loadNotifications, 30000)
-      return () => clearInterval(interval)
-    }
-  }, [authState])
 
   // Click outside listener for notifications
   useEffect(() => {
@@ -76,32 +43,15 @@ function HomeLayout({ children }) {
 
   const handleMarkAsRead = async (id, isRead) => {
     if (isRead) return
-    try {
-      await markAsReadApi(id)
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-      )
-      setUnreadCount((prev) => Math.max(0, prev - 1))
-    } catch (err) {
-      console.error('Failed to mark notification as read:', err.message)
-    }
+    await markAsRead(id)
   }
 
   const handleMarkAllAsRead = async () => {
-    try {
-      await markAllAsReadApi()
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
-      setUnreadCount(0)
-    } catch (err) {
-      console.error('Failed to mark all as read:', err.message)
-    }
+    await markAllAsRead()
   }
 
   const handleLogout = () => {
-    clearAuth()
-    setAuthState(null)
-    setNotifications([])
-    setUnreadCount(0)
+    logout()
     setShowUserMenu(false)
     setShowSignoutConfirm(false)
     navigate('/')
@@ -130,16 +80,16 @@ function HomeLayout({ children }) {
   }
 
   const getDashboardPath = () => {
-    if (!authState) return '/auth'
-    const roleUpper = (authState.user.role || '').toUpperCase()
+    if (!isLoggedIn || !user) return '/auth'
+    const roleUpper = (user.role || '').toUpperCase()
     if (roleUpper === 'ADMIN') return '/admin/account-management'
     if (roleUpper === 'AUTHOR') return '/author/overview'
     return '/auth' // Reader dashboard is handled inside AuthPage
   }
 
   const canOpenWorkspace = () => {
-    if (!authState) return false
-    const roleUpper = (authState.user.role || '').toUpperCase()
+    if (!isLoggedIn || !user) return false
+    const roleUpper = (user.role || '').toUpperCase()
     return !['READER', 'USER'].includes(roleUpper)
   }
 
@@ -239,7 +189,7 @@ function HomeLayout({ children }) {
             {/*<Link to="/library" className={`home-nav-item ${location.pathname === '/library' ? 'active' : ''}`}>*/}
             {/*  Library*/}
             {/*</Link>*/}
-            {authState && (
+            {isLoggedIn && (
               <Link to="/forum" className={`home-nav-item ${location.pathname === '/forum' ? 'active' : ''}`}>
                 Forum
               </Link>
@@ -331,7 +281,32 @@ function HomeLayout({ children }) {
 
         {/* Auth Section */}
         <div className="home-header-right">
-          {authState ? (
+          {/* Theme Toggle Button */}
+          <button
+            onClick={toggleTheme}
+            className="theme-toggle-btn"
+            aria-label="Toggle dark/light mode"
+          >
+            {theme === 'dark' ? (
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="5" />
+                <line x1="12" y1="1" x2="12" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="23" />
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                <line x1="1" y1="12" x2="3" y2="12" />
+                <line x1="21" y1="12" x2="23" y2="12" />
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            )}
+          </button>
+
+          {isLoggedIn ? (
             <>
               {/* Notification Dropdown */}
               <div className="nav-notification-container" ref={notificationRef} style={{ position: 'relative', marginRight: '8px' }}>
@@ -339,17 +314,6 @@ function HomeLayout({ children }) {
                   className="nav-notification-bell"
                   onClick={handleToggleNotifications}
                   aria-label="Toggle notifications"
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#94a3b8',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '8px',
-                    borderRadius: '50%',
-                    position: 'relative'
-                  }}
                 >
                   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -489,14 +453,14 @@ function HomeLayout({ children }) {
                   aria-expanded={showUserMenu}
                   aria-haspopup="menu"
                 >
-                  {authState.user.avatarUrl ? (
-                    <img src={authState.user.avatarUrl} alt="Avatar" className="home-user-avatar-img" />
+                  {user?.avatarUrl ? (
+                    <img src={user.avatarUrl} alt="Avatar" className="home-user-avatar-img" />
                   ) : (
                     <div className="home-user-avatar">
-                      {(authState.user.fullName || authState.user.username || 'U')[0].toUpperCase()}
+                      {(user?.fullName || user?.username || 'U')[0].toUpperCase()}
                     </div>
                   )}
-                  <span>{authState.user.fullName || authState.user.username}</span>
+                  <span>{user?.fullName || user?.username}</span>
                   <svg className={`home-user-menu-chevron ${showUserMenu ? 'open' : ''}`} viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
@@ -506,15 +470,15 @@ function HomeLayout({ children }) {
                   <div className="home-user-dropdown" role="menu">
                     <div className="home-user-dropdown-header">
                       <div className="home-user-dropdown-avatar">
-                        {authState.user.avatarUrl ? (
-                          <img src={authState.user.avatarUrl} alt="Avatar" />
+                        {user?.avatarUrl ? (
+                          <img src={user.avatarUrl} alt="Avatar" />
                         ) : (
-                          <span>{(authState.user.fullName || authState.user.username || 'U')[0].toUpperCase()}</span>
+                          <span>{(user?.fullName || user?.username || 'U')[0].toUpperCase()}</span>
                         )}
                       </div>
                       <div>
-                        <strong>{authState.user.fullName || authState.user.username}</strong>
-                        <span>{authState.user.email || authState.user.role || 'ComiVerse member'}</span>
+                        <strong>{user?.fullName || user?.username}</strong>
+                        <span>{user?.email || user?.role || 'ComiVerse member'}</span>
                       </div>
                     </div>
 
@@ -608,6 +572,18 @@ function HomeLayout({ children }) {
                 <Link to="/ranking" className="footer-link">Ranking</Link>
                 <Link to="/library" className="footer-link">Library</Link>
                 <Link to="/explore" className="footer-link">Explore</Link>
+              </div>
+            </div>
+
+            <div className="footer-links-col">
+              <span className="footer-col-title">Showcases</span>
+              <div className="footer-links-list">
+                <Link to="/showcase/skeletons" className="footer-link">Skeleton Showcase</Link>
+                <Link to="/showcase/popovers" className="footer-link">AI Popover Showcase</Link>
+                <Link to="/showcase/profile-menu" className="footer-link">Profile Dropdown Showcase</Link>
+                <Link to="/showcase/buttons" className="footer-link">Buttons Showcase</Link>
+                <Link to="/showcase/paginations" className="footer-link">Paginations Showcase</Link>
+                <Link to="/showcase/animated-buttons" className="footer-link">Animated Buttons Showcase</Link>
               </div>
             </div>
 

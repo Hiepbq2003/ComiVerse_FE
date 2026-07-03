@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import '../../assets/style/moderator/review-queue.css'
+import ModernButton from '../../components/common/ModernButton'
 
 function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
   const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'approved' | 'rejected'
@@ -173,27 +174,27 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
                   )}
                 </div>
 
-                <div className="submission-actions">
-                  <button 
-                    className="mod-btn review"
-                    onClick={() => setSelectedReview(item)}
-                  >
-                    👁️ Review Content
-                  </button>
+                <div className="submission-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <ModernButton 
+                    variant={5} 
+                    label="👁️ Review Content" 
+                    className="btn-review"
+                    onClick={() => setSelectedReview(item)} 
+                  />
                   {item.status === 'pending' && (
                     <>
-                      <button 
-                        className="mod-btn approve"
-                        onClick={() => onApproveClick(item.id)}
-                      >
-                        ✓ Approve
-                      </button>
-                      <button 
-                        className="mod-btn reject"
-                        onClick={() => onOpenReject(item)}
-                      >
-                        ✗ Reject
-                      </button>
+                      <ModernButton 
+                        variant={2} 
+                        label="✓ Approve" 
+                        className="btn-approve"
+                        onClick={() => onApproveClick(item.id)} 
+                      />
+                      <ModernButton 
+                        variant={5} 
+                        label="✗ Reject" 
+                        className="btn-reject"
+                        onClick={() => onOpenReject(item)} 
+                      />
                     </>
                   )}
                 </div>
@@ -227,27 +228,26 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
               </div>
             </div>
 
-            <div className="mod-modal-footer">
-              <button 
-                className="mod-btn review"
-                onClick={() => setSelectedReview(null)}
-              >
-                Close Preview
-              </button>
+            <div className="mod-modal-footer" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+              <ModernButton 
+                variant={5} 
+                label="Close Preview" 
+                onClick={() => setSelectedReview(null)} 
+              />
               {selectedReview.status === 'pending' && (
                 <>
-                  <button 
-                    className="mod-btn approve"
-                    onClick={() => onApproveClick(selectedReview.id)}
-                  >
-                    ✓ Approve
-                  </button>
-                  <button 
-                    className="mod-btn reject"
-                    onClick={() => onOpenReject(selectedReview)}
-                  >
-                    ✗ Reject
-                  </button>
+                  <ModernButton 
+                    variant={2} 
+                    label="✓ Approve" 
+                    className="btn-approve"
+                    onClick={() => onApproveClick(selectedReview.id)} 
+                  />
+                  <ModernButton 
+                    variant={5} 
+                    label="✗ Reject" 
+                    className="btn-reject"
+                    onClick={() => onOpenReject(selectedReview)} 
+                  />
                 </>
               )}
             </div>
@@ -277,20 +277,19 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
               />
             </div>
 
-            <div className="mod-modal-footer">
-              <button 
-                className="mod-btn review"
-                onClick={() => setSelectedReject(null)}
-              >
-                Cancel
-              </button>
-              <button 
-                className="mod-btn reject"
+            <div className="mod-modal-footer" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+              <ModernButton 
+                variant={5} 
+                label="Cancel" 
+                onClick={() => setSelectedReject(null)} 
+              />
+              <ModernButton 
+                variant={2} 
+                label="Confirm Rejection" 
+                className="btn-reject"
                 onClick={onConfirmRejectClick}
                 disabled={!rejectionReason.trim()}
-              >
-                Confirm Rejection
-              </button>
+              />
             </div>
           </div>
         </div>

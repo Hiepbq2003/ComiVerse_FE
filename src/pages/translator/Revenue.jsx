@@ -44,7 +44,7 @@ function Revenue() {
               <td style={{ padding: '12px 0' }}>June 2026</td>
               <td>42,000 views</td>
               <td>$84.50</td>
-              <td><span className="status-badge paused" style={{ color: '#b45309', background: '#fffbeb' }}>Cleared</span></td>
+              <td><span className="status-badge paused">Cleared</span></td>
             </tr>
             <tr style={{ borderBottom: '1px solid var(--trans-border)' }}>
               <td style={{ padding: '12px 0' }}>May 2026</td>

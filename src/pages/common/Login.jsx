@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { loginApi, getMeApi } from '../../services/api/AuthApi'
+import { useAuth } from '../../context/AuthContext'
 import { setAuth } from '../../utils/Auth'
 
 function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
+  const { login } = useAuth()
   const [form, setForm] = useState({ username: '', password: '', rememberMe: false })
   const [showPassword, setShowPassword] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({ username: '', password: '' })
@@ -47,7 +49,7 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
         avatarUrl: meData.avatarUrl
       }
 
-      setAuth(data.token, userData, data.refreshToken)
+      login(data.token, userData)
       onLoginSuccess(userData)
       showAlert('success', 'Welcome back to ComiVerse!')
     } catch (err) {
@@ -94,14 +96,15 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
       <div className="divider-text-or"><span>OR</span></div>
 
       <form onSubmit={handleSignin} noValidate>
-        <div className={`input-field-group ${fieldErrors.username ? 'has-error' : ''}`}>
-          <label htmlFor="signin-username">EMAIL OR USERNAME</label>
+        <div className={`glass-input-wrapper ${fieldErrors.username ? 'has-error' : ''}`}>
+          <span className="glass-input-label">EMAIL OR USERNAME</span>
           <input 
             id="signin-username"
             type="text" 
             placeholder="you@example.com" 
             value={form.username}
             onChange={(e) => updateField('username', e.target.value)}
+            className="glass-input-field"
             autoComplete="username"
             aria-invalid={fieldErrors.username ? 'true' : 'false'}
             aria-describedby={fieldErrors.username ? 'signin-username-error' : undefined}
@@ -113,31 +116,34 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
           )}
         </div>
 
-        <div className={`input-field-group ${fieldErrors.password ? 'has-error' : ''}`}>
-          <label htmlFor="signin-password">PASSWORD</label>
-          <div className="password-input-wrapper">
-            <input 
-              id="signin-password"
-              type={showPassword ? "text" : "password"} 
-              placeholder="••••••••" 
-              value={form.password}
-              onChange={(e) => updateField('password', e.target.value)}
-              autoComplete="current-password"
-              aria-invalid={fieldErrors.password ? 'true' : 'false'}
-              aria-describedby={fieldErrors.password ? 'signin-password-error' : undefined}
-            />
+        <div className={`glass-input-wrapper ${fieldErrors.password ? 'has-error' : ''}`}>
+          <div className="glass-input-row">
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <span className="glass-input-label">PASSWORD</span>
+              <input 
+                id="signin-password"
+                type={showPassword ? "text" : "password"} 
+                placeholder="••••••••" 
+                value={form.password}
+                onChange={(e) => updateField('password', e.target.value)}
+                className="glass-input-field"
+                autoComplete="current-password"
+                aria-invalid={fieldErrors.password ? 'true' : 'false'}
+                aria-describedby={fieldErrors.password ? 'signin-password-error' : undefined}
+              />
+            </div>
             <button 
               type="button" 
-              className="password-toggle-eye"
+              className="glass-input-trailing-btn"
               onClick={() => setShowPassword(!showPassword)}
             >
               {showPassword ? (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
                   <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
                   <line x1="1" y1="1" x2="23" y2="23"/>
                 </svg>
               ) : (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                   <circle cx="12" cy="12" r="3"/>
                 </svg>
@@ -167,7 +173,7 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
         </div>
 
         <button type="submit" className="btn-primary" disabled={loading}>
-          {loading ? 'Signing In...' : 'Sign In'} <span className="btn-arrow-icon">›</span>
+          <span>{loading ? 'Signing In...' : 'Sign In'}</span> <span className="btn-arrow-icon">›</span>
         </button>
       </form>
 

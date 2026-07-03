@@ -299,13 +299,14 @@
   position: relative;
 }
 
-.brand-footer-text h1 {
+.brand-footer-text h1,
+html.light .brand-footer-text h1 {
   font-family: var(--font-serif);
   font-size: 42px;
   font-weight: 700;
   line-height: 1.15;
   margin: 0 0 16px;
-  color: white;
+  color: white !important;
   letter-spacing: -0.5px;
 }
 
@@ -322,8 +323,9 @@
   100% { background-position: 100% center; }
 }
 
-.brand-footer-text p {
-  color: var(--auth-text-secondary);
+.brand-footer-text p,
+html.light .brand-footer-text p {
+  color: var(--auth-text-secondary) !important;
   font-size: 15px;
   line-height: 1.6;
   margin: 0;
@@ -370,14 +372,15 @@
    GLASSMORPHISM FORM CARD
    ═══════════════════════════════════════════════════════════ */
 .auth-form-card {
-  background: var(--auth-grad-glass);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--auth-card-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.06) 40%, rgba(255, 255, 255, 0.03) 100%) !important;
+  backdrop-filter: blur(14px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(160%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-radius: var(--auth-radius-xl);
   padding: 36px 32px;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.75), 0 8px 24px -8px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.25), inset 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
   transition: border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
@@ -388,12 +391,12 @@
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent 0%, rgba(168, 85, 247, 0.3) 30%, rgba(236, 72, 153, 0.3) 70%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.8) 50%, transparent 100%) !important;
 }
 
 .auth-form-card:hover {
-  border-color: var(--auth-card-border-hover);
-  box-shadow: 0 8px 40px rgba(168, 85, 247, 0.08), 0 0 80px rgba(168, 85, 247, 0.03);
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.8), 0 8px 30px -4px rgba(168, 85, 247, 0.15), inset 0 1px 0 0 rgba(255, 255, 255, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
 }
 
 /* Register card wider variant */
@@ -434,15 +437,16 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
   color: var(--auth-text-primary);
   font-family: var(--font-sans);
   font-weight: 500;
   font-size: 14px;
   padding: 13px 20px;
-  border-radius: var(--auth-radius);
+  border-radius: 16px !important;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
   transition: all var(--auth-transition);
   position: relative;
   overflow: hidden;
@@ -452,22 +456,22 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, transparent 50%);
+  background: radial-gradient(120% 80% at 50% 0%, rgba(255, 255, 255, 0.18), transparent 60%) !important;
   opacity: 0;
   transition: opacity var(--auth-transition);
 }
 
 .btn-google-oauth:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
+  transform: translateY(-2px) scale(1.02) !important;
 }
 
 .btn-google-oauth:hover::before { opacity: 1; }
 
 .btn-google-oauth:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.97) !important;
 }
 
 .google-icon-svg { flex-shrink: 0; }
@@ -498,6 +502,111 @@
 /* ═══════════════════════════════════════════════════════════
    INPUT FIELDS — MODERN DESIGN
    ═══════════════════════════════════════════════════════════ */
+
+/* Glass Input Wrapper styling */
+.glass-input-wrapper {
+  position: relative !important;
+  display: block !important;
+  border-radius: 16px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  padding: 12px 16px 10px !important;
+  box-sizing: border-box !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.04) !important;
+  text-align: left !important;
+  margin-bottom: 18px !important;
+}
+
+.glass-input-wrapper:focus-within {
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15), 0 8px 24px -8px rgba(0, 0, 0, 0.2) !important;
+}
+
+.glass-input-wrapper.has-error {
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.15) !important;
+}
+
+.glass-input-label {
+  display: block !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.16em !important;
+  line-height: 1.2 !important;
+  color: rgba(255, 255, 255, 0.45) !important;
+  transition: color 0.3s ease !important;
+  margin: 0 0 4px 0 !important;
+  padding: 0 !important;
+}
+
+.glass-input-wrapper:focus-within .glass-input-label {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+.glass-input-wrapper.has-error .glass-input-label {
+  color: rgba(239, 68, 68, 0.8) !important;
+}
+
+.glass-input-field {
+  display: block !important;
+  width: 100% !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  line-height: 24px !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  color: #ffffff !important;
+  font-size: 14px !important;
+  outline: none !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+}
+
+/* Highly visible placeholder overrides with all browser prefix fallbacks */
+.glass-input-field::placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
+  opacity: 1 !important;
+}
+.glass-input-field::-webkit-input-placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
+  opacity: 1 !important;
+}
+.glass-input-field::-moz-placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
+  opacity: 1 !important;
+}
+.glass-input-field:-ms-input-placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
+  opacity: 1 !important;
+}
+
+.glass-input-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+}
+
+.glass-input-trailing-btn {
+  background: transparent !important;
+  border: none !important;
+  color: rgba(255, 255, 255, 0.45) !important;
+  cursor: pointer !important;
+  padding: 4px !important;
+  margin-left: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: color 0.2s ease !important;
+}
+
+.glass-input-trailing-btn:hover {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
 .input-field-group {
   display: flex;
   flex-direction: column;
@@ -603,49 +712,52 @@
 /* ═══════════════════════════════════════════════════════════
    PASSWORD STRENGTH METER
    ═══════════════════════════════════════════════════════════ */
-.strength-meter-container {
-  margin-top: 10px;
+.strength {
+  display: block;
+  width: 100%;
+}
+
+.strength__meter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.strength__track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.strength__fill {
+  height: 100%;
+  border-radius: 999px;
+  width: 0;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), background 0.4s ease;
+}
+
+.strength__status {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  width: 100%;
 }
 
-.strength-bar-wrapper {
-  display: flex;
-  gap: 4px;
-  flex: 1;
-}
-
-.strength-segment {
-  height: 4px;
-  flex: 1;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.06);
-  transition: all 0.4s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.strength-segment.active-weak {
-  background: linear-gradient(90deg, #ef4444, #f97316);
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
-}
-
-.strength-segment.active-medium {
-  background: linear-gradient(90deg, #f97316, #eab308);
-  box-shadow: 0 0 8px rgba(234, 179, 8, 0.3);
-}
-
-.strength-segment.active-strong {
-  background: linear-gradient(90deg, #10b981, #06b6d4);
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
-}
-
-.strength-label-text {
+.strength__caption {
   font-size: 11px;
-  color: var(--auth-text-muted);
+  color: var(--auth-text-secondary);
   font-weight: 500;
-  white-space: nowrap;
+}
+
+.strength__level {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -689,20 +801,21 @@
   flex-shrink: 0;
   height: 18px;
   width: 18px;
-  background: rgba(7, 4, 13, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
   border-radius: 5px;
   transition: all var(--auth-transition);
 }
 
 .checkbox-custom-label:hover input ~ .checkmark-box {
-  border-color: var(--auth-purple);
+  border-color: rgba(255, 255, 255, 0.55) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
 }
 
 .checkbox-custom-label input:checked ~ .checkmark-box {
-  background: var(--auth-grad-primary);
-  border-color: transparent;
-  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.3);
+  background: linear-gradient(135deg, #a855f7 0%, #ff6b35 100%) !important;
+  border-color: transparent !important;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.4) !important;
 }
 
 .checkmark-box:after {
@@ -762,11 +875,13 @@
    ═══════════════════════════════════════════════════════════ */
 .btn-primary {
   width: 100%;
-  background: var(--auth-grad-primary);
+  background-size: 150% 100% !important;
+  background-position: 0% 50% !important;
+  background-image: linear-gradient(110deg, #a855f7 0%, #ff6b35 55%, #ff9416 100%) !important;
   border: none;
   color: white;
   padding: 14px 24px;
-  border-radius: var(--auth-radius);
+  border-radius: 16px !important;
   font-family: var(--font-sans);
   font-size: 15px;
   font-weight: 600;
@@ -777,46 +892,64 @@
   gap: 8px;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(168, 85, 247, 0.25), 0 0 40px rgba(236, 72, 153, 0.1);
-  transition: all 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+  box-shadow: 0 4px 20px rgba(255, 107, 53, 0.25) !important;
+  transition: background-position 1.2s ease-out, transform 0.2s ease, box-shadow 0.2s ease !important;
   margin-bottom: 8px;
   letter-spacing: 0.3px;
+  isolation: isolate;
 }
 
-/* Shimmer sweep effect */
 .btn-primary::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
-  transition: left 0.6s ease;
+  content: "" !important;
+  position: absolute !important;
+  top: -30px !important;
+  left: -30px !important;
+  right: -30px !important;
+  bottom: -30px !important;
+  background: radial-gradient(38% 70% at 12% 40%, rgba(190, 130, 255, 0.4), transparent 60%),
+              radial-gradient(36% 66% at 88% 60%, rgba(255, 170, 80, 0.4), transparent 60%) !important;
+  filter: blur(16px) !important;
+  animation: liquid-drift 9s ease-in-out infinite !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+}
+
+/* Hover sheen — a brighter highlight near the top edge */
+.btn-primary::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  opacity: 0 !important;
+  background: radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.25), transparent 60%) !important;
+  transition: opacity 0.3s ease !important;
+  z-index: 2 !important;
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(168, 85, 247, 0.35), 0 0 60px rgba(236, 72, 153, 0.15);
+  background-position: 100% 50% !important;
+  transform: scale(1.02) translateY(-2px) !important;
+  box-shadow: 0 8px 30px rgba(255, 107, 53, 0.45) !important;
 }
 
-.btn-primary:hover::before {
-  left: 100%;
+.btn-primary:hover::after {
+  opacity: 1 !important;
 }
 
 .btn-primary:active {
-  transform: translateY(0) scale(0.98);
+  transform: translateY(0) scale(0.98) !important;
 }
 
 .btn-primary:disabled {
-  opacity: 0.5;
+  opacity: 0.7;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
 }
 
-.btn-primary:disabled::before {
-  display: none;
+.btn-primary span,
+.btn-primary svg {
+  position: relative !important;
+  z-index: 3 !important;
 }
 
 .btn-arrow-icon {
@@ -827,6 +960,15 @@
 
 .btn-primary:hover .btn-arrow-icon {
   transform: translateX(3px);
+}
+
+@keyframes liquid-drift {
+  0%, 100% {
+    transform: translate3d(-4px, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(4px, -1px, 0) scale(1.02);
+  }
 }
 
 /* ── Secondary Button ────────────────────────────────── */
@@ -1047,21 +1189,23 @@
   justify-content: center;
   gap: 10px;
   padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--auth-radius);
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 16px !important;
   color: var(--auth-text-primary);
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
   transition: all var(--auth-transition);
 }
 
 .btn-google-signup:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.15);
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  transform: translateY(-2px) scale(1.02) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
 }
 
 .gmail-subtext {
@@ -1089,19 +1233,24 @@
   width: 18px;
   height: 18px;
   min-width: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
   border-radius: 5px;
-  background: rgba(7, 4, 13, 0.6);
+  background: rgba(255, 255, 255, 0.05) !important;
   cursor: pointer;
   position: relative;
   margin-top: 2px;
   transition: all var(--auth-transition);
 }
 
+.terms-checkbox-container:hover input[type="checkbox"] {
+  border-color: rgba(255, 255, 255, 0.55) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
 .terms-checkbox-container input[type="checkbox"]:checked {
-  background: var(--auth-grad-primary);
-  border-color: transparent;
-  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.3);
+  background: linear-gradient(135deg, #a855f7 0%, #ff6b35 100%) !important;
+  border-color: transparent !important;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.4) !important;
 }
 
 .terms-checkbox-container input[type="checkbox"]:checked::after {

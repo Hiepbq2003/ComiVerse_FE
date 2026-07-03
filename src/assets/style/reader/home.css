@@ -168,16 +168,45 @@
 }
 
 .btn-home-auth-link {
-  color: #94a3b8;
-  text-decoration: none;
-  font-size: 15px;
-  font-weight: 500;
-  transition: color 0.2s ease;
-  padding: 8px 16px;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-decoration: none !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  border-radius: 20px !important;
+  padding: 8px 20px !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease-in-out !important;
+  box-sizing: border-box !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  border: 1.5px solid rgba(167, 139, 250, 0.4) !important;
+  color: #c084fc !important;
+  background-color: rgba(167, 139, 250, 0.05) !important;
 }
 
 .btn-home-auth-link:hover {
-  color: white;
+  background: var(--color-primary-grad) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.25) !important;
+}
+
+/* Light mode overrides */
+html.light .btn-home-auth-link {
+  border: 1.5px solid rgba(139, 92, 246, 0.5) !important;
+  color: #7c3aed !important;
+  background-color: rgba(139, 92, 246, 0.04) !important;
+}
+
+html.light .btn-home-auth-link:hover {
+  background: var(--color-primary-grad) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(236, 72, 153, 0.3) !important;
 }
 
 .btn-home-primary {
@@ -1554,4 +1583,117 @@
   .search-results-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+/* ── PREMIUM HOMEPAGE HEADER CONTROLS ── */
+
+/* 1. Theme Toggle & Notification Bell Buttons */
+.theme-toggle-btn,
+.nav-notification-bell {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #94a3b8 !important;
+  cursor: pointer !important;
+  padding: 8px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s ease-in-out !important;
+  width: 36px !important;
+  height: 36px !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+}
+
+.theme-toggle-btn:hover,
+.nav-notification-bell:hover {
+  background: rgba(168, 85, 247, 0.15) !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
+  color: #c084fc !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.15) !important;
+}
+
+/* Adjust layout positions slightly for alignment */
+.theme-toggle-btn {
+  margin-right: 12px !important;
+}
+
+/* 2. Profile Dropdown Badge */
+.home-user-profile-badge {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #e2e8f0 !important;
+  cursor: pointer !important;
+  padding: 6px 14px !important;
+  border-radius: 20px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  transition: all 0.2s ease-in-out !important;
+  height: 36px !important;
+  box-sizing: border-box !important;
+}
+
+.home-user-profile-badge:hover {
+  background: rgba(168, 85, 247, 0.15) !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
+  color: #c084fc !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.15) !important;
+}
+
+/* 3. Search Bar Input */
+.home-search-input {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(139, 92, 246, 0.25) !important;
+  color: #ffffff !important;
+  transition: all 0.3s ease-in-out !important;
+}
+
+.home-search-input:focus {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: #a78bfa !important;
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.35) !important;
+}
+
+/* ── LIGHT MODE OVERRIDES ── */
+html.light .theme-toggle-btn,
+html.light .nav-notification-bell {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  color: #4b5563 !important;
+}
+
+html.light .theme-toggle-btn:hover,
+html.light .nav-notification-bell:hover {
+  background: rgba(139, 92, 246, 0.08) !important;
+  border-color: rgba(139, 92, 246, 0.2) !important;
+  color: #7c3aed !important;
+}
+
+html.light .home-user-profile-badge {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  color: #374151 !important;
+}
+
+html.light .home-user-profile-badge:hover {
+  background: rgba(139, 92, 246, 0.08) !important;
+  border-color: rgba(139, 92, 246, 0.2) !important;
+  color: #7c3aed !important;
+}
+
+html.light .home-search-input {
+  background: #ffffff !important;
+  border: 1px solid rgba(139, 92, 246, 0.3) !important;
+  color: #0f172a !important;
+}
+
+html.light .home-search-input:focus {
+  border-color: #7c3aed !important;
+  box-shadow: 0 0 14px rgba(124, 58, 237, 0.2) !important;
 }

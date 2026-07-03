@@ -10,11 +10,13 @@ import AdminDashboard from '../admin/AdminDashboard'
 import AuthorDashboard from '../author/AuthorDashboard'
 import ModeratorDashboard from '../moderator/ModeratorDashboard'
 import TranslatorDashboard from '../translator/TranslatorDashboard'
-import { getAuth, clearAuth, setAuth } from '../../utils/Auth'
+import { useAuth } from '../../context/AuthContext'
 import { getMeApi } from '../../services/api/AuthApi'
+import { setAuth } from '../../utils/Auth'
 
 function AuthPage() {
   const navigate = useNavigate()
+  const { login, logout, isLoggedIn, user: authUser } = useAuth()
   const [view, setView] = useState('signin') // 'signin' | 'signup' | 'forgot' | 'reset' | 'profile' | 'oauth-loading'
   const [alert, setAlert] = useState({ type: '', message: '' })
   const [loading, setLoading] = useState(false)
@@ -23,7 +25,11 @@ function AuthPage() {
   const [activeModal, setActiveModal] = useState('none') // 'none' | 'terms' | 'privacy'
 
   const openRoleDestination = (userData, options = {}) => {
-    const roleUpper = (userData?.role || '').toUpperCase()
+    if (!userData) {
+      setView('signin')
+      return
+    }
+    const roleUpper = (userData.role || '').toUpperCase()
 
     if (roleUpper === 'ADMIN') {
       navigate('/admin/account-management', options)
@@ -58,13 +64,13 @@ function AuthPage() {
         
         getMeApi()
           .then((userData) => {
-            setAuth(token, userData, refreshToken)
+            login(token, userData)
             openRoleDestination(userData, { replace: true });
             showAlert('success', 'Logged in successfully with Google!');
           })
           .catch((err) => {
             console.error('Failed to load OAuth profile details:', err);
-            clearAuth();
+            logout();
             setView('signin');
             showAlert('error', 'Failed to retrieve Google user details.');
           });
@@ -75,9 +81,8 @@ function AuthPage() {
         }, 1000);
       }
     } else {
-      const auth = getAuth();
-      if (auth && auth.token && auth.user) {
-        openRoleDestination(auth.user, { replace: true });
+      if (isLoggedIn && authUser) {
+        openRoleDestination(authUser, { replace: true });
       } else {
         const mode = urlParams.get('mode');
         if (mode && ['signin', 'signup', 'forgot'].includes(mode)) {
@@ -85,7 +90,7 @@ function AuthPage() {
         }
       }
     }
-  }, [navigate, window.location.search]);
+  }, [navigate, window.location.search, isLoggedIn, authUser]);
 
   const showAlert = (type, message) => {
     setAlert({ type, message })
@@ -95,7 +100,7 @@ function AuthPage() {
   }
 
   const handleLogout = () => {
-    clearAuth();
+    logout();
     setUser(null);
     setView('signin');
     showAlert('success', 'Logged out successfully.');

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import '../../assets/style/translator/team-projects.css'
+import ModernButton from '../../components/common/ModernButton'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { createSubmissionApi } from '../../services/api/SubmissionApi'
 import {
@@ -37,6 +38,19 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
   const [chatInput, setChatInput] = useState('')
   const [joinRequests, setJoinRequests] = useState([])
   const [tasks, setTasks] = useState([])
+  const [lockedColumns, setLockedColumns] = useState([])
+  const [highlightedColumns, setHighlightedColumns] = useState([])
+  const [sortedColumns, setSortedColumns] = useState([])
+  const [openDropdownCol, setOpenDropdownCol] = useState(null)
+  const [selectedTask, setSelectedTask] = useState(null)
+  const [editTaskData, setEditTaskData] = useState({
+    title: '',
+    columnName: 'backlog',
+    progress: 0,
+    priority: 'Medium',
+    assignee: '',
+    dueDate: ''
+  })
   
   // Dynamic user mapping from auth token
   const authStr = localStorage.getItem('user')
@@ -58,6 +72,8 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
       cleanTitle: title
     }
   }
+
+
 
   const [members, setMembers] = useState([])
   const [claimedCurrentPage, setClaimedCurrentPage] = useState(1)
@@ -145,6 +161,21 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
       }
     }
   }, [projects])
+
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      setOpenDropdownCol(null)
+    }
+    window.addEventListener('click', handleGlobalClick)
+    return () => window.removeEventListener('click', handleGlobalClick)
+  }, [])
+
+  const COLUMN_LIST = [
+    { id: 'backlog', title: 'Backlog', dotClass: 'column__dot--backlog', defaultProgress: 0 },
+    { id: 'in_progress', title: 'In Progress', dotClass: 'column__dot--progress', defaultProgress: 40 },
+    { id: 'under_review', title: 'Under Review', dotClass: 'column__dot--review', defaultProgress: 80 },
+    { id: 'completed', title: 'Completed', dotClass: 'column__dot--done', defaultProgress: 100 }
+  ]
 
   // ── Handlers ─────────────────────────────────────
   const handleOpenDetails = async (project) => {
@@ -419,13 +450,78 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
       setTasks(prev =>
         prev.map(task => task.id === id ? { 
           ...task, 
-          column: updated.columnName, 
+          columnName: updated.columnName, 
           progress: updated.progress
         } : task)
       )
     } catch (err) {
       console.error(err)
       toast.error('Failed to update task state in DB.')
+    }
+  }
+
+  const handleOpenTaskDetails = (task) => {
+    const { priority, cleanTitle, comicProject } = parseTaskTitle(task.title)
+    setSelectedTask(task)
+    setEditTaskData({
+      title: cleanTitle,
+      comic: comicProject || '',
+      columnName: task.columnName || 'backlog',
+      progress: task.progress || 0,
+      priority: priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase(),
+      assignee: task.assignees || '',
+      dueDate: task.dueDate || ''
+    })
+  }
+
+  const handleSaveTaskDetails = async () => {
+    if (!selectedTask) return
+    const formattedTitle = `[${editTaskData.priority.toUpperCase()}] [${editTaskData.comic || selectedDetails?.comicName || selectedDetails?.title}] ${editTaskData.title.trim()}`
+    
+    let finalProgress = editTaskData.progress
+    if (editTaskData.columnName === 'completed') finalProgress = 100
+    if (editTaskData.columnName === 'backlog') finalProgress = 0
+
+    try {
+      const updated = await updateTeamTaskApi(selectedTask.id, {
+        title: formattedTitle,
+        columnName: editTaskData.columnName,
+        progress: finalProgress,
+        dueDate: editTaskData.dueDate,
+        assignees: editTaskData.assignee
+      })
+      setTasks(prev => prev.map(t => t.id === selectedTask.id ? {
+        ...t,
+        title: updated.title || formattedTitle,
+        columnName: updated.columnName,
+        progress: updated.progress,
+        dueDate: updated.dueDate,
+        assignees: updated.assignees
+      } : t))
+      setSelectedTask(null)
+      toast.success('Task details updated in DB!')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to update task details.')
+    }
+  }
+
+  // Action: Move All Column Tasks to Done
+  const handleMoveAllToDone = async (colId) => {
+    const targets = tasks.filter(t => t.columnName === colId)
+    if (targets.length === 0) return
+    try {
+      await Promise.all(targets.map(t => updateTeamTaskApi(t.id, {
+        columnName: 'completed',
+        progress: 100,
+        dueDate: t.dueDate,
+        assignees: t.assignees
+      })))
+      setTasks(prev => prev.map(t => t.columnName === colId ? { ...t, columnName: 'completed', progress: 100 } : t))
+      toast.success(`Moved all tasks from ${colId} to Completed!`)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to move all tasks to Completed.')
     }
   }
 
@@ -765,213 +861,290 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
 
         {/* Tab 4: TASK KANBAN BOARD */}
         {workspaceTab === 'tasks' && (
-          <div className="tasks-board-tab-container fade-in">
-            <div className="taskboard-header-row">
-              <div className="taskboard-summary">
-                <strong>{activeTasks.length}</strong> active · <strong>{pausedTasks.length}</strong> paused · <strong>{tasks.filter(t => t.columnName === 'completed').length}</strong> completed
+          <>
+          <div className="board tasks-board-tab-container fade-in" style={{ padding: 0, background: 'transparent' }}>
+            <div className="board__card">
+              <div className="board__header">
+                <div className="board__title">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="3" width="7" height="9" rx="1" />
+                      <rect x="14" y="3" width="7" height="5" rx="1" />
+                      <rect x="14" y="12" width="7" height="9" rx="1" />
+                      <rect x="3" y="16" width="7" height="5" rx="1" />
+                  </svg>
+                  <h1>{selectedDetails?.comicName || selectedDetails?.title || 'Comic'} Sprint Board</h1>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div className="board__meta">
+                    <span className="board__badge">{selectedDetails?.targetLang || 'Translation'} Team</span>
+                    <span className="board__date">{activeTasks.length} active · {pausedTasks.length} paused</span>
+                  </div>
+                  <button className="trans-btn primary" style={{ height: '38px', padding: '0 16px', borderRadius: '8px', fontSize: '13px' }} onClick={openCreateTaskModal}>
+                    + Create Task
+                  </button>
+                </div>
               </div>
-              <button className="trans-btn primary" onClick={openCreateTaskModal}>
-                + Create Task
-              </button>
+
+              {/* Kanban columns grid */}
+              <div className="columns kanban-board-grid" id="columns">
+                {COLUMN_LIST.map((col) => {
+                  const isLocked = lockedColumns.includes(col.id)
+                  const isHighlighted = highlightedColumns.includes(col.id)
+                  
+                  // Filter tasks
+                  let colTasks = tasks.filter(t => t.columnName === col.id)
+                  
+                  // Sort if needed
+                  if (sortedColumns.includes(col.id)) {
+                    const priorityOrder = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 }
+                    colTasks = [...colTasks].sort((a, b) => {
+                      const pa = parseTaskTitle(a.title).priority
+                      const pb = parseTaskTitle(b.title).priority
+                      return (priorityOrder[pa] ?? 4) - (priorityOrder[pb] ?? 4)
+                    })
+                  }
+
+                  return (
+                    <div 
+                      key={col.id} 
+                      className={`column ${isLocked ? 'column--locked' : ''} ${isHighlighted ? 'column--highlighted' : ''}`}
+                      style={{ height: 'auto', minHeight: '38rem' }}
+                    >
+                      <div className="column__header">
+                        <div className="column__label">
+                          <div className={`column__dot ${col.dotClass}`}></div>
+                          <h2>{col.title}</h2>
+                          <span className="column__count">{colTasks.length}</span>
+                        </div>
+                        <div className={`column__add-wrap ${openDropdownCol === col.id ? 'open' : ''}`}>
+                          <button 
+                            type="button" 
+                            className="column__add" 
+                            aria-label="Column options"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setOpenDropdownCol(openDropdownCol === col.id ? null : col.id)
+                            }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <circle cx="12" cy="12" r="1"/>
+                              <circle cx="19" cy="12" r="1"/>
+                              <circle cx="5" cy="12" r="1"/>
+                            </svg>
+                          </button>
+                          <div className="dropdown" style={{ display: openDropdownCol === col.id ? 'block' : 'none' }}>
+                            <button 
+                              type="button" 
+                              className="dropdown__item"
+                              onClick={() => {
+                                setSortedColumns(prev => prev.includes(col.id) ? prev.filter(c => c !== col.id) : [...prev, col.id])
+                                setOpenDropdownCol(null)
+                              }}
+                            >
+                              {sortedColumns.includes(col.id) ? 'Unsort' : 'Sort by priority'}
+                            </button>
+                            <button 
+                              type="button" 
+                              className="dropdown__item"
+                              onClick={() => {
+                                setLockedColumns(prev => prev.includes(col.id) ? prev.filter(c => c !== col.id) : [...prev, col.id])
+                                setOpenDropdownCol(null)
+                              }}
+                            >
+                              {isLocked ? 'Unlock column' : 'Lock column'}
+                            </button>
+                            <button 
+                              type="button" 
+                              className="dropdown__item"
+                              onClick={() => {
+                                setHighlightedColumns(prev => prev.includes(col.id) ? prev.filter(c => c !== col.id) : [...prev, col.id])
+                                setOpenDropdownCol(null)
+                              }}
+                            >
+                              {isHighlighted ? 'Unhighlight' : 'Highlight column'}
+                            </button>
+                            {col.id !== 'completed' && (
+                              <button 
+                                type="button" 
+                                className="dropdown__item"
+                                onClick={() => {
+                                  handleMoveAllToDone(col.id)
+                                  setOpenDropdownCol(null)
+                                }}
+                              >
+                                Move all to Done
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="task-list" style={{ opacity: isLocked ? 0.6 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>
+                        {colTasks.map(task => {
+                          const { priority, cleanTitle } = parseTaskTitle(task.title)
+                          const isDone = col.id === 'completed'
+
+                          return (
+                            <article 
+                              key={task.id} 
+                              className={`task ${isDone ? 'task--completed' : ''}`}
+                              tabIndex="0"
+                              onClick={() => handleOpenTaskDetails(task)}
+                            >
+                              {isDone ? (
+                                <div className="task__check">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20 6 9 17l-5-5"/>
+                                  </svg>
+                                  <span>Done</span>
+                                </div>
+                              ) : (
+                                <div className={`task__priority task__priority--${priority.toLowerCase()}`}>
+                                  {priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase()}
+                                </div>
+                              )}
+
+                              <h3>{cleanTitle}</h3>
+                              <p className="task__desc">Task for {selectedDetails?.comicName || selectedDetails?.title}</p>
+
+                              {/* Progress bar inside In Progress or Under Review */}
+                              {(col.id === 'in_progress' || col.id === 'under_review') && (
+                                <div className="task-progress-section" style={{ width: '100%', marginTop: '6px' }}>
+                                  <div className="task-progress-label-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--trans-text-secondary)', marginBottom: '4px' }}>
+                                    <span>Progress</span>
+                                    <span>{task.progress || col.defaultProgress}%</span>
+                                  </div>
+                                  <div className="task-progress-bar-bg" style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '10px', height: '6px' }}>
+                                    <div 
+                                      className="task-progress-bar-fill" 
+                                      style={{ 
+                                        width: `${task.progress || col.defaultProgress}%`,
+                                        background: 'linear-gradient(90deg, #a855f7, #c084fc)',
+                                        height: '100%',
+                                        borderRadius: '10px'
+                                      }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              )}
+
+                              <footer className="task__footer">
+                                <div className="avatar avatar--fallback" style={{ fontSize: '9px', width: '22px', height: '22px' }}>
+                                  {(task.assignees || 'TL').split(',')[0].slice(0, 2).toUpperCase()}
+                                </div>
+                                <span className="task__date">📅 {task.dueDate}</span>
+                              </footer>
+                            </article>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="board__footer" style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '16px 24px',
+                borderTop: '1px solid var(--trans-border)',
+                marginTop: '16px'
+              }}>
+                <span className="board__footer-count" style={{ fontSize: '13px', color: 'var(--trans-text-secondary)' }}>
+                  <strong>{tasks.length}</strong> tasks total
+                </span>
+                <span className="board__footer-dot" style={{ width: '3px', height: '3px', borderRadius: '50%', backgroundColor: 'var(--trans-text-muted)', display: 'inline-block' }}></span>
+                <div className="board__footer-members" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--trans-text-secondary)' }}>Project Team:</span>
+                  <div className="task-assignees-row" style={{ display: 'inline-flex', gap: '4px' }}>
+                    {members.slice(0, 6).map((m, i) => (
+                      <div 
+                        className="task-assignee-avatar" 
+                        key={i} 
+                        title={m.name || m.username || 'Member'}
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '10px',
+                          fontWeight: '700',
+                          border: '1.5px solid var(--trans-card-bg)',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}
+                      >
+                        {String(m.name || m.username || 'M')[0].toUpperCase()}
+                      </div>
+                    ))}
+                    {members.length > 6 && (
+                      <div 
+                        className="task-assignee-avatar" 
+                        title={`${members.length - 6} more`}
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          background: '#475569',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '10px',
+                          fontWeight: '700',
+                          border: '1.5px solid var(--trans-card-bg)'
+                        }}
+                      >
+                        +{members.length - 6}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Paused Tasks Row */}
+              <div className="paused-tasks-container" style={{
+                borderTop: '1px solid var(--trans-border)',
+                paddingTop: '20px',
+                marginTop: '20px',
+                paddingLeft: '24px',
+                paddingRight: '24px'
+              }}>
+                <h4 className="paused-tasks-title" style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--trans-text-primary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>⏸</span> Paused ({pausedTasks.length})
+                </h4>
+                {pausedTasks.length === 0 ? (
+                  <p style={{ fontStyle: 'italic', color: 'var(--trans-text-muted)', fontSize: '13px', margin: 0 }}>No paused tasks.</p>
+                ) : (
+                  <div className="paused-tasks-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+                    {pausedTasks.map(task => {
+                      const { priority, cleanTitle } = parseTaskTitle(task.title)
+                      return (
+                        <div className="paused-task-card task-card-item" key={task.id} style={{ opacity: 0.75 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <span className="paused-task-badge task-project-tag" style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>Paused</span>
+                            <span className={`task-priority-badge ${priority.toLowerCase()}`}>{priority}</span>
+                          </div>
+                          <h5 className="task-title" style={{ margin: '8px 0 4px' }}>{cleanTitle}</h5>
+                          <span style={{ fontSize: '11px', color: 'var(--trans-text-muted)' }}>Project: {task.project || selectedDetails?.comicName || selectedDetails?.title}</span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--trans-text-secondary)' }}>Due: {task.dueDate}</span>
+                            <button className="trans-btn primary" style={{ fontSize: '9px', padding: '2px 8px' }} onClick={() => handleMoveTask(task.id, 'backlog')}>Resume</button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
             </div>
-
-            {/* Kanban columns grid */}
-            <div className="kanban-board-grid">
-              
-              {/* Backlog */}
-              <div className="kanban-column-wrapper">
-                <div className="kanban-column-title-row">
-                  <h4>Backlog</h4>
-                  <span className="column-card-count">{tasks.filter(t => t.columnName === 'backlog').length}</span>
-                </div>
-                {tasks.filter(t => t.columnName === 'backlog').map(task => {
-                  const { priority, cleanTitle } = parseTaskTitle(task.title)
-                  return (
-                    <div className="task-card-item" key={task.id}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span className="task-project-tag">{task.project || selectedDetails?.comicName || selectedDetails?.title}</span>
-                        <span className={`task-priority-badge ${priority.toLowerCase()}`}>{priority}</span>
-                      </div>
-                      <h5 className="task-title">{cleanTitle}</h5>
-                      <div className="task-card-footer">
-                        <div className="task-assignees-row">
-                          {(task.assignees || 'TL').split(',').map((as, i) => (
-                            <div className="task-assignee-avatar" key={i}>{as}</div>
-                          ))}
-                        </div>
-                        <div className="task-meta-info">
-                          <span className="task-date-info">📅 {task.dueDate}</span>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                        <button style={{ flex: 1, fontSize: '10px', padding: '2px' }} className="trans-btn primary" onClick={() => handleMoveTask(task.id, 'in_progress')}>Start</button>
-                        <button style={{ fontSize: '10px', padding: '2px 6px' }} className="trans-btn secondary" onClick={() => handleMoveTask(task.id, 'paused')}>⏸</button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* In Progress */}
-              <div className="kanban-column-wrapper">
-                <div className="kanban-column-title-row">
-                  <h4>In Progress</h4>
-                  <span className="column-card-count">{tasks.filter(t => t.columnName === 'in_progress').length}</span>
-                </div>
-                {tasks.filter(t => t.columnName === 'in_progress').map(task => {
-                  const { priority, cleanTitle } = parseTaskTitle(task.title)
-                  return (
-                    <div className="task-card-item" key={task.id}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span className="task-project-tag">{task.project || selectedDetails?.comicName || selectedDetails?.title}</span>
-                        <span className={`task-priority-badge ${priority.toLowerCase()}`}>{priority}</span>
-                      </div>
-                      <h5 className="task-title">{cleanTitle}</h5>
-                      
-                      <div className="task-progress-section">
-                        <div className="task-progress-label-row">
-                          <span>Progress</span>
-                          <span>{task.progress}%</span>
-                        </div>
-                        <div className="task-progress-bar-bg">
-                          <div className="task-progress-bar-fill" style={{ width: `${task.progress}%` }}></div>
-                        </div>
-                      </div>
-
-                      <div className="task-card-footer">
-                        <div className="task-assignees-row">
-                          {(task.assignees || 'TL').split(',').map((as, i) => (
-                            <div className="task-assignee-avatar" key={i}>{as}</div>
-                          ))}
-                        </div>
-                        <div className="task-meta-info">
-                          <span className="task-date-info">📅 {task.dueDate}</span>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                        <button style={{ flex: 1, fontSize: '10px', padding: '2px' }} className="trans-btn primary" onClick={() => handleMoveTask(task.id, 'under_review')}>Submit Review</button>
-                        <button style={{ fontSize: '10px', padding: '2px 6px' }} className="trans-btn secondary" onClick={() => handleMoveTask(task.id, 'paused')}>⏸</button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Under Review */}
-              <div className="kanban-column-wrapper">
-                <div className="kanban-column-title-row">
-                  <h4>Under Review</h4>
-                  <span className="column-card-count">{tasks.filter(t => t.columnName === 'under_review').length}</span>
-                </div>
-                {tasks.filter(t => t.columnName === 'under_review').map(task => {
-                  const { priority, cleanTitle } = parseTaskTitle(task.title)
-                  return (
-                    <div className="task-card-item" key={task.id}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span className="task-project-tag">{task.project || selectedDetails?.comicName || selectedDetails?.title}</span>
-                        <span className={`task-priority-badge ${priority.toLowerCase()}`}>{priority}</span>
-                      </div>
-                      <h5 className="task-title">{cleanTitle}</h5>
-                      
-                      <div className="task-progress-section">
-                        <div className="task-progress-label-row">
-                          <span>Progress</span>
-                          <span>{task.progress}%</span>
-                        </div>
-                        <div className="task-progress-bar-bg">
-                          <div className="task-progress-bar-fill" style={{ width: `${task.progress}%`, backgroundColor: '#3b82f6' }}></div>
-                        </div>
-                      </div>
-
-                      <div className="task-card-footer">
-                        <div className="task-assignees-row">
-                          {(task.assignees || 'TL').split(',').map((as, i) => (
-                            <div className="task-assignee-avatar" key={i}>{as}</div>
-                          ))}
-                        </div>
-                        <div className="task-meta-info">
-                          <span className="task-date-info">📅 {task.dueDate}</span>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                        <button style={{ flex: 1, fontSize: '10px', padding: '2px' }} className="trans-btn primary" onClick={() => handleMoveTask(task.id, 'completed')}>Approve & Done</button>
-                        <button style={{ flex: 1, fontSize: '10px', padding: '2px' }} className="trans-btn secondary" onClick={() => handleMoveTask(task.id, 'in_progress')}>Reject</button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Completed */}
-              <div className="kanban-column-wrapper">
-                <div className="kanban-column-title-row">
-                  <h4>Completed</h4>
-                  <span className="column-card-count">{tasks.filter(t => t.columnName === 'completed').length}</span>
-                </div>
-                {tasks.filter(t => t.columnName === 'completed').map(task => {
-                  const { priority, cleanTitle } = parseTaskTitle(task.title)
-                  return (
-                    <div className="task-card-item" key={task.id}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span className="task-project-tag">{task.project || selectedDetails?.comicName || selectedDetails?.title}</span>
-                        <span className={`task-priority-badge ${priority.toLowerCase()}`}>{priority}</span>
-                      </div>
-                      <h5 className="task-title">{cleanTitle}</h5>
-                      
-                      <div className="task-progress-section">
-                        <div className="task-progress-label-row">
-                          <span>Progress</span>
-                          <span>100%</span>
-                        </div>
-                        <div className="task-progress-bar-bg">
-                          <div className="task-progress-bar-fill completed-fill" style={{ width: '100%' }}></div>
-                        </div>
-                      </div>
-
-                      <div className="task-card-footer">
-                        <div className="task-assignees-row">
-                          {(task.assignees || 'TL').split(',').map((as, i) => (
-                            <div className="task-assignee-avatar" key={i}>{as}</div>
-                          ))}
-                        </div>
-                        <div className="task-meta-info">
-                          <span className="task-date-info">📅 {task.dueDate}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-            </div>
-
-            {/* Paused Tasks Row */}
-            <div className="paused-tasks-container">
-              <h4 className="paused-tasks-title">⏸ Paused ({pausedTasks.length})</h4>
-              {pausedTasks.length === 0 ? (
-                <p style={{ fontStyle: 'italic', color: 'var(--trans-text-muted)', fontSize: '13px' }}>No paused tasks.</p>
-              ) : (
-                <div className="paused-tasks-grid">
-                  {pausedTasks.map(task => {
-                    const { priority, cleanTitle } = parseTaskTitle(task.title)
-                    return (
-                      <div className="paused-task-card" key={task.id}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <span className="paused-task-badge">Paused</span>
-                          <span className={`task-priority-badge ${priority.toLowerCase()}`}>{priority}</span>
-                        </div>
-                        <h5 className="task-title" style={{ margin: '8px 0 4px' }}>{cleanTitle}</h5>
-                        <span style={{ fontSize: '11px', color: 'var(--trans-text-muted)' }}>Project: {task.project || selectedDetails?.comicName || selectedDetails?.title}</span>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
-                          <span style={{ fontSize: '11px', color: 'var(--trans-text-secondary)' }}>Due: {task.dueDate}</span>
-                          <button className="trans-btn primary" style={{ fontSize: '9px', padding: '2px 8px' }} onClick={() => handleMoveTask(task.id, 'backlog')}>Resume</button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+          </div>
 
              {/* CREATE TASK MODAL */}
              {showCreateTask && (
@@ -1100,9 +1273,114 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                    </div>
                  </div>
                </div>
+              )}
+
+             {/* TASK DETAILS & EDIT STATUS MODAL */}
+             {selectedTask && (
+               <div className="trans-modal-overlay">
+                 <div className="trans-modal-card">
+                   <div className="trans-modal-header">
+                     <h3>Edit Task Details</h3>
+                     <button className="trans-modal-close-btn" onClick={() => setSelectedTask(null)}>×</button>
+                   </div>
+                   <div className="trans-modal-body">
+                     
+                     <div className="trans-form-group">
+                       <label className="trans-form-label">Comic Project</label>
+                       <input 
+                         type="text" 
+                         className="trans-form-input" 
+                         value={editTaskData.comic} 
+                         disabled
+                       />
+                     </div>
+
+                     <div className="trans-form-group">
+                       <label className="trans-form-label">Task Name *</label>
+                       <input 
+                         type="text" 
+                         className="trans-form-input" 
+                         value={editTaskData.title}
+                         onChange={(e) => setEditTaskData({ ...editTaskData, title: e.target.value })}
+                       />
+                     </div>
+
+                     <div className="trans-form-group">
+                       <label className="trans-form-label">Status (Sprint Column)</label>
+                       <select 
+                         className="trans-form-input"
+                         value={editTaskData.columnName}
+                         onChange={(e) => setEditTaskData({ ...editTaskData, columnName: e.target.value })}
+                       >
+                         <option value="backlog">Backlog</option>
+                         <option value="in_progress">In Progress</option>
+                         <option value="under_review">Under Review</option>
+                         <option value="completed">Completed</option>
+                         <option value="paused">Paused</option>
+                       </select>
+                     </div>
+
+                     <div className="trans-form-group">
+                       <label className="trans-form-label">Priority</label>
+                       <select 
+                         className="trans-form-input"
+                         value={editTaskData.priority}
+                         onChange={(e) => setEditTaskData({ ...editTaskData, priority: e.target.value })}
+                       >
+                         <option value="Urgent">🚨 Urgent</option>
+                         <option value="High">🟠 High</option>
+                         <option value="Medium">🟣 Medium</option>
+                         <option value="Low">⚪ Low</option>
+                       </select>
+                     </div>
+
+                     <div className="trans-form-group">
+                       <label className="trans-form-label">Assignee</label>
+                       <select 
+                         className="trans-form-input"
+                         value={editTaskData.assignee}
+                         onChange={(e) => setEditTaskData({ ...editTaskData, assignee: e.target.value })}
+                       >
+                         <option value="">Unassigned</option>
+                         {members.map((m, idx) => (
+                           <option key={idx} value={m.avatar || m.name}>{m.name}</option>
+                         ))}
+                       </select>
+                     </div>
+
+                     <div className="trans-form-group">
+                       <label className="trans-form-label">Progress Percentage ({editTaskData.progress}%)</label>
+                       <input 
+                         type="range" 
+                         min="0" 
+                         max="100" 
+                         className="trans-form-input"
+                         value={editTaskData.progress}
+                         onChange={(e) => setEditTaskData({ ...editTaskData, progress: Number(e.target.value) })}
+                         style={{ padding: 0 }}
+                       />
+                     </div>
+
+                     <div className="trans-form-group">
+                       <label className="trans-form-label">Due Date</label>
+                       <input 
+                         type="date" 
+                         className="trans-form-input"
+                         value={editTaskData.dueDate}
+                         onChange={(e) => setEditTaskData({ ...editTaskData, dueDate: e.target.value })}
+                       />
+                     </div>
+
+                   </div>
+                   <div className="trans-modal-footer">
+                     <button className="trans-btn secondary" onClick={() => setSelectedTask(null)}>Cancel</button>
+                     <button className="trans-btn primary" onClick={handleSaveTaskDetails} disabled={!editTaskData.title.trim()}>Save Changes</button>
+                   </div>
+                 </div>
+               </div>
              )}
 
-          </div>
+          </>
         )}
 
         {/* Tab 5: GROUP SETTINGS */}
@@ -1220,14 +1498,16 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                     proj.leaderName.toLowerCase() === user?.username?.toLowerCase() ||
                     proj.leaderName.toLowerCase() === user?.fullName?.toLowerCase()
                   ) && (
-                    <span className="status-badge active" style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.4)', fontSize: '11px', fontWeight: 'bold' }}>⭐ Led by Me</span>
+                    <span className="status-badge leader">⭐ Led by Me</span>
                   )}
                 </div>
               </div>
-              <div className="trans-project-actions">
-                <button className="trans-btn primary" onClick={() => handleOpenDetails(proj)}>
-                  View Details
-                </button>
+              <div className="trans-project-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <ModernButton 
+                  variant={2} 
+                  label="View Details" 
+                  onClick={() => handleOpenDetails(proj)} 
+                />
                 <button className="trans-btn icon-edit" onClick={(e) => handleOpenEdit(proj, e)}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>

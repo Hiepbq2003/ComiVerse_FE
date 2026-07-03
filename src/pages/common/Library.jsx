@@ -245,8 +245,14 @@ function Library() {
 
           {/* ── CONTENT CARDS GRID ─────────────────────── */}
           {loading ? (
-            <div className="moderator-empty-state" style={{ padding: '80px 0' }}>
-              <p>Loading library items...</p>
+            <div className="skeleton-comic-grid">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="skeleton-comic-card">
+                  <div className="skeleton-img skeleton-shimmer"></div>
+                  <div className="skeleton-line skeleton-shimmer short" style={{ marginTop: '12px' }}></div>
+                  <div className="skeleton-line skeleton-shimmer medium"></div>
+                </div>
+              ))}
             </div>
           ) : activeComics.length > 0 ? (
             <>

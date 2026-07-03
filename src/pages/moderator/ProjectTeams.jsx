@@ -136,8 +136,8 @@ function ProjectTeams({
           <p>Create and manage translation project teams. Assign leaders from translator members.</p>
         </div>
         <button 
-          className="mod-btn approve"
-          style={{ background: '#0f172a', padding: '10px 18px' }}
+          className="mod-btn approve mod-btn-create"
+          style={{ padding: '10px 18px' }}
           onClick={triggerOpenCreate}
         >
           ➕ Create Project Team
@@ -183,15 +183,13 @@ function ProjectTeams({
 
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button 
-                    className="comic-btn-action"
-                    style={{ color: '#d97706', borderColor: 'rgba(217, 119, 6, 0.2)' }}
+                    className="comic-btn-action btn-action-pause"
                     onClick={() => handleToggleStatus(team.id, team.status)}
                   >
                     {team.status && team.status.toUpperCase() === 'ACTIVE' ? '⏸️ Pause' : '▶️ Activate'}
                   </button>
                   <button 
-                    className="comic-btn-action"
-                    style={{ color: '#a855f7', borderColor: 'rgba(168, 85, 247, 0.2)' }}
+                    className="comic-btn-action btn-action-assign"
                     onClick={() => openAssignLeaderModal(team.id)}
                   >
                     👤 Assign Leader

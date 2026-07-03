@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { registerApi, getMeApi } from '../../services/api/AuthApi'
+import { useAuth } from '../../context/AuthContext'
 import { setAuth } from '../../utils/Auth'
 
 function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoading, onOpenModal }) {
+  const { login } = useAuth()
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -96,7 +98,7 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
         role: meData.role,
         avatarUrl: meData.avatarUrl
       }
-      setAuth(data.token, userData, data.refreshToken)
+      login(data.token, userData)
       onRegisterSuccess(userData)
       showAlert('success', 'Account registered successfully!')
     } catch (err) {
@@ -140,39 +142,42 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
             
             {/* First & Last Name */}
             <div className="first-last-name-row">
-              <div className="input-field-group">
-                <label htmlFor="signup-firstname">First Name</label>
+              <div className="glass-input-wrapper">
+                <span className="glass-input-label">First Name</span>
                 <input 
                   id="signup-firstname"
                   type="text" 
                   placeholder="John" 
                   value={form.firstName}
                   onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                  className="glass-input-field"
                   required
                 />
               </div>
-              <div className="input-field-group">
-                <label htmlFor="signup-lastname">Last Name</label>
+              <div className="glass-input-wrapper">
+                <span className="glass-input-label">Last Name</span>
                 <input 
                   id="signup-lastname"
                   type="text" 
                   placeholder="Doe" 
                   value={form.lastName}
                   onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                  className="glass-input-field"
                   required
                 />
               </div>
             </div>
 
             {/* Username */}
-            <div className="input-field-group">
-              <label htmlFor="signup-username">Username *</label>
+            <div className="glass-input-wrapper" style={{ marginTop: '16px' }}>
+              <span className="glass-input-label">Username *</span>
               <input 
                 id="signup-username"
                 type="text" 
                 placeholder="johndoe123" 
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value.toLowerCase() })}
+                className="glass-input-field"
                 required
               />
             </div>
@@ -181,26 +186,28 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
             </p>
 
             {/* Email */}
-            <div className="input-field-group">
-              <label htmlFor="signup-email">Email *</label>
+            <div className="glass-input-wrapper" style={{ marginTop: '16px' }}>
+              <span className="glass-input-label">Email *</span>
               <input 
                 id="signup-email"
                 type="email" 
                 placeholder="email@example.com" 
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="glass-input-field"
                 required
               />
             </div>
 
             {/* Date of Birth */}
-            <div className="input-field-group">
-              <label htmlFor="signup-dob">Date of Birth</label>
+            <div className="glass-input-wrapper" style={{ marginTop: '16px' }}>
+              <span className="glass-input-label">Date of Birth</span>
               <input 
                 id="signup-dob"
                 type="date" 
                 value={form.dateOfBirth}
                 onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })}
+                className="glass-input-field"
                 required
               />
             </div>
@@ -241,29 +248,32 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
             <div className="divider-text-or" style={{ margin: '14px 0' }}><span>OR</span></div>
 
             {/* Password */}
-            <div className="input-field-group">
-              <label htmlFor="signup-password">Password *</label>
-              <div className="password-input-wrapper">
-                <input 
-                  id="signup-password"
-                  type={showPassword ? "text" : "password"} 
-                  placeholder="Minimum 8 characters" 
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  required
-                />
+            <div className="glass-input-wrapper">
+              <div className="glass-input-row">
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span className="glass-input-label">Password *</span>
+                  <input 
+                    id="signup-password"
+                    type={showPassword ? "text" : "password"} 
+                    placeholder="Minimum 8 characters" 
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    className="glass-input-field"
+                    required
+                  />
+                </div>
                 <button 
                   type="button" 
-                  className="password-toggle-eye"
+                  className="glass-input-trailing-btn"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
                       <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
                       <line x1="1" y1="1" x2="23" y2="23"/>
                     </svg>
                   ) : (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                       <circle cx="12" cy="12" r="3"/>
                     </svg>
@@ -273,41 +283,110 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
 
               {/* Password Strength Indicator */}
               {form.password && (
-                <div className="strength-meter-container">
-                  <div className="strength-bar-wrapper">
-                    <div className={`strength-segment ${strength.score >= 1 ? (strength.score === 1 ? 'active-weak' : strength.score === 2 ? 'active-medium' : 'active-strong') : ''}`}></div>
-                    <div className={`strength-segment ${strength.score >= 2 ? (strength.score === 2 ? 'active-medium' : 'active-strong') : ''}`}></div>
-                    <div className={`strength-segment ${strength.score >= 3 ? 'active-strong' : ''}`}></div>
+                <section className="strength" aria-live="polite" style={{ marginTop: '12px' }}>
+                  <div className="strength__meter">
+                    <div className="strength__track">
+                      <div 
+                        className="strength__fill" 
+                        id="strength-fill" 
+                        style={{ 
+                          width: strength.score === 1 ? '33.33%' : strength.score === 2 ? '66.66%' : strength.score === 3 ? '100%' : '0%',
+                          background: strength.score === 1 ? 'linear-gradient(90deg, #ef4444, #f97316)' : strength.score === 2 ? 'linear-gradient(90deg, #f97316, #eab308)' : 'linear-gradient(90deg, #10b981, #06b6d4)'
+                        }}
+                      ></div>
+                    </div>
+                    <div className="strength__status">
+                      <span className="strength__caption">Password strength</span>
+                      <span 
+                        className="strength__level" 
+                        id="strength-level" 
+                        data-level={strength.label.toLowerCase()}
+                        style={{
+                          color: strength.score === 1 ? '#ef4444' : strength.score === 2 ? '#eab308' : '#10b981',
+                          fontWeight: 700,
+                          fontSize: '11px'
+                        }}
+                      >
+                        {strength.label}
+                      </span>
+                    </div>
                   </div>
-                  <span className="strength-label-text">Strength: {strength.label}</span>
-                </div>
+
+                  <ul className="rules" id="rules" role="list" style={{ listStyle: 'none', padding: 0, margin: '12px 0 0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {[
+                      { label: 'At least 8 characters', valid: form.password.length >= 8 },
+                      { label: 'One uppercase letter (A-Z)', valid: /[A-Z]/.test(form.password) },
+                      { label: 'One lowercase letter (a-z)', valid: /[a-z]/.test(form.password) },
+                      { label: 'One number (0-9) or symbol', valid: /[0-9\W]/.test(form.password) }
+                    ].map((rule, idx) => (
+                      <li 
+                        key={idx} 
+                        className={`rule-item ${rule.valid ? 'valid' : ''}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          fontSize: '12px',
+                          color: rule.valid ? 'rgba(255, 255, 255, 0.7)' : 'rgba(255, 255, 255, 0.35)',
+                          transition: 'color 0.2s ease'
+                        }}
+                      >
+                        <span 
+                          className="rule-icon"
+                          style={{
+                            width: '14px',
+                            height: '14px',
+                            borderRadius: '50%',
+                            border: rule.valid ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
+                            background: rule.valid ? 'linear-gradient(135deg, #10b981, #06b6d4)' : 'transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s ease',
+                            flexShrink: 0
+                          }}
+                        >
+                          {rule.valid && (
+                            <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </span>
+                        <span>{rule.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               )}
             </div>
 
             {/* Confirm Password */}
-            <div className="input-field-group" style={{ marginTop: '10px' }}>
-              <label htmlFor="signup-confirm">Confirm Password *</label>
-              <div className="password-input-wrapper">
-                <input 
-                  id="signup-confirm"
-                  type={showConfirmPassword ? "text" : "password"} 
-                  placeholder="Re-enter password" 
-                  value={form.confirmPassword}
-                  onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                  required
-                />
+            <div className="glass-input-wrapper" style={{ marginTop: '16px' }}>
+              <div className="glass-input-row">
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span className="glass-input-label">Confirm Password *</span>
+                  <input 
+                    id="signup-confirm"
+                    type={showConfirmPassword ? "text" : "password"} 
+                    placeholder="Re-enter password" 
+                    value={form.confirmPassword}
+                    onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                    className="glass-input-field"
+                    required
+                  />
+                </div>
                 <button 
                   type="button" 
-                  className="password-toggle-eye"
+                  className="glass-input-trailing-btn"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 >
                   {showConfirmPassword ? (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
                       <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
                       <line x1="1" y1="1" x2="23" y2="23"/>
                     </svg>
                   ) : (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                       <circle cx="12" cy="12" r="3"/>
                     </svg>
@@ -332,8 +411,8 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
         </label>
 
         {/* Submit button */}
-        <button type="submit" className="btn-primary" disabled={loading} style={{ padding: '12px' }}>
-          {loading ? 'Creating Account...' : 'Create Account'}
+        <button type="submit" className="btn-primary" disabled={loading} style={{ padding: '12px', marginTop: '16px' }}>
+          <span>{loading ? 'Creating Account...' : 'Create Account'}</span>
         </button>
       </form>
 

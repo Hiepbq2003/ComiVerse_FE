@@ -598,3 +598,100 @@ useEffect(() => {
 | Author | `AuthorLayout` | ✅ | ✅ | `author.css` | `/author/*` |
 | Moderator | `ModeratorLayout` (needed) | ✅ | ✅ | `moderator.css` | `/moderator/*` |
 | Translator | `TranslatorLayout` (needed) | ✅ | ✅ | `translator.css` | `/translator/*` |
+
+---
+
+## 16. Creative & Premium UI Component Guidelines
+
+This section documents the custom, high-end components and visual systems implemented in ComiVerse for future reference.
+
+### 16.1 Glassmorphism Input Field (GlassInput)
+
+For authorization and profile inputs, use the **GlassInput** DOM structure. It consists of a container box with a very thin hairline border, a high-contrast label above the text, and clean transitions.
+
+**HTML / JSX Structure:**
+```jsx
+<div className="glass-input-wrapper">
+  <span className="glass-input-label">EMAIL ADDRESS</span>
+  <input 
+    type="email" 
+    placeholder="you@example.com" 
+    className="glass-input-field" 
+  />
+</div>
+```
+
+**Password Variant with Toggle:**
+```jsx
+<div className="glass-input-wrapper">
+  <div className="glass-input-row">
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <span className="glass-input-label">PASSWORD</span>
+      <input 
+        type="password" 
+        placeholder="••••••••" 
+        className="glass-input-field" 
+      />
+    </div>
+    <button type="button" className="glass-input-trailing-btn">
+      <EyeIcon />
+    </button>
+  </div>
+</div>
+```
+
+### 16.2 Liquid Motion Button (btn-primary)
+
+Primary submit buttons use a **Liquid Motion Gradient** that rolls on hover and has animated violet and orange color blobs drifting under the surface to suggest organic motion.
+
+**Visual Specs:**
+- Background Sunset Gradient: `linear-gradient(110deg, #a855f7 0%, #ff6b35 55%, #ff9416 100%)`
+- Blob Drift: A radial-gradient mask blurred at `16px` moving on a loop.
+- Shimmer Sweep: Highlight sheen opacity sweep near the top-edge on hover.
+
+**CSS Keyframes:**
+```css
+@keyframes liquid-drift {
+  0%, 100% {
+    transform: translate3d(-4px, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(4px, -1px, 0) scale(1.02);
+  }
+}
+```
+
+### 16.3 Shimmer Skeleton Loading Patterns
+
+Avoid raw text loading displays (e.g. "Loading items..."). Instead, render a clean list or grid of **Shimmer Skeletons** reflecting the content structure.
+
+**Card Grid Skeleton (e.g., Explore / Library):**
+```jsx
+<div className="skeleton-comic-grid">
+  {[...Array(4)].map((_, i) => (
+    <div key={i} className="skeleton-comic-card">
+      <div className="skeleton-img skeleton-shimmer"></div>
+      <div className="skeleton-line skeleton-shimmer short" style={{ marginTop: '12px' }}></div>
+      <div className="skeleton-line skeleton-shimmer medium"></div>
+    </div>
+  ))}
+</div>
+```
+
+**Feed Row Skeleton (e.g., Forum / Messages):**
+```jsx
+<div className="skeleton-forum-feed">
+  {[...Array(3)].map((_, i) => (
+    <div key={i} className="skeleton-forum-card">
+      <div className="skeleton-forum-header">
+        <div className="skeleton-circle skeleton-shimmer" style={{ width: '24px', height: '24px' }}></div>
+        <div className="skeleton-line skeleton-shimmer short" style={{ height: '16px', margin: 0, width: '120px' }}></div>
+        <div className="skeleton-line skeleton-shimmer long" style={{ height: '16px', margin: 0, flex: 1 }}></div>
+      </div>
+      <div className="skeleton-line skeleton-shimmer long" style={{ marginTop: '12px' }}></div>
+      <div className="skeleton-line skeleton-shimmer medium"></div>
+    </div>
+  ))}
+</div>
+```
+

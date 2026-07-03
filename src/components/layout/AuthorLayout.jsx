@@ -1,30 +1,27 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { getAuth, clearAuth } from '../../utils/Auth'
+import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../context/ThemeContext'
 import '../../assets/style/author.css'
 
 function AuthorLayout({ children, activeNav = 'overview' }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const [authorized, setAuthorized] = useState(false)
-  const [user, setUser] = useState(null)
+  const { isLoggedIn, user, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
 
   useEffect(() => {
-    const auth = getAuth()
-    if (!auth || !auth.user || auth.user.role?.toUpperCase() !== 'AUTHOR') {
+    if (!isLoggedIn || !user || user.role?.toUpperCase() !== 'AUTHOR') {
       navigate('/', { replace: true })
-    } else {
-      setUser(auth.user)
-      setAuthorized(true)
     }
-  }, [navigate])
+  }, [isLoggedIn, user, navigate])
 
   const handleLogout = () => {
-    clearAuth()
+    logout()
     navigate('/', { replace: true })
   }
 
-  if (!authorized || !user) {
+  if (!isLoggedIn || !user) {
     return null
   }
 
@@ -119,6 +116,32 @@ function AuthorLayout({ children, activeNav = 'overview' }) {
           </div>
 
           <div className="author-topbar-right">
+            {/* Theme Toggle */}
+            <button 
+              className="author-notification-btn" 
+              onClick={toggleTheme}
+              title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              style={{ marginRight: '8px' }}
+            >
+              {theme === 'dark' ? (
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="5"></circle>
+                  <line x1="12" y1="1" x2="12" y2="3"></line>
+                  <line x1="12" y1="21" x2="12" y2="23"></line>
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                  <line x1="1" y1="12" x2="3" y2="12"></line>
+                  <line x1="21" y1="12" x2="23" y2="12"></line>
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+              )}
+            </button>
+
             {/* Notification Bell */}
             <button className="author-notification-btn" title="Notifications">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

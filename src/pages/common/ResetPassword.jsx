@@ -49,8 +49,8 @@ function ResetPassword({ email, onNavigate, showAlert, loading, setLoading }) {
       </div>
 
       <form onSubmit={handleReset}>
-        <div className="input-field-group">
-          <label htmlFor="reset-otp">OTP VERIFICATION CODE</label>
+        <div className="glass-input-wrapper">
+          <span className="glass-input-label">OTP VERIFICATION CODE</span>
           <input 
             id="reset-otp"
             type="text" 
@@ -60,42 +60,45 @@ function ResetPassword({ email, onNavigate, showAlert, loading, setLoading }) {
             placeholder="6-digit code" 
             value={form.otp}
             onChange={(e) => setForm({ ...form, otp: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+            className="glass-input-field"
             autoComplete="one-time-code"
             required
           />
         </div>
 
-        <div className="input-field-group">
-          <label htmlFor="reset-password">NEW PASSWORD</label>
+        <div className="glass-input-wrapper" style={{ marginTop: '16px' }}>
+          <span className="glass-input-label">NEW PASSWORD</span>
           <input 
             id="reset-password"
             type="password" 
             placeholder="••••••••" 
             value={form.newPassword}
             onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
+            className="glass-input-field"
             autoComplete="new-password"
             required
           />
         </div>
 
-        <div className="input-field-group">
-          <label htmlFor="reset-confirm">CONFIRM NEW PASSWORD</label>
+        <div className="glass-input-wrapper" style={{ marginTop: '16px' }}>
+          <span className="glass-input-label">CONFIRM NEW PASSWORD</span>
           <input 
             id="reset-confirm"
             type="password" 
             placeholder="••••••••" 
             value={form.confirmNewPassword}
             onChange={(e) => setForm({ ...form, confirmNewPassword: e.target.value })}
+            className="glass-input-field"
             autoComplete="new-password"
             required
           />
         </div>
 
-        <button type="submit" className="btn-primary" disabled={loading}>
-          {loading ? 'Resetting Password...' : 'Reset Password'} <span className="btn-arrow-icon">›</span>
+        <button type="submit" className="btn-primary" style={{ marginTop: '20px' }} disabled={loading}>
+          <span>{loading ? 'Resetting Password...' : 'Reset Password'}</span> <span className="btn-arrow-icon">›</span>
         </button>
 
-        <button type="button" className="btn-secondary" onClick={handleResendOtp} disabled={loading}>
+        <button type="button" className="btn-secondary" style={{ marginTop: '12px' }} onClick={handleResendOtp} disabled={loading}>
           {loading ? 'Sending OTP...' : 'Resend OTP Code'}
         </button>
       </form>

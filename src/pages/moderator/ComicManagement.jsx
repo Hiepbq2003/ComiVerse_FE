@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import '../../assets/style/moderator/comic-management.css'
+import ModernButton from '../../components/common/ModernButton'
 import { createTranslationRequestApi } from '../../services/api/TranslationPoolApi'
 import { toast } from 'react-toastify'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
@@ -345,20 +346,18 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                   </td>
                   <td>
                     <div className="comic-actions-cell">
-                      <button 
-                        className="comic-btn-action edit"
-                        onClick={() => openEditModal(comic)}
-                        title="Edit Info"
-                      >
-                        📝 Edit
-                      </button>
-                      <button 
-                        className="comic-btn-action archive"
-                        onClick={() => { setComicToArchive(comic); setShowArchiveModal(true); }}
-                        title="Archive Comic"
-                      >
-                        🗑️ Archive
-                      </button>
+                      <ModernButton 
+                        variant={2} 
+                        label="📝 Edit" 
+                        className="btn-edit"
+                        onClick={() => openEditModal(comic)} 
+                      />
+                      <ModernButton 
+                        variant={5} 
+                        label="🗑️ Archive" 
+                        className="btn-archive"
+                        onClick={() => { setComicToArchive(comic); setShowArchiveModal(true); }} 
+                      />
                     </div>
                   </td>
                 </tr>
@@ -482,20 +481,18 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               </div>
             </div>
 
-            <div className="mod-modal-footer">
-              <button 
-                className="mod-btn review"
-                onClick={() => setEditingComic(null)}
-              >
-                Cancel
-              </button>
-              <button 
-                className="mod-btn approve"
+            <div className="mod-modal-footer" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+              <ModernButton 
+                variant={5} 
+                label="Cancel" 
+                onClick={() => setEditingComic(null)} 
+              />
+              <ModernButton 
+                variant={2} 
+                label="Save Changes" 
                 onClick={saveEditModal}
                 disabled={!editComicForm.title.trim()}
-              >
-                Save Changes
-              </button>
+              />
             </div>
           </div>
         </div>
@@ -597,20 +594,18 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               </div>
             </div>
 
-            <div className="mod-modal-footer">
-              <button 
-                className="mod-btn review"
-                onClick={() => setShowTransReqModal(false)}
-              >
-                Cancel
-              </button>
-              <button 
-                className="mod-btn approve"
+            <div className="mod-modal-footer" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+              <ModernButton 
+                variant={5} 
+                label="Cancel" 
+                onClick={() => setShowTransReqModal(false)} 
+              />
+              <ModernButton 
+                variant={2} 
+                label={`Submit Request (${transReqForm.targetLanguages.length} language${transReqForm.targetLanguages.length !== 1 ? 's' : ''})`} 
                 onClick={handleSubmitTranslationRequest}
                 disabled={transReqForm.targetLanguages.length === 0}
-              >
-                Submit Request ({transReqForm.targetLanguages.length} language{transReqForm.targetLanguages.length !== 1 ? 's' : ''})
-              </button>
+              />
             </div>
           </div>
         </div>
@@ -702,20 +697,18 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               </div>
             </div>
 
-            <div className="mod-modal-footer">
-              <button 
-                className="mod-btn review"
-                onClick={() => setShowDirectAssignModal(false)}
-              >
-                Cancel
-              </button>
-              <button 
-                className="mod-btn approve"
+            <div className="mod-modal-footer" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+              <ModernButton 
+                variant={5} 
+                label="Cancel" 
+                onClick={() => setShowDirectAssignModal(false)} 
+              />
+              <ModernButton 
+                variant={2} 
+                label="Confirm Assignment" 
                 onClick={handleSubmitDirectAssignment}
                 disabled={!directAssignForm.targetLang || !selectedTeamId}
-              >
-                Confirm Assignment
-              </button>
+              />
             </div>
           </div>
         </div>
@@ -731,29 +724,26 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                 Are you sure you want to archive the comic <strong style={{ color: 'white' }}>"{comicToArchive.title}"</strong>?
                 This will soft-delete the comic catalog entry.
               </p>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                <button 
-                  className="mod-btn" 
-                  style={{ background: 'rgba(255,255,255,0.05)', color: 'white', padding: '8px 20px' }}
-                  onClick={() => {
-                    setShowArchiveModal(false)
-                    setComicToArchive(null)
-                  }}
-                >
-                  Cancel
-                </button>
-                <button 
-                  className="mod-btn reject" 
-                  style={{ padding: '8px 20px' }}
-                  onClick={() => {
-                    handleArchiveComic(comicToArchive.id)
-                    setShowArchiveModal(false)
-                    setComicToArchive(null)
-                  }}
-                >
-                  Archive
-                </button>
-              </div>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', alignItems: 'center' }}>
+                 <ModernButton 
+                   variant={5} 
+                   label="Cancel" 
+                   onClick={() => {
+                     setShowArchiveModal(false)
+                     setComicToArchive(null)
+                   }} 
+                 />
+                 <ModernButton 
+                   variant={2} 
+                   label="Archive" 
+                   className="btn-archive"
+                   onClick={() => {
+                     handleArchiveComic(comicToArchive.id)
+                     setShowArchiveModal(false)
+                     setComicToArchive(null)
+                   }} 
+                 />
+               </div>
             </div>
           </div>
         </div>

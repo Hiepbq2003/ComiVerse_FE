@@ -696,8 +696,22 @@ function Explore() {
 
               {/* Grid content */}
               {loading ? (
-                <div className="moderator-empty-state" style={{ padding: '80px 0' }}>
-                  <p>Loading catalog comics list...</p>
+                <div 
+                  className="skeleton-comic-grid"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
+                    gap: '24px',
+                    width: '100%'
+                  }}
+                >
+                  {[...Array(8)].map((_, i) => (
+                    <div key={i} className="skeleton-comic-card">
+                      <div className="skeleton-img skeleton-shimmer"></div>
+                      <div className="skeleton-line skeleton-shimmer short" style={{ marginTop: '12px' }}></div>
+                      <div className="skeleton-line skeleton-shimmer medium"></div>
+                    </div>
+                  ))}
                 </div>
               ) : processedComics.length > 0 ? (
                 <>

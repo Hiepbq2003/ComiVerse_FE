@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import HomeLayout from '../../components/layout/HomeLayout'
-import { getForumThreadsPageApi, deleteForumThreadApi } from '../../services/api/ForumThreadApi'
+import { getForumThreadsPageApi, deleteForumThreadApi, createForumThreadApi, getAllForumThreadsApi } from '../../services/api/ForumThreadApi'
+import { getAuth } from '../../utils/Auth'
 import { toast } from 'react-toastify'
 import '../../assets/style/reader/forum.css'
 
@@ -54,6 +55,22 @@ function Forum() {
     fetchThreads(currentPage)
   }, [currentPage])
 
+  const [allThreadsForCounts, setAllThreadsForCounts] = useState([])
+
+  const fetchAllThreadsForCounts = async () => {
+    try {
+      const response = await getAllForumThreadsApi()
+      const list = response.data || response || []
+      setAllThreadsForCounts(list)
+    } catch (err) {
+      console.error('Failed to load thread counts:', err)
+    }
+  }
+
+  useEffect(() => {
+    fetchAllThreadsForCounts()
+  }, [])
+
   const fetchThreads = async (page) => {
     const targetPage = page || currentPage
     try {
@@ -67,7 +84,7 @@ function Forum() {
         id: t.id,
         title: t.title || 'Untitled Thread',
         content: t.content || '',
-        author: t.authorName || 'Guest User',
+        author: t.author || 'Guest User',
         category: t.category || 'Story Discussion',
         views: t.views ? String(t.views) : '0',
         replies: t.replies || 0,
@@ -107,7 +124,7 @@ function Forum() {
   }
 
   // Publish new thread post
-  const handlePublishPost = () => {
+  const handlePublishPost = async () => {
     if (!newPostForm.title.trim()) {
       toast.warn('Please enter a thread title.')
       return
@@ -117,33 +134,39 @@ function Forum() {
       return
     }
 
-    const newThread = {
-      id: `user-thread-${Date.now()}`,
-      title: newPostForm.title.trim(),
-      content: newPostForm.content.trim(),
-      author: 'Minh Khoa', // Logged in user mock name from design mockup
-      category: newPostForm.category,
-      views: '0',
-      replies: 0,
-      likes: 0,
-      isLiked: false,
-      timeAgo: 'Just now'
-    }
+    const auth = getAuth()
+    const authorName = auth?.user?.fullName || auth?.user?.username || 'Guest User'
 
-    setThreads(prev => [newThread, ...prev])
-    toast.success('Thread published successfully!')
-    setShowNewPostModal(false)
-    setNewPostForm({
-      title: '',
-      category: 'Story Discussion',
-      content: ''
-    })
+    try {
+      setLoading(true)
+      await createForumThreadApi({
+        title: newPostForm.title.trim(),
+        author: authorName,
+        category: newPostForm.category,
+        content: newPostForm.content.trim()
+      })
+      toast.success('Thread published successfully!')
+      setShowNewPostModal(false)
+      setNewPostForm({
+        title: '',
+        category: 'Story Discussion',
+        content: ''
+      })
+      // Refresh counts and list from database
+      await fetchAllThreadsForCounts()
+      await fetchThreads(1)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to publish discussion thread.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   // Count threads inside category
   const getCategoryCount = (catName) => {
-    if (catName === 'All') return threads.length
-    return threads.filter(t => t.category === catName).length
+    if (catName === 'All') return allThreadsForCounts.length
+    return allThreadsForCounts.filter(t => t.category === catName).length
   }
 
   // Filter threads
@@ -197,7 +220,7 @@ function Forum() {
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
               <h2 className="section-title" style={{ margin: 0 }}>💬 Forum</h2>
               <span style={{ fontSize: '12.5px', color: '#64748b' }}>
-                1,284 posts · 8,472 members
+                {totalElements} posts
               </span>
             </div>
             <button 
@@ -246,22 +269,7 @@ function Forum() {
                 ))}
               </div>
 
-              {/* Forum statistics widget */}
-              <div className="forum-stats-card">
-                <h5>Stats</h5>
-                <div className="forum-stat-line">
-                  <span className="forum-stat-lbl">Posts today</span>
-                  <span className="forum-stat-val">47</span>
-                </div>
-                <div className="forum-stat-line">
-                  <span className="forum-stat-lbl">Members online</span>
-                  <span className="forum-stat-val">1,063</span>
-                </div>
-                <div className="forum-stat-line">
-                  <span className="forum-stat-lbl">Total posts</span>
-                  <span className="forum-stat-val">84,291</span>
-                </div>
-              </div>
+
             </aside>
 
             {/* ── RIGHT MAIN CONTENT AREA ────────────────── */}
@@ -317,8 +325,18 @@ function Forum() {
 
               {/* Threads list */}
               {loading ? (
-                <div className="moderator-empty-state" style={{ padding: '80px 0' }}>
-                  <p>Loading forum threads...</p>
+                <div className="skeleton-forum-feed">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="skeleton-forum-card">
+                      <div className="skeleton-forum-header">
+                        <div className="skeleton-circle skeleton-shimmer" style={{ width: '24px', height: '24px' }}></div>
+                        <div className="skeleton-line skeleton-shimmer short" style={{ height: '16px', margin: 0, width: '120px' }}></div>
+                        <div className="skeleton-line skeleton-shimmer long" style={{ height: '16px', margin: 0, flex: 1 }}></div>
+                      </div>
+                      <div className="skeleton-line skeleton-shimmer long" style={{ marginTop: '12px' }}></div>
+                      <div className="skeleton-line skeleton-shimmer medium"></div>
+                    </div>
+                  ))}
                 </div>
               ) : processedThreads.length > 0 ? (
                 <>

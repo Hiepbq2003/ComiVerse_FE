@@ -124,8 +124,8 @@ function GenreManagement() {
           <p>Organize categories and genre lists for readers browsing the platform catalog.</p>
         </div>
         <button 
-          className="mod-btn approve"
-          style={{ background: '#0f172a', padding: '10px 18px' }}
+          className="mod-btn approve mod-btn-create"
+          style={{ padding: '10px 18px' }}
           onClick={() => {
             setAddGenreName('')
             setShowAddModal(true)

@@ -2,15 +2,18 @@ export const getAuth = () => {
   const token = localStorage.getItem('token');
   const user = localStorage.getItem('user');
   
-  if (token) {
+  if (token && token !== 'undefined' && token !== 'null') {
     try {
-      return {
-        token,
-        user: user ? JSON.parse(user) : null
-      };
+      if (user && user !== 'undefined' && user !== 'null') {
+        return {
+          token,
+          user: JSON.parse(user)
+        };
+      }
     } catch (e) {
-      return { token, user: null };
+      console.error("Failed to parse user from localStorage", e);
     }
+    return { token, user: null };
   }
   return null;
 };
@@ -18,9 +21,23 @@ export const getAuth = () => {
 export const clearAuth = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
+  localStorage.removeItem('refreshToken');
 };
 
-export const setAuth = (token, user) => {
+export const setAuth = (token, user, refreshToken) => {
+  if (!token || token === 'undefined' || token === 'null') {
+    clearAuth();
+    return;
+  }
   localStorage.setItem('token', token);
-  localStorage.setItem('user', typeof user === 'string' ? user : JSON.stringify(user));
+  if (user && user !== 'undefined' && user !== 'null') {
+    localStorage.setItem('user', typeof user === 'string' ? user : JSON.stringify(user));
+  } else {
+    localStorage.removeItem('user');
+  }
+  if (refreshToken) {
+    localStorage.setItem('refreshToken', refreshToken);
+  } else {
+    localStorage.removeItem('refreshToken');
+  }
 };
