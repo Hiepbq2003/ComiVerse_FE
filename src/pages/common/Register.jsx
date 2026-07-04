@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { registerApi, getMeApi } from '../../services/api/AuthApi'
 import { useAuth } from '../../context/AuthContext'
 import { setAuth } from '../../utils/Auth'
@@ -96,7 +96,10 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
         fullName: meData.fullName,
         email: meData.email,
         role: meData.role,
-        avatarUrl: meData.avatarUrl
+        avatarUrl: meData.avatarUrl,
+        premiumPlan: meData.premiumPlan,
+        premiumExpiresAt: meData.premiumExpiresAt,
+        premiumActive: meData.premiumActive
       }
       login(data.token, userData)
       onRegisterSuccess(userData)
@@ -428,3 +431,4 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
 }
 
 export default Register
+
