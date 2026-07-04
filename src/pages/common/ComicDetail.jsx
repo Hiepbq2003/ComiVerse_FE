@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getAuth, setAuth } from '../../utils/Auth'
@@ -135,7 +135,7 @@ function ComicDetail() {
   const [upgradingPlan, setUpgradingPlan] = useState('')
   const [comments, setComments] = useState([
     { id: 1, name: 'Alex Johnson', avatar: 'A', date: '2 hours ago', content: 'This series is absolutely stunning! The art style is amazing and the plot keeps getting better.', rating: 5 },
-    { id: 2, name: 'Nguyen An', avatar: 'N', date: '1 day ago', content: 'The pacing in the latest chapter is a bit fast, but the fight scene was epic. Canâ€™t wait for the next update.', rating: 4 },
+    { id: 2, name: 'Nguyen An', avatar: 'N', date: '1 day ago', content: "The pacing in the latest chapter is a bit fast, but the fight scene was epic. Can't wait for the next update.", rating: 4 },
     { id: 3, name: 'Elena Rostova', avatar: 'E', date: '3 days ago', content: 'Simply the best manhwa on this site. I highly recommend it to anyone who loves deep worldbuilding.', rating: 5 }
   ])
 
@@ -457,7 +457,7 @@ function ComicDetail() {
             </h1>
 
             <p style={{ margin: '0 0 16px', color: '#94a3b8', fontSize: '15px' }}>
-              Story by <strong style={{ color: 'white' }}>{comic.author}</strong>  â€¢  Art by <strong style={{ color: 'white' }}>{comic.artist}</strong>
+              Story by <strong style={{ color: 'white' }}>{comic.author}</strong>  •  Art by <strong style={{ color: 'white' }}>{comic.artist}</strong>
             </p>
 
             {/* Stats Row */}
@@ -477,17 +477,17 @@ function ComicDetail() {
             >
               <div style={{ textAlign: 'center' }}>
                 <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Rating</span>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#fbbf24' }}>â­ {comic.rating}</span>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#fbbf24' }}>⭐ {comic.rating}</span>
               </div>
               <div style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
               <div style={{ textAlign: 'center' }}>
                 <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Views</span>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>ðŸ‘ï¸ {comic.views}</span>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>👁️ {comic.views}</span>
               </div>
               <div style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
               <div style={{ textAlign: 'center' }}>
                 <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Bookmarks</span>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>ðŸ”– {comic.bookmarks}</span>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>🔖 {comic.bookmarks}</span>
               </div>
             </div>
 
@@ -696,7 +696,7 @@ function ComicDetail() {
                           <span style={{ fontSize: '11px', color: '#64748b' }}>{comment.date}</span>
                         </div>
                         <div style={{ color: '#fbbf24', fontSize: '11px', marginBottom: '6px' }}>
-                          {'â˜…'.repeat(comment.rating)}{'â˜†'.repeat(5 - comment.rating)}
+                          {'★'.repeat(comment.rating)}{'☆'.repeat(5 - comment.rating)}
                         </div>
                         <p style={{ margin: 0, fontSize: '14px', color: '#cbd5e1', lineHeight: '1.5' }}>{comment.content}</p>
                       </div>
