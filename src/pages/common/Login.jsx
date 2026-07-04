@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { loginApi, getMeApi } from '../../services/api/AuthApi'
 import { useAuth } from '../../context/AuthContext'
 import { setAuth } from '../../utils/Auth'
@@ -46,7 +46,10 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
         fullName: meData.fullName,
         email: meData.email,
         role: meData.role,
-        avatarUrl: meData.avatarUrl
+        avatarUrl: meData.avatarUrl,
+        premiumPlan: meData.premiumPlan,
+        premiumExpiresAt: meData.premiumExpiresAt,
+        premiumActive: meData.premiumActive
       }
 
       login(data.token, userData)
@@ -123,7 +126,7 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
               <input 
                 id="signin-password"
                 type={showPassword ? "text" : "password"} 
-                placeholder="••••••••" 
+                placeholder="Enter your password" 
                 value={form.password}
                 onChange={(e) => updateField('password', e.target.value)}
                 className="glass-input-field"
@@ -173,7 +176,7 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
         </div>
 
         <button type="submit" className="btn-primary" disabled={loading}>
-          <span>{loading ? 'Signing In...' : 'Sign In'}</span> <span className="btn-arrow-icon">›</span>
+          <span>{loading ? 'Signing In...' : 'Sign In'}</span> <span className="btn-arrow-icon">&gt;</span>
         </button>
       </form>
 
@@ -188,3 +191,4 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
 }
 
 export default Login
+
