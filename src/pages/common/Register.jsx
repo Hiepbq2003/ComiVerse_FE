@@ -18,6 +18,7 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
   
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false)
 
   const getPasswordStrength = (pass) => {
     if (!pass) return { score: 0, label: 'None' }
@@ -121,10 +122,11 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
   }
 
   return (
-    <div className="auth-form-card register-card fade-in" style={{ padding: '24px' }}>
-      <div className="form-header-group" style={{ textAlign: 'center', marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '28px', marginBottom: '4px' }}>Create Account</h2>
-        <p style={{ fontSize: '14px' }}>Join the largest comic reading community.</p>
+    <div className="auth-form-card register-card fade-in">
+      <div className="border-beam-wrapper" />
+      <div className="form-header-group">
+        <h2>Create Account</h2>
+        <p>Join the largest comic reading community.</p>
       </div>
 
       <form onSubmit={handleSignup}>
@@ -147,7 +149,7 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
                 <input 
                   id="signup-firstname"
                   type="text" 
-                  placeholder="John" 
+                  placeholder="Enter first name" 
                   value={form.firstName}
                   onChange={(e) => setForm({ ...form, firstName: e.target.value })}
                   className="glass-input-field"
@@ -159,7 +161,7 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
                 <input 
                   id="signup-lastname"
                   type="text" 
-                  placeholder="Doe" 
+                  placeholder="Enter last name" 
                   value={form.lastName}
                   onChange={(e) => setForm({ ...form, lastName: e.target.value })}
                   className="glass-input-field"
@@ -169,12 +171,12 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
             </div>
 
             {/* Username */}
-            <div className="glass-input-wrapper" style={{ marginTop: '16px' }}>
+            <div className="glass-input-wrapper auth-margin-top-16">
               <span className="glass-input-label">Username *</span>
               <input 
                 id="signup-username"
                 type="text" 
-                placeholder="johndoe123" 
+                placeholder="Choose a username" 
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value.toLowerCase() })}
                 className="glass-input-field"
@@ -186,12 +188,12 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
             </p>
 
             {/* Email */}
-            <div className="glass-input-wrapper" style={{ marginTop: '16px' }}>
+            <div className="glass-input-wrapper auth-margin-top-16">
               <span className="glass-input-label">Email *</span>
               <input 
                 id="signup-email"
                 type="email" 
-                placeholder="email@example.com" 
+                placeholder="Enter email address" 
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 className="glass-input-field"
@@ -200,7 +202,7 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
             </div>
 
             {/* Date of Birth */}
-            <div className="glass-input-wrapper" style={{ marginTop: '16px' }}>
+            <div className="glass-input-wrapper auth-margin-top-16">
               <span className="glass-input-label">Date of Birth</span>
               <input 
                 id="signup-dob"
@@ -227,7 +229,8 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
             </h3>
 
             {/* Google Signup Button */}
-            <div style={{ marginTop: '4px' }}>
+            {/* Google Signup Button */}
+            <div className="auth-margin-top-12">
               <button 
                 type="button" 
                 className="btn-google-signup"
@@ -245,20 +248,22 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
             </div>
 
             {/* Separator OR */}
-            <div className="divider-text-or" style={{ margin: '14px 0' }}><span>OR</span></div>
+            <div className="divider-text-or auth-margin-top-12"><span>OR</span></div>
 
             {/* Password */}
             <div className="glass-input-wrapper">
               <div className="glass-input-row">
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="auth-flex-fill">
                   <span className="glass-input-label">Password *</span>
                   <input 
                     id="signup-password"
                     type={showPassword ? "text" : "password"} 
-                    placeholder="Minimum 8 characters" 
+                    placeholder="Create password" 
                     value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
                     className="glass-input-field"
+                    onFocus={() => setIsPasswordFocused(true)}
+                    onBlur={() => setIsPasswordFocused(false)}
                     required
                   />
                 </div>
@@ -282,8 +287,8 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
               </div>
 
               {/* Password Strength Indicator */}
-              {form.password && (
-                <section className="strength" aria-live="polite" style={{ marginTop: '12px' }}>
+              {form.password && isPasswordFocused && (
+                <section className="strength" aria-live="polite">
                   <div className="strength__meter">
                     <div className="strength__track">
                       <div 
@@ -312,7 +317,7 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
                     </div>
                   </div>
 
-                  <ul className="rules" id="rules" role="list" style={{ listStyle: 'none', padding: 0, margin: '12px 0 0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <ul className="rules auth-rules-list" id="rules" role="list">
                     {[
                       { label: 'At least 8 characters', valid: form.password.length >= 8 },
                       { label: 'One uppercase letter (A-Z)', valid: /[A-Z]/.test(form.password) },
@@ -321,36 +326,16 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
                     ].map((rule, idx) => (
                       <li 
                         key={idx} 
-                        className={`rule-item ${rule.valid ? 'valid' : ''}`}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          fontSize: '12px',
-                          color: rule.valid ? 'rgba(255, 255, 255, 0.7)' : 'rgba(255, 255, 255, 0.35)',
-                          transition: 'color 0.2s ease'
-                        }}
+                        className={`rule-item auth-rule-item ${rule.valid ? 'valid' : ''}`}
                       >
                         <span 
-                          className="rule-icon"
-                          style={{
-                            width: '14px',
-                            height: '14px',
-                            borderRadius: '50%',
-                            border: rule.valid ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
-                            background: rule.valid ? 'linear-gradient(135deg, #10b981, #06b6d4)' : 'transparent',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.2s ease',
-                            flexShrink: 0
-                          }}
+                          className={`auth-rule-icon ${rule.valid ? 'valid' : 'invalid'}`}
                         >
-                          {rule.valid && (
-                            <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                          {rule.valid ? (
+                            <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="20 6 9 17 4 12" />
                             </svg>
-                          )}
+                          ) : '•'}
                         </span>
                         <span>{rule.label}</span>
                       </li>
@@ -361,14 +346,14 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
             </div>
 
             {/* Confirm Password */}
-            <div className="glass-input-wrapper" style={{ marginTop: '16px' }}>
+            <div className="glass-input-wrapper auth-margin-top-16">
               <div className="glass-input-row">
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="auth-flex-fill">
                   <span className="glass-input-label">Confirm Password *</span>
                   <input 
                     id="signup-confirm"
                     type={showConfirmPassword ? "text" : "password"} 
-                    placeholder="Re-enter password" 
+                    placeholder="Confirm password" 
                     value={form.confirmPassword}
                     onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
                     className="glass-input-field"
@@ -411,13 +396,13 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
         </label>
 
         {/* Submit button */}
-        <button type="submit" className="btn-primary" disabled={loading} style={{ padding: '12px', marginTop: '16px' }}>
+        <button type="submit" className="btn-primary auth-margin-top-16" disabled={loading}>
           <span>{loading ? 'Creating Account...' : 'Create Account'}</span>
         </button>
       </form>
 
       {/* Switch to login */}
-      <div className="form-footer-switch" style={{ marginTop: '20px', textAlign: 'center' }}>
+      <div className="form-footer-switch auth-margin-top-20">
         <span>Already have an account? </span>
         <button type="button" className="footer-link-highlight" onClick={() => onNavigate('signin')}>
           Sign In
