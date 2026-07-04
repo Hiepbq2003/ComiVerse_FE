@@ -22,6 +22,7 @@ import AuthorComicDetail from './pages/author/AuthorComicDetail'
 import AuthorEarnings from './pages/author/AuthorEarnings'
 import AuthorSettings from './pages/author/AuthorSettings'
 import Profile from './pages/common/Profile'
+import Policy from './pages/common/Policy'
 import { SkeletonLoaderShowcase } from './components/common/SkeletonLoaderShowcase'
 import { AIPopoverShowcase } from './components/common/AIPopoverShowcase'
 import { HeaderProfileDropdownShowcase } from './components/common/HeaderProfileDropdownShowcase'
@@ -55,7 +56,7 @@ function App() {
                 {/* Public Home */}
                 <Route path="/" element={<Home />} />
                 {/* Auth */}
-                <Route path="/" element={<AuthPage />} />
+                {/* <Route path="/" element={<AuthPage />} /> */}
                 <Route path="/oauth2/redirect" element={<AuthPage />} />
                 <Route path="/profile" element={<ProfileRouteWrapper />} />
                 <Route path="/auth" element={<AuthPage />} />
@@ -66,6 +67,7 @@ function App() {
                 <Route path="/forum" element={<Forum />} />
                 <Route path="/comic/:id" element={<ComicDetail />} />
                 <Route path="/search" element={<SearchResults />} />
+                <Route path="/policy" element={<Policy />} />
                 {/* Admin */}
                 <Route path="/admin/statistics" element={<StatisticsDashboard />} />
                 <Route path="/admin/revenue" element={<RevenueManagement />} />
