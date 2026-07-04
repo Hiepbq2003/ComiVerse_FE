@@ -25,6 +25,11 @@ export const resetUserPasswordApi = (userId) => {
   return AxiosClient.post(`/admin/users/${userId}/reset-password`);
 };
 
+// Update a user's details (fullName & role)
+export const updateUserApi = (userId, data) => {
+  return AxiosClient.put(`/admin/users/${userId}`, data);
+};
+
 // Search active translators (moderator & admin accessible)
 export const searchTranslatorsApi = (query) => {
   return AxiosClient.get('/users/translators', { params: { query } });
