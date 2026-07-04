@@ -3,6 +3,7 @@ import '../../assets/style/translator/dashboard.css'
 import TranslatorLayout from '../../components/layout/TranslatorLayout'
 import TeamProjects from './TeamProjects'
 import Revenue from './Revenue'
+import ProjectList from './ProjectList' 
 import Payout from './Payout'
 import { getAllProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getAllComicsApi, updateComicApi } from '../../services/api/ComicApi'
@@ -218,6 +219,11 @@ function TranslatorDashboard() {
           {/* VIEW: PROJECT TEAMS */}
           {activeNav === 'project-teams' && (
             <TeamProjects projects={projects} setProjects={setProjects} fetchProjects={fetchProjects} user={user} />
+          )}
+
+          {/* VIEW: PROJECT LIST */}
+          {activeNav === 'project-list' && (
+            <ProjectList />
           )}
 
           {/* VIEW: REVENUE */}

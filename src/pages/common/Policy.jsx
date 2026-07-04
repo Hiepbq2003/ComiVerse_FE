@@ -57,7 +57,6 @@ const Policy = () => {
                   </div>
                 </div>
                 
-                {/* Nút Đăng ký */}
                 <a href="/translator-register" className="btn btn-primary btn-lg px-4 d-flex align-items-center">
                   <UserPlus className="me-2" size={20} />
                   Sign Up Now
