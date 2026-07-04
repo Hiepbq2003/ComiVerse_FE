@@ -1583,6 +1583,27 @@
   transform: translateY(-1px);
 }
 
+.admin-topbar-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--admin-purple), var(--admin-pink));
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.admin-topbar-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 
 .admin-topbar-user-info svg {
   color: var(--admin-purple);
