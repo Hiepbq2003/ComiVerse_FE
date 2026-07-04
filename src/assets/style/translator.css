@@ -2580,27 +2580,6 @@ select.trans-form-input {
   box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15) !important;
 }
 
-.translator-profile-btn > .translator-topbar-avatar {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--trans-purple, #8b5cf6), #06b6d4);
-  color: #ffffff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  font-size: 12px;
-  font-weight: 700;
-  overflow: hidden;
-}
-
-.translator-topbar-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 .translator-logout-btn {
   background: rgba(239, 68, 68, 0.06) !important;
   border: 1px solid rgba(239, 68, 68, 0.2) !important;

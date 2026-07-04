@@ -105,7 +105,7 @@ function AdminStats() {
 
 // ── MAIN PROFILE PAGE COMPONENT ────────────────────────────────────
 
-function Profile({ user, embedded = false }) {
+function Profile({ user }) {
   const { updateUser } = useAuth()
   const [activeTab, setActiveTab] = useState('info') // 'info' | 'password'
 
@@ -252,8 +252,9 @@ function Profile({ user, embedded = false }) {
   const displayUserName = `${firstName} ${lastName}`.trim() || user.fullName || 'Minh Khoa'
   const userInitials = displayUserName.substring(0, 2).toUpperCase()
 
-  const profileContent = (
-    <div className="profile-page-wrapper">
+  return (
+    <HomeLayout>
+      <div className="profile-page-wrapper">
       {/* ── TOP SITE HEADER ──────────────────────────────── */}
 
 
@@ -466,10 +467,9 @@ function Profile({ user, embedded = false }) {
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </HomeLayout>
   )
-
-  return embedded ? profileContent : <HomeLayout>{profileContent}</HomeLayout>
 }
 
 export default Profile

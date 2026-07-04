@@ -1,141 +1,23 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
-import { getAuth, setAuth } from '../../utils/Auth'
-import { useAuth } from '../../context/AuthContext'
-import { getPremiumPlansApi, upgradePlanApi } from '../../services/api/PlanApi'
+import { getAuth } from '../../utils/Auth'
 
 // Import assets
 import comicAction from '../../assets/comic_action.png'
 import comicAdventure from '../../assets/comic_adventure.png'
 import comicScifi from '../../assets/comic_scifi.png'
 
-const DEFAULT_PLAN_SETTINGS = {
-  monthlyPrice: 79000,
-  yearlyPrice: 790000,
-  benefits: [
-    'Read free comics',
-    'No ads',
-    'Premium-only titles',
-    'Offline reading',
-    'HD quality',
-    'Unlimited chapters/day'
-  ]
-}
-
-function PlanUpgradeModal({ settings, currentPlan, loading, loadError, upgradingPlan, onClose, onUpgrade }) {
-  const benefits = settings?.benefits?.length ? settings.benefits : DEFAULT_PLAN_SETTINGS.benefits
-  const monthlyPrice = Number(settings?.monthlyPrice ?? DEFAULT_PLAN_SETTINGS.monthlyPrice)
-  const yearlyPrice = Number(settings?.yearlyPrice ?? DEFAULT_PLAN_SETTINGS.yearlyPrice)
-  const activePlan = (currentPlan || 'FREE').toUpperCase()
-
-  const formatVnd = (value) => Number(value || 0).toLocaleString('vi-VN') + 'd'
-
-  const renderFeatures = (items, enabled = true) => (
-    <div className="plan-feature-list">
-      {items.map((item, index) => (
-        <div key={`${item}-${index}`} className={`plan-feature ${enabled ? '' : 'is-muted'}`}>
-          <span className="plan-feature-icon">
-            {enabled ? '✓' : '×'}
-          </span>
-          <span>{item}</span>
-        </div>
-      ))}
-    </div>
-  )
-
-  return (
-    <div className="plan-modal-overlay">
-      <div className="plan-modal">
-        <div className="plan-modal-header">
-          <div>
-            <h2>ComiVerse Plans</h2>
-            <p>Choose the plan that fits your reading needs</p>
-            {loadError && (
-              <p className="plan-sync-warning">
-                Could not sync the latest plan settings. Showing default plans for now.
-              </p>
-            )}
-          </div>
-          <button type="button" onClick={onClose} className="plan-modal-close">×</button>
-        </div>
-
-        <div className="plan-modal-grid">
-          <div className={`plan-card ${(activePlan === 'FREE' || !activePlan) ? 'is-selected' : ''}`}>
-            {(!activePlan || activePlan === 'FREE') && <span className="plan-badge plan-badge-current">Current Plan</span>}
-            <div className="plan-card-title-row">
-              <span className="plan-card-icon">⚡</span>
-              <h3>Free</h3>
-            </div>
-            <div>
-              <div className="plan-price">$0</div>
-              <div className="plan-price-caption">forever</div>
-            </div>
-            <div className="plan-feature-section">
-              {renderFeatures(['Read free comics'], true)}
-              {renderFeatures(['Ads shown', 'Premium-only titles', 'Offline reading', 'HD quality', 'Unlimited chapters/day'], false)}
-            </div>
-            <button disabled className="plan-action-btn is-disabled">
-              Current Plan
-            </button>
-          </div>
-
-          <div className={`plan-card ${activePlan === 'MONTHLY' ? 'is-selected' : ''}`}>
-            <span className="plan-badge">Most Popular</span>
-            <div className="plan-card-title-row">
-              <span className="plan-card-icon">♛</span>
-              <h3>Premium Monthly</h3>
-            </div>
-            <div>
-              <div className="plan-price">{formatVnd(monthlyPrice)}</div>
-              <div className="plan-price-caption">per month</div>
-            </div>
-            <div className="plan-feature-section">{renderFeatures(benefits, true)}</div>
-            <button onClick={() => onUpgrade('MONTHLY')} disabled={loading || upgradingPlan === 'MONTHLY'} className="plan-action-btn">
-              {upgradingPlan === 'MONTHLY' ? 'Processing...' : activePlan === 'MONTHLY' ? 'Extend Monthly' : 'Get Premium Monthly'}
-            </button>
-          </div>
-
-          <div className={`plan-card ${activePlan === 'YEARLY' ? 'is-selected' : ''}`}>
-            <span className="plan-badge">Best Value</span>
-            <div className="plan-card-title-row">
-              <span className="plan-card-icon">☆</span>
-              <h3>Premium Yearly</h3>
-            </div>
-            <div>
-              <div className="plan-price">{formatVnd(yearlyPrice)}</div>
-              <div className="plan-price-caption">per year</div>
-            </div>
-            <div className="plan-feature-section">{renderFeatures([...benefits, 'Best yearly value'], true)}</div>
-            <button onClick={() => onUpgrade('YEARLY')} disabled={loading || upgradingPlan === 'YEARLY'} className="plan-action-btn">
-              {upgradingPlan === 'YEARLY' ? 'Processing...' : activePlan === 'YEARLY' ? 'Extend Yearly' : 'Get Premium Yearly'}
-            </button>
-          </div>
-        </div>
-
-        <p className="plan-modal-note">
-          Demo checkout: upgrading activates Premium immediately. Payment gateway can be connected later.
-        </p>
-      </div>
-    </div>
-  )
-}
 function ComicDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { updateUser } = useAuth()
   const [activeTab, setActiveTab] = useState('chapters')
   const [user, setUser] = useState(null)
   const [inLibrary, setInLibrary] = useState(false)
   const [commentInput, setCommentInput] = useState('')
-  const [showPlanModal, setShowPlanModal] = useState(false)
-  const [planSettings, setPlanSettings] = useState(DEFAULT_PLAN_SETTINGS)
-  const [planLoadError, setPlanLoadError] = useState(false)
-  const [planLoading, setPlanLoading] = useState(false)
-  const [upgradingPlan, setUpgradingPlan] = useState('')
   const [comments, setComments] = useState([
     { id: 1, name: 'Alex Johnson', avatar: 'A', date: '2 hours ago', content: 'This series is absolutely stunning! The art style is amazing and the plot keeps getting better.', rating: 5 },
-    { id: 2, name: 'Nguyen An', avatar: 'N', date: '1 day ago', content: "The pacing in the latest chapter is a bit fast, but the fight scene was epic. Can't wait for the next update.", rating: 4 },
+    { id: 2, name: 'Nguyen An', avatar: 'N', date: '1 day ago', content: 'The pacing in the latest chapter is a bit fast, but the fight scene was epic. Can’t wait for the next update.', rating: 4 },
     { id: 3, name: 'Elena Rostova', avatar: 'E', date: '3 days ago', content: 'Simply the best manhwa on this site. I highly recommend it to anyone who loves deep worldbuilding.', rating: 5 }
   ])
 
@@ -278,54 +160,6 @@ function ComicDetail() {
     setInLibrary(!inLibrary)
   }
 
-  const handleOpenPlanModal = async () => {
-    setShowPlanModal(true)
-    setPlanLoadError(false)
-
-    try {
-      setPlanLoading(true)
-      const data = await getPremiumPlansApi()
-      setPlanSettings(data || DEFAULT_PLAN_SETTINGS)
-    } catch (err) {
-      console.error(err)
-      setPlanSettings(DEFAULT_PLAN_SETTINGS)
-      setPlanLoadError(true)
-    } finally {
-      setPlanLoading(false)
-    }
-  }
-
-  const handleUpgradePlan = async (planType) => {
-    if (!user) {
-      navigate('/auth?mode=signin')
-      return
-    }
-
-    try {
-      setUpgradingPlan(planType)
-      const result = await upgradePlanApi(planType)
-      const updatedUser = result.user || {
-        ...user,
-        premiumPlan: result.planType,
-        premiumExpiresAt: result.premiumExpiresAt,
-        premiumActive: true
-      }
-
-      setUser(updatedUser)
-      updateUser(updatedUser)
-      const auth = getAuth()
-      if (auth?.token) {
-        setAuth(auth.token, updatedUser, localStorage.getItem('refreshToken'))
-      }
-      setShowPlanModal(false)
-      alert('Premium plan upgraded successfully!')
-    } catch (err) {
-      console.error(err)
-      alert(err.response?.data?.message || 'Could not upgrade plan. Please try again.')
-    } finally {
-      setUpgradingPlan('')
-    }
-  }
   const handlePostComment = (e) => {
     e.preventDefault()
     if (!commentInput.trim()) return
@@ -505,14 +339,7 @@ function ComicDetail() {
                 className="btn-hero-outline"
                 style={{ padding: '12px 24px', fontSize: '15px', borderColor: inLibrary ? '#10b981' : 'rgba(255, 255, 255, 0.15)', color: inLibrary ? '#10b981' : 'white' }}
               >
-                {inLibrary ? 'Saved to Library' : 'Add to Library'}
-              </button>
-              <button
-                onClick={handleOpenPlanModal}
-                className="btn-hero-outline"
-                style={{ padding: '12px 24px', fontSize: '15px', borderColor: user?.premiumActive ? '#fbbf24' : 'rgba(168, 85, 247, 0.45)', color: user?.premiumActive ? '#fbbf24' : '#d8b4fe' }}
-              >
-                {user?.premiumActive ? 'Premium Active' : 'Upgrade Plan'}
+                {inLibrary ? '✓ Saved to Library' : '🔖 Add to Library'}
               </button>
             </div>
 
@@ -747,24 +574,8 @@ function ComicDetail() {
 
         </div>
       </div>
-      {showPlanModal && (
-        <PlanUpgradeModal
-          settings={planSettings}
-          currentPlan={user?.premiumActive ? user?.premiumPlan : 'FREE'}
-          loading={planLoading}
-          loadError={planLoadError}
-          upgradingPlan={upgradingPlan}
-          onClose={() => setShowPlanModal(false)}
-          onUpgrade={handleUpgradePlan}
-        />
-      )}
     </HomeLayout>
   )
 }
 
 export default ComicDetail
-
-
-
-
-
