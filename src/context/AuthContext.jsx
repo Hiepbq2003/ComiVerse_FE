@@ -33,8 +33,7 @@ export function AuthProvider({ children }) {
 
   const updateUser = (updatedUser) => {
     const token = localStorage.getItem('token')
-    const refreshToken = localStorage.getItem('refreshToken')
-    setAuth(token, updatedUser, refreshToken)
+    setAuth(token, updatedUser)
     setAuthState(prev => ({
       ...prev,
       user: updatedUser

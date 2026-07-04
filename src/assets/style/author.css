@@ -2069,27 +2069,6 @@ textarea.form-control-premium {
   padding: 8px 16px;
 }
 
-.author-topbar-avatar {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--author-purple), #ec4899);
-  color: #ffffff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  font-size: 12px;
-  font-weight: 700;
-  overflow: hidden;
-}
-
-.author-topbar-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 .author-topbar-btn.logout {
   color: var(--author-red);
 }

@@ -12,8 +12,6 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
   const { isLoggedIn, user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const userName = user?.fullName || user?.username || 'Moderator'
-  const userAvatar = user?.avatarUrl
-  const userInitial = userName.trim().charAt(0).toUpperCase() || 'M'
   
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification()
 
@@ -213,9 +211,10 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
 
             {/* Profile */}
             <button className="moderator-profile-btn" onClick={() => navigate('/profile')} title="My Profile">
-              <span className="moderator-topbar-avatar">
-                {userAvatar ? <img src={userAvatar} alt="" /> : userInitial}
-              </span>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
               {userName}
             </button>
 
