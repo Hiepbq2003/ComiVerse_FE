@@ -1,5 +1,6 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from './context/ThemeContext'
+import { useNavigate } from 'react-router-dom'
 import { LanguageProvider } from './context/LanguageContext'
 import { AuthProvider } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
@@ -16,6 +17,7 @@ import BroadcastManagement from './pages/admin/BroadcastManagement'
 import StatisticsDashboard from './pages/admin/StatisticsDashboard'
 import RevenueManagement from './pages/admin/RevenueManagement'
 import PayoutManagement from './pages/admin/PayoutManagement'
+import AdminSystemSettings from './pages/admin/AdminSystemSettings'
 import AuthorDashboard from './pages/author/AuthorDashboard'
 import AuthorComics from './pages/author/AuthorComics'
 import AuthorComicDetail from './pages/author/AuthorComicDetail'
@@ -23,7 +25,13 @@ import AuthorEarnings from './pages/author/AuthorEarnings'
 import AuthorSettings from './pages/author/AuthorSettings'
 import AuthorUploadGuide from './pages/author/AuthorUploadGuide'
 import AuthorProfile from './pages/author/AuthorProfile'
+import ModeratorDashboard from './pages/moderator/ModeratorDashboard'
+import TranslatorDashboard from './pages/translator/TranslatorDashboard'
 import Profile from './pages/common/Profile'
+import AdminLayout from './components/layout/AdminLayout'
+import AuthorLayout from './components/layout/AuthorLayout'
+import ModeratorLayout from './components/layout/ModeratorLayout'
+import TranslatorLayout from './components/layout/TranslatorLayout'
 import { SkeletonLoaderShowcase } from './components/common/SkeletonLoaderShowcase'
 import { AIPopoverShowcase } from './components/common/AIPopoverShowcase'
 import { HeaderProfileDropdownShowcase } from './components/common/HeaderProfileDropdownShowcase'
@@ -35,6 +43,7 @@ import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 
 function ProfileRouteWrapper() {
+  const navigate = useNavigate()
   const auth = getAuth()
   if (!auth || !auth.user) {
     return <Navigate to="/" replace />
@@ -43,6 +52,33 @@ function ProfileRouteWrapper() {
     clearAuth()
     window.location.href = '/'
   }
+  const role = (auth.user.role || '').toUpperCase()
+  const profile = <Profile user={auth.user} onLogout={handleLogout} embedded />
+
+  if (role === 'ADMIN') {
+    return <AdminLayout activeNav="settings">{profile}</AdminLayout>
+  }
+
+  if (role === 'AUTHOR') {
+    return <AuthorLayout activeNav="settings">{profile}</AuthorLayout>
+  }
+
+  if (role === 'MODERATOR' || role === 'STAFF') {
+    return (
+      <ModeratorLayout activeNav="profile" onNavChange={() => navigate('/moderator')}>
+        {profile}
+      </ModeratorLayout>
+    )
+  }
+
+  if (role === 'TRANSLATOR') {
+    return (
+      <TranslatorLayout activeNav="profile" onNavChange={() => navigate('/translator')}>
+        {profile}
+      </TranslatorLayout>
+    )
+  }
+
   return <Profile user={auth.user} onLogout={handleLogout} />
 }
 
@@ -74,7 +110,12 @@ function App() {
                 <Route path="/admin/account-management" element={<AccountManagement />} />
                 <Route path="/admin/broadcast" element={<BroadcastManagement />} />
                 <Route path="/admin/payout" element={<PayoutManagement />} />
-              {/* Author */}
+                <Route path="/admin/settings" element={<AdminSystemSettings />} />
+                {/* Moderator */}
+                <Route path="/moderator" element={<ModeratorDashboard />} />
+                {/* Translator */}
+                <Route path="/translator" element={<TranslatorDashboard />} />
+                {/* Author */}
                 <Route path="/author/overview" element={<AuthorDashboard />} />
                 <Route path="/author/comics" element={<AuthorComics />} />
                 <Route path="/author/comics/:id" element={<AuthorComicDetail />} />
@@ -101,4 +142,6 @@ function App() {
 }
 
 export default App
+
+
 

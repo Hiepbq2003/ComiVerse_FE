@@ -29,6 +29,8 @@ function AuthorLayout({ children, activeNav = 'overview' }) {
   }
 
   const authorName = user.fullName || user.username || 'Author'
+  const authorAvatar = user?.avatarUrl
+  const authorInitial = authorName.trim().charAt(0).toUpperCase() || 'A'
 
   const navItems = [
     { id: 'overview', label: 'Overview', path: '/author/overview', icon: 'overview' },
@@ -154,6 +156,11 @@ function AuthorLayout({ children, activeNav = 'overview' }) {
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
+              </button>
+            <button className="author-profile-btn" onClick={() => navigate('/profile')}>
+              <span className="author-topbar-avatar">
+                {authorAvatar ? <img src={authorAvatar} alt="" /> : authorInitial}
+              </span>
               <span>{authorName}</span>
             </button>
 

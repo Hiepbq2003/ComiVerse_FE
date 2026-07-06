@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { loginApi, getMeApi } from '../../services/api/AuthApi'
 import { useAuth } from '../../context/AuthContext'
 import { setAuth } from '../../utils/Auth'
@@ -46,7 +46,10 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
         fullName: meData.fullName,
         email: meData.email,
         role: meData.role,
-        avatarUrl: meData.avatarUrl
+        avatarUrl: meData.avatarUrl,
+        premiumPlan: meData.premiumPlan,
+        premiumExpiresAt: meData.premiumExpiresAt,
+        premiumActive: meData.premiumActive
       }
 
       login(data.token, userData)
@@ -77,6 +80,7 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
 
   return (
     <div className="auth-form-card fade-in">
+      <div className="border-beam-wrapper" />
       <div className="form-header-group">
         <h2>Welcome back</h2>
         <p>Sign in and continue your story.</p>
@@ -101,7 +105,7 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
           <input 
             id="signin-username"
             type="text" 
-            placeholder="you@example.com" 
+            placeholder="Enter username or email" 
             value={form.username}
             onChange={(e) => updateField('username', e.target.value)}
             className="glass-input-field"
@@ -118,12 +122,12 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
 
         <div className={`glass-input-wrapper ${fieldErrors.password ? 'has-error' : ''}`}>
           <div className="glass-input-row">
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="auth-flex-fill">
               <span className="glass-input-label">PASSWORD</span>
               <input 
                 id="signin-password"
                 type={showPassword ? "text" : "password"} 
-                placeholder="••••••••" 
+                placeholder="Enter password" 
                 value={form.password}
                 onChange={(e) => updateField('password', e.target.value)}
                 className="glass-input-field"
@@ -173,7 +177,7 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
         </div>
 
         <button type="submit" className="btn-primary" disabled={loading}>
-          <span>{loading ? 'Signing In...' : 'Sign In'}</span> <span className="btn-arrow-icon">›</span>
+          <span>{loading ? 'Signing In...' : 'Sign In'}</span> <span className="btn-arrow-icon">&gt;</span>
         </button>
       </form>
 
@@ -188,3 +192,4 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
 }
 
 export default Login
+

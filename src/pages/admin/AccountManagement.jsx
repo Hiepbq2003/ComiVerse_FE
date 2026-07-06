@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import AdminLayout from '../../components/layout/AdminLayout'
-import { getAllAccountsApi, registerStaffApi, banUserApi, unbanUserApi, resetUserPasswordApi } from '../../services/api/AccountApi'
+import { getAllAccountsApi, registerStaffApi, banUserApi, unbanUserApi, resetUserPasswordApi, updateUserApi } from '../../services/api/AccountApi'
+import ModernButton from '../../components/common/ModernButton'
+import AnimatedButton from '../../components/common/AnimatedButton'
 
 // Fallback mock data when API is not available
 const MOCK_ACCOUNTS = [
@@ -38,6 +40,12 @@ function AccountManagement() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [confirmAction, setConfirmAction] = useState(null) // { type: 'ban'|'unban'|'reset-pw', account }
+
+  // Edit user states
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingAccount, setEditingAccount] = useState(null)
+  const [editForm, setEditForm] = useState({ fullName: '', role: 'Reader' })
+  const [editFormErrors, setEditFormErrors] = useState({})
 
   // Create staff form
   const [staffForm, setStaffForm] = useState({ username: '', password: '', fullName: '', email: '', role: 'Reader' })
@@ -252,6 +260,101 @@ function AccountManagement() {
     setModalError(null)
   }
 
+  // ── EDIT USER ─────────────────────────────────────
+  const handleOpenEditModal = (account) => {
+    setEditingAccount(account)
+    setEditForm({
+      fullName: account.fullName,
+      role: account.role || 'Reader'
+    })
+    setEditFormErrors({})
+    setModalError(null)
+    setShowEditModal(true)
+  }
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false)
+    setEditingAccount(null)
+    setEditForm({ fullName: '', role: 'Reader' })
+    setEditFormErrors({})
+    setModalError(null)
+  }
+
+  const handleEditInputChange = (field, value) => {
+    setEditForm((prev) => ({ ...prev, [field]: value }))
+    if (editFormErrors[field]) {
+      setEditFormErrors((prev) => ({ ...prev, [field]: '' }))
+    }
+  }
+
+  const handleEditSubmit = async () => {
+    const errors = {}
+    if (!editForm.fullName || !editForm.fullName.trim()) {
+      errors.fullName = 'Full Name is required'
+    }
+    if (Object.keys(errors).length > 0) {
+      setEditFormErrors(errors)
+      setModalError('Validation failed. Please correct the errors below.')
+      return
+    }
+
+    setIsSubmitting(true)
+    setModalError(null)
+
+    try {
+      const response = await updateUserApi(editingAccount.id, {
+        fullName: editForm.fullName.trim(),
+        role: editForm.role
+      })
+
+      const updatedUser = response?.data || {}
+      setAccounts((prev) =>
+        prev.map((a) =>
+          a.id === editingAccount.id
+            ? {
+                ...a,
+                fullName: updatedUser.fullName || editForm.fullName,
+                role: updatedUser.role || editForm.role
+              }
+            : a
+        )
+      )
+
+      setShowEditModal(false)
+      showAlert('success', 'User account updated successfully!')
+    } catch (err) {
+      console.error(err)
+      let errorMsg = 'Failed to update user. Please try again.'
+      if (err.response?.data?.message) {
+        errorMsg = err.response.data.message
+      }
+      setModalError(errorMsg)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleResetPasswordFromEdit = async () => {
+    if (!editingAccount) return
+    if (!window.confirm(`Are you sure you want to reset the password for ${editingAccount.fullName}? A temporary password will be emailed to "${editingAccount.email}".`)) {
+      return
+    }
+
+    setIsSubmitting(true)
+    setModalError(null)
+    try {
+      await resetUserPasswordApi(editingAccount.id)
+      showAlert('success', `Password has been reset. A temporary password was emailed to "${editingAccount.email}".`)
+      setShowEditModal(false)
+    } catch (err) {
+      console.error(err)
+      const errorMsg = err.response?.data?.message || 'Failed to reset password. Please try again.'
+      setModalError(errorMsg)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   // ── BAN / UNBAN ───────────────────────────────────
   const openConfirm = (type, account) => {
     setConfirmAction({ type, account })
@@ -328,13 +431,12 @@ function AccountManagement() {
           <h1>Account Management</h1>
           <p>{totalElements} account{totalElements !== 1 ? 's' : ''} found</p>
         </div>
-        <button className="btn-create-staff" onClick={() => setShowCreateModal(true)}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Create User Account
-        </button>
+        <AnimatedButton
+          variant={3}
+          label="+ Create User Account"
+          tooltip=""
+          onClick={() => setShowCreateModal(true)}
+        />
       </div>
 
       {/* Filters Bar */}
@@ -421,26 +523,26 @@ function AccountManagement() {
                         <span className="admin-spinner-sm" />
                       ) : (
                         <>
-                          <button
-                            className="btn-table-action reset-pw"
-                            onClick={() => openConfirm('reset-pw', account)}
-                          >
-                            Reset PW
-                          </button>
+                          <ModernButton
+                            variant={2}
+                            label="Edit"
+                            onClick={() => handleOpenEditModal(account)}
+                            className="btn-edit"
+                          />
                           {(account.status || '').toLowerCase() === 'banned' ? (
-                            <button
-                              className="btn-table-action unban"
+                            <ModernButton
+                              variant={2}
+                              label="Unban"
                               onClick={() => openConfirm('unban', account)}
-                            >
-                              Unban
-                            </button>
+                              className="btn-unban"
+                            />
                           ) : (
-                            <button
-                              className="btn-table-action ban"
+                            <ModernButton
+                              variant={2}
+                              label="Ban"
                               onClick={() => openConfirm('ban', account)}
-                            >
-                              Ban
-                            </button>
+                              className="btn-ban"
+                            />
                           )}
                         </>
                       )}
@@ -566,11 +668,11 @@ function AccountManagement() {
                   onChange={(e) => handleInputChange('role', e.target.value)}
                   style={{ cursor: 'pointer' }}
                 >
-                  <option value="Moderator" style={{ background: '#1f1a24' }}>Moderator</option>
-                  <option value="Author" style={{ background: '#1f1a24' }}>Author</option>
-                  <option value="Translator" style={{ background: '#1f1a24' }}>Translator</option>
-                  <option value="Admin" style={{ background: '#1f1a24' }}>Admin</option>
-                  <option value="Reader" style={{ background: '#1f1a24' }}>Reader</option>
+                  <option value="Moderator">Moderator</option>
+                  <option value="Author">Author</option>
+                  <option value="Translator">Translator</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Reader">Reader</option>
                 </select>
               </div>
 
@@ -592,24 +694,125 @@ function AccountManagement() {
             </div>
 
             <div className="admin-modal-footer">
-              <button
-                className="admin-btn admin-btn--secondary"
+              <ModernButton
+                variant={2}
+                label="Cancel"
                 onClick={handleCloseCreateModal}
                 disabled={isSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                className="admin-btn admin-btn--primary"
+                className="btn-cancel"
+              />
+              <ModernButton
+                variant={2}
+                label={isSubmitting ? "Creating..." : "Create Account"}
                 onClick={handleCreateStaff}
                 disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <><span className="admin-spinner-sm" /> Creating...</>
-                ) : (
-                  'Create Account'
+                className="btn-save"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════
+          EDIT USER MODAL
+          ═══════════════════════════════════════════════ */}
+      {showEditModal && editingAccount && (
+        <div className="admin-modal-overlay" onClick={handleCloseEditModal}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <h2 className="admin-modal-title">Edit User Account</h2>
+              <button className="admin-modal-close" onClick={handleCloseEditModal}>×</button>
+            </div>
+
+            <div className="admin-modal-body">
+              {modalError && (
+                <div className="admin-inline-alert admin-inline-alert--error" style={{ marginBottom: '20px' }}>
+                  ✕ {modalError}
+                </div>
+              )}
+
+              <div className="admin-form-group">
+                <label className="admin-form-label">Username</label>
+                <input
+                  className="admin-form-input"
+                  type="text"
+                  value={editingAccount.username}
+                  disabled
+                  style={{ opacity: 0.7, cursor: 'not-allowed' }}
+                />
+              </div>
+
+              <div className="admin-form-group">
+                <label className="admin-form-label">Email</label>
+                <input
+                  className="admin-form-input"
+                  type="email"
+                  value={editingAccount.email}
+                  disabled
+                  style={{ opacity: 0.7, cursor: 'not-allowed' }}
+                />
+              </div>
+
+              <div className="admin-form-group">
+                <label className="admin-form-label">
+                  Full Name <span className="required">*</span>
+                </label>
+                <input
+                  className={`admin-form-input ${editFormErrors.fullName ? 'error' : ''}`}
+                  type="text"
+                  placeholder="Enter full name"
+                  value={editForm.fullName}
+                  onChange={(e) => handleEditInputChange('fullName', e.target.value)}
+                />
+                {editFormErrors.fullName && (
+                  <div className="admin-form-error">{editFormErrors.fullName}</div>
                 )}
-              </button>
+              </div>
+
+              <div className="admin-form-group">
+                <label className="admin-form-label">
+                  Role <span className="required">*</span>
+                </label>
+                <select
+                  className="admin-form-input"
+                  value={editForm.role}
+                  onChange={(e) => handleEditInputChange('role', e.target.value)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <option value="Moderator">Moderator</option>
+                  <option value="Author">Author</option>
+                  <option value="Translator">Translator</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Reader">Reader</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="admin-modal-footer" style={{ justifyContent: 'space-between' }}>
+              <ModernButton
+                variant={2}
+                label="Reset Password"
+                onClick={handleResetPasswordFromEdit}
+                disabled={isSubmitting}
+                className="btn-ban"
+              />
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <ModernButton
+                  variant={2}
+                  label="Cancel"
+                  onClick={handleCloseEditModal}
+                  disabled={isSubmitting}
+                  className="btn-cancel"
+                />
+                <ModernButton
+                  variant={2}
+                  label={isSubmitting ? "Saving..." : "Save Changes"}
+                  onClick={handleEditSubmit}
+                  disabled={isSubmitting}
+                  className="btn-save"
+                />
+              </div>
             </div>
           </div>
         </div>

@@ -480,34 +480,34 @@
 
 .role-badge.reader,
 .role-badge.user {
-  background: rgba(59, 130, 246, 0.12);
-  color: #93c5fd;
-  border-color: rgba(59, 130, 246, 0.25);
+  background: rgba(59, 130, 246, 0.18) !important;
+  color: #60a5fa !important;
+  border-color: rgba(59, 130, 246, 0.35) !important;
 }
 
 .role-badge.translator {
-  background: rgba(236, 72, 153, 0.12);
-  color: #f9a8d4;
-  border-color: rgba(236, 72, 153, 0.25);
+  background: rgba(236, 72, 153, 0.18) !important;
+  color: #f472b6 !important;
+  border-color: rgba(236, 72, 153, 0.35) !important;
 }
 
 .role-badge.author {
-  background: rgba(6, 182, 212, 0.12);
-  color: #67e8f9;
-  border-color: rgba(6, 182, 212, 0.25);
+  background: rgba(6, 182, 212, 0.18) !important;
+  color: #22d3ee !important;
+  border-color: rgba(6, 182, 212, 0.35) !important;
 }
 
 .role-badge.moderator,
 .role-badge.staff {
-  background: rgba(168, 85, 247, 0.12);
-  color: #d8b4fe;
-  border-color: rgba(168, 85, 247, 0.25);
+  background: rgba(168, 85, 247, 0.18) !important;
+  color: #c084fc !important;
+  border-color: rgba(168, 85, 247, 0.35) !important;
 }
 
 .role-badge.admin {
-  background: rgba(249, 115, 22, 0.12);
-  color: #fdba74;
-  border-color: rgba(249, 115, 22, 0.25);
+  background: rgba(249, 115, 22, 0.18) !important;
+  color: #fb923c !important;
+  border-color: rgba(249, 115, 22, 0.35) !important;
 }
 
 /* Status Badges */
@@ -1583,6 +1583,27 @@
   transform: translateY(-1px);
 }
 
+.admin-topbar-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--admin-purple), var(--admin-pink));
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.admin-topbar-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 
 .admin-topbar-user-info svg {
   color: var(--admin-purple);
@@ -2017,4 +2038,288 @@
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   ADMIN PORTAL - LIGHT MODE & CONTRAST UPGRADES
+   ========================================================================== */
+
+/* 1. Eager/Default Select Option styling (for Dark Mode default) */
+select.admin-form-input option {
+  background: #151120 !important;
+  color: #f1f5f9 !important;
+}
+
+/* 2. Light Mode Select Option & Inputs overrides */
+html.light select.admin-form-input option {
+  background: #ffffff !important;
+  color: #2c1d11 !important;
+}
+
+html.light .admin-form-input {
+  background: #ffffff !important;
+  border: 1.5px solid rgba(168, 85, 247, 0.25) !important;
+  color: #2c1d11 !important;
+}
+
+html.light .admin-form-input:focus {
+  border-color: #a855f7 !important;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15) !important;
+}
+
+html.light .admin-form-input::placeholder {
+  color: #8c7f73 !important;
+}
+
+html.light .admin-form-label {
+  color: #2c1d11 !important;
+  font-weight: 700 !important;
+}
+
+/* 3. Light Mode Sidebar & Menu readability overrides */
+html.light .admin-sidebar {
+  background: #ffffff !important;
+  border-right: 1px solid rgba(99, 87, 78, 0.12) !important;
+}
+
+html.light .admin-nav-item {
+  color: #4b5563 !important; /* Higher contrast dark grey */
+  font-weight: 500 !important;
+}
+
+html.light .admin-nav-item .nav-icon {
+  color: #4b5563 !important;
+  opacity: 0.85 !important;
+}
+
+html.light .admin-nav-item:hover {
+  background: rgba(168, 85, 247, 0.08) !important;
+  color: #7c3aed !important;
+}
+
+html.light .admin-nav-item:hover .nav-icon {
+  color: #7c3aed !important;
+  opacity: 1 !important;
+}
+
+html.light .admin-nav-item.active {
+  background: rgba(168, 85, 247, 0.12) !important;
+  color: #7c3aed !important; /* vibrant purple instead of pale #c084fc */
+  font-weight: 600 !important;
+  border-color: rgba(168, 85, 247, 0.2) !important;
+}
+
+html.light .admin-nav-item.active .nav-icon {
+  color: #7c3aed !important;
+  opacity: 1 !important;
+}
+
+html.light .admin-sidebar-footer .admin-nav-item {
+  color: #6b7280 !important;
+}
+
+html.light .admin-sidebar-footer .admin-nav-item:hover {
+  color: #7c3aed !important;
+}
+
+/* ==========================================================================
+   TABLE ACTIONS - MODERNBUTTON STYLING AND CUSTOM COLOR THEMES
+   ========================================================================== */
+.table-actions .modern-btn-container {
+  display: inline-block !important;
+  margin: 0 !important;
+}
+
+.table-actions .modern-btn-container .btn-2 {
+  min-height: 28px !important;
+  height: 28px !important;
+  width: auto !important;
+  min-width: 76px !important;
+  padding: 0 12px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Edit Button style (Purple) */
+.table-actions .modern-btn-container .btn-2.btn-edit {
+  background: var(--admin-purple, #a855f7) !important;
+}
+.table-actions .modern-btn-container .btn-2.btn-edit::before {
+  background: #7c3aed !important;
+}
+
+/* Reset PW Button style (Blue) */
+.table-actions .modern-btn-container .btn-2.btn-reset {
+  background: var(--admin-blue, #3b82f6) !important;
+}
+.table-actions .modern-btn-container .btn-2.btn-reset::before {
+  background: #2563eb !important;
+}
+
+/* Ban Button style (Red) */
+.table-actions .modern-btn-container .btn-2.btn-ban {
+  background: var(--admin-red, #ef4444) !important;
+}
+.table-actions .modern-btn-container .btn-2.btn-ban::before {
+  background: #dc2626 !important;
+}
+
+/* Unban Button style (Green) */
+.table-actions .modern-btn-container .btn-2.btn-unban {
+  background: var(--admin-green, #10b981) !important;
+}
+.table-actions .modern-btn-container .btn-2.btn-unban::before {
+  background: #059669 !important;
+}
+
+/* Top Create Staff Button style (ModernButton Variant 5) */
+.btn-create-staff-modern {
+  display: inline-block !important;
+}
+.btn-create-staff-modern .btn-5 {
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
+  height: 38px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* ==========================================================================
+   LIGHT MODE READABILITY & ROLE BADGE OVERRIDES
+   ========================================================================== */
+
+/* 1. Light Mode Role Badges */
+html.light .role-badge.reader,
+html.light .role-badge.user {
+  background: rgba(59, 130, 246, 0.12) !important;
+  color: #1d4ed8 !important; /* Deep vibrant blue */
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+html.light .role-badge.translator {
+  background: rgba(236, 72, 153, 0.12) !important;
+  color: #be185d !important; /* Deep vibrant pink */
+  border-color: rgba(236, 72, 153, 0.3) !important;
+}
+
+html.light .role-badge.author {
+  background: rgba(6, 182, 212, 0.12) !important;
+  color: #0e7490 !important; /* Deep vibrant cyan/teal */
+  border-color: rgba(6, 182, 212, 0.3) !important;
+}
+
+html.light .role-badge.moderator,
+html.light .role-badge.staff {
+  background: rgba(168, 85, 247, 0.12) !important;
+  color: #7c3aed !important; /* Deep vibrant purple */
+  border-color: rgba(168, 85, 247, 0.3) !important;
+}
+
+html.light .role-badge.admin {
+  background: rgba(249, 115, 22, 0.12) !important;
+  color: #c2410c !important; /* Deep vibrant orange */
+  border-color: rgba(249, 115, 22, 0.3) !important;
+}
+
+/* 2. Light Mode Table Header & Cell Text overrides */
+html.light .admin-data-table thead th {
+  color: #374151 !important; /* Darker header labels */
+  border-bottom: 1.5px solid rgba(99, 87, 78, 0.15) !important;
+}
+
+html.light .admin-data-table tbody td {
+  color: #374151 !important; /* Darker cell content */
+}
+
+html.light .admin-data-table tbody td.cell-user-id {
+  color: #475569 !important; /* Distinct dark grey for ID */
+  font-weight: 500 !important;
+}
+
+html.light .admin-data-table tbody td.cell-name {
+  color: #0f172a !important; /* Very dark slate for name */
+  font-weight: 600 !important;
+}
+
+html.light .admin-data-table tbody td.cell-email {
+  color: #334155 !important; /* Distinct slate grey for email */
+}
+
+/* ==========================================================================
+   MODAL FOOTER - MODERNBUTTON STYLING AND CUSTOM THEMES
+   ========================================================================== */
+.admin-modal-footer .modern-btn-container {
+  display: inline-block !important;
+  margin: 0 !important;
+}
+
+.admin-modal-footer .modern-btn-container .btn-2 {
+  min-height: 38px !important;
+  height: 38px !important;
+  width: auto !important;
+  min-width: 100px !important;
+  padding: 0 20px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Save / Submit Button style (Gradient) */
+.modern-btn-container .btn-2.btn-save {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%) !important;
+  color: #ffffff !important;
+}
+.modern-btn-container .btn-2.btn-save::before {
+  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%) !important;
+}
+
+/* Cancel Button style (Sleek Grey/Outline) */
+.modern-btn-container .btn-2.btn-cancel {
+  background: #2a2438 !important; /* solid dark grey-purple */
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #eceaf5 !important;
+}
+.modern-btn-container .btn-2.btn-cancel::before {
+  background: #1f1a2a !important; /* slides to reveal this on hover */
+}
+.modern-btn-container .btn-2.btn-cancel span {
+  color: #eceaf5 !important;
+}
+
+/* Light Mode Cancel Button override */
+html.light .modern-btn-container .btn-2.btn-cancel {
+  background: #e2e8f0 !important; /* solid light grey */
+  border: 1px solid #cbd5e1 !important;
+  color: #374151 !important;
+}
+html.light .modern-btn-container .btn-2.btn-cancel::before {
+  background: #cbd5e1 !important;
+}
+html.light .modern-btn-container .btn-2.btn-cancel span {
+  color: #374151 !important;
+}
+
+/* General Ban Button Style - make it globally accessible */
+.modern-btn-container .btn-2.btn-ban {
+  background: var(--admin-red, #ef4444) !important;
+  color: #ffffff !important;
+}
+.modern-btn-container .btn-2.btn-ban::before {
+  background: #dc2626 !important;
+}
+
+/* Hide AnimatedButton tooltips when explicitly set to empty */
+.animated-btn-container .btn[data-tooltip=""]::before,
+.animated-btn-container .btn[data-tooltip=""]::after {
+  display: none !important;
 }
