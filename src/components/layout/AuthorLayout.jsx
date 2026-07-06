@@ -1,27 +1,30 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext'
-import { useTheme } from '../../context/ThemeContext'
+import { getAuth, clearAuth } from '../../utils/Auth'
 import '../../assets/style/author.css'
 
 function AuthorLayout({ children, activeNav = 'overview' }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isLoggedIn, user, logout } = useAuth()
-  const { theme, toggleTheme } = useTheme()
+  const [authorized, setAuthorized] = useState(false)
+  const [user, setUser] = useState(null)
 
   useEffect(() => {
-    if (!isLoggedIn || !user || user.role?.toUpperCase() !== 'AUTHOR') {
+    const auth = getAuth()
+    if (!auth || !auth.user || auth.user.role?.toUpperCase() !== 'AUTHOR') {
       navigate('/', { replace: true })
+    } else {
+      setUser(auth.user)
+      setAuthorized(true)
     }
-  }, [isLoggedIn, user, navigate])
+  }, [navigate])
 
   const handleLogout = () => {
-    logout()
+    clearAuth()
     navigate('/', { replace: true })
   }
 
-  if (!isLoggedIn || !user) {
+  if (!authorized || !user) {
     return null
   }
 
@@ -32,7 +35,9 @@ function AuthorLayout({ children, activeNav = 'overview' }) {
   const navItems = [
     { id: 'overview', label: 'Overview', path: '/author/overview', icon: 'overview' },
     { id: 'comics', label: 'My Comics', path: '/author/comics', icon: 'comics' },
+    { id: 'profile', label: 'Author Profile', path: '/author/profile', icon: 'profile' },
     { id: 'earnings', label: 'Earnings & Revenue', path: '/author/earnings', icon: 'earnings' },
+    { id: 'upload-guide', label: 'Upload Guide', path: '/author/upload-guide', icon: 'guide' },
     { id: 'settings', label: 'Settings', path: '/author/settings', icon: 'settings' },
   ]
 
@@ -54,11 +59,28 @@ function AuthorLayout({ children, activeNav = 'overview' }) {
             <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
           </svg>
         )
+      case 'profile':
+        return (
+          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+        )
       case 'earnings':
         return (
           <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="1" x2="12" y2="23" />
             <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+        )
+      case 'guide':
+        return (
+          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+            <polyline points="10 9 9 9 8 9" />
           </svg>
         )
       case 'settings':
@@ -118,32 +140,6 @@ function AuthorLayout({ children, activeNav = 'overview' }) {
           </div>
 
           <div className="author-topbar-right">
-            {/* Theme Toggle */}
-            <button 
-              className="author-notification-btn" 
-              onClick={toggleTheme}
-              title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
-              style={{ marginRight: '8px' }}
-            >
-              {theme === 'dark' ? (
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="5"></circle>
-                  <line x1="12" y1="1" x2="12" y2="3"></line>
-                  <line x1="12" y1="21" x2="12" y2="23"></line>
-                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                  <line x1="1" y1="12" x2="3" y2="12"></line>
-                  <line x1="21" y1="12" x2="23" y2="12"></line>
-                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                </svg>
-              )}
-            </button>
-
             {/* Notification Bell */}
             <button className="author-notification-btn" title="Notifications">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -155,6 +151,12 @@ function AuthorLayout({ children, activeNav = 'overview' }) {
             <div className="topbar-divider" />
 
             {/* Profile Button */}
+            <button className="author-profile-btn" onClick={() => navigate('/author/profile')}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+              </button>
             <button className="author-profile-btn" onClick={() => navigate('/profile')}>
               <span className="author-topbar-avatar">
                 {authorAvatar ? <img src={authorAvatar} alt="" /> : authorInitial}
