@@ -130,7 +130,6 @@ function AuthorProfile() {
               <strong>{profile.contactEmail || profile.email || 'Not set'}</strong>
             </div>
           </div>
-
           <p className="author-profile-preview-bio">
             {profile.bio || 'No bio has been added yet.'}
           </p>

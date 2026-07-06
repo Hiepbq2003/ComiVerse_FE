@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import AuthorLayout from '../../components/layout/AuthorLayout'
+import UploadGuideModal from '../../components/author/UploadGuideModal'
 import {
   createAuthorComicApi,
   getAuthorChapterUploadStatusApi,
@@ -131,7 +132,7 @@ const buildChapterFormData = ({ chapterNumber, chapterTitle, zipFile }) => {
   return formData
 }
 
-function ZipPackagingGuide() {
+function ZipPackagingGuide({ onOpenGuide }) {
   return (
     <div className="author-upload-guide-card">
       <div>
@@ -145,13 +146,13 @@ function ZipPackagingGuide() {
         <li>Inside each chapter CBZ: page images directly at root like <code>01.jpg</code>, <code>02.jpg</code>.</li>
         <li>Do not put page images directly in the outer comic package archive.</li>
       </ul>
-      <Link to="/author/upload-guide" className="author-guide-link">Open full upload guide</Link>
+      <button type="button" className="author-guide-link" onClick={onOpenGuide}>Open full upload guide</button>
     </div>
   )
 }
 
 
-function ChapterZipPackagingGuide() {
+function ChapterZipPackagingGuide({ onOpenGuide }) {
   return (
     <div className="author-upload-guide-card">
       <div>
@@ -164,7 +165,7 @@ function ChapterZipPackagingGuide() {
         <li>Do not put another archive or wrapper folder inside a chapter CBZ.</li>
         <li>Do not include PDF, TXT, PSD, README, hidden files, or <code>__MACOSX</code>.</li>
       </ul>
-      <Link to="/author/upload-guide" className="author-guide-link">Open full upload guide</Link>
+      <button type="button" className="author-guide-link" onClick={onOpenGuide}>Open full upload guide</button>
     </div>
   )
 }
@@ -182,7 +183,7 @@ function buildComicPackageFormData({ title, slug, description, minimumAge, genre
   return formData
 }
 
-function CreateComicModal({ onClose, onCreated }) {
+function CreateComicModal({ onClose, onCreated, onOpenGuide }) {
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
@@ -455,7 +456,7 @@ function CreateComicModal({ onClose, onCreated }) {
                 <span>Example: TenTruyen.zip contains Chapter 1.cbz and Chapter 2.cbz directly. Leave empty to create only the comic profile.</span>
               </div>
             </label>
-            <ZipPackagingGuide />
+            <ZipPackagingGuide onOpenGuide={onOpenGuide} />
           </div>
         )}
 
@@ -475,7 +476,7 @@ function CreateComicModal({ onClose, onCreated }) {
   )
 }
 
-function AddChapterModal({ comic, onClose, onUploaded }) {
+function AddChapterModal({ comic, onClose, onUploaded, onOpenGuide }) {
   const [chapterNumber, setChapterNumber] = useState((Number(getChapterCount(comic)) || 0) + 1)
   const [title, setTitle] = useState('')
   const [zipFile, setZipFile] = useState(null)
@@ -562,7 +563,7 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
           </div>
         </label>
 
-        <ChapterZipPackagingGuide />
+        <ChapterZipPackagingGuide onOpenGuide={onOpenGuide} />
 
         <div className="author-alert info">
           ℹ Chapter is uploaded as preview first. Open the comic detail page and submit it for moderator review after checking pages.
@@ -583,10 +584,12 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
 
 function AuthorComics() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [comics, setComics] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showUploadGuide, setShowUploadGuide] = useState(Boolean(location.state?.openUploadGuide))
   const [chapterTarget, setChapterTarget] = useState(null)
   const [uploadTasks, setUploadTasks] = useState([])
 
@@ -725,7 +728,7 @@ function AuthorComics() {
             <p>{loading ? 'Loading comics...' : `${comics.length} comics · ${pendingReviewCount} pending review`}</p>
           </div>
           <div className="author-header-actions">
-            <Link className="btn-author-action" to="/author/upload-guide">Upload Guide</Link>
+            <button className="btn-author-action" type="button" onClick={() => setShowUploadGuide(true)}>Upload Guide</button>
             <button className="btn-author-action black large" onClick={() => setShowCreateModal(true)}>
               + Upload New Comic
             </button>
@@ -818,10 +821,16 @@ function AuthorComics() {
         </div>
       </div>
 
+      {showUploadGuide && <UploadGuideModal onClose={() => setShowUploadGuide(false)} />}
+
       {showCreateModal && (
         <CreateComicModal
           onClose={() => setShowCreateModal(false)}
           onCreated={handleCreated}
+          onOpenGuide={() => {
+            setShowCreateModal(false)
+            setShowUploadGuide(true)
+          }}
         />
       )}
 
@@ -830,6 +839,10 @@ function AuthorComics() {
           comic={chapterTarget}
           onClose={() => setChapterTarget(null)}
           onUploaded={handleChapterUploaded}
+          onOpenGuide={() => {
+            setChapterTarget(null)
+            setShowUploadGuide(true)
+          }}
         />
       )}
     </AuthorLayout>

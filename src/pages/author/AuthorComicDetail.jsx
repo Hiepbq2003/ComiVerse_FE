@@ -149,7 +149,7 @@ function ZipPackagingGuideMini() {
         <li>Inside the CBZ must be page images directly at root: <code>01.jpg</code>, <code>02.jpg</code>.</li>
         <li>No wrapper folder, nested archive, PDF, TXT, PSD, README, or hidden files. Each image max 10MB.</li>
       </ul>
-      <Link to="/author/upload-guide" className="author-guide-link">Read full guide</Link>
+      <Link to="/author/comics" state={{ openUploadGuide: true }} className="author-guide-link">Read full guide</Link>
     </div>
   )
 }
@@ -716,7 +716,7 @@ function AuthorComicDetail() {
               <p>Upload CBZ, preview pages, then submit each chapter for moderator review.</p>
             </div>
             <div className="author-header-actions">
-              <Link className="btn-author-action" to="/author/upload-guide">Upload Guide</Link>
+              <Link className="btn-author-action" to="/author/comics" state={{ openUploadGuide: true }}>Upload Guide</Link>
               <button className="btn-author-action black" onClick={() => setShowAddChapter(true)}>
                 + Add Chapter
               </button>

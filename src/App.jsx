@@ -22,7 +22,6 @@ import AuthorComics from './pages/author/AuthorComics'
 import AuthorComicDetail from './pages/author/AuthorComicDetail'
 import AuthorEarnings from './pages/author/AuthorEarnings'
 import AuthorSettings from './pages/author/AuthorSettings'
-import AuthorUploadGuide from './pages/author/AuthorUploadGuide'
 import AuthorProfile from './pages/author/AuthorProfile'
 import ModeratorDashboard from './pages/moderator/ModeratorDashboard'
 import TranslatorDashboard from './pages/translator/TranslatorDashboard'
@@ -86,7 +85,6 @@ function App() {
                 <Route path="/author/overview" element={<AuthorDashboard />} />
                 <Route path="/author/comics" element={<AuthorComics />} />
                 <Route path="/author/comics/:id" element={<AuthorComicDetail />} />
-                <Route path="/author/upload-guide" element={<AuthorUploadGuide />} />
                 <Route path="/author/profile" element={<AuthorProfile />} />
                 <Route path="/author/earnings" element={<AuthorEarnings />} />
                 <Route path="/author/settings" element={<AuthorSettings />} />

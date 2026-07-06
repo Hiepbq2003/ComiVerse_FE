@@ -2716,6 +2716,12 @@ textarea.form-control-premium {
 }
 
 .author-guide-link {
+  appearance: none;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
   color: var(--author-accent);
   font-weight: 700;
   text-decoration: none;
@@ -2724,6 +2730,22 @@ textarea.form-control-premium {
 
 .author-guide-link:hover {
   text-decoration: underline;
+}
+
+.author-modal.author-upload-guide-modal {
+  width: min(900px, calc(100vw - 32px));
+  max-height: min(860px, calc(100vh - 32px));
+  display: flex;
+  flex-direction: column;
+}
+
+.author-upload-guide-content {
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+
+.author-upload-guide-modal .author-section-card {
+  margin-bottom: 18px;
 }
 
 .author-preview-section-card {
