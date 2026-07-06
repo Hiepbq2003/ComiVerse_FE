@@ -23,6 +23,12 @@ import AuthorEarnings from './pages/author/AuthorEarnings'
 import AuthorSettings from './pages/author/AuthorSettings'
 import Profile from './pages/common/Profile'
 import Policy from './pages/common/Policy'
+import TranslateDashboard from './pages/translator/TranslatorDashboard'
+import TranslateWorkspace from './pages/translator/TranslateWorkspace'
+import TeamProjects from './pages/translator/TeamProjects'
+import ProjectList from './pages/translator/ProjectList'
+import TranslatorRevenue from './pages/translator/Revenue'
+import TranslatorPayout from './pages/translator/Payout'
 import { SkeletonLoaderShowcase } from './components/common/SkeletonLoaderShowcase'
 import { AIPopoverShowcase } from './components/common/AIPopoverShowcase'
 import { HeaderProfileDropdownShowcase } from './components/common/HeaderProfileDropdownShowcase'
@@ -32,6 +38,8 @@ import { AnimatedButtonShowcase } from './components/common/AnimatedButtonShowca
 import { getAuth, clearAuth } from './utils/Auth'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
+import { Import } from 'lucide-react'
+import TranslatorLayout from './components/layout/TranslatorLayout'
 
 function ProfileRouteWrapper() {
   const auth = getAuth()
@@ -74,13 +82,23 @@ function App() {
                 <Route path="/admin/account-management" element={<AccountManagement />} />
                 <Route path="/admin/broadcast" element={<BroadcastManagement />} />
                 <Route path="/admin/payout" element={<PayoutManagement />} />
-              {/* Author */}
+                {/* Author */}
                 <Route path="/author/overview" element={<AuthorDashboard />} />
                 <Route path="/author/comics" element={<AuthorComics />} />
                 <Route path="/author/comics/:id" element={<AuthorComicDetail />} />
                 <Route path="/author/earnings" element={<AuthorEarnings />} />
                 <Route path="/author/settings" element={<AuthorSettings />} />
+                {/* Translator */}
+                <Route path="/translator" element={<TranslatorLayout />}>
+                  <Route path="translate-workspace" element={<TranslateWorkspace />} />
+                  <Route path="project-list" element={<ProjectList />} />
+                  <Route path="project-teams" element={<TeamProjects />} />
+                  <Route path="revenue" element={<TranslatorRevenue />} />
+                  <Route path="payout" element={<TranslatorPayout />} />
+                  <Route path="dashboard" element={<TranslateDashboard />} />
+                </Route>
                 
+
                 {/* Showcase Demos */}
                 <Route path="/showcase/skeletons" element={<SkeletonLoaderShowcase />} />
                 <Route path="/showcase/popovers" element={<AIPopoverShowcase />} />

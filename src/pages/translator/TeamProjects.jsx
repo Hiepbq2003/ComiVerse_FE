@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom';
 import '../../assets/style/translator/team-projects.css'
 import ModernButton from '../../components/common/ModernButton'
-import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
+import { getAllProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { createSubmissionApi } from '../../services/api/SubmissionApi'
+import { StepForward } from "lucide-react";
+import { GitCompare } from "lucide-react";
+import { getAuth } from '../../utils/Auth'
+
 import {
   getTeamAnnouncementsApi,
   createTeamAnnouncementApi,
@@ -17,12 +22,42 @@ import {
 } from '../../services/api/TeamWorkspaceApi'
 import { toast } from 'react-toastify'
 
-function TeamProjects({ projects, setProjects, fetchProjects, user }) {
+function TeamProjects() {
+  const navigate = useNavigate()
+
+  // ── Projects data (previously received via props, now fetched locally) ──
+  const [projects, setProjects] = useState([])
+  const [loadingProjects, setLoadingProjects] = useState(true)
+  const auth = getAuth()
+  const user = auth?.user || {}
+
+  const fetchProjects = async (silent = false) => {
+    try {
+      if (!silent) setLoadingProjects(true)
+      const data = await getAllProjectTeamsApi()
+      const mapped = (data || []).map(p => ({
+        ...p,
+        team: p.title,
+        title: p.comicName
+      }))
+      setProjects(mapped)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to load translator project teams.')
+    } finally {
+      if (!silent) setLoadingProjects(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchProjects()
+  }, [])
+
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDetails, setSelectedDetails] = useState(null)
   const [selectedEdit, setSelectedEdit] = useState(null)
   const [showUploadForm, setShowUploadForm] = useState(false)
-  
+
   const [uploadData, setUploadData] = useState({ chapterTitle: '', chapterContent: '', wordsCount: 3000 })
   const [editForm, setEditForm] = useState({ description: '', status: 'Active', team: '' })
 
@@ -30,7 +65,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
   const [activeProjectTab, setActiveProjectTab] = useState('my-projects') // 'my-projects' | 'job-pool'
   const [workspaceTab, setWorkspaceTab] = useState('home') // 'home' | 'members' | 'requests' | 'tasks' | 'settings'
   const [loadingWorkspace, setLoadingWorkspace] = useState(false)
-  
+
   // Real DB Backed States
   const [announcements, setAnnouncements] = useState([])
   const [newPostText, setNewPostText] = useState('')
@@ -51,7 +86,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
     assignee: '',
     dueDate: ''
   })
-  
+
   // Dynamic user mapping from auth token
   const authStr = localStorage.getItem('user')
   const authUser = authStr ? JSON.parse(authStr) : user
@@ -83,18 +118,18 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
   }, [selectedDetails?.id])
   const [memberSearch, setMemberSearch] = useState('')
   const [showCreateTask, setShowCreateTask] = useState(false)
-  const [newTaskData, setNewTaskData] = useState({ 
-    title: '', 
-    column: 'backlog', 
-    assignee: '', 
-    dueDate: '', 
+  const [newTaskData, setNewTaskData] = useState({
+    title: '',
+    column: 'backlog',
+    assignee: '',
+    dueDate: '',
     priority: 'Medium',
     comic: ''
   })
 
   const openCreateTaskModal = () => {
-    const claimedComics = projects.filter(p => 
-      p.status === 'ACTIVE' && 
+    const claimedComics = projects.filter(p =>
+      p.status === 'ACTIVE' &&
       (p.leaderName === userFullName || p.leaderName === authUser?.fullName || p.leaderName === authUser?.username) &&
       p.title && p.title !== '-'
     )
@@ -124,8 +159,8 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
   const claimedProjects = projects.filter(proj => {
     const isNotUnclaimed = !proj.status || proj.status.toUpperCase() !== 'UNCLAIMED'
     const isUserLeader = proj.leaderName && (
-      proj.leaderName === userFullName || 
-      proj.leaderName === authUser?.fullName || 
+      proj.leaderName === userFullName ||
+      proj.leaderName === authUser?.fullName ||
       proj.leaderName === authUser?.username ||
       proj.leaderName.toLowerCase() === userFullName.toLowerCase() ||
       proj.leaderName.toLowerCase() === authUser?.username?.toLowerCase() ||
@@ -183,7 +218,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
     setWorkspaceTab('home')
     setShowUploadForm(false)
     setLoadingWorkspace(true)
-    
+
     // Sync leader info dynamically in the members list
     const actualLeader = {
       name: project.leaderName || 'No Leader',
@@ -313,7 +348,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
     try {
       await createSubmissionApi(submission)
       toast.success('Chapter uploaded successfully and sent for review!')
-      
+
       // Update local history preview
       if (selectedDetails.chaptersList) {
         selectedDetails.chaptersList.unshift({
@@ -388,7 +423,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
     try {
       await deleteTeamRequestApi(id)
       setJoinRequests(prev => prev.filter(req => req.id !== id))
-      
+
       const newMem = {
         name,
         role: 'Member',
@@ -448,9 +483,9 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
         progress: progressVal
       })
       setTasks(prev =>
-        prev.map(task => task.id === id ? { 
-          ...task, 
-          columnName: updated.columnName, 
+        prev.map(task => task.id === id ? {
+          ...task,
+          columnName: updated.columnName,
           progress: updated.progress
         } : task)
       )
@@ -474,37 +509,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
     })
   }
 
-  const handleSaveTaskDetails = async () => {
-    if (!selectedTask) return
-    const formattedTitle = `[${editTaskData.priority.toUpperCase()}] [${editTaskData.comic || selectedDetails?.comicName || selectedDetails?.title}] ${editTaskData.title.trim()}`
-    
-    let finalProgress = editTaskData.progress
-    if (editTaskData.columnName === 'completed') finalProgress = 100
-    if (editTaskData.columnName === 'backlog') finalProgress = 0
 
-    try {
-      const updated = await updateTeamTaskApi(selectedTask.id, {
-        title: formattedTitle,
-        columnName: editTaskData.columnName,
-        progress: finalProgress,
-        dueDate: editTaskData.dueDate,
-        assignees: editTaskData.assignee
-      })
-      setTasks(prev => prev.map(t => t.id === selectedTask.id ? {
-        ...t,
-        title: updated.title || formattedTitle,
-        columnName: updated.columnName,
-        progress: updated.progress,
-        dueDate: updated.dueDate,
-        assignees: updated.assignees
-      } : t))
-      setSelectedTask(null)
-      toast.success('Task details updated in DB!')
-    } catch (err) {
-      console.error(err)
-      toast.error('Failed to update task details.')
-    }
-  }
 
   // Action: Move All Column Tasks to Done
   const handleMoveAllToDone = async (colId) => {
@@ -526,13 +531,13 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
   }
 
   const teamProjectsList = projects.filter(proj => {
-    const matchesSearch = (proj.title || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = (proj.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (proj.comicName || '').toLowerCase().includes(searchTerm.toLowerCase())
     if (!matchesSearch) return false
 
     const isUserLeader = proj.leaderName && (
-      proj.leaderName === userFullName || 
-      proj.leaderName === authUser?.fullName || 
+      proj.leaderName === userFullName ||
+      proj.leaderName === authUser?.fullName ||
       proj.leaderName === authUser?.username ||
       proj.leaderName.toLowerCase() === userFullName.toLowerCase() ||
       proj.leaderName.toLowerCase() === authUser?.username?.toLowerCase() ||
@@ -542,6 +547,15 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
 
     return isUserLeader
   })
+
+  // ── PROJECTS DATA LOADING GUARD ───────────────────
+  if (loadingProjects) {
+    return (
+      <div style={{ textAlign: 'center', padding: '100px', color: 'var(--trans-text-primary)' }}>
+        <h3>⏳ Loading translation project teams...</h3>
+      </div>
+    )
+  }
 
   // ── WORKSPACE DETAIL VIEW ────────────────────────
   if (selectedDetails) {
@@ -553,8 +567,8 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
       )
     }
 
-    const isCurrentLeader = selectedDetails.leaderName === userFullName || 
-      selectedDetails.leaderName === authUser?.fullName || 
+    const isCurrentLeader = selectedDetails.leaderName === userFullName ||
+      selectedDetails.leaderName === authUser?.fullName ||
       selectedDetails.leaderName === authUser?.username ||
       (selectedDetails.leaderName && selectedDetails.leaderName.toLowerCase() === userFullName.toLowerCase()) ||
       (selectedDetails.leaderName && selectedDetails.leaderName.toLowerCase() === authUser?.username?.toLowerCase()) ||
@@ -578,34 +592,34 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
 
         {/* Dynamic Tab Switcher bar */}
         <div className="workspace-tabs">
-          <button 
+          <button
             className={`workspace-tab-btn ${workspaceTab === 'home' ? 'active' : ''}`}
             onClick={() => setWorkspaceTab('home')}
           >
             Home
           </button>
-          <button 
+          <button
             className={`workspace-tab-btn ${workspaceTab === 'members' ? 'active' : ''}`}
             onClick={() => setWorkspaceTab('members')}
           >
             Members <span className={`tab-badge ${workspaceTab === 'members' ? 'active-badge' : ''}`}>{members.length}</span>
           </button>
           {isCurrentLeader && (
-            <button 
+            <button
               className={`workspace-tab-btn ${workspaceTab === 'requests' ? 'active' : ''}`}
               onClick={() => setWorkspaceTab('requests')}
             >
               Requests {joinRequests.length > 0 && <span className="tab-badge alert-badge">{joinRequests.length}</span>}
             </button>
           )}
-          <button 
+          <button
             className={`workspace-tab-btn ${workspaceTab === 'tasks' ? 'active' : ''}`}
             onClick={() => setWorkspaceTab('tasks')}
           >
             Tasks <span className={`tab-badge ${workspaceTab === 'tasks' ? 'active-badge' : ''}`}>{tasks.length}</span>
           </button>
           {isCurrentLeader && (
-            <button 
+            <button
               className={`workspace-tab-btn ${workspaceTab === 'settings' ? 'active' : ''}`}
               onClick={() => setWorkspaceTab('settings')}
             >
@@ -617,10 +631,10 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
         {/* Tab 1: HOME WORKSPACE */}
         {workspaceTab === 'home' && (
           <div className="workspace-home-grid">
-            
+
             {/* Left Feed Column */}
             <div className="workspace-feed-column">
-              
+
               {/* Draft Chapter Upload Form Toggle (Integrated original feature) */}
               <div style={{ marginBottom: '20px' }}>
                 {!showUploadForm ? (
@@ -674,7 +688,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
               <div className="post-creation-card">
                 <div className="post-user-avatar">YS</div>
                 <div className="post-creation-input-wrapper">
-                  <textarea 
+                  <textarea
                     className="post-textarea"
                     placeholder="Post an announcement, update, or share with the group..."
                     value={newPostText}
@@ -725,7 +739,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                 <h3>💬 Group Chat</h3>
                 <span className="chat-online-badge">● 6 online</span>
               </div>
-              
+
               <div className="chat-messages-container">
                 {chatMessages.length === 0 ? (
                   <p style={{ fontStyle: 'italic', color: 'var(--trans-text-muted)', textAlign: 'center', padding: '20px' }}>Send the first message!</p>
@@ -744,8 +758,8 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
               </div>
 
               <form className="chat-input-wrapper" onSubmit={handleSendChat}>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   className="chat-input"
                   placeholder="Send a message..."
                   value={chatInput}
@@ -762,7 +776,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
         {workspaceTab === 'members' && (
           <div className="members-tab-container fade-in">
             <div className="members-actions-bar">
-              <input 
+              <input
                 type="text"
                 className="trans-form-input"
                 placeholder="Search members..."
@@ -823,7 +837,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
         {workspaceTab === 'requests' && (
           <div className="join-requests-tab-container fade-in">
             <h3 className="requests-count-header">{joinRequests.length} requests pending review</h3>
-            
+
             {joinRequests.length === 0 ? (
               <div className="translator-empty-state">
                 <h3>No pending recruitment requests</h3>
@@ -867,7 +881,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
               <div className="board__header">
                 <div className="board__title">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="3" y="3" width="7" height="9" rx="1" />
                       <rect x="14" y="3" width="7" height="5" rx="1" />
                       <rect x="14" y="12" width="7" height="9" rx="1" />
@@ -891,10 +905,10 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                 {COLUMN_LIST.map((col) => {
                   const isLocked = lockedColumns.includes(col.id)
                   const isHighlighted = highlightedColumns.includes(col.id)
-                  
+
                   // Filter tasks
                   let colTasks = tasks.filter(t => t.columnName === col.id)
-                  
+
                   // Sort if needed
                   if (sortedColumns.includes(col.id)) {
                     const priorityOrder = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 }
@@ -906,8 +920,8 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                   }
 
                   return (
-                    <div 
-                      key={col.id} 
+                    <div
+                      key={col.id}
                       className={`column ${isLocked ? 'column--locked' : ''} ${isHighlighted ? 'column--highlighted' : ''}`}
                       style={{ height: 'auto', minHeight: '38rem' }}
                     >
@@ -918,24 +932,24 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                           <span className="column__count">{colTasks.length}</span>
                         </div>
                         <div className={`column__add-wrap ${openDropdownCol === col.id ? 'open' : ''}`}>
-                          <button 
-                            type="button" 
-                            className="column__add" 
+                          <button
+                            type="button"
+                            className="column__add"
                             aria-label="Column options"
                             onClick={(e) => {
                               e.stopPropagation()
                               setOpenDropdownCol(openDropdownCol === col.id ? null : col.id)
                             }}
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <circle cx="12" cy="12" r="1"/>
                               <circle cx="19" cy="12" r="1"/>
                               <circle cx="5" cy="12" r="1"/>
                             </svg>
                           </button>
                           <div className="dropdown" style={{ display: openDropdownCol === col.id ? 'block' : 'none' }}>
-                            <button 
-                              type="button" 
+                            <button
+                              type="button"
                               className="dropdown__item"
                               onClick={() => {
                                 setSortedColumns(prev => prev.includes(col.id) ? prev.filter(c => c !== col.id) : [...prev, col.id])
@@ -944,8 +958,8 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                             >
                               {sortedColumns.includes(col.id) ? 'Unsort' : 'Sort by priority'}
                             </button>
-                            <button 
-                              type="button" 
+                            <button
+                              type="button"
                               className="dropdown__item"
                               onClick={() => {
                                 setLockedColumns(prev => prev.includes(col.id) ? prev.filter(c => c !== col.id) : [...prev, col.id])
@@ -954,8 +968,8 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                             >
                               {isLocked ? 'Unlock column' : 'Lock column'}
                             </button>
-                            <button 
-                              type="button" 
+                            <button
+                              type="button"
                               className="dropdown__item"
                               onClick={() => {
                                 setHighlightedColumns(prev => prev.includes(col.id) ? prev.filter(c => c !== col.id) : [...prev, col.id])
@@ -965,8 +979,8 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                               {isHighlighted ? 'Unhighlight' : 'Highlight column'}
                             </button>
                             {col.id !== 'completed' && (
-                              <button 
-                                type="button" 
+                              <button
+                                type="button"
                                 className="dropdown__item"
                                 onClick={() => {
                                   handleMoveAllToDone(col.id)
@@ -986,15 +1000,15 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                           const isDone = col.id === 'completed'
 
                           return (
-                            <article 
-                              key={task.id} 
+                            <article
+                              key={task.id}
                               className={`task ${isDone ? 'task--completed' : ''}`}
                               tabIndex="0"
                               onClick={() => handleOpenTaskDetails(task)}
                             >
                               {isDone ? (
                                 <div className="task__check">
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M20 6 9 17l-5-5"/>
                                   </svg>
                                   <span>Done</span>
@@ -1016,9 +1030,9 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                                     <span>{task.progress || col.defaultProgress}%</span>
                                   </div>
                                   <div className="task-progress-bar-bg" style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '10px', height: '6px' }}>
-                                    <div 
-                                      className="task-progress-bar-fill" 
-                                      style={{ 
+                                    <div
+                                      className="task-progress-bar-fill"
+                                      style={{
                                         width: `${task.progress || col.defaultProgress}%`,
                                         background: 'linear-gradient(90deg, #a855f7, #c084fc)',
                                         height: '100%',
@@ -1060,9 +1074,9 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                   <span style={{ fontSize: '12px', color: 'var(--trans-text-secondary)' }}>Project Team:</span>
                   <div className="task-assignees-row" style={{ display: 'inline-flex', gap: '4px' }}>
                     {members.slice(0, 6).map((m, i) => (
-                      <div 
-                        className="task-assignee-avatar" 
-                        key={i} 
+                      <div
+                        className="task-assignee-avatar"
+                        key={i}
                         title={m.name || m.username || 'Member'}
                         style={{
                           width: '24px',
@@ -1083,8 +1097,8 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                       </div>
                     ))}
                     {members.length > 6 && (
-                      <div 
-                        className="task-assignee-avatar" 
+                      <div
+                        className="task-assignee-avatar"
                         title={`${members.length - 6} more`}
                         style={{
                           width: '24px',
@@ -1157,13 +1171,13 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                    <div className="trans-modal-body">
                      <div className="trans-form-group">
                        <label className="trans-form-label">Comic Project *</label>
-                       <select 
+                       <select
                          className="trans-form-input"
                          value={newTaskData.comic}
                          onChange={(e) => setNewTaskData({ ...newTaskData, comic: e.target.value })}
                        >
-                         {projects.filter(p => 
-                           p.status === 'ACTIVE' && 
+                         {projects.filter(p =>
+                           p.status === 'ACTIVE' &&
                            (p.leaderName === userFullName || p.leaderName === authUser?.fullName || p.leaderName === authUser?.username) &&
                            p.title && p.title !== '-'
                          ).map((c, idx) => (
@@ -1173,9 +1187,9 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                      </div>
                      <div className="trans-form-group">
                        <label className="trans-form-label">Task Name *</label>
-                       <input 
-                         type="text" 
-                         className="trans-form-input" 
+                       <input
+                         type="text"
+                         className="trans-form-input"
                          placeholder="e.g. Chapter 47 - Proofreading"
                          value={newTaskData.title}
                          onChange={(e) => setNewTaskData({ ...newTaskData, title: e.target.value })}
@@ -1183,7 +1197,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                      </div>
                      <div className="trans-form-group">
                        <label className="trans-form-label">Kanban Column</label>
-                       <select 
+                       <select
                          className="trans-form-input"
                          value={newTaskData.column}
                          onChange={(e) => setNewTaskData({ ...newTaskData, column: e.target.value })}
@@ -1196,7 +1210,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                      </div>
                      <div className="trans-form-group">
                        <label className="trans-form-label">Priority</label>
-                       <select 
+                       <select
                          className="trans-form-input"
                          value={newTaskData.priority}
                          onChange={(e) => setNewTaskData({ ...newTaskData, priority: e.target.value })}
@@ -1209,7 +1223,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                      </div>
                      <div className="trans-form-group">
                        <label className="trans-form-label">Assignee</label>
-                       <select 
+                       <select
                          className="trans-form-input"
                          value={newTaskData.assignee}
                          onChange={(e) => setNewTaskData({ ...newTaskData, assignee: e.target.value })}
@@ -1221,16 +1235,16 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                      </div>
                      <div className="trans-form-group">
                        <label className="trans-form-label">Due Date</label>
-                       <input 
-                         type="date" 
+                       <input
+                         type="date"
                          className="trans-form-input"
                          value={newTaskData.dueDate}
                          onChange={(e) => setNewTaskData({ ...newTaskData, dueDate: e.target.value })}
                        />
                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                         <button 
-                           type="button" 
-                           className="trans-btn secondary" 
+                         <button
+                           type="button"
+                           className="trans-btn secondary"
                            style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
                            onClick={() => {
                              const d = new Date()
@@ -1240,9 +1254,9 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                          >
                            +3 Days
                          </button>
-                         <button 
-                           type="button" 
-                           className="trans-btn secondary" 
+                         <button
+                           type="button"
+                           className="trans-btn secondary"
                            style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
                            onClick={() => {
                              const d = new Date()
@@ -1252,9 +1266,9 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                          >
                            +1 Week
                          </button>
-                         <button 
-                           type="button" 
-                           className="trans-btn secondary" 
+                         <button
+                           type="button"
+                           className="trans-btn secondary"
                            style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
                            onClick={() => {
                              const d = new Date()
@@ -1284,22 +1298,22 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                      <button className="trans-modal-close-btn" onClick={() => setSelectedTask(null)}>×</button>
                    </div>
                    <div className="trans-modal-body">
-                     
+
                      <div className="trans-form-group">
                        <label className="trans-form-label">Comic Project</label>
-                       <input 
-                         type="text" 
-                         className="trans-form-input" 
-                         value={editTaskData.comic} 
+                       <input
+                         type="text"
+                         className="trans-form-input"
+                         value={editTaskData.comic}
                          disabled
                        />
                      </div>
 
                      <div className="trans-form-group">
                        <label className="trans-form-label">Task Name *</label>
-                       <input 
-                         type="text" 
-                         className="trans-form-input" 
+                       <input
+                         type="text"
+                         className="trans-form-input"
                          value={editTaskData.title}
                          onChange={(e) => setEditTaskData({ ...editTaskData, title: e.target.value })}
                        />
@@ -1307,7 +1321,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
 
                      <div className="trans-form-group">
                        <label className="trans-form-label">Status (Sprint Column)</label>
-                       <select 
+                       <select
                          className="trans-form-input"
                          value={editTaskData.columnName}
                          onChange={(e) => setEditTaskData({ ...editTaskData, columnName: e.target.value })}
@@ -1322,7 +1336,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
 
                      <div className="trans-form-group">
                        <label className="trans-form-label">Priority</label>
-                       <select 
+                       <select
                          className="trans-form-input"
                          value={editTaskData.priority}
                          onChange={(e) => setEditTaskData({ ...editTaskData, priority: e.target.value })}
@@ -1336,7 +1350,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
 
                      <div className="trans-form-group">
                        <label className="trans-form-label">Assignee</label>
-                       <select 
+                       <select
                          className="trans-form-input"
                          value={editTaskData.assignee}
                          onChange={(e) => setEditTaskData({ ...editTaskData, assignee: e.target.value })}
@@ -1350,10 +1364,10 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
 
                      <div className="trans-form-group">
                        <label className="trans-form-label">Progress Percentage ({editTaskData.progress}%)</label>
-                       <input 
-                         type="range" 
-                         min="0" 
-                         max="100" 
+                       <input
+                         type="range"
+                         min="0"
+                         max="100"
                          className="trans-form-input"
                          value={editTaskData.progress}
                          onChange={(e) => setEditTaskData({ ...editTaskData, progress: Number(e.target.value) })}
@@ -1363,8 +1377,8 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
 
                      <div className="trans-form-group">
                        <label className="trans-form-label">Due Date</label>
-                       <input 
-                         type="date" 
+                       <input
+                         type="date"
                          className="trans-form-input"
                          value={editTaskData.dueDate}
                          onChange={(e) => setEditTaskData({ ...editTaskData, dueDate: e.target.value })}
@@ -1374,7 +1388,15 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                    </div>
                    <div className="trans-modal-footer">
                      <button className="trans-btn secondary" onClick={() => setSelectedTask(null)}>Cancel</button>
-                     <button className="trans-btn primary" onClick={handleSaveTaskDetails} disabled={!editTaskData.title.trim()}>Save Changes</button>
+                     <button className="trans-btn secondary" onClick={() => setSelectedTask(null)}><GitCompare />Review</button>
+
+                     <button
+                       className="trans-btn primary"
+                       onClick={() => navigate(`/translator/translate-workspace`)}
+                       disabled={!editTaskData.title.trim()}
+                     >
+                       <StepForward />Continue
+                     </button>
                    </div>
                  </div>
                </div>
@@ -1388,12 +1410,12 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
           <div className="group-settings-tab-container fade-in">
             <div className="settings-tab-card">
               <h3 className="settings-section-title">Group Information</h3>
-              
+
               <div className="trans-form-group">
                 <label className="trans-form-label">Group Name</label>
-                <input 
-                  type="text" 
-                  className="trans-form-input" 
+                <input
+                  type="text"
+                  className="trans-form-input"
                   value={selectedDetails.team}
                   onChange={(e) => {
                     const updated = { ...selectedDetails, team: e.target.value }
@@ -1404,8 +1426,8 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
 
               <div className="trans-form-group">
                 <label className="trans-form-label">Description</label>
-                <textarea 
-                  className="trans-form-input textarea" 
+                <textarea
+                  className="trans-form-input textarea"
                   style={{ height: '120px' }}
                   value={selectedDetails.description || ''}
                   onChange={(e) => {
@@ -1490,8 +1512,8 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
                   <span className={`status-badge ${proj.status.toLowerCase()}`}>{proj.status}</span>
                   {proj.leaderName && (
-                    proj.leaderName === userFullName || 
-                    proj.leaderName === authUser?.fullName || 
+                    proj.leaderName === userFullName ||
+                    proj.leaderName === authUser?.fullName ||
                     proj.leaderName === authUser?.username ||
                     proj.leaderName.toLowerCase() === userFullName.toLowerCase() ||
                     proj.leaderName.toLowerCase() === authUser?.username?.toLowerCase() ||
@@ -1503,10 +1525,10 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                 </div>
               </div>
               <div className="trans-project-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <ModernButton 
-                  variant={2} 
-                  label="View Details" 
-                  onClick={() => handleOpenDetails(proj)} 
+                <ModernButton
+                  variant={2}
+                  label="View Details"
+                  onClick={() => handleOpenDetails(proj)}
                 />
                 <button className="trans-btn icon-edit" onClick={(e) => handleOpenEdit(proj, e)}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
