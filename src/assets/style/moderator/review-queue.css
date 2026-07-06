@@ -149,3 +149,55 @@
 .rejection-reason-textarea:focus {
   border-color: var(--mod-red);
 }
+
+/* ==========================================================================
+   REVIEW QUEUE ACTION BUTTONS - MODERNBUTTON STYLING AND THEMES
+   ========================================================================== */
+.submission-actions .modern-btn-container {
+  display: inline-block !important;
+  margin: 0 !important;
+}
+
+.submission-actions .modern-btn-container .btn-2 {
+  min-height: 32px !important;
+  height: 32px !important;
+  width: auto !important;
+  min-width: 105px !important;
+  padding: 0 14px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  border-radius: 20px !important; /* matches the capsule styling from screenshots */
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Review Button: Purple Slide Skew */
+.submission-actions .modern-btn-container .btn-2.btn-review {
+  background: var(--mod-purple, #a855f7) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(168, 85, 247, 0.2) !important;
+}
+.submission-actions .modern-btn-container .btn-2.btn-review::before {
+  background: #7c3aed !important;
+}
+
+/* Approve Button: Green Slide Skew */
+.submission-actions .modern-btn-container .btn-2.btn-approve {
+  background: var(--mod-green, #10b981) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(16, 185, 129, 0.2) !important;
+}
+.submission-actions .modern-btn-container .btn-2.btn-approve::before {
+  background: #059669 !important;
+}
+
+/* Reject Button: Red Slide Skew */
+.submission-actions .modern-btn-container .btn-2.btn-reject {
+  background: var(--mod-red, #ef4444) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(239, 68, 68, 0.2) !important;
+}
+.submission-actions .modern-btn-container .btn-2.btn-reject::before {
+  background: #dc2626 !important;
+}

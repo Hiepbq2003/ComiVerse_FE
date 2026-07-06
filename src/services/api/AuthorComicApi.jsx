@@ -1,7 +1,7 @@
 import AxiosClient from './AxiosClient'
 
-export const getAuthorComicsApi = () => {
-  return AxiosClient.get('/author/comics')
+export const getAuthorComicsApi = (params = {}) => {
+  return AxiosClient.get('/author/comics', { params })
 }
 
 export const getAuthorComicByIdApi = (comicId) => {
@@ -20,17 +20,28 @@ export const createAuthorComicApi = (payload) => {
   return AxiosClient.post('/author/comics', payload)
 }
 
+export const uploadAuthorComicPackageZipApi = (formData) => {
+  return AxiosClient.post('/author/comics/upload-package', formData, {
+    timeout: 300000,
+  })
+}
+
+export const getAuthorComicPackageUploadStatusApi = (taskId) => {
+  return AxiosClient.get(`/author/comics/upload-package/status/${taskId}`)
+}
+
 export const updateAuthorComicApi = (comicId, payload) => {
   return AxiosClient.put(`/author/comics/${comicId}`, payload)
 }
 
 export const uploadAuthorChapterZipApi = (comicId, formData) => {
   return AxiosClient.post(`/author/comics/${comicId}/chapters/upload-zip`, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-    timeout: 60000,
+    timeout: 120000,
   })
+}
+
+export const getAuthorChapterUploadStatusApi = (comicId, taskId) => {
+  return AxiosClient.get(`/author/comics/${comicId}/chapters/upload-zip/status/${taskId}`)
 }
 
 export const getAuthorChapterPreviewApi = (comicId, chapterId) => {
@@ -39,4 +50,16 @@ export const getAuthorChapterPreviewApi = (comicId, chapterId) => {
 
 export const submitAuthorChapterReviewApi = (comicId, chapterId) => {
   return AxiosClient.post(`/author/comics/${comicId}/chapters/${chapterId}/submit-review`)
+}
+
+export const deleteAuthorComicApi = (comicId) => {
+  return AxiosClient.delete(`/author/comics/${comicId}`)
+}
+
+export const updateAuthorChapterApi = (comicId, chapterId, payload) => {
+  return AxiosClient.put(`/author/comics/${comicId}/chapters/${chapterId}`, payload)
+}
+
+export const deleteAuthorChapterApi = (comicId, chapterId) => {
+  return AxiosClient.delete(`/author/comics/${comicId}/chapters/${chapterId}`)
 }

@@ -1,70 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import AuthorLayout from '../../components/layout/AuthorLayout'
-import comicAction from '../../assets/comic_action.png'
-import comicAdventure from '../../assets/comic_adventure.png'
-import comicSciFi from '../../assets/comic_scifi.png'
 import {
+  deleteAuthorChapterApi,
+  deleteAuthorComicApi,
+  getAuthorChapterPreviewApi,
+  getAuthorChapterUploadStatusApi,
   getAuthorComicByIdApi,
   getAuthorComicChaptersApi,
   getAuthorComicMetricsApi,
   submitAuthorChapterReviewApi,
+  updateAuthorComicApi,
   uploadAuthorChapterZipApi,
 } from '../../services/api/AuthorComicApi'
-
-const MOCK_DETAILS = [
-  {
-    id: 1,
-    title: 'New Life',
-    description: 'A cultivator reborn in a new world seeks to reclaim his power.',
-    coverImageUrl: comicAction,
-    genres: ['Fantasy', 'Action'],
-    chapterCount: 3,
-    totalViews: '1.2M',
-    revenue: '5.5Mđ',
-    moderationStatus: 'APPROVED',
-    publicationStatus: 'ONGOING',
-  },
-  {
-    id: 2,
-    title: 'Infinite Journey',
-    description: 'An endless quest through dimensions to discover the ultimate truth of magic.',
-    coverImageUrl: comicAdventure,
-    genres: ['Adventure', 'Mystery'],
-    chapterCount: 2,
-    totalViews: '450K',
-    revenue: '1.2Mđ',
-    moderationStatus: 'PENDING_REVIEW',
-    publicationStatus: 'ONGOING',
-  },
-  {
-    id: 3,
-    title: 'Shadow Path',
-    description: 'A hidden path through ancient clans and forbidden techniques.',
-    coverImageUrl: comicSciFi,
-    genres: ['Drama', 'Cultivation'],
-    chapterCount: 1,
-    totalViews: '210K',
-    revenue: '0.8Mđ',
-    moderationStatus: 'HIDDEN',
-    publicationStatus: 'HIATUS',
-  },
-]
-
-const MOCK_CHAPTERS = {
-  1: [
-    { id: 101, chapterNumber: 1, title: 'Awakening', uploadedAt: 'Dec 20, 2024', views: '450K', status: 'APPROVED' },
-    { id: 102, chapterNumber: 2, title: 'First Steps', uploadedAt: 'Dec 22, 2024', views: '380K', status: 'APPROVED' },
-    { id: 103, chapterNumber: 3, title: 'The Gate', uploadedAt: 'Dec 28, 2024', views: '—', status: 'SUBMITTED_FOR_REVIEW' },
-  ],
-  2: [
-    { id: 201, chapterNumber: 1, title: 'Dimensional Door', uploadedAt: 'Dec 18, 2024', views: '270K', status: 'APPROVED' },
-    { id: 202, chapterNumber: 2, title: 'Broken Compass', uploadedAt: 'Dec 24, 2024', views: '—', status: 'SUBMITTED_FOR_REVIEW' },
-  ],
-  3: [
-    { id: 301, chapterNumber: 1, title: 'Silent Clan', uploadedAt: 'Dec 10, 2024', views: '210K', status: 'HIDDEN' },
-  ],
-}
 
 const normalizeArrayResponse = (payload) => {
   if (Array.isArray(payload)) return payload
@@ -75,7 +23,11 @@ const normalizeArrayResponse = (payload) => {
 }
 
 const normalizeGenres = (genres) => {
-  if (Array.isArray(genres)) return genres
+  if (Array.isArray(genres)) {
+    return genres
+      .map((genre) => (typeof genre === 'string' ? genre : genre?.name || genre?.title || genre?.label))
+      .filter(Boolean)
+  }
   if (typeof genres === 'string' && genres.trim()) {
     return genres.split(',').map((genre) => genre.trim()).filter(Boolean)
   }
@@ -84,20 +36,78 @@ const normalizeGenres = (genres) => {
 
 const getComicId = (comic) => comic?.id || comic?.comicId || comic?._id
 
-const getChapterId = (chapter) => chapter.id || chapter.chapterId || chapter._id
+const getComicCover = (comic) => comic?.coverImageUrl || comic?.coverUrl || comic?.cover || comic?.thumbnail || ''
 
-const getChapterNumber = (chapter) => chapter.chapterNumber ?? chapter.number ?? chapter.chapterNo ?? chapter.index
+const getChapterId = (chapter) => chapter?.id || chapter?.chapterId || chapter?._id
 
-const getChapterTitle = (chapter) => chapter.title || chapter.chapterTitle || 'Untitled Chapter'
+const getChapterNumber = (chapter) => chapter?.chapterNumber ?? chapter?.number ?? chapter?.chapterNo ?? chapter?.index
+
+const getChapterTitle = (chapter) => chapter?.title || chapter?.chapterTitle || 'Untitled Chapter'
 
 const getChapterCount = (comic) => comic?.chapterCount ?? comic?.chapters ?? comic?.totalChapters ?? 0
 
-const formatModerationStatus = (status) => {
-  const value = (status || 'PENDING_REVIEW').toString().toUpperCase()
+const getChapterViews = (chapter) => chapter?.views ?? chapter?.viewCount ?? chapter?.totalViews ?? '—'
+
+const normalizePublicationStatusValue = (status) => {
+  const value = (status || 'ONGOING').toString().replace(/[-\s]+/g, '_').toUpperCase()
+  if (value === 'COMPLETED' || value === 'COMPLETE') return 'COMPLETED'
+  if (value === 'PAUSED' || value === 'HIATUS' || value === 'ON_HIATUS') return 'PAUSED'
+  if (value === 'ARCHIVED') return 'ARCHIVED'
+  return 'ONGOING'
+}
+
+const isCbzFile = (file) => {
+  const name = file?.name?.toLowerCase() || ''
+  return name.endsWith('.cbz')
+}
+
+const UPLOAD_POLL_INTERVAL_MS = 2500
+const getTaskId = (task) => task?.taskId || task?.id || task?.uploadTaskId
+const isFinalUploadStatus = (status) => ['COMPLETED', 'FAILED'].includes((status || '').toString().toUpperCase())
+
+const formatUploadStatus = (status) => {
+  const value = (status || 'QUEUED').toString().toUpperCase()
+  if (value === 'COMPLETED') return 'Completed'
+  if (value === 'FAILED') return 'Failed'
+  if (value === 'PROCESSING') return 'Processing'
+  return 'Queued'
+}
+
+const CHAPTER_ZIP_NAME_REGEX = /^chapter\s+[1-9][0-9]*(?:[,.][0-9]+)?\.cbz$/i
+
+const isChapterZipName = (file) => CHAPTER_ZIP_NAME_REGEX.test(file?.name || '')
+
+const getChapterNumberFromZipName = (file) => {
+  const match = (file?.name || '').match(/^chapter\s+([1-9][0-9]*(?:[,.][0-9]+)?)\.cbz$/i)
+  return match ? match[1] : ''
+}
+
+const validateChapterZip = (file) => {
+  if (!file) return 'Please select a .cbz chapter file.'
+  if (!isCbzFile(file)) return 'Chapter file must be a .cbz file.'
+
+  if (!isChapterZipName(file)) {
+    return "Chapter archive name must be like 'Chapter 1.cbz' or 'Chapter 1,5.cbz'."
+  }
+
+  return ''
+}
+
+const buildChapterFormData = ({ chapterNumber, chapterTitle, zipFile }) => {
+  const formData = new FormData()
+  formData.append('chapterNumber', chapterNumber)
+  formData.append('title', chapterTitle || '')
+  formData.append('zipFile', zipFile)
+  return formData
+}
+
+const formatStatus = (status) => {
+  const value = (status || 'SUBMITTED_FOR_REVIEW').toString().toUpperCase()
   if (value === 'APPROVED' || value === 'PUBLISHED') return '✓ Approved'
   if (value === 'HIDDEN' || value === 'UNPUBLISHED') return '👁 Hidden'
   if (value === 'REJECTED') return '✕ Rejected'
   if (value === 'DRAFT') return 'Draft'
+  if (value === 'PREVIEW_READY') return 'Preview Ready'
   return '⏳ Pending'
 }
 
@@ -113,8 +123,10 @@ const getStatusClass = (status) => {
 const formatDate = (value) => {
   if (!value) return '—'
   if (typeof value === 'string' && value.includes(',')) return value
+
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return value
+
   return parsed.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -122,8 +134,28 @@ const formatDate = (value) => {
   })
 }
 
+const formatMoney = (value) => {
+  if (value === null || value === undefined || value === '') return '0đ'
+  if (typeof value === 'number') return `${value.toLocaleString('vi-VN')}đ`
+  return value
+}
+
+function ZipPackagingGuideMini() {
+  return (
+    <div className="author-upload-guide-card compact">
+      <strong>Chapter CBZ format</strong>
+      <ul>
+        <li>File name must be <code>Chapter 1.cbz</code> or <code>Chapter 1,5.cbz</code>.</li>
+        <li>Inside the CBZ must be page images directly at root: <code>01.jpg</code>, <code>02.jpg</code>.</li>
+        <li>No wrapper folder, nested archive, PDF, TXT, PSD, README, or hidden files. Each image max 10MB.</li>
+      </ul>
+      <Link to="/author/upload-guide" className="author-guide-link">Read full guide</Link>
+    </div>
+  )
+}
+
 function AddChapterModal({ comic, onClose, onUploaded }) {
-  const [chapterNumber, setChapterNumber] = useState((Number(getChapterCount(comic)) || 0) + 1)
+  const [chapterNumber, setChapterNumber] = useState(String((Number(getChapterCount(comic)) || 0) + 1))
   const [title, setTitle] = useState('')
   const [zipFile, setZipFile] = useState(null)
   const [submitting, setSubmitting] = useState(false)
@@ -131,24 +163,27 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    if (!zipFile) {
-      setError('Please select a .zip chapter file.')
+
+    const zipError = validateChapterZip(zipFile)
+    if (zipError) {
+      setError(zipError)
       return
     }
 
-    const formData = new FormData()
-    formData.append('chapterNumber', chapterNumber)
-    formData.append('title', title)
-    formData.append('zipFile', zipFile)
-
     setSubmitting(true)
     setError('')
+
     try {
-      const preview = await uploadAuthorChapterZipApi(getComicId(comic), formData)
-      onUploaded(preview)
+      const uploadTask = await uploadAuthorChapterZipApi(
+        getComicId(comic),
+        buildChapterFormData({ chapterNumber, chapterTitle: title, zipFile }),
+      )
+
+      onUploaded(uploadTask)
       onClose()
     } catch (err) {
-      setError('Could not upload ZIP. Please check API/backend connection.')
+      const message = err?.response?.data?.message || err?.message || 'Could not upload CBZ. Please check API/backend connection.'
+      setError(message)
     } finally {
       setSubmitting(false)
     }
@@ -170,10 +205,10 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
             Chapter # *
             <input
               className="author-input"
-              type="number"
-              min="1"
+              type="text"
               value={chapterNumber}
               onChange={(event) => setChapterNumber(event.target.value)}
+              placeholder="1 or 1,5"
             />
           </label>
 
@@ -189,21 +224,34 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
         </div>
 
         <label className="author-form-label">
-          Upload Pages (.zip) *
+          Upload Pages (.cbz) *
           <div className="author-upload-zone file-picker-zone">
             <input
               type="file"
-              accept=".zip,application/zip,application/x-zip-compressed"
-              onChange={(event) => setZipFile(event.target.files?.[0] || null)}
+              accept=".cbz,application/vnd.comicbook+zip,application/x-cbz"
+              onChange={(event) => {
+                const file = event.target.files?.[0] || null
+                setZipFile(file)
+
+                const numberFromFile = getChapterNumberFromZipName(file)
+                if (numberFromFile) {
+                  setChapterNumber(numberFromFile)
+                }
+
+                const zipError = validateChapterZip(file)
+                setError(zipError)
+              }}
             />
             <div className="author-upload-icon">⇧</div>
-            <strong>{zipFile ? zipFile.name : 'Drop chapter ZIP or select file'}</strong>
-            <span>PNG/JPG images are sorted by filename automatically after backend extracts the ZIP.</span>
+            <strong>{zipFile ? zipFile.name : 'Drop chapter CBZ or select file'}</strong>
+            <span>Example: Chapter 1.cbz or Chapter 1,5.cbz. Put images directly inside the CBZ: 01.jpg, 02.jpg.</span>
           </div>
         </label>
 
+        <ZipPackagingGuideMini />
+
         <div className="author-alert info">
-          ℹ Chapter will be created as preview first. Submit it for moderator review after checking the pages.
+          ℹ Chapter will be created as preview first. Submit it for moderator review after checking pages.
         </div>
 
         {error && <div className="author-form-error">{error}</div>}
@@ -211,7 +259,7 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
         <div className="author-modal-actions">
           <button type="button" className="btn-author-action" onClick={onClose} disabled={submitting}>Cancel</button>
           <button type="submit" className="btn-author-action black" disabled={submitting}>
-            {submitting ? 'Uploading...' : 'Upload ZIP'}
+            {submitting ? 'Sending file...' : 'Upload CBZ'}
           </button>
         </div>
       </form>
@@ -219,99 +267,351 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
   )
 }
 
+function EditComicModal({ comic, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    title: comic?.title || '',
+    slug: comic?.slug || '',
+    description: comic?.description || comic?.summary || '',
+    coverImageUrl: getComicCover(comic),
+    minimumAge: comic?.minimumAge ?? 13,
+    publicationStatus: normalizePublicationStatusValue(comic?.publicationStatus),
+    genres: normalizeGenres(comic?.genres).join(', '),
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const updateField = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }))
+  }
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+
+    if (!form.title.trim()) {
+      setError('Title is required.')
+      return
+    }
+
+    setSaving(true)
+    setError('')
+
+    try {
+      const payload = {
+        title: form.title.trim(),
+        slug: form.slug.trim(),
+        description: form.description.trim(),
+        coverImageUrl: form.coverImageUrl.trim(),
+        minimumAge: Number(form.minimumAge) || 0,
+        publicationStatus: form.publicationStatus,
+        genres: form.genres
+          .split(',')
+          .map((genre) => genre.trim())
+          .filter(Boolean),
+      }
+
+      const updated = await updateAuthorComicApi(getComicId(comic), payload)
+      onSaved(updated || payload)
+      onClose()
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Could not update comic information.'
+      setError(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="author-modal-backdrop" role="presentation">
+      <form className="author-modal author-chapter-modal" onSubmit={handleSubmit}>
+        <div className="author-modal-head">
+          <div>
+            <h2>Edit Comic Info</h2>
+            <p>Sensitive fields will be sent back to moderation.</p>
+          </div>
+          <button type="button" className="author-icon-btn ghost" onClick={onClose} aria-label="Close">×</button>
+        </div>
+
+        <div className="author-chapter-form-grid">
+          <label className="author-form-label">
+            Title *
+            <input className="author-input" value={form.title} onChange={(event) => updateField('title', event.target.value)} />
+          </label>
+
+          <label className="author-form-label">
+            Slug
+            <input className="author-input" value={form.slug} onChange={(event) => updateField('slug', event.target.value)} />
+          </label>
+
+          <label className="author-form-label">
+            Minimum Age
+            <input className="author-input" type="number" min="0" max="21" value={form.minimumAge} onChange={(event) => updateField('minimumAge', event.target.value)} />
+          </label>
+
+          <label className="author-form-label">
+            Publication Status
+            <select className="author-input" value={form.publicationStatus} onChange={(event) => updateField('publicationStatus', event.target.value)}>
+              <option value="ONGOING">Ongoing</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="PAUSED">Paused</option>
+              <option value="ARCHIVED">Archived</option>
+            </select>
+          </label>
+        </div>
+
+        <label className="author-form-label">
+          Cover Image URL
+          <input className="author-input" value={form.coverImageUrl} onChange={(event) => updateField('coverImageUrl', event.target.value)} />
+        </label>
+
+        <label className="author-form-label">
+          Genres
+          <input className="author-input" value={form.genres} onChange={(event) => updateField('genres', event.target.value)} placeholder="Action, Fantasy" />
+        </label>
+
+        <label className="author-form-label">
+          Description
+          <textarea className="author-input" rows="4" value={form.description} onChange={(event) => updateField('description', event.target.value)} />
+        </label>
+
+        <div className="author-alert info">
+          Title, description, cover, slug, and age rating will trigger a new moderation review. Genres and progress status update directly.
+        </div>
+
+        {error && <div className="author-form-error">{error}</div>}
+
+        <div className="author-modal-actions">
+          <button type="button" className="btn-author-action" onClick={onClose} disabled={saving}>Cancel</button>
+          <button type="submit" className="btn-author-action black" disabled={saving}>
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function ChapterPreviewPanel({ preview, onClose }) {
+  const pages = normalizeArrayResponse(preview?.pages)
+  if (!preview) return null
+
+  return (
+    <section className="author-preview-section-card">
+      <div className="author-chapter-section-head">
+        <div>
+          <h2>Preview · Chapter {getChapterNumber(preview)}</h2>
+          <p>{pages.length} pages returned from backend upload.</p>
+        </div>
+        <button className="btn-author-action" onClick={onClose}>Close Preview</button>
+      </div>
+
+      {pages.length === 0 ? (
+        <div className="author-empty-state small">No page URL was returned for this chapter.</div>
+      ) : (
+        <div className="author-page-preview-grid">
+          {pages.map((page) => (
+            <figure key={page.id || page.pageNumber || page.imageUrl}>
+              <img src={page.imageUrl} alt={`Page ${page.pageNumber}`} />
+              <figcaption>Page {page.pageNumber}</figcaption>
+            </figure>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 function AuthorComicDetail() {
   const { id } = useParams()
+  const location = useLocation()
   const navigate = useNavigate()
+
   const [comic, setComic] = useState(null)
   const [chapters, setChapters] = useState([])
   const [metrics, setMetrics] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [usingMockData, setUsingMockData] = useState(false)
+  const [error, setError] = useState('')
   const [showAddChapter, setShowAddChapter] = useState(false)
-  const [actionMessage, setActionMessage] = useState('')
+  const [showEditComic, setShowEditComic] = useState(false)
+  const [actionMessage, setActionMessage] = useState(location.state?.message || '')
+  const [preview, setPreview] = useState(null)
+  const [actionLoadingId, setActionLoadingId] = useState(null)
+  const [uploadTask, setUploadTask] = useState(null)
+
+  const loadDetail = async () => {
+    setLoading(true)
+    setError('')
+
+    try {
+      const [comicResponse, chaptersResponse, metricsResponse] = await Promise.allSettled([
+        getAuthorComicByIdApi(id),
+        getAuthorComicChaptersApi(id),
+        getAuthorComicMetricsApi(id),
+      ])
+
+      if (comicResponse.status !== 'fulfilled') {
+        throw comicResponse.reason
+      }
+
+      setComic(comicResponse.value)
+      setChapters(chaptersResponse.status === 'fulfilled' ? normalizeArrayResponse(chaptersResponse.value) : [])
+      setMetrics(metricsResponse.status === 'fulfilled' ? metricsResponse.value : null)
+    } catch (err) {
+      setComic(null)
+      setChapters([])
+      setMetrics(null)
+      setError('Cannot load this comic. Please check that it belongs to the logged-in author and backend is running.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    let mounted = true
-
-    const loadDetail = async () => {
-      setLoading(true)
-      setActionMessage('')
-      try {
-        const [comicResponse, chaptersResponse, metricsResponse] = await Promise.allSettled([
-          getAuthorComicByIdApi(id),
-          getAuthorComicChaptersApi(id),
-          getAuthorComicMetricsApi(id),
-        ])
-
-        if (!mounted) return
-
-        const nextComic = comicResponse.status === 'fulfilled' ? comicResponse.value : null
-        const nextChapters = chaptersResponse.status === 'fulfilled' ? normalizeArrayResponse(chaptersResponse.value) : []
-        const nextMetrics = metricsResponse.status === 'fulfilled' ? metricsResponse.value : null
-
-        if (nextComic) {
-          setComic(nextComic)
-          setChapters(nextChapters)
-          setMetrics(nextMetrics)
-          setUsingMockData(false)
-        } else {
-          const fallbackComic = MOCK_DETAILS.find((item) => String(item.id) === String(id)) || MOCK_DETAILS[0]
-          setComic(fallbackComic)
-          setChapters(MOCK_CHAPTERS[fallbackComic.id] || [])
-          setMetrics(null)
-          setUsingMockData(true)
-        }
-      } catch (err) {
-        if (!mounted) return
-        const fallbackComic = MOCK_DETAILS.find((item) => String(item.id) === String(id)) || MOCK_DETAILS[0]
-        setComic(fallbackComic)
-        setChapters(MOCK_CHAPTERS[fallbackComic.id] || [])
-        setMetrics(null)
-        setUsingMockData(true)
-      } finally {
-        if (mounted) setLoading(false)
-      }
-    }
-
     loadDetail()
-
-    return () => {
-      mounted = false
-    }
   }, [id])
 
   const summary = useMemo(() => ({
     chapters: metrics?.chapterCount ?? getChapterCount(comic),
-    views: metrics?.totalViews ?? comic?.totalViews ?? comic?.views ?? '0',
-    revenue: metrics?.revenue ?? metrics?.totalRevenue ?? comic?.revenue ?? comic?.totalRevenue ?? '0đ',
+    views: metrics?.viewCount ?? comic?.views ?? comic?.viewCount ?? '0',
+    revenue: formatMoney(metrics?.estimatedRevenue ?? metrics?.revenue ?? metrics?.totalRevenue ?? comic?.revenue ?? comic?.totalRevenue),
   }), [comic, metrics])
 
-  const handleChapterUploaded = (preview) => {
+  const appendUploadedChapter = (uploadedPreview) => {
     const newChapter = {
-      id: preview?.id || preview?.chapterId || `preview-${Date.now()}`,
-      chapterNumber: preview?.chapterNumber || Number(summary.chapters) + 1,
-      title: preview?.title || 'Preview chapter',
-      uploadedAt: new Date().toISOString(),
-      views: '—',
-      status: preview?.status || 'PREVIEW_READY',
+      ...uploadedPreview,
+      id: getChapterId(uploadedPreview) || `preview-${Date.now()}`,
+      chapterNumber: getChapterNumber(uploadedPreview) || String(Number(summary.chapters) + 1),
+      title: uploadedPreview?.title || 'Preview chapter',
+      createdAt: uploadedPreview?.createdAt || new Date().toISOString(),
+      status: uploadedPreview?.status || 'PREVIEW_READY',
     }
+
     setChapters((current) => [...current, newChapter])
-    setComic((current) => ({ ...current, chapterCount: Number(getChapterCount(current)) + 1 }))
-    setActionMessage('ZIP uploaded. Preview is ready; submit it for moderator review after checking pages.')
+    setComic((current) => ({
+      ...current,
+      chapterCount: Number(getChapterCount(current)) + 1,
+      chapters: Number(getChapterCount(current)) + 1,
+    }))
+    setPreview(uploadedPreview)
+  }
+
+  const pollChapterUploadTask = (taskId) => {
+    const poll = async () => {
+      try {
+        const latest = await getAuthorChapterUploadStatusApi(id, taskId)
+        setUploadTask(latest)
+
+        if (!isFinalUploadStatus(latest?.status)) {
+          window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
+          return
+        }
+
+        if (latest?.status === 'COMPLETED') {
+          if (latest?.chapter) {
+            appendUploadedChapter(latest.chapter)
+          }
+          setActionMessage('CBZ processed. Preview is ready; submit it for moderator review after checking pages.')
+        } else {
+          setActionMessage(latest?.error || 'Upload processing failed.')
+        }
+      } catch (err) {
+        setUploadTask({ taskId, status: 'FAILED', error: err?.message || 'Could not check upload status.' })
+        setActionMessage('Could not check upload status.')
+      }
+    }
+
+    window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
+  }
+
+  const handleChapterUploaded = (task) => {
+    const taskId = getTaskId(task)
+    if (!taskId) return
+
+    setUploadTask(task)
+    setActionMessage('Chapter CBZ accepted. Backend is processing it in the background.')
+    pollChapterUploadTask(taskId)
+  }
+
+  const handleOpenPreview = async (chapter) => {
+    const chapterId = getChapterId(chapter)
+    setActionLoadingId(chapterId)
+    setActionMessage('')
+
+    try {
+      const data = await getAuthorChapterPreviewApi(getComicId(comic), chapterId)
+      setPreview(data)
+    } catch (err) {
+      setActionMessage('Could not load chapter preview. Please check API/backend connection.')
+    } finally {
+      setActionLoadingId(null)
+    }
   }
 
   const handleSubmitForReview = async (chapter) => {
     const chapterId = getChapterId(chapter)
+    setActionLoadingId(chapterId)
+    setActionMessage('')
+
     try {
-      await submitAuthorChapterReviewApi(getComicId(comic), chapterId)
+      const response = await submitAuthorChapterReviewApi(getComicId(comic), chapterId)
+
       setChapters((current) => current.map((item) => (
         getChapterId(item) === chapterId
-          ? { ...item, status: 'SUBMITTED_FOR_REVIEW' }
+          ? { ...item, status: response?.status || 'SUBMITTED_FOR_REVIEW' }
           : item
       )))
-      setActionMessage('Chapter submitted for moderator review.')
+
+      setActionMessage(response?.message || 'Chapter submitted for moderator review.')
     } catch (err) {
-      setActionMessage('Could not submit chapter. Please check API/backend connection.')
+      const message = err?.response?.data?.message || err?.message || 'Could not submit chapter. Please check API/backend connection.'
+      setActionMessage(message)
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  const handleComicUpdated = (updatedComic) => {
+    setComic((current) => ({
+      ...current,
+      ...updatedComic,
+      moderationStatus: updatedComic?.moderationStatus || current?.moderationStatus,
+    }))
+    setActionMessage('Comic information updated successfully.')
+  }
+
+  const handleDeleteComic = async () => {
+    if (!window.confirm('Soft delete this comic and its chapters?')) return
+
+    setActionMessage('')
+    try {
+      await deleteAuthorComicApi(getComicId(comic))
+      navigate('/author/comics', { state: { message: 'Comic deleted successfully.' } })
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Could not delete comic.'
+      setActionMessage(message)
+    }
+  }
+
+  const handleDeleteChapter = async (chapter) => {
+    const chapterId = getChapterId(chapter)
+    if (!window.confirm(`Soft delete Chapter ${getChapterNumber(chapter)}?`)) return
+
+    setActionLoadingId(chapterId)
+    setActionMessage('')
+
+    try {
+      await deleteAuthorChapterApi(getComicId(comic), chapterId)
+      setChapters((current) => current.filter((item) => getChapterId(item) !== chapterId))
+      setComic((current) => ({
+        ...current,
+        chapterCount: Math.max(0, Number(getChapterCount(current)) - 1),
+        chapters: Math.max(0, Number(getChapterCount(current)) - 1),
+      }))
+      setActionMessage('Chapter deleted successfully.')
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Could not delete chapter.'
+      setActionMessage(message)
+    } finally {
+      setActionLoadingId(null)
     }
   }
 
@@ -323,20 +623,21 @@ function AuthorComicDetail() {
     )
   }
 
-  if (!comic) {
+  if (error) {
     return (
       <AuthorLayout activeNav="comics">
         <div className="author-empty-state">
-          <h2>Comic not found</h2>
+          <h2>Comic not found or API unavailable</h2>
+          <p>{error}</p>
           <button className="btn-author-action black" onClick={() => navigate('/author/comics')}>Back to My Comics</button>
         </div>
       </AuthorLayout>
     )
   }
 
-  const cover = comic.coverImageUrl || comic.coverUrl || comic.cover
-  const genres = normalizeGenres(comic.genres)
-  const moderationStatus = comic.moderationStatus || comic.status
+  const cover = getComicCover(comic)
+  const genres = normalizeGenres(comic?.genres)
+  const moderationStatus = comic?.moderationStatus || comic?.approvalStatus || 'DRAFT'
 
   return (
     <AuthorLayout activeNav="comics">
@@ -345,7 +646,6 @@ function AuthorComicDetail() {
           <Link to="/author/comics">← Back to My Comics</Link>
           <span>/</span>
           <strong>{comic.title}</strong>
-          {usingMockData && <em>sample data</em>}
         </div>
 
         <section className="author-detail-hero">
@@ -357,11 +657,13 @@ function AuthorComicDetail() {
             <div className="author-detail-title-row">
               <h1>{comic.title}</h1>
               <span className={`author-status-badge ${getStatusClass(moderationStatus)}`}>
-                {formatModerationStatus(moderationStatus)}
+                {formatStatus(moderationStatus)}
               </span>
+              <button className="btn-author-action" onClick={() => setShowEditComic(true)}>Edit Info</button>
+              <button className="btn-author-action danger" onClick={handleDeleteComic}>Delete Comic</button>
             </div>
 
-            <p>{comic.description || comic.tagline || 'No description has been added yet.'}</p>
+            <p>{comic.description || comic.summary || comic.tagline || 'No description has been added yet.'}</p>
 
             <div className="author-genre-pills">
               {genres.map((genre) => (
@@ -382,65 +684,109 @@ function AuthorComicDetail() {
                 <span>Revenue</span>
                 <strong>{summary.revenue}</strong>
               </div>
+              <div className="author-detail-stat-card">
+                <span>Minimum Age</span>
+                <strong>{comic.minimumAge ?? 13}+</strong>
+              </div>
             </div>
           </div>
         </section>
 
+        {comic.moderationNote && <div className="author-alert warning detail-message">Moderator note: {comic.moderationNote}</div>}
         {actionMessage && <div className="author-alert info detail-message">{actionMessage}</div>}
+        {uploadTask && (
+          <div className={`author-upload-task-card ${(uploadTask.status || 'queued').toString().toLowerCase()} detail-message`}>
+            <div>
+              <strong>Chapter background upload</strong>
+              <p>{uploadTask.error || uploadTask.message || 'Waiting for backend status...'}</p>
+            </div>
+            <div className="author-upload-task-meta">
+              <span>{formatUploadStatus(uploadTask.status)}</span>
+              <small>{uploadTask.progress ?? 0}%</small>
+            </div>
+          </div>
+        )}
+
+        <ChapterPreviewPanel preview={preview} onClose={() => setPreview(null)} />
 
         <section className="author-chapter-section-card">
           <div className="author-chapter-section-head">
-            <h2>Chapters ({chapters.length})</h2>
-            <button className="btn-author-action black" onClick={() => setShowAddChapter(true)}>
-              + Add Chapter
-            </button>
+            <div>
+              <h2>Chapters ({chapters.length})</h2>
+              <p>Upload CBZ, preview pages, then submit each chapter for moderator review.</p>
+            </div>
+            <div className="author-header-actions">
+              <Link className="btn-author-action" to="/author/upload-guide">Upload Guide</Link>
+              <button className="btn-author-action black" onClick={() => setShowAddChapter(true)}>
+                + Add Chapter
+              </button>
+            </div>
           </div>
 
-          <div className="author-table-scroll">
-            <table className="author-chapter-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Title</th>
-                  <th>Uploaded</th>
-                  <th>Views</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {chapters.map((chapter) => {
-                  const status = chapter.status || chapter.moderationStatus
-                  const canSubmit = status?.toString().toUpperCase() === 'PREVIEW_READY'
-                  return (
-                    <tr key={getChapterId(chapter)}>
-                      <td className="chapter-no">Ch.{getChapterNumber(chapter)}</td>
-                      <td>{getChapterTitle(chapter)}</td>
-                      <td>{formatDate(chapter.uploadedAt || chapter.createdAt || chapter.submittedAt)}</td>
-                      <td>{chapter.views || chapter.totalViews || '—'}</td>
-                      <td>
-                        <span className={`author-status-badge ${getStatusClass(status)}`}>
-                          {formatModerationStatus(status)}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="author-table-actions">
-                          {canSubmit ? (
-                            <button className="btn-table-action" onClick={() => handleSubmitForReview(chapter)}>
-                              Submit Review
+          {chapters.length === 0 ? (
+            <div className="author-empty-state small">
+              <h3>No chapters yet</h3>
+              <p>Upload your first CBZ file to create real chapter pages.</p>
+            </div>
+          ) : (
+            <div className="author-table-scroll">
+              <table className="author-chapter-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Title</th>
+                    <th>Uploaded</th>
+                    <th>Pages</th>
+                    <th>Views</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {chapters.map((chapter) => {
+                    const status = chapter.status || chapter.moderationStatus
+                    const statusValue = status?.toString().toUpperCase()
+                    const canSubmit = statusValue === 'PREVIEW_READY' || statusValue === 'DRAFT'
+                    const chapterId = getChapterId(chapter)
+                    const busy = actionLoadingId === chapterId
+
+                    return (
+                      <tr key={chapterId}>
+                        <td className="chapter-no">Ch.{getChapterNumber(chapter)}</td>
+                        <td>{getChapterTitle(chapter)}</td>
+                        <td>{formatDate(chapter.uploadedAt || chapter.createdAt || chapter.submittedAt)}</td>
+                        <td>{chapter.pageCount ?? normalizeArrayResponse(chapter.pages).length ?? '—'}</td>
+                        <td>{getChapterViews(chapter)}</td>
+                        <td>
+                          <span className={`author-status-badge ${getStatusClass(status)}`}>
+                            {formatStatus(status)}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="author-table-actions">
+                            <button className="btn-table-action" onClick={() => handleOpenPreview(chapter)} disabled={busy}>
+                              {busy ? 'Loading...' : 'Preview'}
                             </button>
-                          ) : (status || '').toString().toUpperCase() === 'APPROVED' ? (
-                            <button className="btn-table-action">Hide</button>
-                          ) : null}
-                          <button className="btn-table-icon" title="Edit chapter">✎</button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+
+                            {canSubmit && (
+                              <button className="btn-table-action" onClick={() => handleSubmitForReview(chapter)} disabled={busy}>
+                                {busy ? 'Submitting...' : 'Submit Review'}
+                              </button>
+                            )}
+
+                            <button className="btn-table-action danger" onClick={() => handleDeleteChapter(chapter)} disabled={busy}>
+                              {busy ? 'Deleting...' : 'Delete'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       </div>
 
@@ -449,6 +795,14 @@ function AuthorComicDetail() {
           comic={comic}
           onClose={() => setShowAddChapter(false)}
           onUploaded={handleChapterUploaded}
+        />
+      )}
+
+      {showEditComic && (
+        <EditComicModal
+          comic={comic}
+          onClose={() => setShowEditComic(false)}
+          onSaved={handleComicUpdated}
         />
       )}
     </AuthorLayout>
