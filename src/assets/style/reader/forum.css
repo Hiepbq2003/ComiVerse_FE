@@ -303,3 +303,37 @@
 .forum-textarea-field:focus {
   border-color: rgba(168, 85, 247, 0.5);
 }
+
+/* Light mode overrides for Publish Modal */
+html.light .forum-form-group label {
+  color: #4b5563 !important;
+}
+
+html.light .forum-input-field,
+html.light .forum-textarea-field {
+  background: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+  color: #1f2937 !important;
+}
+
+html.light .forum-input-field::placeholder,
+html.light .forum-textarea-field::placeholder {
+  color: #9ca3af !important;
+}
+
+html.light .forum-input-field:focus,
+html.light .forum-textarea-field:focus {
+  border-color: #a855f7 !important;
+  box-shadow: 0 0 6px rgba(168, 85, 247, 0.2) !important;
+}
+
+html.light .forum-select-field {
+  background: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+  color: #1f2937 !important;
+}
+
+html.light .forum-select-field option {
+  background: #ffffff !important;
+  color: #1f2937 !important;
+}

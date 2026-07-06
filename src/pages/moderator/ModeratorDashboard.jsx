@@ -11,6 +11,8 @@ import { getAllComicsApi, updateComicApi, deleteComicApi } from '../../services/
 import { getAllProjectTeamsApi, createProjectTeamApi, deleteProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getAllSubmissionsApi, approveSubmissionApi, rejectSubmissionApi } from '../../services/api/SubmissionApi'
 import { getAllGenresApi } from '../../services/api/GenreApi'
+import { getAllForumThreadsApi } from '../../services/api/ForumThreadApi'
+import { getAllChatFlagsApi } from '../../services/api/ChatFlagApi'
 import { toast } from 'react-toastify'
 
 
@@ -22,6 +24,8 @@ function ModeratorDashboard() {
   const [comics, setComics] = useState([])
   const [projectTeams, setProjectTeams] = useState([])
   const [genres, setGenres] = useState([])
+  const [forumThreads, setForumThreads] = useState([])
+  const [chatFlags, setChatFlags] = useState([])
   const [loading, setLoading] = useState(true)
 
   // Creation Team Modal Shared triggers
@@ -44,16 +48,20 @@ function ModeratorDashboard() {
   const fetchAllData = async () => {
     try {
       setLoading(true)
-      const [comicsData, teamsData, submissionsData, genresData] = await Promise.all([
+      const [comicsData, teamsData, submissionsData, genresData, forumData, chatData] = await Promise.all([
         getAllComicsApi(),
         getAllProjectTeamsApi(),
         getAllSubmissionsApi(),
-        getAllGenresApi()
+        getAllGenresApi(),
+        getAllForumThreadsApi(),
+        getAllChatFlagsApi()
       ])
       setComics(comicsData || [])
       setProjectTeams(teamsData || [])
       setSubmissions(submissionsData || [])
       setGenres(genresData?.data || genresData || [])
+      setForumThreads(forumData || [])
+      setChatFlags(chatData || [])
     } catch (err) {
       console.error(err)
       toast.error('Failed to retrieve control panel data from server.')
@@ -65,8 +73,8 @@ function ModeratorDashboard() {
   const getNavBadges = () => {
     return {
       'review-queue': submissions.filter(item => item.status === 'pending').length,
-      'chat-monitor': 2,
-      'forum': 2,
+      'chat-monitor': chatFlags.length,
+      'forum': forumThreads.filter(item => item.isReported).length,
     }
   }
 
@@ -294,12 +302,12 @@ function ModeratorDashboard() {
 
           {/* VIEW: CHAT MONITOR */}
           {activeNav === 'chat-monitor' && (
-            <ChatMonitor />
+            <ChatMonitor fetchAllData={fetchAllData} />
           )}
 
           {/* VIEW: FORUM */}
           {activeNav === 'forum' && (
-            <ForumModeration />
+            <ForumModeration fetchAllData={fetchAllData} />
           )}
         </>
       )}

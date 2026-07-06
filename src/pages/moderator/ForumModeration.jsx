@@ -1,11 +1,79 @@
 import { useState, useEffect } from 'react'
 import '../../assets/style/moderator/forum-moderation.css'
-import { getAllForumThreadsApi, deleteForumThreadApi } from '../../services/api/ForumThreadApi'
+import { 
+  getAllForumThreadsApi, 
+  deleteForumThreadApi, 
+  updateForumThreadApi 
+} from '../../services/api/ForumThreadApi'
 import { toast } from 'react-toastify'
+import ModernButton from '../../components/common/ModernButton'
 
-function ForumModeration() {
+const formatTimeAgo = (createdAtString) => {
+  if (!createdAtString) return 'Just now'
+  const date = new Date(createdAtString)
+  if (isNaN(date.getTime())) {
+    return 'Just now'
+  }
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const seconds = Math.floor(diffMs / 1000)
+  
+  // If the server time is ahead due to timezone differences, handle absolute values
+  if (seconds < 0) {
+    const absSeconds = Math.abs(seconds)
+    if (absSeconds < 86400) {
+      if (absSeconds < 60) return 'Just now'
+      const minutes = Math.floor(absSeconds / 60)
+      if (minutes < 60) return `${minutes}m ago`
+      const hours = Math.floor(absSeconds / 60)
+      return `${hours}h ago`
+    }
+    return 'Just now'
+  }
+  
+  if (seconds < 60) {
+    return 'Just now'
+  }
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) {
+    return `${minutes}m ago`
+  }
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) {
+    return `${hours}h ago`
+  }
+  const days = Math.floor(hours / 24)
+  if (days === 1) {
+    return '1 day ago'
+  }
+  return `${days} days ago`
+}
+
+function ForumModeration({ fetchAllData }) {
+  const [activeTab, setActiveTab] = useState('threads') // 'threads' | 'reports' | 'categories'
   const [threads, setThreads] = useState([])
   const [loading, setLoading] = useState(true)
+  
+  // Local state for dynamically added custom categories (persisted in localStorage)
+  const [customCategories, setCustomCategories] = useState(() => {
+    const saved = localStorage.getItem('comiverse_forum_categories')
+    return saved ? JSON.parse(saved) : []
+  })
+
+  useEffect(() => {
+    localStorage.setItem('comiverse_forum_categories', JSON.stringify(customCategories))
+  }, [customCategories])
+  
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('All Categories')
+
+  // Modals
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false)
+  const [editingCategory, setEditingCategory] = useState(null) // index
+  const [newCatName, setNewCatName] = useState('')
+  const [newCatColor, setNewCatColor] = useState('#3b82f6')
+  const [editCatName, setEditCatName] = useState('')
 
   useEffect(() => {
     fetchThreads()
@@ -15,7 +83,18 @@ function ForumModeration() {
     try {
       setLoading(true)
       const data = await getAllForumThreadsApi()
-      setThreads(data || [])
+      
+      // Ensure all fields have defaults to prevent null checks
+      const mapped = (data || []).map((t) => ({
+        ...t,
+        isPinned: t.isPinned ?? false,
+        isLocked: t.isLocked ?? false,
+        isReported: t.isReported ?? false,
+        reportReason: t.reportReason ?? '',
+        replies: t.replies ?? 0,
+        timeLabel: formatTimeAgo(t.createdAt)
+      }))
+      setThreads(mapped)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load forum threads!')
@@ -24,11 +103,49 @@ function ForumModeration() {
     }
   }
 
+  // ── THREAD ACTIONS ─────────────────────────────────
+  const togglePin = async (id) => {
+    const thread = threads.find(t => t.id === id)
+    if (!thread) return
+    try {
+      const nextState = !thread.isPinned
+      await updateForumThreadApi(id, {
+        ...thread,
+        isPinned: nextState
+      })
+      setThreads(prev => prev.map(t => t.id === id ? { ...t, isPinned: nextState } : t))
+      fetchAllData?.()
+      toast.info(nextState ? `Thread "${thread.title}" pinned!` : `Thread "${thread.title}" unpinned!`)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to update pin state in DB!')
+    }
+  }
+
+  const toggleLock = async (id) => {
+    const thread = threads.find(t => t.id === id)
+    if (!thread) return
+    try {
+      const nextState = !thread.isLocked
+      await updateForumThreadApi(id, {
+        ...thread,
+        isLocked: nextState
+      })
+      setThreads(prev => prev.map(t => t.id === id ? { ...t, isLocked: nextState } : t))
+      fetchAllData?.()
+      toast.info(nextState ? `Thread "${thread.title}" locked!` : `Thread "${thread.title}" unlocked!`)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to update lock state in DB!')
+    }
+  }
+
   const handleDeleteThread = async (id, title) => {
     if (window.confirm(`Are you sure you want to delete the thread "${title}"?`)) {
       try {
         await deleteForumThreadApi(id)
         setThreads(prev => prev.filter(t => t.id !== id))
+        fetchAllData?.()
         toast.success(`Thread "${title}" deleted successfully.`)
       } catch (err) {
         console.error(err)
@@ -37,43 +154,496 @@ function ForumModeration() {
     }
   }
 
+  // ── REPORT ACTIONS ─────────────────────────────────
+  const handleResolveReport = async (threadId) => {
+    const thread = threads.find(t => t.id === threadId)
+    if (!thread) return
+    try {
+      await updateForumThreadApi(threadId, {
+        ...thread,
+        isReported: false,
+        reportReason: ''
+      })
+      setThreads(prev => prev.map(t => t.id === threadId ? { ...t, isReported: false, reportReason: '' } : t))
+      fetchAllData?.()
+      toast.success('Report resolved successfully.')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to resolve report!')
+    }
+  }
+
+  const handleDismissReport = async (threadId) => {
+    const thread = threads.find(t => t.id === threadId)
+    if (!thread) return
+    try {
+      await updateForumThreadApi(threadId, {
+        ...thread,
+        isReported: false,
+        reportReason: ''
+      })
+      setThreads(prev => prev.map(t => t.id === threadId ? { ...t, isReported: false, reportReason: '' } : t))
+      fetchAllData?.()
+      toast.success('Report dismissed.')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to dismiss report!')
+    }
+  }
+
+  const handleRemoveReportThread = async (threadId, title) => {
+    if (window.confirm(`Are you sure you want to remove the reported thread "${title}"?`)) {
+      try {
+        await deleteForumThreadApi(threadId)
+        setThreads(prev => prev.filter(t => t.id !== threadId))
+        fetchAllData?.()
+        toast.success('Reported thread removed successfully.')
+      } catch (err) {
+        console.error(err)
+        toast.error('Failed to remove thread!')
+      }
+    }
+  }
+
+  // ── CATEGORY ACTIONS ───────────────────────────────
+  const handleAddCategory = () => {
+    if (!newCatName.trim()) return
+    const name = newCatName.trim()
+    if (!customCategories.includes(name)) {
+      setCustomCategories(prev => [...prev, name])
+    }
+    fetchAllData?.()
+    setNewCatName('')
+    setShowAddCategoryModal(false)
+    toast.success('New category added locally!')
+  }
+
+  const handleEditCategory = async () => {
+    if (!editCatName.trim() || editingCategory === null) return
+    const oldName = categoriesList[editingCategory].name
+    const newName = editCatName.trim()
+    
+    try {
+      // Update all threads in DB that match the old category name
+      const threadsToUpdate = threads.filter(t => t.category === oldName)
+      await Promise.all(threadsToUpdate.map(t => 
+        updateForumThreadApi(t.id, { ...t, category: newName })
+      ))
+      
+      // Update custom list if it was a local add
+      setCustomCategories(prev => prev.map(c => c === oldName ? newName : c))
+      await fetchThreads()
+      fetchAllData?.()
+      toast.success(`Category renamed to "${newName}".`)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to rename category on database threads!')
+    } finally {
+      setEditingCategory(null)
+      setEditCatName('')
+    }
+  }
+
+  const handleDeleteCategory = async (index, name) => {
+    if (window.confirm(`Are you sure you want to delete the category "${name}"? Threads under this category will become uncategorized.`)) {
+      try {
+        // Set category to blank for all matching threads in DB
+        const threadsToUpdate = threads.filter(t => t.category === name)
+        await Promise.all(threadsToUpdate.map(t => 
+          updateForumThreadApi(t.id, { ...t, category: '' })
+        ))
+        
+        setCustomCategories(prev => prev.filter(c => c !== name))
+        await fetchThreads()
+        fetchAllData?.()
+        toast.success(`Category "${name}" deleted.`)
+      } catch (err) {
+        console.error(err)
+        toast.error('Failed to clear category on database threads!')
+      }
+    }
+  }
+
+  // ── DYNAMIC CATEGORY RESOLUTION (DB DRIVEN) ────────
+  const allCategoryNames = Array.from(new Set([
+    ...threads.map(t => t.category || 'General'),
+    ...customCategories
+  ]))
+
+  const categoriesList = allCategoryNames.map(catName => {
+    const count = threads.filter(t => (t.category || 'General') === catName).length
+    const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1']
+    const hash = catName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    const color = colors[hash % colors.length]
+    return {
+      name: catName,
+      threadsCount: count,
+      color
+    }
+  })
+
+  // ── DYNAMIC REPORTS RESOLUTION (DB DRIVEN) ─────────
+  const reportsList = threads.filter(t => t.isReported)
+
+  // Filtering for threads list
+  const filteredThreads = threads.filter(t => {
+    const matchesSearch = !searchQuery.trim() || t.title.toLowerCase().includes(searchQuery.toLowerCase().trim()) || t.author.toLowerCase().includes(searchQuery.toLowerCase().trim())
+    const matchesCategory = categoryFilter === 'All Categories' || t.category === categoryFilter
+    return matchesSearch && matchesCategory
+  })
+
   return (
     <div className="fade-in">
       <div className="moderator-page-header">
         <h1>Forum Moderation</h1>
-        <p>Moderate user posts and replies in the platform community forum.</p>
+        <p>Moderate community board threads, resolve report flags, and manage forum categories.</p>
       </div>
 
-      {loading ? (
-        <div className="moderator-empty-state">
-          <p>Loading forum threads...</p>
-        </div>
-      ) : (
-        <div className="moderator-cards-list">
-          {threads.length === 0 ? (
+      {/* TABS HEADER */}
+      <div className="mod-forum-tabs">
+        <button 
+          className={`mod-forum-tab-btn ${activeTab === 'threads' ? 'active' : ''}`}
+          onClick={() => setActiveTab('threads')}
+        >
+          💬 All Threads
+        </button>
+        <button 
+          className={`mod-forum-tab-btn ${activeTab === 'reports' ? 'active' : ''}`}
+          onClick={() => setActiveTab('reports')}
+        >
+          🚩 Reports
+          {reportsList.length > 0 && <span className="mod-forum-badge red">{reportsList.length}</span>}
+        </button>
+        <button 
+          className={`mod-forum-tab-btn ${activeTab === 'categories' ? 'active' : ''}`}
+          onClick={() => setActiveTab('categories')}
+        >
+          # Categories
+        </button>
+      </div>
+
+      {/* VIEW: ALL THREADS */}
+      {activeTab === 'threads' && (
+        <div className="forum-tab-content">
+          <div className="forum-content-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 className="forum-section-title">
+              Forum Threads 
+              <span className="forum-title-count">{filteredThreads.length} threads total</span>
+            </h2>
+            
+            <div className="forum-filters-bar" style={{ display: 'flex', gap: '12px' }}>
+              <input 
+                type="text"
+                className="moderator-select forum-search"
+                placeholder="Search threads..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ width: '220px', outline: 'none' }}
+              />
+              <select 
+                className="moderator-select"
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+              >
+                <option>All Categories</option>
+                {categoriesList.map(c => <option key={c.name}>{c.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {loading ? (
             <div className="moderator-empty-state">
-              <h3>No flagged forum posts</h3>
-              <p>Forum community board is fully peaceful!</p>
+              <p>Loading forum threads...</p>
+            </div>
+          ) : filteredThreads.length === 0 ? (
+            <div className="moderator-empty-state">
+              <h3>No threads found</h3>
+              <p>Try modifying your search or filters.</p>
             </div>
           ) : (
-            threads.map(t => (
-              <div className="submission-card" key={t.id}>
-                <div className="submission-info">
-                  <h3 className="submission-title">{t.title}</h3>
-                  <p className="submission-meta">Submitted by: <strong>{t.author}</strong></p>
-                  <p className="submission-meta">Content: <em>{t.content}</em></p>
+            <div className="forum-table-wrapper">
+              <table className="forum-threads-table">
+                <thead>
+                  <tr>
+                    <th>Thread</th>
+                    <th>Author</th>
+                    <th>Category</th>
+                    <th style={{ textAlign: 'center' }}>Replies</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'center' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredThreads.map(t => {
+                    let statusLabel = 'Normal'
+                    let statusClass = 'normal'
+                    if (t.isPinned) {
+                      statusLabel = 'Pinned'
+                      statusClass = 'pinned'
+                    } else if (t.isReported) {
+                      statusLabel = 'Reported'
+                      statusClass = 'reported'
+                    } else if (t.isLocked) {
+                      statusLabel = 'Locked'
+                      statusClass = 'locked'
+                    }
+
+                    return (
+                      <tr key={t.id}>
+                        <td>
+                          <div className="forum-thread-cell">
+                            <span className="forum-thread-icons">
+                              {t.isPinned && <span title="Pinned">📌</span>}
+                              {t.isReported && <span title="Reported">🚩</span>}
+                              {t.isLocked && <span title="Locked">🔒</span>}
+                              {!t.isPinned && !t.isReported && !t.isLocked && <span title="Thread">💬</span>}
+                            </span>
+                            <div className="forum-thread-texts">
+                              <span className="forum-thread-title" title={t.title}>{t.title}</span>
+                              <span className="forum-thread-time">{t.timeLabel || 'recently'}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="forum-thread-author">{t.author}</span>
+                        </td>
+                        <td>
+                          <span className="forum-category-pill">{t.category || 'General'}</span>
+                        </td>
+                        <td style={{ textAlign: 'center', fontWeight: '600' }}>
+                          {t.replies}
+                        </td>
+                        <td>
+                          <span className={`forum-status-pill ${statusClass}`}>{statusLabel}</span>
+                        </td>
+                        <td>
+                          <div className="forum-actions-cell" style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                            <button 
+                              className={`mod-icon-action-btn ${t.isPinned ? 'pinned' : ''}`}
+                              onClick={() => togglePin(t.id)}
+                              title="Pin Thread"
+                            >
+                              📌
+                            </button>
+                            <button 
+                              className={`mod-icon-action-btn ${t.isLocked ? 'locked' : ''}`}
+                              onClick={() => toggleLock(t.id)}
+                              title="Lock Thread"
+                            >
+                              🔒
+                            </button>
+                            <button 
+                              className="mod-icon-action-btn delete"
+                              onClick={() => handleDeleteThread(t.id, t.title)}
+                              title="Delete Thread"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* VIEW: REPORTS */}
+      {activeTab === 'reports' && (
+        <div className="forum-tab-content">
+          <h2 className="forum-section-title" style={{ marginBottom: '16px' }}>
+            User Reports
+            <span className="forum-title-count">
+              {reportsList.length} pending
+            </span>
+          </h2>
+
+          {reportsList.length === 0 ? (
+            <div className="moderator-empty-state">
+              <h3>No report logs</h3>
+              <p>Everything is clean!</p>
+            </div>
+          ) : (
+            <div className="mod-reports-list" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {reportsList.map(rep => (
+                <div className="report-panel-card pending" key={rep.id}>
+                  <div className="report-panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <h3 className="report-thread-title">{rep.title}</h3>
+                      <span className="report-meta">
+                        Reported by <strong>ConcernedUser</strong> · {rep.timeLabel}
+                      </span>
+                    </div>
+                    <span className="report-status-badge pending">PENDING</span>
+                  </div>
+
+                  <div className="report-reason-box">
+                    <strong>Reason:</strong> {rep.reportReason || 'Off-topic / spam content'}
+                  </div>
+
+                  <div className="report-actions-row" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                    <ModernButton 
+                      variant={2}
+                      label="✓ Mark Resolved"
+                      className="btn-approve"
+                      onClick={() => handleResolveReport(rep.id)}
+                      style={{ height: '32px', minHeight: '32px', fontSize: '12px' }}
+                    />
+                    <ModernButton 
+                      variant={2}
+                      label="🗑️ Remove Thread"
+                      className="btn-reject"
+                      onClick={() => handleRemoveReportThread(rep.id, rep.title)}
+                      style={{ height: '32px', minHeight: '32px', fontSize: '12px' }}
+                    />
+                    <ModernButton 
+                      variant={2}
+                      label="Dismiss"
+                      className="btn-cancel"
+                      onClick={() => handleDismissReport(rep.id)}
+                      style={{ height: '32px', minHeight: '32px', fontSize: '12px' }}
+                    />
+                  </div>
                 </div>
-                <div className="submission-actions">
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* VIEW: CATEGORIES */}
+      {activeTab === 'categories' && (
+        <div className="forum-tab-content">
+          <div className="forum-content-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 className="forum-section-title">
+              Forum Categories
+              <span className="forum-title-count">{categoriesList.length} categories</span>
+            </h2>
+
+            <button 
+              className="mod-btn-create" 
+              onClick={() => setShowAddCategoryModal(true)}
+              style={{ height: '36px', padding: '0 16px', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              + Add Category
+            </button>
+          </div>
+
+          <div className="forum-categories-grid">
+            {categoriesList.map((cat, idx) => (
+              <div className="forum-category-card" key={idx}>
+                <div className="forum-category-card-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <span className="category-color-dot" style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: cat.color || '#a855f7' }} />
+                  <h3 className="category-card-title">{cat.name}</h3>
+                </div>
+                <span className="category-threads-count">{cat.threadsCount} threads</span>
+                
+                <div className="category-card-actions" style={{ display: 'flex', gap: '6px', marginTop: '16px' }}>
                   <button 
-                    className="mod-btn reject"
-                    onClick={() => handleDeleteThread(t.id, t.title)}
+                    className="cat-btn-action edit"
+                    onClick={() => {
+                      setEditingCategory(idx)
+                      setEditCatName(cat.name)
+                    }}
                   >
-                    🗑️ Delete Thread
+                    Edit
+                  </button>
+                  <button 
+                    className="cat-btn-action delete"
+                    onClick={() => handleDeleteCategory(idx, cat.name)}
+                  >
+                    🗑️
                   </button>
                 </div>
               </div>
-            ))
-          )}
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD CATEGORY */}
+      {showAddCategoryModal && (
+        <div className="mod-modal-overlay">
+          <div className="mod-modal-card" style={{ maxWidth: '480px' }}>
+            <div className="mod-modal-header">
+              <h3>Add Forum Category</h3>
+              <button className="mod-modal-close-btn" onClick={() => setShowAddCategoryModal(false)}>×</button>
+            </div>
+            
+            <div className="mod-modal-body" style={{ padding: '20px 24px' }}>
+              <div className="mod-form-group">
+                <label className="mod-label">Category Name *</label>
+                <input 
+                  type="text"
+                  className="mod-input"
+                  placeholder="e.g. Off-topic, Spoilers"
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="mod-modal-footer">
+              <ModernButton 
+                variant={2} 
+                label="Cancel" 
+                className="btn-cancel"
+                onClick={() => setShowAddCategoryModal(false)}
+              />
+              <ModernButton 
+                variant={2} 
+                label="Create" 
+                className="btn-approve"
+                onClick={handleAddCategory}
+                disabled={!newCatName.trim()}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT CATEGORY */}
+      {editingCategory !== null && (
+        <div className="mod-modal-overlay">
+          <div className="mod-modal-card" style={{ maxWidth: '480px' }}>
+            <div className="mod-modal-header">
+              <h3>Edit Forum Category</h3>
+              <button className="mod-modal-close-btn" onClick={() => setEditingCategory(null)}>×</button>
+            </div>
+            
+            <div className="mod-modal-body" style={{ padding: '20px 24px' }}>
+              <div className="mod-form-group">
+                <label className="mod-label">Category Name *</label>
+                <input 
+                  type="text"
+                  className="mod-input"
+                  value={editCatName}
+                  onChange={(e) => setEditCatName(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="mod-modal-footer">
+              <ModernButton 
+                variant={2} 
+                label="Cancel" 
+                className="btn-cancel"
+                onClick={() => setEditingCategory(null)}
+              />
+              <ModernButton 
+                variant={2} 
+                label="Save" 
+                className="btn-approve"
+                onClick={handleEditCategory}
+                disabled={!editCatName.trim()}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>

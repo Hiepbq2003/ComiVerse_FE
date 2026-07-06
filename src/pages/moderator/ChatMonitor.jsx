@@ -3,7 +3,7 @@ import '../../assets/style/moderator/chat-monitor.css'
 import { getAllChatFlagsApi, warnChatFlagApi, deleteChatFlagApi } from '../../services/api/ChatFlagApi'
 import { toast } from 'react-toastify'
 
-function ChatMonitor() {
+function ChatMonitor({ fetchAllData }) {
   const [flags, setFlags] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -16,6 +16,7 @@ function ChatMonitor() {
       setLoading(true)
       const data = await getAllChatFlagsApi()
       setFlags(data || [])
+      fetchAllData?.()
     } catch (err) {
       console.error(err)
       toast.error('Failed to load chat flags!')
@@ -40,6 +41,7 @@ function ChatMonitor() {
       try {
         await deleteChatFlagApi(id)
         setFlags(prev => prev.filter(f => f.id !== id))
+        fetchAllData?.()
         toast.success(`User ${user} has been banned and flag removed.`)
       } catch (err) {
         console.error(err)
