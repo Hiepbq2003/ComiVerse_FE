@@ -10,8 +10,6 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
   const { user, isLoggedIn, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const adminName = user?.fullName || user?.username || 'Admin'
-  const adminAvatar = user?.avatarUrl
-  const adminInitial = adminName.trim().charAt(0).toUpperCase() || 'A'
 
   useEffect(() => {
     if (!isLoggedIn || !user || user.role?.toLowerCase() !== 'admin') {
@@ -156,9 +154,10 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
 
             {/* Admin Info */}
             <Link to="/profile" className="admin-topbar-user-info" title="My Profile">
-              <span className="admin-topbar-avatar">
-                {adminAvatar ? <img src={adminAvatar} alt="" /> : adminInitial}
-              </span>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
               {adminName}
             </Link>
 

@@ -41,13 +41,9 @@ function AuthPage() {
       return
     }
 
-    if (roleUpper === 'MODERATOR' || roleUpper === 'STAFF') {
-      navigate('/moderator', options)
-      return
-    }
-
-    if (roleUpper === 'TRANSLATOR') {
-      navigate('/translator', options)
+    if (roleUpper === 'MODERATOR' || roleUpper === 'STAFF' || roleUpper === 'TRANSLATOR') {
+      setUser(userData)
+      setView('profile')
       return
     }
 
