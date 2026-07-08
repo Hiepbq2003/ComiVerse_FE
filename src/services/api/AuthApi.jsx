@@ -8,6 +8,14 @@ export const registerApi = (userData) => {
   return AxiosClient.post('/auth/register', userData);
 };
 
+export const verifyEmailApi = (email, otp) => {
+  return AxiosClient.post('/auth/verify-email', { email, otp });
+};
+
+export const resendVerificationOtpApi = (email) => {
+  return AxiosClient.post('/auth/resend-verification-otp', { email });
+};
+
 export const forgotPasswordApi = (email) => {
   return AxiosClient.post('/auth/forgot-password', { email });
 };

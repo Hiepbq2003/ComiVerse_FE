@@ -5,6 +5,7 @@ import Login from './Login'
 import Register from './Register'
 import ForgotPassword from './ForgotPassword'
 import ResetPassword from './ResetPassword'
+import VerifyEmail from './VerifyEmail'
 import Profile from './Profile'
 import AdminDashboard from '../admin/AdminDashboard'
 import AuthorDashboard from '../author/AuthorDashboard'
@@ -17,10 +18,11 @@ import { setAuth } from '../../utils/Auth'
 function AuthPage() {
   const navigate = useNavigate()
   const { login, logout, isLoggedIn, user: authUser } = useAuth()
-  const [view, setView] = useState('signin') // 'signin' | 'signup' | 'forgot' | 'reset' | 'profile' | 'oauth-loading'
+  const [view, setView] = useState('signin') // 'signin' | 'signup' | 'verify-email' | 'forgot' | 'reset' | 'profile' | 'oauth-loading'
   const [alert, setAlert] = useState({ type: '', message: '' })
   const [loading, setLoading] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
+  const [verificationEmail, setVerificationEmail] = useState('')
   const [user, setUser] = useState(null)
   const [activeModal, setActiveModal] = useState('none') // 'none' | 'terms' | 'privacy'
 
@@ -145,6 +147,10 @@ function AuthPage() {
       {view === 'signin' && (
         <Login 
           onNavigate={setView} 
+          onVerificationRequired={(email) => {
+            setVerificationEmail(email);
+            setView('verify-email');
+          }}
           onLoginSuccess={(userData) => {
             openRoleDestination(userData, { replace: true });
           }} 
@@ -157,13 +163,24 @@ function AuthPage() {
       {view === 'signup' && (
         <Register 
           onNavigate={setView} 
-          onRegisterSuccess={(userData) => {
-            openRoleDestination(userData, { replace: true });
-          }} 
+          onVerificationRequired={(email) => {
+            setVerificationEmail(email);
+            setView('verify-email');
+          }}
           showAlert={showAlert} 
           loading={loading}
           setLoading={setLoading}
           onOpenModal={setActiveModal}
+        />
+      )}
+
+      {view === 'verify-email' && (
+        <VerifyEmail
+          email={verificationEmail}
+          onNavigate={setView}
+          showAlert={showAlert}
+          loading={loading}
+          setLoading={setLoading}
         />
       )}
 
