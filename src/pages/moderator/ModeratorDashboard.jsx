@@ -289,7 +289,10 @@ function ModeratorDashboard() {
             <ProjectTeams 
               projectTeams={projectTeams}
               setProjectTeams={setProjectTeams}
-              comics={comics}
+              comics={comics
+                .filter(c => !submissions.some(s => s.queueType === 'author' && s.status === 'pending' && s.title === c.title))
+                .filter((value, index, self) => self.findIndex(t => t.title === value.title) === index)
+              }
               showCreateTeamModal={showCreateTeamModal}
               setShowCreateTeamModal={setShowCreateTeamModal}
               createTeamStep={createTeamStep}
