@@ -15,3 +15,7 @@ export const deleteForumThreadApi = (id) => {
 export const createForumThreadApi = (threadData) => {
   return AxiosClient.post('/forum-threads', threadData);
 };
+
+export const updateForumThreadApi = (id, data) => {
+  return AxiosClient.put(`/forum-threads/${id}`, data);
+};

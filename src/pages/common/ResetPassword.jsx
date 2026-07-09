@@ -43,6 +43,7 @@ function ResetPassword({ email, onNavigate, showAlert, loading, setLoading }) {
 
   return (
     <div className="auth-form-card fade-in">
+      <div className="border-beam-wrapper" />
       <div className="form-header-group">
         <h2>Set new password</h2>
         <p>We've sent an OTP code to <strong>{email}</strong>.</p>
@@ -57,7 +58,7 @@ function ResetPassword({ email, onNavigate, showAlert, loading, setLoading }) {
             inputMode="numeric"
             maxLength="6"
             pattern="[0-9]{6}"
-            placeholder="6-digit code" 
+            placeholder="Enter 6-digit code" 
             value={form.otp}
             onChange={(e) => setForm({ ...form, otp: e.target.value.replace(/\D/g, '').slice(0, 6) })}
             className="glass-input-field"
@@ -66,12 +67,12 @@ function ResetPassword({ email, onNavigate, showAlert, loading, setLoading }) {
           />
         </div>
 
-        <div className="glass-input-wrapper" style={{ marginTop: '16px' }}>
+        <div className="glass-input-wrapper auth-margin-top-16">
           <span className="glass-input-label">NEW PASSWORD</span>
           <input 
             id="reset-password"
             type="password" 
-            placeholder="••••••••" 
+            placeholder="Enter new password" 
             value={form.newPassword}
             onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
             className="glass-input-field"
@@ -80,12 +81,12 @@ function ResetPassword({ email, onNavigate, showAlert, loading, setLoading }) {
           />
         </div>
 
-        <div className="glass-input-wrapper" style={{ marginTop: '16px' }}>
+        <div className="glass-input-wrapper auth-margin-top-16">
           <span className="glass-input-label">CONFIRM NEW PASSWORD</span>
           <input 
             id="reset-confirm"
             type="password" 
-            placeholder="••••••••" 
+            placeholder="Confirm new password" 
             value={form.confirmNewPassword}
             onChange={(e) => setForm({ ...form, confirmNewPassword: e.target.value })}
             className="glass-input-field"
@@ -94,11 +95,11 @@ function ResetPassword({ email, onNavigate, showAlert, loading, setLoading }) {
           />
         </div>
 
-        <button type="submit" className="btn-primary" style={{ marginTop: '20px' }} disabled={loading}>
+        <button type="submit" className="btn-primary auth-margin-top-20" disabled={loading}>
           <span>{loading ? 'Resetting Password...' : 'Reset Password'}</span> <span className="btn-arrow-icon">›</span>
         </button>
 
-        <button type="button" className="btn-secondary" style={{ marginTop: '12px' }} onClick={handleResendOtp} disabled={loading}>
+        <button type="button" className="btn-secondary auth-margin-top-12" onClick={handleResendOtp} disabled={loading}>
           {loading ? 'Sending OTP...' : 'Resend OTP Code'}
         </button>
       </form>
