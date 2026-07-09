@@ -163,12 +163,6 @@ async function fetchJson(url, signal) {
 async function fetchChapterForTask(taskId, signal) {
   const task = await fetchJson(`${API_BASE}/team-workspace/tasks/${taskId}`, signal);
 
-  // eslint-disable-next-line no-console
-  console.log("[fetchChapterForTask] raw task response:", task);
-
-  // Different endpoints in this backend don't always return the same shape,
-  // so we defensively check a few likely locations for chapterId before
-  // giving up.
   const chapterId =
     task?.chapterId ??
     task?.chapter_id ??
@@ -178,11 +172,26 @@ async function fetchChapterForTask(taskId, signal) {
 
   if (!chapterId) {
     throw new Error(
-      `Task không có chapterId. Kiểm tra console log "[fetchChapterForTask] raw task response" để xem cấu trúc thật của response.`
+      `Task does not have a chapterId. Check the console log "[fetchJson]" to see the actual structure of the response.`
     );
   }
 
-  return fetchJson(`${API_BASE}/chapters/detail/${chapterId}`, signal);
+  const chapter = await fetchJson(`${API_BASE}/chapters/detail/${chapterId}`, signal);
+
+  
+  let comicTitle = null;
+  if (chapter?.comicId) {
+    try {
+      const comic = await fetchJson(`${API_BASE}/comics/${chapter.comicId}`, signal);
+      comicTitle = comic?.title ?? comic?.name ?? null;
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        console.error("Unable to fetch comic title:", err);
+      }
+    }
+  }
+
+  return { ...chapter, comicTitle };
 }
 
 // Normalizes whatever shape `images` comes back as (array of strings, or
@@ -245,7 +254,7 @@ export default function TranslateWorkspace() {
       })
       .catch((err) => {
         if (err.name === "AbortError") return;
-        console.error("Lỗi khi tải chương:", err);
+        console.error("Error loading chapter:", err);
         setError(err.message);
         setStatus("error");
       });
@@ -301,10 +310,10 @@ export default function TranslateWorkspace() {
           </div>
           <div>
             <p className="tw-project-title tw-font-display">
-              {chapterData?.title || "Untitled chapter"}
+              {chapterData?.comicTitle}
             </p>
             <p className="tw-project-sub tw-font-mono">
-              Page {images.length ? currentPageIndex + 1 : 0} / {images.length}
+              {chapterData?.title}
             </p>
           </div>
         </div>
