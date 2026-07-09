@@ -1,9 +1,29 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import { useAuth } from './AuthContext'
+import { getAuth } from '../utils/Auth'
 
 const ThemeContext = createContext()
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark')
+  const { user } = useAuth()
+
+  const getThemeKey = (u) => {
+    if (!u) return 'theme'
+    const identifier = u.userId || u.id || u.email || u.username
+    return identifier ? `theme_${identifier}` : 'theme'
+  }
+
+  const [theme, setTheme] = useState(() => {
+    const auth = getAuth()
+    const key = getThemeKey(auth?.user)
+    return localStorage.getItem(key) || 'dark'
+  })
+
+  useEffect(() => {
+    const key = getThemeKey(user)
+    const savedTheme = localStorage.getItem(key) || 'dark'
+    setTheme(savedTheme)
+  }, [user])
 
   useEffect(() => {
     if (theme === 'light') {
@@ -13,8 +33,9 @@ export function ThemeProvider({ children }) {
       document.documentElement.classList.remove('light')
       document.documentElement.classList.add('dark')
     }
-    localStorage.setItem('theme', theme)
-  }, [theme])
+    const key = getThemeKey(user)
+    localStorage.setItem(key, theme)
+  }, [theme, user])
 
   const toggleTheme = () => {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))

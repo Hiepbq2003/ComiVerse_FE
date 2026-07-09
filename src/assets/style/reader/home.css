@@ -181,9 +181,10 @@
   box-sizing: border-box !important;
   height: 38px !important;
   min-height: 38px !important;
-  border: 1.5px solid rgba(167, 139, 250, 0.4) !important;
-  color: #c084fc !important;
-  background-color: rgba(167, 139, 250, 0.05) !important;
+  border: none !important;
+  color: #ffffff !important;
+  background: #7c3aed !important;
+  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.25) !important;
 }
 
 .btn-home-auth-link:hover {
@@ -191,14 +192,15 @@
   color: #ffffff !important;
   border-color: transparent !important;
   transform: translateY(-2px) !important;
-  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.25) !important;
+  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.35) !important;
 }
 
 /* Light mode overrides */
 html.light .btn-home-auth-link {
-  border: 1.5px solid rgba(139, 92, 246, 0.5) !important;
-  color: #7c3aed !important;
-  background-color: rgba(139, 92, 246, 0.04) !important;
+  border: none !important;
+  color: #ffffff !important;
+  background: #8b5cf6 !important;
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.25) !important;
 }
 
 html.light .btn-home-auth-link:hover {
@@ -206,7 +208,7 @@ html.light .btn-home-auth-link:hover {
   color: #ffffff !important;
   border-color: transparent !important;
   transform: translateY(-2px) !important;
-  box-shadow: 0 6px 20px rgba(236, 72, 153, 0.3) !important;
+  box-shadow: 0 6px 20px rgba(236, 72, 153, 0.35) !important;
 }
 
 .btn-home-primary {

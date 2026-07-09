@@ -46,9 +46,9 @@ function ProfileRouteWrapper() {
 
 function App() {
   return (
-    <ThemeProvider>
-      <LanguageProvider>
-        <AuthProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <LanguageProvider>
           <NotificationProvider>
             <BrowserRouter>
               <Routes>
@@ -90,9 +90,9 @@ function App() {
               <ToastContainer position="top-right" autoClose={3000} theme="dark" />
             </BrowserRouter>
           </NotificationProvider>
-        </AuthProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </AuthProvider>
   )
 }
 
