@@ -90,13 +90,14 @@ function App() {
                 <Route path="/author/settings" element={<AuthorSettings />} />
                 {/* Translator */}
                 <Route path="/translator" element={<TranslatorLayout />}>
-                  <Route path="translate-workspace" element={<TranslateWorkspace />} />
+                  
                   <Route path="project-list" element={<ProjectList />} />
                   <Route path="project-teams" element={<TeamProjects />} />
                   <Route path="revenue" element={<TranslatorRevenue />} />
                   <Route path="payout" element={<TranslatorPayout />} />
                   <Route path="dashboard" element={<TranslateDashboard />} />
                 </Route>
+                <Route path="/translator/translate-workspace/task/:taskId" element={<TranslateWorkspace />} />
                 
 
                 {/* Showcase Demos */}
