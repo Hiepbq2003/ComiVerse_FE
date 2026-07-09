@@ -323,7 +323,9 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                         <span className="comic-cell-title">{comic.title}</span>
                         <div className="comic-cell-genres">
                           {comic.genres.map((g, idx) => (
-                            <span key={idx} className="comic-genre-tag">{g}</span>
+                            <span key={idx} className="comic-genre-tag">
+                              {typeof g === 'object' && g !== null ? g.name : g}
+                            </span>
                           ))}
                         </div>
                       </div>

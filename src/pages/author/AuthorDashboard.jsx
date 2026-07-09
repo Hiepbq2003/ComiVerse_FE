@@ -130,7 +130,7 @@ function AuthorDashboard() {
               const y = lineChart.padY + (1 - v / lineChart.maxVal) * (lineChart.chartH - lineChart.padY * 2)
               return (
                 <g key={v}>
-                  <line x1={lineChart.padX} y1={y} x2={lineChart.chartW - lineChart.padX} y2={y} stroke="rgba(15,23,42,0.08)" strokeDasharray="4 4" />
+                  <line x1={lineChart.padX} y1={y} x2={lineChart.chartW - lineChart.padX} y2={y} stroke="rgba(255,255,255,0.08)" strokeDasharray="4 4" />
                   <text x={lineChart.padX - 10} y={y + 4} textAnchor="end" fill="#94a3b8" fontSize="11" fontFamily="Outfit">{v}</text>
                 </g>
               )
@@ -139,13 +139,13 @@ function AuthorDashboard() {
               const x = lineChart.padX + (i / 11) * (lineChart.chartW - lineChart.padX * 2)
               return <text key={m} x={x} y={lineChart.chartH - 5} textAnchor="middle" fill="#94a3b8" fontSize="11" fontFamily="Outfit">{m}</text>
             })}
-            <path d={lineChart.viewPath} fill="none" stroke="#1e293b" strokeWidth="2.5" strokeLinejoin="round" />
+            <path d={lineChart.viewPath} fill="none" stroke="#c084fc" strokeWidth="2.5" strokeLinejoin="round" />
             <path d={lineChart.revenuePath} fill="none" stroke="#aa3bff" strokeWidth="2" strokeDasharray="6 3" strokeLinejoin="round" />
             <path d={lineChart.followerPath} fill="none" stroke="#10b981" strokeWidth="2" strokeDasharray="4 4" strokeLinejoin="round" />
             {VIEWS_DATA.map((val, i) => {
               const x = lineChart.padX + (i / 11) * (lineChart.chartW - lineChart.padX * 2)
               const y = lineChart.padY + (1 - val / lineChart.maxVal) * (lineChart.chartH - lineChart.padY * 2)
-              return <circle key={i} cx={x} cy={y} r="3" fill="#1e293b" />
+              return <circle key={i} cx={x} cy={y} r="3" fill="#c084fc" />
             })}
           </svg>
         </div>
@@ -170,7 +170,7 @@ function AuthorDashboard() {
                 const y = barPadY + (1 - v / maxBar) * (barH - barPadY * 2)
                 return (
                   <g key={v}>
-                    <line x1={barPadX} y1={y} x2={barW - 20} y2={y} stroke="rgba(15,23,42,0.08)" strokeDasharray="4 4" />
+                    <line x1={barPadX} y1={y} x2={barW - 20} y2={y} stroke="rgba(255,255,255,0.08)" strokeDasharray="4 4" />
                     <text x={barPadX - 8} y={y + 4} textAnchor="end" fill="#94a3b8" fontSize="10" fontFamily="Outfit">{v}</text>
                   </g>
                 )
@@ -184,7 +184,7 @@ function AuthorDashboard() {
                 const baseY = barH - barPadY
                 return (
                   <g key={m}>
-                    <rect x={gx} y={baseY - uploadH} width={bw} height={uploadH} rx="2" fill="#64748b" />
+                    <rect x={gx} y={baseY - uploadH} width={bw} height={uploadH} rx="2" fill="#94a3b8" />
                     <rect x={gx + bw + 2} y={baseY - reviewH} width={bw} height={reviewH} rx="2" fill="#aa3bff" />
                     <rect x={gx + bw * 2 + 4} y={baseY - approvedH} width={bw} height={approvedH} rx="2" fill="#10b981" />
                     <text x={gx + bw} y={barH - 4} textAnchor="middle" fill="#94a3b8" fontSize="9" fontFamily="Outfit">{m}</text>

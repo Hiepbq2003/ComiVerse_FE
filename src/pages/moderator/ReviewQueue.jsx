@@ -1,6 +1,23 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import '../../assets/style/moderator/review-queue.css'
 import ModernButton from '../../components/common/ModernButton'
+
+const formatSubmitterName = (submittedBy) => {
+  if (!submittedBy) return 'Unknown';
+  let name = submittedBy;
+  let isAuthor = false;
+  if (name.startsWith('Author: ')) {
+    name = name.substring(8);
+    isAuthor = true;
+  }
+  
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(name)) {
+    name = `User_${name.substring(0, 7)}`;
+  }
+  
+  return isAuthor ? `Author: ${name}` : name;
+};
 
 function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
   const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'approved' | 'rejected'
@@ -8,6 +25,7 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
   
   const [priorityFilter, setPriorityFilter] = useState('All Priority')
   const [sortFilter, setSortFilter] = useState('Newest')
+  const [searchQuery, setSearchQuery] = useState('')
 
   const [selectedReview, setSelectedReview] = useState(null)
   const [selectedReject, setSelectedReject] = useState(null)
@@ -26,6 +44,14 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
       .filter(item => item.status === activeTab)
       .filter(item => item.queueType === subQueue)
       .filter(item => subQueue === 'author' || priorityFilter === 'All Priority' || item.priority === priorityFilter)
+      .filter(item => {
+        if (!searchQuery.trim()) return true;
+        const query = searchQuery.toLowerCase().trim();
+        const titleMatch = item.title?.toLowerCase().includes(query);
+        const nameMatch = item.submittedBy?.toLowerCase().includes(query);
+        const emailMatch = item.submittedByEmail?.toLowerCase().includes(query);
+        return titleMatch || nameMatch || emailMatch;
+      })
       .sort((a, b) => {
         if (sortFilter === 'Newest') {
           return b.timestamp - a.timestamp
@@ -113,7 +139,15 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
       </div>
 
       {/* Filter and Sort bar */}
-      <div className="moderator-filter-bar">
+      <div className="moderator-filter-bar" style={{ display: 'flex', gap: '12px', alignItems: 'center', width: '100%', flexWrap: 'wrap' }}>
+        <input 
+          type="text"
+          className="moderator-select"
+          placeholder="Search by title, author name, or email..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{ flex: 1, minWidth: '240px', outline: 'none' }}
+        />
         {subQueue !== 'author' && (
           <select 
             className="moderator-select"
@@ -148,13 +182,21 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
           filteredItems.map(item => (
             <div className="submission-card" key={item.id}>
               <div className="submission-cover-placeholder">
-                {item.cover}
+                {item.cover && (item.cover.startsWith('http') || item.cover.includes('/')) ? (
+                  <img src={item.cover} alt={item.title} className="submission-cover-img" />
+                ) : (
+                  item.cover || '📚'
+                )}
               </div>
 
               <div className="submission-info">
                 <h3 className="submission-title">{item.title}</h3>
-                <p className="submission-meta">
-                  {item.chapter} · Submitted by <strong>{item.submittedBy}</strong>
+                 <p className="submission-meta">
+                  {item.queueType === 'author' ? (
+                    <span><strong>Author:</strong> {formatSubmitterName(item.submittedBy).replace('Author: ', '')}</span>
+                  ) : (
+                    <span><strong>Chapter {item.chapter}</strong> · {formatSubmitterName(item.submittedBy)}</span>
+                  )}
                 </p>
                 <div className="submission-extra">
                   <span className="submission-extra-item">⏱️ {item.timeLabel}</span>
@@ -176,7 +218,7 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
 
                 <div className="submission-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <ModernButton 
-                    variant={5} 
+                    variant={2} 
                     label="👁️ Review Content" 
                     className="btn-review"
                     onClick={() => setSelectedReview(item)} 
@@ -190,7 +232,7 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
                         onClick={() => onApproveClick(item.id)} 
                       />
                       <ModernButton 
-                        variant={5} 
+                        variant={2} 
                         label="✗ Reject" 
                         className="btn-reject"
                         onClick={() => onOpenReject(item)} 
@@ -217,9 +259,35 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
               <div className="review-preview-info">
                 <strong>Submission Details:</strong>
                 <div className="review-preview-meta-grid">
-                  <div><strong>Chapter:</strong> {selectedReview.chapter}</div>
-                  <div><strong>Submitter:</strong> {selectedReview.submittedBy}</div>
-                  {selectedReview.queueType !== 'author' && <div><strong>Priority:</strong> {selectedReview.priority}</div>}
+                  {selectedReview.queueType === 'author' ? (
+                    <>
+                      <div>
+                        <strong>Author:</strong> {formatSubmitterName(selectedReview.submittedBy).replace('Author: ', '')}
+                      </div>
+                      {selectedReview.submittedByEmail && (
+                        <div>
+                          <strong>Email:</strong> {selectedReview.submittedByEmail}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <strong>Chapter:</strong> {selectedReview.chapter}
+                      </div>
+                      <div>
+                        <strong>Team:</strong> {formatSubmitterName(selectedReview.submittedBy)}
+                      </div>
+                      {selectedReview.submittedByEmail && (
+                        <div>
+                          <strong>Email:</strong> {selectedReview.submittedByEmail}
+                        </div>
+                      )}
+                      <div>
+                        <strong>Priority:</strong> {selectedReview.priority}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -230,8 +298,9 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
 
             <div className="mod-modal-footer" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
               <ModernButton 
-                variant={5} 
+                variant={2} 
                 label="Close Preview" 
+                className="btn-cancel"
                 onClick={() => setSelectedReview(null)} 
               />
               {selectedReview.status === 'pending' && (
@@ -243,7 +312,7 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
                     onClick={() => onApproveClick(selectedReview.id)} 
                   />
                   <ModernButton 
-                    variant={5} 
+                    variant={2} 
                     label="✗ Reject" 
                     className="btn-reject"
                     onClick={() => onOpenReject(selectedReview)} 
@@ -279,8 +348,9 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
 
             <div className="mod-modal-footer" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
               <ModernButton 
-                variant={5} 
+                variant={2} 
                 label="Cancel" 
+                className="btn-cancel"
                 onClick={() => setSelectedReject(null)} 
               />
               <ModernButton 
