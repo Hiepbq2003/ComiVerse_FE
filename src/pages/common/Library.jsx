@@ -192,7 +192,7 @@ function Library() {
                 <span className="lib-banner-stat-label">Groups</span>
                 <span className="lib-banner-stat-value">127 groups</span>
               </div>
-              <button className="lib-banner-btn" onClick={() => navigate('/auth')}>
+              <button className="lib-banner-btn" onClick={() => navigate('/policy')}>
                 Learn More →
               </button>
             </div>
