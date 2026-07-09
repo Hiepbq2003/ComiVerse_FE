@@ -9,7 +9,7 @@ import { useNotification } from '../../context/NotificationContext'
 function HomeLayout({ children }) {
   const navigate = useNavigate()
   const location = useLocation()
-  
+
   const { isLoggedIn, user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const { notifications, unreadCount, loadNotifications, markAsRead, markAllAsRead } = useNotification()
@@ -84,6 +84,8 @@ function HomeLayout({ children }) {
     const roleUpper = (user.role || '').toUpperCase()
     if (roleUpper === 'ADMIN') return '/admin/account-management'
     if (roleUpper === 'AUTHOR') return '/author/overview'
+    if (roleUpper === 'TRANSLATOR') return '/translator/dashboard'
+
     return '/auth' // Reader dashboard is handled inside AuthPage
   }
 
