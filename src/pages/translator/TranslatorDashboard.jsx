@@ -67,11 +67,6 @@ function TranslatorDashboard() {
           status: 'ACTIVE'
         }
         await updateProjectTeamApi(team.id, teamPayload)
-        const allComics = await getAllComicsApi()
-        const comicToReset = allComics.find(c => c.title.toLowerCase() === team.title.toLowerCase())
-        if (comicToReset) {
-          await updateComicApi(comicToReset.id, { ...comicToReset, projectTeam: '-' })
-        }
         toast.info(`Rejected assignment for ${team.title}. The project has been returned.`)
         await fetchProjects()
       } catch (err) {

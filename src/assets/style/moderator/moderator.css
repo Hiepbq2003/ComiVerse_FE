@@ -1728,6 +1728,70 @@ select.mod-form-input,
 }
 
 /* ── LIGHT MODE OVERRIDES FOR MODERATOR CONTROLS ── */
+html.light {
+  --mod-bg: #faf9f6;
+  --mod-sidebar-bg: #ffffff;
+  --mod-topbar-bg: #ffffff;
+  --mod-card-bg: #ffffff;
+  --mod-border: rgba(0, 0, 0, 0.1);
+  --mod-text-primary: #0f172a;
+  --mod-text-secondary: #475569;
+  --mod-text-muted: #64748b;
+  --mod-sidebar-text: #475569;
+  --mod-sidebar-active: #7c3aed;
+}
+
+html.light .mod-modal-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08), 0 0 1px rgba(15, 23, 42, 0.1) !important;
+}
+
+html.light .mod-modal-overlay {
+  background: rgba(15, 23, 42, 0.4) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+html.light .mod-modal-footer {
+  background: #f8fafc !important;
+  border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+html.light .modern-btn-container .btn-2.btn-cancel {
+  background: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+html.light .modern-btn-container .btn-2.btn-cancel::before {
+  background: #94a3b8 !important;
+}
+
+html.light .moderator-select::placeholder,
+html.light .mod-form-input::placeholder,
+html.light .mod-textarea::placeholder,
+html.light .genre-form-container input::placeholder,
+html.light .genre-form-container textarea::placeholder,
+html.light .comic-search-input::placeholder,
+html.light .mod-input::placeholder {
+  color: #94a3b8 !important;
+  opacity: 0.85 !important;
+}
+
+html.light .leader-search-dropdown {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .leader-search-result-card + .leader-search-result-card,
+html.light .leader-search-result + .leader-search-result {
+  border-top: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .project-team-progress-bar-bg {
+  background: rgba(0, 0, 0, 0.06) !important;
+}
+
 html.light .moderator-sidebar {
   border-right: 1px solid rgba(99, 87, 78, 0.1) !important;
 }
