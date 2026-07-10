@@ -305,3 +305,75 @@
 .leader-selected-tag strong {
   color: #4ade80;
 }
+
+/* ── Selected Leader Card ──────────────────────── */
+.leader-selected-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(34, 197, 94, 0.06);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 10px;
+  margin-top: 6px;
+  transition: border-color 0.2s ease;
+}
+
+.leader-selected-card .leader-result-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22c55e, #10b981);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.leader-selected-card .leader-result-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.leader-selected-card .leader-result-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4ade80;
+}
+
+.leader-selected-card .leader-result-email {
+  font-size: 12px;
+  color: var(--mod-text-secondary, #94a3b8);
+}
+
+.leader-change-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--mod-text-secondary, #94a3b8);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.leader-change-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(168, 85, 247, 0.3);
+  color: #c084fc;
+}
+
+/* ── Search Hint ────────────────────────────────── */
+.leader-search-hint-inline {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--mod-text-muted, #64748b);
+}
+

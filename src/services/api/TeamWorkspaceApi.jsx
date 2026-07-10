@@ -39,3 +39,7 @@ export const getTeamRequestsApi = async (teamId) => {
 export const deleteTeamRequestApi = async (id) => {
   return AxiosClient.delete(`/team-workspace/requests/${id}`)
 }
+
+export const getChapterBacklogApi = async (teamId) => {
+  return AxiosClient.get(`/team-workspace/${teamId}/chapter-backlog`)
+}

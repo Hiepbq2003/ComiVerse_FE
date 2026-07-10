@@ -1,0 +1,124 @@
+/* ── TRANSLATOR PROJECT LIST DARK STYLES ──────────────────── */
+.translator-project-list-container {
+  color: var(--trans-text-primary);
+  font-family: 'Outfit', sans-serif;
+}
+
+.translator-project-list-container h1 {
+  color: var(--trans-text-primary);
+  font-weight: 700;
+}
+
+/* Toolbar search field */
+.translator-project-list-container .form-control {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid var(--trans-border) !important;
+  color: var(--trans-text-primary) !important;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.translator-project-list-container .form-control:focus {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--trans-purple) !important;
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2) !important;
+  color: var(--trans-text-primary) !important;
+}
+
+.translator-project-list-container .form-control::placeholder {
+  color: var(--trans-text-muted) !important;
+}
+
+/* Filter button */
+.translator-project-list-container .btn-outline-secondary {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid var(--trans-border) !important;
+  color: var(--trans-text-primary) !important;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.translator-project-list-container .btn-outline-secondary:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: var(--trans-purple) !important;
+  color: var(--trans-text-primary) !important;
+}
+
+/* Card overrides */
+.translator-project-list-container .card {
+  background: var(--trans-card-bg) !important;
+  border: 1px solid var(--trans-border) !important;
+  border-radius: 12px;
+  color: var(--trans-text-primary) !important;
+  box-shadow: none !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.translator-project-list-container .card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(168, 85, 247, 0.25) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(168, 85, 247, 0.1) !important;
+}
+
+.translator-project-list-container .card-title {
+  color: var(--trans-text-primary) !important;
+  font-weight: 700;
+  font-size: 17px;
+}
+
+.translator-project-list-container .text-muted {
+  color: var(--trans-text-secondary) !important;
+}
+
+/* Ensure all detail lists/elements are light gray */
+.translator-project-list-container .list-unstyled li {
+  color: var(--trans-text-secondary) !important;
+}
+
+.translator-project-list-container .list-unstyled li svg {
+  color: var(--trans-purple) !important;
+}
+
+/* Badge overlay */
+.translator-project-list-container .badge.bg-info-subtle {
+  background-color: rgba(6, 182, 212, 0.12) !important;
+  color: #22d3ee !important;
+  border: 1px solid rgba(6, 182, 212, 0.2);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Buttons */
+.translator-project-list-container .btn-primary {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%) !important;
+  border: none !important;
+  color: #ffffff !important;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  transition: opacity 0.2s ease, transform 0.1s ease;
+}
+
+.translator-project-list-container .btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.translator-project-list-container .btn-primary:active {
+  transform: translateY(0);
+}
+
+.translator-project-list-container .btn-success {
+  background: rgba(16, 185, 129, 0.12) !important;
+  border: 1px solid rgba(16, 185, 129, 0.2) !important;
+  color: #34d399 !important;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+}

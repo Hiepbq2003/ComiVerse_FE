@@ -30,6 +30,7 @@ function ProjectTeams({
   // Create Team - leader search states
   const [createLeaderSearch, setCreateLeaderSearch] = useState('')
   const [createLeaderResults, setCreateLeaderResults] = useState([])
+  const [selectedLeader, setSelectedLeader] = useState(null)
 
   const handleLeaderSearch = async (query) => {
     setLeaderSearch(query)
@@ -91,7 +92,15 @@ function ProjectTeams({
   const selectCreateLeader = (translator) => {
     const displayName = translator.fullName || translator.username;
     setCreateTeamForm(prev => ({ ...prev, leaderName: displayName }))
-    setCreateLeaderSearch(displayName)
+    setSelectedLeader(translator)
+    setCreateLeaderSearch('')
+    setCreateLeaderResults([])
+  }
+
+  const clearSelectedLeader = () => {
+    setSelectedLeader(null)
+    setCreateTeamForm(prev => ({ ...prev, leaderName: '' }))
+    setCreateLeaderSearch('')
     setCreateLeaderResults([])
   }
 
@@ -118,12 +127,14 @@ function ProjectTeams({
     setCreateTeamForm({
       title: '',
       comicName: comics[0]?.title || '',
-      deadline: '',
       sourceLang: 'Japanese',
       targetLang: 'English',
-      leaderName: 'John Smith',
+      leaderName: '',
       priority: 'High'
     })
+    setCreateLeaderSearch('')
+    setCreateLeaderResults([])
+    setSelectedLeader(null)
     setCreateTeamStep(1)
     setShowCreateTeamModal(true)
   }
@@ -225,7 +236,7 @@ function ProjectTeams({
                   </div>
 
                   <div className="project-team-deadline-info">
-                    📅 Deadline: <strong>{team.deadline}</strong>
+                    🔥 Priority: <strong>{team.priority || 'High'}</strong>
                   </div>
                 </div>
               </div>
@@ -284,13 +295,17 @@ function ProjectTeams({
                   </div>
 
                   <div className="mod-form-group">
-                    <label className="mod-label">Deadline</label>
-                    <input 
-                      type="date" 
-                      className="mod-input" 
-                      value={createTeamForm.deadline}
-                      onChange={(e) => setCreateTeamForm({ ...createTeamForm, deadline: e.target.value })}
-                    />
+                    <label className="mod-label">Priority</label>
+                    <select 
+                      className="mod-select-field"
+                      value={createTeamForm.priority || 'High'}
+                      onChange={(e) => setCreateTeamForm({ ...createTeamForm, priority: e.target.value })}
+                    >
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                      <option value="Urgent">Urgent</option>
+                    </select>
                   </div>
 
                   <div className="mod-form-row">
@@ -325,41 +340,62 @@ function ProjectTeams({
                 <div className="fade-in">
                   <div className="mod-form-group">
                     <label className="mod-label">Assign Group Leader *</label>
-                    <div className="leader-search-container">
-                      <input 
-                        type="text" 
-                        className="mod-input"
-                        placeholder="Search by name, username, or email..."
-                        value={createLeaderSearch}
-                        onChange={(e) => handleCreateLeaderSearch(e.target.value)}
-                      />
-                      {createLeaderResults.length > 0 && (
-                        <div className="leader-search-dropdown">
-                          {createLeaderResults.map((t, idx) => (
-                            <button
-                              key={t.id || idx}
-                              type="button"
-                              className="leader-search-result"
-                              onClick={() => selectCreateLeader(t)}
-                            >
-                              <span className="leader-result-avatar">{t.initials}</span>
-                              <div className="leader-result-info">
-                                <span className="leader-result-name">{t.fullName || t.username}</span>
-                                <span className="leader-result-email">{t.email || 'Translator'}</span>
-                              </div>
-                            </button>
-                          ))}
+
+                    {selectedLeader ? (
+                      /* ── Selected Leader Card ── */
+                      <div className="leader-selected-card">
+                        <span className="leader-result-avatar">{selectedLeader.initials}</span>
+                        <div className="leader-result-info">
+                          <span className="leader-result-name">{selectedLeader.fullName || selectedLeader.username}</span>
+                          <span className="leader-result-email">{selectedLeader.email || 'Translator'}</span>
                         </div>
-                      )}
-                      {createLeaderSearch.trim().length >= 2 && createLeaderResults.length === 0 && (
-                        <div className="leader-search-dropdown">
-                          <div className="leader-search-empty">No translators found matching "{createLeaderSearch}"</div>
-                        </div>
-                      )}
-                    </div>
-                    {createTeamForm.leaderName && (
-                      <div className="leader-selected-tag">
-                        ✅ Selected: <strong>{createTeamForm.leaderName}</strong>
+                        <button
+                          type="button"
+                          className="leader-change-btn"
+                          onClick={clearSelectedLeader}
+                        >
+                          Change
+                        </button>
+                      </div>
+                    ) : (
+                      /* ── Search Input ── */
+                      <div className="leader-search-container">
+                        <input 
+                          type="text" 
+                          className="mod-input"
+                          placeholder="Search by name, username, or email..."
+                          value={createLeaderSearch}
+                          onChange={(e) => handleCreateLeaderSearch(e.target.value)}
+                          autoFocus
+                        />
+                        {createLeaderResults.length > 0 && (
+                          <div className="leader-search-dropdown">
+                            {createLeaderResults.map((t, idx) => (
+                              <button
+                                key={t.id || idx}
+                                type="button"
+                                className="leader-search-result"
+                                onClick={() => selectCreateLeader(t)}
+                              >
+                                <span className="leader-result-avatar">{t.initials}</span>
+                                <div className="leader-result-info">
+                                  <span className="leader-result-name">{t.fullName || t.username}</span>
+                                  <span className="leader-result-email">{t.email || 'Translator'}</span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {createLeaderSearch.trim().length >= 2 && createLeaderResults.length === 0 && (
+                          <div className="leader-search-dropdown">
+                            <div className="leader-search-empty">No translators found matching "{createLeaderSearch}"</div>
+                          </div>
+                        )}
+                        {createLeaderSearch.trim().length < 2 && (
+                          <div className="leader-search-hint-inline">
+                            🔍 Type at least 2 characters to search translators
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -384,6 +420,14 @@ function ProjectTeams({
                 className="mod-btn approve"
                 onClick={() => {
                   if (createTeamStep === 1) {
+                    const exists = projectTeams.some(
+                      t => t.comicName && t.comicName.toLowerCase() === createTeamForm.comicName.toLowerCase() &&
+                           t.targetLang && t.targetLang.toLowerCase() === createTeamForm.targetLang.toLowerCase()
+                    );
+                    if (exists) {
+                      toast.error(`A translation team for "${createTeamForm.comicName}" in "${createTeamForm.targetLang}" already exists!`);
+                      return;
+                    }
                     setCreateTeamStep(2);
                   } else {
                     handleCreateProjectTeam();

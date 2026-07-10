@@ -18,7 +18,8 @@ import {
   createTeamTaskApi,
   updateTeamTaskApi,
   getTeamRequestsApi,
-  deleteTeamRequestApi
+  deleteTeamRequestApi,
+  getChapterBacklogApi
 } from '../../services/api/TeamWorkspaceApi'
 import { toast } from 'react-toastify'
 
@@ -73,6 +74,8 @@ function TeamProjects() {
   const [chatInput, setChatInput] = useState('')
   const [joinRequests, setJoinRequests] = useState([])
   const [tasks, setTasks] = useState([])
+  const [chapterBacklog, setChapterBacklog] = useState([])
+  const [backlogCollapsed, setBacklogCollapsed] = useState(false)
   const [lockedColumns, setLockedColumns] = useState([])
   const [highlightedColumns, setHighlightedColumns] = useState([])
   const [sortedColumns, setSortedColumns] = useState([])
@@ -151,9 +154,35 @@ function TeamProjects() {
       assignee: selectedDetails?.leaderInitials || 'TL',
       dueDate: '',
       priority: 'Medium',
-      comic: comicName
+      comic: comicName,
+      chapterId: null
     })
     setShowCreateTask(true)
+  }
+
+  const openCreateTaskFromBacklog = (chapter) => {
+    setNewTaskData({
+      title: `${chapter.title || 'Chapter ' + chapter.chapterNumber} - Translation`,
+      column: 'backlog',
+      assignee: selectedDetails?.leaderInitials || 'TL',
+      dueDate: '',
+      priority: 'Medium',
+      comic: chapter.comicName || selectedDetails?.comicName || selectedDetails?.title || '',
+      chapterId: chapter.chapterId
+    })
+    setShowCreateTask(true)
+  }
+
+  const getTimeAgo = (date) => {
+    const seconds = Math.floor((new Date() - date) / 1000)
+    if (seconds < 60) return 'Just now'
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `${minutes} min ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+    const days = Math.floor(hours / 24)
+    if (days < 30) return `${days} day${days > 1 ? 's' : ''} ago`
+    return date.toLocaleDateString()
   }
 
   const claimedProjects = projects.filter(proj => {
@@ -231,11 +260,12 @@ function TeamProjects() {
     setMembers([actualLeader])
 
     try {
-      const [annList, msgList, taskList, reqList] = await Promise.all([
+      const [annList, msgList, taskList, reqList, backlogList] = await Promise.all([
         getTeamAnnouncementsApi(project.id),
         getTeamMessagesApi(project.id),
         getTeamTasksApi(project.id),
-        getTeamRequestsApi(project.id)
+        getTeamRequestsApi(project.id),
+        getChapterBacklogApi(project.id).catch(() => [])
       ])
       setAnnouncements(annList)
       setChatMessages(msgList.map(m => ({ ...m, isMe: m.sender === userFullName })))
@@ -244,6 +274,7 @@ function TeamProjects() {
         ...r,
         roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles
       })))
+      setChapterBacklog(Array.isArray(backlogList) ? backlogList : [])
     } catch (err) {
       console.error(err)
       toast.error('Failed to load real workspace data from DB.')
@@ -457,15 +488,22 @@ function TeamProjects() {
     if (!newTaskData.title.trim()) return
     const formattedTitle = `[${newTaskData.priority.toUpperCase()}] [${newTaskData.comic}] ${newTaskData.title.trim()}`
     try {
-      const created = await createTeamTaskApi(selectedDetails.id, {
+      const taskPayload = {
         title: formattedTitle,
         columnName: newTaskData.column,
         progress: 0,
         assignees: newTaskData.assignee,
         dueDate: newTaskData.dueDate || new Date().toISOString().split('T')[0]
-      })
+      }
+      if (newTaskData.chapterId) {
+        taskPayload.chapterId = newTaskData.chapterId
+      }
+      const created = await createTeamTaskApi(selectedDetails.id, taskPayload)
       setTasks([...tasks, created])
-      setNewTaskData({ title: '', column: 'backlog', assignee: '', dueDate: '', priority: 'Medium', comic: '' })
+      if (newTaskData.chapterId) {
+        setChapterBacklog(prev => prev.filter(c => c.chapterId !== newTaskData.chapterId))
+      }
+      setNewTaskData({ title: '', column: 'backlog', assignee: '', dueDate: '', priority: 'Medium', comic: '', chapterId: null })
       setShowCreateTask(false)
       toast.success('Task saved to database!')
     } catch (err) {
@@ -905,6 +943,71 @@ function TeamProjects() {
                     </button>
                   </div>
                 </div>
+
+                {/* Chapter Backlog Section */}
+                {chapterBacklog.length > 0 && (
+                  <div className="chapter-backlog-section">
+                    <div className="chapter-backlog-header" onClick={() => setBacklogCollapsed(!backlogCollapsed)}>
+                      <div className="chapter-backlog-header-left">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                        </svg>
+                        <h3>Chapter Backlog</h3>
+                        <span className="chapter-backlog-subtitle">— approved by moderator, waiting for task assignment</span>
+                      </div>
+                      <div className="chapter-backlog-header-right">
+                        <span className="chapter-backlog-count">{chapterBacklog.length}</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                          className={`chapter-backlog-chevron ${backlogCollapsed ? '' : 'rotated'}`}>
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      </div>
+                    </div>
+                    {!backlogCollapsed && (
+                      <div className="chapter-backlog-table">
+                        <div className="chapter-backlog-table-head">
+                          <span>CHAPTER</span>
+                          <span>COMIC</span>
+                          <span>PAGES</span>
+                          <span>APPROVED</span>
+                          <span></span>
+                        </div>
+                        {chapterBacklog.map(ch => {
+                          const approvedDate = ch.approvedAt ? new Date(ch.approvedAt) : null
+                          const timeAgo = approvedDate ? getTimeAgo(approvedDate) : 'Unknown'
+                          return (
+                            <div className="chapter-backlog-row" key={ch.chapterId}>
+                              <span className="chapter-backlog-cell-chapter">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                                </svg>
+                                <div>
+                                  <strong>{ch.title || 'Chapter ' + ch.chapterNumber}</strong>
+                                </div>
+                              </span>
+                              <span className="chapter-backlog-cell-comic">{ch.comicName}</span>
+                              <span className="chapter-backlog-cell-pages">{ch.pages} pages</span>
+                              <span className="chapter-backlog-cell-approved">{timeAgo}</span>
+                              <span className="chapter-backlog-cell-action">
+                                <button
+                                  className="chapter-backlog-create-btn"
+                                  onClick={() => openCreateTaskFromBacklog(ch)}
+                                >
+                                  + Create Task
+                                </button>
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Kanban columns grid */}
                 <div className="columns kanban-board-grid" id="columns">

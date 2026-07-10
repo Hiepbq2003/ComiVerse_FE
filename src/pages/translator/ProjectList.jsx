@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Search, Filter, BookOpen, Users, Calendar } from 'lucide-react';
 import { toast } from 'react-toastify';
+import '../../assets/style/translator/project-list.css';
 
 // TODO: Replace this mock data with a real API call, e.g.:
 // const data = await getAvailableProjectsApi()
@@ -66,7 +67,7 @@ function ProjectList() {
   };
 
   return (
-    <div className="container-fluid py-4">
+    <div className="translator-project-list-container container-fluid py-4">
       {/* Header */}
       <div className="mb-4">
         <h1 className="fw-bold">Available Projects</h1>

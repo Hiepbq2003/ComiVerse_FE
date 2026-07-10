@@ -34,10 +34,9 @@ function ModeratorDashboard() {
   const [createTeamForm, setCreateTeamForm] = useState({
     title: '',
     comicName: '',
-    deadline: '',
     sourceLang: 'Japanese',
     targetLang: 'English',
-    leaderName: 'John Smith',
+    leaderName: '',
     priority: 'High'
   })
 
@@ -56,7 +55,16 @@ function ModeratorDashboard() {
         getAllForumThreadsApi(),
         getAllChatFlagsApi()
       ])
-      setComics(comicsData || [])
+      // Map projectTeam from teamsData dynamically
+      const mappedComics = (comicsData || []).map(c => {
+        const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === c.title.toLowerCase())
+        return {
+          ...c,
+          projectTeam: team ? team.title : '-'
+        }
+      })
+
+      setComics(mappedComics)
       setProjectTeams(teamsData || [])
       setSubmissions(submissionsData || [])
       setGenres(genresData?.data || genresData || [])
@@ -128,7 +136,6 @@ function ModeratorDashboard() {
     setCreateTeamForm({
       title: `${comic.title} Team`,
       comicName: comic.title,
-      deadline: '',
       sourceLang: 'Japanese',
       targetLang: 'English',
       leaderName: '',
@@ -139,6 +146,15 @@ function ModeratorDashboard() {
   }
 
   const handleCreateProjectTeam = async () => {
+    const exists = projectTeams.some(
+      t => t.comicName && t.comicName.toLowerCase() === createTeamForm.comicName.toLowerCase() &&
+           t.targetLang && t.targetLang.toLowerCase() === createTeamForm.targetLang.toLowerCase()
+    )
+    if (exists) {
+      toast.error(`A translation team for "${createTeamForm.comicName}" in "${createTeamForm.targetLang}" already exists!`)
+      return
+    }
+
     const leaderName = createTeamForm.leaderName.trim() || 'Translator Leader'
     const leaderInitials = leaderName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     const newTeam = {
@@ -150,7 +166,7 @@ function ModeratorDashboard() {
       progress: 0,
       leaderName: leaderName,
       leaderInitials: leaderInitials,
-      deadline: createTeamForm.deadline || 'unspecified',
+      deadline: 'unspecified',
       sourceLang: createTeamForm.sourceLang,
       targetLang: createTeamForm.targetLang,
       priority: createTeamForm.priority,
@@ -162,15 +178,6 @@ function ModeratorDashboard() {
     try {
       await createProjectTeamApi(newTeam)
       
-      // Also update the comic's projectTeam field dynamically in the database
-      const comicToUpdate = comics.find(c => c.title.toLowerCase() === createTeamForm.comicName.toLowerCase())
-      if (comicToUpdate) {
-        await updateComicApi(comicToUpdate.id, {
-          ...comicToUpdate,
-          projectTeam: newTeam.title
-        })
-      }
-
       toast.success('Project team created successfully!')
       setShowCreateTeamModal(false)
       await fetchAllData()
@@ -184,15 +191,6 @@ function ModeratorDashboard() {
     if (window.confirm(`Are you sure you want to remove ${teamTitle}?`)) {
       try {
         await deleteProjectTeamApi(id)
-        
-        // Reset the comic's projectTeam indicator
-        const comicToUpdate = comics.find(c => c.title.toLowerCase() === comicName.toLowerCase())
-        if (comicToUpdate) {
-          await updateComicApi(comicToUpdate.id, {
-            ...comicToUpdate,
-            projectTeam: '-'
-          })
-        }
         
         toast.success('Project team removed successfully.')
         await fetchAllData()
