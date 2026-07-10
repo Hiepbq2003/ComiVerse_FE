@@ -3,6 +3,7 @@ import '../../assets/style/moderator/project-teams.css'
 import { toast } from 'react-toastify'
 import { searchTranslatorsApi } from '../../services/api/AccountApi'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
+import ModernPagination from '../../components/common/ModernPagination'
 
 function ProjectTeams({
   projectTeams,
@@ -17,8 +18,14 @@ function ProjectTeams({
   handleCreateProjectTeam
 }) {
 
-  const [activeViewTab, setActiveViewTab] = useState('teams') // 'teams' | 'jobs'
-  const [jobsCurrentPage, setJobsCurrentPage] = useState(1)
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 6
+  const totalPages = Math.ceil(projectTeams.length / ITEMS_PER_PAGE)
+  const activePage = Math.min(currentPage, Math.max(1, totalPages))
+  const paginatedTeams = projectTeams.slice(
+    (activePage - 1) * ITEMS_PER_PAGE,
+    activePage * ITEMS_PER_PAGE
+  )
 
   // Assign Leader Modal states
   const [showAssignModal, setShowAssignModal] = useState(false)
@@ -170,29 +177,67 @@ function ProjectTeams({
         </div>
       </div>
 
-      <div className="project-team-cards-list" style={{ marginTop: '24px' }}>
-        {projectTeams.length === 0 ? (
+      {projectTeams.length === 0 ? (
+        <div className="project-team-cards-list" style={{ marginTop: '24px' }}>
           <div className="moderator-empty-state">
             <h3>No translation project teams</h3>
             <p>Click "Create Project Team" on the top right to start a new project team.</p>
           </div>
-        ) : (
-          projectTeams.map(team => (
-            <div className="project-team-row-card" key={team.id}>
-              <div className="project-team-card-header">
-                <div>
+        </div>
+      ) : (
+        <>
+          <div className="project-team-cards-grid" style={{ marginTop: '24px' }}>
+            {paginatedTeams.map(team => (
+              <div className="project-team-grid-card" key={team.id}>
+                <div className="project-team-card-header">
                   <div className="project-team-card-title-group">
-                    <h3>{team.title}</h3>
+                    <h3 title={team.title}>{team.title}</h3>
                     <span className={`comic-status-badge ${team.status ? team.status.toLowerCase() : 'active'}`}>
                       {team.status || 'Active'}
                     </span>
                   </div>
-                  <div className="project-team-meta-desc" style={{ marginTop: '6px' }}>
-                    Linked Comic: <strong>{team.comicName}</strong> · Target Language: <strong>{team.targetLang || 'English'}</strong> · {team.membersCount} members · {team.chaptersCount} chapters
+                </div>
+
+                <div className="project-team-card-body">
+                  <div className="project-team-info-item">
+                    <span className="info-label">Linked Comic:</span>
+                    <strong className="info-value" title={team.comicName}>{team.comicName}</strong>
+                  </div>
+                  
+                  <div className="project-team-info-row">
+                    <div className="info-col">
+                      <span className="info-label">Language:</span>
+                      <strong>{team.targetLang || 'English'}</strong>
+                    </div>
+                    <div className="info-col">
+                      <span className="info-label">Priority:</span>
+                      <span className={`priority-tag ${team.priority ? team.priority.toLowerCase() : 'high'}`}>
+                        {team.priority || 'High'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="project-team-stats">
+                    <span className="stat-pill">👥 {team.membersCount || 0} members</span>
+                    <span className="stat-pill">📖 {team.chaptersCount || 0} chs</span>
+                  </div>
+
+                  <div className="project-team-leader-section">
+                    <div className="project-team-leader-badge">
+                      <div className="project-team-leader-avatar">
+                        {team.leaderInitials || 'TL'}
+                      </div>
+                      <div className="project-team-leader-details">
+                        <span className="project-team-leader-name" title={team.leaderName || 'Assigning...'}>
+                          {team.leaderName || 'Assigning...'}
+                        </span>
+                        <span className="project-team-leader-role">👑 Group Leader</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div className="project-team-card-actions">
                   <button 
                     className="comic-btn-action btn-action-pause"
                     onClick={() => handleToggleStatus(team.id, team.status)}
@@ -203,47 +248,25 @@ function ProjectTeams({
                     className="comic-btn-action btn-action-assign"
                     onClick={() => openAssignLeaderModal(team.id)}
                   >
-                    👤 Assign Leader
+                    👤 Leader
                   </button>
                 </div>
               </div>
+            ))}
+          </div>
 
-              <div className="project-team-card-body">
-                <div className="project-team-progress-section">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--mod-text-secondary)' }}>
-                    <span>Translation & Review Progress</span>
-                    <span>{team.progress || '0'}%</span>
-                  </div>
-                  <div className="project-team-progress-bar-bg" style={{ marginTop: '6px' }}>
-                    <div 
-                      className="project-team-progress-bar-fill" 
-                      style={{ width: `${team.progress || 0}%`, background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)' }}
-                    />
-                  </div>
-                </div>
-
-                <div className="project-team-footer-meta">
-                  <div className="project-team-leader-badge">
-                    <div className="project-team-leader-avatar">
-                      {team.leaderInitials || 'TL'}
-                    </div>
-                    <div className="project-team-leader-details">
-                      <span className="project-team-leader-name">{team.leaderName || 'Assigning...'}</span>
-                      <span className="project-team-leader-role">
-                        👑 Group Leader
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="project-team-deadline-info">
-                    🔥 Priority: <strong>{team.priority || 'High'}</strong>
-                  </div>
-                </div>
-              </div>
+          {totalPages > 1 && (
+            <div className="project-teams-pagination-wrap" style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
+              <ModernPagination 
+                currentPage={activePage}
+                totalPages={totalPages}
+                onPageChange={(page) => setCurrentPage(page)}
+                variant="pills"
+              />
             </div>
-          ))
-        )}
-      </div>
+          )}
+        </>
+      )}
 
       {/* ── MODAL: CREATE PROJECT TEAM ──────────────── */}
       {showCreateTeamModal && (

@@ -1428,12 +1428,25 @@
 }
 
 /* Settings Tab */
+.group-settings-tab-container {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .group-settings-tab-container {
+    grid-template-columns: 1fr;
+  }
+}
+
 .settings-tab-card {
   background: #ffffff;
   border: 1px solid var(--trans-border);
   border-radius: 12px;
   padding: 24px;
-  max-width: 600px;
+  max-width: 100%;
 }
 
 .settings-section-title {
@@ -1448,8 +1461,8 @@
   border: 1px solid var(--trans-border);
   border-radius: 12px;
   padding: 20px;
-  max-width: 600px;
-  margin-top: 24px;
+  max-width: 100%;
+  margin-top: 0;
 }
 
 
