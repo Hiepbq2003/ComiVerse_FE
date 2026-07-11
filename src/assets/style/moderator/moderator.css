@@ -6,17 +6,17 @@
   --mod-sidebar-w: 240px;
   --mod-topbar-h: 56px;
 
-  --mod-bg: #0f0b18;
-  --mod-sidebar-bg: #0a0714;
-  --mod-topbar-bg: #13101e;
-  --mod-card-bg: #151120;
+  --mod-bg: radial-gradient(circle at 50% 50%, #150d2c 0%, #070511 70%, #030206 100%);
+  --mod-sidebar-bg: rgba(10, 7, 20, 0.45);
+  --mod-topbar-bg: rgba(19, 16, 30, 0.4);
+  --mod-card-bg: rgba(255, 255, 255, 0.02);
   --mod-sidebar-text: #94a3b8;
   --mod-sidebar-active: #ffffff;
 
   --mod-text-primary: #f1f5f9;
   --mod-text-secondary: #94a3b8;
   --mod-text-muted: #64748b;
-  --mod-border: rgba(255, 255, 255, 0.06);
+  --mod-border: rgba(255, 255, 255, 0.08);
 
   --mod-purple: #a855f7;
   --mod-purple-hover: #c084fc;
@@ -32,7 +32,7 @@
 .moderator-layout {
   display: flex;
   min-height: 100vh;
-  background: var(--mod-bg);
+  background: var(--mod-bg) !important;
   font-family: 'Outfit', sans-serif;
   color: var(--mod-text-primary);
 }
@@ -41,8 +41,10 @@
 .moderator-sidebar {
   width: var(--mod-sidebar-w);
   height: 100vh;
-  background: var(--mod-sidebar-bg);
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--mod-sidebar-bg) !important;
+  backdrop-filter: blur(20px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
   display: flex;
   flex-direction: column;
   position: fixed;
@@ -183,10 +185,10 @@
 /* ── TOPBAR ──────────────────────────────────────── */
 .moderator-topbar {
   height: var(--mod-topbar-h);
-  background: var(--mod-topbar-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--mod-border);
+  background: var(--mod-topbar-bg) !important;
+  backdrop-filter: blur(20px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
   padding: 0 24px;
   display: flex;
   align-items: center;
@@ -405,20 +407,27 @@
 }
 
 .moderator-select {
-  background: #ffffff;
-  border: 1px solid var(--mod-border);
-  border-radius: 6px;
-  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.35) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 8px;
+  padding: 8px 14px;
   font-size: 13px;
-  color: var(--mod-text-secondary);
+  color: var(--mod-text-primary) !important;
   cursor: pointer;
   outline: none;
   font-family: inherit;
   font-weight: 500;
+  transition: all 0.2s ease;
 }
 
 .moderator-select:focus {
-  border-color: var(--mod-purple);
+  border-color: var(--mod-purple) !important;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.25) !important;
+}
+
+.moderator-select option {
+  background: #0f0b18 !important;
+  color: var(--mod-text-primary) !important;
 }
 
 /* ── CARDS LIST ──────────────────────────────────── */
@@ -431,10 +440,11 @@
 .moderator-empty-state {
   text-align: center;
   padding: 48px;
-  background: #ffffff;
-  border-radius: 8px;
-  border: 1px solid var(--mod-border);
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
   color: var(--mod-text-secondary);
+  backdrop-filter: blur(10px);
 }
 
 .moderator-empty-state h3 {
@@ -449,32 +459,43 @@
 
 /* ── SUBMISSION CARD ─────────────────────────────── */
 .submission-card {
-  background: #ffffff;
-  border: 1px solid var(--mod-border);
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px;
   padding: 16px 20px;
   display: flex;
   align-items: center;
   gap: 16px;
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(10px);
 }
 
 .submission-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  transform: translateY(-2px) scale(1.005);
+  border-color: rgba(168, 85, 247, 0.25) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3), 0 0 15px rgba(168, 85, 247, 0.05) !important;
 }
 
 .submission-cover-placeholder {
   width: 48px;
   height: 60px;
-  background: #e2e8f0;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 20px;
   flex-shrink: 0;
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.submission-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .submission-info {
@@ -629,15 +650,17 @@
 }
 
 .mod-modal-card {
-  background: #ffffff;
-  border-radius: 12px;
+  background: rgba(15, 11, 28, 0.96) !important;
+  border: 1px solid rgba(168, 85, 247, 0.2) !important;
+  border-radius: 16px;
   width: 100%;
   max-width: 650px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(168, 85, 247, 0.1) !important;
   display: flex;
   flex-direction: column;
   max-height: 85vh;
   animation: slideUp 0.2s ease-out;
+  backdrop-filter: blur(25px);
 }
 
 .mod-modal-card.wide {
@@ -675,18 +698,19 @@
 
 .mod-modal-footer {
   padding: 16px 24px;
-  border-top: 1px solid var(--mod-border);
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  background: #f8fafc;
-  border-bottom-left-radius: 12px;
-  border-bottom-right-radius: 12px;
+  background: rgba(0, 0, 0, 0.2) !important;
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
 }
 
 /* ── PREVIEW STYLES ──────────────────────────────── */
 .review-preview-info {
-  background: #f1f5f9;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
   border-radius: 8px;
   padding: 14px 18px;
   margin-bottom: 20px;
@@ -702,11 +726,11 @@
 
 .chapter-viewer-text {
   line-height: 1.6;
-  color: #334155;
+  color: var(--mod-text-primary) !important;
   font-size: 15px;
   white-space: pre-wrap;
-  background: #fafafb;
-  border: 1px solid var(--mod-border);
+  background: rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-radius: 8px;
   padding: 20px;
 }
@@ -736,10 +760,12 @@
 }
 
 .placeholder-card {
-  background: #ffffff;
-  border: 1px solid var(--mod-border);
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px;
   padding: 20px;
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
 }
 
 .placeholder-card h4 {
@@ -807,21 +833,22 @@
 .mod-input,
 .mod-select-field {
   width: 100%;
-  border: 1px solid var(--mod-border);
-  border-radius: 6px;
-  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 8px;
+  padding: 10px 14px;
   font-family: inherit;
   font-size: 14px;
   outline: none;
-  background: #ffffff;
+  background: rgba(0, 0, 0, 0.35) !important;
   box-sizing: border-box;
-  color: var(--mod-text-primary);
-  transition: border-color 0.15s ease;
+  color: var(--mod-text-primary) !important;
+  transition: all 0.2s ease;
 }
 
 .mod-input:focus,
 .mod-select-field:focus {
-  border-color: var(--mod-purple);
+  border-color: var(--mod-purple) !important;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.25) !important;
 }
 
 /* Multi-step progress tracker */
@@ -871,13 +898,20 @@
 .comic-search-input {
   width: 100%;
   padding: 12px 16px;
-  border: 1px solid var(--mod-border);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-radius: 8px;
   font-size: 14px;
   font-family: inherit;
   outline: none;
   box-sizing: border-box;
-  background: #ffffff;
+  background: rgba(0, 0, 0, 0.35) !important;
+  color: var(--mod-text-primary) !important;
+  transition: all 0.2s ease;
+}
+
+.comic-search-input:focus {
+  border-color: var(--mod-purple) !important;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.25) !important;
 }
 
 .comic-filters-group {
@@ -887,10 +921,11 @@
 }
 
 .comic-table-card {
-  background: #ffffff;
-  border: 1px solid var(--mod-border);
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px;
   overflow: hidden;
+  backdrop-filter: blur(10px);
 }
 
 .comic-table {
@@ -900,22 +935,30 @@
 }
 
 .comic-table th {
-  background: #f8fafc;
+  background: rgba(255, 255, 255, 0.03) !important;
   padding: 14px 18px;
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--mod-text-secondary);
-  border-bottom: 1px solid var(--mod-border);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 .comic-table td {
   padding: 16px 18px;
   font-size: 14px;
   color: var(--mod-text-primary);
-  border-bottom: 1px solid var(--mod-border);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
   vertical-align: middle;
+}
+
+.comic-table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.comic-table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.02) !important;
 }
 
 .comic-table tbody tr:last-child td {
@@ -931,8 +974,9 @@
 .comic-cell-thumbnail {
   width: 40px;
   height: 52px;
-  background: #e2e8f0;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -959,10 +1003,11 @@
 
 .comic-genre-tag {
   font-size: 10px;
-  background: #f1f5f9;
-  color: var(--mod-text-secondary);
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: var(--mod-text-secondary) !important;
   padding: 1px 6px;
   border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 /* Comic Status Badges */
@@ -975,18 +1020,21 @@
 }
 
 .comic-status-badge.ongoing {
-  background: #ecfdf5;
-  color: var(--mod-green);
+  background: rgba(16, 185, 129, 0.1) !important;
+  color: var(--mod-green) !important;
+  border: 1px solid rgba(16, 185, 129, 0.2) !important;
 }
 
 .comic-status-badge.paused {
-  background: #fffbeb;
-  color: #d97706;
+  background: rgba(217, 119, 6, 0.1) !important;
+  color: #d97706 !important;
+  border: 1px solid rgba(217, 119, 6, 0.2) !important;
 }
 
 .comic-status-badge.completed {
-  background: #eff6ff;
-  color: #2563eb;
+  background: rgba(59, 130, 246, 0.1) !important;
+  color: #3b82f6 !important;
+  border: 1px solid rgba(59, 130, 246, 0.2) !important;
 }
 
 /* Action icons/buttons in Table */
@@ -1680,6 +1728,70 @@ select.mod-form-input,
 }
 
 /* ── LIGHT MODE OVERRIDES FOR MODERATOR CONTROLS ── */
+html.light {
+  --mod-bg: #faf9f6;
+  --mod-sidebar-bg: #ffffff;
+  --mod-topbar-bg: #ffffff;
+  --mod-card-bg: #ffffff;
+  --mod-border: rgba(0, 0, 0, 0.1);
+  --mod-text-primary: #0f172a;
+  --mod-text-secondary: #475569;
+  --mod-text-muted: #64748b;
+  --mod-sidebar-text: #475569;
+  --mod-sidebar-active: #7c3aed;
+}
+
+html.light .mod-modal-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08), 0 0 1px rgba(15, 23, 42, 0.1) !important;
+}
+
+html.light .mod-modal-overlay {
+  background: rgba(15, 23, 42, 0.4) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+html.light .mod-modal-footer {
+  background: #f8fafc !important;
+  border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+html.light .modern-btn-container .btn-2.btn-cancel {
+  background: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+html.light .modern-btn-container .btn-2.btn-cancel::before {
+  background: #94a3b8 !important;
+}
+
+html.light .moderator-select::placeholder,
+html.light .mod-form-input::placeholder,
+html.light .mod-textarea::placeholder,
+html.light .genre-form-container input::placeholder,
+html.light .genre-form-container textarea::placeholder,
+html.light .comic-search-input::placeholder,
+html.light .mod-input::placeholder {
+  color: #94a3b8 !important;
+  opacity: 0.85 !important;
+}
+
+html.light .leader-search-dropdown {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .leader-search-result-card + .leader-search-result-card,
+html.light .leader-search-result + .leader-search-result {
+  border-top: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .project-team-progress-bar-bg {
+  background: rgba(0, 0, 0, 0.06) !important;
+}
+
 html.light .moderator-sidebar {
   border-right: 1px solid rgba(99, 87, 78, 0.1) !important;
 }
@@ -1703,6 +1815,11 @@ html.light .mod-input,
 html.light .mod-select-field {
   background-color: #ffffff !important;
   border: 1px solid var(--mod-border) !important;
+  color: var(--mod-text-primary) !important;
+}
+
+html.light select option {
+  background-color: #ffffff !important;
   color: var(--mod-text-primary) !important;
 }
 
@@ -1813,9 +1930,14 @@ html.light .leader-search-result-card+.leader-search-result-card {
 /* 1. Base button sizing override to ensure matching height and font size */
 .modern-btn-container .btn-2.btn-approve,
 .modern-btn-container .btn-2.btn-edit,
+.modern-btn-container .btn-2.btn-reject,
+.modern-btn-container .btn-2.btn-archive,
+.modern-btn-container .btn-2.btn-review,
+.modern-btn-container .btn-2.btn-cancel,
 .modern-btn-container .btn-5.btn-reject,
 .modern-btn-container .btn-5.btn-archive,
-.modern-btn-container .btn-5.btn-review {
+.modern-btn-container .btn-5.btn-review,
+.modern-btn-container .btn-5.btn-cancel {
   height: 36px !important;
   min-height: 36px !important;
   border-radius: 20px !important;
@@ -1837,69 +1959,110 @@ html.light .leader-search-result-card+.leader-search-result-card {
 }
 
 /* 2. Approve Button - Green Theme (Variant 2) */
-.modern-btn-container .btn-2.btn-approve {
+.modern-btn-container .btn-2.btn-approve,
+.modern-btn-container .btn-5.btn-approve {
   background: #10b981 !important;
-  /* Bright green on hover reveal */
   color: #ffffff !important;
+  border: none !important;
+  outline: none !important;
 }
 
-.modern-btn-container .btn-2.btn-approve::before {
-  background: #059669 !important;
-  /* Dark green by default */
-}
-
-html.light .modern-btn-container .btn-2.btn-approve {
+.modern-btn-container .btn-2.btn-approve::before,
+.modern-btn-container .btn-5.btn-approve::before {
   background: #059669 !important;
 }
 
-html.light .modern-btn-container .btn-2.btn-approve::before {
+html.light .modern-btn-container .btn-2.btn-approve,
+html.light .modern-btn-container .btn-5.btn-approve {
+  background: #059669 !important;
+}
+
+html.light .modern-btn-container .btn-2.btn-approve::before,
+html.light .modern-btn-container .btn-5.btn-approve::before {
   background: #047857 !important;
 }
 
-/* 3. Reject & Archive Buttons - Red Outline Fill Theme (Variant 5) */
+/* 3. Reject & Archive Buttons - Red Theme (Variant 2 / 5) */
+.modern-btn-container .btn-2.btn-reject,
+.modern-btn-container .btn-2.btn-archive,
 .modern-btn-container .btn-5.btn-reject,
 .modern-btn-container .btn-5.btn-archive {
-  outline: 2px solid #ef4444 !important;
-  color: #ef4444 !important;
-  background-color: transparent !important;
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  border: none !important;
+  outline: none !important;
 }
 
+.modern-btn-container .btn-2.btn-reject::before,
+.modern-btn-container .btn-2.btn-archive::before,
 .modern-btn-container .btn-5.btn-reject::before,
 .modern-btn-container .btn-5.btn-archive::before {
-  background: #ef4444 !important;
-}
-
-.modern-btn-container .btn-5.btn-reject:hover,
-.modern-btn-container .btn-5.btn-archive:hover,
-html.light .modern-btn-container .btn-5.btn-reject:hover,
-html.light .modern-btn-container .btn-5.btn-archive:hover {
-  color: #ffffff !important;
-}
-
-html.light .modern-btn-container .btn-5.btn-reject,
-html.light .modern-btn-container .btn-5.btn-archive {
-  outline: 2px solid #dc2626 !important;
-  color: #dc2626 !important;
-}
-
-html.light .modern-btn-container .btn-5.btn-reject::before,
-html.light .modern-btn-container .btn-5.btn-archive::before {
   background: #dc2626 !important;
 }
 
-/* 4. Review Content Button - Purple Theme (Variant 5) */
-.modern-btn-container .btn-5.btn-review {
-  outline: 2px solid var(--mod-purple) !important;
-  color: var(--mod-purple) !important;
-  background-color: transparent !important;
-}
-
-.modern-btn-container .btn-5.btn-review::before {
-  background: var(--mod-purple) !important;
-}
-
-.modern-btn-container .btn-5.btn-review:hover {
+html.light .modern-btn-container .btn-2.btn-reject,
+html.light .modern-btn-container .btn-2.btn-archive,
+html.light .modern-btn-container .btn-5.btn-reject,
+html.light .modern-btn-container .btn-5.btn-archive {
+  background: #dc2626 !important;
   color: #ffffff !important;
+}
+
+html.light .modern-btn-container .btn-2.btn-reject::before,
+html.light .modern-btn-container .btn-2.btn-archive::before,
+html.light .modern-btn-container .btn-5.btn-reject::before,
+html.light .modern-btn-container .btn-5.btn-archive::before {
+  background: #b91c1c !important;
+}
+
+/* 4. Review Content Button - Purple Theme (Variant 2 / 5) */
+.modern-btn-container .btn-2.btn-review,
+.modern-btn-container .btn-5.btn-review {
+  background: var(--mod-purple) !important;
+  color: #ffffff !important;
+  border: none !important;
+  outline: none !important;
+}
+
+.modern-btn-container .btn-2.btn-review::before,
+.modern-btn-container .btn-5.btn-review::before {
+  background: #7c3aed !important;
+}
+
+html.light .modern-btn-container .btn-2.btn-review,
+html.light .modern-btn-container .btn-5.btn-review {
+  background: #7c3aed !important;
+  color: #ffffff !important;
+}
+
+html.light .modern-btn-container .btn-2.btn-review::before,
+html.light .modern-btn-container .btn-5.btn-review::before {
+  background: #6d28d9 !important;
+}
+
+/* 5. Cancel / Close Preview Button - Neutral Gray Theme (Variant 2 / 5) */
+.modern-btn-container .btn-2.btn-cancel,
+.modern-btn-container .btn-5.btn-cancel {
+  background: #64748b !important;
+  color: #ffffff !important;
+  border: none !important;
+  outline: none !important;
+}
+
+.modern-btn-container .btn-2.btn-cancel::before,
+.modern-btn-container .btn-5.btn-cancel::before {
+  background: #475569 !important;
+}
+
+html.light .modern-btn-container .btn-2.btn-cancel,
+html.light .modern-btn-container .btn-5.btn-cancel {
+  background: #94a3b8 !important;
+  color: #1e293b !important;
+}
+
+html.light .modern-btn-container .btn-2.btn-cancel::before,
+html.light .modern-btn-container .btn-5.btn-cancel::before {
+  background: #cbd5e1 !important;
 }
 
 /* 5. Create Project Team & Genre Creation Button - Vibrant Purple Theme */

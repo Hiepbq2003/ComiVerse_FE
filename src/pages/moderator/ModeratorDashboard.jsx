@@ -11,6 +11,8 @@ import { getAllComicsApi, updateComicApi, deleteComicApi } from '../../services/
 import { getAllProjectTeamsApi, createProjectTeamApi, deleteProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getAllSubmissionsApi, approveSubmissionApi, rejectSubmissionApi } from '../../services/api/SubmissionApi'
 import { getAllGenresApi } from '../../services/api/GenreApi'
+import { getAllForumThreadsApi } from '../../services/api/ForumThreadApi'
+import { getAllChatFlagsApi } from '../../services/api/ChatFlagApi'
 import { toast } from 'react-toastify'
 
 
@@ -22,6 +24,8 @@ function ModeratorDashboard() {
   const [comics, setComics] = useState([])
   const [projectTeams, setProjectTeams] = useState([])
   const [genres, setGenres] = useState([])
+  const [forumThreads, setForumThreads] = useState([])
+  const [chatFlags, setChatFlags] = useState([])
   const [loading, setLoading] = useState(true)
 
   // Creation Team Modal Shared triggers
@@ -30,10 +34,9 @@ function ModeratorDashboard() {
   const [createTeamForm, setCreateTeamForm] = useState({
     title: '',
     comicName: '',
-    deadline: '',
     sourceLang: 'Japanese',
     targetLang: 'English',
-    leaderName: 'John Smith',
+    leaderName: '',
     priority: 'High'
   })
 
@@ -44,16 +47,29 @@ function ModeratorDashboard() {
   const fetchAllData = async () => {
     try {
       setLoading(true)
-      const [comicsData, teamsData, submissionsData, genresData] = await Promise.all([
+      const [comicsData, teamsData, submissionsData, genresData, forumData, chatData] = await Promise.all([
         getAllComicsApi(),
         getAllProjectTeamsApi(),
         getAllSubmissionsApi(),
-        getAllGenresApi()
+        getAllGenresApi(),
+        getAllForumThreadsApi(),
+        getAllChatFlagsApi()
       ])
-      setComics(comicsData || [])
+      // Map projectTeam from teamsData dynamically
+      const mappedComics = (comicsData || []).map(c => {
+        const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === c.title.toLowerCase())
+        return {
+          ...c,
+          projectTeam: team ? team.title : '-'
+        }
+      })
+
+      setComics(mappedComics)
       setProjectTeams(teamsData || [])
       setSubmissions(submissionsData || [])
       setGenres(genresData?.data || genresData || [])
+      setForumThreads(forumData || [])
+      setChatFlags(chatData || [])
     } catch (err) {
       console.error(err)
       toast.error('Failed to retrieve control panel data from server.')
@@ -65,8 +81,8 @@ function ModeratorDashboard() {
   const getNavBadges = () => {
     return {
       'review-queue': submissions.filter(item => item.status === 'pending').length,
-      'chat-monitor': 2,
-      'forum': 2,
+      'chat-monitor': chatFlags.length,
+      'forum': forumThreads.filter(item => item.isReported).length,
     }
   }
 
@@ -120,7 +136,6 @@ function ModeratorDashboard() {
     setCreateTeamForm({
       title: `${comic.title} Team`,
       comicName: comic.title,
-      deadline: '',
       sourceLang: 'Japanese',
       targetLang: 'English',
       leaderName: '',
@@ -131,6 +146,15 @@ function ModeratorDashboard() {
   }
 
   const handleCreateProjectTeam = async () => {
+    const exists = projectTeams.some(
+      t => t.comicName && t.comicName.toLowerCase() === createTeamForm.comicName.toLowerCase() &&
+           t.targetLang && t.targetLang.toLowerCase() === createTeamForm.targetLang.toLowerCase()
+    )
+    if (exists) {
+      toast.error(`A translation team for "${createTeamForm.comicName}" in "${createTeamForm.targetLang}" already exists!`)
+      return
+    }
+
     const leaderName = createTeamForm.leaderName.trim() || 'Translator Leader'
     const leaderInitials = leaderName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     const newTeam = {
@@ -142,7 +166,7 @@ function ModeratorDashboard() {
       progress: 0,
       leaderName: leaderName,
       leaderInitials: leaderInitials,
-      deadline: createTeamForm.deadline || 'unspecified',
+      deadline: 'unspecified',
       sourceLang: createTeamForm.sourceLang,
       targetLang: createTeamForm.targetLang,
       priority: createTeamForm.priority,
@@ -154,15 +178,6 @@ function ModeratorDashboard() {
     try {
       await createProjectTeamApi(newTeam)
       
-      // Also update the comic's projectTeam field dynamically in the database
-      const comicToUpdate = comics.find(c => c.title.toLowerCase() === createTeamForm.comicName.toLowerCase())
-      if (comicToUpdate) {
-        await updateComicApi(comicToUpdate.id, {
-          ...comicToUpdate,
-          projectTeam: newTeam.title
-        })
-      }
-
       toast.success('Project team created successfully!')
       setShowCreateTeamModal(false)
       await fetchAllData()
@@ -176,15 +191,6 @@ function ModeratorDashboard() {
     if (window.confirm(`Are you sure you want to remove ${teamTitle}?`)) {
       try {
         await deleteProjectTeamApi(id)
-        
-        // Reset the comic's projectTeam indicator
-        const comicToUpdate = comics.find(c => c.title.toLowerCase() === comicName.toLowerCase())
-        if (comicToUpdate) {
-          await updateComicApi(comicToUpdate.id, {
-            ...comicToUpdate,
-            projectTeam: '-'
-          })
-        }
         
         toast.success('Project team removed successfully.')
         await fetchAllData()
@@ -281,7 +287,10 @@ function ModeratorDashboard() {
             <ProjectTeams 
               projectTeams={projectTeams}
               setProjectTeams={setProjectTeams}
-              comics={comics}
+              comics={comics
+                .filter(c => !submissions.some(s => s.queueType === 'author' && s.status === 'pending' && s.title === c.title))
+                .filter((value, index, self) => self.findIndex(t => t.title === value.title) === index)
+              }
               showCreateTeamModal={showCreateTeamModal}
               setShowCreateTeamModal={setShowCreateTeamModal}
               createTeamStep={createTeamStep}
@@ -294,12 +303,12 @@ function ModeratorDashboard() {
 
           {/* VIEW: CHAT MONITOR */}
           {activeNav === 'chat-monitor' && (
-            <ChatMonitor />
+            <ChatMonitor fetchAllData={fetchAllData} />
           )}
 
           {/* VIEW: FORUM */}
           {activeNav === 'forum' && (
-            <ForumModeration />
+            <ForumModeration fetchAllData={fetchAllData} />
           )}
         </>
       )}

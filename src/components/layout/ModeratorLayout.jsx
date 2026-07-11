@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { AIPopover } from '../common/AIPopover'
-import '../../assets/style/moderator.css'
+import '../../assets/style/moderator/moderator.css'
 
 function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBadges = {} }) {
   const navigate = useNavigate()

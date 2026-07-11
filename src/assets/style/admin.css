@@ -2302,3 +2302,205 @@ html.light .modern-btn-container .btn-2.btn-cancel span {
 .animated-btn-container .btn[data-tooltip=""]::after {
   display: none !important;
 }
+
+/* ═══════════════════════════════════════════════════
+   ADMIN SYSTEM - GLASSMORPHIC OVERRIDES (AGENTS.MD)
+   ═══════════════════════════════════════════════════ */
+
+/* Glassmorphic Table Wrapper */
+.admin-data-table-wrapper {
+  background: rgba(21, 17, 32, 0.45) !important;
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+}
+
+html.light .admin-data-table-wrapper {
+  background: rgba(255, 255, 255, 0.45) !important;
+  border: 1px solid rgba(112, 92, 255, 0.12) !important;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05) !important;
+}
+
+/* Glassmorphic Filters Bar */
+.admin-filters-bar {
+  background: rgba(21, 17, 32, 0.3) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-radius: var(--admin-radius) !important;
+  padding: 12px 16px !important;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+html.light .admin-filters-bar {
+  background: rgba(255, 255, 255, 0.3) !important;
+  border: 1px solid rgba(112, 92, 255, 0.08) !important;
+}
+
+/* Glowing Glass Inputs & Select Filters */
+.admin-search-input-wrapper {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: var(--admin-radius) !important;
+  transition: all var(--admin-transition);
+}
+
+.admin-search-input-wrapper:focus-within {
+  border-color: rgba(168, 85, 247, 0.4) !important;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.15) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+html.light .admin-search-input-wrapper {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .admin-search-input-wrapper:focus-within {
+  border-color: rgba(112, 92, 255, 0.4) !important;
+  box-shadow: 0 0 12px rgba(112, 92, 255, 0.1) !important;
+}
+
+.admin-filter-select {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: var(--admin-text-primary) !important;
+  border-radius: var(--admin-radius) !important;
+  padding: 8px 12px !important;
+  transition: all var(--admin-transition);
+  cursor: pointer;
+}
+
+.admin-filter-select:hover, .admin-filter-select:focus {
+  border-color: rgba(168, 85, 247, 0.4) !important;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.15) !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+}
+
+html.light .admin-filter-select {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid rgba(112, 92, 255, 0.15) !important;
+  color: #1e293b !important;
+}
+
+html.light .admin-filter-select:hover {
+  border-color: rgba(112, 92, 255, 0.4) !important;
+  box-shadow: 0 0 10px rgba(112, 92, 255, 0.08) !important;
+}
+
+/* Glass Status Badges */
+.status-badge {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px !important;
+  border-radius: 12px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.2px;
+  border: 1px solid transparent !important;
+}
+.status-badge::before {
+  display: none !important;
+}
+
+.status-badge.active {
+  background: rgba(16, 185, 129, 0.12) !important;
+  color: var(--admin-green, #10b981) !important;
+  border-color: rgba(16, 185, 129, 0.25) !important;
+}
+
+.status-badge.banned {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: var(--admin-red, #ef4444) !important;
+  border-color: rgba(239, 68, 68, 0.25) !important;
+}
+
+.status-badge.inactive, .status-badge.suspended {
+  background: rgba(234, 179, 8, 0.12) !important;
+  color: var(--admin-yellow, #eab308) !important;
+  border-color: rgba(234, 179, 8, 0.25) !important;
+}
+
+/* Frosted Modals */
+.admin-modal-overlay {
+  backdrop-filter: blur(12px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(180%) !important;
+  background: rgba(10, 7, 20, 0.6) !important;
+}
+
+.admin-modal {
+  background: rgba(21, 17, 32, 0.75) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04) !important;
+}
+
+html.light .admin-modal {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border-color: rgba(112, 92, 255, 0.15) !important;
+  box-shadow: 0 24px 64px rgba(31, 38, 135, 0.1) !important;
+}
+
+.admin-form-input {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  transition: all var(--admin-transition);
+}
+
+.admin-form-input:focus {
+  border-color: rgba(168, 85, 247, 0.45) !important;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+html.light .admin-form-input {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #1e293b !important;
+}
+
+html.light .admin-form-input:focus {
+  border-color: rgba(112, 92, 255, 0.4) !important;
+  box-shadow: 0 0 0 3px rgba(112, 92, 255, 0.08) !important;
+}
+
+/* Popover Inline scope modifier */
+.popover-showcase.popover-inline {
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: inline-block !important;
+  position: relative !important;
+  z-index: 10 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.popover-showcase.popover-inline .trigger {
+  padding: 4px 8px !important;
+  min-height: auto !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-radius: 6px !important;
+}
+
+.popover-showcase.popover-inline .trigger:hover {
+  background: rgba(168, 85, 247, 0.1) !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
+  box-shadow: 0 0 8px rgba(168, 85, 247, 0.15) !important;
+}
+
+.popover-showcase.popover-inline .pop {
+  min-width: 9rem !important;
+  background: rgba(21, 17, 32, 0.9) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}

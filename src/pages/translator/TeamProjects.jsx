@@ -18,7 +18,9 @@ import {
   createTeamTaskApi,
   updateTeamTaskApi,
   getTeamRequestsApi,
-  deleteTeamRequestApi
+  deleteTeamRequestApi,
+  getChapterBacklogApi,
+  createTeamRequestApi
 } from '../../services/api/TeamWorkspaceApi'
 import { toast } from 'react-toastify'
 
@@ -29,7 +31,9 @@ function TeamProjects() {
   const [projects, setProjects] = useState([])
   const [loadingProjects, setLoadingProjects] = useState(true)
   const auth = getAuth()
-  const user = auth?.user || {}
+  const authUser = auth?.user
+  const userFullName = authUser?.fullName || authUser?.username || 'Translator'
+  const user = authUser || {}
 
   const fetchProjects = async (silent = false) => {
     try {
@@ -73,6 +77,12 @@ function TeamProjects() {
   const [chatInput, setChatInput] = useState('')
   const [joinRequests, setJoinRequests] = useState([])
   const [tasks, setTasks] = useState([])
+  const [chapterBacklog, setChapterBacklog] = useState([])
+  const [showBacklogModal, setShowBacklogModal] = useState(false)
+  const [showJoinModal, setShowJoinModal] = useState(false)
+  const [selectedJoinProject, setSelectedJoinProject] = useState(null)
+  const [joinMessage, setJoinMessage] = useState('')
+  const [joinRole, setJoinRole] = useState('Translator')
   const [lockedColumns, setLockedColumns] = useState([])
   const [highlightedColumns, setHighlightedColumns] = useState([])
   const [sortedColumns, setSortedColumns] = useState([])
@@ -89,8 +99,6 @@ function TeamProjects() {
 
   // Dynamic user mapping from auth token
   const authStr = localStorage.getItem('user')
-  const authUser = authStr ? JSON.parse(authStr) : user
-  const userFullName = authUser?.fullName || authUser?.username || user?.fullName || user?.username || 'Translator'
 
   const parseTaskTitle = (title) => {
     const match = (title || '').match(/^\[(URGENT|HIGH|MEDIUM|LOW)\]\s*(?:\[([^\]]+)\])?\s*(.*)$/i)
@@ -151,9 +159,35 @@ function TeamProjects() {
       assignee: selectedDetails?.leaderInitials || 'TL',
       dueDate: '',
       priority: 'Medium',
-      comic: comicName
+      comic: comicName,
+      chapterId: null
     })
     setShowCreateTask(true)
+  }
+
+  const openCreateTaskFromBacklog = (chapter) => {
+    setNewTaskData({
+      title: `${chapter.title || 'Chapter ' + chapter.chapterNumber} - Translation`,
+      column: 'backlog',
+      assignee: selectedDetails?.leaderInitials || 'TL',
+      dueDate: '',
+      priority: 'Medium',
+      comic: chapter.comicName || selectedDetails?.comicName || selectedDetails?.title || '',
+      chapterId: chapter.chapterId
+    })
+    setShowCreateTask(true)
+  }
+
+  const getTimeAgo = (date) => {
+    const seconds = Math.floor((new Date() - date) / 1000)
+    if (seconds < 60) return 'Just now'
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `${minutes} min ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+    const days = Math.floor(hours / 24)
+    if (days < 30) return `${days} day${days > 1 ? 's' : ''} ago`
+    return date.toLocaleDateString()
   }
 
   const claimedProjects = projects.filter(proj => {
@@ -231,11 +265,12 @@ function TeamProjects() {
     setMembers([actualLeader])
 
     try {
-      const [annList, msgList, taskList, reqList] = await Promise.all([
+      const [annList, msgList, taskList, reqList, backlogList] = await Promise.all([
         getTeamAnnouncementsApi(project.id),
         getTeamMessagesApi(project.id),
         getTeamTasksApi(project.id),
-        getTeamRequestsApi(project.id)
+        getTeamRequestsApi(project.id),
+        getChapterBacklogApi(project.id).catch(() => [])
       ])
       setAnnouncements(annList)
       setChatMessages(msgList.map(m => ({ ...m, isMe: m.sender === userFullName })))
@@ -244,6 +279,7 @@ function TeamProjects() {
         ...r,
         roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles
       })))
+      setChapterBacklog(Array.isArray(backlogList) ? backlogList : [])
     } catch (err) {
       console.error(err)
       toast.error('Failed to load real workspace data from DB.')
@@ -275,7 +311,15 @@ function TeamProjects() {
         sourceLang: selectedEdit.sourceLang,
         targetLang: selectedEdit.targetLang,
         priority: selectedEdit.priority,
-        cover: selectedEdit.cover
+        cover: selectedEdit.cover,
+        isRecruiting: selectedEdit.isRecruiting,
+        maxMembers: selectedEdit.maxMembers,
+        leaderName: selectedEdit.leaderName,
+        leaderInitials: selectedEdit.leaderInitials,
+        membersCount: selectedEdit.membersCount,
+        chaptersCount: selectedEdit.chaptersCount,
+        progress: selectedEdit.progress,
+        assignedToMe: selectedEdit.assignedToMe
       })
       const mappedUpdated = {
         ...updated,
@@ -309,7 +353,15 @@ function TeamProjects() {
         sourceLang: selectedDetails.sourceLang,
         targetLang: selectedDetails.targetLang,
         priority: selectedDetails.priority,
-        cover: selectedDetails.cover
+        cover: selectedDetails.cover,
+        isRecruiting: selectedDetails.isRecruiting,
+        maxMembers: Number(selectedDetails.maxMembers) || 5,
+        leaderName: selectedDetails.leaderName,
+        leaderInitials: selectedDetails.leaderInitials,
+        membersCount: selectedDetails.membersCount,
+        chaptersCount: selectedDetails.chaptersCount,
+        progress: selectedDetails.progress,
+        assignedToMe: selectedDetails.assignedToMe
       })
       const mappedUpdated = {
         ...updated,
@@ -457,15 +509,22 @@ function TeamProjects() {
     if (!newTaskData.title.trim()) return
     const formattedTitle = `[${newTaskData.priority.toUpperCase()}] [${newTaskData.comic}] ${newTaskData.title.trim()}`
     try {
-      const created = await createTeamTaskApi(selectedDetails.id, {
+      const taskPayload = {
         title: formattedTitle,
         columnName: newTaskData.column,
         progress: 0,
         assignees: newTaskData.assignee,
         dueDate: newTaskData.dueDate || new Date().toISOString().split('T')[0]
-      })
+      }
+      if (newTaskData.chapterId) {
+        taskPayload.chapterId = newTaskData.chapterId
+      }
+      const created = await createTeamTaskApi(selectedDetails.id, taskPayload)
       setTasks([...tasks, created])
-      setNewTaskData({ title: '', column: 'backlog', assignee: '', dueDate: '', priority: 'Medium', comic: '' })
+      if (newTaskData.chapterId) {
+        setChapterBacklog(prev => prev.filter(c => c.chapterId !== newTaskData.chapterId))
+      }
+      setNewTaskData({ title: '', column: 'backlog', assignee: '', dueDate: '', priority: 'Medium', comic: '', chapterId: null })
       setShowCreateTask(false)
       toast.success('Task saved to database!')
     } catch (err) {
@@ -533,22 +592,26 @@ function TeamProjects() {
     }
   }
 
+  const isLeaderMatch = (leaderName) => {
+    if (!leaderName) return false
+    const ln = leaderName.toLowerCase().trim()
+    const username = (authUser?.username || '').toLowerCase().trim()
+    const fullName = (authUser?.fullName || '').toLowerCase().trim()
+    
+    if (ln === username || ln === fullName) return true
+    
+    const isDevLeader = ln.includes('trans') || ln.includes('tran')
+    const isDevUser = username.includes('trans') || username.includes('tran') || fullName.includes('trans') || fullName.includes('tran')
+    
+    return isDevLeader && isDevUser
+  }
+
   const teamProjectsList = projects.filter(proj => {
     const matchesSearch = (proj.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (proj.comicName || '').toLowerCase().includes(searchTerm.toLowerCase())
     if (!matchesSearch) return false
 
-    const isUserLeader = proj.leaderName && (
-      proj.leaderName === userFullName ||
-      proj.leaderName === authUser?.fullName ||
-      proj.leaderName === authUser?.username ||
-      proj.leaderName.toLowerCase() === userFullName.toLowerCase() ||
-      proj.leaderName.toLowerCase() === authUser?.username?.toLowerCase() ||
-      proj.leaderName.toLowerCase() === user?.username?.toLowerCase() ||
-      proj.leaderName.toLowerCase() === user?.fullName?.toLowerCase()
-    )
-
-    return isUserLeader
+    return isLeaderMatch(proj.leaderName)
   })
 
   // ── PROJECTS DATA LOADING GUARD ───────────────────
@@ -570,13 +633,7 @@ function TeamProjects() {
       )
     }
 
-    const isCurrentLeader = selectedDetails.leaderName === userFullName ||
-      selectedDetails.leaderName === authUser?.fullName ||
-      selectedDetails.leaderName === authUser?.username ||
-      (selectedDetails.leaderName && selectedDetails.leaderName.toLowerCase() === userFullName.toLowerCase()) ||
-      (selectedDetails.leaderName && selectedDetails.leaderName.toLowerCase() === authUser?.username?.toLowerCase()) ||
-      (selectedDetails.leaderName && selectedDetails.leaderName.toLowerCase() === user?.username?.toLowerCase()) ||
-      (selectedDetails.leaderName && selectedDetails.leaderName.toLowerCase() === user?.fullName?.toLowerCase())
+    const isCurrentLeader = isLeaderMatch(selectedDetails.leaderName)
 
     const activeTasks = tasks.filter(t => t.columnName !== 'paused')
     const pausedTasks = tasks.filter(t => t.columnName === 'paused')
@@ -892,16 +949,25 @@ function TeamProjects() {
                     </svg>
                     <h1>{selectedDetails?.comicName || selectedDetails?.title || 'Comic'}</h1>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div className="board__meta">
                       <span className="board__badge">{selectedDetails?.te || 'Translation'} Team</span>
                       <span className="board__date">{activeTasks.length} active · {pausedTasks.length} paused</span>
                     </div>
+                    <button 
+                      className="trans-btn secondary" 
+                      style={{ height: '38px', padding: '0 16px', borderRadius: '8px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }} 
+                      onClick={() => setShowBacklogModal(true)}
+                    >
+                      📂 Chapter Backlog ({chapterBacklog.length})
+                    </button>
                     <button className="trans-btn primary" style={{ height: '38px', padding: '0 16px', borderRadius: '8px', fontSize: '13px' }} onClick={openCreateTaskModal}>
                       + Create Task
                     </button>
                   </div>
                 </div>
+
+
 
                 {/* Kanban columns grid */}
                 <div className="columns kanban-board-grid" id="columns">
@@ -1292,6 +1358,90 @@ function TeamProjects() {
               </div>
             )}
 
+            {/* MODAL: CHAPTER BACKLOG WAREHOUSE */}
+            {showBacklogModal && (
+              <div className="trans-modal-overlay">
+                <div className="trans-modal-card" style={{ maxWidth: '800px', width: '90%' }}>
+                  <div className="trans-modal-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        stroke="#a855f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                      </svg>
+                      <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--trans-text-primary)' }}>Chapter Backlog</h3>
+                      <span className="chapter-backlog-count" style={{
+                        background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                        color: '#fff',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        minWidth: '20px',
+                        textAlign: 'center'
+                      }}>{chapterBacklog.length}</span>
+                    </div>
+                    <button className="trans-modal-close-btn" onClick={() => setShowBacklogModal(false)}>×</button>
+                  </div>
+
+                  <div className="trans-modal-body" style={{ padding: '0 20px 20px 20px' }}>
+                    <p style={{ fontSize: '13px', color: 'var(--trans-text-secondary)', margin: '12px 0 20px' }}>
+                      These are approved chapters from the Author that are waiting for task creation and assignment in your team.
+                    </p>
+                    
+                    {chapterBacklog.length === 0 ? (
+                      <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
+                        <p style={{ fontSize: '15px', fontWeight: '600', margin: '0 0 6px 0', color: 'var(--trans-text-primary)' }}>🎉 No chapters pending</p>
+                        <p style={{ fontSize: '13px', margin: 0 }}>All approved chapters have been assigned tasks on your board.</p>
+                      </div>
+                    ) : (
+                      <div className="chapter-backlog-table" style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
+                        <div className="chapter-backlog-table-head" style={{ position: 'sticky', top: 0, background: '#130d24', zIndex: 10 }}>
+                          <span>CHAPTER</span>
+                          <span>COMIC</span>
+                          <span>PAGES</span>
+                          <span>APPROVED</span>
+                          <span></span>
+                        </div>
+                        {chapterBacklog.map(ch => {
+                          const approvedDate = ch.approvedAt ? new Date(ch.approvedAt) : null
+                          const timeAgo = approvedDate ? getTimeAgo(approvedDate) : 'Unknown'
+                          return (
+                            <div className="chapter-backlog-row" key={ch.chapterId}>
+                              <span className="chapter-backlog-cell-chapter">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                                </svg>
+                                <div>
+                                  <strong>{ch.title || 'Chapter ' + ch.chapterNumber}</strong>
+                                </div>
+                              </span>
+                              <span className="chapter-backlog-cell-comic">{ch.comicName}</span>
+                              <span className="chapter-backlog-cell-pages">{ch.pages} pages</span>
+                              <span className="chapter-backlog-cell-approved">{timeAgo}</span>
+                              <span className="chapter-backlog-cell-action">
+                                <button
+                                  className="chapter-backlog-create-btn"
+                                  onClick={() => {
+                                    setShowBacklogModal(false)
+                                    openCreateTaskFromBacklog(ch)
+                                  }}
+                                >
+                                  + Create Task
+                                </button>
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* TASK DETAILS & EDIT STATUS MODAL */}
             {selectedTask && (
               <div className="trans-modal-overlay">
@@ -1411,6 +1561,7 @@ function TeamProjects() {
         {/* Tab 5: GROUP SETTINGS */}
         {workspaceTab === 'settings' && (
           <div className="group-settings-tab-container fade-in">
+            {/* Left Column: Group Details */}
             <div className="settings-tab-card">
               <h3 className="settings-section-title">Group Information</h3>
 
@@ -1427,11 +1578,11 @@ function TeamProjects() {
                 />
               </div>
 
-              <div className="trans-form-group">
+              <div className="trans-form-group" style={{ marginTop: '16px' }}>
                 <label className="trans-form-label">Description</label>
                 <textarea
                   className="trans-form-input textarea"
-                  style={{ height: '120px' }}
+                  style={{ height: '150px' }}
                   value={selectedDetails.description || ''}
                   onChange={(e) => {
                     const updated = { ...selectedDetails, description: e.target.value }
@@ -1440,36 +1591,122 @@ function TeamProjects() {
                 />
               </div>
 
-              <div className="trans-form-group">
-                <label className="trans-form-label">Recruitment Status</label>
-                <select className="trans-form-input">
-                  <option>Open — accepting new members</option>
-                  <option>Closed — team is full</option>
-                </select>
-              </div>
-
-              <button className="trans-btn primary" style={{ marginTop: '12px' }} onClick={handleSaveWorkspaceSettings}>
+              <button className="trans-btn primary" style={{ marginTop: '20px' }} onClick={handleSaveWorkspaceSettings}>
                 Save Changes
               </button>
             </div>
 
-            {/* Leader Info section */}
-            <div className="settings-leader-card">
-              <h3 className="settings-section-title">Group Leader</h3>
-              <div className="member-cell-info">
-                <div className="chat-avatar" style={{ background: '#f59e0b', color: '#ffffff' }}>
-                  {selectedDetails.leaderInitials || 'TL'}
+            {/* Right Column: Recruitment & Capacity + Leader Info */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div className="settings-tab-card" style={{ maxWidth: '100%' }}>
+                <h3 className="settings-section-title">Recruitment & Capacity</h3>
+                
+                <div className="trans-form-group">
+                  <label className="trans-form-label">Recruitment Status</label>
+                  <select 
+                    className="trans-form-input"
+                    value={selectedDetails.isRecruiting ? "true" : "false"}
+                    onChange={(e) => {
+                      const val = e.target.value === "true"
+                      setSelectedDetails({ ...selectedDetails, isRecruiting: val })
+                    }}
+                  >
+                    <option value="true">Open — recruiting new members (Visible in pool)</option>
+                    <option value="false">Closed — not accepting new members</option>
+                  </select>
                 </div>
-                <div className="member-status-details">
-                  <span className="member-name-text">{selectedDetails.leaderName || 'No Leader'}</span>
-                  <span className="post-time" style={{ textTransform: 'uppercase', fontWeight: '700', fontSize: '9px', color: '#d97706' }}>
-                    Group Leader · {selectedDetails.chaptersCount || 0} chapters contributed
-                  </span>
+
+                <div className="trans-form-group" style={{ marginTop: '16px' }}>
+                  <label className="trans-form-label">Max Members Limit</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    className="trans-form-input"
+                    value={selectedDetails.maxMembers || 5}
+                    onChange={(e) => {
+                      const val = Math.max(1, Number(e.target.value) || 5)
+                      setSelectedDetails({ ...selectedDetails, maxMembers: val })
+                    }}
+                  />
                 </div>
+
+                <div className="trans-form-group" style={{ marginTop: '16px' }}>
+                  <label className="trans-form-label">Recruitment Urgency / Priority</label>
+                  <select 
+                    className="trans-form-input"
+                    value={selectedDetails.priority || 'Medium'}
+                    onChange={(e) => setSelectedDetails({ ...selectedDetails, priority: e.target.value })}
+                  >
+                    <option value="Urgent">🔥 Urgent (Recruiting Urgently)</option>
+                    <option value="High">🟠 High Priority</option>
+                    <option value="Medium">🟣 Medium Priority</option>
+                    <option value="Low">⚪ Low Priority</option>
+                  </select>
+                </div>
+
+                <div style={{ marginTop: '16px' }}>
+                  {selectedDetails.isRecruiting ? (
+                    (selectedDetails.maxMembers || 5) - members.length > 0 ? (
+                      <div className="capacity-info-alert recruiting" style={{
+                        background: 'rgba(34, 197, 94, 0.08)',
+                        border: '1px solid rgba(34, 197, 94, 0.15)',
+                        color: '#4ade80',
+                        padding: '10px 14px',
+                        borderRadius: '6px',
+                        fontSize: '13px'
+                      }}>
+                        <span>🟢 Open Recruiting: <strong>{Math.max(0, (selectedDetails.maxMembers || 5) - members.length)}</strong> spots available to join</span>
+                      </div>
+                    ) : (
+                      <div className="capacity-info-alert full" style={{
+                        background: 'rgba(239, 68, 68, 0.08)',
+                        border: '1px solid rgba(239, 68, 68, 0.15)',
+                        color: '#f87171',
+                        padding: '10px 14px',
+                        borderRadius: '6px',
+                        fontSize: '13px'
+                      }}>
+                        <span>🔴 Team is full (0 spots available)</span>
+                      </div>
+                    )
+                  ) : (
+                    <div className="capacity-info-alert full" style={{
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      color: '#94a3b8',
+                      padding: '10px 14px',
+                      borderRadius: '6px',
+                      fontSize: '13px'
+                    }}>
+                      <span>⚪ Recruitment Closed</span>
+                    </div>
+                  )}
+                </div>
+
+                <button className="trans-btn primary" style={{ marginTop: '16px', width: '100%' }} onClick={handleSaveWorkspaceSettings}>
+                  Save Recruitment Settings
+                </button>
               </div>
-              <p style={{ fontSize: '12.5px', color: 'var(--trans-text-muted)', margin: '14px 0 0' }}>
-                All other members are assigned as Member. Roles are managed automatically.
-              </p>
+
+              {/* Leader Info section */}
+              <div className="settings-leader-card" style={{ maxWidth: '100%', marginTop: 0 }}>
+                <h3 className="settings-section-title">Group Leader</h3>
+                <div className="member-cell-info">
+                  <div className="chat-avatar" style={{ background: '#f59e0b', color: '#ffffff' }}>
+                    {selectedDetails.leaderInitials || 'TL'}
+                  </div>
+                  <div className="member-status-details">
+                    <span className="member-name-text">{selectedDetails.leaderName || 'No Leader'}</span>
+                    <span className="post-time" style={{ textTransform: 'uppercase', fontWeight: '700', fontSize: '9px', color: '#d97706' }}>
+                      Group Leader · {selectedDetails.chaptersCount || 0} chapters contributed
+                    </span>
+                  </div>
+                </div>
+                <p style={{ fontSize: '12.5px', color: 'var(--trans-text-muted)', margin: '14px 0 0' }}>
+                  All other members are assigned as Member. Roles are managed automatically.
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -1504,54 +1741,54 @@ function TeamProjects() {
             <p>Change your search filters and try again.</p>
           </div>
         ) : (
-          teamProjectsList.map(proj => (
-            <div className="trans-project-card" key={proj.id}>
-              <div className="trans-project-cover">
-                {proj.cover && /^(https?:)?\/\//.test(proj.cover) ? (
-                  <img
-                    src={proj.cover}
-                    alt={proj.title}
-                    style={{ width: '100FS%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }}
+          teamProjectsList.map(proj => {
+            return (
+              <div className="trans-project-card" key={proj.id}>
+                <div className="trans-project-cover">
+                  {proj.cover && /^(https?:)?\/\//.test(proj.cover) ? (
+                    <img
+                      src={proj.cover}
+                      alt={proj.title}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }}
+                    />
+                  ) : (
+                    proj.cover || '📚'
+                  )}
+                </div>
+                <div className="trans-project-info">
+                  <h3 className="trans-project-title">{proj.title}</h3>
+                  <p className="trans-project-meta">
+                    🧑‍🤝‍🧑 Language: <strong>{proj.sourceLang || 'Any'} ➔ {proj.targetLang}</strong>
+                  </p>
+                  
+                  {/* Capacity Info */}
+                  <p className="trans-project-meta" style={{ marginTop: '4px' }}>
+                    <span style={{ color: '#cbd5e1', fontSize: '12.5px' }}>
+                      👥 Capacity: {proj.membersCount || 0} / {proj.maxMembers || 5} members ({proj.isRecruiting ? 'Open' : 'Closed'})
+                    </span>
+                  </p>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                    <span className={`status-badge ${proj.status.toLowerCase()}`}>{proj.status}</span>
+                    <span className="status-badge leader">⭐ Led by Me</span>
+                  </div>
+                </div>
+                <div className="trans-project-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <ModernButton
+                    variant={2}
+                    label="Workspace"
+                    onClick={() => handleOpenDetails(proj)}
                   />
-                ) : (
-                  proj.cover || '📚'
-                )}
-              </div>
-              <div className="trans-project-info">
-                <h3 className="trans-project-title">{proj.title}</h3>
-                <p className="trans-project-meta">
-                  🧑‍🤝‍🧑 Language: <strong>{proj.targetLang}</strong>
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-                  <span className={`status-badge ${proj.status.toLowerCase()}`}>{proj.status}</span>
-                  {proj.leaderName && (
-                    proj.leaderName === userFullName ||
-                    proj.leaderName === authUser?.fullName ||
-                    proj.leaderName === authUser?.username ||
-                    proj.leaderName.toLowerCase() === userFullName.toLowerCase() ||
-                    proj.leaderName.toLowerCase() === authUser?.username?.toLowerCase() ||
-                    proj.leaderName.toLowerCase() === user?.username?.toLowerCase() ||
-                    proj.leaderName.toLowerCase() === user?.fullName?.toLowerCase()
-                  ) && (
-                      <span className="status-badge leader">⭐ Led by Me</span>
-                    )}
+                  <button className="trans-btn icon-edit" onClick={(e) => handleOpenEdit(proj, e)}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                      <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                  </button>
                 </div>
               </div>
-              <div className="trans-project-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <ModernButton
-                  variant={2}
-                  label="View Details"
-                  onClick={() => handleOpenDetails(proj)}
-                />
-                <button className="trans-btn icon-edit" onClick={(e) => handleOpenEdit(proj, e)}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                    <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
 

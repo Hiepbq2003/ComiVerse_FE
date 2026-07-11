@@ -77,6 +77,7 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
 
   return (
     <div className="auth-form-card fade-in">
+      <div className="border-beam-wrapper" />
       <div className="form-header-group">
         <h2>Welcome back</h2>
         <p>Sign in and continue your story.</p>
@@ -101,7 +102,7 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
           <input 
             id="signin-username"
             type="text" 
-            placeholder="you@example.com" 
+            placeholder="Enter username or email" 
             value={form.username}
             onChange={(e) => updateField('username', e.target.value)}
             className="glass-input-field"
@@ -118,12 +119,12 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
 
         <div className={`glass-input-wrapper ${fieldErrors.password ? 'has-error' : ''}`}>
           <div className="glass-input-row">
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="auth-flex-fill">
               <span className="glass-input-label">PASSWORD</span>
               <input 
                 id="signin-password"
                 type={showPassword ? "text" : "password"} 
-                placeholder="••••••••" 
+                placeholder="Enter password" 
                 value={form.password}
                 onChange={(e) => updateField('password', e.target.value)}
                 className="glass-input-field"

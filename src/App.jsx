@@ -16,11 +16,16 @@ import BroadcastManagement from './pages/admin/BroadcastManagement'
 import StatisticsDashboard from './pages/admin/StatisticsDashboard'
 import RevenueManagement from './pages/admin/RevenueManagement'
 import PayoutManagement from './pages/admin/PayoutManagement'
+import AdminSystemSettings from './pages/admin/AdminSystemSettings'
 import AuthorDashboard from './pages/author/AuthorDashboard'
 import AuthorComics from './pages/author/AuthorComics'
 import AuthorComicDetail from './pages/author/AuthorComicDetail'
 import AuthorEarnings from './pages/author/AuthorEarnings'
 import AuthorSettings from './pages/author/AuthorSettings'
+import AuthorUploadGuide from './pages/author/AuthorUploadGuide'
+import AuthorProfile from './pages/author/AuthorProfile'
+import ModeratorDashboard from './pages/moderator/ModeratorDashboard'
+import TranslatorDashboard from './pages/translator/TranslatorDashboard'
 import Profile from './pages/common/Profile'
 import Policy from './pages/common/Policy'
 import TranslateDashboard from './pages/translator/TranslatorDashboard'
@@ -55,9 +60,9 @@ function ProfileRouteWrapper() {
 
 function App() {
   return (
-    <ThemeProvider>
-      <LanguageProvider>
-        <AuthProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <LanguageProvider>
           <NotificationProvider>
             <BrowserRouter>
               <Routes>
@@ -82,10 +87,17 @@ function App() {
                 <Route path="/admin/account-management" element={<AccountManagement />} />
                 <Route path="/admin/broadcast" element={<BroadcastManagement />} />
                 <Route path="/admin/payout" element={<PayoutManagement />} />
+                <Route path="/admin/settings" element={<AdminSystemSettings />} />
+                {/* Moderator */}
+                <Route path="/moderator" element={<ModeratorDashboard />} />
+                {/* Translator */}
+                <Route path="/translator" element={<TranslatorDashboard />} />
                 {/* Author */}
                 <Route path="/author/overview" element={<AuthorDashboard />} />
                 <Route path="/author/comics" element={<AuthorComics />} />
                 <Route path="/author/comics/:id" element={<AuthorComicDetail />} />
+                <Route path="/author/upload-guide" element={<AuthorUploadGuide />} />
+                <Route path="/author/profile" element={<AuthorProfile />} />
                 <Route path="/author/earnings" element={<AuthorEarnings />} />
                 <Route path="/author/settings" element={<AuthorSettings />} />
                 {/* Translator */}
@@ -111,9 +123,9 @@ function App() {
               <ToastContainer position="top-right" autoClose={3000} theme="dark" />
             </BrowserRouter>
           </NotificationProvider>
-        </AuthProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </AuthProvider>
   )
 }
 

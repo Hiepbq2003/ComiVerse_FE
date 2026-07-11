@@ -5,6 +5,47 @@ import { getAuth } from '../../utils/Auth'
 import { toast } from 'react-toastify'
 import '../../assets/style/reader/forum.css'
 
+const formatTimeAgo = (createdAtString) => {
+  if (!createdAtString) return 'Just now'
+  const date = new Date(createdAtString)
+  if (isNaN(date.getTime())) {
+    return 'Just now'
+  }
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const seconds = Math.floor(diffMs / 1000)
+  
+  // If the server time is ahead due to timezone differences, handle absolute values
+  if (seconds < 0) {
+    const absSeconds = Math.abs(seconds)
+    if (absSeconds < 86400) {
+      if (absSeconds < 60) return 'Just now'
+      const minutes = Math.floor(absSeconds / 60)
+      if (minutes < 60) return `${minutes}m ago`
+      const hours = Math.floor(absSeconds / 60)
+      return `${hours}h ago`
+    }
+    return 'Just now'
+  }
+  
+  if (seconds < 60) {
+    return 'Just now'
+  }
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) {
+    return `${minutes}m ago`
+  }
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) {
+    return `${hours}h ago`
+  }
+  const days = Math.floor(hours / 24)
+  if (days === 1) {
+    return '1 day ago'
+  }
+  return `${days} days ago`
+}
+
 function Forum() {
   const [threads, setThreads] = useState([])
   const [loading, setLoading] = useState(true)
@@ -16,6 +57,11 @@ function Forum() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalElements, setTotalElements] = useState(0)
+  const [allThreadsForCounts, setAllThreadsForCounts] = useState([])
+  const [customCategories, setCustomCategories] = useState(() => {
+    const saved = localStorage.getItem('comiverse_forum_categories')
+    return saved ? JSON.parse(saved) : []
+  })
   const ITEMS_PER_PAGE = 5
 
   // Reset page when category or sorting tab changes
@@ -27,19 +73,17 @@ function Forum() {
   const [showNewPostModal, setShowNewPostModal] = useState(false)
   const [newPostForm, setNewPostForm] = useState({
     title: '',
-    category: 'Story Discussion',
+    category: 'General',
     content: ''
   })
 
-  // Categories list matching mockup
+  // Categories list derived dynamically from database threads (synced with customCategories)
   const categoriesList = [
     { name: 'All' },
-    { name: 'Story Discussion' },
-    { name: 'Recommendations' },
-    { name: 'Fan Art' },
-    { name: 'News' },
-    { name: 'Q&A' },
-    { name: 'Site Feedback' }
+    ...Array.from(new Set([
+      ...allThreadsForCounts.map(t => t.category || 'General'),
+      ...customCategories
+    ])).map(name => ({ name }))
   ]
 
   // Hover states for category selector
@@ -55,7 +99,7 @@ function Forum() {
     fetchThreads(currentPage)
   }, [currentPage])
 
-  const [allThreadsForCounts, setAllThreadsForCounts] = useState([])
+  // State moved to top
 
   const fetchAllThreadsForCounts = async () => {
     try {
@@ -85,12 +129,12 @@ function Forum() {
         title: t.title || 'Untitled Thread',
         content: t.content || '',
         author: t.author || 'Guest User',
-        category: t.category || 'Story Discussion',
-        views: t.views ? String(t.views) : '0',
-        replies: t.replies || 0,
+        category: t.category || 'General',
+        views: t.views !== undefined && t.views !== null ? String(t.views) : '0',
+        replies: t.replies ?? 0,
         likes: t.likes || 0,
         isLiked: false,
-        timeAgo: 'Just now'
+        timeAgo: formatTimeAgo(t.createdAt)
       }))
 
       setThreads(formattedDb)
@@ -149,7 +193,7 @@ function Forum() {
       setShowNewPostModal(false)
       setNewPostForm({
         title: '',
-        category: 'Story Discussion',
+        category: 'General',
         content: ''
       })
       // Refresh counts and list from database
@@ -166,7 +210,7 @@ function Forum() {
   // Count threads inside category
   const getCategoryCount = (catName) => {
     if (catName === 'All') return allThreadsForCounts.length
-    return allThreadsForCounts.filter(t => t.category === catName).length
+    return allThreadsForCounts.filter(t => (t.category || 'General') === catName).length
   }
 
   // Filter threads
@@ -479,11 +523,12 @@ function Forum() {
                   value={newPostForm.category}
                   onChange={(e) => setNewPostForm({ ...newPostForm, category: e.target.value })}
                 >
-                  <option value="Story Discussion">Story Discussion</option>
-                  <option value="Recommendations">Recommendations</option>
-                  <option value="Fan Art">Fan Art</option>
-                  <option value="Q&A">Q&A</option>
-                  <option value="Site Feedback">Site Feedback</option>
+                  {categoriesList.filter(c => c.name !== 'All').map(c => (
+                    <option key={c.name} value={c.name}>{c.name}</option>
+                  ))}
+                  {categoriesList.length <= 1 && (
+                    <option value="General">General</option>
+                  )}
                 </select>
               </div>
 

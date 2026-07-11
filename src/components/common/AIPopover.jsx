@@ -298,23 +298,42 @@ export const AIPopover = ({
         {/* 5. NESTED MENU */}
         {variant === 'menu' && (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div 
-              className="pop-menu__item" 
-              onMouseEnter={() => setMenuOpen('export')} 
-              onMouseLeave={() => setMenuOpen(null)}
-            >
-              <span>Export</span>
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-              <div className={`pop-sub ${menuOpen === 'export' ? 'is-open' : ''}`}>
-                <div className="pop-menu__item" onClick={() => { setIsOpen(false); onAction('ONNX'); }}>ONNX</div>
-                <div className="pop-menu__item" onClick={() => { setIsOpen(false); onAction('TensorRT'); }}>TensorRT</div>
-                <div className="pop-menu__item" onClick={() => { setIsOpen(false); onAction('CoreML'); }}>CoreML</div>
-              </div>
-            </div>
-            <div className="pop-menu__item" onClick={() => { setIsOpen(false); onAction('duplicate'); }}>Duplicate</div>
-            <div className="pop-menu__item" onClick={() => { setIsOpen(false); onAction('archive'); }}>Archive</div>
-            <div className="pop-menu__divider"></div>
-            <div className="pop-menu__item pop-menu__item--danger" onClick={() => { setIsOpen(false); onAction('delete'); }}>Delete</div>
+            {data.menuItems ? (
+              data.menuItems.map((item, index) => {
+                if (item.type === 'divider') {
+                  return <div key={`div-${index}`} className="pop-menu__divider"></div>
+                }
+                return (
+                  <div 
+                    key={item.label || index}
+                    className={`pop-menu__item ${item.danger ? 'pop-menu__item--danger' : ''}`}
+                    onClick={() => { setIsOpen(false); onAction(item.action); }}
+                  >
+                    {item.label}
+                  </div>
+                )
+              })
+            ) : (
+              <>
+                <div 
+                  className="pop-menu__item" 
+                  onMouseEnter={() => setMenuOpen('export')} 
+                  onMouseLeave={() => setMenuOpen(null)}
+                >
+                  <span>Export</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  <div className={`pop-sub ${menuOpen === 'export' ? 'is-open' : ''}`}>
+                    <div className="pop-menu__item" onClick={() => { setIsOpen(false); onAction('ONNX'); }}>ONNX</div>
+                    <div className="pop-menu__item" onClick={() => { setIsOpen(false); onAction('TensorRT'); }}>TensorRT</div>
+                    <div className="pop-menu__item" onClick={() => { setIsOpen(false); onAction('CoreML'); }}>CoreML</div>
+                  </div>
+                </div>
+                <div className="pop-menu__item" onClick={() => { setIsOpen(false); onAction('duplicate'); }}>Duplicate</div>
+                <div className="pop-menu__item" onClick={() => { setIsOpen(false); onAction('archive'); }}>Archive</div>
+                <div className="pop-menu__divider"></div>
+                <div className="pop-menu__item pop-menu__item--danger" onClick={() => { setIsOpen(false); onAction('delete'); }}>Delete</div>
+              </>
+            )}
           </div>
         )}
 
