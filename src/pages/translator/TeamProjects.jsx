@@ -496,9 +496,6 @@ function TeamProjects() {
   }
 
   const handleOpenTaskDetails = (task) => {
-    // In toàn bộ đối tượng ra console để xem nó có chứa gì
-    console.log("Đối tượng task đầy đủ:", JSON.stringify(task, null, 2));
-
     const { priority, cleanTitle, comicProject } = parseTaskTitle(task.title);
     setSelectedTask(task);
     

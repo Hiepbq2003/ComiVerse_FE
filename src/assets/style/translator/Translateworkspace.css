@@ -36,6 +36,7 @@
 .tw-font-display {
   font-family: "Fraunces", serif;
 }
+
 .tw-font-mono {
   font-family: "IBM Plex Mono", monospace;
 }
@@ -54,10 +55,12 @@
   cursor: pointer;
   transition: background-color 0.15s, border-color 0.15s;
 }
+
 .tw-btn:hover {
   background: var(--ink-900);
   border-color: #454863;
 }
+
 .tw-btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--ink-950), 0 0 0 4px var(--aizuri);
@@ -77,9 +80,11 @@
   cursor: pointer;
   transition: background-color 0.15s;
 }
+
 .tw-btn-primary:hover {
   background: var(--aizuri-hover);
 }
+
 .tw-btn-primary:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--ink-950), 0 0 0 4px var(--aizuri);
@@ -96,13 +101,16 @@
   align-items: center;
   justify-content: center;
 }
+
 .tw-btn-icon:hover {
   background: var(--ink-900);
 }
+
 .tw-btn-icon.active {
   background: var(--aizuri);
   color: var(--ink-950);
 }
+
 .tw-btn-icon.outline-active {
   border: 1px solid var(--aizuri);
   color: var(--aizuri);
@@ -131,16 +139,19 @@
   padding: 0 16px;
   border-bottom: 1px solid var(--ink-line-soft);
 }
+
 .tw-header-left {
   display: flex;
   align-items: center;
   gap: 12px;
 }
+
 .tw-divider-v {
   width: 1px;
   height: 24px;
   background: var(--ink-line-soft);
 }
+
 .tw-project-icon {
   width: 32px;
   height: 32px;
@@ -152,6 +163,7 @@
   color: var(--ink-950);
   flex-shrink: 0;
 }
+
 .tw-project-title {
   font-size: 15px;
   font-weight: 500;
@@ -159,6 +171,7 @@
   margin: 0;
   line-height: 1.2;
 }
+
 .tw-project-sub {
   font-size: 11px;
   letter-spacing: 0.04em;
@@ -166,6 +179,7 @@
   text-transform: uppercase;
   margin: 0;
 }
+
 .tw-header-right {
   display: flex;
   align-items: center;
@@ -187,6 +201,7 @@
   overflow-y: auto;
   background: var(--ink-850);
 }
+
 .tw-sidebar-label {
   padding: 16px 16px 8px;
   font-size: 11px;
@@ -195,6 +210,7 @@
   color: var(--ink-muted-2);
   margin: 0;
 }
+
 .tw-chapter-row {
   width: 100%;
   display: flex;
@@ -206,9 +222,11 @@
   cursor: pointer;
   text-align: left;
 }
+
 .tw-chapter-row:hover {
   background: var(--ink-900);
 }
+
 .tw-chapter-title {
   flex: 1;
   text-align: left;
@@ -217,11 +235,13 @@
   white-space: nowrap;
   color: #dbd9cf;
 }
+
 .tw-chapter-progress {
   font-size: 11px;
   font-family: "IBM Plex Mono", monospace;
   color: var(--ink-muted-2);
 }
+
 .tw-page-row {
   width: 100%;
   display: flex;
@@ -235,14 +255,17 @@
   text-align: left;
   color: var(--ink-muted);
 }
+
 .tw-page-row:hover {
   background: var(--ink-900);
 }
+
 .tw-page-row.current {
   border-left-color: var(--shu);
   background: var(--ink-900);
   color: var(--ink-text-hi);
 }
+
 .tw-page-row-inner {
   padding-left: 24px;
   display: flex;
@@ -260,6 +283,7 @@
   justify-content: center;
   flex-shrink: 0;
 }
+
 .tw-status-dot-todo {
   width: 16px;
   height: 16px;
@@ -270,6 +294,7 @@
   justify-content: center;
   flex-shrink: 0;
 }
+
 .tw-status-dot-current-wrap {
   position: relative;
   width: 16px;
@@ -279,6 +304,7 @@
   justify-content: center;
   flex-shrink: 0;
 }
+
 .tw-status-dot-current-pulse {
   position: absolute;
   width: 16px;
@@ -287,15 +313,26 @@
   background: rgba(193, 68, 14, 0.25);
   animation: tw-pulse 1.6s ease-in-out infinite;
 }
+
 .tw-status-dot-current-core {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--shu);
 }
+
 @keyframes tw-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(1.3); }
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.4;
+    transform: scale(1.3);
+  }
 }
 
 /* Canvas toolbar */
@@ -309,6 +346,7 @@
   border-bottom: 1px solid var(--ink-line-soft);
   background: var(--ink-850);
 }
+
 .tw-toolbar-group {
   display: flex;
   align-items: center;
@@ -318,6 +356,7 @@
   border-radius: 6px;
   padding: 4px;
 }
+
 .tw-select {
   background: transparent;
   border: none;
@@ -326,11 +365,13 @@
   color: var(--ink-text-2);
   outline: none;
 }
+
 .tw-toolbar-divider {
   width: 1px;
   height: 20px;
   background: var(--ink-line);
 }
+
 .tw-page-nav {
   display: flex;
   align-items: center;
@@ -339,6 +380,7 @@
   font-family: "IBM Plex Mono", monospace;
   font-size: 12px;
 }
+
 .tw-page-nav-btn {
   padding: 4px 10px;
   border-radius: 6px;
@@ -352,6 +394,7 @@
   align-items: center;
   gap: 4px;
 }
+
 .tw-page-nav-btn:hover {
   background: var(--ink-900);
 }
@@ -366,6 +409,7 @@
   padding: 32px;
   background: radial-gradient(ellipse at top, var(--ink-900) 0%, #0e0f16 70%);
 }
+
 .tw-page {
   position: relative;
   width: 640px;
@@ -376,6 +420,7 @@
   background: var(--paper);
   box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.65);
 }
+
 .tw-bubble {
   position: absolute;
   border-radius: 16px;
@@ -391,16 +436,20 @@
   transition: box-shadow 0.15s;
   font-family: "IBM Plex Sans", sans-serif;
 }
+
 .tw-bubble:hover {
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 }
+
 .tw-bubble.active {
   box-shadow: 0 0 0 3px rgba(193, 68, 14, 0.35);
 }
+
 .tw-bubble p {
   margin: 0;
   white-space: pre-wrap;
 }
+
 .tw-bubble-index {
   position: absolute;
   top: -10px;
@@ -418,6 +467,7 @@
   background: var(--ink-950);
   color: var(--ink-text);
 }
+
 .tw-bubble-tail {
   position: absolute;
   bottom: -8px;
@@ -438,6 +488,7 @@
   flex-shrink: 0;
   z-index: 5;
 }
+
 .tw-panel-collapse-btn {
   position: absolute;
   top: 50%;
@@ -454,6 +505,7 @@
   justify-content: center;
   cursor: pointer;
 }
+
 .tw-panel-collapse-btn:hover {
   background: var(--ink-line);
   color: var(--ink-text-hi);
@@ -470,17 +522,21 @@
   overflow: hidden;
   transition: width 0.2s ease;
 }
+
 .tw-rightpanel-collapsed {
   width: 0;
   border-left: none;
 }
-.tw-rightpanel-collapsed > * {
+
+.tw-rightpanel-collapsed>* {
   display: none;
 }
+
 .tw-tabs {
   display: flex;
   border-bottom: 1px solid var(--ink-line-soft);
 }
+
 .tw-tab {
   flex: 1;
   padding: 12px 0;
@@ -492,13 +548,16 @@
   color: var(--ink-muted-2);
   cursor: pointer;
 }
+
 .tw-tab:hover {
   color: var(--ink-text-2);
 }
+
 .tw-tab.active {
   border-bottom-color: var(--aizuri);
   color: var(--ink-text-hi);
 }
+
 .tw-tabpanel {
   flex: 1;
   overflow-y: auto;
@@ -507,6 +566,7 @@
   flex-direction: column;
   gap: 20px;
 }
+
 .tw-bubble-nav-row {
   display: flex;
   align-items: center;
@@ -515,6 +575,7 @@
   font-family: "IBM Plex Mono", monospace;
   font-size: 12px;
 }
+
 .tw-section-label {
   display: flex;
   align-items: center;
@@ -524,12 +585,14 @@
   letter-spacing: 0.03em;
   margin: 0 0 8px;
 }
+
 .tw-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   display: inline-block;
 }
+
 .tw-card {
   border-radius: 8px;
   background: var(--ink-950);
@@ -538,17 +601,20 @@
   color: var(--ink-text);
   white-space: pre-wrap;
 }
+
 .tw-caption {
   font-size: 11px;
   font-family: "IBM Plex Mono", monospace;
   color: var(--ink-muted-2);
   margin: 6px 0 0;
 }
+
 .tw-glossary-list {
   border-radius: 8px;
   background: var(--ink-950);
   border: 1px solid var(--ink-line);
 }
+
 .tw-glossary-row {
   display: flex;
   align-items: center;
@@ -557,14 +623,17 @@
   padding: 8px 12px;
   border-bottom: 1px solid var(--ink-line-soft);
 }
+
 .tw-glossary-row:last-child {
   border-bottom: none;
 }
+
 .tw-translation-block {
   flex: 1;
   display: flex;
   flex-direction: column;
 }
+
 .tw-translation-toolbar {
   display: flex;
   align-items: center;
@@ -575,6 +644,7 @@
   border-radius: 6px 6px 0 0;
   padding: 6px 8px;
 }
+
 .tw-textarea {
   flex: 1;
   min-height: 140px;
@@ -588,9 +658,11 @@
   font-family: inherit;
   font-size: 14px;
 }
+
 .tw-textarea:focus-visible {
   box-shadow: inset 0 0 0 1px var(--aizuri);
 }
+
 .tw-textarea-footer {
   display: flex;
   align-items: center;
@@ -600,12 +672,14 @@
   color: var(--ink-muted-2);
   margin-top: 6px;
 }
+
 .tw-textarea-footer .saved {
   display: flex;
   align-items: center;
   gap: 4px;
   color: var(--shu-soft);
 }
+
 .tw-save-next-btn {
   width: 100%;
   padding: 10px;
@@ -617,9 +691,11 @@
   cursor: pointer;
   font-size: 14px;
 }
+
 .tw-save-next-btn:hover {
   background: var(--aizuri-hover);
 }
+
 .tw-placeholder {
   flex: 1;
   display: flex;
@@ -631,12 +707,14 @@
   padding: 16px;
   text-align: center;
 }
+
 .tw-panel-footer {
   border-top: 1px solid var(--ink-line-soft);
   padding: 8px 16px;
   display: flex;
   justify-content: flex-end;
 }
+
 .tw-help-btn {
   width: 28px;
   height: 28px;
@@ -649,7 +727,24 @@
   justify-content: center;
   cursor: pointer;
 }
+
 .tw-help-btn:hover {
   background: var(--ink-900);
   color: var(--ink-text-2);
+}
+
+.editor {
+  position: relative;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+}
+
+.region {
+  position: absolute;
+  border: 2px solid #4ea1ff;
+  background: rgba(78, 161, 255, .2);
 }
