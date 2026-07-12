@@ -41,21 +41,22 @@
 .moderator-sidebar {
   width: var(--mod-sidebar-w);
   height: 100vh;
-  background: var(--mod-sidebar-bg) !important;
+  background: linear-gradient(180deg, #0e0a1f 0%, #070512 100%) !important;
   backdrop-filter: blur(20px) saturate(140%) !important;
   -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
   display: flex;
   flex-direction: column;
   position: fixed;
   top: 0;
   left: 0;
   z-index: 100;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.35);
 }
 
 .moderator-sidebar-brand {
   padding: 24px 20px 28px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .moderator-sidebar-brand h2 {
@@ -81,7 +82,7 @@
   padding: 16px 12px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   overflow-y: auto;
 }
 
@@ -89,32 +90,40 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
-  border-radius: 8px;
+  padding: 11px 14px;
+  border-radius: 10px;
   font-size: 14px;
   font-weight: 500;
   color: var(--mod-sidebar-text);
   text-decoration: none;
   cursor: pointer;
-  transition: all 0.2s ease;
-  background: transparent;
-  border: none;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   width: 100%;
   box-sizing: border-box;
   text-align: left;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
 .moderator-nav-item:hover {
-  background: rgba(168, 85, 247, 0.06);
+  background: rgba(168, 85, 247, 0.08);
+  border-color: rgba(168, 85, 247, 0.25);
   color: var(--mod-sidebar-active, #ffffff);
+  transform: translateX(2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .moderator-nav-item.active {
-  background: rgba(168, 85, 247, 0.12);
-  color: var(--mod-sidebar-active, #ffffff);
-  border-left: 3px solid var(--mod-purple);
-  padding-left: 11px;
-  box-shadow: 0 0 20px rgba(168, 85, 247, 0.06);
+  background: linear-gradient(90deg, rgba(168, 85, 247, 0.2) 0%, rgba(236, 72, 153, 0.05) 100%) !important;
+  color: var(--mod-sidebar-active, #ffffff) !important;
+  border: 1px solid rgba(168, 85, 247, 0.35) !important;
+  border-left: 4px solid var(--mod-purple) !important;
+  padding-left: 10px !important;
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 4px 15px rgba(168, 85, 247, 0.12) !important;
+  font-weight: 600 !important;
 }
 
 .moderator-nav-label-group {
@@ -459,22 +468,25 @@
 
 /* ── SUBMISSION CARD ─────────────────────────────── */
 .submission-card {
-  background: rgba(255, 255, 255, 0.02) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: linear-gradient(145deg, #1a1433 0%, #16112b 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
   border-radius: 12px;
   padding: 16px 20px;
   display: flex;
   align-items: center;
   gap: 16px;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 }
 
 .submission-card:hover {
   transform: translateY(-2px) scale(1.005);
-  border-color: rgba(168, 85, 247, 0.25) !important;
-  background: rgba(255, 255, 255, 0.04) !important;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3), 0 0 15px rgba(168, 85, 247, 0.05) !important;
+  border-color: rgba(168, 85, 247, 0.22) !important;
+  background: linear-gradient(145deg, #1e1739 0%, #1a1433 100%) !important;
+  box-shadow: 
+    0 12px 30px rgba(0, 0, 0, 0.35),
+    0 0 15px rgba(168, 85, 247, 0.12) !important;
 }
 
 .submission-cover-placeholder {
@@ -645,7 +657,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 500;
+  z-index: 9999 !important;
   animation: fadeIn 0.2s ease-out;
 }
 
@@ -1792,12 +1804,25 @@ html.light .project-team-progress-bar-bg {
   background: rgba(0, 0, 0, 0.06) !important;
 }
 
+html.light .moderator-layout,
+html.light .moderator-main,
+html.light .moderator-page-content {
+  background: #faf6f0 !important;
+}
+
 html.light .moderator-sidebar {
-  border-right: 1px solid rgba(99, 87, 78, 0.1) !important;
+  background: #ffffff !important;
+  border-right: 1px solid rgba(0, 0, 0, 0.04) !important;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.01) !important;
 }
 
 html.light .moderator-sidebar-brand {
-  border-bottom: 1px solid rgba(99, 87, 78, 0.1) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .moderator-topbar {
+  background: #ffffff !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04) !important;
 }
 
 html.light .moderator-sidebar-brand span {
@@ -2195,4 +2220,142 @@ html.light .moderator-logout-btn:hover {
   background: #dc2626 !important;
   border-color: #dc2626 !important;
   color: #ffffff !important;
+}
+
+/* Light mode overrides for sidebar and navigation items */
+html.light .moderator-sidebar {
+  background: #ffffff !important;
+  border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light .moderator-sidebar-brand {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+html.light .moderator-sidebar-brand span {
+  color: #64748b !important;
+}
+
+html.light .moderator-sidebar-footer {
+  border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+html.light .moderator-nav-item {
+  background: #f8fafc !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  color: #475569 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+}
+
+html.light .moderator-nav-item:hover {
+  background: rgba(168, 85, 247, 0.06) !important;
+  border-color: rgba(168, 85, 247, 0.2) !important;
+  color: #7c3aed !important;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.05) !important;
+}
+
+html.light .moderator-nav-item.active {
+  background: linear-gradient(90deg, rgba(168, 85, 247, 0.1) 0%, rgba(236, 72, 153, 0.02) 100%) !important;
+  color: #7c3aed !important;
+  border: 1px solid rgba(168, 85, 247, 0.25) !important;
+  border-left: 4px solid #7c3aed !important;
+  padding-left: 10px !important;
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 4px 12px rgba(168, 85, 247, 0.08) !important;
+}
+
+/* Light mode overrides for submission cards */
+html.light .submission-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .submission-card:hover {
+  background: rgba(168, 85, 247, 0.02) !important;
+  border-color: rgba(168, 85, 247, 0.25) !important;
+  box-shadow: 
+    0 12px 30px rgba(0, 0, 0, 0.08),
+    0 0 15px rgba(168, 85, 247, 0.06) !important;
+}
+
+html.light .submission-cover-placeholder {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Light mode overrides for tabs and sub-tabs */
+html.light .moderator-tabs {
+  border-bottom-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .moderator-tab-btn {
+  color: #475569 !important;
+}
+
+html.light .moderator-tab-btn:hover {
+  color: #0f172a !important;
+}
+
+html.light .moderator-tab-btn.active {
+  color: #7c3aed !important;
+  border-bottom-color: #7c3aed !important;
+}
+
+html.light .moderator-tab-btn-badge {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #475569 !important;
+}
+
+html.light .moderator-tab-btn.active .moderator-tab-btn-badge {
+  background: #7c3aed !important;
+  color: #ffffff !important;
+}
+
+html.light .moderator-sub-tab-btn {
+  background: #ffffff !important;
+  color: #475569 !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .moderator-sub-tab-btn:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+html.light .moderator-sub-tab-btn.active {
+  background: rgba(168, 85, 247, 0.08) !important;
+  color: #7c3aed !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
+}
+
+html.light .moderator-sub-tab-badge {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #475569 !important;
+}
+
+/* Light mode overrides for filter search bars and select controls */
+html.light .moderator-select,
+html.light .mod-input,
+html.light .mod-select-field {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+  color: #0f172a !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02) !important;
+}
+
+html.light .moderator-select:focus,
+html.light .mod-input:focus,
+html.light .mod-select-field:focus {
+  border-color: #7c3aed !important;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.12) !important;
+}
+
+html.light .moderator-empty-state {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  color: #475569 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03) !important;
 }
