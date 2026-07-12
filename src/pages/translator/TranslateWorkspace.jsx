@@ -25,6 +25,8 @@ import {
   Trash2,
   ZoomIn,
   ZoomOut,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import polygonClipping from "polygon-clipping";
@@ -144,9 +146,21 @@ function ChapterList({ chapters, open, onToggle, currentChapterId, currentPageIn
   );
 }
 
-function TranslateHeaderBar({ comicTitle, chapterTitle, onBack }) {
+function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSaveProgress, saveStatus }) {
+  // Inline @keyframes for the spinning "saving" icon — scoped here since this is the
+  // only place in the app that needs a spin animation; no need to touch the external CSS file.
+  const badgeConfig = {
+    saving: { icon: <Loader2 size={11} strokeWidth={3} className="tw-spin" />, label: "SAVING", color: "#5472b0" },
+    saved: { icon: <Check size={11} strokeWidth={3} />, label: "SAVED", color: "#16a34a" },
+    unsaved: { icon: <AlertCircle size={11} strokeWidth={3} />, label: "UNSAVED", color: "#c1440e" },
+  }[saveStatus ?? "unsaved"];
+
   return (
     <header className="tw-header">
+      <style>{`
+        @keyframes tw-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .tw-spin { animation: tw-spin 0.8s linear infinite; }
+      `}</style>
       <div className="tw-header-left">
         <button onClick={onBack} className="tw-btn">
           <ChevronLeft size={16} />
@@ -163,13 +177,16 @@ function TranslateHeaderBar({ comicTitle, chapterTitle, onBack }) {
       </div>
 
       <div className="tw-header-right">
-        <span className="tw-badge-saved tw-font-mono">
-          <Check size={11} strokeWidth={3} /> SAVED
+        <span
+          className="tw-badge-saved tw-font-mono"
+          style={{ color: badgeConfig.color, borderColor: `${badgeConfig.color}66`, background: `${badgeConfig.color}1a` }}
+        >
+          {badgeConfig.icon} {badgeConfig.label}
         </span>
         <button className="tw-btn">
           <Upload size={14} /> Upload
         </button>
-        <button className="tw-btn">
+        <button className="tw-btn" onClick={onSaveProgress}>
           <Save size={14} /> Save progress
         </button>
         <button className="tw-btn-primary">
@@ -183,7 +200,7 @@ function TranslateHeaderBar({ comicTitle, chapterTitle, onBack }) {
 // Dropdown chọn font TỰ LÀM (không dùng <select> gốc) — vì <select>/<option> của
 // trình duyệt rất khó ép màu chữ/nền (phần lớn do OS/browser tự vẽ, CSS không can
 // thiệp được triệt để), và không kiểm soát được số dòng hiện ra trước khi cuộn.
-function FontFamilyDropdown({ fontFamily, onChangeFontFamily }) {
+function FontFamilyDropdown({ fontFamily, onChangeFontFamily, hasActiveSelection }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
 
@@ -211,11 +228,12 @@ function FontFamilyDropdown({ fontFamily, onChangeFontFamily }) {
   }, [isOpen]);
 
   return (
-    <div ref={containerRef} style={{ position: "relative" }}>
+    <div ref={containerRef} style={{ position: "relative", opacity: hasActiveSelection ? 1 : 0.4 }}>
       <button
         type="button"
-        onClick={() => setIsOpen((v) => !v)}
-        title="Font family"
+        onClick={() => hasActiveSelection && setIsOpen((v) => !v)}
+        disabled={!hasActiveSelection}
+        title={hasActiveSelection ? "Font family of the selected area" : "Select an area first"}
         className="tw-select"
         style={{
           maxWidth: 130,
@@ -223,7 +241,7 @@ function FontFamilyDropdown({ fontFamily, onChangeFontFamily }) {
           alignItems: "center",
           justifyContent: "space-between",
           gap: 4,
-          cursor: "pointer",
+          cursor: hasActiveSelection ? "pointer" : "not-allowed",
         }}
       >
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -317,7 +335,7 @@ function CanvasToolbar({
 }) {
   return (
     <div className="tw-toolbar-group">
-      <FontFamilyDropdown fontFamily={fontFamily} onChangeFontFamily={onChangeFontFamily} />
+      <FontFamilyDropdown fontFamily={fontFamily} onChangeFontFamily={onChangeFontFamily} hasActiveSelection={hasActiveSelection} />
       <button type="button" onClick={onToggleBold} className={`tw-btn-icon ${isBold ? "active" : ""}`} title="Bold">
         <Bold size={14} />
       </button>
@@ -334,12 +352,25 @@ function CanvasToolbar({
         <AlignRight size={14} />
       </button>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 2, marginLeft: 4 }}>
-        <button type="button" onClick={onDecreaseFontSize} className="tw-btn-icon" title="Decrease font size">
+      {/* Font size — ONLY applies to the currently selected area, not a global setting (same pattern as text/bg color below) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 2, marginLeft: 4, opacity: hasActiveSelection ? 1 : 0.4 }}>
+        <button
+          type="button"
+          onClick={onDecreaseFontSize}
+          disabled={!hasActiveSelection}
+          className="tw-btn-icon"
+          title={hasActiveSelection ? "Decrease font size" : "Select an area first"}
+        >
           <Minus size={13} />
         </button>
         <span style={{ fontSize: 12, color: "#8286A0", width: 24, textAlign: "center" }}>{fontSize}</span>
-        <button type="button" onClick={onIncreaseFontSize} className="tw-btn-icon" title="Increase font size">
+        <button
+          type="button"
+          onClick={onIncreaseFontSize}
+          disabled={!hasActiveSelection}
+          className="tw-btn-icon"
+          title={hasActiveSelection ? "Increase font size" : "Select an area first"}
+        >
           <Plus size={13} />
         </button>
       </div>
@@ -642,8 +673,9 @@ function PageImage({
                   fill={sel.textBgColor ?? "#ffffff"}
                   stroke={isActive ? "#16a34a" : "#f59e0b"}
                   strokeWidth={2}
-                  style={{ pointerEvents: "auto", cursor: isActive ? "move" : "pointer" }}
+                  style={{ pointerEvents: "auto", cursor: isPickingZoomPoint ? "zoom-in" : isActive ? "move" : "pointer" }}
                   onMouseDown={(e) => {
+                    if (isPickingZoomPoint) return;
                     e.stopPropagation();
                     if (isActive) {
                       onStartMove(e, sel.id);
@@ -668,8 +700,9 @@ function PageImage({
                   fill="#16a34a"
                   stroke="#fff"
                   strokeWidth={1.5}
-                  style={{ pointerEvents: "auto", cursor: "grab" }}
+                  style={{ pointerEvents: "auto", cursor: isPickingZoomPoint ? "zoom-in" : "grab" }}
                   onMouseDown={(e) => {
+                    if (isPickingZoomPoint) return;
                     e.stopPropagation();
                     onStartVertexDrag(e, sel.id, i);
                   }}
@@ -693,6 +726,7 @@ function PageImage({
                 value={sel.translation ?? ""}
                 onChange={(e) => onChangeTranslation(sel.id, e.target.value)}
                 onMouseDown={(e) => {
+                  if (isPickingZoomPoint) return;
                   e.stopPropagation();
                   if (!isActive) onSelectArea(sel.id);
                 }}
@@ -710,10 +744,12 @@ function PageImage({
                   outline: "none",
                   background: "transparent",
                   color: sel.textColor ?? "#000000",
+                  fontSize: `${sel.fontSize ?? 13}px`,
+                  fontFamily: sel.fontFamily ?? COMIC_FONT_LIBRARY[0].value,
                   ...textStyle,
                   lineHeight: 1.25,
                   padding: 4,
-                  cursor: isActive ? "move" : "text",
+                  cursor: isPickingZoomPoint ? "zoom-in" : isActive ? "move" : "text",
                   pointerEvents: "auto",
                   overflow: "hidden",
                 }}
@@ -731,6 +767,7 @@ function PageImage({
               <div
                 key={sel.id}
                 onMouseDown={(e) => {
+                  if (isPickingZoomPoint) return;
                   e.stopPropagation();
                   if (isActive) {
                     onStartMove(e, sel.id);
@@ -747,7 +784,7 @@ function PageImage({
                   border: isActive ? "2px solid #16a34a" : "2px solid #f59e0b",
                   background: sel.textBgColor ?? "#ffffff",
                   borderRadius: sel.shape === "ellipse" ? "50%" : 0,
-                  cursor: isActive ? "move" : "pointer",
+                  cursor: isPickingZoomPoint ? "zoom-in" : isActive ? "move" : "pointer",
                 }}
               >
                 {isActive ? (
@@ -801,6 +838,7 @@ function PageImage({
                   value={sel.translation ?? ""}
                   onChange={(e) => onChangeTranslation(sel.id, e.target.value)}
                   onMouseDown={(e) => {
+                    if (isPickingZoomPoint) return;
                     // Allow clicking to place the text cursor, without triggering move/resize/reselect
                     e.stopPropagation();
                     if (!isActive) onSelectArea(sel.id);
@@ -818,10 +856,12 @@ function PageImage({
                     outline: "none",
                     background: "transparent",
                     color: sel.textColor ?? "#000000",
+                    fontSize: `${sel.fontSize ?? 13}px`,
+                    fontFamily: sel.fontFamily ?? COMIC_FONT_LIBRARY[0].value,
                     ...textStyle,
                     lineHeight: 1.25,
                     padding: 4,
-                    cursor: isActive ? "move" : "text",
+                    cursor: isPickingZoomPoint ? "zoom-in" : isActive ? "move" : "text",
                     overflow: "hidden",
                   }}
                 />
@@ -832,6 +872,7 @@ function PageImage({
                     <div
                       key={handle}
                       onMouseDown={(e) => {
+                        if (isPickingZoomPoint) return;
                         e.stopPropagation();
                         onStartResize(e, sel.id, handle);
                       }}
@@ -842,7 +883,7 @@ function PageImage({
                         background: "#16a34a",
                         border: "1.5px solid #fff",
                         borderRadius: sel.shape === "ellipse" ? "50%" : 2,
-                        cursor: HANDLE_CURSOR[handle],
+                        cursor: isPickingZoomPoint ? "zoom-in" : HANDLE_CURSOR[handle],
                         top: handle.includes("n") ? -5 : undefined,
                         bottom: handle.includes("s") ? -5 : undefined,
                         left: handle.includes("w") ? -5 : undefined,
@@ -1227,6 +1268,24 @@ async function fetchPagesForTask(taskId, signal) {
   return Array.isArray(list) ? list : [];
 }
 
+// Save the bubbles (selections + translations + colors + shapes) AND the page-wide text
+// style settings (font family/size/bold/italic/align — these apply to the whole page, not
+// per-bubble) for ONE page. "payload" is {selections, textStyle}; the backend only reads
+// the "bubbles" field of the body (a raw JSON string of this whole payload object).
+async function saveBubblesForPage(pageId, payload, signal) {
+  const res = await fetch(`${API_BASE}/translate-workspace/pages/${pageId}/bubbles`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ bubbles: JSON.stringify(payload) }),
+    signal,
+  });
+  if (!res.ok) {
+    console.error(`Failed to save bubbles for page ${pageId}: HTTP ${res.status}`);
+    return false;
+  }
+  return true;
+}
+
 // [LEGACY] No longer used — kept in case a temporary rollback is needed.
 // The official image source is now fetchPagesForTask() above.
 function normalizeImages(chapterData) {
@@ -1562,6 +1621,8 @@ function useSelectionAreas() {
         shape: activeTool === "ellipse" ? "ellipse" : "rect",
         textColor: "#000000",
         textBgColor: "#ffffff",
+        fontSize: 13,
+        fontFamily: COMIC_FONT_LIBRARY[0].value,
         ...drawing,
       };
       setSelections((prev) => [...prev, newArea]);
@@ -1580,6 +1641,8 @@ function useSelectionAreas() {
         points: polygonDraft,
         textColor: "#000000",
         textBgColor: "#ffffff",
+        fontSize: 13,
+        fontFamily: COMIC_FONT_LIBRARY[0].value,
       };
       setSelections((prev) => [...prev, newArea]);
       setActiveId(newArea.id);
@@ -1607,11 +1670,16 @@ function useSelectionAreas() {
 
   const loadSelections = (boxes) => {
     const withIds = boxes.map((box) => ({
-      id: ++selectionIdCounter,
       shape: "rect",
       textColor: "#000000",
       textBgColor: "#ffffff",
+      fontSize: 13,
+      fontFamily: COMIC_FONT_LIBRARY[0].value,
       ...box,
+      id: ++selectionIdCounter, // ALWAYS assign a fresh id last, overriding any "id" the
+      // loaded box might already carry (e.g. restored from a previous save) — old ids
+      // could otherwise collide with ids assigned in this session, causing 2 different
+      // selections to share the same React key / update target.
     }));
     setSelections((prev) => [...prev, ...withIds]);
   };
@@ -1853,10 +1921,10 @@ export default function TranslateWorkspace() {
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
   // Starts empty — will auto-open the current chapter once the real list finishes loading
   const [open, setOpen] = useState({});
-  const [fontSize, setFontSize] = useState(13);
-  const increaseFontSize = () => setFontSize((v) => Math.min(v + 1, 48));
-  const decreaseFontSize = () => setFontSize((v) => Math.max(v - 1, 8));
-  const [fontFamily, setFontFamily] = useState(COMIC_FONT_LIBRARY[0].value);
+  // NOTE: fontSize/fontFamily are NOT global/page-wide settings — each selection stores
+  // its own "fontSize"/"fontFamily" field (see updateSelectionStyle calls in
+  // CanvasToolbar's onIncrease/DecreaseFontSize and onChangeFontFamily below), same
+  // pattern as textColor/textBgColor.
   const [isBold, setIsBold] = useState(false);
   const [isItalic, setIsItalic] = useState(false);
   const [textAlign, setTextAlign] = useState("left");
@@ -2037,6 +2105,39 @@ export default function TranslateWorkspace() {
     return () => window.removeEventListener("mousedown", onMouseDown);
   }, [isPickingZoomPoint, cancelZoomPick, canvasRef]);
 
+  // Kept in sync with the latest "selections" — read from inside a useEffect cleanup
+  // function (see the auto-save effect below), where a normal closure would otherwise
+  // capture a STALE (outdated) copy of selections from when the effect was first set up.
+  const selectionsRef = useRef(selections);
+  useEffect(() => {
+    selectionsRef.current = selections;
+  }, [selections]);
+
+  // "unsaved" | "saving" | "saved" — drives the badge in the header.
+  const [saveStatus, setSaveStatus] = useState("unsaved");
+  // While true, the NEXT "watched state changed" event is a result of LOADING previously-
+  // saved data (page switch, initial mount) rather than a real user edit — should NOT
+  // flip the badge to "unsaved". Set to true right before clearSelections()/loadSelections()/
+  // setIsBold/setIsItalic/setTextAlign run in the page-change effect below, consumed
+  // (reset to false) by this effect right after (React 18 batches all those setState calls
+  // into a single re-render, so this fires exactly once per page load, not once per field).
+  const isLoadingPageRef = useRef(false);
+  useEffect(() => {
+    if (isLoadingPageRef.current) {
+      isLoadingPageRef.current = false;
+      return;
+    }
+    setSaveStatus("unsaved");
+  }, [selections, isBold, isItalic, textAlign]);
+
+  // Same staleness problem as selectionsRef above, but for the page-wide text style
+  // settings (bold/italic/align — fontSize/fontFamily are now PER-SELECTION, not here)
+  // — need to be saved ALONGSIDE selections so a full reload doesn't silently reset them.
+  const textStyleSettingsRef = useRef(null);
+  useEffect(() => {
+    textStyleSettingsRef.current = { isBold, isItalic, textAlign };
+  }, [isBold, isItalic, textAlign]);
+
   // The currently selected area (if any) — used to populate the source text + translation in the side panel
   const activeSelection = selections.find((s) => s.id === activeId) ?? null;
   const activeSelectionIndex = selections.findIndex((s) => s.id === activeId);
@@ -2061,13 +2162,11 @@ export default function TranslateWorkspace() {
 
   const textStyle = useMemo(
     () => ({
-      fontSize: `${fontSize}px`,
-      fontFamily,
       fontWeight: isBold ? 700 : 400,
       fontStyle: isItalic ? "italic" : "normal",
       textAlign,
     }),
-    [fontSize, fontFamily, isBold, isItalic, textAlign]
+    [isBold, isItalic, textAlign]
   );
 
   useEffect(() => {
@@ -2155,16 +2254,107 @@ export default function TranslateWorkspace() {
     navigate("/translator/dashboard");
   }, [navigate]);
 
-  const handleSaveAndNext = useCallback(() => {
-    goToPage(currentPageIndex + 1);
-  }, [goToPage, currentPageIndex]);
+  // Save bubbles for a page AND update the local "taskPages" state to match — without
+  // this second step, re-visiting a page within the SAME session would still show the
+  // OLD (stale) bubbles fetched at initial page-load time, since taskPages is only
+  // fetched once from the server; only a full reload would show the newly-saved data.
+  //
+  // "textStyleSettings" (font family/size/bold/italic/align) is saved ALONGSIDE the
+  // selections in the same JSON payload — these are page-wide settings, not stored per
+  // selection, but were previously ONLY kept in React state (never persisted), so a full
+  // reload silently reset them back to defaults even though "selections" saved correctly.
+  const persistBubbles = useCallback((pageId, selectionsArray, textStyleSettings) => {
+    if (!pageId) return;
+    setSaveStatus("saving");
+    const payload = { selections: selectionsArray, textStyle: textStyleSettings };
+    const bubblesJson = JSON.stringify(payload);
+    saveBubblesForPage(pageId, payload).then((success) => {
+      if (!success) {
+        setSaveStatus("unsaved");
+        return;
+      }
+      setTaskPages((prev) => prev.map((p) => (p.pageId === pageId ? { ...p, bubbles: bubblesJson } : p)));
+      setSaveStatus("saved");
+    });
+  }, []);
 
-  // Clear all selections from the previous page when switching pages (or chapters) —
-  // each page has its own bubbles, so the previous page's selections shouldn't carry over.
-  // Also clear the old imageNaturalSize to avoid accidentally using the previous page's image size.
+  const handleSaveAndNext = useCallback(() => {
+    // Save explicitly here rather than relying only on the page-change effect's cleanup
+    // (see below) — if already on the LAST page, goToPage() is a no-op (currentPageIndex
+    // won't change), so that cleanup would never fire and nothing would get saved.
+    if (currentPageMeta?.pageId) {
+      persistBubbles(currentPageMeta.pageId, selectionsRef.current, textStyleSettingsRef.current);
+    }
+    goToPage(currentPageIndex + 1);
+  }, [goToPage, currentPageIndex, currentPageMeta, persistBubbles]);
+
+  // Manual "Save progress" button (header) — same explicit save, without navigating away.
+  const handleSaveProgress = useCallback(() => {
+    if (currentPageMeta?.pageId) {
+      persistBubbles(currentPageMeta.pageId, selectionsRef.current, textStyleSettingsRef.current);
+    }
+  }, [currentPageMeta, persistBubbles]);
+
+  // Ctrl+S (Windows/Linux) or Cmd+S (Mac) also saves — preventDefault() is REQUIRED here,
+  // otherwise the browser's native "Save Page As..." dialog would pop up instead.
   useEffect(() => {
+    const onKeyDown = (e) => {
+      const isSaveShortcut = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s";
+      if (!isSaveShortcut) return;
+      e.preventDefault();
+      handleSaveProgress();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleSaveProgress]);
+
+  // Runs every time the user arrives at a (page, chapter) — loads that page's
+  // previously-saved bubbles (if any). The RETURNED cleanup function runs right before
+  // this effect re-runs for the NEXT page (or on unmount) — used to AUTO-SAVE whatever
+  // the user had on the page they're LEAVING, so work is never silently lost just by
+  // switching pages/chapters.
+  useEffect(() => {
+    isLoadingPageRef.current = true;
     clearSelections();
     setImageNaturalSize(null);
+    setSaveStatus("saved"); // freshly loaded from the server -> nothing unsaved yet
+
+    if (currentPageMeta?.bubbles) {
+      try {
+        const parsed = JSON.parse(currentPageMeta.bubbles);
+
+        // NEW format: { selections: [...], textStyle: {...} }. OLD format (saved before
+        // this fix): a plain array of selections, with no page-wide text style at all —
+        // kept working here so previously-saved pages don't break/lose their bubbles.
+        const selectionsToLoad = Array.isArray(parsed) ? parsed : parsed?.selections;
+        const savedTextStyle = Array.isArray(parsed) ? null : parsed?.textStyle;
+
+        if (Array.isArray(selectionsToLoad) && selectionsToLoad.length > 0) {
+          loadSelections(selectionsToLoad);
+        }
+        if (savedTextStyle) {
+          if (typeof savedTextStyle.isBold === "boolean") setIsBold(savedTextStyle.isBold);
+          if (typeof savedTextStyle.isItalic === "boolean") setIsItalic(savedTextStyle.isItalic);
+          if (typeof savedTextStyle.textAlign === "string") setTextAlign(savedTextStyle.textAlign);
+        }
+      } catch (err) {
+        console.error("Could not parse this page's saved bubbles:", err);
+      }
+    }
+
+    const pageIdBeingViewed = currentPageMeta?.pageId;
+
+    return () => {
+      if (pageIdBeingViewed) {
+        persistBubbles(pageIdBeingViewed, selectionsRef.current, textStyleSettingsRef.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Deliberately NOT including currentPageMeta/persistBubbles here — persistBubbles
+    // updates taskPages on save, which would change currentPageMeta's identity and
+    // re-trigger this whole effect (re-running clearSelections + reload) right after
+    // saving, wiping out what was just saved. Only currentPageIndex/currentChapterId
+    // should determine when this effect actually re-runs.
   }, [currentPageIndex, currentChapterId]);
 
   // Apply the just-picked color to the right place (text or background) — shared by both eyedropper entry points
@@ -2217,6 +2407,8 @@ export default function TranslateWorkspace() {
         comicTitle={chapterData?.comicTitle}
         chapterTitle={chapterData?.title}
         onBack={gotoProjectList}
+        onSaveProgress={handleSaveProgress}
+        saveStatus={saveStatus}
       />
 
       <div className="tw-body">
@@ -2295,17 +2487,23 @@ export default function TranslateWorkspace() {
                 isBold={isBold}
                 isItalic={isItalic}
                 textAlign={textAlign}
-                fontSize={fontSize}
-                fontFamily={fontFamily}
+                fontSize={activeSelection?.fontSize ?? 13}
+                fontFamily={activeSelection?.fontFamily ?? COMIC_FONT_LIBRARY[0].value}
                 textColor={activeSelection?.textColor ?? "#000000"}
                 textBgColor={activeSelection?.textBgColor ?? "#ffffff"}
                 hasActiveSelection={activeSelection != null}
                 onToggleBold={() => setIsBold((v) => !v)}
                 onToggleItalic={() => setIsItalic((v) => !v)}
                 onSetTextAlign={setTextAlign}
-                onIncreaseFontSize={increaseFontSize}
-                onDecreaseFontSize={decreaseFontSize}
-                onChangeFontFamily={setFontFamily}
+                onIncreaseFontSize={() =>
+                  activeId != null &&
+                  updateSelectionStyle(activeId, { fontSize: Math.min((activeSelection?.fontSize ?? 13) + 1, 48) })
+                }
+                onDecreaseFontSize={() =>
+                  activeId != null &&
+                  updateSelectionStyle(activeId, { fontSize: Math.max((activeSelection?.fontSize ?? 13) - 1, 8) })
+                }
+                onChangeFontFamily={(value) => activeId != null && updateSelectionStyle(activeId, { fontFamily: value })}
                 onChangeTextColor={(color) => activeId != null && updateSelectionStyle(activeId, { textColor: color })}
                 onChangeTextBgColor={(color) => activeId != null && updateSelectionStyle(activeId, { textBgColor: color })}
                 onPickTextColor={pickTextColorFromScreen}
