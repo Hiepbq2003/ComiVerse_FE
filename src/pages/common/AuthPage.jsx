@@ -41,7 +41,7 @@ function AuthPage() {
       return
     }
 
-    if (roleUpper === 'TRANSLATOR') {
+    if (roleUpper === 'TRANSLATOR' || roleUpper === 'PROJECT LEADER') {
       navigate('/translator/dashboard', options)
       return
     }
@@ -124,6 +124,7 @@ function AuthPage() {
       case 'STAFF':
         return <ModeratorDashboard user={user} onLogout={handleLogout} />;
       case 'TRANSLATOR':
+      case 'PROJECT LEADER':
         return <TranslatorDashboard user={user} onLogout={handleLogout} />;
       case 'READER':
       case 'USER':

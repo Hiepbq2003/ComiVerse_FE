@@ -15,11 +15,11 @@ import {
   getTeamMessagesApi,
   createTeamMessageApi,
   getTeamTasksApi,
+  getTeamMembersApi,
   createTeamTaskApi,
   updateTeamTaskApi,
   getTeamRequestsApi,
   deleteTeamRequestApi,
-  getChapterBacklogApi,
   createTeamRequestApi
 } from '../../services/api/TeamWorkspaceApi'
 import { toast } from 'react-toastify'
@@ -77,8 +77,6 @@ function TeamProjects() {
   const [chatInput, setChatInput] = useState('')
   const [joinRequests, setJoinRequests] = useState([])
   const [tasks, setTasks] = useState([])
-  const [chapterBacklog, setChapterBacklog] = useState([])
-  const [showBacklogModal, setShowBacklogModal] = useState(false)
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [selectedJoinProject, setSelectedJoinProject] = useState(null)
   const [joinMessage, setJoinMessage] = useState('')
@@ -90,15 +88,27 @@ function TeamProjects() {
   const [selectedTask, setSelectedTask] = useState(null)
   const [editTaskData, setEditTaskData] = useState({
     title: '',
-    columnName: 'backlog',
-    progress: 0,
+    status: 'backlog',
     priority: 'Medium',
-    assignee: '',
+    assignees: [],
     dueDate: ''
   })
 
   // Dynamic user mapping from auth token
   const authStr = localStorage.getItem('user')
+
+  // Backend Entity đã đổi field sang "status" (xác nhận đã test OK) — đây là nguồn
+  // DUY NHẤT quyết định task nằm ở cột nào trên Kanban.
+  const getTaskColumn = (task) => task?.status || 'backlog'
+
+  // Look up an assignee's display initials from their real UUID — task.assigneeIds only
+  // stores IDs, teamMembersForAssign has the {id, name, avatar} mapping fetched from
+  // /team-workspace/{teamId}/members. Falls back to "?" if the member can't be found
+  // (e.g. removed from the team since the task was assigned).
+  const getAssigneeInitials = (memberId) => {
+    const member = teamMembersForAssign.find(m => m.id === memberId)
+    return member?.avatar || '?'
+  }
 
   const parseTaskTitle = (title) => {
     const match = (title || '').match(/^\[(URGENT|HIGH|MEDIUM|LOW)\]\s*(?:\[([^\]]+)\])?\s*(.*)$/i)
@@ -119,6 +129,10 @@ function TeamProjects() {
 
 
   const [members, setMembers] = useState([])
+  // Real team members with real UUID ids — fetched from /team-workspace/{teamId}/members
+  // (backed by ProjectTeamEntity.memberIds), used ONLY for the assignee picker in Create/
+  // Edit Task modals. "members" above stays as-is for the Members tab display.
+  const [teamMembersForAssign, setTeamMembersForAssign] = useState([])
   const [claimedCurrentPage, setClaimedCurrentPage] = useState(1)
 
   useEffect(() => {
@@ -129,7 +143,7 @@ function TeamProjects() {
   const [newTaskData, setNewTaskData] = useState({
     title: '',
     column: 'backlog',
-    assignee: '',
+    assignees: [],
     dueDate: '',
     priority: 'Medium',
     comic: ''
@@ -144,7 +158,7 @@ function TeamProjects() {
     setNewTaskData({
       title: '',
       column: 'backlog',
-      assignee: selectedDetails?.leaderInitials || 'TL',
+      assignees: [],
       dueDate: '',
       priority: 'Medium',
       comic: claimedComics[0]?.title || selectedDetails?.comicName || selectedDetails?.title || ''
@@ -156,24 +170,11 @@ function TeamProjects() {
     setNewTaskData({
       title: '',
       column: 'backlog',
-      assignee: selectedDetails?.leaderInitials || 'TL',
+      assignees: [],
       dueDate: '',
       priority: 'Medium',
       comic: comicName,
       chapterId: null
-    })
-    setShowCreateTask(true)
-  }
-
-  const openCreateTaskFromBacklog = (chapter) => {
-    setNewTaskData({
-      title: `${chapter.title || 'Chapter ' + chapter.chapterNumber} - Translation`,
-      column: 'backlog',
-      assignee: selectedDetails?.leaderInitials || 'TL',
-      dueDate: '',
-      priority: 'Medium',
-      comic: chapter.comicName || selectedDetails?.comicName || selectedDetails?.title || '',
-      chapterId: chapter.chapterId
     })
     setShowCreateTask(true)
   }
@@ -240,10 +241,10 @@ function TeamProjects() {
   }, [])
 
   const COLUMN_LIST = [
-    { id: 'backlog', title: 'Backlog', dotClass: 'column__dot--backlog', defaultProgress: 0 },
-    { id: 'in_progress', title: 'In Progress', dotClass: 'column__dot--progress', defaultProgress: 40 },
-    { id: 'under_review', title: 'Under Review', dotClass: 'column__dot--review', defaultProgress: 80 },
-    { id: 'completed', title: 'Completed', dotClass: 'column__dot--done', defaultProgress: 100 }
+    { id: 'backlog', title: 'Backlog', dotClass: 'column__dot--backlog' },
+    { id: 'in_progress', title: 'In Progress', dotClass: 'column__dot--progress' },
+    { id: 'under_review', title: 'Under Review', dotClass: 'column__dot--review' },
+    { id: 'completed', title: 'Completed', dotClass: 'column__dot--done' }
   ]
 
   // ── Handlers ─────────────────────────────────────
@@ -253,7 +254,9 @@ function TeamProjects() {
     setShowUploadForm(false)
     setLoadingWorkspace(true)
 
-    // Sync leader info dynamically in the members list
+    // Sync leader info dynamically in the members list (Members tab display — has
+    // richer info like role/joinDate/contributions that the new simple members API
+    // below doesn't provide, so this stays separate and untouched).
     const actualLeader = {
       name: project.leaderName || 'No Leader',
       role: 'Group Leader',
@@ -265,12 +268,15 @@ function TeamProjects() {
     setMembers([actualLeader])
 
     try {
-      const [annList, msgList, taskList, reqList, backlogList] = await Promise.all([
+      const [annList, msgList, taskList, reqList, teamMembersList] = await Promise.all([
         getTeamAnnouncementsApi(project.id),
         getTeamMessagesApi(project.id),
         getTeamTasksApi(project.id),
         getTeamRequestsApi(project.id),
-        getChapterBacklogApi(project.id).catch(() => [])
+        getTeamMembersApi(project.id).catch((err) => {
+          console.error('Could not load real team members for assignee picker:', err)
+          return []
+        })
       ])
       setAnnouncements(annList)
       setChatMessages(msgList.map(m => ({ ...m, isMe: m.sender === userFullName })))
@@ -279,7 +285,7 @@ function TeamProjects() {
         ...r,
         roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles
       })))
-      setChapterBacklog(Array.isArray(backlogList) ? backlogList : [])
+      setTeamMembersForAssign(Array.isArray(teamMembersList) ? teamMembersList : [])
     } catch (err) {
       console.error(err)
       toast.error('Failed to load real workspace data from DB.')
@@ -511,9 +517,8 @@ function TeamProjects() {
     try {
       const taskPayload = {
         title: formattedTitle,
-        columnName: newTaskData.column,
-        progress: 0,
-        assignees: newTaskData.assignee,
+        status: newTaskData.column,
+        assigneeIds: newTaskData.assignees,
         dueDate: newTaskData.dueDate || new Date().toISOString().split('T')[0]
       }
       if (newTaskData.chapterId) {
@@ -521,10 +526,7 @@ function TeamProjects() {
       }
       const created = await createTeamTaskApi(selectedDetails.id, taskPayload)
       setTasks([...tasks, created])
-      if (newTaskData.chapterId) {
-        setChapterBacklog(prev => prev.filter(c => c.chapterId !== newTaskData.chapterId))
-      }
-      setNewTaskData({ title: '', column: 'backlog', assignee: '', dueDate: '', priority: 'Medium', comic: '', chapterId: null })
+      setNewTaskData({ title: '', column: 'backlog', assignees: [], dueDate: '', priority: 'Medium', comic: '', chapterId: null })
       setShowCreateTask(false)
       toast.success('Task saved to database!')
     } catch (err) {
@@ -535,17 +537,14 @@ function TeamProjects() {
 
   // Action: Move Task Column
   const handleMoveTask = async (id, newCol) => {
-    const progressVal = newCol === 'completed' ? 100 : (newCol === 'backlog' ? 0 : undefined)
     try {
       const updated = await updateTeamTaskApi(id, {
-        columnName: newCol,
-        progress: progressVal
+        status: newCol
       })
       setTasks(prev =>
         prev.map(task => task.id === id ? {
           ...task,
-          columnName: updated.columnName,
-          progress: updated.progress
+          status: newCol
         } : task)
       )
     } catch (err) {
@@ -561,10 +560,9 @@ function TeamProjects() {
     setEditTaskData({
       title: cleanTitle,
       comic: comicProject || '',
-      columnName: task.columnName || 'backlog',
-      progress: task.progress || 0,
+      status: getTaskColumn(task),
       priority: priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase(),
-      assignees: task.assignees || '',      
+      assignees: task.assigneeIds || [],
       dueDate: task.dueDate || '',
       // Dùng logic này để tìm mọi khả năng có thể là ID
       taskId: task.id || task._id || task.taskId || task.TaskID || 'KHONG-TIM-THAY-ID'
@@ -575,16 +573,15 @@ function TeamProjects() {
 
   // Action: Move All Column Tasks to Done
   const handleMoveAllToDone = async (colId) => {
-    const targets = tasks.filter(t => t.columnName === colId)
+    const targets = tasks.filter(t => getTaskColumn(t) === colId)
     if (targets.length === 0) return
     try {
       await Promise.all(targets.map(t => updateTeamTaskApi(t.id, {
-        columnName: 'completed',
-        progress: 100,
+        status: 'completed',
         dueDate: t.dueDate,
-        assignees: t.assignees
+        assigneeIds: t.assigneeIds
       })))
-      setTasks(prev => prev.map(t => t.columnName === colId ? { ...t, columnName: 'completed', progress: 100 } : t))
+      setTasks(prev => prev.map(t => getTaskColumn(t) === colId ? { ...t, status: 'completed' } : t))
       toast.success(`Moved all tasks from ${colId} to Completed!`)
     } catch (err) {
       console.error(err)
@@ -635,8 +632,8 @@ function TeamProjects() {
 
     const isCurrentLeader = isLeaderMatch(selectedDetails.leaderName)
 
-    const activeTasks = tasks.filter(t => t.columnName !== 'paused')
-    const pausedTasks = tasks.filter(t => t.columnName === 'paused')
+    const activeTasks = tasks.filter(t => getTaskColumn(t) !== 'paused')
+    const pausedTasks = tasks.filter(t => getTaskColumn(t) === 'paused')
     const filteredMembers = members.filter(m => m.name.toLowerCase().includes(memberSearch.toLowerCase()))
 
     return (
@@ -651,7 +648,11 @@ function TeamProjects() {
         </div>
 
         {/* Dynamic Tab Switcher bar */}
-        <div className="workspace-tabs">
+        <style>{`.workspace-tabs::-webkit-scrollbar { display: none; }`}</style>
+        <div
+          className="workspace-tabs"
+          style={{ overflowY: 'hidden', overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
           <button
             className={`workspace-tab-btn ${workspaceTab === 'home' ? 'active' : ''}`}
             onClick={() => setWorkspaceTab('home')}
@@ -954,13 +955,6 @@ function TeamProjects() {
                       <span className="board__badge">{selectedDetails?.te || 'Translation'} Team</span>
                       <span className="board__date">{activeTasks.length} active · {pausedTasks.length} paused</span>
                     </div>
-                    <button 
-                      className="trans-btn secondary" 
-                      style={{ height: '38px', padding: '0 16px', borderRadius: '8px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }} 
-                      onClick={() => setShowBacklogModal(true)}
-                    >
-                      📂 Chapter Backlog ({chapterBacklog.length})
-                    </button>
                     <button className="trans-btn primary" style={{ height: '38px', padding: '0 16px', borderRadius: '8px', fontSize: '13px' }} onClick={openCreateTaskModal}>
                       + Create Task
                     </button>
@@ -976,7 +970,7 @@ function TeamProjects() {
                     const isHighlighted = highlightedColumns.includes(col.id)
 
                     // Filter tasks
-                    let colTasks = tasks.filter(t => t.columnName === col.id)
+                    let colTasks = tasks.filter(t => getTaskColumn(t) === col.id)
 
                     // Sort if needed
                     if (sortedColumns.includes(col.id)) {
@@ -1091,30 +1085,41 @@ function TeamProjects() {
                                 <h3>{cleanTitle}</h3>
                                 <p className="task__desc">Task for {selectedDetails?.comicName || selectedDetails?.title}</p>
 
-                                {/* Progress bar inside In Progress or Under Review */}
-                                {(col.id === 'in_progress' || col.id === 'under_review') && (
-                                  <div className="task-progress-section" style={{ width: '100%', marginTop: '6px' }}>
-                                    <div className="task-progress-label-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--trans-text-secondary)', marginBottom: '4px' }}>
-                                      <span>Progress</span>
-                                      <span>{task.progress || col.defaultProgress}%</span>
-                                    </div>
-                                    <div className="task-progress-bar-bg" style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '10px', height: '6px' }}>
-                                      <div
-                                        className="task-progress-bar-fill"
-                                        style={{
-                                          width: `${task.progress || col.defaultProgress}%`,
-                                          background: 'linear-gradient(90deg, #a855f7, #c084fc)',
-                                          height: '100%',
-                                          borderRadius: '10px'
-                                        }}
-                                      ></div>
-                                    </div>
-                                  </div>
-                                )}
-
                                 <footer className="task__footer">
-                                  <div className="avatar avatar--fallback" style={{ fontSize: '9px', width: '22px', height: '22px' }}>
-                                    {(task.assignees || 'TL').split(',')[0].slice(0, 2).toUpperCase()}
+                                  <div style={{ display: 'flex' }}>
+                                    {(task.assigneeIds && task.assigneeIds.length > 0 ? task.assigneeIds : [null])
+                                      .slice(0, 3)
+                                      .map((memberId, i) => (
+                                        <div
+                                          key={memberId || i}
+                                          className="avatar avatar--fallback"
+                                          style={{
+                                            fontSize: '9px',
+                                            width: '22px',
+                                            height: '22px',
+                                            marginLeft: i > 0 ? '-6px' : 0,
+                                            border: '1.5px solid var(--trans-card-bg, #1a1225)',
+                                            zIndex: 3 - i
+                                          }}
+                                        >
+                                          {memberId ? getAssigneeInitials(memberId) : 'TL'}
+                                        </div>
+                                      ))}
+                                    {task.assigneeIds && task.assigneeIds.length > 3 && (
+                                      <div
+                                        className="avatar avatar--fallback"
+                                        style={{
+                                          fontSize: '9px',
+                                          width: '22px',
+                                          height: '22px',
+                                          marginLeft: '-6px',
+                                          border: '1.5px solid var(--trans-card-bg, #1a1225)',
+                                          background: '#475569'
+                                        }}
+                                      >
+                                        +{task.assigneeIds.length - 3}
+                                      </div>
+                                    )}
                                   </div>
                                   <span className="task__date">📅 {task.dueDate}</span>
                                 </footer>
@@ -1232,28 +1237,19 @@ function TeamProjects() {
             {/* CREATE TASK MODAL */}
             {showCreateTask && (
               <div className="trans-modal-overlay">
-                <div className="trans-modal-card">
+                <div className="trans-modal-card" style={{ maxWidth: '560px', width: '92%' }}>
                   <div className="trans-modal-header">
-                    <h3>Create New Task</h3>
+                    <div>
+                      <h3 style={{ margin: 0 }}>Create New Task</h3>
+                      <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--trans-text-muted)' }}>
+                        Add a task to the {selectedDetails?.comicName || selectedDetails?.title || 'project'} board
+                      </p>
+                    </div>
                     <button className="trans-modal-close-btn" onClick={() => setShowCreateTask(false)}>×</button>
                   </div>
+
                   <div className="trans-modal-body">
-                    <div className="trans-form-group">
-                      <label className="trans-form-label">Comic Project *</label>
-                      <select
-                        className="trans-form-input"
-                        value={newTaskData.comic}
-                        onChange={(e) => setNewTaskData({ ...newTaskData, comic: e.target.value })}
-                      >
-                        {projects.filter(p =>
-                          p.status === 'ACTIVE' &&
-                          (p.leaderName === userFullName || p.leaderName === authUser?.fullName || p.leaderName === authUser?.username) &&
-                          p.title && p.title !== '-'
-                        ).map((c, idx) => (
-                          <option key={idx} value={c.title}>{c.title} ({c.targetLang})</option>
-                        ))}
-                      </select>
-                    </div>
+                    {/* Task name — full width, first thing you type */}
                     <div className="trans-form-group">
                       <label className="trans-form-label">Task Name *</label>
                       <input
@@ -1262,47 +1258,147 @@ function TeamProjects() {
                         placeholder="e.g. Chapter 47 - Proofreading"
                         value={newTaskData.title}
                         onChange={(e) => setNewTaskData({ ...newTaskData, title: e.target.value })}
+                        autoFocus
                       />
                     </div>
-                    <div className="trans-form-group">
-                      <label className="trans-form-label">Kanban Column</label>
-                      <select
-                        className="trans-form-input"
-                        value={newTaskData.column}
-                        onChange={(e) => setNewTaskData({ ...newTaskData, column: e.target.value })}
-                      >
-                        <option value="backlog">Backlog</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="under_review">Under Review</option>
-                        <option value="completed">Completed</option>
-                      </select>
+
+                    {/* Where it belongs — comic + column, side by side */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '14px' }}>
+                      <div className="trans-form-group" style={{ margin: 0 }}>
+                        <label className="trans-form-label">Comic Project *</label>
+                        <select
+                          className="trans-form-input"
+                          value={newTaskData.comic}
+                          onChange={(e) => setNewTaskData({ ...newTaskData, comic: e.target.value })}
+                        >
+                          {projects.filter(p =>
+                            p.status === 'ACTIVE' &&
+                            (p.leaderName === userFullName || p.leaderName === authUser?.fullName || p.leaderName === authUser?.username) &&
+                            p.title && p.title !== '-'
+                          ).map((c, idx) => (
+                            <option key={idx} value={c.title}>{c.title} ({c.targetLang})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="trans-form-group" style={{ margin: 0 }}>
+                        <label className="trans-form-label">Kanban Column</label>
+                        <select
+                          className="trans-form-input"
+                          value={newTaskData.column}
+                          onChange={(e) => setNewTaskData({ ...newTaskData, column: e.target.value })}
+                        >
+                          <option value="backlog">Backlog</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="under_review">Under Review</option>
+                          <option value="completed">Completed</option>
+                        </select>
+                      </div>
                     </div>
-                    <div className="trans-form-group">
+
+                    {/* Priority — visual color-coded button group instead of a plain dropdown */}
+                    <div className="trans-form-group" style={{ marginTop: '14px' }}>
                       <label className="trans-form-label">Priority</label>
-                      <select
-                        className="trans-form-input"
-                        value={newTaskData.priority}
-                        onChange={(e) => setNewTaskData({ ...newTaskData, priority: e.target.value })}
-                      >
-                        <option value="Urgent">🚨 Urgent</option>
-                        <option value="High">🟠 High</option>
-                        <option value="Medium">🟣 Medium</option>
-                        <option value="Low">⚪ Low</option>
-                      </select>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                        {[
+                          { value: 'Urgent', icon: '🚨', color: '#ef4444' },
+                          { value: 'High', icon: '🟠', color: '#f59e0b' },
+                          { value: 'Medium', icon: '🟣', color: '#a855f7' },
+                          { value: 'Low', icon: '⚪', color: '#94a3b8' }
+                        ].map((p) => {
+                          const isActive = newTaskData.priority === p.value
+                          return (
+                            <button
+                              key={p.value}
+                              type="button"
+                              onClick={() => setNewTaskData({ ...newTaskData, priority: p.value })}
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '10px 4px',
+                                borderRadius: '8px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                border: `1.5px solid ${isActive ? p.color : 'rgba(255,255,255,0.1)'}`,
+                                background: isActive ? `${p.color}22` : 'rgba(255,255,255,0.03)',
+                                color: isActive ? p.color : 'var(--trans-text-secondary)',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              <span style={{ fontSize: '16px' }}>{p.icon}</span>
+                              {p.value}
+                            </button>
+                          )
+                        })}
+                      </div>
                     </div>
-                    <div className="trans-form-group">
-                      <label className="trans-form-label">Assignee</label>
-                      <select
-                        className="trans-form-input"
-                        value={newTaskData.assignee}
-                        onChange={(e) => setNewTaskData({ ...newTaskData, assignee: e.target.value })}
-                      >
-                        {members.map((m, idx) => (
-                          <option key={idx} value={m.avatar}>{m.name}</option>
-                        ))}
-                      </select>
+
+                    {/* Assignees — multi-select chips, full width so names can wrap freely */}
+                    <div className="trans-form-group" style={{ marginTop: '14px' }}>
+                      <label className="trans-form-label">Assignees</label>
+                      {teamMembersForAssign.length === 0 ? (
+                        <p style={{ fontSize: '12px', color: 'var(--trans-text-muted)', margin: 0 }}>
+                          No team members found for this project.
+                        </p>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          {teamMembersForAssign.map((m) => {
+                            const isSelected = newTaskData.assignees.includes(m.id)
+                            return (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => {
+                                  setNewTaskData({
+                                    ...newTaskData,
+                                    assignees: isSelected
+                                      ? newTaskData.assignees.filter(a => a !== m.id)
+                                      : [...newTaskData.assignees, m.id]
+                                  })
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '5px 12px 5px 5px',
+                                  borderRadius: '999px',
+                                  fontSize: '12px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  border: `1.5px solid ${isSelected ? '#a855f7' : 'rgba(255,255,255,0.1)'}`,
+                                  background: isSelected ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.03)',
+                                  color: isSelected ? '#c084fc' : 'var(--trans-text-secondary)',
+                                  transition: 'all 0.15s'
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: 20,
+                                    height: 20,
+                                    borderRadius: '50%',
+                                    background: isSelected ? '#a855f7' : 'rgba(255,255,255,0.12)',
+                                    color: isSelected ? '#fff' : 'inherit',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '9px',
+                                    fontWeight: 700
+                                  }}
+                                >
+                                  {m.avatar}
+                                </span>
+                                {m.name}
+                              </button>
+                            )
+                        })}
+                        </div>
+                      )}
                     </div>
-                    <div className="trans-form-group">
+
+                    {/* Due date — own row */}
+                    <div className="trans-form-group" style={{ marginTop: '14px' }}>
                       <label className="trans-form-label">Due Date</label>
                       <input
                         type="date"
@@ -1310,133 +1406,35 @@ function TeamProjects() {
                         value={newTaskData.dueDate}
                         onChange={(e) => setNewTaskData({ ...newTaskData, dueDate: e.target.value })}
                       />
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                    </div>
+
+                    {/* Quick date-pick shortcuts — full width beneath the row above */}
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                      {[
+                        { label: '+3 Days', days: 3 },
+                        { label: '+1 Week', days: 7 },
+                        { label: '+2 Weeks', days: 14 }
+                      ].map((opt) => (
                         <button
+                          key={opt.label}
                           type="button"
                           className="trans-btn secondary"
-                          style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
+                          style={{ fontSize: '11px', padding: '4px 10px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
                           onClick={() => {
                             const d = new Date()
-                            d.setDate(d.getDate() + 3)
+                            d.setDate(d.getDate() + opt.days)
                             setNewTaskData({ ...newTaskData, dueDate: d.toISOString().split('T')[0] })
                           }}
                         >
-                          +3 Days
+                          {opt.label}
                         </button>
-                        <button
-                          type="button"
-                          className="trans-btn secondary"
-                          style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
-                          onClick={() => {
-                            const d = new Date()
-                            d.setDate(d.getDate() + 7)
-                            setNewTaskData({ ...newTaskData, dueDate: d.toISOString().split('T')[0] })
-                          }}
-                        >
-                          +1 Week
-                        </button>
-                        <button
-                          type="button"
-                          className="trans-btn secondary"
-                          style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
-                          onClick={() => {
-                            const d = new Date()
-                            d.setDate(d.getDate() + 14)
-                            setNewTaskData({ ...newTaskData, dueDate: d.toISOString().split('T')[0] })
-                          }}
-                        >
-                          +2 Weeks
-                        </button>
-                      </div>
+                      ))}
                     </div>
                   </div>
+
                   <div className="trans-modal-footer">
                     <button className="trans-btn secondary" onClick={() => setShowCreateTask(false)}>Cancel</button>
                     <button className="trans-btn primary" onClick={handleCreateTask} disabled={!newTaskData.title.trim()}>Create Task</button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* MODAL: CHAPTER BACKLOG WAREHOUSE */}
-            {showBacklogModal && (
-              <div className="trans-modal-overlay">
-                <div className="trans-modal-card" style={{ maxWidth: '800px', width: '90%' }}>
-                  <div className="trans-modal-header">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                        stroke="#a855f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-                      </svg>
-                      <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--trans-text-primary)' }}>Chapter Backlog</h3>
-                      <span className="chapter-backlog-count" style={{
-                        background: 'linear-gradient(135deg, #a855f7, #ec4899)',
-                        color: '#fff',
-                        fontSize: '11px',
-                        fontWeight: '700',
-                        padding: '2px 8px',
-                        borderRadius: '10px',
-                        minWidth: '20px',
-                        textAlign: 'center'
-                      }}>{chapterBacklog.length}</span>
-                    </div>
-                    <button className="trans-modal-close-btn" onClick={() => setShowBacklogModal(false)}>×</button>
-                  </div>
-
-                  <div className="trans-modal-body" style={{ padding: '0 20px 20px 20px' }}>
-                    <p style={{ fontSize: '13px', color: 'var(--trans-text-secondary)', margin: '12px 0 20px' }}>
-                      These are approved chapters from the Author that are waiting for task creation and assignment in your team.
-                    </p>
-                    
-                    {chapterBacklog.length === 0 ? (
-                      <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
-                        <p style={{ fontSize: '15px', fontWeight: '600', margin: '0 0 6px 0', color: 'var(--trans-text-primary)' }}>🎉 No chapters pending</p>
-                        <p style={{ fontSize: '13px', margin: 0 }}>All approved chapters have been assigned tasks on your board.</p>
-                      </div>
-                    ) : (
-                      <div className="chapter-backlog-table" style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
-                        <div className="chapter-backlog-table-head" style={{ position: 'sticky', top: 0, background: '#130d24', zIndex: 10 }}>
-                          <span>CHAPTER</span>
-                          <span>COMIC</span>
-                          <span>PAGES</span>
-                          <span>APPROVED</span>
-                          <span></span>
-                        </div>
-                        {chapterBacklog.map(ch => {
-                          const approvedDate = ch.approvedAt ? new Date(ch.approvedAt) : null
-                          const timeAgo = approvedDate ? getTimeAgo(approvedDate) : 'Unknown'
-                          return (
-                            <div className="chapter-backlog-row" key={ch.chapterId}>
-                              <span className="chapter-backlog-cell-chapter">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                                </svg>
-                                <div>
-                                  <strong>{ch.title || 'Chapter ' + ch.chapterNumber}</strong>
-                                </div>
-                              </span>
-                              <span className="chapter-backlog-cell-comic">{ch.comicName}</span>
-                              <span className="chapter-backlog-cell-pages">{ch.pages} pages</span>
-                              <span className="chapter-backlog-cell-approved">{timeAgo}</span>
-                              <span className="chapter-backlog-cell-action">
-                                <button
-                                  className="chapter-backlog-create-btn"
-                                  onClick={() => {
-                                    setShowBacklogModal(false)
-                                    openCreateTaskFromBacklog(ch)
-                                  }}
-                                >
-                                  + Create Task
-                                </button>
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -1476,8 +1474,8 @@ function TeamProjects() {
                       <label className="trans-form-label">Status (Sprint Column)</label>
                       <select
                         className="trans-form-input"
-                        value={editTaskData.columnName}
-                        onChange={(e) => setEditTaskData({ ...editTaskData, columnName: e.target.value })}
+                        value={editTaskData.status}
+                        onChange={(e) => setEditTaskData({ ...editTaskData, status: e.target.value })}
                       >
                         <option value="backlog">Backlog</option>
                         <option value="in_progress">In Progress</option>
@@ -1502,30 +1500,58 @@ function TeamProjects() {
                     </div>
 
                     <div className="trans-form-group">
-                      <label className="trans-form-label">Assignee</label>
-                      <select
-                        className="trans-form-input"
-                        value={editTaskData.assignee}
-                        onChange={(e) => setEditTaskData({ ...editTaskData, assignee: e.target.value })}
-                      >
-                        <option value="">Unassigned</option>
-                        {members.map((m, idx) => (
-                          <option key={idx} value={m.avatar || m.name}>{m.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="trans-form-group">
-                      <label className="trans-form-label">Progress Percentage ({editTaskData.progress}%)</label>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        className="trans-form-input"
-                        value={editTaskData.progress}
-                        onChange={(e) => setEditTaskData({ ...editTaskData, progress: Number(e.target.value) })}
-                        style={{ padding: 0 }}
-                      />
+                      <label className="trans-form-label">Assignees</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {teamMembersForAssign.map((m) => {
+                          const isSelected = editTaskData.assignees?.includes(m.id)
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                setEditTaskData({
+                                  ...editTaskData,
+                                  assignees: isSelected
+                                    ? editTaskData.assignees.filter(a => a !== m.id)
+                                    : [...(editTaskData.assignees || []), m.id]
+                                })
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '5px 12px 5px 5px',
+                                borderRadius: '999px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                border: `1.5px solid ${isSelected ? '#a855f7' : 'rgba(255,255,255,0.1)'}`,
+                                background: isSelected ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.03)',
+                                color: isSelected ? '#c084fc' : 'var(--trans-text-secondary)',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              <span
+                                style={{
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: '50%',
+                                  background: isSelected ? '#a855f7' : 'rgba(255,255,255,0.12)',
+                                  color: isSelected ? '#fff' : 'inherit',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '9px',
+                                  fontWeight: 700
+                                }}
+                              >
+                                {m.avatar}
+                              </span>
+                              {m.name}
+                            </button>
+                          )
+                        })}
+                      </div>
                     </div>
 
                     <div className="trans-form-group">

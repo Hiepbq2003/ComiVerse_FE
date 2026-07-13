@@ -24,6 +24,10 @@ export const getTeamTasksApi = async (teamId) => {
   return AxiosClient.get(`/team-workspace/${teamId}/tasks`)
 }
 
+export const getTeamMembersApi = async (teamId) => {
+  return AxiosClient.get(`/team-workspace/${teamId}/members`)
+}
+
 export const createTeamTaskApi = async (teamId, task) => {
   return AxiosClient.post(`/team-workspace/${teamId}/tasks`, task)
 }
@@ -38,10 +42,6 @@ export const getTeamRequestsApi = async (teamId) => {
 
 export const deleteTeamRequestApi = async (id) => {
   return AxiosClient.delete(`/team-workspace/requests/${id}`)
-}
-
-export const getChapterBacklogApi = async (teamId) => {
-  return AxiosClient.get(`/team-workspace/${teamId}/chapter-backlog`)
 }
 
 export const createTeamRequestApi = async (teamId, request) => {
