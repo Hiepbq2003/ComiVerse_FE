@@ -12,7 +12,6 @@
  * @property {string} slug
  * @property {string} summary
  * @property {string} status - ONGOING, COMPLETED, PAUSED
- * @property {string} moderationStatus - DRAFT, PENDING, PUBLISHED, REJECTED
  * @property {string} cover
  * @property {string} thumbnail
  * @property {GenreDTO[]} genres
@@ -44,7 +43,6 @@ export const mapToComicDTO = (raw) => {
     slug: raw.slug || '',
     summary: raw.summary || '',
     status: raw.status || 'ONGOING',
-    moderationStatus: raw.moderationStatus || 'DRAFT',
     cover: raw.cover || '',
     thumbnail: raw.thumbnail || '',
     genres: (raw.genres || []).map(g => ({
