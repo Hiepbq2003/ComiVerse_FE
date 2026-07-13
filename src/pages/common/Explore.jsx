@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
-import { getComicsPageApi } from '../../services/api/ComicApi'
+import { getExploreComicsApi } from '../../services/api/ComicApi'
 import { getAllGenresApi } from '../../services/api/GenreApi'
+import ComicCard from '../../components/common/ComicCard'
 import { toast } from 'react-toastify'
-import { MOCK_COMICS } from '../../utils/mockComics'
+import { mapToComicDTO } from '../../utils/comicModels'
+
 
 // Import fallback local assets if backend images are not available
 import comicAction from '../../assets/comic_action.png'
@@ -33,6 +35,16 @@ function Explore() {
   const sortDropdownRef = useRef(null)
   const genresDropdownRef = useRef(null)
   const statusDropdownRef = useRef(null)
+
+  // Cursor pagination states & refs
+  const [hasMore, setHasMore] = useState(false)
+  const pageCursorsRef = useRef([{ cursor: null, referenceId: null }])
+  const prevFiltersRef = useRef({
+    selectedGenres,
+    selectedStatus,
+    sortBy,
+    searchQuery
+  })
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -76,123 +88,25 @@ function Explore() {
   const [hoveredGenre, setHoveredGenre] = useState(null)
   const [hoveredStatus, setHoveredStatus] = useState(null)
 
-  // Reset page on filter changes
+  // Load genres on mount
   useEffect(() => {
-    setCurrentPage(1)
-  }, [selectedGenres, selectedStatus, sortBy])
-
-  // Re-fetch when page or search changes
-  useEffect(() => {
-    setCurrentPage(1)
-    fetchData(1)
-  }, [searchQuery])
-
-  useEffect(() => {
-    fetchData(currentPage)
-  }, [currentPage])
-
-  const fetchData = async (page) => {
-    try {
-      setLoading(true)
-      setComics(MOCK_COMICS)
-      setGenres([
-        { id: 1, name: 'Action' },
-        { id: 2, name: 'Adventure' },
-        { id: 3, name: 'Fantasy' },
-        { id: 4, name: 'Sci-Fi' }
-      ])
-    } catch (err) {
-      console.error('Failed to load mock data:', err)
-    } finally {
-      setLoading(false)
+    const fetchGenres = async () => {
+      try {
+        const data = await getAllGenresApi()
+        setGenres(data?.data || data || [])
+      } catch (err) {
+        console.error('Failed to load genres:', err)
+      }
     }
-  }
-
-  // Parse formatted view counts (e.g. "1.2M", "850K") to numbers for sorting
-  const parseViews = (viewsStr) => {
-    if (!viewsStr) return 0
-    const cleanStr = String(viewsStr).toUpperCase().trim()
-    if (cleanStr.endsWith('M')) {
-      return parseFloat(cleanStr) * 1000000
-    }
-    if (cleanStr.endsWith('K')) {
-      return parseFloat(cleanStr) * 1000
-    }
-    return parseFloat(cleanStr) || 0
-  }
-
-  // Parse chapter strings (e.g. "Ch. 184" or "184") to numbers for sorting
-  const parseChapters = (ch) => {
-    if (!ch) return 0
-    return parseInt(String(ch).replace(/\D/g, '')) || 0
-  }
-
-  // Filter and Sort comics
-  const getProcessedComics = () => {
-    let result = [...comics]
-
-    // 1. Text Search Filter
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim()
-      result = result.filter(c => 
-        (c.title || '').toLowerCase().includes(q) ||
-        (c.author || '').toLowerCase().includes(q)
-      )
-    }
-
-    // 2. Genre Filter
-    if (selectedGenres.length > 0 && !selectedGenres.includes('All')) {
-      result = result.filter(c => 
-        c.genres && selectedGenres.every(selectedG => 
-          c.genres.some(g => String(g).toLowerCase() === selectedG.toLowerCase())
-        )
-      )
-    }
-
-    // 3. Status Filter
-    if (selectedStatus !== 'All') {
-      result = result.filter(c => 
-        (c.status || '').toLowerCase() === selectedStatus.toLowerCase()
-      )
-    }
-
-    // 4. Sort Order logic (Translated English fields matching Vietnamese mock)
-    if (sortBy === 'Recently Added') {
-      // Sort descending by ID or default sequence
-      result.sort((a, b) => b.id - a.id)
-    } else if (sortBy === 'Recently Updated') {
-      // Sort descending by chapter count or ID as proxy
-      result.sort((a, b) => parseChapters(b.chapters) - parseChapters(a.chapters))
-    } else if (sortBy === 'Total Views') {
-      result.sort((a, b) => parseViews(b.views) - parseViews(a.views))
-
-    } else if (sortBy === 'Most Liked') {
-      // Pseudo-random deterministic sort based on title hash for visual variations
-      result.sort((a, b) => (b.title || '').charCodeAt(0) - (a.title || '').charCodeAt(0))
-    } else if (sortBy === 'Most Followed') {
-      result.sort((a, b) => (b.author || '').charCodeAt(0) - (a.author || '').charCodeAt(0))
-    } else if (sortBy === 'Most Bookmarked') {
-      result.sort((a, b) => parseChapters(b.chapters) - parseChapters(a.chapters))
-    } else if (sortBy === 'Chapter Count') {
-      result.sort((a, b) => parseChapters(b.chapters) - parseChapters(a.chapters))
-    }
-
-    return result
-  }
-
-  const processedComics = getProcessedComics()
-  const totalPages = Math.ceil(processedComics.length / ITEMS_PER_PAGE) || 1
-  const paginatedComics = processedComics.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  )
-
-
+    fetchGenres()
+  }, [])
 
   // Cover image fallback picker
   const getCoverImage = (comic) => {
-    if (comic.cover && typeof comic.cover === 'string' && comic.cover.startsWith('data:image')) {
-      return comic.cover
+    if (comic.cover && typeof comic.cover === 'string') {
+      if (comic.cover.startsWith('data:image') || comic.cover.startsWith('http://') || comic.cover.startsWith('https://') || comic.cover.startsWith('/')) {
+        return comic.cover
+      }
     }
     const title = (comic.title || '').toLowerCase()
     if (title.includes('action') || title.includes('battle')) return comicAction
@@ -200,8 +114,140 @@ function Explore() {
     if (title.includes('sci-fi') || title.includes('neon') || title.includes('cyber')) return comicScifi
     // Default fallback cycling
     const fallbacks = [comicAction, comicAdventure, comicScifi]
-    return fallbacks[comic.id % 3] || comicAction
+    const idHash = typeof comic.id === 'string' ? comic.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : comic.id || 0
+    return fallbacks[idHash % 3] || comicAction
   }
+
+  // Helper to format views
+  const formatViews = (count) => {
+    if (count === undefined || count === null) return '0'
+    const num = Number(count)
+    if (isNaN(num)) return String(count)
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M'
+    }
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K'
+    }
+    return String(num)
+  }
+
+  // Fetch explore comics logic
+  const fetchData = async (page, cursorObj) => {
+    try {
+      setLoading(true)
+      
+      // Get selected genre IDs matching their names
+      const genreIds = selectedGenres
+        .filter(gName => gName !== 'All')
+        .map(gName => genres.find(g => g.name === gName)?.id)
+        .filter(Boolean)
+
+      const statusParam = selectedStatus !== 'All' ? selectedStatus.toUpperCase() : undefined
+      const sortByParam = sortBy !== 'Default' ? sortBy : undefined
+
+      const params = {
+        size: ITEMS_PER_PAGE,
+        cursor: cursorObj?.cursor || undefined,
+        referenceId: cursorObj?.referenceId || undefined,
+        genres: genreIds.length > 0 ? genreIds.join(',') : undefined,
+        status: statusParam,
+        sortBy: sortByParam
+      }
+
+      const response = await getExploreComicsApi(params)
+      
+      let comicsList = []
+      let nextCursor = null
+      let nextReferenceId = null
+      let apiHasMore = false
+
+      if (response) {
+        if (Array.isArray(response)) {
+          comicsList = response
+        } else if (response.data && Array.isArray(response.data)) {
+          comicsList = response.data
+          nextCursor = response.nextCursor
+          nextReferenceId = response.nextReferenceId
+          apiHasMore = response.hasMore || false
+        } else if (response.success && response.data) {
+          const nested = response.data
+          comicsList = nested.data || []
+          nextCursor = nested.nextCursor
+          nextReferenceId = nested.nextReferenceId
+          apiHasMore = nested.hasMore || false
+        }
+      }
+
+      // Preprocess each comic to ensure compatibility with ComicCard component props
+      const processedList = comicsList.map(item => {
+        const mappedComic = mapToComicDTO(item)
+        if (!mappedComic) return null
+
+        const coverUrl = getCoverImage(mappedComic)
+        const rating = mappedComic.ratingAverage !== undefined ? mappedComic.ratingAverage.toFixed(1) : '0.0'
+        const views = mappedComic.viewCount !== undefined ? formatViews(mappedComic.viewCount) : '0'
+        const chapters = mappedComic.chaptersCount || mappedComic.chapterCount || mappedComic.chapters || mappedComic.totalChapters || '0'
+        
+        return {
+          ...mappedComic,
+          cover: coverUrl,
+          rating,
+          views,
+          chapters
+        }
+      }).filter(Boolean)
+
+      setComics(processedList)
+      setHasMore(apiHasMore)
+
+      if (apiHasMore) {
+        pageCursorsRef.current[page] = { cursor: nextCursor, referenceId: nextReferenceId }
+      }
+    } catch (err) {
+      console.error('Failed to load explore comics:', err)
+      toast.error('Failed to load comics!')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Unified effect to handle both pagination and filter resets
+  useEffect(() => {
+    const filtersChanged = 
+      prevFiltersRef.current.selectedGenres !== selectedGenres ||
+      prevFiltersRef.current.selectedStatus !== selectedStatus ||
+      prevFiltersRef.current.sortBy !== sortBy ||
+      prevFiltersRef.current.searchQuery !== searchQuery
+
+    let targetPage = currentPage
+    let cursorObj = pageCursorsRef.current[currentPage - 1] || { cursor: null, referenceId: null }
+
+    if (filtersChanged) {
+      pageCursorsRef.current = [{ cursor: null, referenceId: null }]
+      targetPage = 1
+      cursorObj = { cursor: null, referenceId: null }
+      
+      prevFiltersRef.current = {
+        selectedGenres,
+        selectedStatus,
+        sortBy,
+        searchQuery
+      }
+
+      if (currentPage !== 1) {
+        setCurrentPage(1)
+        return
+      }
+    }
+
+    const hasGenreFilter = selectedGenres.some(gName => gName !== 'All')
+    if (hasGenreFilter && genres.length === 0) {
+      return
+    }
+
+    fetchData(targetPage, cursorObj)
+  }, [currentPage, selectedGenres, selectedStatus, sortBy, searchQuery, genres])
 
   // Sorting configurations
   const sortOptions = [
@@ -690,7 +736,7 @@ function Explore() {
                 paddingBottom: '14px'
                }}>
                 <span style={{ fontSize: '13.5px', color: '#cbd5e1' }}>
-                  Showing <strong>{processedComics.length}</strong> results
+                  Showing <strong>{comics.length}</strong> results
                 </span>
               </div>
 
@@ -713,7 +759,7 @@ function Explore() {
                     </div>
                   ))}
                 </div>
-              ) : processedComics.length > 0 ? (
+              ) : comics.length > 0 ? (
                 <>
                   <div 
                     className="explore-grid" 
@@ -723,107 +769,17 @@ function Explore() {
                       gap: '24px'
                     }}
                   >
-                    {paginatedComics.map((comic) => (
-                      <div 
-                        key={comic.id}
-                        onClick={() => navigate(`/comic/${comic.id}`)}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        {/* Cover wrapper with overlay status badge */}
-                        <div style={{
-                          position: 'relative',
-                          width: '100%',
-                          paddingTop: '135%', // 3:4 Aspect Ratio
-                          borderRadius: '8px',
-                          overflow: 'hidden',
-                          background: 'rgba(255,255,255,0.02)',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                          transition: 'transform 0.2s ease, box-shadow 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-4px)'
-                          e.currentTarget.style.boxShadow = '0 8px 24px rgba(168, 85, 247, 0.25)'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)'
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)'
-                        }}
-                        >
-                          <img 
-                            src={getCoverImage(comic)} 
-                            alt={comic.title}
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover'
-                            }}
-                          />
-
-                          {/* Status Badge overlay */}
-                          <div style={{
-                            position: 'absolute',
-                            top: '8px',
-                            left: '8px',
-                            background: 'rgba(7, 4, 13, 0.85)',
-                            color: comic.status === 'Ongoing' ? '#10b981' : comic.status === 'Completed' ? '#3b82f6' : '#f59e0b',
-                            fontSize: '10px',
-                            fontWeight: '700',
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            border: '1px solid rgba(255,255,255,0.08)',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px'
-                          }}>
-                            {comic.status || 'Ongoing'}
-                          </div>
-                        </div>
-
-                        {/* Info details */}
-                        <div style={{ marginTop: '10px' }}>
-                          <h4 style={{ 
-                            margin: '0 0 4px', 
-                            fontSize: '13.5px', 
-                            fontWeight: '600', 
-                            color: 'white',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                          }}>
-                            {comic.title}
-                          </h4>
-                          <p style={{ margin: '0 0 6px', fontSize: '12px', color: '#64748b' }}>
-                            Ch {parseChapters(comic.chapters)}
-                          </p>
-                          
-                          {/* First genre display pill */}
-                          {comic.genres && comic.genres.length > 0 && (
-                            <span style={{
-                              background: 'rgba(255, 255, 255, 0.04)',
-                              border: '1px solid rgba(255, 255, 255, 0.08)',
-                              color: '#cbd5e1',
-                              fontSize: '10px',
-                              fontWeight: '600',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              display: 'inline-block'
-                            }}>
-                              {comic.genres[0]}
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                    {comics.map((comic) => (
+                      <ComicCard key={comic.id} comic={comic} />
                     ))}
                   </div>
 
                   {/* Pagination Controls */}
-                  {totalPages > 1 && (
+                  {(currentPage > 1 || hasMore) && (
                     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '32px' }}>
                       <button
                         onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                        disabled={currentPage === 1}
+                        disabled={currentPage === 1 || loading}
                         style={{
                           background: currentPage === 1 ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
                           border: '1px solid rgba(255,255,255,0.06)',
@@ -839,19 +795,19 @@ function Explore() {
                         Previous
                       </button>
                       <span style={{ fontSize: '13px', color: '#cbd5e1' }}>
-                        Page <strong>{currentPage}</strong> of {totalPages}
+                        Page <strong>{currentPage}</strong>
                       </span>
                       <button
-                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage(prev => prev + 1)}
+                        disabled={!hasMore || loading}
                         style={{
-                          background: currentPage === totalPages ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                          background: !hasMore ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
                           border: '1px solid rgba(255,255,255,0.06)',
-                          color: currentPage === totalPages ? '#64748b' : 'white',
+                          color: !hasMore ? '#64748b' : 'white',
                           borderRadius: '6px',
                           padding: '8px 16px',
                           fontSize: '13px',
-                          cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                          cursor: !hasMore ? 'not-allowed' : 'pointer',
                           fontWeight: '600',
                           transition: 'all 0.2s ease'
                         }}
