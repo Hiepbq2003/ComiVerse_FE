@@ -1,7 +1,7 @@
 /* ── MODERATOR GENRE MANAGEMENT STYLES ───────────── */
 .genres-list-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 16px;
   margin-top: 16px;
 }
@@ -13,6 +13,13 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.genre-mgmt-info {
+  flex: 1;
+  min-width: 120px;
 }
 
 .genre-mgmt-info h4 {
@@ -30,4 +37,21 @@
 .genre-mgmt-actions {
   display: flex;
   gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Light mode overrides for genre management card */
+html.light .genre-mgmt-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04) !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+html.light .genre-mgmt-card:hover {
+  transform: translateY(-2px) !important;
+  border-color: rgba(168, 85, 247, 0.25) !important;
+  box-shadow: 
+    0 10px 25px rgba(0, 0, 0, 0.06),
+    0 0 12px rgba(168, 85, 247, 0.04) !important;
 }

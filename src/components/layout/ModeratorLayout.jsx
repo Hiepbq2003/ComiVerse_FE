@@ -132,7 +132,13 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
             <button
               key={item.id}
               className={`moderator-nav-item ${activeNav === item.id ? 'active' : ''}`}
-              onClick={() => onNavChange?.(item.id)}
+              onClick={() => {
+                if (onNavChange) {
+                  onNavChange(item.id)
+                } else {
+                  navigate('/moderator', { state: { activeNav: item.id } })
+                }
+              }}
             >
               <span className="moderator-nav-label-group">
                 <span className="moderator-nav-icon">

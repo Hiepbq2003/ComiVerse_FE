@@ -81,15 +81,29 @@
 }
 
 .comic-table-card {
-  border: 1px solid var(--mod-border);
-  border-radius: 8px;
+  background: linear-gradient(145deg, #1a1433 0%, #14102a 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  border-radius: 12px;
   overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
 }
 
 .comic-table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
+}
+
+.comic-table tr {
+  transition: background-color 0.2s ease;
+}
+
+.comic-table tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.comic-table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.03);
 }
 
 .comic-table th {
@@ -99,15 +113,19 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--mod-text-secondary);
-  border-bottom: 1px solid var(--mod-border);
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .comic-table td {
   padding: 16px 18px;
   font-size: 14px;
   color: var(--mod-text-primary);
-  border-bottom: 1px solid var(--mod-border);
   vertical-align: middle;
+}
+
+.comic-table tbody tr:last-child {
+  border-bottom: none;
 }
 
 .comic-table tbody tr:last-child td {
@@ -311,4 +329,59 @@
   background: var(--mod-purple);
   border-color: var(--mod-purple);
   color: #ffffff;
+}
+
+/* Light mode overrides for comic management components */
+html.light .comic-table-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06) !important;
+}
+
+html.light .comic-table th {
+  background: #f8fafc !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #475569 !important;
+}
+
+html.light .comic-table tbody tr {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .comic-table tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.01) !important;
+}
+
+html.light .comic-genre-tag {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .comic-btn-action {
+  background: #f8fafc !important;
+  color: #475569 !important;
+}
+
+html.light .comic-btn-action:hover {
+  background-color: rgba(168, 85, 247, 0.08) !important;
+  color: #7c3aed !important;
+}
+
+html.light .lang-checkbox-item {
+  background: #f8fafc !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  color: #475569 !important;
+}
+
+html.light .lang-checkbox-item:hover {
+  border-color: rgba(168, 85, 247, 0.25) !important;
+  background: rgba(168, 85, 247, 0.04) !important;
+  color: #0f172a !important;
+}
+
+html.light .lang-checkbox-item.checked {
+  background: rgba(168, 85, 247, 0.08) !important;
+  border-color: #7c3aed !important;
+  color: #7c3aed !important;
 }

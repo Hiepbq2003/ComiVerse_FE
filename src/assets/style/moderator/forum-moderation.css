@@ -82,11 +82,11 @@
 
 /* Threads Table */
 .forum-table-wrapper {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(145deg, #1a1433 0%, #14102a 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(10px);
 }
 
@@ -97,25 +97,29 @@
 }
 
 .forum-threads-table th {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.02) !important;
   padding: 14px 18px;
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   color: var(--mod-text-secondary, #9ca3af);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 .forum-threads-table td {
   padding: 16px 18px;
   font-size: 14px;
   color: var(--mod-text-primary, #ffffff);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   vertical-align: middle;
 }
 
-.forum-threads-table tbody tr:hover td {
-  background: rgba(255, 255, 255, 0.02);
+.forum-threads-table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.forum-threads-table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.03) !important;
 }
 
 /* Thread Cell Details */
@@ -502,13 +506,20 @@ html.light .forum-filters-bar input.forum-search::placeholder {
 
 html.light .forum-table-wrapper {
   background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06) !important;
 }
 
 html.light .forum-threads-table th {
-  border-bottom: 1px solid #cbd5e1 !important;
+  background: #f8fafc !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #475569 !important;
 }
 
 html.light .forum-threads-table td {
-  border-bottom: 1px solid #e2e8f0 !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .forum-threads-table tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.01) !important;
 }
