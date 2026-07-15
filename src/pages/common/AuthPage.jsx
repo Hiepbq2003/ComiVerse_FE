@@ -216,7 +216,7 @@ function AuthPage() {
 
     {/* Terms and Privacy Modals at Root Level to avoid containing block transforms */}
     {activeModal !== 'none' && (
-      <div className="policy-modal-overlay" onClick={() => setActiveModal('none')}>
+      <div className="policy-modal-overlay" onClick={(event) => event.stopPropagation()}>
         <div className="policy-modal-container" onClick={(e) => e.stopPropagation()}>
           <div className="policy-modal-header">
             <h3 className="policy-modal-title">

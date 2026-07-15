@@ -18,7 +18,7 @@ import {
   createTeamTaskApi,
   updateTeamTaskApi,
   getTeamRequestsApi,
-  deleteTeamRequestApi,
+  decideTeamRequestApi,
   getChapterBacklogApi,
   createTeamRequestApi
 } from '../../services/api/TeamWorkspaceApi'
@@ -192,7 +192,8 @@ function TeamProjects() {
 
   const claimedProjects = projects.filter(proj => {
     const isNotUnclaimed = !proj.status || proj.status.toUpperCase() !== 'UNCLAIMED'
-    const isUserLeader = proj.leaderName && (
+    const authenticatedUserId = authUser?.userId || authUser?.id
+    const isUserLeader = (authenticatedUserId && proj.leaderId === authenticatedUserId) || (proj.leaderName && (
       proj.leaderName === userFullName ||
       proj.leaderName === authUser?.fullName ||
       proj.leaderName === authUser?.username ||
@@ -200,7 +201,7 @@ function TeamProjects() {
       proj.leaderName.toLowerCase() === authUser?.username?.toLowerCase() ||
       proj.leaderName.toLowerCase() === user?.username?.toLowerCase() ||
       proj.leaderName.toLowerCase() === user?.fullName?.toLowerCase()
-    )
+    ))
     return isNotUnclaimed && isUserLeader
   })
 
@@ -255,6 +256,7 @@ function TeamProjects() {
 
     // Sync leader info dynamically in the members list
     const actualLeader = {
+      id: project.leaderId,
       name: project.leaderName || 'No Leader',
       role: 'Group Leader',
       status: 'Active',
@@ -471,12 +473,14 @@ function TeamProjects() {
   }
 
   // Action: Approve Join Request
-  const handleApproveRequest = async (id, name) => {
+  const handleApproveRequest = async (request) => {
+    const { id, name } = request
     try {
-      await deleteTeamRequestApi(id)
+      await decideTeamRequestApi(id, 'approved')
       setJoinRequests(prev => prev.filter(req => req.id !== id))
 
       const newMem = {
+        id: request.requesterId,
         name,
         role: 'Member',
         status: 'Active',
@@ -495,7 +499,7 @@ function TeamProjects() {
   // Action: Reject Join Request
   const handleRejectRequest = async (id, name) => {
     try {
-      await deleteTeamRequestApi(id)
+      await decideTeamRequestApi(id, 'rejected')
       setJoinRequests(prev => prev.filter(req => req.id !== id))
       toast.info(`Rejected ${name}'s request in database.`)
     } catch (err) {
@@ -509,11 +513,13 @@ function TeamProjects() {
     if (!newTaskData.title.trim()) return
     const formattedTitle = `[${newTaskData.priority.toUpperCase()}] [${newTaskData.comic}] ${newTaskData.title.trim()}`
     try {
+      const selectedAssignee = members.find(member => (member.id || member.avatar) === newTaskData.assignee)
       const taskPayload = {
         title: formattedTitle,
         columnName: newTaskData.column,
         progress: 0,
-        assignees: newTaskData.assignee,
+        assigneeId: selectedAssignee?.id || null,
+        assignees: selectedAssignee?.avatar || selectedAssignee?.name || newTaskData.assignee,
         dueDate: newTaskData.dueDate || new Date().toISOString().split('T')[0]
       }
       if (newTaskData.chapterId) {
@@ -923,7 +929,7 @@ function TeamProjects() {
                     ))}
                   </div>
                   <div className="request-actions-row">
-                    <button className="trans-btn primary" onClick={() => handleApproveRequest(req.id, req.name)}>
+                    <button className="trans-btn primary" onClick={() => handleApproveRequest(req)}>
                       Approve
                     </button>
                     <button className="trans-btn secondary" onClick={() => handleRejectRequest(req.id, req.name)}>
@@ -1301,7 +1307,7 @@ function TeamProjects() {
                         onChange={(e) => setNewTaskData({ ...newTaskData, assignee: e.target.value })}
                       >
                         {members.map((m, idx) => (
-                          <option key={idx} value={m.avatar}>{m.name}</option>
+                          <option key={m.id || idx} value={m.id || m.avatar}>{m.name}</option>
                         ))}
                       </select>
                     </div>

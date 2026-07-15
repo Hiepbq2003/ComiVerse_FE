@@ -419,7 +419,7 @@ function BroadcastManagement() {
           CONFIRMATION MODAL
           ═══════════════════════════════════════════════ */}
       {showConfirm && (
-        <div className="admin-modal-overlay" onClick={() => setShowConfirm(false)}>
+        <div className="admin-modal-overlay" onClick={(event) => event.stopPropagation()}>
           <div className="admin-modal admin-confirm-modal" onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-body" style={{ paddingTop: '32px', paddingBottom: '28px' }}>
               <div className="admin-confirm-icon admin-confirm-icon--warning">
@@ -457,7 +457,7 @@ function BroadcastManagement() {
           RECALL CONFIRMATION MODAL
           ═══════════════════════════════════════════════ */}
       {showRecallConfirm && (
-        <div className="admin-modal-overlay" onClick={() => setShowRecallConfirm(false)}>
+        <div className="admin-modal-overlay" onClick={(event) => event.stopPropagation()}>
           <div className="admin-modal admin-confirm-modal" onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-body" style={{ paddingTop: '32px', paddingBottom: '28px' }}>
               <div className="admin-confirm-icon admin-confirm-icon--danger">

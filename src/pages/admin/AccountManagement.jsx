@@ -365,25 +365,9 @@ function AccountManagement() {
     }
   }
 
-  const handleResetPasswordFromEdit = async () => {
+  const handleResetPasswordFromEdit = () => {
     if (!editingAccount) return
-    if (!window.confirm(`Are you sure you want to reset the password for ${editingAccount.fullName}? A temporary password will be emailed to "${editingAccount.email}".`)) {
-      return
-    }
-
-    setIsSubmitting(true)
-    setModalError(null)
-    try {
-      await resetUserPasswordApi(editingAccount.id)
-      showAlert('success', `Password has been reset. A temporary password was emailed to "${editingAccount.email}".`)
-      setShowEditModal(false)
-    } catch (err) {
-      console.error(err)
-      const errorMsg = err.response?.data?.message || 'Failed to reset password. Please try again.'
-      setModalError(errorMsg)
-    } finally {
-      setIsSubmitting(false)
-    }
+    openConfirm('reset-pw', editingAccount)
   }
 
   // ── BAN / UNBAN ───────────────────────────────────
@@ -413,7 +397,8 @@ function AccountManagement() {
         showAlert('success', `"${account.fullName}" has been unbanned.`)
       } else if (type === 'reset-pw') {
         await resetUserPasswordApi(account.id)
-        showAlert('success', `Password reset email sent to "${account.email}".`)
+        setShowEditModal(false)
+        showAlert('success', `Password for "${account.fullName}" has been reset to abcd1234.`)
       }
     } catch (err) {
       const errorMsg = err.response?.data?.message || `Failed to ${type} user. Please try again.`
@@ -626,7 +611,7 @@ function AccountManagement() {
           CREATE STAFF MODAL
           ═══════════════════════════════════════════════ */}
       {showCreateModal && (
-        <div className="admin-modal-overlay" onClick={handleCloseCreateModal}>
+        <div className="admin-modal-overlay" onClick={(event) => event.stopPropagation()}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-header">
               <h2 className="admin-modal-title">Create User Account</h2>
@@ -745,7 +730,7 @@ function AccountManagement() {
           EDIT USER MODAL
           ═══════════════════════════════════════════════ */}
       {showEditModal && editingAccount && (
-        <div className="admin-modal-overlay" onClick={handleCloseEditModal}>
+        <div className="admin-modal-overlay" onClick={(event) => event.stopPropagation()}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-header">
               <h2 className="admin-modal-title">Edit User Account</h2>
@@ -848,7 +833,7 @@ function AccountManagement() {
           CONFIRMATION MODAL
           ═══════════════════════════════════════════════ */}
       {showConfirmModal && confirmAction && (
-        <div className="admin-modal-overlay" onClick={() => setShowConfirmModal(false)}>
+        <div className="admin-modal-overlay" onClick={(event) => event.stopPropagation()}>
           <div className="admin-modal admin-confirm-modal" onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-body" style={{ paddingTop: '32px', paddingBottom: '28px' }}>
               <div className={`admin-confirm-icon ${
@@ -871,7 +856,7 @@ function AccountManagement() {
                   {confirmAction.type === 'unban' &&
                     `"${confirmAction.account.fullName}" will regain access to the platform.`}
                   {confirmAction.type === 'reset-pw' &&
-                    `A password reset email will be sent to "${confirmAction.account.email}".`}
+                    `The password for "${confirmAction.account.fullName}" will be reset to the default: abcd1234.`}
                 </p>
               </div>
 
@@ -892,7 +877,7 @@ function AccountManagement() {
                 >
                   {confirmAction.type === 'ban' && 'Yes, Ban'}
                   {confirmAction.type === 'unban' && 'Yes, Unban'}
-                  {confirmAction.type === 'reset-pw' && 'Send Reset Email'}
+                  {confirmAction.type === 'reset-pw' && 'Reset to Default'}
                 </button>
               </div>
             </div>
