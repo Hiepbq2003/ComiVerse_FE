@@ -28,6 +28,10 @@ export const getTeamMembersApi = async (teamId) => {
   return AxiosClient.get(`/team-workspace/${teamId}/members`)
 }
 
+export const getTeamChaptersApi = async (teamId) => {
+  return AxiosClient.get(`/team-workspace/${teamId}/chapters`)
+}
+
 export const createTeamTaskApi = async (teamId, task) => {
   return AxiosClient.post(`/team-workspace/${teamId}/tasks`, task)
 }
