@@ -1,7 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getAuth } from '../../utils/Auth'
+import { getComicByIdApi } from '../../services/api/ComicApi'
+import { getChaptersByComicIdApi } from '../../services/api/ChapterApi'
+import { checkLikeStatusApi, toggleLikeStatusApi } from '../../services/api/LikeApi'
+import { checkSaveStatusApi, toggleSaveStatusApi } from '../../services/api/SaveApi'
+import { formatTimeAgo } from '../../utils/formatTimeAgo'
 
 // Import assets
 import comicAction from '../../assets/comic_action.png'
@@ -21,17 +26,23 @@ function ComicDetail() {
     { id: 3, name: 'Elena Rostova', avatar: 'E', date: '3 days ago', content: 'Simply the best manhwa on this site. I highly recommend it to anyone who loves deep worldbuilding.', rating: 5 }
   ])
 
-  // Get current user on mount
-  useEffect(() => {
-    const auth = getAuth()
-    if (auth && auth.user) {
-      setUser(auth.user)
-    }
-  }, [])
+  // Backend integration states
+  const [comic, setComic] = useState(null)
+  const [chapters, setChapters] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [isMockData, setIsMockData] = useState(false)
+  const [isLiked, setIsLiked] = useState(false)
 
-  // All comics data list for detail lookup
+  // Spam prevention and state mapping refs
+  const likeTimeoutRef = useRef(null)
+  const saveTimeoutRef = useRef(null)
+  const serverLikedRef = useRef(false)
+  const serverSavedRef = useRef(false)
+
+  // All comics data list for detail lookup (fallback)
   const comicsDb = {
     '1': {
+      id: '1',
       title: 'Battle Chronicles',
       cover: comicAction,
       genres: ['Action', 'Fantasy', 'Adventure'],
@@ -45,6 +56,7 @@ function ComicDetail() {
       tagline: 'An epic fantasy action-adventure following the legacy of the legendary warrior who shattered the heavens. Forces of darkness emerge, and a young apprentice must unlock the ancient power within.'
     },
     '2': {
+      id: '2',
       title: 'Dragon Legacy',
       cover: comicAdventure,
       genres: ['Adventure', 'Fantasy'],
@@ -58,6 +70,7 @@ function ComicDetail() {
       tagline: 'The last dragon rider rises to save the kingdom from ancient ashes. Together with a young dragon hatchling, they must journey to the Edge of the World.'
     },
     '3': {
+      id: '3',
       title: 'Neon Genesis',
       cover: comicScifi,
       genres: ['Sci-Fi', 'Action'],
@@ -71,6 +84,7 @@ function ComicDetail() {
       tagline: 'In a dystopian cyberpunk future, a rogue hacker discovers a secret AI that could either save humanity or wipe it out entirely. The neon streets are paved with danger.'
     },
     '4': {
+      id: '4',
       title: 'Infinite Journey',
       cover: comicAdventure,
       genres: ['Adventure', 'Fantasy'],
@@ -84,6 +98,7 @@ function ComicDetail() {
       tagline: 'An endless quest through dimensions to discover the ultimate truth of magic and science.'
     },
     '5': {
+      id: '5',
       title: 'Solo Adventure',
       cover: comicAction,
       genres: ['Action', 'Fantasy'],
@@ -97,6 +112,7 @@ function ComicDetail() {
       tagline: 'Conquering dungeons alone to protect what matters most. In a world of guilds, one hunter goes solo.'
     },
     '6': {
+      id: '6',
       title: 'Cyber Odyssey',
       cover: comicScifi,
       genres: ['Sci-Fi'],
@@ -110,6 +126,7 @@ function ComicDetail() {
       tagline: 'A space-opera journey across the galaxy to find the lost cradle of cybernetic life.'
     },
     '7': {
+      id: '7',
       title: 'Shadow Legend',
       cover: comicAction,
       genres: ['Action', 'Fantasy'],
@@ -123,6 +140,7 @@ function ComicDetail() {
       tagline: 'The shadows rise to obey their monarch. Can he keep his humanity while wielding the power of death?'
     },
     '8': {
+      id: '8',
       title: 'Sky Realm',
       cover: comicAdventure,
       genres: ['Adventure', 'Fantasy'],
@@ -137,27 +155,192 @@ function ComicDetail() {
     }
   }
 
-  // Fallback to comic 1 if ID is invalid
-  const comic = comicsDb[id] || comicsDb['1']
-
-  // Generate chapters list
-  const chaptersList = []
-  for (let i = comic.chaptersCount; i >= 1; i--) {
-    chaptersList.push({
-      num: i,
-      title: `Chapter ${i}: ${i === comic.chaptersCount ? 'The Final Confrontation' : `Story Arc Part ${i}`}`,
-      date: i === comic.chaptersCount ? '2 hours ago' : `${comic.chaptersCount - i} days ago`,
-      views: Math.floor(Math.random() * 20 + 5) + 'K'
-    })
+  // Helper to format views
+  const formatViews = (count) => {
+    if (count === undefined || count === null) return '0'
+    const num = Number(count)
+    if (isNaN(num)) return String(count)
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M'
+    }
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K'
+    }
+    return String(num)
   }
+
+  // Get current user on mount
+  useEffect(() => {
+    const auth = getAuth()
+    if (auth && auth.user) {
+      setUser(auth.user)
+    }
+  }, [])
+
+  // Load details from API or fall back to mock
+  useEffect(() => {
+    const fetchComicDetail = async () => {
+      try {
+        setLoading(true)
+        
+        // Check user login status at call time
+        const auth = getAuth()
+        const isLoggedIn = !!(auth && auth.user)
+
+        // Perform parallel async API calls to prevent sequential blocking
+        const [comicRes, chaptersRes, saveCheckRes, likeCheckRes] = await Promise.all([
+          getComicByIdApi(id),
+          getChaptersByComicIdApi(id),
+          isLoggedIn ? checkSaveStatusApi(id) : Promise.resolve(null),
+          isLoggedIn ? checkLikeStatusApi(id) : Promise.resolve(null)
+        ])
+
+        const comicData = comicRes?.data || comicRes
+        const chaptersData = chaptersRes?.data || chaptersRes || []
+        
+        // Save/Like check resolves to a boolean or object containing it
+        const savedStatus = saveCheckRes?.data !== undefined ? saveCheckRes.data : !!saveCheckRes
+        const likedStatus = likeCheckRes?.data !== undefined ? likeCheckRes.data : !!likeCheckRes
+
+        setComic(comicData)
+        setChapters(chaptersData)
+        setInLibrary(savedStatus)
+        setIsLiked(likedStatus)
+
+        // Sync refs for debounce tracking
+        serverSavedRef.current = savedStatus
+        serverLikedRef.current = likedStatus
+
+        setIsMockData(false)
+      } catch (err) {
+        console.error('API failed, using mock data:', err.message)
+        
+        // Fall back to mock data
+        const fallbackComic = comicsDb[id] || comicsDb['1']
+        setComic(fallbackComic)
+        
+        // Generate mock chapters list
+        const mockChapters = []
+        const totalCh = fallbackComic.chaptersCount || 10
+        for (let i = totalCh; i >= 1; i--) {
+          mockChapters.push({
+            id: `mock-${i}`,
+            chapterNumber: String(i),
+            title: `Chapter ${i}: ${i === totalCh ? 'The Final Confrontation' : `Story Arc Part ${i}`}`,
+            createdAt: new Date(Date.now() - (totalCh - i) * 24 * 60 * 60 * 1000).toISOString(),
+            viewCount: Math.floor(Math.random() * 20000 + 5000)
+          })
+        }
+        setChapters(mockChapters)
+        setInLibrary(false)
+        setIsLiked(false)
+        serverSavedRef.current = false
+        serverLikedRef.current = false
+        setIsMockData(true)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchComicDetail()
+  }, [id, user])
 
   const handleAddToLibrary = () => {
     if (!user) {
-      // Redirect to login
       navigate('/auth?mode=signin')
       return
     }
-    setInLibrary(!inLibrary)
+
+    const next = !inLibrary
+    setInLibrary(next)
+    
+    // Update save count on screen immediately
+    setComic(prevComic => {
+      if (!prevComic) return prevComic
+      const diff = next ? 1 : -1
+      const currentCount = Number(prevComic.saveCount || 0)
+      return {
+        ...prevComic,
+        saveCount: Math.max(0, currentCount + diff)
+      }
+    })
+    
+    // Clear any pending toggle API call to enforce 1s debounce
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+    }
+    
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        if (next !== serverSavedRef.current) {
+          await toggleSaveStatusApi(id)
+          serverSavedRef.current = next
+        }
+      } catch (err) {
+        console.error('Failed to toggle save status:', err)
+        toast.error('Failed to update library status!')
+        // Revert local state on failure
+        setInLibrary(serverSavedRef.current)
+        setComic(prevComic => {
+          if (!prevComic) return prevComic
+          const adjust = (serverSavedRef.current ? 1 : 0) - (next ? 1 : 0)
+          const baseCount = Number(prevComic.saveCount || 0)
+          return {
+            ...prevComic,
+            saveCount: Math.max(0, baseCount + adjust)
+          }
+        })
+      }
+    }, 1000)
+  }
+
+  const handleToggleLike = () => {
+    if (!user) {
+      navigate('/auth?mode=signin')
+      return
+    }
+
+    const next = !isLiked
+    setIsLiked(next)
+    
+    // Update like count on screen immediately
+    setComic(prevComic => {
+      if (!prevComic) return prevComic
+      const diff = next ? 1 : -1
+      const currentCount = Number(prevComic.likeCount || 0)
+      return {
+        ...prevComic,
+        likeCount: Math.max(0, currentCount + diff)
+      }
+    })
+    
+    // Clear any pending toggle API call to enforce 1s debounce
+    if (likeTimeoutRef.current) {
+      clearTimeout(likeTimeoutRef.current)
+    }
+    
+    likeTimeoutRef.current = setTimeout(async () => {
+      try {
+        if (next !== serverLikedRef.current) {
+          await toggleLikeStatusApi(id)
+          serverLikedRef.current = next
+        }
+      } catch (err) {
+        console.error('Failed to toggle like status:', err)
+        toast.error('Failed to update like status!')
+        // Revert local state on failure
+        setIsLiked(serverLikedRef.current)
+        setComic(prevComic => {
+          if (!prevComic) return prevComic
+          const adjust = (serverLikedRef.current ? 1 : 0) - (next ? 1 : 0)
+          const baseCount = Number(prevComic.likeCount || 0)
+          return {
+            ...prevComic,
+            likeCount: Math.max(0, baseCount + adjust)
+          }
+        })
+      }
+    }, 1000)
   }
 
   const handlePostComment = (e) => {
@@ -181,6 +364,74 @@ function ComicDetail() {
     setCommentInput('')
   }
 
+  const handleReadChapter1 = () => {
+    if (chapters && chapters.length > 0) {
+      // Find the first chapter (sorting by chapter number ascending)
+      const sorted = [...chapters].sort((a, b) => Number(a.chapterNumber) - Number(b.chapterNumber))
+      const firstChap = sorted[0]
+      alert(`Opening Chapter ${firstChap.chapterNumber}! Reading features coming soon.`)
+    } else {
+      alert('No chapters available for this comic yet.')
+    }
+  }
+
+  if (loading || !comic) {
+    return (
+      <HomeLayout>
+        <div style={{ textAlign: 'center', padding: '100px 20px', color: '#64748b' }}>
+          <div className="search-spinner" style={{ margin: '0 auto 16px', borderLeftColor: '#a855f7' }}></div>
+          <p>Loading comic details...</p>
+        </div>
+      </HomeLayout>
+    )
+  }
+
+  // Cover image fallback picker
+  const getCoverImage = (coverPath, titleVal, comicId) => {
+    if (coverPath && typeof coverPath === 'string') {
+      if (coverPath.startsWith('data:image') || coverPath.startsWith('http://') || coverPath.startsWith('https://') || coverPath.startsWith('/')) {
+        return coverPath
+      }
+    }
+    const t = (titleVal || '').toLowerCase()
+    if (t.includes('action') || t.includes('battle')) return comicAction
+    if (t.includes('adventure') || t.includes('dragon')) return comicAdventure
+    if (t.includes('sci-fi') || t.includes('neon') || t.includes('cyber')) return comicScifi
+    // Default fallback cycling
+    const fallbacks = [comicAction, comicAdventure, comicScifi]
+    const idHash = typeof comicId === 'string' ? comicId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : comicId || 0
+    return fallbacks[idHash % 3] || comicAction
+  }
+
+  const displayCover = getCoverImage(comic.cover, comic.title, comic.id)
+  const displayTitle = comic.title || 'Untitled Comic'
+  const displayStatus = comic.status ? (comic.status.charAt(0).toUpperCase() + comic.status.slice(1).toLowerCase()) : 'Ongoing'
+  
+  const displayGenres = comic.genres 
+    ? comic.genres.map(g => typeof g === 'object' && g !== null ? g.name : g)
+    : []
+    
+  const displayAuthor = comic.author || 'Unknown'
+  const displayArtist = comic.artist || 'Unknown'
+  
+  const displayRating = comic.ratingAverage !== undefined 
+    ? comic.ratingAverage.toFixed(1) 
+    : (comic.rating || '0.0')
+    
+  const displayViews = comic.viewCount !== undefined 
+    ? formatViews(comic.viewCount) 
+    : (comic.views || '0')
+    
+  const displayBookmarks = comic.saveCount !== undefined 
+    ? formatViews(comic.saveCount) 
+    : (comic.bookmarks || '0')
+    
+  const displayLikes = comic.likeCount !== undefined 
+    ? formatViews(comic.likeCount) 
+    : (comic.likes || '0')
+    
+  const displaySummary = comic.summary || comic.tagline || 'No synopsis available.'
+
   return (
     <HomeLayout>
       {/* BACKGROUND BANNER */}
@@ -199,7 +450,7 @@ function ComicDetail() {
           style={{
             position: 'absolute',
             inset: 0,
-            backgroundImage: `url(${comic.cover})`,
+            backgroundImage: `url(${displayCover})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center 25%',
             filter: 'brightness(0.15) blur(10px)',
@@ -240,7 +491,7 @@ function ComicDetail() {
               flexShrink: 0
             }}
           >
-            <img src={comic.cover} alt={comic.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src={displayCover} alt={displayTitle} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
 
           {/* Details */}
@@ -257,9 +508,9 @@ function ComicDetail() {
                   fontWeight: '600'
                 }}
               >
-                {comic.status}
+                {displayStatus}
               </span>
-              {comic.genres.map((genre, idx) => (
+              {displayGenres.map((genre, idx) => (
                 <span
                   key={idx}
                   style={{
@@ -287,11 +538,11 @@ function ComicDetail() {
                 lineHeight: '1.2'
               }}
             >
-              {comic.title}
+              {displayTitle}
             </h1>
 
             <p style={{ margin: '0 0 16px', color: '#94a3b8', fontSize: '15px' }}>
-              Story by <strong style={{ color: 'white' }}>{comic.author}</strong>  •  Art by <strong style={{ color: 'white' }}>{comic.artist}</strong>
+              Story by <strong style={{ color: 'white' }}>{displayAuthor}</strong>  •  Art by <strong style={{ color: 'white' }}>{displayArtist}</strong>
             </p>
 
             {/* Stats Row */}
@@ -311,24 +562,29 @@ function ComicDetail() {
             >
               <div style={{ textAlign: 'center' }}>
                 <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Rating</span>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#fbbf24' }}>⭐ {comic.rating}</span>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#fbbf24' }}>⭐ {displayRating}</span>
               </div>
               <div style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
               <div style={{ textAlign: 'center' }}>
                 <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Views</span>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>👁️ {comic.views}</span>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>👁️ {displayViews}</span>
+              </div>
+              <div style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+              <div style={{ textAlign: 'center' }}>
+                <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Likes</span>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>❤️ {displayLikes}</span>
               </div>
               <div style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
               <div style={{ textAlign: 'center' }}>
                 <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Bookmarks</span>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>🔖 {comic.bookmarks}</span>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>🔖 {displayBookmarks}</span>
               </div>
             </div>
 
             {/* Actions */}
             <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
               <button
-                onClick={() => alert('Reading chapter 1! Feature coming soon.')}
+                onClick={handleReadChapter1}
                 className="btn-home-primary"
                 style={{ padding: '12px 30px', fontSize: '15px' }}
               >
@@ -340,6 +596,18 @@ function ComicDetail() {
                 style={{ padding: '12px 24px', fontSize: '15px', borderColor: inLibrary ? '#10b981' : 'rgba(255, 255, 255, 0.15)', color: inLibrary ? '#10b981' : 'white' }}
               >
                 {inLibrary ? '✓ Saved to Library' : '🔖 Add to Library'}
+              </button>
+              <button
+                onClick={handleToggleLike}
+                className="btn-hero-outline"
+                style={{ 
+                  padding: '12px 24px', 
+                  fontSize: '15px', 
+                  borderColor: isLiked ? '#ec4899' : 'rgba(255, 255, 255, 0.15)', 
+                  color: isLiked ? '#ec4899' : 'white' 
+                }}
+              >
+                {isLiked ? '❤️ Liked' : '🤍 Like'}
               </button>
             </div>
 
@@ -357,7 +625,7 @@ function ComicDetail() {
             {/* Synopsis */}
             <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', padding: '24px', borderRadius: '16px' }}>
               <h3 style={{ margin: '0 0 12px', fontSize: '18px', color: 'white' }}>Synopsis</h3>
-              <p style={{ margin: 0, fontSize: '15px', color: '#cbd5e1', lineHeight: '1.6' }}>{comic.tagline}</p>
+              <p style={{ margin: 0, fontSize: '15px', color: '#cbd5e1', lineHeight: '1.6' }}>{displaySummary}</p>
             </div>
 
             {/* Tabs Selector */}
@@ -382,7 +650,7 @@ function ComicDetail() {
                   transition: 'all 0.2s'
                 }}
               >
-                Chapters ({comic.chaptersCount})
+                Chapters ({chapters.length})
               </button>
               <button
                 onClick={() => setActiveTab('comments')}
@@ -414,37 +682,44 @@ function ComicDetail() {
                   paddingRight: '8px'
                 }}
               >
-                {chaptersList.map((ch) => (
-                  <div
-                    key={ch.num}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '14px 20px',
-                      background: 'rgba(255, 255, 255, 0.02)',
-                      border: '1px solid rgba(255, 255, 255, 0.04)',
-                      borderRadius: '10px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                    onClick={() => alert(`Opening Chapter ${ch.num}! Reading features coming soon.`)}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(168, 85, 247, 0.05)'
-                      e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.2)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)'
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.04)'
-                    }}
-                  >
-                    <div>
-                      <span style={{ fontWeight: '600', color: 'white', display: 'block', fontSize: '14px' }}>{ch.title}</span>
-                      <span style={{ fontSize: '11px', color: '#64748b' }}>Views: {ch.views}</span>
+                {chapters.map((ch) => {
+                  const chNumber = ch.chapterNumber || '0'
+                  const chTitle = ch.title || `Chapter ${chNumber}`
+                  const chViewsStr = formatViews(ch.viewCount || 0)
+                  const chDateStr = formatTimeAgo(ch.createdAt)
+
+                  return (
+                    <div
+                      key={ch.id || ch.chapterNumber}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '14px 20px',
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid rgba(255, 255, 255, 0.04)',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      onClick={() => alert(`Opening Chapter ${chNumber}! Reading features coming soon.`)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(168, 85, 247, 0.05)'
+                        e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.2)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)'
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.04)'
+                      }}
+                    >
+                      <div>
+                        <span style={{ fontWeight: '600', color: 'white', display: 'block', fontSize: '14px' }}>{chTitle}</span>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>Views: {chViewsStr}</span>
+                      </div>
+                      <span style={{ fontSize: '12px', color: '#94a3b8' }}>{chDateStr}</span>
                     </div>
-                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>{ch.date}</span>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
 
@@ -552,17 +827,17 @@ function ComicDetail() {
 
               <div>
                 <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Author</span>
-                <span style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{comic.author}</span>
+                <span style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayAuthor}</span>
               </div>
 
               <div>
                 <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Artist</span>
-                <span style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{comic.artist}</span>
+                <span style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayArtist}</span>
               </div>
 
               <div>
                 <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Status</span>
-                <span style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{comic.status}</span>
+                <span style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayStatus}</span>
               </div>
 
               <div>

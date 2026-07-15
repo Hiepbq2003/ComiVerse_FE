@@ -16,14 +16,15 @@ function ComicCard({ comic }) {
   // Determine primary genre
   let genre = 'Fantasy'
   if (comic.genres && comic.genres.length > 0) {
-    genre = comic.genres[0]
+    const first = comic.genres[0]
+    genre = typeof first === 'object' && first !== null ? first.name : first
   } else if (comic.genre) {
-    genre = comic.genre
+    genre = typeof comic.genre === 'object' && comic.genre !== null ? comic.genre.name : comic.genre
   }
 
   // Determine badge class for styling
   let badgeClass = 'fantasy'
-  const genreLower = genre.toLowerCase()
+  const genreLower = String(genre || '').toLowerCase()
   if (genreLower.includes('action')) {
     badgeClass = 'action'
   } else if (genreLower.includes('adventure')) {
