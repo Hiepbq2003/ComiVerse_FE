@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import '../../assets/style/moderator/project-teams.css'
 import { toast } from 'react-toastify'
 import { searchTranslatorsApi } from '../../services/api/AccountApi'
@@ -158,7 +159,7 @@ function ProjectTeams({
           style={{ padding: '10px 18px' }}
           onClick={triggerOpenCreate}
         >
-          ➕ Create Project Team
+          <span style={{ fontWeight: '800', fontSize: '16px', color: '#ffffff', marginRight: '6px' }}>+</span> Create Project Team
         </button>
       </div>
 
@@ -269,7 +270,7 @@ function ProjectTeams({
       )}
 
       {/* ── MODAL: CREATE PROJECT TEAM ──────────────── */}
-      {showCreateTeamModal && (
+      {showCreateTeamModal && createPortal(
         <div className="mod-modal-overlay">
           <div className="mod-modal-card">
             <div className="mod-modal-header">
@@ -304,56 +305,44 @@ function ProjectTeams({
                   </div>
 
                   <div className="mod-form-group">
-                    <label className="mod-label">Comic / Series Name *</label>
+                    <label className="mod-label">Source Comic *</label>
                     <select 
-                      className="mod-select-field"
+                      className="mod-input select"
                       value={createTeamForm.comicName}
                       onChange={(e) => setCreateTeamForm({ ...createTeamForm, comicName: e.target.value })}
                     >
-                      <option value="">-- Select Comic to Translate --</option>
-                      {comics.map(c => (
+                      <option value="">-- Select a Comic --</option>
+                      {comics.map((c) => (
                         <option key={c.id} value={c.title}>{c.title}</option>
                       ))}
                     </select>
                   </div>
 
-                  <div className="mod-form-group">
-                    <label className="mod-label">Priority</label>
-                    <select 
-                      className="mod-select-field"
-                      value={createTeamForm.priority || 'High'}
-                      onChange={(e) => setCreateTeamForm({ ...createTeamForm, priority: e.target.value })}
-                    >
-                      <option value="Low">Low</option>
-                      <option value="Medium">Medium</option>
-                      <option value="High">High</option>
-                      <option value="Urgent">Urgent</option>
-                    </select>
-                  </div>
-
                   <div className="mod-form-row">
-                    <div className="mod-form-group">
+                    <div className="mod-form-group half">
                       <label className="mod-label">Source Language</label>
                       <select 
-                        className="mod-select-field"
+                        className="mod-input select"
                         value={createTeamForm.sourceLang}
                         onChange={(e) => setCreateTeamForm({ ...createTeamForm, sourceLang: e.target.value })}
                       >
                         <option value="Japanese">Japanese</option>
-                        <option value="Chinese">Chinese</option>
                         <option value="Korean">Korean</option>
+                        <option value="Chinese">Chinese</option>
+                        <option value="English">English</option>
                       </select>
                     </div>
-                    
-                    <div className="mod-form-group">
+
+                    <div className="mod-form-group half">
                       <label className="mod-label">Target Language</label>
                       <select 
-                        className="mod-select-field"
+                        className="mod-input select"
                         value={createTeamForm.targetLang}
                         onChange={(e) => setCreateTeamForm({ ...createTeamForm, targetLang: e.target.value })}
                       >
                         <option value="English">English</option>
                         <option value="Vietnamese">Vietnamese</option>
+                        <option value="Spanish">Spanish</option>
                       </select>
                     </div>
                   </div>
@@ -462,11 +451,12 @@ function ProjectTeams({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── MODAL: ASSIGN LEADER ─────────────────────── */}
-      {showAssignModal && (
+      {showAssignModal && createPortal(
         <div className="mod-modal-overlay">
           <div className="mod-modal-card" style={{ maxWidth: '480px' }}>
             <div className="mod-modal-header">
@@ -530,7 +520,8 @@ function ProjectTeams({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

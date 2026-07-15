@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import '../../assets/style/moderator/genre-management.css'
 import { getAllGenresApi, createGenreApi, updateGenreApi, deleteGenreApi } from '../../services/api/GenreApi'
 import { toast } from 'react-toastify'
 
-function GenreManagement() {
+function GenreManagement({ comics }) {
   const [genres, setGenres] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -114,7 +115,29 @@ function GenreManagement() {
   }
 
   // Calculate statistics metrics
-  const emptyGenresCount = genres.filter(g => (g.count || 0) === 0).length
+  const getComicCountForGenre = (genreName) => {
+    if (!comics) return 0
+    return comics.filter(c => 
+      (c.genres || []).some(g => {
+        const name = typeof g === 'object' && g !== null ? g.name : g
+        return name && name.toLowerCase() === genreName.toLowerCase()
+      })
+    ).length
+  }
+
+  const getMostPopularGenre = () => {
+    if (genres.length === 0 || !comics || comics.length === 0) return 'None'
+    let maxCount = -1
+    let popularName = 'None'
+    for (const g of genres) {
+      const cnt = getComicCountForGenre(g.name)
+      if (cnt > maxCount) {
+        maxCount = cnt
+        popularName = g.name
+      }
+    }
+    return maxCount > 0 ? `${popularName} (${maxCount})` : 'None'
+  }
 
   return (
     <div className="fade-in">
@@ -131,7 +154,7 @@ function GenreManagement() {
             setShowAddModal(true)
           }}
         >
-          ➕ Add Genre
+          <span style={{ fontWeight: '800', fontSize: '16px', color: '#ffffff', marginRight: '6px' }}>+</span> Add Genre
         </button>
       </div>
 
@@ -148,12 +171,14 @@ function GenreManagement() {
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <span className="stat-label">Empty Genres</span>
-            <svg viewBox="0 0 100 30" className="stat-sparkline" style={{ width: '60px', height: '20px', color: '#d97706', opacity: 0.7 }}>
+            <span className="stat-label">Most Popular Genre</span>
+            <svg viewBox="0 0 100 30" className="stat-sparkline" style={{ width: '60px', height: '20px', color: '#10b981', opacity: 0.7 }}>
               <path d="M0 10 C 20 10, 40 25, 60 20 C 80 15, 90 25, 100 25" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value paused-count">{emptyGenresCount}</span>
+          <span className="stat-value" style={{ color: '#10b981', fontSize: getMostPopularGenre().length > 15 ? '20px' : '24px' }}>
+            {getMostPopularGenre()}
+          </span>
         </div>
       </div>
 
@@ -167,7 +192,7 @@ function GenreManagement() {
             <div className="genre-mgmt-card" key={g.id || idx}>
               <div className="genre-mgmt-info">
                 <h4>{g.name}</h4>
-                <p>{g.count || 0} comics</p>
+                <p>{getComicCountForGenre(g.name)} comics</p>
               </div>
               <div className="genre-mgmt-actions">
                 <button 
@@ -180,9 +205,9 @@ function GenreManagement() {
                 <button 
                   className="comic-btn-action archive" 
                   onClick={() => handleOpenDeleteModal(g)}
-                  title="Delete Genre"
+                  title="Archive Genre"
                 >
-                  🗑️
+                  📥 Archive
                 </button>
               </div>
             </div>
@@ -191,7 +216,7 @@ function GenreManagement() {
       )}
 
       {/* ── MODAL: ADD GENRE ─────────────────────────── */}
-      {showAddModal && (
+      {showAddModal && createPortal(
         <div className="mod-modal-overlay">
           <div className="mod-modal-card">
             <div className="mod-modal-header">
@@ -213,7 +238,7 @@ function GenreManagement() {
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px' }}>
                 <button 
                   className="mod-btn" 
-                  style={{ background: 'rgba(255,255,255,0.05)', color: 'white' }}
+                  style={{ background: 'rgba(128,128,128,0.1)', color: 'var(--mod-text-primary)', border: '1px solid var(--mod-border)' }}
                   onClick={() => setShowAddModal(false)}
                 >
                   Cancel
@@ -227,11 +252,12 @@ function GenreManagement() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── MODAL: EDIT GENRE ────────────────────────── */}
-      {showEditModal && editingGenre && (
+      {showEditModal && editingGenre && createPortal(
         <div className="mod-modal-overlay">
           <div className="mod-modal-card">
             <div className="mod-modal-header">
@@ -252,7 +278,7 @@ function GenreManagement() {
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px' }}>
                 <button 
                   className="mod-btn" 
-                  style={{ background: 'rgba(255,255,255,0.05)', color: 'white' }}
+                  style={{ background: 'rgba(128,128,128,0.1)', color: 'var(--mod-text-primary)', border: '1px solid var(--mod-border)' }}
                   onClick={() => setShowEditModal(false)}
                 >
                   Cancel
@@ -266,40 +292,65 @@ function GenreManagement() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* ── MODAL: DELETE GENRE ──────────────────────── */}
-      {showDeleteModal && genreToDelete && (
-        <div className="mod-modal-overlay" style={{ zIndex: 9999 }}>
-          <div className="mod-modal-card" style={{ maxWidth: '400px', textAlign: 'center' }}>
-            <div className="mod-modal-body" style={{ padding: '24px 16px' }}>
-              <div style={{ fontSize: '40px', marginBottom: '16px' }}>⚠️</div>
-              <h3 style={{ margin: '0 0 10px', fontSize: '18px', color: 'white' }}>Delete Genre</h3>
-              <p style={{ margin: '0 0 24px', fontSize: '14px', color: 'var(--mod-text-secondary)', lineHeight: '1.5' }}>
-                Are you sure you want to permanently delete the genre <strong style={{ color: 'white' }}>"{genreToDelete.name}"</strong>?
-                This action cannot be undone.
-              </p>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                <button 
-                  className="mod-btn" 
-                  style={{ background: 'rgba(255,255,255,0.05)', color: 'white', padding: '8px 20px' }}
-                  onClick={() => setShowDeleteModal(false)}
-                >
-                  Cancel
-                </button>
-                <button 
-                  className="mod-btn reject" 
-                  style={{ padding: '8px 20px' }}
-                  onClick={submitDeleteGenre}
-                >
-                  Delete
-                </button>
+      {/* ── MODAL: DELETE (ARCHIVE) GENRE ──────────────── */}
+      {showDeleteModal && genreToDelete && createPortal((() => {
+        const linkedComicCount = getComicCountForGenre(genreToDelete.name);
+        const hasLinkedComics = linkedComicCount > 0;
+        return (
+          <div className="mod-modal-overlay" style={{ zIndex: 9999 }}>
+            <div className="mod-modal-card" style={{ maxWidth: '440px', textAlign: 'center' }}>
+              <div className="mod-modal-body" style={{ padding: '24px 16px' }}>
+                <div style={{ fontSize: '40px', marginBottom: '16px' }}>📥</div>
+                <h3 style={{ margin: '0 0 10px', fontSize: '18px', color: 'var(--mod-text-primary)' }}>
+                  Archive Genre
+                </h3>
+                {hasLinkedComics ? (
+                  <p style={{ margin: '0 0 24px', fontSize: '14px', color: 'var(--mod-text-secondary)', lineHeight: '1.5' }}>
+                    The genre <strong style={{ color: 'var(--mod-text-primary)' }}>"{genreToDelete.name}"</strong> is currently linked to <strong style={{ color: 'var(--mod-purple, #a855f7)', fontWeight: '700' }}>{linkedComicCount}</strong> comics. 
+                    Archiving this genre will hide it from the platform browse filters and new creators, but existing comics will still preserve their labels.
+                    Are you sure you want to suspend/archive this genre?
+                  </p>
+                ) : (
+                  <p style={{ margin: '0 0 24px', fontSize: '14px', color: 'var(--mod-text-secondary)', lineHeight: '1.5' }}>
+                    Are you sure you want to archive/suspend the genre <strong style={{ color: 'var(--mod-text-primary)' }}>"{genreToDelete.name}"</strong>? 
+                    This will hide it from the public platform catalog and creators.
+                  </p>
+                )}
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                  <button 
+                    className="mod-btn" 
+                    style={{ 
+                      background: 'rgba(128,128,128,0.1)', 
+                      color: 'var(--mod-text-primary)', 
+                      border: '1px solid var(--mod-border)',
+                      padding: '8px 20px' 
+                    }}
+                    onClick={() => setShowDeleteModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    className="mod-btn approve" 
+                    style={{ 
+                      padding: '8px 20px', 
+                      background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                      border: 'none',
+                      color: '#ffffff'
+                    }}
+                    onClick={submitDeleteGenre}
+                  >
+                    Archive
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })(), document.body)}
     </div>
   )
 }

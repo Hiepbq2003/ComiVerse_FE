@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import '../../assets/style/moderator/comic-management.css'
 import ModernButton from '../../components/common/ModernButton'
 import { createTranslationRequestApi } from '../../services/api/TranslationPoolApi'
@@ -13,6 +14,9 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   const [comicGenreFilter, setComicGenreFilter] = useState('All Genres')
   const [comicAuthorFilter, setComicAuthorFilter] = useState('All Authors')
   const [comicTeamFilter, setComicTeamFilter] = useState('All Project Teams')
+  const [viewsSort, setViewsSort] = useState('All Views')
+  const [comicTimeFilter, setComicTimeFilter] = useState('All Time')
+  const [chapterUpdateSort, setChapterUpdateSort] = useState('Sort by Update Time')
 
   // Archive confirmation modal states
   const [showArchiveModal, setShowArchiveModal] = useState(false)
@@ -159,19 +163,24 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
     setEditingComic(comic)
     setEditComicForm({
       title: comic.title,
-      author: comic.author,
+      author: comic.authorName || comic.author || '',
       status: comic.status,
-      genres: comic.genres.join(', ')
+      genres: comic.genres.map(g => typeof g === 'object' && g !== null ? g.name : g).join(', ')
     })
   }
 
   const saveEditModal = () => {
     if (!editingComic) return
+    const inputGenreNames = editComicForm.genres.split(',').map(g => g.trim().toLowerCase()).filter(Boolean)
+    const matchedGenreIds = (genres || [])
+      .filter(g => inputGenreNames.includes((g.name || '').toLowerCase()))
+      .map(g => g.id)
+
     const updatedData = {
       title: editComicForm.title.trim(),
-      author: editComicForm.author.trim(),
-      status: editComicForm.status,
-      genres: editComicForm.genres.split(',').map(g => g.trim()).filter(Boolean)
+      authorName: editComicForm.author.trim(),
+      status: editComicForm.status?.toUpperCase(),
+      genreIds: matchedGenreIds
     }
     handleSaveEditComic(editingComic.id, updatedData)
     setEditingComic(null)
@@ -204,7 +213,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               <path d="M0 25 C 20 25, 40 5, 60 10 C 80 15, 90 2, 100 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value active-count">{comics.filter(c => c.status === 'Ongoing').length}</span>
+          <span className="stat-value active-count">{comics.filter(c => c.status?.toUpperCase() === 'ONGOING').length}</span>
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -213,7 +222,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               <path d="M0 25 C 30 25, 50 20, 70 8 C 85 2, 95 10, 100 2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value" style={{ color: '#3b82f6' }}>{comics.filter(c => c.status === 'Completed').length}</span>
+          <span className="stat-value" style={{ color: '#3b82f6' }}>{comics.filter(c => c.status?.toUpperCase() === 'COMPLETED').length}</span>
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -222,7 +231,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               <path d="M0 10 C 20 10, 40 25, 60 20 C 80 15, 90 25, 100 25" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value paused-count">{comics.filter(c => c.status === 'Paused').length}</span>
+          <span className="stat-value paused-count">{comics.filter(c => c.status?.toUpperCase() === 'PAUSED').length}</span>
         </div>
       </div>
 
@@ -266,7 +275,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
             onChange={(e) => setComicAuthorFilter(e.target.value)}
           >
             <option>All Authors</option>
-            {Array.from(new Set(comics.map(c => c.author))).map((author, idx) => (
+            {Array.from(new Set(comics.map(c => c.authorName || c.author).filter(Boolean))).map((author, idx) => (
               <option key={idx} value={author}>{author}</option>
             ))}
           </select>
@@ -281,6 +290,37 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               <option key={idx} value={team}>{team}</option>
             ))}
           </select>
+
+          <select 
+            className="moderator-select"
+            value={viewsSort}
+            onChange={(e) => setViewsSort(e.target.value)}
+          >
+            <option>All Views</option>
+            <option>Most Viewed</option>
+            <option>Least Viewed</option>
+          </select>
+
+          <select 
+            className="moderator-select"
+            value={comicTimeFilter}
+            onChange={(e) => setComicTimeFilter(e.target.value)}
+          >
+            <option>All Time</option>
+            <option>Updated Today</option>
+            <option>Updated Last 7 Days</option>
+            <option>Updated Last 30 Days</option>
+          </select>
+
+          <select 
+            className="moderator-select"
+            value={chapterUpdateSort}
+            onChange={(e) => setChapterUpdateSort(e.target.value)}
+          >
+            <option>Sort by Update Time</option>
+            <option>Newest Chapters First</option>
+            <option>Oldest Chapters First</option>
+          </select>
         </div>
       </div>
 
@@ -293,6 +333,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               <th>Project Team</th>
               <th>Chapters</th>
               <th>Views</th>
+              <th>Rating</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -302,15 +343,57 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               .filter(c => {
                 const searchLower = comicSearch.toLowerCase();
                 const matchesSearch = c.title.toLowerCase().includes(searchLower) ||
-                  c.author.toLowerCase().includes(searchLower) ||
+                  (c.authorName || '').toLowerCase().includes(searchLower) ||
+                  (c.author || '').toLowerCase().includes(searchLower) ||
                   c.projectTeam.toLowerCase().includes(searchLower);
                 
-                const matchesStatus = comicStatusFilter === 'All Status' || c.status === comicStatusFilter;
-                const matchesGenre = comicGenreFilter === 'All Genres' || c.genres.includes(comicGenreFilter);
-                const matchesAuthor = comicAuthorFilter === 'All Authors' || c.author === comicAuthorFilter;
+                const matchesStatus = comicStatusFilter === 'All Status' || c.status?.toUpperCase() === comicStatusFilter.toUpperCase();
+                const matchesGenre = comicGenreFilter === 'All Genres' || c.genres.some(g => (typeof g === 'object' && g !== null ? g.name : g) === comicGenreFilter);
+                const matchesAuthor = comicAuthorFilter === 'All Authors' || c.authorName === comicAuthorFilter || c.author === comicAuthorFilter;
                 const matchesTeam = comicTeamFilter === 'All Project Teams' || c.projectTeam === comicTeamFilter;
 
-                return matchesSearch && matchesStatus && matchesGenre && matchesAuthor && matchesTeam;
+                let matchesTime = true;
+                if (comicTimeFilter !== 'All Time') {
+                  const targetTime = c.lastChapterUpdatedAt || c.createdAt || c.timestamp;
+                  if (targetTime) {
+                    const updateDate = new Date(targetTime);
+                    const now = new Date();
+                    if (comicTimeFilter === 'Updated Today') {
+                      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                      matchesTime = updateDate >= oneDayAgo;
+                    } else if (comicTimeFilter === 'Updated Last 7 Days') {
+                      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                      matchesTime = updateDate >= sevenDaysAgo;
+                    } else if (comicTimeFilter === 'Updated Last 30 Days') {
+                      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                      matchesTime = updateDate >= thirtyDaysAgo;
+                    }
+                  } else {
+                    matchesTime = false;
+                  }
+                }
+
+                return matchesSearch && matchesStatus && matchesGenre && matchesAuthor && matchesTeam && matchesTime;
+              })
+              .sort((a, b) => {
+                if (chapterUpdateSort === 'Newest Chapters First') {
+                  const tA = new Date(a.lastChapterUpdatedAt || a.createdAt || a.timestamp || 0).getTime();
+                  const tB = new Date(b.lastChapterUpdatedAt || b.createdAt || b.timestamp || 0).getTime();
+                  return tB - tA;
+                } else if (chapterUpdateSort === 'Oldest Chapters First') {
+                  const tA = new Date(a.lastChapterUpdatedAt || a.createdAt || a.timestamp || 0).getTime();
+                  const tB = new Date(b.lastChapterUpdatedAt || b.createdAt || b.timestamp || 0).getTime();
+                  return tA - tB;
+                }
+
+                const aViews = a.viewCount !== undefined ? a.viewCount : (a.views || 0);
+                const bViews = b.viewCount !== undefined ? b.viewCount : (b.views || 0);
+                if (viewsSort === 'Most Viewed') {
+                  return bViews - aViews;
+                } else if (viewsSort === 'Least Viewed') {
+                  return aViews - bViews;
+                }
+                return 0;
               })
               .map(comic => (
                 <tr key={comic.id}>
@@ -331,7 +414,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                       </div>
                     </div>
                   </td>
-                  <td>{comic.author}</td>
+                  <td>{comic.authorName || comic.author || 'Original Author'}</td>
                   <td>
                     {comic.projectTeam === '-' ? (
                       <span style={{ color: 'var(--mod-text-muted)', fontSize: '13px' }}>Unassigned</span>
@@ -339,8 +422,24 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                       <span style={{ fontWeight: '500' }}>{comic.projectTeam}</span>
                     )}
                   </td>
-                  <td><strong>{comic.chapters}</strong></td>
-                  <td>{comic.views}</td>
+                  <td>
+                    <strong>{comic.chapterCount !== undefined ? comic.chapterCount : (comic.chapters || 0)}</strong>
+                    {comic.lastChapterUpdatedAt && (
+                      <div style={{ fontSize: '11px', color: 'var(--mod-text-secondary)', marginTop: '4px' }}>
+                        🕒 {new Date(comic.lastChapterUpdatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </div>
+                    )}
+                  </td>
+                  <td>{comic.viewCount !== undefined ? comic.viewCount : (comic.views || 0)}</td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', color: '#f59e0b' }}>
+                      <span style={{ fontSize: '15px' }}>★</span>
+                      <span>{comic.ratingAverage !== undefined ? comic.ratingAverage.toFixed(1) : (comic.rating !== undefined ? comic.rating.toFixed(1) : '0.0')}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--mod-text-secondary)', fontWeight: 'normal' }}>
+                        ({comic.ratingCount || 0})
+                      </span>
+                    </div>
+                  </td>
                   <td>
                     <span className={`comic-status-badge ${comic.status.toLowerCase()}`}>
                       {comic.status}
@@ -369,7 +468,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
       </div>
 
       {/* ── MODAL: EDIT COMIC INFO ─────────────────── */}
-      {editingComic && (
+      {editingComic && createPortal(
         <div className="mod-modal-overlay">
           <div className="mod-modal-card">
             <div className="mod-modal-header">
@@ -406,9 +505,9 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                     value={editComicForm.status}
                     onChange={(e) => setEditComicForm({ ...editComicForm, status: e.target.value })}
                   >
-                    <option value="Ongoing">Ongoing</option>
-                    <option value="Paused">Paused</option>
-                    <option value="Completed">Completed</option>
+                    <option value="ONGOING">Ongoing</option>
+                    <option value="PAUSED">Paused</option>
+                    <option value="COMPLETED">Completed</option>
                   </select>
                 </div>
               </div>
@@ -425,7 +524,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                 {genres && genres.length > 0 && (
                   <div style={{ marginTop: '12px' }}>
                     <label className="mod-label" style={{ fontSize: '12px', color: 'var(--mod-text-secondary)', marginBottom: '6px', display: 'block' }}>
-                      Or select from registered genres (Click to toggle):
+                       Or select from registered genres (Click to toggle):
                     </label>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
                       {genres.map((g) => {
@@ -485,23 +584,27 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
 
             <div className="mod-modal-footer" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
               <ModernButton 
-                variant={5} 
+                variant={2} 
                 label="Cancel" 
+                className="btn-cancel"
                 onClick={() => setEditingComic(null)} 
+                style={{ width: '130px' }}
               />
               <ModernButton 
                 variant={2} 
                 label="Save Changes" 
                 onClick={saveEditModal}
                 disabled={!editComicForm.title.trim()}
+                style={{ width: '130px' }}
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── MODAL: REQUEST TRANSLATION ─────────────── */}
-      {showTransReqModal && transReqComic && (
+      {showTransReqModal && transReqComic && createPortal(
         <div className="mod-modal-overlay">
           <div className="mod-modal-card" style={{ maxWidth: '560px' }}>
             <div className="mod-modal-header">
@@ -610,11 +713,12 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── MODAL: DIRECT ASSIGN TEAM ────────────────── */}
-      {showDirectAssignModal && (
+      {showDirectAssignModal && createPortal(
         <div className="mod-modal-overlay">
           <div className="mod-modal-card" style={{ maxWidth: '520px' }}>
             <div className="mod-modal-header">
@@ -713,10 +817,11 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       {/* ── MODAL: ARCHIVE COMIC CONFIRMATION ───────── */}
-      {showArchiveModal && comicToArchive && (
+      {showArchiveModal && comicToArchive && createPortal(
         <div className="mod-modal-overlay" style={{ zIndex: 9999 }}>
           <div className="mod-modal-card" style={{ maxWidth: '420px', textAlign: 'center' }}>
             <div className="mod-modal-body" style={{ padding: '28px 20px' }}>
@@ -748,7 +853,8 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
