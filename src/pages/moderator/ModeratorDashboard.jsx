@@ -109,6 +109,64 @@ function ModeratorDashboard() {
     fetchAllData()
   }, [])
 
+  const fetchComicsAndTeams = async () => {
+    try {
+      const [comicsData, teamsData, genresData] = await Promise.all([
+        getAllComicsApi(),
+        getAllProjectTeamsApi(),
+        getAllGenresApi()
+      ])
+      const mappedComics = (comicsData || []).map(c => {
+        const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === c.title.toLowerCase())
+        return {
+          ...c,
+          projectTeam: team ? team.title : '-'
+        }
+      })
+      setComics(mappedComics)
+      setProjectTeams(teamsData || [])
+      setGenres(genresData?.data || genresData || [])
+    } catch (err) {
+      console.error('Failed to fetch comics/teams:', err)
+    }
+  }
+
+  const fetchSubmissionsData = async () => {
+    try {
+      const data = await getAllSubmissionsApi()
+      setSubmissions(data || [])
+    } catch (err) {
+      console.error('Failed to fetch submissions:', err)
+    }
+  }
+
+  const fetchForumThreadsData = async () => {
+    try {
+      const data = await getAllForumThreadsApi()
+      setForumThreads(data || [])
+    } catch (err) {
+      console.error('Failed to fetch forum threads:', err)
+    }
+  }
+
+  const fetchChatFlagsData = async () => {
+    try {
+      const data = await getAllChatFlagsApi()
+      setChatFlags(data || [])
+    } catch (err) {
+      console.error('Failed to fetch chat flags:', err)
+    }
+  }
+
+  const fetchAuditLogsData = async () => {
+    try {
+      const data = await getAllAuditLogsApi()
+      setAuditLogs(data || [])
+    } catch (err) {
+      console.error('Failed to fetch audit logs:', err)
+    }
+  }
+
   const fetchAllData = async () => {
     try {
       setLoading(true)
@@ -121,7 +179,6 @@ function ModeratorDashboard() {
         getAllChatFlagsApi(),
         getAllAuditLogsApi()
       ])
-      // Map projectTeam from teamsData dynamically
       const mappedComics = (comicsData || []).map(c => {
         const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === c.title.toLowerCase())
         return {
@@ -129,7 +186,6 @@ function ModeratorDashboard() {
           projectTeam: team ? team.title : '-'
         }
       })
-
       setComics(mappedComics)
       setProjectTeams(teamsData || [])
       setSubmissions(submissionsData || [])
@@ -158,7 +214,9 @@ function ModeratorDashboard() {
     try {
       await approveSubmissionApi(id)
       toast.success('Submission approved!')
-      await fetchAllData() // Reload lists to sync all changes
+      setSubmissions(prev => prev.filter(item => item.id !== id))
+      fetchComicsAndTeams()
+      fetchAuditLogsData()
     } catch (err) {
       console.error(err)
       toast.error('Failed to approve submission.')
@@ -169,7 +227,8 @@ function ModeratorDashboard() {
     try {
       await rejectSubmissionApi(id, reason)
       toast.success('Submission rejected.')
-      await fetchAllData()
+      setSubmissions(prev => prev.filter(item => item.id !== id))
+      fetchAuditLogsData()
     } catch (err) {
       console.error(err)
       toast.error('Failed to reject submission.')
@@ -248,7 +307,8 @@ function ModeratorDashboard() {
       
       toast.success('Project team created successfully!')
       setShowCreateTeamModal(false)
-      await fetchAllData()
+      fetchComicsAndTeams()
+      fetchAuditLogsData()
     } catch (err) {
       console.error(err)
       toast.error('Failed to create translation project team.')
@@ -261,7 +321,9 @@ function ModeratorDashboard() {
         await deleteProjectTeamApi(id)
         
         toast.success('Project team removed successfully.')
-        await fetchAllData()
+        setProjectTeams(prev => prev.filter(t => t.id !== id))
+        setComics(prev => prev.map(c => c.projectTeam === teamTitle ? { ...c, projectTeam: '-' } : c))
+        fetchAuditLogsData()
       } catch (err) {
         console.error(err)
         toast.error('Failed to remove project team.')
@@ -943,7 +1005,7 @@ function ModeratorDashboard() {
               handleSaveEditComic={handleSaveEditComic} 
               handleArchiveComic={handleArchiveComic} 
               handleTriggerAssignTeam={handleTriggerAssignTeam} 
-              fetchAllData={fetchAllData}
+              fetchAllData={fetchComicsAndTeams}
             />
           )}
 
@@ -973,12 +1035,12 @@ function ModeratorDashboard() {
 
           {/* VIEW: CHAT MONITOR */}
           {activeNav === 'chat-monitor' && (
-            <ChatMonitor fetchAllData={fetchAllData} />
+            <ChatMonitor fetchAllData={fetchChatFlagsData} />
           )}
 
           {/* VIEW: FORUM */}
           {activeNav === 'forum' && (
-            <ForumModeration fetchAllData={fetchAllData} />
+            <ForumModeration fetchAllData={fetchForumThreadsData} />
           )}
 
           {/* Action Audit Log Modal (at root level to prevent stacking context scroll issues) */}
