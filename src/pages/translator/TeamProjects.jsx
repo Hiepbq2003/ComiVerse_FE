@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom';
 import '../../assets/style/translator/team-projects.css'
 import ModernButton from '../../components/common/ModernButton'
-import { getAllProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
+import { getMyProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { createSubmissionApi } from '../../services/api/SubmissionApi'
 import { StepForward } from "lucide-react";
 import { GitCompare } from "lucide-react";
@@ -78,7 +78,7 @@ const COLUMN_LIST = [
 // grid of project cards.
 // =============================================================================
 
-function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpenDetails, onOpenEdit }) {
+function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpenDetails, onOpenEdit, isLeaderMatch }) {
   return (
     <div className="fade-in">
       <div className="translator-page-header">
@@ -130,7 +130,11 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                   <span className={`status-badge ${proj.status.toLowerCase()}`}>{proj.status}</span>
-                  <span className="status-badge leader">⭐ Led by Me</span>
+                  {isLeaderMatch(proj.leaderName) ? (
+                    <span className="status-badge leader">⭐ Led by Me</span>
+                  ) : (
+                    <span className="status-badge">👤 Member</span>
+                  )}
                 </div>
               </div>
               <div className="trans-project-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -1479,7 +1483,7 @@ function TeamProjects() {
   const fetchProjects = async (silent = false) => {
     try {
       if (!silent) setLoadingProjects(true)
-      const data = await getAllProjectTeamsApi()
+      const data = await getMyProjectTeamsApi()
       const mapped = (data || []).map(p => ({ ...p, team: p.title, title: p.comicName }))
       setProjects(mapped)
     } catch (err) {
@@ -1881,12 +1885,14 @@ function TeamProjects() {
     return isDevLeader && isDevUser
   }
 
-  const teamProjectsList = projects.filter(proj => {
-    const matchesSearch = (proj.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (proj.comicName || '').toLowerCase().includes(searchTerm.toLowerCase())
-    if (!matchesSearch) return false
-    return isLeaderMatch(proj.leaderName)
-  })
+  // Backend's /my-teams endpoint already only returns projects the current user leads
+  // or is a member of — no need to re-filter by leader here anymore. isLeaderMatch is
+  // still used below for "isCurrentLeader" (deciding whether to show the Requests/
+  // Settings tabs INSIDE an already-opened project's workspace).
+  const teamProjectsList = projects.filter(proj =>
+    (proj.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (proj.comicName || '').toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   // ── Render ─────────────────────────────────────
   if (loadingProjects) {
@@ -1981,6 +1987,7 @@ function TeamProjects() {
         onSearchChange={setSearchTerm}
         onOpenDetails={handleOpenDetails}
         onOpenEdit={handleOpenEdit}
+        isLeaderMatch={isLeaderMatch}
       />
       {selectedEdit && (
         <EditProjectModal
