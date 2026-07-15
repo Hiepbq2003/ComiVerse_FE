@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import AuthorLayout from '../../components/layout/AuthorLayout'
+import UploadGuideModal from '../../components/author/UploadGuideModal'
 import {
   createAuthorComicApi,
   getAuthorChapterUploadStatusApi,
@@ -112,7 +113,6 @@ const isChapterCbzFile = (file) => {
 const CHAPTER_ARCHIVE_NAME_REGEX = /^chapter\s+[1-9][0-9]*(?:[,.][0-9]+)?\.cbz$/i
 
 const UPLOAD_POLL_INTERVAL_MS = 2500
-const COMICS_PER_PAGE = 12
 const isFinalUploadStatus = (status) => ['COMPLETED', 'FAILED'].includes((status || '').toString().toUpperCase())
 const getTaskId = (task) => task?.taskId || task?.id || task?.uploadTaskId
 
@@ -592,173 +592,132 @@ function AuthorComics() {
   const [showUploadGuide, setShowUploadGuide] = useState(Boolean(location.state?.openUploadGuide))
   const [chapterTarget, setChapterTarget] = useState(null)
   const [uploadTasks, setUploadTasks] = useState([])
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [totalElements, setTotalElements] = useState(0)
 
-  const loadComics = async (page = currentPage) => {
+  const loadComics = async () => {
     setLoading(true)
     setError('')
     try {
-      const response = await getAuthorComicsApi({ page, size: COMICS_PER_PAGE })
-      const normalizedComics = normalizeArrayResponse(response)
-      const metadata = response?.metadata || {}
-      const nextTotalPages = Math.max(1, Number(metadata.totalPages) || 1)
-
-      setComics(normalizedComics)
-      setTotalPages(nextTotalPages)
-      setTotalElements(Number(metadata.totalElements) || normalizedComics.length)
-
-      if (page > nextTotalPages) {
-        setCurrentPage(nextTotalPages)
-      }
-    } catch (error) {
-      console.error('Load author comics failed:', {
-        message: error.message,
-        code: error.code,
-        status: error.response?.status,
-        data: error.response?.data,
-        url: error.config?.url,
-        method: error.config?.method,
-        baseURL: error.config?.baseURL
-      })
-
-      const status = error.response?.status
-
-      if (status === 401) {
-        setError('Phiên đăng nhập đã hết hạn hoặc thiếu token. Vui lòng đăng nhập lại.')
-      } else if (status === 403) {
-        setError('Tài khoản của bạn không có quyền AUTHOR.')
-      } else if (status === 404) {
-        setError('Không tìm thấy API author comics. Kiểm tra endpoint backend.')
-      } else if (status >= 500) {
-        setError('Backend đang lỗi khi tải danh sách truyện của author.')
-      } else if (error.code === 'ERR_NETWORK' || !error.response) {
-        setError('Không kết nối được backend. Kiểm tra backend có chạy không, proxy Vite, CORS hoặc baseURL.')
-      } else {
-        setError('Không thể tải danh sách truyện author.')
-      }
-    }finally {
-    setLoading(false)
-  }
-}
-
-useEffect(() => {
-  loadComics(currentPage)
-}, [currentPage])
-
-const pendingReviewCount = useMemo(() => comics.filter((comic) => {
-  const status = (comic.moderationStatus || comic.status || '').toString().toUpperCase()
-  return status.includes('PENDING') || status.includes('REVIEW') || status.includes('SUBMITTED')
-}).length, [comics])
-
-const upsertUploadTask = (task, extra = {}) => {
-  const taskId = getTaskId(task)
-  if (!taskId) return
-
-  setUploadTasks((current) => {
-    const nextTask = { ...extra, ...task, taskId }
-    const exists = current.some((item) => getTaskId(item) === taskId)
-    if (exists) {
-      return current.map((item) => (getTaskId(item) === taskId ? { ...item, ...nextTask } : item))
+      const response = await getAuthorComicsApi({ page: 1, size: 100 })
+      setComics(normalizeArrayResponse(response))
+    } catch (err) {
+      setError('Cannot load author comics. Please check login token, AUTHOR role, and backend API.')
+      setComics([])
+    } finally {
+      setLoading(false)
     }
-    return [nextTask, ...current]
-  })
-}
+  }
 
-const pollComicPackageTask = (taskId) => {
-  const poll = async () => {
-    try {
-      const latest = await getAuthorComicPackageUploadStatusApi(taskId)
-      upsertUploadTask(latest)
+  useEffect(() => {
+    loadComics()
+  }, [])
 
-      if (!isFinalUploadStatus(latest?.status)) {
-        window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
-        return
+  const pendingReviewCount = useMemo(() => comics.filter((comic) => {
+    const status = (comic.moderationStatus || comic.status || '').toString().toUpperCase()
+    return status.includes('PENDING') || status.includes('REVIEW') || status.includes('SUBMITTED')
+  }).length, [comics])
+
+  const upsertUploadTask = (task, extra = {}) => {
+    const taskId = getTaskId(task)
+    if (!taskId) return
+
+    setUploadTasks((current) => {
+      const nextTask = { ...extra, ...task, taskId }
+      const exists = current.some((item) => getTaskId(item) === taskId)
+      if (exists) {
+        return current.map((item) => (getTaskId(item) === taskId ? { ...item, ...nextTask } : item))
       }
+      return [nextTask, ...current]
+    })
+  }
 
-      if (latest?.status === 'COMPLETED') {
-        const createdComic = latest?.comicPackage?.comic || latest?.comic
-        const comicId = getComicId(createdComic)
-        if (createdComic) {
-          setComics((current) => {
-            const exists = current.some((comic) => getComicId(comic) === comicId)
-            return exists ? current.map((comic) => (getComicId(comic) === comicId ? createdComic : comic)) : [createdComic, ...current]
-          })
+  const pollComicPackageTask = (taskId) => {
+    const poll = async () => {
+      try {
+        const latest = await getAuthorComicPackageUploadStatusApi(taskId)
+        upsertUploadTask(latest)
+
+        if (!isFinalUploadStatus(latest?.status)) {
+          window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
+          return
         }
-        if (comicId) {
+
+        if (latest?.status === 'COMPLETED') {
+          const createdComic = latest?.comicPackage?.comic || latest?.comic
+          const comicId = getComicId(createdComic)
+          if (createdComic) {
+            setComics((current) => {
+              const exists = current.some((comic) => getComicId(comic) === comicId)
+              return exists ? current.map((comic) => (getComicId(comic) === comicId ? createdComic : comic)) : [createdComic, ...current]
+            })
+          }
+          if (comicId) {
+            navigate(`/author/comics/${comicId}`, {
+              state: { message: latest?.message || 'Comic package processed. Preview chapters before submitting them for review.' },
+            })
+          }
+        }
+      } catch (err) {
+        upsertUploadTask({ taskId, status: 'FAILED', error: err?.message || 'Could not check upload status.' })
+      }
+    }
+
+    window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
+  }
+
+  const pollChapterTask = (comicId, taskId) => {
+    const poll = async () => {
+      try {
+        const latest = await getAuthorChapterUploadStatusApi(comicId, taskId)
+        upsertUploadTask(latest)
+
+        if (!isFinalUploadStatus(latest?.status)) {
+          window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
+          return
+        }
+
+        if (latest?.status === 'COMPLETED') {
+          const preview = latest?.chapter
+          setComics((current) => current.map((comic) => (
+            getComicId(comic) === comicId
+              ? { ...comic, chapterCount: Number(getChapterCount(comic)) + 1, chapters: Number(getChapterCount(comic)) + 1, latestChapterPreview: preview }
+              : comic
+          )))
           navigate(`/author/comics/${comicId}`, {
-            state: { message: latest?.message || 'Comic package processed. Preview chapters before submitting them for review.' },
+            state: { message: 'Chapter CBZ processed. Submit it for moderator review after checking preview pages.' },
           })
         }
+      } catch (err) {
+        upsertUploadTask({ taskId, status: 'FAILED', error: err?.message || 'Could not check upload status.' })
       }
-    } catch (err) {
-      upsertUploadTask({ taskId, status: 'FAILED', error: err?.message || 'Could not check upload status.' })
+    }
+
+    window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
+  }
+
+  const handleCreated = (createdComic, _chapterPreview, uploadTask) => {
+    const taskId = getTaskId(uploadTask)
+    if (taskId) {
+      upsertUploadTask(uploadTask, { title: 'Comic package upload' })
+      pollComicPackageTask(taskId)
+      return
+    }
+
+    if (createdComic) {
+      setComics((current) => [createdComic, ...current])
     }
   }
 
-  window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
-}
+  const handleChapterUploaded = (uploadTask, targetComic = chapterTarget) => {
+    const taskId = getTaskId(uploadTask)
+    const comicId = getComicId(targetComic)
+    if (!taskId || !comicId) return
 
-const pollChapterTask = (comicId, taskId) => {
-  const poll = async () => {
-    try {
-      const latest = await getAuthorChapterUploadStatusApi(comicId, taskId)
-      upsertUploadTask(latest)
-
-      if (!isFinalUploadStatus(latest?.status)) {
-        window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
-        return
-      }
-
-      if (latest?.status === 'COMPLETED') {
-        const preview = latest?.chapter
-        setComics((current) => current.map((comic) => (
-          getComicId(comic) === comicId
-            ? { ...comic, chapterCount: Number(getChapterCount(comic)) + 1, chapters: Number(getChapterCount(comic)) + 1, latestChapterPreview: preview }
-            : comic
-        )))
-        navigate(`/author/comics/${comicId}`, {
-          state: { message: 'Chapter CBZ processed. Submit it for moderator review after checking preview pages.' },
-        })
-      }
-    } catch (err) {
-      upsertUploadTask({ taskId, status: 'FAILED', error: err?.message || 'Could not check upload status.' })
-    }
+    upsertUploadTask(uploadTask, {
+      title: `Chapter upload · ${targetComic?.title || 'Comic'}`,
+      comicId,
+    })
+    pollChapterTask(comicId, taskId)
   }
-
-  window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
-}
-
-const handleCreated = (createdComic, _chapterPreview, uploadTask) => {
-  const taskId = getTaskId(uploadTask)
-  if (taskId) {
-    upsertUploadTask(uploadTask, { title: 'Comic package upload' })
-    pollComicPackageTask(taskId)
-    return
-  }
-
-  if (createdComic) {
-    setComics((current) => [createdComic, ...current].slice(0, COMICS_PER_PAGE))
-    setTotalElements((current) => current + 1)
-    if (totalElements > 0 && totalElements % COMICS_PER_PAGE === 0) {
-      setTotalPages((current) => current + 1)
-    }
-    setCurrentPage(1)
-  }
-}
-
-const handleChapterUploaded = (uploadTask, targetComic = chapterTarget) => {
-  const taskId = getTaskId(uploadTask)
-  const comicId = getComicId(targetComic)
-  if (!taskId || !comicId) return
-
-  upsertUploadTask(uploadTask, {
-    title: `Chapter upload · ${targetComic?.title || 'Comic'}`,
-    comicId,
-  })
-  pollChapterTask(comicId, taskId)
-}
 
   return (
     <AuthorLayout activeNav="comics">
@@ -769,84 +728,84 @@ const handleChapterUploaded = (uploadTask, targetComic = chapterTarget) => {
             <p>{loading ? 'Loading comics...' : `${comics.length} comics · ${pendingReviewCount} pending review`}</p>
           </div>
           <div className="author-header-actions">
-            <Link className="btn-author-action" to="/author/upload-guide">Upload Guide</Link>
+            <button className="btn-author-action" type="button" onClick={() => setShowUploadGuide(true)}>Upload Guide</button>
             <button className="btn-author-action black large" onClick={() => setShowCreateModal(true)}>
               + Upload New Comic
             </button>
           </div>
         </div>
 
-      {error && <div className="author-alert warning">{error}</div>}
+        {error && <div className="author-alert warning">{error}</div>}
 
-      {uploadTasks.length > 0 && (
-        <div className="author-upload-task-list">
-          {uploadTasks.map((task) => {
-            const statusValue = (task.status || 'QUEUED').toString().toLowerCase()
+        {uploadTasks.length > 0 && (
+          <div className="author-upload-task-list">
+            {uploadTasks.map((task) => {
+              const statusValue = (task.status || 'QUEUED').toString().toLowerCase()
+              return (
+                <div className={`author-upload-task-card ${statusValue}`} key={getTaskId(task)}>
+                  <div>
+                    <strong>{task.title || task.type || 'Upload task'}</strong>
+                    <p>{task.error || task.message || 'Waiting for backend status...'}</p>
+                  </div>
+                  <div className="author-upload-task-meta">
+                    <span>{formatUploadStatus(task.status)}</span>
+                    <small>{task.progress ?? 0}%</small>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {!loading && !error && comics.length === 0 && (
+          <div className="author-empty-state">
+            <h2>No real comics yet</h2>
+            <p>Create your first comic profile, upload a real cover image, then upload a chapter CBZ.</p>
+            <button className="btn-author-action black" onClick={() => setShowCreateModal(true)}>Create First Comic</button>
+          </div>
+        )}
+
+        <div className="author-comic-list">
+          {comics.map((comic) => {
+            const comicId = getComicId(comic)
+            const moderationStatus = comic.moderationStatus || comic.status
+            const publicationStatus = comic.publicationStatus || comic.comicStatus
+            const genres = normalizeGenres(comic.genres)
+            const cover = getComicCover(comic)
+
             return (
-              <div className={`author-upload-task-card ${statusValue}`} key={getTaskId(task)}>
-                <div>
-                  <strong>{task.title || task.type || 'Upload task'}</strong>
-                  <p>{task.error || task.message || 'Waiting for backend status...'}</p>
-                </div>
-                <div className="author-upload-task-meta">
-                  <span>{formatUploadStatus(task.status)}</span>
-                  <small>{task.progress ?? 0}%</small>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {!loading && !error && comics.length === 0 && (
-        <div className="author-empty-state">
-          <h2>No real comics yet</h2>
-          <p>Create your first comic profile, upload a real cover image, then upload a chapter CBZ.</p>
-          <button className="btn-author-action black" onClick={() => setShowCreateModal(true)}>Create First Comic</button>
-        </div>
-      )}
-
-      <div className="author-comic-list">
-        {comics.map((comic) => {
-          const comicId = getComicId(comic)
-          const moderationStatus = comic.moderationStatus || comic.status
-          const publicationStatus = comic.publicationStatus || comic.comicStatus
-          const genres = normalizeGenres(comic.genres)
-          const cover = getComicCover(comic)
-
-          return (
-            <article className="author-comic-list-card" key={comicId || comic.title}>
-              <div className="author-comic-cover-box">
-                {cover ? <img src={cover} alt={comic.title} /> : <span>Cover</span>}
-              </div>
-
-              <div className="author-comic-card-main">
-                <div className="author-comic-title-line">
-                  <h2>{comic.title}</h2>
-                  <span className={`author-status-badge ${getModerationClass(moderationStatus)}`}>
-                    {formatModerationStatus(moderationStatus)}
-                  </span>
-                  <span className={`author-publication-badge ${getPublicationClass(publicationStatus)}`}>
-                    {formatPublicationStatus(publicationStatus)}
-                  </span>
+              <article className="author-comic-list-card" key={comicId || comic.title}>
+                <div className="author-comic-cover-box">
+                  {cover ? <img src={cover} alt={comic.title} /> : <span>Cover</span>}
                 </div>
 
-                <div className="author-comic-meta-line">
-                  <span>📖 {getChapterCount(comic)} chapters</span>
-                  <span>👁 {getViews(comic)} views</span>
-                  <span>💰 {comic.revenue || comic.totalRevenue || '0đ'}</span>
-                  <span>🔞 {comic.minimumAge ?? 13}+</span>
-                  <span>🕘 {formatDate(comic.updatedAt || comic.createdAt)}</span>
-                </div>
+                <div className="author-comic-card-main">
+                  <div className="author-comic-title-line">
+                    <h2>{comic.title}</h2>
+                    <span className={`author-status-badge ${getModerationClass(moderationStatus)}`}>
+                      {formatModerationStatus(moderationStatus)}
+                    </span>
+                    <span className={`author-publication-badge ${getPublicationClass(publicationStatus)}`}>
+                      {formatPublicationStatus(publicationStatus)}
+                    </span>
+                  </div>
 
-                <p className="author-comic-card-summary">{comic.description || comic.summary || 'No description has been added yet.'}</p>
+                  <div className="author-comic-meta-line">
+                    <span>📖 {getChapterCount(comic)} chapters</span>
+                    <span>👁 {getViews(comic)} views</span>
+                    <span>💰 {comic.revenue || comic.totalRevenue || '0đ'}</span>
+                    <span>🔞 {comic.minimumAge ?? 13}+</span>
+                    <span>🕘 {formatDate(comic.updatedAt || comic.createdAt)}</span>
+                  </div>
 
-                <div className="author-genre-pills">
-                  {genres.slice(0, 4).map((genre) => (
-                    <span className="author-genre-pill" key={genre}>{genre}</span>
-                  ))}
+                  <p className="author-comic-card-summary">{comic.description || comic.summary || 'No description has been added yet.'}</p>
+
+                  <div className="author-genre-pills">
+                    {genres.slice(0, 4).map((genre) => (
+                      <span className="author-genre-pill" key={genre}>{genre}</span>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
                 <div className="author-comic-card-actions">
                   <button className="btn-author-action black" onClick={() => navigate(`/author/comics/${comicId}`)}>
@@ -862,10 +821,16 @@ const handleChapterUploaded = (uploadTask, targetComic = chapterTarget) => {
         </div>
       </div>
 
+      {showUploadGuide && <UploadGuideModal onClose={() => setShowUploadGuide(false)} />}
+
       {showCreateModal && (
         <CreateComicModal
           onClose={() => setShowCreateModal(false)}
           onCreated={handleCreated}
+          onOpenGuide={() => {
+            setShowCreateModal(false)
+            setShowUploadGuide(true)
+          }}
         />
       )}
 
@@ -874,6 +839,10 @@ const handleChapterUploaded = (uploadTask, targetComic = chapterTarget) => {
           comic={chapterTarget}
           onClose={() => setChapterTarget(null)}
           onUploaded={handleChapterUploaded}
+          onOpenGuide={() => {
+            setChapterTarget(null)
+            setShowUploadGuide(true)
+          }}
         />
       )}
     </AuthorLayout>

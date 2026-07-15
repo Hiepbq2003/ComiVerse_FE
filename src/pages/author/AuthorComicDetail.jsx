@@ -428,11 +428,8 @@ function AuthorComicDetail() {
   const [comic, setComic] = useState(null)
   const [chapters, setChapters] = useState([])
   const [metrics, setMetrics] = useState(null)
-  const [comicLoading, setComicLoading] = useState(true)
-  const [chaptersLoading, setChaptersLoading] = useState(true)
-  const [metricsLoading, setMetricsLoading] = useState(true)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [chaptersError, setChaptersError] = useState('')
   const [showAddChapter, setShowAddChapter] = useState(false)
   const [showEditComic, setShowEditComic] = useState(false)
   const [actionMessage, setActionMessage] = useState(location.state?.message || '')
@@ -440,58 +437,36 @@ function AuthorComicDetail() {
   const [actionLoadingId, setActionLoadingId] = useState(null)
   const [uploadTask, setUploadTask] = useState(null)
 
-  useEffect(() => {
-    let active = true
-
-    setComic(null)
-    setChapters([])
-    setMetrics(null)
-    setComicLoading(true)
-    setChaptersLoading(true)
-    setMetricsLoading(true)
+  const loadDetail = async () => {
+    setLoading(true)
     setError('')
-    setChaptersError('')
 
-    getAuthorComicByIdApi(id)
-      .then((response) => {
-        if (active) setComic(response)
-      })
-      .catch(() => {
-        if (!active) return
-        setComic(null)
-        setError('Cannot load this comic. Please check that it belongs to the logged-in author and backend is running.')
-      })
-      .finally(() => {
-        if (active) setComicLoading(false)
-      })
+    try {
+      const [comicResponse, chaptersResponse, metricsResponse] = await Promise.allSettled([
+        getAuthorComicByIdApi(id),
+        getAuthorComicChaptersApi(id),
+        getAuthorComicMetricsApi(id),
+      ])
 
-    getAuthorComicChaptersApi(id)
-      .then((response) => {
-        if (active) setChapters(normalizeArrayResponse(response))
-      })
-      .catch(() => {
-        if (!active) return
-        setChapters([])
-        setChaptersError('Could not load chapters. Please try refreshing the page.')
-      })
-      .finally(() => {
-        if (active) setChaptersLoading(false)
-      })
+      if (comicResponse.status !== 'fulfilled') {
+        throw comicResponse.reason
+      }
 
-    getAuthorComicMetricsApi(id)
-      .then((response) => {
-        if (active) setMetrics(response)
-      })
-      .catch(() => {
-        if (active) setMetrics(null)
-      })
-      .finally(() => {
-        if (active) setMetricsLoading(false)
-      })
-
-    return () => {
-      active = false
+      setComic(comicResponse.value)
+      setChapters(chaptersResponse.status === 'fulfilled' ? normalizeArrayResponse(chaptersResponse.value) : [])
+      setMetrics(metricsResponse.status === 'fulfilled' ? metricsResponse.value : null)
+    } catch (err) {
+      setComic(null)
+      setChapters([])
+      setMetrics(null)
+      setError('Cannot load this comic. Please check that it belongs to the logged-in author and backend is running.')
+    } finally {
+      setLoading(false)
     }
+  }
+
+  useEffect(() => {
+    loadDetail()
   }, [id])
 
   const summary = useMemo(() => ({
@@ -564,7 +539,7 @@ function AuthorComicDetail() {
     try {
       const data = await getAuthorChapterPreviewApi(getComicId(comic), chapterId)
       setPreview(data)
-    } catch {
+    } catch (err) {
       setActionMessage('Could not load chapter preview. Please check API/backend connection.')
     } finally {
       setActionLoadingId(null)
@@ -640,7 +615,7 @@ function AuthorComicDetail() {
     }
   }
 
-  if (comicLoading) {
+  if (loading) {
     return (
       <AuthorLayout activeNav="comics">
         <div className="author-empty-state">Loading comic detail...</div>
@@ -703,11 +678,11 @@ function AuthorComicDetail() {
               </div>
               <div className="author-detail-stat-card">
                 <span>Total Views</span>
-                <strong>{metricsLoading ? '…' : summary.views}</strong>
+                <strong>{summary.views}</strong>
               </div>
               <div className="author-detail-stat-card">
                 <span>Revenue</span>
-                <strong>{metricsLoading ? '…' : summary.revenue}</strong>
+                <strong>{summary.revenue}</strong>
               </div>
               <div className="author-detail-stat-card">
                 <span>Minimum Age</span>
@@ -737,7 +712,7 @@ function AuthorComicDetail() {
         <section className="author-chapter-section-card">
           <div className="author-chapter-section-head">
             <div>
-              <h2>Chapters ({chaptersLoading ? '…' : chapters.length})</h2>
+              <h2>Chapters ({chapters.length})</h2>
               <p>Upload CBZ, preview pages, then submit each chapter for moderator review.</p>
             </div>
             <div className="author-header-actions">
@@ -748,11 +723,7 @@ function AuthorComicDetail() {
             </div>
           </div>
 
-          {chaptersLoading ? (
-            <div className="author-empty-state small">Loading chapters...</div>
-          ) : chaptersError ? (
-            <div className="author-alert warning">{chaptersError}</div>
-          ) : chapters.length === 0 ? (
+          {chapters.length === 0 ? (
             <div className="author-empty-state small">
               <h3>No chapters yet</h3>
               <p>Upload your first CBZ file to create real chapter pages.</p>

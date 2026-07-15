@@ -1,54 +1,40 @@
-import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from './context/ThemeContext'
 import { LanguageProvider } from './context/LanguageContext'
 import { AuthProvider } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
+import AuthPage from './pages/common/AuthPage'
+import Home from './pages/common/Home'
+import Explore from './pages/common/Explore'
+import Ranking from './pages/common/Ranking'
+import Library from './pages/common/Library'
+import Forum from './pages/common/Forum'
+import ComicDetail from './pages/common/ComicDetail'
+import SearchResults from './pages/common/SearchResults'
+import AccountManagement from './pages/admin/AccountManagement'
+import BroadcastManagement from './pages/admin/BroadcastManagement'
+import StatisticsDashboard from './pages/admin/StatisticsDashboard'
+import RevenueManagement from './pages/admin/RevenueManagement'
+import PayoutManagement from './pages/admin/PayoutManagement'
+import AdminSystemSettings from './pages/admin/AdminSystemSettings'
+import AuthorDashboard from './pages/author/AuthorDashboard'
+import AuthorComics from './pages/author/AuthorComics'
+import AuthorComicDetail from './pages/author/AuthorComicDetail'
+import AuthorEarnings from './pages/author/AuthorEarnings'
+import AuthorSettings from './pages/author/AuthorSettings'
+import AuthorProfile from './pages/author/AuthorProfile'
+import ModeratorDashboard from './pages/moderator/ModeratorDashboard'
+import TranslatorDashboard from './pages/translator/TranslatorDashboard'
+import Profile from './pages/common/Profile'
+import { SkeletonLoaderShowcase } from './components/common/SkeletonLoaderShowcase'
+import { AIPopoverShowcase } from './components/common/AIPopoverShowcase'
+import { HeaderProfileDropdownShowcase } from './components/common/HeaderProfileDropdownShowcase'
+import { ModernButtonShowcase } from './components/common/ModernButtonShowcase'
+import { ModernPaginationShowcase } from './components/common/ModernPaginationShowcase'
+import { AnimatedButtonShowcase } from './components/common/AnimatedButtonShowcase'
 import { getAuth, clearAuth } from './utils/Auth'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
-
-const AuthPage = lazy(() => import('./pages/common/AuthPage'))
-const Home = lazy(() => import('./pages/common/Home'))
-const Explore = lazy(() => import('./pages/common/Explore'))
-const Ranking = lazy(() => import('./pages/common/Ranking'))
-const Library = lazy(() => import('./pages/common/Library'))
-const Forum = lazy(() => import('./pages/common/Forum'))
-const ComicDetail = lazy(() => import('./pages/common/ComicDetail'))
-const SearchResults = lazy(() => import('./pages/common/SearchResults'))
-const Profile = lazy(() => import('./pages/common/Profile'))
-const Policy = lazy(() => import('./pages/common/Policy'))
-
-const AccountManagement = lazy(() => import('./pages/admin/AccountManagement'))
-const BroadcastManagement = lazy(() => import('./pages/admin/BroadcastManagement'))
-const StatisticsDashboard = lazy(() => import('./pages/admin/StatisticsDashboard'))
-const RevenueManagement = lazy(() => import('./pages/admin/RevenueManagement'))
-const PayoutManagement = lazy(() => import('./pages/admin/PayoutManagement'))
-const AdminSystemSettings = lazy(() => import('./pages/admin/AdminSystemSettings'))
-
-const AuthorDashboard = lazy(() => import('./pages/author/AuthorDashboard'))
-const AuthorComics = lazy(() => import('./pages/author/AuthorComics'))
-const AuthorComicDetail = lazy(() => import('./pages/author/AuthorComicDetail'))
-const AuthorEarnings = lazy(() => import('./pages/author/AuthorEarnings'))
-const AuthorSettings = lazy(() => import('./pages/author/AuthorSettings'))
-const AuthorUploadGuide = lazy(() => import('./pages/author/AuthorUploadGuide'))
-const AuthorProfile = lazy(() => import('./pages/author/AuthorProfile'))
-
-const ModeratorDashboard = lazy(() => import('./pages/moderator/ModeratorDashboard'))
-const TranslatorDashboard = lazy(() => import('./pages/translator/TranslatorDashboard'))
-const TranslateWorkspace = lazy(() => import('./pages/translator/TranslateWorkspace'))
-const TeamProjects = lazy(() => import('./pages/translator/TeamProjects'))
-const ProjectList = lazy(() => import('./pages/translator/ProjectList'))
-const TranslatorRevenue = lazy(() => import('./pages/translator/Revenue'))
-const TranslatorPayout = lazy(() => import('./pages/translator/Payout'))
-const TranslatorLayout = lazy(() => import('./components/layout/TranslatorLayout'))
-
-const SkeletonLoaderShowcase = lazy(() => import('./components/common/SkeletonLoaderShowcase').then((module) => ({ default: module.SkeletonLoaderShowcase })))
-const AIPopoverShowcase = lazy(() => import('./components/common/AIPopoverShowcase').then((module) => ({ default: module.AIPopoverShowcase })))
-const HeaderProfileDropdownShowcase = lazy(() => import('./components/common/HeaderProfileDropdownShowcase').then((module) => ({ default: module.HeaderProfileDropdownShowcase })))
-const ModernButtonShowcase = lazy(() => import('./components/common/ModernButtonShowcase').then((module) => ({ default: module.ModernButtonShowcase })))
-const ModernPaginationShowcase = lazy(() => import('./components/common/ModernPaginationShowcase').then((module) => ({ default: module.ModernPaginationShowcase })))
-const AnimatedButtonShowcase = lazy(() => import('./components/common/AnimatedButtonShowcase').then((module) => ({ default: module.AnimatedButtonShowcase })))
 
 function ProfileRouteWrapper() {
   const auth = getAuth()
@@ -69,8 +55,7 @@ function App() {
         <AuthProvider>
           <NotificationProvider>
             <BrowserRouter>
-              <Suspense fallback={<div className="route-loading" role="status">Loading page...</div>}>
-                <Routes>
+              <Routes>
                 {/* Public Home */}
                 <Route path="/" element={<Home />} />
                 {/* Auth */}
@@ -103,18 +88,7 @@ function App() {
                 <Route path="/author/profile" element={<AuthorProfile />} />
                 <Route path="/author/earnings" element={<AuthorEarnings />} />
                 <Route path="/author/settings" element={<AuthorSettings />} />
-                {/* Translator */}
-                <Route path="/translator" element={<TranslatorLayout />}>
-                  
-                  <Route path="project-list" element={<ProjectList />} />
-                  <Route path="project-teams" element={<TeamProjects />} />
-                  <Route path="revenue" element={<TranslatorRevenue />} />
-                  <Route path="payout" element={<TranslatorPayout />} />
-                  <Route path="dashboard" element={<TranslatorDashboard />} />
-                </Route>
-                <Route path="/translator/translate-workspace/task/:taskId" element={<TranslateWorkspace />} />
                 
-
                 {/* Showcase Demos */}
                 <Route path="/showcase/skeletons" element={<SkeletonLoaderShowcase />} />
                 <Route path="/showcase/popovers" element={<AIPopoverShowcase />} />
@@ -122,8 +96,7 @@ function App() {
                 <Route path="/showcase/buttons" element={<ModernButtonShowcase />} />
                 <Route path="/showcase/paginations" element={<ModernPaginationShowcase />} />
                 <Route path="/showcase/animated-buttons" element={<AnimatedButtonShowcase />} />
-                </Routes>
-              </Suspense>
+              </Routes>
               <ToastContainer position="top-right" autoClose={3000} theme="dark" />
             </BrowserRouter>
           </NotificationProvider>
