@@ -37,9 +37,7 @@ const API_BASE = "http://localhost:8081/api";
 const TOKEN_KEY = "token";
 const IS_DEV = process.env.NODE_ENV === "development";
 
-// =============================================================================
 // Constants
-// =============================================================================
 
 const TABS = [
   { id: "translate", label: "Translate" },
@@ -75,9 +73,7 @@ const COMIC_FONT_LIBRARY = [
   { name: "Handlee", value: "'Handlee', cursive", group: "Art & Handwriting" },
 ];
 
-// =============================================================================
 // Small presentational components
-// =============================================================================
 
 function PageStatusDot({ status }) {
   if (status === "done") {
@@ -122,7 +118,6 @@ function ChapterList({ chapters, open, onToggle, currentChapterId, currentPageIn
               const pageIndex = page.pageNumber - 1; // API returns pageNumber (1-based), state uses index (0-based)
               const isSameChapter = ch.chapterId === currentChapterId;
               const isCurrent = isSameChapter && pageIndex === currentPageIndex;
-              // Real status from the DB (DONE/TODO); the currently open page always shows "current" first
               const status = isCurrent ? "current" : page.status === "DONE" ? "done" : "todo";
               return (
                 <button
@@ -147,8 +142,6 @@ function ChapterList({ chapters, open, onToggle, currentChapterId, currentPageIn
 }
 
 function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSaveProgress, saveStatus }) {
-  // Inline @keyframes for the spinning "saving" icon — scoped here since this is the
-  // only place in the app that needs a spin animation; no need to touch the external CSS file.
   const badgeConfig = {
     saving: { icon: <Loader2 size={11} strokeWidth={3} className="tw-spin" />, label: "SAVING", color: "#5472b0" },
     saved: { icon: <Check size={11} strokeWidth={3} />, label: "SAVED", color: "#16a34a" },
@@ -197,9 +190,6 @@ function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSaveProgress, 
   );
 }
 
-// Dropdown chọn font TỰ LÀM (không dùng <select> gốc) — vì <select>/<option> của
-// trình duyệt rất khó ép màu chữ/nền (phần lớn do OS/browser tự vẽ, CSS không can
-// thiệp được triệt để), và không kiểm soát được số dòng hiện ra trước khi cuộn.
 function FontFamilyDropdown({ fontFamily, onChangeFontFamily, hasActiveSelection }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
@@ -602,12 +592,6 @@ function PageImage({
           cursor: isPickingZoomPoint ? "zoom-in" : "crosshair",
           transform: `scale(${zoomScale})`,
           transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
-          // NO CSS transition here on purpose — if zoom animates over time, any click/draw
-          // that happens DURING the animation reads getBoundingClientRect() at an
-          // INTERMEDIATE (not-yet-final) visual size, but the code divides by the FINAL
-          // zoomScale value (React state updates instantly) — mismatched intermediate vs
-          // final values cause selections to be stored at the wrong position. Instant zoom
-          // (no transition) guarantees bounds always match the current zoomScale exactly.
         }}
       >
         {currentImage ? (
@@ -712,8 +696,6 @@ function PageImage({
 
         </svg>
 
-        {/* Translation input for polygons — <textarea> can't be embedded in SVG, so it's a separate
-            HTML overlay, positioned via the bounding box */}
         {selections
           .filter((s) => s.shape === "polygon")
           .map((sel) => {
@@ -900,12 +882,6 @@ function PageImage({
   );
 }
 
-// Crop a region of the comic page image into a separate preview — pure CSS (no canvas needed).
-// NOTE 1: the main image uses objectFit:"contain" so it may be "letterboxed" (empty bars
-// top/bottom or left/right) if the container's aspect ratio differs from the image's — this
-// letterbox must be compensated for, otherwise the crop preview will be off by exactly that amount.
-// NOTE 2: uses CSS clip-path to crop to the EXACT SHAPE (oval/polygon), not just the
-// rectangular bounding box as before.
 function SourceImageCrop({ imageSrc, canvasRef, selection, imageNaturalSize, isPickingColor, onPickColorInCrop, zoomScale }) {
   const PREVIEW_WIDTH = 260;
 
@@ -917,11 +893,6 @@ function SourceImageCrop({ imageSrc, canvasRef, selection, imageNaturalSize, isP
   const rawContainer = canvasRef.current.getBoundingClientRect();
   if (rawContainer.width === 0 || rawContainer.height === 0) return null;
 
-  // Use offsetWidth/offsetHeight (LAYOUT size) instead of getBoundingClientRect().width
-  // divided by zoomScale — offsetWidth/Height are the element's own LOGICAL size and are
-  // NEVER affected by CSS transform (unlike getBoundingClientRect, which reflects the
-  // VISUAL/scaled size and depends on zoomScale being perfectly in sync at read-time).
-  // This sidesteps any risk of a stale/out-of-sync zoomScale causing the wrong divisor.
   const container = {
     width: canvasRef.current.offsetWidth,
     height: canvasRef.current.offsetHeight,
@@ -934,18 +905,11 @@ function SourceImageCrop({ imageSrc, canvasRef, selection, imageNaturalSize, isP
     imageNaturalSize.height
   );
 
-  // Selection coordinates measured FROM THE REAL IMAGE'S CORNER (letterbox subtracted), not from the container's corner
   const boxXInImage = box.x - offsetX;
   const boxYInImage = box.y - offsetY;
 
   const scale = PREVIEW_WIDTH / box.width;
   const previewHeight = Math.min(box.height * scale, 320);
-  // If constrained by previewHeight (a very tall/narrow box), the actual vertical scale
-  // would differ from the horizontal scale — but for simplicity we keep a single width-based
-  // scale, accepting that the bottom gets clipped by overflow:hidden if the box is too tall.
-
-  // Compute the clip-path based on shape — coordinates in px, RELATIVE to the preview
-  // container's top-left corner (scale already applied).
   let clipPath;
   if (selection.shape === "ellipse") {
     clipPath = "ellipse(50% 50% at 50% 50%)";
@@ -959,7 +923,7 @@ function SourceImageCrop({ imageSrc, canvasRef, selection, imageNaturalSize, isP
       .join(", ");
     clipPath = `polygon(${pointsStr})`;
   } else {
-    clipPath = "none"; // rect: no clip-path needed, the outer container's overflow:hidden is enough
+    clipPath = "none"; 
   }
 
   return (
@@ -1186,9 +1150,7 @@ function TranslationSidePanel({
   );
 }
 
-// =============================================================================
 // Data layer
-// =============================================================================
 
 function authHeaders() {
   const token = localStorage.getItem(TOKEN_KEY);
@@ -1219,8 +1181,6 @@ async function fetchJson(url, signal) {
   return json?.data !== undefined ? json.data : json;
 }
 
-// Fetch chapter details by ID (used both for the initial task load and when
-// the user switches to another chapter from the sidebar).
 async function fetchChapterById(chapterId, signal) {
   const chapter = await fetchJson(`${API_BASE}/chapters/detail/${chapterId}`, signal);
 
@@ -1243,6 +1203,7 @@ async function fetchChapterForTask(taskId, signal) {
   const task = await fetchJson(`${API_BASE}/team-workspace/tasks/${taskId}`, signal);
 
   const chapterId =
+    task?.chapter?.id ??
     task?.chapterId ??
     task?.chapter_id ??
     task?.data?.chapterId ??
@@ -1258,20 +1219,11 @@ async function fetchChapterForTask(taskId, signal) {
   return fetchChapterById(chapterId, signal);
 }
 
-// Fetch the REAL list of pages (image + status) for a task, sorted by page_number —
-// this is the OFFICIAL image source now, replacing chapter.images (the old text[]
-// array, no longer updated since the page_translation table was introduced).
-// Real route: /api/translate-workspace/{taskId} — CONFIRMED to have "/api" prefix
-// (tested directly in the browser, returns valid JSON, not a "No static resource" error).
 async function fetchPagesForTask(taskId, signal) {
   const list = await fetchJson(`${API_BASE}/translate-workspace/${taskId}`, signal);
   return Array.isArray(list) ? list : [];
 }
 
-// Save the bubbles (selections + translations + colors + shapes) AND the page-wide text
-// style settings (font family/size/bold/italic/align — these apply to the whole page, not
-// per-bubble) for ONE page. "payload" is {selections, textStyle}; the backend only reads
-// the "bubbles" field of the body (a raw JSON string of this whole payload object).
 async function saveBubblesForPage(pageId, payload, signal) {
   const res = await fetch(`${API_BASE}/translate-workspace/pages/${pageId}/bubbles`, {
     method: "PUT",
@@ -1286,16 +1238,12 @@ async function saveBubblesForPage(pageId, payload, signal) {
   return true;
 }
 
-// [LEGACY] No longer used — kept in case a temporary rollback is needed.
-// The official image source is now fetchPagesForTask() above.
 function normalizeImages(chapterData) {
   const raw = chapterData?.images || [];
   return raw.map((item) => (typeof item === "string" ? item : item?.url)).filter(Boolean);
 }
 
-// =============================================================================
 // Drawing logic — pure calculation functions (NOT Hooks, defined outside, any name)
-// =============================================================================
 
 function calculateRect(start, end) {
   const x = Math.min(start.x, end.x);
@@ -1305,9 +1253,6 @@ function calculateRect(start, end) {
   return { x, y, width, height };
 }
 
-// Compute the bounding box of a selection REGARDLESS of its shape —
-// rect/ellipse already have x,y,width,height; polygon must be computed from the "points" array.
-// Used by: SourceImageCrop, resize handle rendering, etc.
 function getBoundingBox(selection) {
   if (selection.shape === "polygon" && selection.points?.length) {
     const xs = selection.points.map((p) => p.x);
@@ -1319,10 +1264,6 @@ function getBoundingBox(selection) {
   return { x: selection.x, y: selection.y, width: selection.width, height: selection.height };
 }
 
-// Scale an entire "points" array (polygon) from the OLD bounding box to the NEW one —
-// used when resizing via a corner handle, since a polygon has no direct width/height
-// to change like rect/ellipse; it must be derived from each point's relative position
-// inside the bounding box.
 function scalePointsToNewBox(origPoints, origBox, newBox) {
   const scaleX = origBox.width > 0 ? newBox.width / origBox.width : 1;
   const scaleY = origBox.height > 0 ? newBox.height / origBox.height : 1;
@@ -1332,13 +1273,6 @@ function scalePointsToNewBox(origPoints, origBox, newBox) {
   }));
 }
 
-// ============================== Merge 2 overlapping selections into 1 (precise geometric union) ==============================
-
-// Convert every shape type (rect/ellipse/polygon) into a closed [x,y] point ring —
-// used as input for the polygon-clipping library. Ellipses are APPROXIMATED with a
-// many-sided polygon (48 points) since the library only works with straight-edged
-// polygons and has no concept of an "ellipse" — 48 points is smooth enough that the
-// naked eye won't notice it's actually a polygon.
 function shapeToRing(selection) {
   if (selection.shape === "polygon") {
     const pts = selection.points.map((p) => [p.x, p.y]);
@@ -1370,16 +1304,10 @@ function shapeToRing(selection) {
   ];
 }
 
-// Check whether 2 selections' bounding boxes might touch/overlap — used as a FAST
-// filter before calling the polygon-clipping library (the precise geometric
-// computation is much more expensive; no need to run it for pairs that are clearly far apart).
 function boundingBoxesOverlap(a, b) {
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
-// Merge 2 selections into 1 — returns a NEW "polygon"-shaped selection containing the
-// exact union of both, or null if they don't actually overlap (bounding boxes touch
-// but the real shapes don't, e.g. two ellipse corners near each other).
 function mergeTwoSelections(a, b) {
   const ringA = shapeToRing(a);
   const ringB = shapeToRing(b);
@@ -1392,8 +1320,6 @@ function mergeTwoSelections(a, b) {
     return null;
   }
 
-  // The result may contain several sub-polygons (if the 2 shapes barely touch or have
-  // holes) — take the polygon with the LARGEST AREA as the main shape, ignore small fragments.
   if (!unionResult || unionResult.length === 0) return null;
 
   const ringArea = (ring) => {
@@ -1425,19 +1351,12 @@ function mergeTwoSelections(a, b) {
     id: ++selectionIdCounter,
     shape: "polygon",
     points,
-    // Prefer keeping selection "a"'s info (usually the one just acted on / newer),
-    // concatenate both translations if both have text.
     textColor: a.textColor ?? b.textColor ?? "#000000",
     textBgColor: a.textBgColor ?? b.textBgColor ?? "#ffffff",
     translation: [a.translation, b.translation].filter(Boolean).join(" ") || undefined,
   };
 }
 
-// Compute the ACTUAL displayed image area inside a container (containerWidth/Height)
-// when using objectFit:"contain" — the image may be "letterboxed" (empty bars top/bottom
-// or left/right) if the container's aspect ratio differs from the image's. Shared by:
-// SourceImageCrop, the eyedropper on the main image, the eyedropper on the crop preview —
-// avoids duplicating this logic in 3 places.
 function computeDisplayedImageGeometry(containerWidth, containerHeight, naturalWidth, naturalHeight) {
   const containerAspect = containerWidth / containerHeight;
   const imageAspect = naturalWidth / naturalHeight;
@@ -1458,23 +1377,16 @@ function computeDisplayedImageGeometry(containerWidth, containerHeight, naturalW
   return { displayedWidth, displayedHeight, offsetX, offsetY };
 }
 
-// =============================================================================
-// Selection logic — custom hook managing MULTIPLE selections (speech bubbles) on a page
-// (name MUST start with "use" since it calls Hooks internally)
-// =============================================================================
 
 let selectionIdCounter = 0;
 
 function useSelectionAreas() {
-  const [selections, setSelections] = useState([]); // [{id, shape:'rect'|'ellipse', x,y,width,height} | {id, shape:'polygon', points:[{x,y}]}]
-  const [drawing, setDrawing] = useState(null);      // rect/ellipse currently being dragged out
+  const [selections, setSelections] = useState([]); 
+  const [drawing, setDrawing] = useState(null);      
   const [activeId, setActiveId] = useState(null);
-  const [activeTool, setActiveTool] = useState("rect"); // 'rect' | 'ellipse' | 'polygon'
-  const [polygonDraft, setPolygonDraft] = useState(null); // in-progress polygon's point array
+  const [activeTool, setActiveTool] = useState("rect"); 
+  const [polygonDraft, setPolygonDraft] = useState(null); 
 
-  // Zoom state — zoomScale is a CSS transform:scale() applied to the whole canvas,
-  // zoomOrigin is the point (in % of the container) the scale grows FROM, and
-  // isPickingZoomPoint is true while waiting for the user to click a point to zoom into.
   const [zoomScale, setZoomScale] = useState(1);
   const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
   const [isPickingZoomPoint, setIsPickingZoomPoint] = useState(false);
@@ -1482,23 +1394,13 @@ function useSelectionAreas() {
   const ZOOM_MIN = 1;
   const ZOOM_MAX = 6;
 
-  // State for dragging to MOVE or RESIZE an existing selection (not drawing a new one)
   const dragState = useRef(null); // { mode: 'move'|'resize'|'vertex', id, handle?, vertexIndex?, startPos, originalSelection }
 
   const startPoint = useRef({ x: 0, y: 0 });
   const containerRef = useRef(null);
 
-  // IMPORTANT: getBoundingClientRect() already reflects the VISUAL (zoomed) size of the
-  // container after CSS transform:scale() — but selections are stored in the UNSCALED
-  // logical coordinate space (children render at their normal position, then the whole
-  // box is visually scaled). So a raw click position must be DIVIDED by zoomScale to land
-  // back in the same coordinate space as stored selections.
   const getRelativePos = (e) => {
     const bounds = containerRef.current.getBoundingClientRect();
-    // Derive the ACTUAL current scale by comparing the live VISUAL width (bounds.width,
-    // affected by transform) against the live LOGICAL width (offsetWidth, never affected
-    // by transform) — this is self-correcting and doesn't depend on the zoomScale state
-    // variable being perfectly in sync with what's actually rendered on screen right now.
     const actualScale = bounds.width / containerRef.current.offsetWidth;
     return {
       x: (e.clientX - bounds.left) / actualScale,
@@ -1506,14 +1408,9 @@ function useSelectionAreas() {
     };
   };
 
-  // Toggle "pick a point to zoom into" mode — while ON, EVERY click on the image zooms
-  // in further (repeatable), staying active until the button is clicked again (toggle off)
-  // or Esc is pressed.
   const toggleZoomIn = () => setIsPickingZoomPoint((v) => !v);
   const cancelZoomPick = () => setIsPickingZoomPoint(false);
 
-  // Zoom out by one step, centered on the CURRENT zoom origin — if back at 1x, reset
-  // the origin to center too so the next zoom-in starts fresh.
   const zoomOut = () => {
     setZoomScale((prev) => {
       const next = Math.max(ZOOM_MIN, prev / ZOOM_STEP);
@@ -1531,9 +1428,6 @@ function useSelectionAreas() {
   // ============================== Drawing new shapes (rect/ellipse/polygon) ==============================
 
   const handleMouseDown = (e) => {
-    // Zoom-point picking takes priority over everything else — clicking anywhere while
-    // armed zooms in further, centered on the clicked point. Stays ON (doesn't auto-exit)
-    // so the user can click repeatedly to keep zooming in; toggle the button off to stop.
     if (isPickingZoomPoint) {
       const bounds = containerRef.current.getBoundingClientRect();
       const percentX = ((e.clientX - bounds.left) / bounds.width) * 100;
@@ -1570,10 +1464,6 @@ function useSelectionAreas() {
     setDrawing(calculateRect(startPoint.current, pos));
   };
 
-  // After a selection is created/moved/resized/vertex-edited, check whether it now
-  // overlaps any other selection — if so, MERGE FOR REAL (precise geometric union,
-  // not just a bounding-box merge). Repeat until no more overlaps remain, in case the
-  // just-merged shape now overlaps a third selection.
   const mergeOverlappingWith = (changedId) => {
     setSelections((prev) => {
       let list = [...prev];
@@ -1598,7 +1488,7 @@ function useSelectionAreas() {
           list.push(mergedSelection);
           currentId = mergedSelection.id;
           keepMerging = true;
-          break; // go back to the while loop, check again with the just-merged shape (it might still overlap another one)
+          break; 
         }
       }
 
@@ -1611,7 +1501,7 @@ function useSelectionAreas() {
     if (dragState.current) {
       const changedId = dragState.current.id;
       dragState.current = null;
-      mergeOverlappingWith(changedId); // move/resize/vertex-drag finished -> check for overlaps
+      mergeOverlappingWith(changedId); 
       return;
     }
 
@@ -1632,7 +1522,6 @@ function useSelectionAreas() {
     setDrawing(null);
   };
 
-  // Close the in-progress polygon into a finished selection (needs at least 3 points)
   const finishPolygon = () => {
     if (polygonDraft && polygonDraft.length >= 3) {
       const newArea = {
@@ -1676,10 +1565,7 @@ function useSelectionAreas() {
       fontSize: 13,
       fontFamily: COMIC_FONT_LIBRARY[0].value,
       ...box,
-      id: ++selectionIdCounter, // ALWAYS assign a fresh id last, overriding any "id" the
-      // loaded box might already carry (e.g. restored from a previous save) — old ids
-      // could otherwise collide with ids assigned in this session, causing 2 different
-      // selections to share the same React key / update target.
+      id: ++selectionIdCounter, 
     }));
     setSelections((prev) => [...prev, ...withIds]);
   };
@@ -1688,12 +1574,10 @@ function useSelectionAreas() {
     setSelections((prev) => prev.map((s) => (s.id === id ? { ...s, translation } : s)));
   };
 
-  // Set a custom name for a selection — applies to all 3 shape types (rect/ellipse/polygon)
   const updateName = (id, name) => {
     setSelections((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
   };
 
-  // Change text/background color for ONE selection only — doesn't affect other selections
   const updateSelectionStyle = (id, patch) => {
     setSelections((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   };
@@ -1719,8 +1603,6 @@ function useSelectionAreas() {
   };
 
   // ============================== Move / Resize / drag polygon vertex ==============================
-  // Start dragging: called from a shape body's onMouseDown (move) or a handle (resize/vertex).
-  // stopPropagation must be called at the call site so it doesn't trigger handleMouseDown's new-shape drawing.
 
   const startMove = (e, id) => {
     const selection = selections.find((s) => s.id === id);
@@ -1742,7 +1624,7 @@ function useSelectionAreas() {
     dragState.current = {
       mode: "resize",
       id,
-      handle, // 'nw' | 'ne' | 'sw' | 'se'
+      handle, 
       startPos: getRelativePos(e),
       original: selection,
     };
@@ -1785,9 +1667,6 @@ function useSelectionAreas() {
         }
 
         if (drag.mode === "resize") {
-          // Polygon — has no direct x/y/width/height, only "points".
-          // Must compute the new bounding box then RESCALE all points proportionally —
-          // can't apply the x/y/width/height formula directly like rect/ellipse.
           if (s.shape === "polygon") {
             const origBox = getBoundingBox(drag.original);
 
@@ -1825,7 +1704,6 @@ function useSelectionAreas() {
             };
           }
 
-          // Rect / Ellipse — already have x/y/width/height, compute directly as before
           let { x, y, width, height } = drag.original;
           const right = drag.original.x + drag.original.width;
           const bottom = drag.original.y + drag.original.height;
@@ -1845,7 +1723,6 @@ function useSelectionAreas() {
             height = drag.original.height + dy;
           }
 
-          // Don't allow negative width/height (dragging past the opposite edge) — keep a minimum of 8px
           if (width < 8) width = 8;
           if (height < 8) height = 8;
 
@@ -1899,9 +1776,7 @@ function useSelectionAreas() {
   };
 }
 
-// =============================================================================
 // Main component
-// =============================================================================
 
 export default function TranslateWorkspace() {
   const { taskId } = useParams();
@@ -1909,8 +1784,8 @@ export default function TranslateWorkspace() {
   const { isLoggedIn } = useAuth();
 
   const [chapterData, setChapterData] = useState(null);
-  const [taskPages, setTaskPages] = useState([]); // OFFICIAL image source — fetched from /tasks/{taskId}/pages
-  const [status, setStatus] = useState("loading"); // loading | ready | error
+  const [taskPages, setTaskPages] = useState([]); 
+  const [status, setStatus] = useState("loading"); 
   const [error, setError] = useState(null);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
 
@@ -1921,21 +1796,9 @@ export default function TranslateWorkspace() {
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
   // Starts empty — will auto-open the current chapter once the real list finishes loading
   const [open, setOpen] = useState({});
-  // NOTE: fontSize/fontFamily are NOT global/page-wide settings — each selection stores
-  // its own "fontSize"/"fontFamily" field (see updateSelectionStyle calls in
-  // CanvasToolbar's onIncrease/DecreaseFontSize and onChangeFontFamily below), same
-  // pattern as textColor/textBgColor.
   const [isBold, setIsBold] = useState(false);
   const [isItalic, setIsItalic] = useState(false);
   const [textAlign, setTextAlign] = useState("left");
-  // No more GLOBAL text/background color state — each selection now stores its own
-  // textColor/textBgColor, see updateSelectionStyle() and the defaults set on creation below.
-
-  // Hidden canvas (not rendered to the DOM) — redrawn with the current page image whenever
-  // it changes, used to READ THE PIXEL VALUE DIRECTLY at a click point — the same approach
-  // offline software (Photoshop, GIMP...) uses, instead of relying on an OS-level API like
-  // window.EyeDropper (that API previously caused the page to "freeze" by entering a
-  // whole-screen color-picking mode).
   const pixelCanvasRef = useRef(null);
   if (!pixelCanvasRef.current && typeof document !== "undefined") {
     pixelCanvasRef.current = document.createElement("canvas");
@@ -1947,12 +1810,7 @@ export default function TranslateWorkspace() {
   const handleImageLoad = (size) => {
     setImageNaturalSize(size);
 
-    // Redraw the image onto the hidden canvas at its ACTUAL original size (not the displayed
-    // size) so pixels are read accurately, without distortion from on-screen scaling.
     const img = new Image();
-    // MUST be set before assigning src — otherwise, even if the server (Cloudinary) sends
-    // Access-Control-Allow-Origin, the browser will still treat the canvas as "tainted" and
-    // block getImageData(). crossOrigin must be set BEFORE the image starts loading.
     img.crossOrigin = "anonymous";
     img.onload = () => {
       const canvas = pixelCanvasRef.current;
@@ -1967,19 +1825,12 @@ export default function TranslateWorkspace() {
     img.src = currentImage;
   };
 
-  // Read the color at a point on the image (coordinates in DISPLAY SPACE, same coordinate
-  // system as "selections"), converting to original-image coordinates before reading the
-  // pixel, accounting for the letterbox from objectFit:contain.
-  // Read a pixel's color BY ORIGINAL-IMAGE COORDINATES (naturalX/naturalY) — low-level helper,
-  // shared by both eyedropper entry points (main image + crop preview panel).
   const readColorAtNaturalPixel = (naturalX, naturalY) => {
     try {
       const ctx = pixelCanvasRef.current.getContext("2d");
       const [r, g, b] = ctx.getImageData(naturalX, naturalY, 1, 1).data;
       return "#" + [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("");
     } catch (err) {
-      // The most common error here is CORS ("tainted canvas") — happens when the image is
-      // loaded from a DIFFERENT domain and that server doesn't send a header allowing pixel reads.
       console.error("Failed to read pixel color:", err);
       return "CORS_ERROR";
     }
@@ -2008,9 +1859,6 @@ export default function TranslateWorkspace() {
     return readColorAtNaturalPixel(naturalX, naturalY);
   };
 
-  // Pick a color when clicking the CROP PREVIEW in the side panel — receives numbers already
-  // computed by SourceImageCrop (scale, offset within the image, displayed image size) to
-  // derive the correct pixel on the original image, without recomputing the letterbox logic here.
   const readColorInCrop = (clickX, clickY, scale, boxXInImage, boxYInImage, displayedWidth, displayedHeight) => {
     if (!imageNaturalSize) return null;
 
@@ -2023,10 +1871,8 @@ export default function TranslateWorkspace() {
     return readColorAtNaturalPixel(naturalX, naturalY);
   };
 
-  // Clicking the "Pick color" button -> only enables a WAITING MODE; the actual color read
-  // happens when the user clicks the image (see handleCanvasMouseDown below) — no popup/API is opened.
   const pickTextColorFromScreen = () => {
-    if (activeId == null) return; // must select an area first, otherwise there's nowhere to apply the picked color
+    if (activeId == null) return; 
     cancelZoomPick();
     setPickingColorFor("text");
   };
@@ -2091,36 +1937,23 @@ export default function TranslateWorkspace() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isPickingZoomPoint, cancelZoomPick]);
 
-  // Clicking ANY other control (toolbar buttons, sidebar, panels...) while zoom-point-picking
-  // is active should automatically cancel it — EXCEPT clicking inside the canvas itself
-  // (that's the intended zoom-in click) or the zoom toggle button (it manages its own state).
   useEffect(() => {
     if (!isPickingZoomPoint) return;
     const onMouseDown = (e) => {
-      if (canvasRef.current && canvasRef.current.contains(e.target)) return; // clicking the canvas -> let it zoom in
-      if (e.target.closest("[data-zoom-toggle]")) return; // clicking the toggle button itself -> let it handle on/off
+      if (canvasRef.current && canvasRef.current.contains(e.target)) return; 
+      if (e.target.closest("[data-zoom-toggle]")) return; 
       cancelZoomPick();
     };
     window.addEventListener("mousedown", onMouseDown);
     return () => window.removeEventListener("mousedown", onMouseDown);
   }, [isPickingZoomPoint, cancelZoomPick, canvasRef]);
 
-  // Kept in sync with the latest "selections" — read from inside a useEffect cleanup
-  // function (see the auto-save effect below), where a normal closure would otherwise
-  // capture a STALE (outdated) copy of selections from when the effect was first set up.
   const selectionsRef = useRef(selections);
   useEffect(() => {
     selectionsRef.current = selections;
   }, [selections]);
 
-  // "unsaved" | "saving" | "saved" — drives the badge in the header.
   const [saveStatus, setSaveStatus] = useState("unsaved");
-  // While true, the NEXT "watched state changed" event is a result of LOADING previously-
-  // saved data (page switch, initial mount) rather than a real user edit — should NOT
-  // flip the badge to "unsaved". Set to true right before clearSelections()/loadSelections()/
-  // setIsBold/setIsItalic/setTextAlign run in the page-change effect below, consumed
-  // (reset to false) by this effect right after (React 18 batches all those setState calls
-  // into a single re-render, so this fires exactly once per page load, not once per field).
   const isLoadingPageRef = useRef(false);
   useEffect(() => {
     if (isLoadingPageRef.current) {
@@ -2130,9 +1963,6 @@ export default function TranslateWorkspace() {
     setSaveStatus("unsaved");
   }, [selections, isBold, isItalic, textAlign]);
 
-  // Same staleness problem as selectionsRef above, but for the page-wide text style
-  // settings (bold/italic/align — fontSize/fontFamily are now PER-SELECTION, not here)
-  // — need to be saved ALONGSIDE selections so a full reload doesn't silently reset them.
   const textStyleSettingsRef = useRef(null);
   useEffect(() => {
     textStyleSettingsRef.current = { isBold, isItalic, textAlign };
@@ -2142,8 +1972,6 @@ export default function TranslateWorkspace() {
   const activeSelection = selections.find((s) => s.id === activeId) ?? null;
   const activeSelectionIndex = selections.findIndex((s) => s.id === activeId);
 
-  // Press Delete/Backspace to remove the selected area — SKIP this if the user is currently
-  // typing in an input/textarea (avoids accidentally deleting a selection while just editing a translation).
   useEffect(() => {
     if (activeId == null) return;
     const onKeyDown = (e) => {
@@ -2156,8 +1984,6 @@ export default function TranslateWorkspace() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeId, deleteArea]);
 
-  // The REAL size (naturalWidth/naturalHeight) of the current page image — needed so
-  // SourceImageCrop can correctly compute the letterbox area caused by objectFit:"contain".
   const [imageNaturalSize, setImageNaturalSize] = useState(null);
 
   const textStyle = useMemo(
@@ -2177,7 +2003,6 @@ export default function TranslateWorkspace() {
     setStatus("loading");
     setError(null);
 
-    // Fetch in parallel: chapter (metadata: title, comicId...) + pages (real images + status)
     Promise.all([
       fetchChapterForTask(taskId, controller.signal),
       fetchPagesForTask(taskId, controller.signal),
@@ -2188,7 +2013,6 @@ export default function TranslateWorkspace() {
         setCurrentChapterId(chapterResult.id);
         setCurrentPageIndex(0);
         setStatus("ready");
-        // Automatically expand the currently viewed chapter in the sidebar
         setOpen({ [chapterResult.id]: true });
       })
       .catch((err) => {
@@ -2201,17 +2025,10 @@ export default function TranslateWorkspace() {
     return () => controller.abort();
   }, [taskId]);
 
-  // OFFICIAL image source — comes from taskPages (API /translate-workspace/{taskId}), NO
-  // longer read from chapterData.images (the old text[] array, obsolete since page_translation was introduced).
   const images = useMemo(() => taskPages.map((p) => p.imageUrl).filter(Boolean), [taskPages]);
   const currentImage = images[currentPageIndex];
-  // Full metadata for the current page (pageId, status...) — used by future features
-  // that need the real page ID, e.g. a "Mark as done" button.
   const currentPageMeta = taskPages[currentPageIndex] ?? null;
 
-  // "PROJECT FILES" sidebar — since switching chapters is NOT allowed, there's no need to
-  // call a separate API for all of a comic's chapters. Build an array containing ONLY the
-  // current chapter, reading page data directly from the already-fetched taskPages.
   const sidebarChapters = useMemo(() => {
     if (!chapterData) return [];
     const doneCount = taskPages.filter((p) => p.status === "DONE").length;
@@ -2239,9 +2056,6 @@ export default function TranslateWorkspace() {
     setOpen((o) => ({ ...o, [id]: !o[id] }));
   }, []);
 
-  // Clicking a page in the sidebar — ONLY works if that page belongs to the currently
-  // open chapter (other chapters' buttons are already disabled in ChapterList; this is just
-  // an extra safety check in case this function gets called from elsewhere later).
   const handleSelectPage = useCallback(
     (chapterId, pageIndex) => {
       if (chapterId !== currentChapterId) return;
@@ -2254,15 +2068,6 @@ export default function TranslateWorkspace() {
     navigate("/translator/dashboard");
   }, [navigate]);
 
-  // Save bubbles for a page AND update the local "taskPages" state to match — without
-  // this second step, re-visiting a page within the SAME session would still show the
-  // OLD (stale) bubbles fetched at initial page-load time, since taskPages is only
-  // fetched once from the server; only a full reload would show the newly-saved data.
-  //
-  // "textStyleSettings" (font family/size/bold/italic/align) is saved ALONGSIDE the
-  // selections in the same JSON payload — these are page-wide settings, not stored per
-  // selection, but were previously ONLY kept in React state (never persisted), so a full
-  // reload silently reset them back to defaults even though "selections" saved correctly.
   const persistBubbles = useCallback((pageId, selectionsArray, textStyleSettings) => {
     if (!pageId) return;
     setSaveStatus("saving");
@@ -2279,9 +2084,6 @@ export default function TranslateWorkspace() {
   }, []);
 
   const handleSaveAndNext = useCallback(() => {
-    // Save explicitly here rather than relying only on the page-change effect's cleanup
-    // (see below) — if already on the LAST page, goToPage() is a no-op (currentPageIndex
-    // won't change), so that cleanup would never fire and nothing would get saved.
     if (currentPageMeta?.pageId) {
       persistBubbles(currentPageMeta.pageId, selectionsRef.current, textStyleSettingsRef.current);
     }
@@ -2295,8 +2097,6 @@ export default function TranslateWorkspace() {
     }
   }, [currentPageMeta, persistBubbles]);
 
-  // Ctrl+S (Windows/Linux) or Cmd+S (Mac) also saves — preventDefault() is REQUIRED here,
-  // otherwise the browser's native "Save Page As..." dialog would pop up instead.
   useEffect(() => {
     const onKeyDown = (e) => {
       const isSaveShortcut = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s";
@@ -2308,24 +2108,16 @@ export default function TranslateWorkspace() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleSaveProgress]);
 
-  // Runs every time the user arrives at a (page, chapter) — loads that page's
-  // previously-saved bubbles (if any). The RETURNED cleanup function runs right before
-  // this effect re-runs for the NEXT page (or on unmount) — used to AUTO-SAVE whatever
-  // the user had on the page they're LEAVING, so work is never silently lost just by
-  // switching pages/chapters.
   useEffect(() => {
     isLoadingPageRef.current = true;
     clearSelections();
     setImageNaturalSize(null);
-    setSaveStatus("saved"); // freshly loaded from the server -> nothing unsaved yet
+    setSaveStatus("saved"); 
 
     if (currentPageMeta?.bubbles) {
       try {
         const parsed = JSON.parse(currentPageMeta.bubbles);
 
-        // NEW format: { selections: [...], textStyle: {...} }. OLD format (saved before
-        // this fix): a plain array of selections, with no page-wide text style at all —
-        // kept working here so previously-saved pages don't break/lose their bubbles.
         const selectionsToLoad = Array.isArray(parsed) ? parsed : parsed?.selections;
         const savedTextStyle = Array.isArray(parsed) ? null : parsed?.textStyle;
 
@@ -2349,12 +2141,6 @@ export default function TranslateWorkspace() {
         persistBubbles(pageIdBeingViewed, selectionsRef.current, textStyleSettingsRef.current);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    // Deliberately NOT including currentPageMeta/persistBubbles here — persistBubbles
-    // updates taskPages on save, which would change currentPageMeta's identity and
-    // re-trigger this whole effect (re-running clearSelections + reload) right after
-    // saving, wiping out what was just saved. Only currentPageIndex/currentChapterId
-    // should determine when this effect actually re-runs.
   }, [currentPageIndex, currentChapterId]);
 
   // Apply the just-picked color to the right place (text or background) — shared by both eyedropper entry points
@@ -2372,8 +2158,6 @@ export default function TranslateWorkspace() {
     setPickingColorFor(null);
   };
 
-  // Wrap the original handleMouseDown: if in color-picking mode, block the normal
-  // draw/select behavior, read the color at the click point, then exit picking mode.
   const handleCanvasMouseDown = (e) => {
     if (pickingColorFor && canvasRef.current) {
       e.stopPropagation();
@@ -2386,8 +2170,7 @@ export default function TranslateWorkspace() {
     handleMouseDown(e);
   };
 
-  // Pick a color when clicking the CROP PREVIEW in the side panel (SourceImageCrop already
-  // computes the geometry parameters and passes them up here via onPickColorInCrop)
+  
   const handleCropColorPick = (clickX, clickY, _box, scale, boxXInImage, boxYInImage, displayedWidth, displayedHeight) => {
     if (!pickingColorFor) return;
     applyPickedColor(readColorInCrop(clickX, clickY, scale, boxXInImage, boxYInImage, displayedWidth, displayedHeight));
