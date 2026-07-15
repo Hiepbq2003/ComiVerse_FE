@@ -31,7 +31,7 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 import polygonClipping from "polygon-clipping";
 import { useAuth } from "../../context/AuthContext";
-import "../../assets/style/translator/TranslateWorkspace.css";
+import "../../assets/style/translator/translate-workspace.css";
 
 const API_BASE = "http://localhost:8081/api";
 const TOKEN_KEY = "token";
@@ -122,11 +122,10 @@ function ChapterList({ chapters, open, onToggle, currentChapterId, currentPageIn
               return (
                 <button
                   key={page.pageId}
-                  className={`tw-page-row ${isCurrent ? "current" : ""}`}
+                  className={`tw-page-row ${isCurrent ? "current" : ""} ${isSameChapter ? "" : "is-disabled"}`}
                   onClick={() => isSameChapter && onSelectPage(ch.chapterId, pageIndex)}
                   disabled={!isSameChapter}
                   title={isSameChapter ? undefined : "View only — you can't switch chapters from here"}
-                  style={!isSameChapter ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
                 >
                   <span className="tw-page-row-inner">
                     <PageStatusDot status={status} />
@@ -143,17 +142,14 @@ function ChapterList({ chapters, open, onToggle, currentChapterId, currentPageIn
 
 function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSaveProgress, saveStatus }) {
   const badgeConfig = {
-    saving: { icon: <Loader2 size={11} strokeWidth={3} className="tw-spin" />, label: "SAVING", color: "#5472b0" },
-    saved: { icon: <Check size={11} strokeWidth={3} />, label: "SAVED", color: "#16a34a" },
-    unsaved: { icon: <AlertCircle size={11} strokeWidth={3} />, label: "UNSAVED", color: "#c1440e" },
+    saving: { icon: <Loader2 size={11} strokeWidth={3} className="tw-spin" />, label: "SAVING" },
+    saved: { icon: <Check size={11} strokeWidth={3} />, label: "SAVED" },
+    unsaved: { icon: <AlertCircle size={11} strokeWidth={3} />, label: "UNSAVED" },
   }[saveStatus ?? "unsaved"];
+  const statusKey = saveStatus ?? "unsaved";
 
   return (
     <header className="tw-header">
-      <style>{`
-        @keyframes tw-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .tw-spin { animation: tw-spin 0.8s linear infinite; }
-      `}</style>
       <div className="tw-header-left">
         <button onClick={onBack} className="tw-btn">
           <ChevronLeft size={16} />
@@ -170,10 +166,7 @@ function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSaveProgress, 
       </div>
 
       <div className="tw-header-right">
-        <span
-          className="tw-badge-saved tw-font-mono"
-          style={{ color: badgeConfig.color, borderColor: `${badgeConfig.color}66`, background: `${badgeConfig.color}1a` }}
-        >
+        <span className={`tw-badge-saved tw-font-mono is-${statusKey}`}>
           {badgeConfig.icon} {badgeConfig.label}
         </span>
         <button className="tw-btn">
@@ -218,7 +211,7 @@ function FontFamilyDropdown({ fontFamily, onChangeFontFamily, hasActiveSelection
   }, [isOpen]);
 
   return (
-    <div ref={containerRef} style={{ position: "relative", opacity: hasActiveSelection ? 1 : 0.4 }}>
+    <div ref={containerRef} className={`tw-x-dropdown-container ${hasActiveSelection ? "" : "is-disabled"}`}>
       <button
         type="button"
         onClick={() => hasActiveSelection && setIsOpen((v) => !v)}
@@ -241,38 +234,10 @@ function FontFamilyDropdown({ fontFamily, onChangeFontFamily, hasActiveSelection
       </button>
 
       {isOpen && (
-        <div
-          style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            left: 0,
-            width: 180,
-            // 5 dòng vừa đủ hiện ra (mỗi dòng ~28px), quá số đó sẽ cuộn thay vì kéo dài mãi
-            maxHeight: 28 * 5,
-            overflowY: "auto",
-            background: "#ffffff",
-            color: "#111111",
-            border: "1px solid #d0d0d0",
-            borderRadius: 6,
-            boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
-            zIndex: 50,
-          }}
-        >
+        <div className="tw-x-dropdown-menu">
           {Object.entries(fontGroups).map(([groupName, fonts]) => (
             <div key={groupName}>
-              <div
-                style={{
-                  padding: "6px 10px 2px",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "#6b7280",
-                  background: "#f5f5f5",
-                  position: "sticky",
-                  top: 0,
-                }}
-              >
-                {groupName}
-              </div>
+              <div className="tw-x-dropdown-group-label">{groupName}</div>
               {fonts.map((font) => (
                 <div
                   key={font.name}
@@ -280,17 +245,7 @@ function FontFamilyDropdown({ fontFamily, onChangeFontFamily, hasActiveSelection
                     onChangeFontFamily(font.value);
                     setIsOpen(false);
                   }}
-                  style={{
-                    padding: "6px 10px",
-                    fontSize: 13,
-                    color: "#111111",
-                    background: font.value === fontFamily ? "#e5e7eb" : "#ffffff",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "#f0f0f0")}
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = font.value === fontFamily ? "#e5e7eb" : "#ffffff")
-                  }
+                  className={`tw-x-dropdown-item ${font.value === fontFamily ? "is-selected" : ""}`}
                 >
                   {font.name}
                 </div>
@@ -343,7 +298,7 @@ function CanvasToolbar({
       </button>
 
       {/* Font size — ONLY applies to the currently selected area, not a global setting (same pattern as text/bg color below) */}
-      <div style={{ display: "flex", alignItems: "center", gap: 2, marginLeft: 4, opacity: hasActiveSelection ? 1 : 0.4 }}>
+      <div className={`tw-x-fontsize-group ${hasActiveSelection ? "" : "is-disabled"}`}>
         <button
           type="button"
           onClick={onDecreaseFontSize}
@@ -353,7 +308,7 @@ function CanvasToolbar({
         >
           <Minus size={13} />
         </button>
-        <span style={{ fontSize: 12, color: "#8286A0", width: 24, textAlign: "center" }}>{fontSize}</span>
+        <span className="tw-x-fontsize-value">{fontSize}</span>
         <button
           type="button"
           onClick={onIncreaseFontSize}
@@ -366,25 +321,18 @@ function CanvasToolbar({
       </div>
 
       {/* Text color — ONLY applies to the currently selected area, not a global setting */}
-      <div style={{ display: "flex", alignItems: "center", gap: 2, marginLeft: 8, opacity: hasActiveSelection ? 1 : 0.4 }}>
+      <div className={`tw-x-color-group ${hasActiveSelection ? "" : "is-disabled"}`}>
         <label
           title={hasActiveSelection ? "Text color of the selected area" : "Select an area first"}
-          style={{
-            width: 20,
-            height: 20,
-            borderRadius: 4,
-            border: "1px solid rgba(255,255,255,0.3)",
-            background: textColor,
-            cursor: hasActiveSelection ? "pointer" : "not-allowed",
-            display: "inline-block",
-          }}
+          className={`tw-x-color-swatch ${hasActiveSelection ? "" : "is-disabled"}`}
+          style={{ "--swatch-color": textColor }}
         >
           <input
             type="color"
             value={textColor}
             disabled={!hasActiveSelection}
             onChange={(e) => onChangeTextColor(e.target.value)}
-            style={{ opacity: 0, width: 0, height: 0, position: "absolute" }}
+            className="tw-x-color-input-hidden"
           />
         </label>
         <button
@@ -399,25 +347,18 @@ function CanvasToolbar({
       </div>
 
       {/* Background color (of the box/text) — ONLY applies to the currently selected area */}
-      <div style={{ display: "flex", alignItems: "center", gap: 2, marginLeft: 4, opacity: hasActiveSelection ? 1 : 0.4 }}>
+      <div className={`tw-x-color-group tight ${hasActiveSelection ? "" : "is-disabled"}`}>
         <label
           title={hasActiveSelection ? "Background color of the selected area" : "Select an area first"}
-          style={{
-            width: 20,
-            height: 20,
-            borderRadius: 4,
-            border: "1px solid rgba(255,255,255,0.3)",
-            background: textBgColor,
-            cursor: hasActiveSelection ? "pointer" : "not-allowed",
-            display: "inline-block",
-          }}
+          className={`tw-x-color-swatch ${hasActiveSelection ? "" : "is-disabled"}`}
+          style={{ "--swatch-color": textBgColor }}
         >
           <input
             type="color"
             value={textBgColor}
             disabled={!hasActiveSelection}
             onChange={(e) => onChangeTextBgColor(e.target.value)}
-            style={{ opacity: 0, width: 0, height: 0, position: "absolute" }}
+            className="tw-x-color-input-hidden"
           />
         </label>
         <button
@@ -456,7 +397,7 @@ function PageNav({
         Next <ChevronRight size={14} />
       </button>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 2, marginLeft: 8 }}>
+      <div className="tw-x-zoom-controls">
         <button
           type="button"
           data-zoom-toggle="true"
@@ -478,13 +419,7 @@ function PageNav({
         <span
           onClick={onResetZoom}
           title="Reset zoom to 100%"
-          style={{
-            fontSize: 12,
-            color: "#8286A0",
-            width: 40,
-            textAlign: "center",
-            cursor: zoomScale !== 1 ? "pointer" : "default",
-          }}
+          className={`tw-x-zoom-percent ${zoomScale !== 1 ? "is-clickable" : ""}`}
         >
           {Math.round(zoomScale * 100)}%
         </span>
@@ -495,7 +430,6 @@ function PageNav({
 
 // PageImage receives the "selections" list (multiple speech bubbles) to render over the image
 const RESIZE_HANDLES = ["nw", "ne", "sw", "se"];
-const HANDLE_CURSOR = { nw: "nwse-resize", se: "nwse-resize", ne: "nesw-resize", sw: "nesw-resize" };
 
 function ShapeToolbar({ activeTool, onSetTool }) {
   const tools = [
@@ -550,48 +484,37 @@ function PageImage({
     <div className="tw-canvas">
       {/* In color-picking mode -> remind the user to click the image, or press Esc to cancel */}
       {isPickingColor && (
-        <div
-          style={{
-            marginBottom: 8,
-            padding: "4px 10px",
-            fontSize: 12,
-            color: "#fff",
-            background: "#2563eb",
-            borderRadius: 4,
-            display: "inline-block",
-          }}
-        >
+        <div className="tw-x-picking-banner">
           Click the image to pick the color at that point — press Esc to cancel
         </div>
       )}
 
       {/* Polygon in progress -> show finish/cancel buttons */}
       {polygonDraft && polygonDraft.length > 0 && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
-          <span style={{ fontSize: 12, color: "#8286A0" }}>
+        <div className="tw-x-polygon-draft-bar">
+          <span className="tw-x-polygon-draft-label">
             Drawing freeform shape: {polygonDraft.length} points (minimum 3)
           </span>
-          <button type="button" onClick={onFinishPolygon} className="tw-btn" style={{ padding: "2px 10px", fontSize: 12 }}>
+          <button type="button" onClick={onFinishPolygon} className="tw-btn tw-x-mini-btn">
             Xong
           </button>
-          <button type="button" onClick={onCancelPolygon} className="tw-btn" style={{ padding: "2px 10px", fontSize: 12 }}>
+          <button type="button" onClick={onCancelPolygon} className="tw-btn tw-x-mini-btn">
             Cancel
           </button>
         </div>
       )}
 
       <div
-        className="tw-page"
+        className={`tw-page tw-x-page-canvas ${isPickingZoomPoint ? "is-zoom-picking" : ""}`}
         ref={canvasRef}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
         style={{
-          position: "relative",
-          cursor: isPickingZoomPoint ? "zoom-in" : "crosshair",
-          transform: `scale(${zoomScale})`,
-          transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
+          "--zoom-scale": zoomScale,
+          "--zoom-origin-x": `${zoomOrigin.x}%`,
+          "--zoom-origin-y": `${zoomOrigin.y}%`,
         }}
       >
         {currentImage ? (
@@ -609,26 +532,18 @@ function PageImage({
         {/* Dashed outline: rect/ellipse being dragged out */}
         {drawing && (
           <div
+            className={`tw-x-drawing-outline ${activeTool === "ellipse" ? "is-ellipse" : ""}`}
             style={{
-              position: "absolute",
-              left: drawing.x,
-              top: drawing.y,
-              width: drawing.width,
-              height: drawing.height,
-              border: "2px dashed #3b82f6",
-              background: "rgba(59,130,246,0.15)",
-              borderRadius: activeTool === "ellipse" ? "50%" : 0,
-              pointerEvents: "none",
+              "--x": `${drawing.x}px`,
+              "--y": `${drawing.y}px`,
+              "--w": `${drawing.width}px`,
+              "--h": `${drawing.height}px`,
             }}
           />
         )}
 
         {/* SVG overlaying the whole frame, containing every polygon (finished + in progress) */}
-        <svg
-          width="100%"
-          height="100%"
-          style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 6 }}
-        >
+        <svg width="100%" height="100%" className="tw-x-overlay-svg">
           {/* Polygon in progress */}
           {polygonDraft && polygonDraft.length > 0 && (
             <>
@@ -657,7 +572,7 @@ function PageImage({
                   fill={sel.textBgColor ?? "#ffffff"}
                   stroke={isActive ? "#16a34a" : "#f59e0b"}
                   strokeWidth={2}
-                  style={{ pointerEvents: "auto", cursor: isPickingZoomPoint ? "zoom-in" : isActive ? "move" : "pointer" }}
+                  className={`tw-x-polygon-shape ${isActive ? "is-active" : ""} ${isPickingZoomPoint ? "is-zoom-picking" : ""}`}
                   onMouseDown={(e) => {
                     if (isPickingZoomPoint) return;
                     e.stopPropagation();
@@ -684,7 +599,7 @@ function PageImage({
                   fill="#16a34a"
                   stroke="#fff"
                   strokeWidth={1.5}
-                  style={{ pointerEvents: "auto", cursor: isPickingZoomPoint ? "zoom-in" : "grab" }}
+                  className={`tw-x-vertex-handle ${isPickingZoomPoint ? "is-zoom-picking" : ""}`}
                   onMouseDown={(e) => {
                     if (isPickingZoomPoint) return;
                     e.stopPropagation();
@@ -704,7 +619,7 @@ function PageImage({
             return (
               <textarea
                 key={`text-${sel.id}`}
-                className="tw-inline-translation-textarea"
+                className={`tw-inline-translation-textarea tw-x-inline-textarea ${isActive ? "is-active" : ""} ${isPickingZoomPoint ? "is-zoom-picking" : ""}`}
                 value={sel.translation ?? ""}
                 onChange={(e) => onChangeTranslation(sel.id, e.target.value)}
                 onMouseDown={(e) => {
@@ -716,24 +631,16 @@ function PageImage({
                 readOnly={!isActive}
                 onWheel={(e) => e.preventDefault()}
                 style={{
-                  position: "absolute",
-                  left: box.x,
-                  top: box.y,
-                  width: box.width,
-                  height: box.height,
-                  resize: "none",
-                  border: "none",
-                  outline: "none",
-                  background: "transparent",
-                  color: sel.textColor ?? "#000000",
-                  fontSize: `${sel.fontSize ?? 13}px`,
-                  fontFamily: sel.fontFamily ?? COMIC_FONT_LIBRARY[0].value,
-                  ...textStyle,
-                  lineHeight: 1.25,
-                  padding: 4,
-                  cursor: isPickingZoomPoint ? "zoom-in" : isActive ? "move" : "text",
-                  pointerEvents: "auto",
-                  overflow: "hidden",
+                  "--x": `${box.x}px`,
+                  "--y": `${box.y}px`,
+                  "--w": `${box.width}px`,
+                  "--h": `${box.height}px`,
+                  "--text-color": sel.textColor ?? "#000000",
+                  "--font-size": `${sel.fontSize ?? 13}px`,
+                  "--font-family": sel.fontFamily ?? COMIC_FONT_LIBRARY[0].value,
+                  "--text-align": textStyle.textAlign,
+                  "--font-weight": textStyle.fontWeight,
+                  "--font-style": textStyle.fontStyle,
                 }}
               />
             );
@@ -757,66 +664,28 @@ function PageImage({
                     onSelectArea(sel.id);
                   }
                 }}
+                className={`tw-x-selection-box ${sel.shape === "ellipse" ? "is-ellipse" : ""} ${isActive ? "is-active" : ""} ${isPickingZoomPoint ? "is-zoom-picking" : ""}`}
                 style={{
-                  position: "absolute",
-                  left: sel.x,
-                  top: sel.y,
-                  width: sel.width,
-                  height: sel.height,
-                  border: isActive ? "2px solid #16a34a" : "2px solid #f59e0b",
-                  background: sel.textBgColor ?? "#ffffff",
-                  borderRadius: sel.shape === "ellipse" ? "50%" : 0,
-                  cursor: isPickingZoomPoint ? "zoom-in" : isActive ? "move" : "pointer",
+                  "--x": `${sel.x}px`,
+                  "--y": `${sel.y}px`,
+                  "--w": `${sel.width}px`,
+                  "--h": `${sel.height}px`,
+                  "--bg-color": sel.textBgColor ?? "#ffffff",
                 }}
               >
                 {isActive ? (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: -20,
-                      left: 0,
-                      fontSize: 11,
-                      fontWeight: 500,
-                      color: "#16a34a",
-                      background: "rgba(0,0,0,0.75)",
-                      padding: "1px 6px",
-                      borderRadius: 4,
-                      whiteSpace: "nowrap",
-                      maxWidth: 240,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      zIndex: 5,
-                    }}
-                    title={sel.text || undefined}
-                  >
+                  <span className="tw-x-bubble-label-active" title={sel.text || undefined}>
                     {sel.text ? sel.text.replace(/\n/g, " / ") : `Bubble ${index + 1}`}
                   </span>
                 ) : (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: -9,
-                      left: -9,
-                      width: 18,
-                      height: 18,
-                      lineHeight: "18px",
-                      textAlign: "center",
-                      fontSize: 10,
-                      fontWeight: 500,
-                      color: "#b45309",
-                      background: "rgba(0,0,0,0.75)",
-                      borderRadius: "50%",
-                      border: "1px solid #f59e0b",
-                    }}
-                    title={sel.text || `Bubble ${index + 1}`}
-                  >
+                  <span className="tw-x-bubble-label-index" title={sel.text || `Bubble ${index + 1}`}>
                     {index + 1}
                   </span>
                 )}
 
                 {/* Translation input DIRECTLY OVER the selection — type right there, see the text in its real position */}
                 <textarea
-                  className="tw-inline-translation-textarea"
+                  className={`tw-inline-translation-textarea tw-x-inline-textarea tw-x-inline-textarea--fill ${isActive ? "is-active" : ""} ${isPickingZoomPoint ? "is-zoom-picking" : ""}`}
                   value={sel.translation ?? ""}
                   onChange={(e) => onChangeTranslation(sel.id, e.target.value)}
                   onMouseDown={(e) => {
@@ -829,22 +698,12 @@ function PageImage({
                   readOnly={!isActive}
                   onWheel={(e) => e.preventDefault()}
                   style={{
-                    position: "absolute",
-                    inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    resize: "none",
-                    border: "none",
-                    outline: "none",
-                    background: "transparent",
-                    color: sel.textColor ?? "#000000",
-                    fontSize: `${sel.fontSize ?? 13}px`,
-                    fontFamily: sel.fontFamily ?? COMIC_FONT_LIBRARY[0].value,
-                    ...textStyle,
-                    lineHeight: 1.25,
-                    padding: 4,
-                    cursor: isPickingZoomPoint ? "zoom-in" : isActive ? "move" : "text",
-                    overflow: "hidden",
+                    "--text-color": sel.textColor ?? "#000000",
+                    "--font-size": `${sel.fontSize ?? 13}px`,
+                    "--font-family": sel.fontFamily ?? COMIC_FONT_LIBRARY[0].value,
+                    "--text-align": textStyle.textAlign,
+                    "--font-weight": textStyle.fontWeight,
+                    "--font-style": textStyle.fontStyle,
                   }}
                 />
 
@@ -858,20 +717,7 @@ function PageImage({
                         e.stopPropagation();
                         onStartResize(e, sel.id, handle);
                       }}
-                      style={{
-                        position: "absolute",
-                        width: 10,
-                        height: 10,
-                        background: "#16a34a",
-                        border: "1.5px solid #fff",
-                        borderRadius: sel.shape === "ellipse" ? "50%" : 2,
-                        cursor: isPickingZoomPoint ? "zoom-in" : HANDLE_CURSOR[handle],
-                        top: handle.includes("n") ? -5 : undefined,
-                        bottom: handle.includes("s") ? -5 : undefined,
-                        left: handle.includes("w") ? -5 : undefined,
-                        right: handle.includes("e") ? -5 : undefined,
-                        zIndex: 7,
-                      }}
+                      className={`tw-x-resize-handle tw-x-resize-handle--${handle} ${sel.shape === "ellipse" ? "is-round" : ""} ${isPickingZoomPoint ? "is-zoom-picking" : ""}`}
                     />
                   ))}
               </div>
@@ -935,28 +781,20 @@ function SourceImageCrop({ imageSrc, canvasRef, selection, imageNaturalSize, isP
         const clickY = e.clientY - rect.top;
         onPickColorInCrop?.(clickX, clickY, box, scale, boxXInImage, boxYInImage, displayedWidth, displayedHeight);
       }}
-      style={{
-        width: PREVIEW_WIDTH,
-        height: previewHeight,
-        overflow: "hidden",
-        position: "relative",
-        background: "#000",
-        borderRadius: selection.shape === "rect" ? 6 : 0,
-        cursor: isPickingColor ? "crosshair" : "default",
-      }}
+      className={`tw-x-crop-preview ${selection.shape === "rect" ? "is-rect" : ""} ${isPickingColor ? "is-picking" : ""}`}
+      style={{ "--preview-height": `${previewHeight}px` }}
     >
-      <div style={{ position: "absolute", inset: 0, clipPath }}>
+      <div className="tw-x-crop-clip" style={{ "--clip-path": clipPath }}>
         <img
           src={imageSrc}
           alt="Selected source area"
           draggable={false}
+          className="tw-x-crop-image"
           style={{
-            position: "absolute",
-            left: -boxXInImage * scale,
-            top: -boxYInImage * scale,
-            width: displayedWidth * scale,
-            height: displayedHeight * scale,
-            maxWidth: "none",
+            "--img-left": `${-boxXInImage * scale}px`,
+            "--img-top": `${-boxYInImage * scale}px`,
+            "--img-w": `${displayedWidth * scale}px`,
+            "--img-h": `${displayedHeight * scale}px`,
           }}
         />
       </div>
@@ -988,11 +826,11 @@ function TranslateTabPanel({
     <div className="tw-tabpanel">
       {/* Navigate back and forth between bubbles on the current page */}
       {bubbleTotal > 0 && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <span style={{ fontSize: 13, color: "#8286A0" }}>
+        <div className="tw-x-bubble-nav-row">
+          <span className="tw-x-bubble-nav-label">
             Bubble #{hasActiveSelection ? bubbleIndex + 1 : "-"} / {bubbleTotal}
           </span>
-          <div style={{ display: "flex", gap: 4 }}>
+          <div className="tw-x-bubble-nav-actions">
             <button type="button" onClick={onSelectPrev} className="tw-btn-icon" title="Previous bubble">
               <ChevronLeft size={14} />
             </button>
@@ -1003,9 +841,8 @@ function TranslateTabPanel({
               type="button"
               onClick={() => hasActiveSelection && onDeleteArea(activeSelection.id)}
               disabled={!hasActiveSelection}
-              className="tw-btn-icon"
+              className={`tw-btn-icon tw-x-delete-btn ${hasActiveSelection ? "is-enabled" : ""}`}
               title={hasActiveSelection ? "Delete the selected area" : "Select an area first"}
-              style={{ color: hasActiveSelection ? "#ef4444" : undefined, marginLeft: 4 }}
             >
               <Trash2 size={14} />
             </button>
@@ -1014,8 +851,8 @@ function TranslateTabPanel({
       )}
 
       {/* The ORIGINAL image of the selected area — for visual reference, no OCR text reading needed */}
-      <div className="tw-translation-block" style={{ marginBottom: 16 }}>
-        <p className="tw-caption" style={{ marginBottom: 8, marginTop: 0 }}>
+      <div className="tw-translation-block tw-x-block-spaced">
+        <p className="tw-caption tw-x-caption-tight">
           SOURCE IMAGE {isPickingColor && <span style={{ color: "#2563eb" }}>— click to pick color</span>}
         </p>
         {hasActiveSelection ? (
@@ -1029,26 +866,14 @@ function TranslateTabPanel({
             zoomScale={zoomScale}
           />
         ) : (
-          <div
-            style={{
-              width: 260,
-              height: 100,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#8286A0",
-              fontSize: 13,
-              background: "var(--tw-surface, #1a1a1a)",
-              borderRadius: 6,
-            }}
-          >
+          <div className="tw-x-crop-placeholder">
             Select an area on the image to view it here
           </div>
         )}
       </div>
 
       <div className="tw-translation-block">
-        <p className="tw-caption" style={{ marginBottom: 8, marginTop: 0 }}>
+        <p className="tw-caption tw-x-caption-tight">
           TRANSLATION
         </p>
         {/* This box ALWAYS keeps a fixed white text color — it does NOT follow the custom
@@ -1056,8 +881,12 @@ function TranslateTabPanel({
         <textarea
           value={translationValue}
           onChange={(e) => onChangeTranslation(e.target.value)}
-          className="tw-textarea"
-          style={{ ...textStyle, color: "#ffffff" }}
+          className="tw-textarea tw-x-translation-textarea"
+          style={{
+            "--text-align": textStyle.textAlign,
+            "--font-weight": textStyle.fontWeight,
+            "--font-style": textStyle.fontStyle,
+          }}
           placeholder={hasActiveSelection ? "Enter translation for this area..." : "Select an area first"}
           disabled={!hasActiveSelection}
         />
@@ -2195,10 +2024,7 @@ export default function TranslateWorkspace() {
       />
 
       <div className="tw-body">
-        <aside
-          className="tw-sidebar"
-          style={leftSidebarOpen ? undefined : { width: 0, minWidth: 0, borderRight: "none", overflow: "hidden" }}
-        >
+        <aside className={`tw-sidebar ${leftSidebarOpen ? "" : "tw-sidebar--collapsed"}`}>
           {leftSidebarOpen && (
             <>
               <p className="tw-sidebar-label">PROJECT FILES</p>
@@ -2214,34 +2040,18 @@ export default function TranslateWorkspace() {
           )}
         </aside>
 
-        <div style={{ position: "relative", width: 0, flexShrink: 0, zIndex: 5 }}>
+        <div className="tw-x-sidebar-toggle-wrap">
           <button
             type="button"
             onClick={() => setLeftSidebarOpen((v) => !v)}
             title={leftSidebarOpen ? "Hide left panel" : "Show left panel"}
-            style={{
-              position: "absolute",
-              top: "50%",
-              left: 0,
-              transform: "translateY(-50%)",
-              width: 24,
-              height: 44,
-              borderRadius: "0 6px 6px 0",
-              border: "1px solid var(--ink-line, #33364a)",
-              borderLeft: "none",
-              background: "var(--ink-900, #1b1e2b)",
-              color: "var(--ink-text-2, #c7c9d6)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-            }}
+            className="tw-x-sidebar-toggle-btn"
           >
             {leftSidebarOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
           </button>
         </div>
 
-        <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <main className="tw-x-main-content">
           <div style={{ display: "flex", flexDirection: "column" }}>
             {/* Row 1: drawing tool + page navigation/zoom */}
             <div className="tw-canvas-toolbar">
@@ -2265,7 +2075,7 @@ export default function TranslateWorkspace() {
             </div>
 
             {/* Row 2: text styling — font, weight/style, alignment, size, colors */}
-            <div className="tw-canvas-toolbar" style={{ borderTop: "1px solid var(--ink-line-soft, #242737)" }}>
+            <div className="tw-canvas-toolbar tw-x-toolbar-row2">
               <CanvasToolbar
                 isBold={isBold}
                 isItalic={isItalic}

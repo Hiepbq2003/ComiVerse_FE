@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { AIPopover } from '../common/AIPopover'
-import '../../assets/style/translator.css'
+import '../../assets/style/translator/translator.css'
 
 function TranslatorLayout() {
   const navigate = useNavigate()
