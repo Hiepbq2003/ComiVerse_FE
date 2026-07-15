@@ -1346,7 +1346,7 @@
 }
 
 /* Make trigger styling apply generally */
-.popover-wrap .trigger:not(.moderator-icon-btn):not(.translator-icon-btn) {
+.popover-wrap .trigger:not(.moderator-icon-btn):not(.translator-icon-btn):not(.author-notification-btn) {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
@@ -1363,7 +1363,7 @@
     position: relative;
 }
 
-.popover-wrap .trigger:not(.moderator-icon-btn):not(.translator-icon-btn):hover {
+.popover-wrap .trigger:not(.moderator-icon-btn):not(.translator-icon-btn):not(.author-notification-btn):hover {
     background: var(--ghost-bg-hover);
     border-color: var(--interactive);
     box-shadow: 0 0 12px var(--interactive-glow);

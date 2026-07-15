@@ -400,7 +400,19 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                   <td>
                     <div className="comic-cell-info">
                       <div className="comic-cell-thumbnail">
-                        {comic.title.toLowerCase().includes('sword') ? '⚔️' : comic.title.toLowerCase().includes('spirit') ? '🔮' : comic.title.toLowerCase().includes('demon') ? '👑' : '📚'}
+                        {(comic.cover || comic.coverImageUrl) ? (
+                          <img 
+                            src={comic.cover || comic.coverImageUrl} 
+                            alt={comic.title} 
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.style.display = 'none';
+                              e.target.parentNode.innerHTML = comic.title.toLowerCase().includes('sword') ? '⚔️' : comic.title.toLowerCase().includes('spirit') ? '🔮' : comic.title.toLowerCase().includes('demon') ? '👑' : '📚';
+                            }}
+                          />
+                        ) : (
+                          comic.title.toLowerCase().includes('sword') ? '⚔️' : comic.title.toLowerCase().includes('spirit') ? '🔮' : comic.title.toLowerCase().includes('demon') ? '👑' : '📚'
+                        )}
                       </div>
                       <div className="comic-cell-details">
                         <span className="comic-cell-title">{comic.title}</span>
@@ -447,6 +459,12 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                   </td>
                   <td>
                     <div className="comic-actions-cell">
+                      <ModernButton 
+                        variant={2} 
+                        label="👁️ View" 
+                        className="btn-view"
+                        onClick={() => window.open(`/comic/${comic.id}`, '_blank')} 
+                      />
                       <ModernButton 
                         variant={2} 
                         label="📝 Edit" 

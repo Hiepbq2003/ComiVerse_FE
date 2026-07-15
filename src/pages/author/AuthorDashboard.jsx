@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AuthorLayout from '../../components/layout/AuthorLayout'
+import '../../assets/style/author/dashboard.css'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const VIEWS_DATA = [120, 180, 240, 310, 420, 520, 680, 820, 960, 1100, 1210, 1380]
