@@ -19,3 +19,13 @@ export const deleteComicApi = (id) => {
 export const searchComicsApi = (query) => {
   return AxiosClient.get(`/comics/search?query=${encodeURIComponent(query)}`);
 };
+
+export const getExploreComicsApi = (params) => {
+  return AxiosClient.get('/comics/explore', { params });
+};
+
+export const getComicByIdApi = (id) => {
+  return AxiosClient.get(`/comics/${id}`);
+};
+
+

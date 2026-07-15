@@ -3,6 +3,13 @@ import AdminLayout from '../../components/layout/AdminLayout'
 import { getAllAccountsApi, registerStaffApi, banUserApi, unbanUserApi, resetUserPasswordApi, updateUserApi } from '../../services/api/AccountApi'
 import ModernButton from '../../components/common/ModernButton'
 import AnimatedButton from '../../components/common/AnimatedButton'
+import { SkeletonLoader } from '../../components/common/SkeletonLoader'
+import { AIPopover } from '../../components/common/AIPopover'
+import { ModernPagination } from '../../components/common/ModernPagination'
+import { useTheme } from '../../context/ThemeContext'
+import '../../assets/style/common/ai-popover.css'
+import '../../assets/style/common/modern-pagination.css'
+import '../../assets/style/common/skeleton-loader.css'
 
 // Fallback mock data when API is not available
 const MOCK_ACCOUNTS = [
@@ -23,6 +30,7 @@ const MOCK_ACCOUNTS = [
 const ITEMS_PER_PAGE = 8
 
 function AccountManagement() {
+  const { theme } = useTheme()
   // Data states
   const [accounts, setAccounts] = useState([])
   const [isLoading, setIsLoading] = useState(true)

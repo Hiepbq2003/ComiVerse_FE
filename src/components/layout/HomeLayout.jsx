@@ -5,11 +5,12 @@ import '../../assets/style/reader/home.css'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
+import { formatTimeAgo } from '../../utils/formatTimeAgo'
 
 function HomeLayout({ children }) {
   const navigate = useNavigate()
   const location = useLocation()
-  
+
   const { isLoggedIn, user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const { notifications, unreadCount, loadNotifications, markAsRead, markAllAsRead } = useNotification()
@@ -62,28 +63,15 @@ function HomeLayout({ children }) {
     navigate(path)
   }
 
-  const formatTimeAgo = (dateStr) => {
-    if (!dateStr) return ''
-    try {
-      const date = new Date(dateStr)
-      const now = new Date()
-      const diffMs = now - date
-      const diffMins = Math.floor(diffMs / 60000)
-      if (diffMins < 1) return 'Just now'
-      if (diffMins < 60) return `${diffMins}m ago`
-      const diffHrs = Math.floor(diffMins / 60)
-      if (diffHrs < 24) return `${diffHrs}h ago`
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    } catch {
-      return ''
-    }
-  }
+
 
   const getDashboardPath = () => {
     if (!isLoggedIn || !user) return '/auth'
     const roleUpper = (user.role || '').toUpperCase()
     if (roleUpper === 'ADMIN') return '/admin/account-management'
     if (roleUpper === 'AUTHOR') return '/author/overview'
+    if (roleUpper === 'TRANSLATOR') return '/translator/dashboard'
+
     return '/auth' // Reader dashboard is handled inside AuthPage
   }
 

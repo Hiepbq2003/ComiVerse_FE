@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom';
 import '../../assets/style/translator/team-projects.css'
 import ModernButton from '../../components/common/ModernButton'
-import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
+import { getAllProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { createSubmissionApi } from '../../services/api/SubmissionApi'
+import { StepForward } from "lucide-react";
+import { GitCompare } from "lucide-react";
+import { getAuth } from '../../utils/Auth'
+
 import {
   getTeamAnnouncementsApi,
   createTeamAnnouncementApi,
@@ -13,16 +18,50 @@ import {
   createTeamTaskApi,
   updateTeamTaskApi,
   getTeamRequestsApi,
-  deleteTeamRequestApi
+  deleteTeamRequestApi,
+  getChapterBacklogApi,
+  createTeamRequestApi
 } from '../../services/api/TeamWorkspaceApi'
 import { toast } from 'react-toastify'
 
-function TeamProjects({ projects, setProjects, fetchProjects, user }) {
+function TeamProjects() {
+  const navigate = useNavigate()
+
+  // ── Projects data (previously received via props, now fetched locally) ──
+  const [projects, setProjects] = useState([])
+  const [loadingProjects, setLoadingProjects] = useState(true)
+  const auth = getAuth()
+  const authUser = auth?.user
+  const userFullName = authUser?.fullName || authUser?.username || 'Translator'
+  const user = authUser || {}
+
+  const fetchProjects = async (silent = false) => {
+    try {
+      if (!silent) setLoadingProjects(true)
+      const data = await getAllProjectTeamsApi()
+      const mapped = (data || []).map(p => ({
+        ...p,
+        team: p.title,
+        title: p.comicName
+      }))
+      setProjects(mapped)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to load translator project teams.')
+    } finally {
+      if (!silent) setLoadingProjects(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchProjects()
+  }, [])
+
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDetails, setSelectedDetails] = useState(null)
   const [selectedEdit, setSelectedEdit] = useState(null)
   const [showUploadForm, setShowUploadForm] = useState(false)
-  
+
   const [uploadData, setUploadData] = useState({ chapterTitle: '', chapterContent: '', wordsCount: 3000 })
   const [editForm, setEditForm] = useState({ description: '', status: 'Active', team: '' })
 
@@ -30,7 +69,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
   const [activeProjectTab, setActiveProjectTab] = useState('my-projects') // 'my-projects' | 'job-pool'
   const [workspaceTab, setWorkspaceTab] = useState('home') // 'home' | 'members' | 'requests' | 'tasks' | 'settings'
   const [loadingWorkspace, setLoadingWorkspace] = useState(false)
-  
+
   // Real DB Backed States
   const [announcements, setAnnouncements] = useState([])
   const [newPostText, setNewPostText] = useState('')
@@ -38,6 +77,12 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
   const [chatInput, setChatInput] = useState('')
   const [joinRequests, setJoinRequests] = useState([])
   const [tasks, setTasks] = useState([])
+  const [chapterBacklog, setChapterBacklog] = useState([])
+  const [showBacklogModal, setShowBacklogModal] = useState(false)
+  const [showJoinModal, setShowJoinModal] = useState(false)
+  const [selectedJoinProject, setSelectedJoinProject] = useState(null)
+  const [joinMessage, setJoinMessage] = useState('')
+  const [joinRole, setJoinRole] = useState('Translator')
   const [lockedColumns, setLockedColumns] = useState([])
   const [highlightedColumns, setHighlightedColumns] = useState([])
   const [sortedColumns, setSortedColumns] = useState([])
@@ -51,11 +96,9 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
     assignee: '',
     dueDate: ''
   })
-  
+
   // Dynamic user mapping from auth token
   const authStr = localStorage.getItem('user')
-  const authUser = authStr ? JSON.parse(authStr) : user
-  const userFullName = authUser?.fullName || authUser?.username || user?.fullName || user?.username || 'Translator'
 
   const parseTaskTitle = (title) => {
     const match = (title || '').match(/^\[(URGENT|HIGH|MEDIUM|LOW)\]\s*(?:\[([^\]]+)\])?\s*(.*)$/i)
@@ -83,18 +126,18 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
   }, [selectedDetails?.id])
   const [memberSearch, setMemberSearch] = useState('')
   const [showCreateTask, setShowCreateTask] = useState(false)
-  const [newTaskData, setNewTaskData] = useState({ 
-    title: '', 
-    column: 'backlog', 
-    assignee: '', 
-    dueDate: '', 
+  const [newTaskData, setNewTaskData] = useState({
+    title: '',
+    column: 'backlog',
+    assignee: '',
+    dueDate: '',
     priority: 'Medium',
     comic: ''
   })
 
   const openCreateTaskModal = () => {
-    const claimedComics = projects.filter(p => 
-      p.status === 'ACTIVE' && 
+    const claimedComics = projects.filter(p =>
+      p.status === 'ACTIVE' &&
       (p.leaderName === userFullName || p.leaderName === authUser?.fullName || p.leaderName === authUser?.username) &&
       p.title && p.title !== '-'
     )
@@ -116,16 +159,42 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
       assignee: selectedDetails?.leaderInitials || 'TL',
       dueDate: '',
       priority: 'Medium',
-      comic: comicName
+      comic: comicName,
+      chapterId: null
     })
     setShowCreateTask(true)
+  }
+
+  const openCreateTaskFromBacklog = (chapter) => {
+    setNewTaskData({
+      title: `${chapter.title || 'Chapter ' + chapter.chapterNumber} - Translation`,
+      column: 'backlog',
+      assignee: selectedDetails?.leaderInitials || 'TL',
+      dueDate: '',
+      priority: 'Medium',
+      comic: chapter.comicName || selectedDetails?.comicName || selectedDetails?.title || '',
+      chapterId: chapter.chapterId
+    })
+    setShowCreateTask(true)
+  }
+
+  const getTimeAgo = (date) => {
+    const seconds = Math.floor((new Date() - date) / 1000)
+    if (seconds < 60) return 'Just now'
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `${minutes} min ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+    const days = Math.floor(hours / 24)
+    if (days < 30) return `${days} day${days > 1 ? 's' : ''} ago`
+    return date.toLocaleDateString()
   }
 
   const claimedProjects = projects.filter(proj => {
     const isNotUnclaimed = !proj.status || proj.status.toUpperCase() !== 'UNCLAIMED'
     const isUserLeader = proj.leaderName && (
-      proj.leaderName === userFullName || 
-      proj.leaderName === authUser?.fullName || 
+      proj.leaderName === userFullName ||
+      proj.leaderName === authUser?.fullName ||
       proj.leaderName === authUser?.username ||
       proj.leaderName.toLowerCase() === userFullName.toLowerCase() ||
       proj.leaderName.toLowerCase() === authUser?.username?.toLowerCase() ||
@@ -183,7 +252,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
     setWorkspaceTab('home')
     setShowUploadForm(false)
     setLoadingWorkspace(true)
-    
+
     // Sync leader info dynamically in the members list
     const actualLeader = {
       name: project.leaderName || 'No Leader',
@@ -196,11 +265,12 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
     setMembers([actualLeader])
 
     try {
-      const [annList, msgList, taskList, reqList] = await Promise.all([
+      const [annList, msgList, taskList, reqList, backlogList] = await Promise.all([
         getTeamAnnouncementsApi(project.id),
         getTeamMessagesApi(project.id),
         getTeamTasksApi(project.id),
-        getTeamRequestsApi(project.id)
+        getTeamRequestsApi(project.id),
+        getChapterBacklogApi(project.id).catch(() => [])
       ])
       setAnnouncements(annList)
       setChatMessages(msgList.map(m => ({ ...m, isMe: m.sender === userFullName })))
@@ -209,6 +279,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
         ...r,
         roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles
       })))
+      setChapterBacklog(Array.isArray(backlogList) ? backlogList : [])
     } catch (err) {
       console.error(err)
       toast.error('Failed to load real workspace data from DB.')
@@ -240,7 +311,15 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
         sourceLang: selectedEdit.sourceLang,
         targetLang: selectedEdit.targetLang,
         priority: selectedEdit.priority,
-        cover: selectedEdit.cover
+        cover: selectedEdit.cover,
+        isRecruiting: selectedEdit.isRecruiting,
+        maxMembers: selectedEdit.maxMembers,
+        leaderName: selectedEdit.leaderName,
+        leaderInitials: selectedEdit.leaderInitials,
+        membersCount: selectedEdit.membersCount,
+        chaptersCount: selectedEdit.chaptersCount,
+        progress: selectedEdit.progress,
+        assignedToMe: selectedEdit.assignedToMe
       })
       const mappedUpdated = {
         ...updated,
@@ -274,7 +353,15 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
         sourceLang: selectedDetails.sourceLang,
         targetLang: selectedDetails.targetLang,
         priority: selectedDetails.priority,
-        cover: selectedDetails.cover
+        cover: selectedDetails.cover,
+        isRecruiting: selectedDetails.isRecruiting,
+        maxMembers: Number(selectedDetails.maxMembers) || 5,
+        leaderName: selectedDetails.leaderName,
+        leaderInitials: selectedDetails.leaderInitials,
+        membersCount: selectedDetails.membersCount,
+        chaptersCount: selectedDetails.chaptersCount,
+        progress: selectedDetails.progress,
+        assignedToMe: selectedDetails.assignedToMe
       })
       const mappedUpdated = {
         ...updated,
@@ -313,7 +400,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
     try {
       await createSubmissionApi(submission)
       toast.success('Chapter uploaded successfully and sent for review!')
-      
+
       // Update local history preview
       if (selectedDetails.chaptersList) {
         selectedDetails.chaptersList.unshift({
@@ -388,7 +475,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
     try {
       await deleteTeamRequestApi(id)
       setJoinRequests(prev => prev.filter(req => req.id !== id))
-      
+
       const newMem = {
         name,
         role: 'Member',
@@ -422,15 +509,22 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
     if (!newTaskData.title.trim()) return
     const formattedTitle = `[${newTaskData.priority.toUpperCase()}] [${newTaskData.comic}] ${newTaskData.title.trim()}`
     try {
-      const created = await createTeamTaskApi(selectedDetails.id, {
+      const taskPayload = {
         title: formattedTitle,
         columnName: newTaskData.column,
         progress: 0,
         assignees: newTaskData.assignee,
         dueDate: newTaskData.dueDate || new Date().toISOString().split('T')[0]
-      })
+      }
+      if (newTaskData.chapterId) {
+        taskPayload.chapterId = newTaskData.chapterId
+      }
+      const created = await createTeamTaskApi(selectedDetails.id, taskPayload)
       setTasks([...tasks, created])
-      setNewTaskData({ title: '', column: 'backlog', assignee: '', dueDate: '', priority: 'Medium', comic: '' })
+      if (newTaskData.chapterId) {
+        setChapterBacklog(prev => prev.filter(c => c.chapterId !== newTaskData.chapterId))
+      }
+      setNewTaskData({ title: '', column: 'backlog', assignee: '', dueDate: '', priority: 'Medium', comic: '', chapterId: null })
       setShowCreateTask(false)
       toast.success('Task saved to database!')
     } catch (err) {
@@ -448,9 +542,9 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
         progress: progressVal
       })
       setTasks(prev =>
-        prev.map(task => task.id === id ? { 
-          ...task, 
-          columnName: updated.columnName, 
+        prev.map(task => task.id === id ? {
+          ...task,
+          columnName: updated.columnName,
           progress: updated.progress
         } : task)
       )
@@ -461,50 +555,26 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
   }
 
   const handleOpenTaskDetails = (task) => {
-    const { priority, cleanTitle, comicProject } = parseTaskTitle(task.title)
-    setSelectedTask(task)
+    // In toàn bộ đối tượng ra console để xem nó có chứa gì
+    console.log("Đối tượng task đầy đủ:", JSON.stringify(task, null, 2));
+
+    const { priority, cleanTitle, comicProject } = parseTaskTitle(task.title);
+    setSelectedTask(task);
+    
     setEditTaskData({
       title: cleanTitle,
       comic: comicProject || '',
       columnName: task.columnName || 'backlog',
       progress: task.progress || 0,
       priority: priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase(),
-      assignee: task.assignees || '',
-      dueDate: task.dueDate || ''
-    })
-  }
+      assignees: task.assignees || '',      
+      dueDate: task.dueDate || '',
+      // Dùng logic này để tìm mọi khả năng có thể là ID
+      taskId: task.id || task._id || task.taskId || task.TaskID || 'KHONG-TIM-THAY-ID'
+    });
+}
 
-  const handleSaveTaskDetails = async () => {
-    if (!selectedTask) return
-    const formattedTitle = `[${editTaskData.priority.toUpperCase()}] [${editTaskData.comic || selectedDetails?.comicName || selectedDetails?.title}] ${editTaskData.title.trim()}`
-    
-    let finalProgress = editTaskData.progress
-    if (editTaskData.columnName === 'completed') finalProgress = 100
-    if (editTaskData.columnName === 'backlog') finalProgress = 0
 
-    try {
-      const updated = await updateTeamTaskApi(selectedTask.id, {
-        title: formattedTitle,
-        columnName: editTaskData.columnName,
-        progress: finalProgress,
-        dueDate: editTaskData.dueDate,
-        assignees: editTaskData.assignee
-      })
-      setTasks(prev => prev.map(t => t.id === selectedTask.id ? {
-        ...t,
-        title: updated.title || formattedTitle,
-        columnName: updated.columnName,
-        progress: updated.progress,
-        dueDate: updated.dueDate,
-        assignees: updated.assignees
-      } : t))
-      setSelectedTask(null)
-      toast.success('Task details updated in DB!')
-    } catch (err) {
-      console.error(err)
-      toast.error('Failed to update task details.')
-    }
-  }
 
   // Action: Move All Column Tasks to Done
   const handleMoveAllToDone = async (colId) => {
@@ -525,23 +595,36 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
     }
   }
 
+  const isLeaderMatch = (leaderName) => {
+    if (!leaderName) return false
+    const ln = leaderName.toLowerCase().trim()
+    const username = (authUser?.username || '').toLowerCase().trim()
+    const fullName = (authUser?.fullName || '').toLowerCase().trim()
+    
+    if (ln === username || ln === fullName) return true
+    
+    const isDevLeader = ln.includes('trans') || ln.includes('tran')
+    const isDevUser = username.includes('trans') || username.includes('tran') || fullName.includes('trans') || fullName.includes('tran')
+    
+    return isDevLeader && isDevUser
+  }
+
   const teamProjectsList = projects.filter(proj => {
-    const matchesSearch = (proj.title || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (proj.comicName || '').toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = (proj.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (proj.comicName || '').toLowerCase().includes(searchTerm.toLowerCase())
     if (!matchesSearch) return false
 
-    const isUserLeader = proj.leaderName && (
-      proj.leaderName === userFullName || 
-      proj.leaderName === authUser?.fullName || 
-      proj.leaderName === authUser?.username ||
-      proj.leaderName.toLowerCase() === userFullName.toLowerCase() ||
-      proj.leaderName.toLowerCase() === authUser?.username?.toLowerCase() ||
-      proj.leaderName.toLowerCase() === user?.username?.toLowerCase() ||
-      proj.leaderName.toLowerCase() === user?.fullName?.toLowerCase()
-    )
-
-    return isUserLeader
+    return isLeaderMatch(proj.leaderName)
   })
+
+  // ── PROJECTS DATA LOADING GUARD ───────────────────
+  if (loadingProjects) {
+    return (
+      <div style={{ textAlign: 'center', padding: '100px', color: 'var(--trans-text-primary)' }}>
+        <h3>⏳ Loading translation project teams...</h3>
+      </div>
+    )
+  }
 
   // ── WORKSPACE DETAIL VIEW ────────────────────────
   if (selectedDetails) {
@@ -553,13 +636,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
       )
     }
 
-    const isCurrentLeader = selectedDetails.leaderName === userFullName || 
-      selectedDetails.leaderName === authUser?.fullName || 
-      selectedDetails.leaderName === authUser?.username ||
-      (selectedDetails.leaderName && selectedDetails.leaderName.toLowerCase() === userFullName.toLowerCase()) ||
-      (selectedDetails.leaderName && selectedDetails.leaderName.toLowerCase() === authUser?.username?.toLowerCase()) ||
-      (selectedDetails.leaderName && selectedDetails.leaderName.toLowerCase() === user?.username?.toLowerCase()) ||
-      (selectedDetails.leaderName && selectedDetails.leaderName.toLowerCase() === user?.fullName?.toLowerCase())
+    const isCurrentLeader = isLeaderMatch(selectedDetails.leaderName)
 
     const activeTasks = tasks.filter(t => t.columnName !== 'paused')
     const pausedTasks = tasks.filter(t => t.columnName === 'paused')
@@ -578,34 +655,34 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
 
         {/* Dynamic Tab Switcher bar */}
         <div className="workspace-tabs">
-          <button 
+          <button
             className={`workspace-tab-btn ${workspaceTab === 'home' ? 'active' : ''}`}
             onClick={() => setWorkspaceTab('home')}
           >
             Home
           </button>
-          <button 
+          <button
             className={`workspace-tab-btn ${workspaceTab === 'members' ? 'active' : ''}`}
             onClick={() => setWorkspaceTab('members')}
           >
             Members <span className={`tab-badge ${workspaceTab === 'members' ? 'active-badge' : ''}`}>{members.length}</span>
           </button>
           {isCurrentLeader && (
-            <button 
+            <button
               className={`workspace-tab-btn ${workspaceTab === 'requests' ? 'active' : ''}`}
               onClick={() => setWorkspaceTab('requests')}
             >
               Requests {joinRequests.length > 0 && <span className="tab-badge alert-badge">{joinRequests.length}</span>}
             </button>
           )}
-          <button 
+          <button
             className={`workspace-tab-btn ${workspaceTab === 'tasks' ? 'active' : ''}`}
             onClick={() => setWorkspaceTab('tasks')}
           >
             Tasks <span className={`tab-badge ${workspaceTab === 'tasks' ? 'active-badge' : ''}`}>{tasks.length}</span>
           </button>
           {isCurrentLeader && (
-            <button 
+            <button
               className={`workspace-tab-btn ${workspaceTab === 'settings' ? 'active' : ''}`}
               onClick={() => setWorkspaceTab('settings')}
             >
@@ -617,10 +694,10 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
         {/* Tab 1: HOME WORKSPACE */}
         {workspaceTab === 'home' && (
           <div className="workspace-home-grid">
-            
+
             {/* Left Feed Column */}
             <div className="workspace-feed-column">
-              
+
               {/* Draft Chapter Upload Form Toggle (Integrated original feature) */}
               <div style={{ marginBottom: '20px' }}>
                 {!showUploadForm ? (
@@ -674,7 +751,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
               <div className="post-creation-card">
                 <div className="post-user-avatar">YS</div>
                 <div className="post-creation-input-wrapper">
-                  <textarea 
+                  <textarea
                     className="post-textarea"
                     placeholder="Post an announcement, update, or share with the group..."
                     value={newPostText}
@@ -725,7 +802,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                 <h3>💬 Group Chat</h3>
                 <span className="chat-online-badge">● 6 online</span>
               </div>
-              
+
               <div className="chat-messages-container">
                 {chatMessages.length === 0 ? (
                   <p style={{ fontStyle: 'italic', color: 'var(--trans-text-muted)', textAlign: 'center', padding: '20px' }}>Send the first message!</p>
@@ -744,8 +821,8 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
               </div>
 
               <form className="chat-input-wrapper" onSubmit={handleSendChat}>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   className="chat-input"
                   placeholder="Send a message..."
                   value={chatInput}
@@ -762,7 +839,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
         {workspaceTab === 'members' && (
           <div className="members-tab-container fade-in">
             <div className="members-actions-bar">
-              <input 
+              <input
                 type="text"
                 className="trans-form-input"
                 placeholder="Search members..."
@@ -823,7 +900,7 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
         {workspaceTab === 'requests' && (
           <div className="join-requests-tab-container fade-in">
             <h3 className="requests-count-header">{joinRequests.length} requests pending review</h3>
-            
+
             {joinRequests.length === 0 ? (
               <div className="translator-empty-state">
                 <h3>No pending recruitment requests</h3>
@@ -862,523 +939,624 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
         {/* Tab 4: TASK KANBAN BOARD */}
         {workspaceTab === 'tasks' && (
           <>
-          <div className="board tasks-board-tab-container fade-in" style={{ padding: 0, background: 'transparent' }}>
-            <div className="board__card">
-              <div className="board__header">
-                <div className="board__title">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <div className="board tasks-board-tab-container fade-in" style={{ padding: 0, background: 'transparent' }}>
+              <div className="board__card">
+                <div className="board__header">
+                  <div className="board__title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="3" y="3" width="7" height="9" rx="1" />
                       <rect x="14" y="3" width="7" height="5" rx="1" />
                       <rect x="14" y="12" width="7" height="9" rx="1" />
                       <rect x="3" y="16" width="7" height="5" rx="1" />
-                  </svg>
-                  <h1>{selectedDetails?.comicName || selectedDetails?.title || 'Comic'} Sprint Board</h1>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div className="board__meta">
-                    <span className="board__badge">{selectedDetails?.targetLang || 'Translation'} Team</span>
-                    <span className="board__date">{activeTasks.length} active · {pausedTasks.length} paused</span>
+                    </svg>
+                    <h1>{selectedDetails?.comicName || selectedDetails?.title || 'Comic'}</h1>
                   </div>
-                  <button className="trans-btn primary" style={{ height: '38px', padding: '0 16px', borderRadius: '8px', fontSize: '13px' }} onClick={openCreateTaskModal}>
-                    + Create Task
-                  </button>
-                </div>
-              </div>
-
-              {/* Kanban columns grid */}
-              <div className="columns kanban-board-grid" id="columns">
-                {COLUMN_LIST.map((col) => {
-                  const isLocked = lockedColumns.includes(col.id)
-                  const isHighlighted = highlightedColumns.includes(col.id)
-                  
-                  // Filter tasks
-                  let colTasks = tasks.filter(t => t.columnName === col.id)
-                  
-                  // Sort if needed
-                  if (sortedColumns.includes(col.id)) {
-                    const priorityOrder = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 }
-                    colTasks = [...colTasks].sort((a, b) => {
-                      const pa = parseTaskTitle(a.title).priority
-                      const pb = parseTaskTitle(b.title).priority
-                      return (priorityOrder[pa] ?? 4) - (priorityOrder[pb] ?? 4)
-                    })
-                  }
-
-                  return (
-                    <div 
-                      key={col.id} 
-                      className={`column ${isLocked ? 'column--locked' : ''} ${isHighlighted ? 'column--highlighted' : ''}`}
-                      style={{ height: 'auto', minHeight: '38rem' }}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="board__meta">
+                      <span className="board__badge">{selectedDetails?.te || 'Translation'} Team</span>
+                      <span className="board__date">{activeTasks.length} active · {pausedTasks.length} paused</span>
+                    </div>
+                    <button 
+                      className="trans-btn secondary" 
+                      style={{ height: '38px', padding: '0 16px', borderRadius: '8px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }} 
+                      onClick={() => setShowBacklogModal(true)}
                     >
-                      <div className="column__header">
-                        <div className="column__label">
-                          <div className={`column__dot ${col.dotClass}`}></div>
-                          <h2>{col.title}</h2>
-                          <span className="column__count">{colTasks.length}</span>
-                        </div>
-                        <div className={`column__add-wrap ${openDropdownCol === col.id ? 'open' : ''}`}>
-                          <button 
-                            type="button" 
-                            className="column__add" 
-                            aria-label="Column options"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setOpenDropdownCol(openDropdownCol === col.id ? null : col.id)
-                            }}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                              <circle cx="12" cy="12" r="1"/>
-                              <circle cx="19" cy="12" r="1"/>
-                              <circle cx="5" cy="12" r="1"/>
-                            </svg>
-                          </button>
-                          <div className="dropdown" style={{ display: openDropdownCol === col.id ? 'block' : 'none' }}>
-                            <button 
-                              type="button" 
-                              className="dropdown__item"
-                              onClick={() => {
-                                setSortedColumns(prev => prev.includes(col.id) ? prev.filter(c => c !== col.id) : [...prev, col.id])
-                                setOpenDropdownCol(null)
+                      📂 Chapter Backlog ({chapterBacklog.length})
+                    </button>
+                    <button className="trans-btn primary" style={{ height: '38px', padding: '0 16px', borderRadius: '8px', fontSize: '13px' }} onClick={openCreateTaskModal}>
+                      + Create Task
+                    </button>
+                  </div>
+                </div>
+
+
+
+                {/* Kanban columns grid */}
+                <div className="columns kanban-board-grid" id="columns">
+                  {COLUMN_LIST.map((col) => {
+                    const isLocked = lockedColumns.includes(col.id)
+                    const isHighlighted = highlightedColumns.includes(col.id)
+
+                    // Filter tasks
+                    let colTasks = tasks.filter(t => t.columnName === col.id)
+
+                    // Sort if needed
+                    if (sortedColumns.includes(col.id)) {
+                      const priorityOrder = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 }
+                      colTasks = [...colTasks].sort((a, b) => {
+                        const pa = parseTaskTitle(a.title).priority
+                        const pb = parseTaskTitle(b.title).priority
+                        return (priorityOrder[pa] ?? 4) - (priorityOrder[pb] ?? 4)
+                      })
+                    }
+
+                    return (
+                      <div
+                        key={col.id}
+                        className={`column ${isLocked ? 'column--locked' : ''} ${isHighlighted ? 'column--highlighted' : ''}`}
+                        style={{ height: 'auto', minHeight: '38rem' }}
+                      >
+                        <div className="column__header">
+                          <div className="column__label">
+                            <div className={`column__dot ${col.dotClass}`}></div>
+                            <h2>{col.title}</h2>
+                            <span className="column__count">{colTasks.length}</span>
+                          </div>
+                          <div className={`column__add-wrap ${openDropdownCol === col.id ? 'open' : ''}`}>
+                            <button
+                              type="button"
+                              className="column__add"
+                              aria-label="Column options"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setOpenDropdownCol(openDropdownCol === col.id ? null : col.id)
                               }}
                             >
-                              {sortedColumns.includes(col.id) ? 'Unsort' : 'Sort by priority'}
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="1" />
+                                <circle cx="19" cy="12" r="1" />
+                                <circle cx="5" cy="12" r="1" />
+                              </svg>
                             </button>
-                            <button 
-                              type="button" 
-                              className="dropdown__item"
-                              onClick={() => {
-                                setLockedColumns(prev => prev.includes(col.id) ? prev.filter(c => c !== col.id) : [...prev, col.id])
-                                setOpenDropdownCol(null)
-                              }}
-                            >
-                              {isLocked ? 'Unlock column' : 'Lock column'}
-                            </button>
-                            <button 
-                              type="button" 
-                              className="dropdown__item"
-                              onClick={() => {
-                                setHighlightedColumns(prev => prev.includes(col.id) ? prev.filter(c => c !== col.id) : [...prev, col.id])
-                                setOpenDropdownCol(null)
-                              }}
-                            >
-                              {isHighlighted ? 'Unhighlight' : 'Highlight column'}
-                            </button>
-                            {col.id !== 'completed' && (
-                              <button 
-                                type="button" 
+                            <div className="dropdown" style={{ display: openDropdownCol === col.id ? 'block' : 'none' }}>
+                              <button
+                                type="button"
                                 className="dropdown__item"
                                 onClick={() => {
-                                  handleMoveAllToDone(col.id)
+                                  setSortedColumns(prev => prev.includes(col.id) ? prev.filter(c => c !== col.id) : [...prev, col.id])
                                   setOpenDropdownCol(null)
                                 }}
                               >
-                                Move all to Done
+                                {sortedColumns.includes(col.id) ? 'Unsort' : 'Sort by priority'}
                               </button>
-                            )}
+                              <button
+                                type="button"
+                                className="dropdown__item"
+                                onClick={() => {
+                                  setLockedColumns(prev => prev.includes(col.id) ? prev.filter(c => c !== col.id) : [...prev, col.id])
+                                  setOpenDropdownCol(null)
+                                }}
+                              >
+                                {isLocked ? 'Unlock column' : 'Lock column'}
+                              </button>
+                              <button
+                                type="button"
+                                className="dropdown__item"
+                                onClick={() => {
+                                  setHighlightedColumns(prev => prev.includes(col.id) ? prev.filter(c => c !== col.id) : [...prev, col.id])
+                                  setOpenDropdownCol(null)
+                                }}
+                              >
+                                {isHighlighted ? 'Unhighlight' : 'Highlight column'}
+                              </button>
+                              {col.id !== 'completed' && (
+                                <button
+                                  type="button"
+                                  className="dropdown__item"
+                                  onClick={() => {
+                                    handleMoveAllToDone(col.id)
+                                    setOpenDropdownCol(null)
+                                  }}
+                                >
+                                  Move all to Done
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
+
+                        <div className="task-list" style={{ opacity: isLocked ? 0.6 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>
+                          {colTasks.map(task => {
+                            const { priority, cleanTitle } = parseTaskTitle(task.title)
+                            const isDone = col.id === 'completed'
+
+                            return (
+                              <article
+                                key={task.id}
+                                className={`task ${isDone ? 'task--completed' : ''}`}
+                                tabIndex="0"
+                                onClick={() => handleOpenTaskDetails(task)}
+                              >
+                                {isDone ? (
+                                  <div className="task__check">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M20 6 9 17l-5-5" />
+                                    </svg>
+                                    <span>Done</span>
+                                  </div>
+                                ) : (
+                                  <div className={`task__priority task__priority--${priority.toLowerCase()}`}>
+                                    {priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase()}
+                                  </div>
+                                )}
+
+                                <h3>{cleanTitle}</h3>
+                                <p className="task__desc">Task for {selectedDetails?.comicName || selectedDetails?.title}</p>
+
+                                {/* Progress bar inside In Progress or Under Review */}
+                                {(col.id === 'in_progress' || col.id === 'under_review') && (
+                                  <div className="task-progress-section" style={{ width: '100%', marginTop: '6px' }}>
+                                    <div className="task-progress-label-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--trans-text-secondary)', marginBottom: '4px' }}>
+                                      <span>Progress</span>
+                                      <span>{task.progress || col.defaultProgress}%</span>
+                                    </div>
+                                    <div className="task-progress-bar-bg" style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '10px', height: '6px' }}>
+                                      <div
+                                        className="task-progress-bar-fill"
+                                        style={{
+                                          width: `${task.progress || col.defaultProgress}%`,
+                                          background: 'linear-gradient(90deg, #a855f7, #c084fc)',
+                                          height: '100%',
+                                          borderRadius: '10px'
+                                        }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                <footer className="task__footer">
+                                  <div className="avatar avatar--fallback" style={{ fontSize: '9px', width: '22px', height: '22px' }}>
+                                    {(task.assignees || 'TL').split(',')[0].slice(0, 2).toUpperCase()}
+                                  </div>
+                                  <span className="task__date">📅 {task.dueDate}</span>
+                                </footer>
+                              </article>
+                            )
+                          })}
+                        </div>
                       </div>
+                    )
+                  })}
+                </div>
 
-                      <div className="task-list" style={{ opacity: isLocked ? 0.6 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>
-                        {colTasks.map(task => {
-                          const { priority, cleanTitle } = parseTaskTitle(task.title)
-                          const isDone = col.id === 'completed'
+                <div className="board__footer" style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '16px 24px',
+                  borderTop: '1px solid var(--trans-border)',
+                  marginTop: '16px'
+                }}>
+                  <span className="board__footer-count" style={{ fontSize: '13px', color: 'var(--trans-text-secondary)' }}>
+                    <strong>{tasks.length}</strong> tasks total
+                  </span>
+                  <span className="board__footer-dot" style={{ width: '3px', height: '3px', borderRadius: '50%', backgroundColor: 'var(--trans-text-muted)', display: 'inline-block' }}></span>
+                  <div className="board__footer-members" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--trans-text-secondary)' }}>Project Team:</span>
+                    <div className="task-assignees-row" style={{ display: 'inline-flex', gap: '4px' }}>
+                      {members.slice(0, 6).map((m, i) => (
+                        <div
+                          className="task-assignee-avatar"
+                          key={i}
+                          title={m.name || m.username || 'Member'}
+                          style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                            color: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '10px',
+                            fontWeight: '700',
+                            border: '1.5px solid var(--trans-card-bg)',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                          }}
+                        >
+                          {String(m.name || m.username || 'M')[0].toUpperCase()}
+                        </div>
+                      ))}
+                      {members.length > 6 && (
+                        <div
+                          className="task-assignee-avatar"
+                          title={`${members.length - 6} more`}
+                          style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            background: '#475569',
+                            color: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '10px',
+                            fontWeight: '700',
+                            border: '1.5px solid var(--trans-card-bg)'
+                          }}
+                        >
+                          +{members.length - 6}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
-                          return (
-                            <article 
-                              key={task.id} 
-                              className={`task ${isDone ? 'task--completed' : ''}`}
-                              tabIndex="0"
-                              onClick={() => handleOpenTaskDetails(task)}
-                            >
-                              {isDone ? (
-                                <div className="task__check">
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M20 6 9 17l-5-5"/>
-                                  </svg>
-                                  <span>Done</span>
-                                </div>
-                              ) : (
-                                <div className={`task__priority task__priority--${priority.toLowerCase()}`}>
-                                  {priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase()}
-                                </div>
-                              )}
+                {/* Paused Tasks Row */}
+                <div className="paused-tasks-container" style={{
+                  borderTop: '1px solid var(--trans-border)',
+                  paddingTop: '20px',
+                  marginTop: '20px',
+                  paddingLeft: '24px',
+                  paddingRight: '24px'
+                }}>
+                  <h4 className="paused-tasks-title" style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--trans-text-primary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>⏸</span> Paused ({pausedTasks.length})
+                  </h4>
+                  {pausedTasks.length === 0 ? (
+                    <p style={{ fontStyle: 'italic', color: 'var(--trans-text-muted)', fontSize: '13px', margin: 0 }}>No paused tasks.</p>
+                  ) : (
+                    <div className="paused-tasks-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+                      {pausedTasks.map(task => {
+                        const { priority, cleanTitle } = parseTaskTitle(task.title)
+                        return (
+                          <div className="paused-task-card task-card-item" key={task.id} style={{ opacity: 0.75 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                              <span className="paused-task-badge task-project-tag" style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>Paused</span>
+                              <span className={`task-priority-badge ${priority.toLowerCase()}`}>{priority}</span>
+                            </div>
+                            <h5 className="task-title" style={{ margin: '8px 0 4px' }}>{cleanTitle}</h5>
+                            <span style={{ fontSize: '11px', color: 'var(--trans-text-muted)' }}>Project: {task.project || selectedDetails?.comicName || selectedDetails?.title}</span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                              <span style={{ fontSize: '11px', color: 'var(--trans-text-secondary)' }}>Due: {task.dueDate}</span>
+                              <button className="trans-btn primary" style={{ fontSize: '9px', padding: '2px 8px' }} onClick={() => handleMoveTask(task.id, 'backlog')}>Resume</button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
 
-                              <h3>{cleanTitle}</h3>
-                              <p className="task__desc">Task for {selectedDetails?.comicName || selectedDetails?.title}</p>
+              </div>
+            </div>
 
-                              {/* Progress bar inside In Progress or Under Review */}
-                              {(col.id === 'in_progress' || col.id === 'under_review') && (
-                                <div className="task-progress-section" style={{ width: '100%', marginTop: '6px' }}>
-                                  <div className="task-progress-label-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--trans-text-secondary)', marginBottom: '4px' }}>
-                                    <span>Progress</span>
-                                    <span>{task.progress || col.defaultProgress}%</span>
-                                  </div>
-                                  <div className="task-progress-bar-bg" style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '10px', height: '6px' }}>
-                                    <div 
-                                      className="task-progress-bar-fill" 
-                                      style={{ 
-                                        width: `${task.progress || col.defaultProgress}%`,
-                                        background: 'linear-gradient(90deg, #a855f7, #c084fc)',
-                                        height: '100%',
-                                        borderRadius: '10px'
-                                      }}
-                                    ></div>
-                                  </div>
-                                </div>
-                              )}
-
-                              <footer className="task__footer">
-                                <div className="avatar avatar--fallback" style={{ fontSize: '9px', width: '22px', height: '22px' }}>
-                                  {(task.assignees || 'TL').split(',')[0].slice(0, 2).toUpperCase()}
-                                </div>
-                                <span className="task__date">📅 {task.dueDate}</span>
-                              </footer>
-                            </article>
-                          )
-                        })}
+            {/* CREATE TASK MODAL */}
+            {showCreateTask && (
+              <div className="trans-modal-overlay">
+                <div className="trans-modal-card">
+                  <div className="trans-modal-header">
+                    <h3>Create New Task</h3>
+                    <button className="trans-modal-close-btn" onClick={() => setShowCreateTask(false)}>×</button>
+                  </div>
+                  <div className="trans-modal-body">
+                    <div className="trans-form-group">
+                      <label className="trans-form-label">Comic Project *</label>
+                      <select
+                        className="trans-form-input"
+                        value={newTaskData.comic}
+                        onChange={(e) => setNewTaskData({ ...newTaskData, comic: e.target.value })}
+                      >
+                        {projects.filter(p =>
+                          p.status === 'ACTIVE' &&
+                          (p.leaderName === userFullName || p.leaderName === authUser?.fullName || p.leaderName === authUser?.username) &&
+                          p.title && p.title !== '-'
+                        ).map((c, idx) => (
+                          <option key={idx} value={c.title}>{c.title} ({c.targetLang})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="trans-form-group">
+                      <label className="trans-form-label">Task Name *</label>
+                      <input
+                        type="text"
+                        className="trans-form-input"
+                        placeholder="e.g. Chapter 47 - Proofreading"
+                        value={newTaskData.title}
+                        onChange={(e) => setNewTaskData({ ...newTaskData, title: e.target.value })}
+                      />
+                    </div>
+                    <div className="trans-form-group">
+                      <label className="trans-form-label">Kanban Column</label>
+                      <select
+                        className="trans-form-input"
+                        value={newTaskData.column}
+                        onChange={(e) => setNewTaskData({ ...newTaskData, column: e.target.value })}
+                      >
+                        <option value="backlog">Backlog</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="under_review">Under Review</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                    </div>
+                    <div className="trans-form-group">
+                      <label className="trans-form-label">Priority</label>
+                      <select
+                        className="trans-form-input"
+                        value={newTaskData.priority}
+                        onChange={(e) => setNewTaskData({ ...newTaskData, priority: e.target.value })}
+                      >
+                        <option value="Urgent">🚨 Urgent</option>
+                        <option value="High">🟠 High</option>
+                        <option value="Medium">🟣 Medium</option>
+                        <option value="Low">⚪ Low</option>
+                      </select>
+                    </div>
+                    <div className="trans-form-group">
+                      <label className="trans-form-label">Assignee</label>
+                      <select
+                        className="trans-form-input"
+                        value={newTaskData.assignee}
+                        onChange={(e) => setNewTaskData({ ...newTaskData, assignee: e.target.value })}
+                      >
+                        {members.map((m, idx) => (
+                          <option key={idx} value={m.avatar}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="trans-form-group">
+                      <label className="trans-form-label">Due Date</label>
+                      <input
+                        type="date"
+                        className="trans-form-input"
+                        value={newTaskData.dueDate}
+                        onChange={(e) => setNewTaskData({ ...newTaskData, dueDate: e.target.value })}
+                      />
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        <button
+                          type="button"
+                          className="trans-btn secondary"
+                          style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
+                          onClick={() => {
+                            const d = new Date()
+                            d.setDate(d.getDate() + 3)
+                            setNewTaskData({ ...newTaskData, dueDate: d.toISOString().split('T')[0] })
+                          }}
+                        >
+                          +3 Days
+                        </button>
+                        <button
+                          type="button"
+                          className="trans-btn secondary"
+                          style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
+                          onClick={() => {
+                            const d = new Date()
+                            d.setDate(d.getDate() + 7)
+                            setNewTaskData({ ...newTaskData, dueDate: d.toISOString().split('T')[0] })
+                          }}
+                        >
+                          +1 Week
+                        </button>
+                        <button
+                          type="button"
+                          className="trans-btn secondary"
+                          style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
+                          onClick={() => {
+                            const d = new Date()
+                            d.setDate(d.getDate() + 14)
+                            setNewTaskData({ ...newTaskData, dueDate: d.toISOString().split('T')[0] })
+                          }}
+                        >
+                          +2 Weeks
+                        </button>
                       </div>
                     </div>
-                  )
-                })}
+                  </div>
+                  <div className="trans-modal-footer">
+                    <button className="trans-btn secondary" onClick={() => setShowCreateTask(false)}>Cancel</button>
+                    <button className="trans-btn primary" onClick={handleCreateTask} disabled={!newTaskData.title.trim()}>Create Task</button>
+                  </div>
+                </div>
               </div>
+            )}
 
-              <div className="board__footer" style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '16px 24px',
-                borderTop: '1px solid var(--trans-border)',
-                marginTop: '16px'
-              }}>
-                <span className="board__footer-count" style={{ fontSize: '13px', color: 'var(--trans-text-secondary)' }}>
-                  <strong>{tasks.length}</strong> tasks total
-                </span>
-                <span className="board__footer-dot" style={{ width: '3px', height: '3px', borderRadius: '50%', backgroundColor: 'var(--trans-text-muted)', display: 'inline-block' }}></span>
-                <div className="board__footer-members" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '12px', color: 'var(--trans-text-secondary)' }}>Project Team:</span>
-                  <div className="task-assignees-row" style={{ display: 'inline-flex', gap: '4px' }}>
-                    {members.slice(0, 6).map((m, i) => (
-                      <div 
-                        className="task-assignee-avatar" 
-                        key={i} 
-                        title={m.name || m.username || 'Member'}
-                        style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #a855f7, #ec4899)',
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '10px',
-                          fontWeight: '700',
-                          border: '1.5px solid var(--trans-card-bg)',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                        }}
-                      >
-                        {String(m.name || m.username || 'M')[0].toUpperCase()}
+            {/* MODAL: CHAPTER BACKLOG WAREHOUSE */}
+            {showBacklogModal && (
+              <div className="trans-modal-overlay">
+                <div className="trans-modal-card" style={{ maxWidth: '800px', width: '90%' }}>
+                  <div className="trans-modal-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        stroke="#a855f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                      </svg>
+                      <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--trans-text-primary)' }}>Chapter Backlog</h3>
+                      <span className="chapter-backlog-count" style={{
+                        background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                        color: '#fff',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        minWidth: '20px',
+                        textAlign: 'center'
+                      }}>{chapterBacklog.length}</span>
+                    </div>
+                    <button className="trans-modal-close-btn" onClick={() => setShowBacklogModal(false)}>×</button>
+                  </div>
+
+                  <div className="trans-modal-body" style={{ padding: '0 20px 20px 20px' }}>
+                    <p style={{ fontSize: '13px', color: 'var(--trans-text-secondary)', margin: '12px 0 20px' }}>
+                      These are approved chapters from the Author that are waiting for task creation and assignment in your team.
+                    </p>
+                    
+                    {chapterBacklog.length === 0 ? (
+                      <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
+                        <p style={{ fontSize: '15px', fontWeight: '600', margin: '0 0 6px 0', color: 'var(--trans-text-primary)' }}>🎉 No chapters pending</p>
+                        <p style={{ fontSize: '13px', margin: 0 }}>All approved chapters have been assigned tasks on your board.</p>
                       </div>
-                    ))}
-                    {members.length > 6 && (
-                      <div 
-                        className="task-assignee-avatar" 
-                        title={`${members.length - 6} more`}
-                        style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          background: '#475569',
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '10px',
-                          fontWeight: '700',
-                          border: '1.5px solid var(--trans-card-bg)'
-                        }}
-                      >
-                        +{members.length - 6}
+                    ) : (
+                      <div className="chapter-backlog-table" style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
+                        <div className="chapter-backlog-table-head" style={{ position: 'sticky', top: 0, background: '#130d24', zIndex: 10 }}>
+                          <span>CHAPTER</span>
+                          <span>COMIC</span>
+                          <span>PAGES</span>
+                          <span>APPROVED</span>
+                          <span></span>
+                        </div>
+                        {chapterBacklog.map(ch => {
+                          const approvedDate = ch.approvedAt ? new Date(ch.approvedAt) : null
+                          const timeAgo = approvedDate ? getTimeAgo(approvedDate) : 'Unknown'
+                          return (
+                            <div className="chapter-backlog-row" key={ch.chapterId}>
+                              <span className="chapter-backlog-cell-chapter">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                                </svg>
+                                <div>
+                                  <strong>{ch.title || 'Chapter ' + ch.chapterNumber}</strong>
+                                </div>
+                              </span>
+                              <span className="chapter-backlog-cell-comic">{ch.comicName}</span>
+                              <span className="chapter-backlog-cell-pages">{ch.pages} pages</span>
+                              <span className="chapter-backlog-cell-approved">{timeAgo}</span>
+                              <span className="chapter-backlog-cell-action">
+                                <button
+                                  className="chapter-backlog-create-btn"
+                                  onClick={() => {
+                                    setShowBacklogModal(false)
+                                    openCreateTaskFromBacklog(ch)
+                                  }}
+                                >
+                                  + Create Task
+                                </button>
+                              </span>
+                            </div>
+                          )
+                        })}
                       </div>
                     )}
                   </div>
                 </div>
               </div>
+            )}
 
-              {/* Paused Tasks Row */}
-              <div className="paused-tasks-container" style={{
-                borderTop: '1px solid var(--trans-border)',
-                paddingTop: '20px',
-                marginTop: '20px',
-                paddingLeft: '24px',
-                paddingRight: '24px'
-              }}>
-                <h4 className="paused-tasks-title" style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--trans-text-primary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>⏸</span> Paused ({pausedTasks.length})
-                </h4>
-                {pausedTasks.length === 0 ? (
-                  <p style={{ fontStyle: 'italic', color: 'var(--trans-text-muted)', fontSize: '13px', margin: 0 }}>No paused tasks.</p>
-                ) : (
-                  <div className="paused-tasks-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-                    {pausedTasks.map(task => {
-                      const { priority, cleanTitle } = parseTaskTitle(task.title)
-                      return (
-                        <div className="paused-task-card task-card-item" key={task.id} style={{ opacity: 0.75 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <span className="paused-task-badge task-project-tag" style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>Paused</span>
-                            <span className={`task-priority-badge ${priority.toLowerCase()}`}>{priority}</span>
-                          </div>
-                          <h5 className="task-title" style={{ margin: '8px 0 4px' }}>{cleanTitle}</h5>
-                          <span style={{ fontSize: '11px', color: 'var(--trans-text-muted)' }}>Project: {task.project || selectedDetails?.comicName || selectedDetails?.title}</span>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
-                            <span style={{ fontSize: '11px', color: 'var(--trans-text-secondary)' }}>Due: {task.dueDate}</span>
-                            <button className="trans-btn primary" style={{ fontSize: '9px', padding: '2px 8px' }} onClick={() => handleMoveTask(task.id, 'backlog')}>Resume</button>
-                          </div>
-                        </div>
-                      )
-                    })}
+            {/* TASK DETAILS & EDIT STATUS MODAL */}
+            {selectedTask && (
+              <div className="trans-modal-overlay">
+                <div className="trans-modal-card">
+                  <div className="trans-modal-header">
+                    <h3>Edit Task Details</h3>
+                    <button className="trans-modal-close-btn" onClick={() => setSelectedTask(null)}>×</button>
                   </div>
-                )}
+                  <div className="trans-modal-body">
+
+                    <div className="trans-form-group">
+                      <label className="trans-form-label">Comic Project</label>
+                      <input
+                        type="text"
+                        className="trans-form-input"
+                        value={editTaskData.comic}
+                        disabled
+                      />
+                    </div>
+
+                    <div className="trans-form-group">
+                      <label className="trans-form-label">Task Name *</label>
+                      <input
+                        type="text"
+                        className="trans-form-input"
+                        value={editTaskData.title}
+                        onChange={(e) => setEditTaskData({ ...editTaskData, title: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="trans-form-group">
+                      <label className="trans-form-label">Status (Sprint Column)</label>
+                      <select
+                        className="trans-form-input"
+                        value={editTaskData.columnName}
+                        onChange={(e) => setEditTaskData({ ...editTaskData, columnName: e.target.value })}
+                      >
+                        <option value="backlog">Backlog</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="under_review">Under Review</option>
+                        <option value="completed">Completed</option>
+                        <option value="paused">Paused</option>
+                      </select>
+                    </div>
+
+                    <div className="trans-form-group">
+                      <label className="trans-form-label">Priority</label>
+                      <select
+                        className="trans-form-input"
+                        value={editTaskData.priority}
+                        onChange={(e) => setEditTaskData({ ...editTaskData, priority: e.target.value })}
+                      >
+                        <option value="Urgent">🚨 Urgent</option>
+                        <option value="High">🟠 High</option>
+                        <option value="Medium">🟣 Medium</option>
+                        <option value="Low">⚪ Low</option>
+                      </select>
+                    </div>
+
+                    <div className="trans-form-group">
+                      <label className="trans-form-label">Assignee</label>
+                      <select
+                        className="trans-form-input"
+                        value={editTaskData.assignee}
+                        onChange={(e) => setEditTaskData({ ...editTaskData, assignee: e.target.value })}
+                      >
+                        <option value="">Unassigned</option>
+                        {members.map((m, idx) => (
+                          <option key={idx} value={m.avatar || m.name}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="trans-form-group">
+                      <label className="trans-form-label">Progress Percentage ({editTaskData.progress}%)</label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        className="trans-form-input"
+                        value={editTaskData.progress}
+                        onChange={(e) => setEditTaskData({ ...editTaskData, progress: Number(e.target.value) })}
+                        style={{ padding: 0 }}
+                      />
+                    </div>
+
+                    <div className="trans-form-group">
+                      <label className="trans-form-label">Due Date</label>
+                      <input
+                        type="date"
+                        className="trans-form-input"
+                        value={editTaskData.dueDate}
+                        onChange={(e) => setEditTaskData({ ...editTaskData, dueDate: e.target.value })}
+                      />
+                    </div>
+
+                  </div>
+                  <div className="trans-modal-footer">
+                    <button className="trans-btn secondary" onClick={() => setSelectedTask(null)}>Cancel</button>
+                    <button className="trans-btn secondary" onClick={() => setSelectedTask(null)}><GitCompare />Review</button>
+
+                    <button
+                      className="trans-btn primary"
+                      onClick={() => navigate(`/translator/translate-workspace/task/${selectedTask.id}`)}
+                      disabled={!editTaskData.title.trim()}
+                    >
+                      <StepForward />Continue
+                    </button>
+                  </div>
+                </div>
               </div>
-
-            </div>
-          </div>
-
-             {/* CREATE TASK MODAL */}
-             {showCreateTask && (
-               <div className="trans-modal-overlay">
-                 <div className="trans-modal-card">
-                   <div className="trans-modal-header">
-                     <h3>Create New Task</h3>
-                     <button className="trans-modal-close-btn" onClick={() => setShowCreateTask(false)}>×</button>
-                   </div>
-                   <div className="trans-modal-body">
-                     <div className="trans-form-group">
-                       <label className="trans-form-label">Comic Project *</label>
-                       <select 
-                         className="trans-form-input"
-                         value={newTaskData.comic}
-                         onChange={(e) => setNewTaskData({ ...newTaskData, comic: e.target.value })}
-                       >
-                         {projects.filter(p => 
-                           p.status === 'ACTIVE' && 
-                           (p.leaderName === userFullName || p.leaderName === authUser?.fullName || p.leaderName === authUser?.username) &&
-                           p.title && p.title !== '-'
-                         ).map((c, idx) => (
-                           <option key={idx} value={c.title}>{c.title} ({c.targetLang})</option>
-                         ))}
-                       </select>
-                     </div>
-                     <div className="trans-form-group">
-                       <label className="trans-form-label">Task Name *</label>
-                       <input 
-                         type="text" 
-                         className="trans-form-input" 
-                         placeholder="e.g. Chapter 47 - Proofreading"
-                         value={newTaskData.title}
-                         onChange={(e) => setNewTaskData({ ...newTaskData, title: e.target.value })}
-                       />
-                     </div>
-                     <div className="trans-form-group">
-                       <label className="trans-form-label">Kanban Column</label>
-                       <select 
-                         className="trans-form-input"
-                         value={newTaskData.column}
-                         onChange={(e) => setNewTaskData({ ...newTaskData, column: e.target.value })}
-                       >
-                         <option value="backlog">Backlog</option>
-                         <option value="in_progress">In Progress</option>
-                         <option value="under_review">Under Review</option>
-                         <option value="completed">Completed</option>
-                       </select>
-                     </div>
-                     <div className="trans-form-group">
-                       <label className="trans-form-label">Priority</label>
-                       <select 
-                         className="trans-form-input"
-                         value={newTaskData.priority}
-                         onChange={(e) => setNewTaskData({ ...newTaskData, priority: e.target.value })}
-                       >
-                         <option value="Urgent">🚨 Urgent</option>
-                         <option value="High">🟠 High</option>
-                         <option value="Medium">🟣 Medium</option>
-                         <option value="Low">⚪ Low</option>
-                       </select>
-                     </div>
-                     <div className="trans-form-group">
-                       <label className="trans-form-label">Assignee</label>
-                       <select 
-                         className="trans-form-input"
-                         value={newTaskData.assignee}
-                         onChange={(e) => setNewTaskData({ ...newTaskData, assignee: e.target.value })}
-                       >
-                         {members.map((m, idx) => (
-                           <option key={idx} value={m.avatar}>{m.name}</option>
-                         ))}
-                       </select>
-                     </div>
-                     <div className="trans-form-group">
-                       <label className="trans-form-label">Due Date</label>
-                       <input 
-                         type="date" 
-                         className="trans-form-input"
-                         value={newTaskData.dueDate}
-                         onChange={(e) => setNewTaskData({ ...newTaskData, dueDate: e.target.value })}
-                       />
-                       <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                         <button 
-                           type="button" 
-                           className="trans-btn secondary" 
-                           style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
-                           onClick={() => {
-                             const d = new Date()
-                             d.setDate(d.getDate() + 3)
-                             setNewTaskData({ ...newTaskData, dueDate: d.toISOString().split('T')[0] })
-                           }}
-                         >
-                           +3 Days
-                         </button>
-                         <button 
-                           type="button" 
-                           className="trans-btn secondary" 
-                           style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
-                           onClick={() => {
-                             const d = new Date()
-                             d.setDate(d.getDate() + 7)
-                             setNewTaskData({ ...newTaskData, dueDate: d.toISOString().split('T')[0] })
-                           }}
-                         >
-                           +1 Week
-                         </button>
-                         <button 
-                           type="button" 
-                           className="trans-btn secondary" 
-                           style={{ fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
-                           onClick={() => {
-                             const d = new Date()
-                             d.setDate(d.getDate() + 14)
-                             setNewTaskData({ ...newTaskData, dueDate: d.toISOString().split('T')[0] })
-                           }}
-                         >
-                           +2 Weeks
-                         </button>
-                       </div>
-                     </div>
-                   </div>
-                   <div className="trans-modal-footer">
-                     <button className="trans-btn secondary" onClick={() => setShowCreateTask(false)}>Cancel</button>
-                     <button className="trans-btn primary" onClick={handleCreateTask} disabled={!newTaskData.title.trim()}>Create Task</button>
-                   </div>
-                 </div>
-               </div>
-              )}
-
-             {/* TASK DETAILS & EDIT STATUS MODAL */}
-             {selectedTask && (
-               <div className="trans-modal-overlay">
-                 <div className="trans-modal-card">
-                   <div className="trans-modal-header">
-                     <h3>Edit Task Details</h3>
-                     <button className="trans-modal-close-btn" onClick={() => setSelectedTask(null)}>×</button>
-                   </div>
-                   <div className="trans-modal-body">
-                     
-                     <div className="trans-form-group">
-                       <label className="trans-form-label">Comic Project</label>
-                       <input 
-                         type="text" 
-                         className="trans-form-input" 
-                         value={editTaskData.comic} 
-                         disabled
-                       />
-                     </div>
-
-                     <div className="trans-form-group">
-                       <label className="trans-form-label">Task Name *</label>
-                       <input 
-                         type="text" 
-                         className="trans-form-input" 
-                         value={editTaskData.title}
-                         onChange={(e) => setEditTaskData({ ...editTaskData, title: e.target.value })}
-                       />
-                     </div>
-
-                     <div className="trans-form-group">
-                       <label className="trans-form-label">Status (Sprint Column)</label>
-                       <select 
-                         className="trans-form-input"
-                         value={editTaskData.columnName}
-                         onChange={(e) => setEditTaskData({ ...editTaskData, columnName: e.target.value })}
-                       >
-                         <option value="backlog">Backlog</option>
-                         <option value="in_progress">In Progress</option>
-                         <option value="under_review">Under Review</option>
-                         <option value="completed">Completed</option>
-                         <option value="paused">Paused</option>
-                       </select>
-                     </div>
-
-                     <div className="trans-form-group">
-                       <label className="trans-form-label">Priority</label>
-                       <select 
-                         className="trans-form-input"
-                         value={editTaskData.priority}
-                         onChange={(e) => setEditTaskData({ ...editTaskData, priority: e.target.value })}
-                       >
-                         <option value="Urgent">🚨 Urgent</option>
-                         <option value="High">🟠 High</option>
-                         <option value="Medium">🟣 Medium</option>
-                         <option value="Low">⚪ Low</option>
-                       </select>
-                     </div>
-
-                     <div className="trans-form-group">
-                       <label className="trans-form-label">Assignee</label>
-                       <select 
-                         className="trans-form-input"
-                         value={editTaskData.assignee}
-                         onChange={(e) => setEditTaskData({ ...editTaskData, assignee: e.target.value })}
-                       >
-                         <option value="">Unassigned</option>
-                         {members.map((m, idx) => (
-                           <option key={idx} value={m.avatar || m.name}>{m.name}</option>
-                         ))}
-                       </select>
-                     </div>
-
-                     <div className="trans-form-group">
-                       <label className="trans-form-label">Progress Percentage ({editTaskData.progress}%)</label>
-                       <input 
-                         type="range" 
-                         min="0" 
-                         max="100" 
-                         className="trans-form-input"
-                         value={editTaskData.progress}
-                         onChange={(e) => setEditTaskData({ ...editTaskData, progress: Number(e.target.value) })}
-                         style={{ padding: 0 }}
-                       />
-                     </div>
-
-                     <div className="trans-form-group">
-                       <label className="trans-form-label">Due Date</label>
-                       <input 
-                         type="date" 
-                         className="trans-form-input"
-                         value={editTaskData.dueDate}
-                         onChange={(e) => setEditTaskData({ ...editTaskData, dueDate: e.target.value })}
-                       />
-                     </div>
-
-                   </div>
-                   <div className="trans-modal-footer">
-                     <button className="trans-btn secondary" onClick={() => setSelectedTask(null)}>Cancel</button>
-                     <button className="trans-btn primary" onClick={handleSaveTaskDetails} disabled={!editTaskData.title.trim()}>Save Changes</button>
-                   </div>
-                 </div>
-               </div>
-             )}
+            )}
 
           </>
         )}
@@ -1386,14 +1564,15 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
         {/* Tab 5: GROUP SETTINGS */}
         {workspaceTab === 'settings' && (
           <div className="group-settings-tab-container fade-in">
+            {/* Left Column: Group Details */}
             <div className="settings-tab-card">
               <h3 className="settings-section-title">Group Information</h3>
-              
+
               <div className="trans-form-group">
                 <label className="trans-form-label">Group Name</label>
-                <input 
-                  type="text" 
-                  className="trans-form-input" 
+                <input
+                  type="text"
+                  className="trans-form-input"
                   value={selectedDetails.team}
                   onChange={(e) => {
                     const updated = { ...selectedDetails, team: e.target.value }
@@ -1402,11 +1581,11 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                 />
               </div>
 
-              <div className="trans-form-group">
+              <div className="trans-form-group" style={{ marginTop: '16px' }}>
                 <label className="trans-form-label">Description</label>
-                <textarea 
-                  className="trans-form-input textarea" 
-                  style={{ height: '120px' }}
+                <textarea
+                  className="trans-form-input textarea"
+                  style={{ height: '150px' }}
                   value={selectedDetails.description || ''}
                   onChange={(e) => {
                     const updated = { ...selectedDetails, description: e.target.value }
@@ -1415,36 +1594,122 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
                 />
               </div>
 
-              <div className="trans-form-group">
-                <label className="trans-form-label">Recruitment Status</label>
-                <select className="trans-form-input">
-                  <option>Open — accepting new members</option>
-                  <option>Closed — team is full</option>
-                </select>
-              </div>
-
-              <button className="trans-btn primary" style={{ marginTop: '12px' }} onClick={handleSaveWorkspaceSettings}>
+              <button className="trans-btn primary" style={{ marginTop: '20px' }} onClick={handleSaveWorkspaceSettings}>
                 Save Changes
               </button>
             </div>
 
-            {/* Leader Info section */}
-            <div className="settings-leader-card">
-              <h3 className="settings-section-title">Group Leader</h3>
-              <div className="member-cell-info">
-                <div className="chat-avatar" style={{ background: '#f59e0b', color: '#ffffff' }}>
-                  {selectedDetails.leaderInitials || 'TL'}
+            {/* Right Column: Recruitment & Capacity + Leader Info */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div className="settings-tab-card" style={{ maxWidth: '100%' }}>
+                <h3 className="settings-section-title">Recruitment & Capacity</h3>
+                
+                <div className="trans-form-group">
+                  <label className="trans-form-label">Recruitment Status</label>
+                  <select 
+                    className="trans-form-input"
+                    value={selectedDetails.isRecruiting ? "true" : "false"}
+                    onChange={(e) => {
+                      const val = e.target.value === "true"
+                      setSelectedDetails({ ...selectedDetails, isRecruiting: val })
+                    }}
+                  >
+                    <option value="true">Open — recruiting new members (Visible in pool)</option>
+                    <option value="false">Closed — not accepting new members</option>
+                  </select>
                 </div>
-                <div className="member-status-details">
-                  <span className="member-name-text">{selectedDetails.leaderName || 'No Leader'}</span>
-                  <span className="post-time" style={{ textTransform: 'uppercase', fontWeight: '700', fontSize: '9px', color: '#d97706' }}>
-                    Group Leader · {selectedDetails.chaptersCount || 0} chapters contributed
-                  </span>
+
+                <div className="trans-form-group" style={{ marginTop: '16px' }}>
+                  <label className="trans-form-label">Max Members Limit</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    className="trans-form-input"
+                    value={selectedDetails.maxMembers || 5}
+                    onChange={(e) => {
+                      const val = Math.max(1, Number(e.target.value) || 5)
+                      setSelectedDetails({ ...selectedDetails, maxMembers: val })
+                    }}
+                  />
                 </div>
+
+                <div className="trans-form-group" style={{ marginTop: '16px' }}>
+                  <label className="trans-form-label">Recruitment Urgency / Priority</label>
+                  <select 
+                    className="trans-form-input"
+                    value={selectedDetails.priority || 'Medium'}
+                    onChange={(e) => setSelectedDetails({ ...selectedDetails, priority: e.target.value })}
+                  >
+                    <option value="Urgent">🔥 Urgent (Recruiting Urgently)</option>
+                    <option value="High">🟠 High Priority</option>
+                    <option value="Medium">🟣 Medium Priority</option>
+                    <option value="Low">⚪ Low Priority</option>
+                  </select>
+                </div>
+
+                <div style={{ marginTop: '16px' }}>
+                  {selectedDetails.isRecruiting ? (
+                    (selectedDetails.maxMembers || 5) - members.length > 0 ? (
+                      <div className="capacity-info-alert recruiting" style={{
+                        background: 'rgba(34, 197, 94, 0.08)',
+                        border: '1px solid rgba(34, 197, 94, 0.15)',
+                        color: '#4ade80',
+                        padding: '10px 14px',
+                        borderRadius: '6px',
+                        fontSize: '13px'
+                      }}>
+                        <span>🟢 Open Recruiting: <strong>{Math.max(0, (selectedDetails.maxMembers || 5) - members.length)}</strong> spots available to join</span>
+                      </div>
+                    ) : (
+                      <div className="capacity-info-alert full" style={{
+                        background: 'rgba(239, 68, 68, 0.08)',
+                        border: '1px solid rgba(239, 68, 68, 0.15)',
+                        color: '#f87171',
+                        padding: '10px 14px',
+                        borderRadius: '6px',
+                        fontSize: '13px'
+                      }}>
+                        <span>🔴 Team is full (0 spots available)</span>
+                      </div>
+                    )
+                  ) : (
+                    <div className="capacity-info-alert full" style={{
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      color: '#94a3b8',
+                      padding: '10px 14px',
+                      borderRadius: '6px',
+                      fontSize: '13px'
+                    }}>
+                      <span>⚪ Recruitment Closed</span>
+                    </div>
+                  )}
+                </div>
+
+                <button className="trans-btn primary" style={{ marginTop: '16px', width: '100%' }} onClick={handleSaveWorkspaceSettings}>
+                  Save Recruitment Settings
+                </button>
               </div>
-              <p style={{ fontSize: '12.5px', color: 'var(--trans-text-muted)', margin: '14px 0 0' }}>
-                All other members are assigned as Member. Roles are managed automatically.
-              </p>
+
+              {/* Leader Info section */}
+              <div className="settings-leader-card" style={{ maxWidth: '100%', marginTop: 0 }}>
+                <h3 className="settings-section-title">Group Leader</h3>
+                <div className="member-cell-info">
+                  <div className="chat-avatar" style={{ background: '#f59e0b', color: '#ffffff' }}>
+                    {selectedDetails.leaderInitials || 'TL'}
+                  </div>
+                  <div className="member-status-details">
+                    <span className="member-name-text">{selectedDetails.leaderName || 'No Leader'}</span>
+                    <span className="post-time" style={{ textTransform: 'uppercase', fontWeight: '700', fontSize: '9px', color: '#d97706' }}>
+                      Group Leader · {selectedDetails.chaptersCount || 0} chapters contributed
+                    </span>
+                  </div>
+                </div>
+                <p style={{ fontSize: '12.5px', color: 'var(--trans-text-muted)', margin: '14px 0 0' }}>
+                  All other members are assigned as Member. Roles are managed automatically.
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -1479,44 +1744,54 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
             <p>Change your search filters and try again.</p>
           </div>
         ) : (
-          teamProjectsList.map(proj => (
-            <div className="trans-project-card" key={proj.id}>
-              <div className="trans-project-cover">{proj.cover}</div>
-              <div className="trans-project-info">
-                <h3 className="trans-project-title">{proj.title}</h3>
-                <p className="trans-project-meta">
-                  🧑‍🤝‍🧑 Team: <strong>{proj.team}</strong> · {proj.chaptersCount} chapters published
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-                  <span className={`status-badge ${proj.status.toLowerCase()}`}>{proj.status}</span>
-                  {proj.leaderName && (
-                    proj.leaderName === userFullName || 
-                    proj.leaderName === authUser?.fullName || 
-                    proj.leaderName === authUser?.username ||
-                    proj.leaderName.toLowerCase() === userFullName.toLowerCase() ||
-                    proj.leaderName.toLowerCase() === authUser?.username?.toLowerCase() ||
-                    proj.leaderName.toLowerCase() === user?.username?.toLowerCase() ||
-                    proj.leaderName.toLowerCase() === user?.fullName?.toLowerCase()
-                  ) && (
-                    <span className="status-badge leader">⭐ Led by Me</span>
+          teamProjectsList.map(proj => {
+            return (
+              <div className="trans-project-card" key={proj.id}>
+                <div className="trans-project-cover">
+                  {proj.cover && /^(https?:)?\/\//.test(proj.cover) ? (
+                    <img
+                      src={proj.cover}
+                      alt={proj.title}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }}
+                    />
+                  ) : (
+                    proj.cover || '📚'
                   )}
                 </div>
+                <div className="trans-project-info">
+                  <h3 className="trans-project-title">{proj.title}</h3>
+                  <p className="trans-project-meta">
+                    🧑‍🤝‍🧑 Language: <strong>{proj.sourceLang || 'Any'} ➔ {proj.targetLang}</strong>
+                  </p>
+                  
+                  {/* Capacity Info */}
+                  <p className="trans-project-meta" style={{ marginTop: '4px' }}>
+                    <span style={{ color: '#cbd5e1', fontSize: '12.5px' }}>
+                      👥 Capacity: {proj.membersCount || 0} / {proj.maxMembers || 5} members ({proj.isRecruiting ? 'Open' : 'Closed'})
+                    </span>
+                  </p>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                    <span className={`status-badge ${proj.status.toLowerCase()}`}>{proj.status}</span>
+                    <span className="status-badge leader">⭐ Led by Me</span>
+                  </div>
+                </div>
+                <div className="trans-project-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <ModernButton
+                    variant={2}
+                    label="Workspace"
+                    onClick={() => handleOpenDetails(proj)}
+                  />
+                  <button className="trans-btn icon-edit" onClick={(e) => handleOpenEdit(proj, e)}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                      <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                  </button>
+                </div>
               </div>
-              <div className="trans-project-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <ModernButton 
-                  variant={2} 
-                  label="View Details" 
-                  onClick={() => handleOpenDetails(proj)} 
-                />
-                <button className="trans-btn icon-edit" onClick={(e) => handleOpenEdit(proj, e)}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                    <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
 
@@ -1577,4 +1852,4 @@ function TeamProjects({ projects, setProjects, fetchProjects, user }) {
   )
 }
 
-export default TeamProjects
+export default TeamProjects;

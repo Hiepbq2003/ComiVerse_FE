@@ -21,7 +21,7 @@ const formatSubmitterName = (submittedBy) => {
 
 function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
   const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'approved' | 'rejected'
-  const [subQueue, setSubQueue] = useState('translator') // 'author' | 'translator'
+  const [subQueue, setSubQueue] = useState('author') // 'author' | 'translator'
   
   const [priorityFilter, setPriorityFilter] = useState('All Priority')
   const [sortFilter, setSortFilter] = useState('Newest')

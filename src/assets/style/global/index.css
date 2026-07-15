@@ -332,14 +332,7 @@ html.light .footer-bottom-row {
   color: #64748b !important;
 }
 
-/* Auth links in home header */
-html.light .btn-home-auth-link {
-  color: #475569 !important;
-}
 
-html.light .btn-home-auth-link:hover {
-  color: #0f172a !important;
-}
 
 /* Generic elements and Page Contents overrides */
 html.light .section-title,

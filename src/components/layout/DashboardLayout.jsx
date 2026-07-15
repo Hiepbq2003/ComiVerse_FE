@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import '../../assets/style/App.css'
+import '../../assets/style/global/App.css'
 import {
   getMyNotificationsApi,
   getUnreadCountApi,
