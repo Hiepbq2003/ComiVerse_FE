@@ -32,8 +32,8 @@ export const changePasswordApi = (currentPassword, newPassword) => {
   return AxiosClient.post('/auth/change-password', { currentPassword, newPassword });
 };
 
-export const updateProfileApi = (fullName, avatarUrl) => {
-  return AxiosClient.put('/auth/profile', { fullName, avatarUrl });
+export const updateProfileApi = (fullName, avatarUrl, backgroundImageUrl) => {
+  return AxiosClient.put('/auth/profile', { fullName, avatarUrl, backgroundImageUrl });
 };
 
 export const uploadAvatarApi = (file) => {

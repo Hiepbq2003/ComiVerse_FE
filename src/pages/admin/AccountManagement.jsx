@@ -10,6 +10,7 @@ import { useTheme } from '../../context/ThemeContext'
 import '../../assets/style/common/ai-popover.css'
 import '../../assets/style/common/modern-pagination.css'
 import '../../assets/style/common/skeleton-loader.css'
+import '../../assets/style/admin/account-management.css'
 
 // Fallback mock data when API is not available
 const MOCK_ACCOUNTS = [
@@ -17,6 +18,7 @@ const MOCK_ACCOUNTS = [
   { id: 2, userId: 'USR-0002', fullName: 'Spirit Group', username: 'spiritgroup', email: 'spirit@gmail.com', role: 'Translator', status: 'Active', createdDate: '2023-03-02', lastActive: '2 days ago' },
   { id: 3, userId: 'USR-0003', fullName: 'Author X', username: 'authorx', email: 'authorx@gmail.com', role: 'Author', status: 'Active', createdDate: '2023-04-18', lastActive: 'Yesterday' },
   { id: 4, userId: 'USR-0004', fullName: 'Mod Y', username: 'mody', email: 'mody@gmail.com', role: 'Moderator', status: 'Active', createdDate: '2023-05-10', lastActive: 'Today' },
+  { id: 13, userId: 'USR-0013', fullName: 'Project Lead', username: 'projectlead', email: 'lead@comiverse.com', role: 'Project Leader', status: 'Active', createdDate: '2023-05-21', lastActive: 'Today' },
   { id: 5, userId: 'USR-0005', fullName: 'Sarah Chen', username: 'sarahchen', email: 'sarah@gmail.com', role: 'Reader', status: 'Active', createdDate: '2023-06-01', lastActive: '3 hours ago' },
   { id: 6, userId: 'USR-0006', fullName: 'Dragon Scans', username: 'dragonscans', email: 'dragon@group.com', role: 'Translator', status: 'Banned', createdDate: '2023-07-22', lastActive: '1 month ago' },
   { id: 7, userId: 'USR-0007', fullName: 'NoviceWriter', username: 'novicewriter', email: 'novice@mail.com', role: 'Author', status: 'Active', createdDate: '2023-08-05', lastActive: '5 days ago' },
@@ -28,6 +30,27 @@ const MOCK_ACCOUNTS = [
 ]
 
 const ITEMS_PER_PAGE = 8
+const ROLE_OPTIONS = [
+  { value: 'ADMIN', label: 'Admin' },
+  { value: 'MODERATOR', label: 'Moderator' },
+  { value: 'PROJECT_LEADER', label: 'Project Leader' },
+  { value: 'AUTHOR', label: 'Author' },
+  { value: 'TRANSLATOR', label: 'Translator' },
+  { value: 'READER', label: 'Reader' },
+]
+
+const normalizeRoleValue = (role) => (role || 'READER').toString().trim().toUpperCase().replace(/[\s-]+/g, '_')
+const formatRoleLabel = (role) => {
+  const normalized = normalizeRoleValue(role)
+  const found = ROLE_OPTIONS.find((item) => item.value === normalized)
+  if (found) return found.label
+  return normalized
+    .toLowerCase()
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+const roleToClassName = (role) => normalizeRoleValue(role).toLowerCase().replace(/_/g, '-')
 
 function AccountManagement() {
   const { theme } = useTheme()
@@ -52,11 +75,11 @@ function AccountManagement() {
   // Edit user states
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingAccount, setEditingAccount] = useState(null)
-  const [editForm, setEditForm] = useState({ fullName: '', role: 'Reader' })
+  const [editForm, setEditForm] = useState({ fullName: '', role: 'READER' })
   const [editFormErrors, setEditFormErrors] = useState({})
 
   // Create staff form
-  const [staffForm, setStaffForm] = useState({ username: '', password: '', fullName: '', email: '', role: 'Reader' })
+  const [staffForm, setStaffForm] = useState({ username: '', password: '', fullName: '', email: '', role: 'READER' })
   const [staffFormErrors, setStaffFormErrors] = useState({})
   const [modalError, setModalError] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -101,7 +124,7 @@ function AccountManagement() {
         fullName: acc.fullName || acc.name || acc.username,
         username: acc.username,
         email: acc.email,
-        role: acc.role?.roleName || acc.role || acc.roleName || 'Reader',
+        role: formatRoleLabel(acc.role?.roleName || acc.role || acc.roleName || 'Reader'),
         status: acc.status || (acc.banned ? 'Banned' : 'Active'),
         createdDate: acc.createdDate || acc.createdAt || '-',
         lastActive: acc.lastActive || acc.lastLogin || '-',
@@ -125,7 +148,7 @@ function AccountManagement() {
 
         const matchesRole =
           roleFilter === 'All Roles' ||
-          (account.role || '').toLowerCase() === roleFilter.toLowerCase() ||
+          normalizeRoleValue(account.role) === normalizeRoleValue(roleFilter) ||
           (roleFilter.toLowerCase() === 'moderator' && (account.role || '').toLowerCase() === 'staff') ||
           (roleFilter.toLowerCase() === 'reader' && (account.role || '').toLowerCase() === 'user')
 
@@ -226,7 +249,7 @@ function AccountManagement() {
         role: staffForm.role,
       })
       // Add to local list
-      const displayRole = result?.role || staffForm.role
+      const displayRole = formatRoleLabel(result?.role || staffForm.role)
       
       const newAccount = {
         id: result?.userId || result?.id || Date.now(),
@@ -241,7 +264,7 @@ function AccountManagement() {
       }
       setAccounts((prev) => [newAccount, ...prev])
       setShowCreateModal(false)
-      setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'Reader' })
+      setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'READER' })
       setStaffFormErrors({})
       setModalError(null)
       showAlert('success', `Account "${newAccount.fullName}" created successfully!`)
@@ -263,7 +286,7 @@ function AccountManagement() {
 
   const handleCloseCreateModal = () => {
     setShowCreateModal(false)
-    setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'Reader' })
+    setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'READER' })
     setStaffFormErrors({})
     setModalError(null)
   }
@@ -273,7 +296,7 @@ function AccountManagement() {
     setEditingAccount(account)
     setEditForm({
       fullName: account.fullName,
-      role: account.role || 'Reader'
+      role: normalizeRoleValue(account.role || 'READER')
     })
     setEditFormErrors({})
     setModalError(null)
@@ -283,7 +306,7 @@ function AccountManagement() {
   const handleCloseEditModal = () => {
     setShowEditModal(false)
     setEditingAccount(null)
-    setEditForm({ fullName: '', role: 'Reader' })
+    setEditForm({ fullName: '', role: 'READER' })
     setEditFormErrors({})
     setModalError(null)
   }
@@ -322,7 +345,7 @@ function AccountManagement() {
             ? {
                 ...a,
                 fullName: updatedUser.fullName || editForm.fullName,
-                role: updatedUser.role || editForm.role
+                role: formatRoleLabel(updatedUser.role || editForm.role)
               }
             : a
         )
@@ -419,6 +442,7 @@ function AccountManagement() {
 
   return (
     <AdminLayout activeNav="account-management">
+      <div className="admin-account-management-screen">
       {/* Inline Alert */}
       {alert && (
         <div className={`admin-inline-alert admin-inline-alert--${alert.type}`}>
@@ -464,12 +488,10 @@ function AccountManagement() {
         </div>
 
         <select className="admin-filter-select" value={roleFilter} onChange={handleRoleChange}>
-          <option>All Roles</option>
-          <option>Admin</option>
-          <option>Moderator</option>
-          <option>Author</option>
-          <option>Translator</option>
-          <option>Reader</option>
+          <option value="All Roles">All Roles</option>
+          {ROLE_OPTIONS.map((role) => (
+            <option key={role.value} value={role.value}>{role.label}</option>
+          ))}
         </select>
 
         <select className="admin-filter-select" value={statusFilter} onChange={handleStatusChange}>
@@ -514,8 +536,8 @@ function AccountManagement() {
                   <td className="cell-name">{account.fullName}</td>
                   <td className="cell-email">{account.email}</td>
                   <td>
-                    <span className={`role-badge ${(account.role || '').toLowerCase()}`}>
-                      {account.role ? (account.role.charAt(0).toUpperCase() + account.role.slice(1).toLowerCase()) : ''}
+                    <span className={`role-badge ${roleToClassName(account.role)}`}>
+                      {formatRoleLabel(account.role)}
                     </span>
                   </td>
                   <td>
@@ -676,11 +698,9 @@ function AccountManagement() {
                   onChange={(e) => handleInputChange('role', e.target.value)}
                   style={{ cursor: 'pointer' }}
                 >
-                  <option value="Moderator">Moderator</option>
-                  <option value="Author">Author</option>
-                  <option value="Translator">Translator</option>
-                  <option value="Admin">Admin</option>
-                  <option value="Reader">Reader</option>
+                  {ROLE_OPTIONS.map((role) => (
+                    <option key={role.value} value={role.value}>{role.label}</option>
+                  ))}
                 </select>
               </div>
 
@@ -787,11 +807,9 @@ function AccountManagement() {
                   onChange={(e) => handleEditInputChange('role', e.target.value)}
                   style={{ cursor: 'pointer' }}
                 >
-                  <option value="Moderator">Moderator</option>
-                  <option value="Author">Author</option>
-                  <option value="Translator">Translator</option>
-                  <option value="Admin">Admin</option>
-                  <option value="Reader">Reader</option>
+                  {ROLE_OPTIONS.map((role) => (
+                    <option key={role.value} value={role.value}>{role.label}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -881,6 +899,7 @@ function AccountManagement() {
           </div>
         </div>
       )}
+      </div>
     </AdminLayout>
   )
 }

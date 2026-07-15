@@ -31,7 +31,7 @@ function AuthPage() {
       setView('signin')
       return
     }
-    const roleUpper = (userData.role || '').toUpperCase()
+    const roleUpper = (userData.role || '').toUpperCase().replace(/[\s-]+/g, '_')
 
     if (roleUpper === 'ADMIN') {
       navigate('/admin/account-management', options)
@@ -43,7 +43,7 @@ function AuthPage() {
       return
     }
 
-    if (roleUpper === 'TRANSLATOR') {
+    if (roleUpper === 'TRANSLATOR' || roleUpper === 'PROJECT_LEADER') {
       navigate('/translator/dashboard', options)
       return
     }
@@ -116,7 +116,7 @@ function AuthPage() {
 
   const renderProfileDashboard = () => {
     if (!user) return null;
-    const roleUpper = (user.role || '').toUpperCase();
+    const roleUpper = (user.role || '').toUpperCase().replace(/[\s-]+/g, '_');
     switch (roleUpper) {
       case 'ADMIN':
         return <AdminDashboard user={user} onLogout={handleLogout} />;
@@ -126,6 +126,7 @@ function AuthPage() {
       case 'STAFF':
         return <ModeratorDashboard user={user} onLogout={handleLogout} />;
       case 'TRANSLATOR':
+      case 'PROJECT_LEADER':
         return <TranslatorDashboard user={user} onLogout={handleLogout} />;
       case 'READER':
       case 'USER':

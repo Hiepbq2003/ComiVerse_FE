@@ -67,17 +67,17 @@ function HomeLayout({ children }) {
 
   const getDashboardPath = () => {
     if (!isLoggedIn || !user) return '/auth'
-    const roleUpper = (user.role || '').toUpperCase()
+    const roleUpper = (user.role || '').toUpperCase().replace(/[\s-]+/g, '_')
     if (roleUpper === 'ADMIN') return '/admin/account-management'
     if (roleUpper === 'AUTHOR') return '/author/overview'
-    if (roleUpper === 'TRANSLATOR') return '/translator/dashboard'
+    if (roleUpper === 'TRANSLATOR' || roleUpper === 'PROJECT_LEADER') return '/translator/dashboard'
 
     return '/auth' // Reader dashboard is handled inside AuthPage
   }
 
   const canOpenWorkspace = () => {
     if (!isLoggedIn || !user) return false
-    const roleUpper = (user.role || '').toUpperCase()
+    const roleUpper = (user.role || '').toUpperCase().replace(/[\s-]+/g, '_')
     return !['READER', 'USER'].includes(roleUpper)
   }
 

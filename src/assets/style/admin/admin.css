@@ -504,6 +504,12 @@
   border-color: rgba(168, 85, 247, 0.35) !important;
 }
 
+.role-badge.project-leader {
+  background: rgba(16, 185, 129, 0.18) !important;
+  color: #34d399 !important;
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+
 .role-badge.admin {
   background: rgba(249, 115, 22, 0.18) !important;
   color: #fb923c !important;
@@ -2199,6 +2205,12 @@ html.light .role-badge.staff {
   background: rgba(168, 85, 247, 0.12) !important;
   color: #7c3aed !important; /* Deep vibrant purple */
   border-color: rgba(168, 85, 247, 0.3) !important;
+}
+
+html.light .role-badge.project-leader {
+  background: rgba(16, 185, 129, 0.12) !important;
+  color: #047857 !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
 }
 
 html.light .role-badge.admin {
