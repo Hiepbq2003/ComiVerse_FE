@@ -994,6 +994,13 @@
   justify-content: center;
   font-size: 18px;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.comic-cell-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .comic-cell-details {
@@ -1955,10 +1962,12 @@ html.light .leader-search-result-card+.leader-search-result-card {
 /* 1. Base button sizing override to ensure matching height and font size */
 .modern-btn-container .btn-2.btn-approve,
 .modern-btn-container .btn-2.btn-edit,
+.modern-btn-container .btn-2.btn-view,
 .modern-btn-container .btn-2.btn-reject,
 .modern-btn-container .btn-2.btn-archive,
 .modern-btn-container .btn-2.btn-review,
 .modern-btn-container .btn-2.btn-cancel,
+.modern-btn-container .btn-5.btn-view,
 .modern-btn-container .btn-5.btn-reject,
 .modern-btn-container .btn-5.btn-archive,
 .modern-btn-container .btn-5.btn-review,
@@ -2063,6 +2072,31 @@ html.light .modern-btn-container .btn-5.btn-review {
 html.light .modern-btn-container .btn-2.btn-review::before,
 html.light .modern-btn-container .btn-5.btn-review::before {
   background: #6d28d9 !important;
+}
+
+/* 4.5. View Button - Blue Theme (Variant 2 / 5) */
+.modern-btn-container .btn-2.btn-view,
+.modern-btn-container .btn-5.btn-view {
+  background: #3b82f6 !important;
+  color: #ffffff !important;
+  border: none !important;
+  outline: none !important;
+}
+
+.modern-btn-container .btn-2.btn-view::before,
+.modern-btn-container .btn-5.btn-view::before {
+  background: #2563eb !important;
+}
+
+html.light .modern-btn-container .btn-2.btn-view,
+html.light .modern-btn-container .btn-5.btn-view {
+  background: #2563eb !important;
+  color: #ffffff !important;
+}
+
+html.light .modern-btn-container .btn-2.btn-view::before,
+html.light .modern-btn-container .btn-5.btn-view::before {
+  background: #1d4ed8 !important;
 }
 
 /* 5. Cancel / Close Preview Button - Neutral Gray Theme (Variant 2 / 5) */

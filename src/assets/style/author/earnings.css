@@ -1,0 +1,107 @@
+﻿/* Earnings Trend Chart & Lists */
+.earnings-container {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+}
+
+.earnings-trend-chart-wrapper {
+  height: 240px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 24px 8px 8px;
+  border-bottom: 2px solid var(--author-border);
+  margin-bottom: 24px;
+}
+
+.chart-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.chart-bar-fill {
+  width: 40px;
+  background: linear-gradient(to top, var(--author-accent), #c084fc);
+  border-radius: 6px 6px 0 0;
+  transition: height 0.5s ease;
+  position: relative;
+}
+
+.chart-bar-fill:hover {
+  filter: brightness(1.1);
+}
+
+.chart-bar-tooltip {
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--author-sidebar-bg);
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.chart-bar-fill:hover .chart-bar-tooltip {
+  opacity: 1;
+}
+
+.chart-bar-label {
+  font-size: 12px;
+  color: var(--author-text-secondary);
+}
+
+.table-premium {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-premium th {
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--author-text-secondary);
+  border-bottom: 1px solid var(--author-border);
+}
+
+.table-premium td {
+  padding: 16px;
+  font-size: 14px;
+  color: var(--author-text-primary);
+  border-bottom: 1px solid var(--author-border);
+}
+
+.table-premium tr:last-child td {
+  border-bottom: none;
+}
+
+.badge-status-payout {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge-status-payout.completed {
+  background-color: #d1fae5;
+  color: #059669;
+}
+
+.badge-status-payout.processing {
+  background-color: #fef3c7;
+  color: #d97706;
+}
+

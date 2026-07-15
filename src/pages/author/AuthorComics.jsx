@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
 import AuthorLayout from '../../components/layout/AuthorLayout'
+import '../../assets/style/author/comics.css'
 import {
   createAuthorComicApi,
   getAuthorChapterUploadStatusApi,
@@ -228,14 +230,17 @@ function CreateComicModal({ onClose, onCreated }) {
   const handleCreateRealComic = async () => {
     if (!form.title.trim()) {
       setError('Title is required.')
+      toast.warning('Title is required.')
       return
     }
     if (Number(form.minimumAge) < 0 || Number(form.minimumAge) > 21) {
       setError('Minimum age must be between 0 and 21.')
+      toast.warning('Minimum age must be between 0 and 21.')
       return
     }
     if (form.comicPackageZip && !isComicPackageZipFile(form.comicPackageZip)) {
       setError('Comic package must be an outer .zip file.')
+      toast.warning('Comic package must be an outer .zip file.')
       return
     }
 
@@ -244,12 +249,14 @@ function CreateComicModal({ onClose, onCreated }) {
     try {
       let coverImageUrl = form.coverImageUrl.trim()
       if (form.coverFile) {
+        toast.info('Uploading cover image, please wait...')
         coverImageUrl = await uploadImageApi(form.coverFile)
       }
 
       const minimumAgeValue = form.minimumAge === '' ? 13 : Number(form.minimumAge)
 
       if (form.comicPackageZip) {
+        toast.info('Uploading comic package ZIP, please wait...')
         const packageTask = await uploadAuthorComicPackageZipApi(
           buildComicPackageFormData({
             title: form.title.trim(),
@@ -263,6 +270,7 @@ function CreateComicModal({ onClose, onCreated }) {
           }),
         )
         onCreated(null, null, packageTask)
+        toast.success('Comic package uploaded successfully!')
         onClose()
         return
       }
@@ -279,6 +287,7 @@ function CreateComicModal({ onClose, onCreated }) {
 
       const comicId = getComicId(createdComic)
       onCreated(createdComic, null, null)
+      toast.success('Comic created successfully!')
       onClose()
       if (comicId) {
         navigate(`/author/comics/${comicId}`, {
@@ -288,6 +297,7 @@ function CreateComicModal({ onClose, onCreated }) {
     } catch (err) {
       const message = err?.response?.data?.message || err?.message || 'Could not create comic. Please check API/backend connection.'
       setError(message)
+      toast.error(message)
     } finally {
       setSubmitting(false)
     }
@@ -486,29 +496,35 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
     event.preventDefault()
     if (!zipFile) {
       setError('Please select a .cbz chapter file.')
+      toast.warning('Please select a .cbz chapter file.')
       return
     }
     if (!isChapterCbzFile(zipFile)) {
       setError('Chapter file must be a .cbz file.')
+      toast.warning('Chapter file must be a .cbz file.')
       return
     }
     if (!CHAPTER_ARCHIVE_NAME_REGEX.test(zipFile.name || '')) {
       setError("Chapter archive name must be like 'Chapter 1.cbz' or 'Chapter 1,5.cbz'.")
+      toast.warning("Chapter archive name must be like 'Chapter 1.cbz' or 'Chapter 1,5.cbz'.")
       return
     }
 
     setSubmitting(true)
     setError('')
     try {
+      toast.info('Uploading chapter CBZ, please wait...')
       const uploadTask = await uploadAuthorChapterZipApi(
         getComicId(comic),
         buildChapterFormData({ chapterNumber, chapterTitle: title, zipFile }),
       )
       onUploaded(uploadTask, comic)
+      toast.success('Chapter uploaded successfully!')
       onClose()
     } catch (err) {
       const message = err?.response?.data?.message || err?.message || 'Could not upload CBZ. Please check API/backend connection.'
       setError(message)
+      toast.error(message)
     } finally {
       setSubmitting(false)
     }
