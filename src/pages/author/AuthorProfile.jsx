@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'react-toastify'
 import AuthorLayout from '../../components/layout/AuthorLayout'
+import '../../assets/style/author/profile.css'
 import { getAuthorProfileApi, saveAuthorProfileApi } from '../../services/api/AuthorProfileApi'
 
 const emptyProfile = {

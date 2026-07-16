@@ -134,20 +134,33 @@
 .rejection-reason-textarea {
   width: 100%;
   height: 120px;
-  border: 1px solid var(--mod-border);
-  border-radius: 6px;
+  border: 1px solid var(--mod-border) !important;
+  border-radius: 8px;
   padding: 12px;
   font-family: inherit;
   font-size: 14px;
   resize: none;
   outline: none;
   box-sizing: border-box;
-  background: rgba(7, 4, 13, 0.7);
-  color: #f8fafc;
+  background: rgba(0, 0, 0, 0.2) !important;
+  color: var(--mod-text-primary) !important;
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+}
+
+html.light .rejection-reason-textarea {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+  color: #0f172a !important;
 }
 
 .rejection-reason-textarea:focus {
-  border-color: var(--mod-red);
+  border-color: var(--mod-purple) !important;
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.15) !important;
+}
+
+html.light .rejection-reason-textarea:focus {
+  border-color: #7c3aed !important;
+  box-shadow: 0 0 0 2px rgba(124, 92, 255, 0.15) !important;
 }
 
 /* ==========================================================================
@@ -200,4 +213,23 @@
 }
 .submission-actions .modern-btn-container .btn-2.btn-reject::before {
   background: #dc2626 !important;
+}
+
+.comic-genre-tag {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--mod-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+html.light .comic-genre-tag {
+  background: rgba(99, 87, 78, 0.06) !important;
+  color: #64748b !important;
+  border: 1px solid rgba(99, 87, 78, 0.08) !important;
 }

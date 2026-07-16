@@ -1,5 +1,9 @@
 import { useState } from 'react'
 import HomeLayout from '../../components/layout/HomeLayout'
+import AdminLayout from '../../components/layout/AdminLayout'
+import ModeratorLayout from '../../components/layout/ModeratorLayout'
+import TranslatorLayout from '../../components/layout/TranslatorLayout'
+import AuthorLayout from '../../components/layout/AuthorLayout'
 import '../../assets/style/reader/profile.css'
 import { changePasswordApi, updateProfileApi, uploadAvatarApi } from '../../services/api/AuthApi'
 import { toast } from 'react-toastify'
@@ -252,8 +256,25 @@ function Profile({ user }) {
   const displayUserName = `${firstName} ${lastName}`.trim() || user.fullName || 'Minh Khoa'
   const userInitials = displayUserName.substring(0, 2).toUpperCase()
 
+  let LayoutComponent = HomeLayout
+  let layoutProps = {}
+
+  if (roleUpper === 'ADMIN') {
+    LayoutComponent = AdminLayout
+    layoutProps = { activeNav: 'profile' }
+  } else if (roleUpper === 'MODERATOR' || roleUpper === 'STAFF') {
+    LayoutComponent = ModeratorLayout
+    layoutProps = { activeNav: 'profile' }
+  } else if (roleUpper === 'TRANSLATOR') {
+    LayoutComponent = TranslatorLayout
+    layoutProps = { activeNav: 'profile' }
+  } else if (roleUpper === 'AUTHOR') {
+    LayoutComponent = AuthorLayout
+    layoutProps = { activeNav: 'profile' }
+  }
+
   return (
-    <HomeLayout>
+    <LayoutComponent {...layoutProps}>
       <div className="profile-page-wrapper">
       {/* ── TOP SITE HEADER ──────────────────────────────── */}
 
@@ -468,7 +489,7 @@ function Profile({ user }) {
         </div>
       </div>
       </div>
-    </HomeLayout>
+    </LayoutComponent>
   )
 }
 

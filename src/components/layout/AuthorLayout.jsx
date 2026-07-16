@@ -1,28 +1,63 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { getAuth, clearAuth } from '../../utils/Auth'
-import '../../assets/style/author.css'
+import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../context/ThemeContext'
+import { useNotification } from '../../context/NotificationContext'
+import { AIPopover } from '../common/AIPopover'
+import '../../assets/style/author/author.css'
 
 function AuthorLayout({ children, activeNav = 'overview' }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { isLoggedIn, user, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification()
   const [authorized, setAuthorized] = useState(false)
-  const [user, setUser] = useState(null)
 
   useEffect(() => {
-    const auth = getAuth()
-    if (!auth || !auth.user || auth.user.role?.toUpperCase() !== 'AUTHOR') {
+    if (!isLoggedIn || !user || user.role?.toUpperCase() !== 'AUTHOR') {
       navigate('/', { replace: true })
     } else {
-      setUser(auth.user)
       setAuthorized(true)
     }
-  }, [navigate])
+  }, [isLoggedIn, user, navigate])
 
   const handleLogout = () => {
-    clearAuth()
+    logout()
     navigate('/', { replace: true })
   }
+
+  const formatTimeAgo = (dateStr) => {
+    if (!dateStr) return ''
+    try {
+      const date = new Date(dateStr)
+      const now = new Date()
+      const diffMs = now - date
+      const diffMins = Math.floor(diffMs / 60000)
+      if (diffMins < 1) return 'Just now'
+      if (diffMins < 60) return `${diffMins}m ago`
+      const diffHrs = Math.floor(diffMins / 60)
+      if (diffHrs < 24) return `${diffHrs}h ago`
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    } catch {
+      return ''
+    }
+  }
+
+  const handleNotificationAction = (actionId) => {
+    if (actionId === 'markAllRead') {
+      markAllAsRead()
+    } else {
+      markAsRead(actionId)
+    }
+  }
+
+  const formattedNotifications = notifications.map(n => ({
+    id: n.id,
+    unread: !n.isRead,
+    msg: `<strong>${n.title || 'Notification'}</strong>: ${n.message || ''}`,
+    time: formatTimeAgo(n.createdAt)
+  }))
 
   if (!authorized || !user) {
     return null
@@ -33,7 +68,6 @@ function AuthorLayout({ children, activeNav = 'overview' }) {
   const navItems = [
     { id: 'overview', label: 'Overview', path: '/author/overview', icon: 'overview' },
     { id: 'comics', label: 'My Comics', path: '/author/comics', icon: 'comics' },
-    { id: 'profile', label: 'Author Profile', path: '/author/profile', icon: 'profile' },
     { id: 'earnings', label: 'Earnings & Revenue', path: '/author/earnings', icon: 'earnings' },
     { id: 'settings', label: 'Settings', path: '/author/settings', icon: 'settings' },
   ]
@@ -54,13 +88,6 @@ function AuthorLayout({ children, activeNav = 'overview' }) {
           <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
             <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-          </svg>
-        )
-      case 'profile':
-        return (
-          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
           </svg>
         )
       case 'earnings':
@@ -127,24 +154,46 @@ function AuthorLayout({ children, activeNav = 'overview' }) {
           </div>
 
           <div className="author-topbar-right">
-            {/* Notification Bell */}
-            <button className="author-notification-btn" title="Notifications">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              </svg>
+            {/* Theme Toggle */}
+            <button 
+              className="author-notification-btn" 
+              onClick={toggleTheme}
+              title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              style={{ marginRight: '4px' }}
+            >
+              {theme === 'dark' ? (
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="5"></circle>
+                  <line x1="12" y1="1" x2="12" y2="3"></line>
+                  <line x1="12" y1="21" x2="12" y2="23"></line>
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                  <line x1="1" y1="12" x2="3" y2="12"></line>
+                  <line x1="21" y1="12" x2="23" y2="12"></line>
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+              )}
             </button>
+
+            {/* Notification Bell */}
+            <AIPopover 
+              variant="notif"
+              triggerText=""
+              triggerClass="author-notification-btn"
+              popoverClass="pop--down pop--right-align"
+              data={{ notifications: formattedNotifications, unreadCount: unreadCount }}
+              onAction={handleNotificationAction}
+            />
 
             <div className="topbar-divider" />
 
             {/* Profile Button */}
-            <button className="author-profile-btn" onClick={() => navigate('/author/profile')}>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-              </button>
-            <button className="author-profile-btn" onClick={() => navigate('/profile')}>
+            <button className="author-profile-btn" onClick={() => navigate('/profile')} title="My Profile">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                 <circle cx="12" cy="7" r="4" />

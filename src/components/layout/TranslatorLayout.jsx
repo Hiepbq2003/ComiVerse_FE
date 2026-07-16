@@ -1,12 +1,12 @@
 import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { AIPopover } from '../common/AIPopover'
 import '../../assets/style/translator.css'
 
-function TranslatorLayout({ children, activeNav = 'dashboard', onNavChange }) {
+function TranslatorLayout({ children }) {
   const navigate = useNavigate()
 
   const { isLoggedIn, user, logout } = useAuth()
@@ -49,7 +49,7 @@ function TranslatorLayout({ children, activeNav = 'dashboard', onNavChange }) {
 
   useEffect(() => {
     if (!isLoggedIn || !user ||
-        user.role?.toLowerCase() !== 'translator') {
+      user.role?.toLowerCase() !== 'translator') {
       navigate('/', { replace: true })
     }
   }, [isLoggedIn, user, navigate])
@@ -60,10 +60,11 @@ function TranslatorLayout({ children, activeNav = 'dashboard', onNavChange }) {
   }
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-    { id: 'project-teams', label: 'Project Teams', icon: 'comics' },
-    { id: 'revenue', label: 'Revenue', icon: 'revenue' },
-    { id: 'payout', label: 'Payout', icon: 'payout' },
+    { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', path: '/translator/dashboard' },
+    { id: 'project-list', label: 'Project List', icon: 'list', path: '/translator/project-list' },
+    { id: 'project-teams', label: 'Project Teams', icon: 'comics', path: '/translator/project-teams' },
+    { id: 'revenue', label: 'Revenue', icon: 'revenue', path: '/translator/revenue' },
+    { id: 'payout', label: 'Payout', icon: 'payout', path: '/translator/payout' },
   ]
 
   const renderNavIcon = (icon) => {
@@ -71,25 +72,36 @@ function TranslatorLayout({ children, activeNav = 'dashboard', onNavChange }) {
       case 'dashboard':
         return (
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+            <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+          </svg>
+        )
+      case 'list':
+        return (
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="8" y1="6" x2="21" y2="6" />
+            <line x1="8" y1="12" x2="21" y2="12" />
+            <line x1="8" y1="18" x2="21" y2="18" />
+            <line x1="3" y1="6" x2="3.01" y2="6" />
+            <line x1="3" y1="12" x2="3.01" y2="12" />
+            <line x1="3" y1="18" x2="3.01" y2="18" />
           </svg>
         )
       case 'comics':
         return (
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
           </svg>
         )
       case 'revenue':
         return (
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>
         )
       case 'payout':
         return (
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+            <rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" />
           </svg>
         )
       default:
@@ -108,16 +120,16 @@ function TranslatorLayout({ children, activeNav = 'dashboard', onNavChange }) {
 
         <nav className="translator-sidebar-nav">
           {navItems.map((item) => (
-            <button
+            <NavLink
               key={item.id}
-              className={`translator-nav-item ${activeNav === item.id ? 'active' : ''}`}
-              onClick={() => onNavChange?.(item.id)}
+              to={item.path}
+              className={({ isActive }) => `translator-nav-item ${isActive ? 'active' : ''}`}
             >
               <span className="translator-nav-icon">
                 {renderNavIcon(item.icon)}
               </span>
               {item.label}
-            </button>
+            </NavLink>
           ))}
         </nav>
 
@@ -144,8 +156,8 @@ function TranslatorLayout({ children, activeNav = 'dashboard', onNavChange }) {
 
           <div className="translator-topbar-right">
             {/* Theme Toggle */}
-            <button 
-              className="translator-icon-btn" 
+            <button
+              className="translator-icon-btn"
               onClick={toggleTheme}
               title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
               style={{ marginRight: '8px' }}
@@ -170,7 +182,7 @@ function TranslatorLayout({ children, activeNav = 'dashboard', onNavChange }) {
             </button>
 
             {/* Notification Bell */}
-            <AIPopover 
+            <AIPopover
               variant="notif"
               triggerText=""
               triggerClass="translator-icon-btn"
@@ -206,7 +218,7 @@ function TranslatorLayout({ children, activeNav = 'dashboard', onNavChange }) {
 
         {/* Page Content */}
         <div className="translator-page-content">
-          {children}
+          {children || <Outlet />}
         </div>
       </main>
     </div>

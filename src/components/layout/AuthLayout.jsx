@@ -1,7 +1,7 @@
 import comicAction from '../../assets/comic_action.png'
 import comicAdventure from '../../assets/comic_adventure.png'
 import comicScifi from '../../assets/comic_scifi.png'
-import '../../assets/style/auth.css'
+import '../../assets/style/auth/auth.css'
 
 function AuthLayout({ children, alert, isWide }) {
   return (

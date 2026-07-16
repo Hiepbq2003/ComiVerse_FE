@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'react-toastify'
 import AuthorLayout from '../../components/layout/AuthorLayout'
+import '../../assets/style/author/comics.css'
 import {
   deleteAuthorChapterApi,
   deleteAuthorComicApi,
@@ -167,6 +169,7 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
     const zipError = validateChapterZip(zipFile)
     if (zipError) {
       setError(zipError)
+      toast.warning(zipError)
       return
     }
 
@@ -174,16 +177,19 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
     setError('')
 
     try {
+      toast.info('Uploading chapter CBZ, please wait...')
       const uploadTask = await uploadAuthorChapterZipApi(
         getComicId(comic),
         buildChapterFormData({ chapterNumber, chapterTitle: title, zipFile }),
       )
 
       onUploaded(uploadTask)
+      toast.success('Chapter uploaded successfully!')
       onClose()
     } catch (err) {
       const message = err?.response?.data?.message || err?.message || 'Could not upload CBZ. Please check API/backend connection.'
       setError(message)
+      toast.error(message)
     } finally {
       setSubmitting(false)
     }

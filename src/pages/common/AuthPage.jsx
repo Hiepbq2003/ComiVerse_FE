@@ -41,7 +41,12 @@ function AuthPage() {
       return
     }
 
-    if (roleUpper === 'MODERATOR' || roleUpper === 'STAFF' || roleUpper === 'TRANSLATOR') {
+    if (roleUpper === 'TRANSLATOR') {
+      navigate('/translator/dashboard', options)
+      return
+    }
+
+    if (roleUpper === 'MODERATOR' || roleUpper === 'STAFF' ) {
       setUser(userData)
       setView('profile')
       return

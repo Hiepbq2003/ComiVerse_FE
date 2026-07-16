@@ -1,4 +1,5 @@
 import AuthorLayout from '../../components/layout/AuthorLayout'
+import '../../assets/style/author/earnings.css'
 function AuthorEarnings() {
   const chartData = [
     { month: 'Jan', amount: '2.1M', pct: '35%' },
