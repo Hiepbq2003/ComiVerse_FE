@@ -38,6 +38,7 @@ export const ModernButton = ({
           className={`btn-2 ${className}`} 
           onClick={onClick}
           disabled={disabled}
+          style={style && style.width ? { width: '100%' } : {}}
         >
           <span>{label || 'Login'}</span>
         </button>

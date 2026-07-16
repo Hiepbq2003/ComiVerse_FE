@@ -214,3 +214,22 @@ html.light .rejection-reason-textarea:focus {
 .submission-actions .modern-btn-container .btn-2.btn-reject::before {
   background: #dc2626 !important;
 }
+
+.comic-genre-tag {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--mod-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+html.light .comic-genre-tag {
+  background: rgba(99, 87, 78, 0.06) !important;
+  color: #64748b !important;
+  border: 1px solid rgba(99, 87, 78, 0.08) !important;
+}

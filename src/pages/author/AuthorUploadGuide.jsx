@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import AuthorLayout from '../../components/layout/AuthorLayout'
+import '../../assets/style/author/upload-guide.css'
 
 function AuthorUploadGuide() {
   return (

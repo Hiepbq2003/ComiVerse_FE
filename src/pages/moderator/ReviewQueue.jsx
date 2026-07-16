@@ -1,6 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import '../../assets/style/moderator/review-queue.css'
 import ModernButton from '../../components/common/ModernButton'
+import { formatTimeAgo } from '../../utils/formatTimeAgo'
+import ModernPagination from '../../components/common/ModernPagination'
 
 const formatSubmitterName = (submittedBy) => {
   if (!submittedBy) return 'Unknown';
@@ -30,6 +33,13 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
   const [selectedReview, setSelectedReview] = useState(null)
   const [selectedReject, setSelectedReject] = useState(null)
   const [rejectionReason, setRejectionReason] = useState('')
+  
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 5
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [activeTab, subQueue, priorityFilter, sortFilter, searchQuery])
 
   const getTabCount = (tab) => {
     return submissions.filter(item => item.status === tab).length
@@ -62,6 +72,8 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
   }
 
   const filteredItems = getFilteredSubmissions()
+  const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE)
+  const paginatedItems = filteredItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
 
   const onApproveClick = (id) => {
     handleApprove(id)
@@ -179,7 +191,7 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
             <p>There are no submissions matching your active filters.</p>
           </div>
         ) : (
-          filteredItems.map(item => (
+          paginatedItems.map(item => (
             <div className="submission-card" key={item.id}>
               <div className="submission-cover-placeholder">
                 {item.cover && (item.cover.startsWith('http') || item.cover.includes('/')) ? (
@@ -195,11 +207,11 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
                   {item.queueType === 'author' ? (
                     <span><strong>Author:</strong> {formatSubmitterName(item.submittedBy).replace('Author: ', '')}</span>
                   ) : (
-                    <span><strong>Chapter {item.chapter}</strong> · {formatSubmitterName(item.submittedBy)}</span>
+                    <span><strong>{item.chapter?.toLowerCase().startsWith('chapter') ? item.chapter : `Chapter ${item.chapter}`}</strong> · {formatSubmitterName(item.submittedBy)}</span>
                   )}
                 </p>
                 <div className="submission-extra">
-                  <span className="submission-extra-item">⏱️ {item.timeLabel}</span>
+                  <span className="submission-extra-item">⏱️ {formatTimeAgo(item.timestamp)}</span>
                   <span className="submission-extra-item">📄 {item.words}</span>
                 </div>
               </div>
@@ -246,8 +258,19 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
         )}
       </div>
 
+      {totalPages > 1 && (
+        <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
+          <ModernPagination 
+            currentPage={currentPage} 
+            totalPages={totalPages} 
+            onPageChange={setCurrentPage} 
+            variant="pills"
+          />
+        </div>
+      )}
+
       {/* ── MODAL: CHAPTER CONTENT REVIEWER ────────── */}
-      {selectedReview && (
+      {selectedReview && createPortal(
         <div className="mod-modal-overlay">
           <div className="mod-modal-card wide">
             <div className="mod-modal-header">
@@ -267,6 +290,18 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
                       {selectedReview.submittedByEmail && (
                         <div>
                           <strong>Email:</strong> {selectedReview.submittedByEmail}
+                        </div>
+                      )}
+                      {selectedReview.genres && selectedReview.genres.length > 0 && (
+                        <div style={{ gridColumn: '1 / -1', marginTop: '10px' }}>
+                          <strong>Genres:</strong>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+                            {selectedReview.genres.map((genre, idx) => (
+                              <span key={idx} className="comic-genre-tag">
+                                {genre}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </>
@@ -321,11 +356,12 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── MODAL: REJECTION REMARKS ───────────────── */}
-      {selectedReject && (
+      {selectedReject && createPortal(
         <div className="mod-modal-overlay">
           <div className="mod-modal-card">
             <div className="mod-modal-header">
@@ -362,7 +398,8 @@ function ReviewQueue({ submissions, handleApprove, handleConfirmReject }) {
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import '../../assets/style/moderator/forum-moderation.css'
 import { 
   getAllForumThreadsApi, 
@@ -565,7 +566,7 @@ function ForumModeration({ fetchAllData }) {
       )}
 
       {/* MODAL: ADD CATEGORY */}
-      {showAddCategoryModal && (
+      {showAddCategoryModal && createPortal(
         <div className="mod-modal-overlay">
           <div className="mod-modal-card" style={{ maxWidth: '480px' }}>
             <div className="mod-modal-header">
@@ -603,11 +604,12 @@ function ForumModeration({ fetchAllData }) {
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* MODAL: EDIT CATEGORY */}
-      {editingCategory !== null && (
+      {editingCategory !== null && createPortal(
         <div className="mod-modal-overlay">
           <div className="mod-modal-card" style={{ maxWidth: '480px' }}>
             <div className="mod-modal-header">
@@ -644,7 +646,8 @@ function ForumModeration({ fetchAllData }) {
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

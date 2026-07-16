@@ -6,7 +6,7 @@ import { useNotification } from '../../context/NotificationContext'
 import { AIPopover } from '../common/AIPopover'
 import '../../assets/style/translator/translator.css'
 
-function TranslatorLayout() {
+function TranslatorLayout({ children }) {
   const navigate = useNavigate()
 
   const { isLoggedIn, user, logout } = useAuth()
@@ -218,7 +218,7 @@ function TranslatorLayout() {
 
         {/* Page Content */}
         <div className="translator-page-content">
-          <Outlet />
+          {children || <Outlet />}
         </div>
       </main>
     </div>
