@@ -51,7 +51,7 @@ AxiosClient.interceptors.response.use(
                 window.location.href = '/';
             }
         } 
-        else if (status === 403) {
+        else if (status === 403 && !isLoginRequest) {
             // 403: Forbidden / Access Denied
             toast.error("Access denied! There is an issue with your account permissions.");
         }

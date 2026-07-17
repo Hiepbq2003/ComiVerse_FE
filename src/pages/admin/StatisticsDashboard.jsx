@@ -1,4 +1,5 @@
 import AdminLayout from '../../components/layout/AdminLayout'
+import '../../assets/style/admin/statistics.css'
 
 // ── Stat cards data ────────────────────────────────
 const STAT_CARDS = [

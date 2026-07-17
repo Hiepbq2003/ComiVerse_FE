@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import AdminLayout from '../../components/layout/AdminLayout'
+import '../../assets/style/admin/revenue.css'
 
 // ── Stat cards ─────────────────────────────────────
 const REVENUE_CARDS = [

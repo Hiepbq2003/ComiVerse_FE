@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { ThemeProvider } from './context/ThemeContext'
+import { ThemeProvider, useTheme } from './context/ThemeContext'
 import { LanguageProvider } from './context/LanguageContext'
 import { AuthProvider } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
@@ -10,6 +10,7 @@ import Ranking from './pages/common/Ranking'
 import Library from './pages/common/Library'
 import Forum from './pages/common/Forum'
 import ComicDetail from './pages/common/ComicDetail'
+import ChapterDetail from './pages/common/ChapterDetail'
 import SearchResults from './pages/common/SearchResults'
 import AccountManagement from './pages/admin/AccountManagement'
 import BroadcastManagement from './pages/admin/BroadcastManagement'
@@ -28,6 +29,9 @@ import ModeratorDashboard from './pages/moderator/ModeratorDashboard'
 import TranslatorDashboard from './pages/translator/TranslatorDashboard'
 import Profile from './pages/common/Profile'
 import Policy from './pages/common/Policy'
+import About from './pages/common/About'
+import Terms from './pages/common/Terms'
+import Contact from './pages/common/Contact'
 import TranslateDashboard from './pages/translator/TranslatorDashboard'
 import TranslateWorkspace from './pages/translator/TranslateWorkspace'
 import TeamProjects from './pages/translator/TeamProjects'
@@ -45,6 +49,7 @@ import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { Import } from 'lucide-react'
 import TranslatorLayout from './components/layout/TranslatorLayout'
+import ScrollToTop from './components/common/ScrollToTop'
 
 function ProfileRouteWrapper() {
   const auth = getAuth()
@@ -58,6 +63,11 @@ function ProfileRouteWrapper() {
   return <Profile user={auth.user} onLogout={handleLogout} />
 }
 
+function ThemedToastContainer() {
+  const { theme } = useTheme()
+  return <ToastContainer position="top-right" autoClose={3000} theme={theme} />
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -65,6 +75,7 @@ function App() {
         <LanguageProvider>
           <NotificationProvider>
             <BrowserRouter>
+              <ScrollToTop />
               <Routes>
                 {/* Public Home */}
                 <Route path="/" element={<Home />} />
@@ -79,8 +90,12 @@ function App() {
                 <Route path="/library" element={<Library />} />
                 <Route path="/forum" element={<Forum />} />
                 <Route path="/comic/:id" element={<ComicDetail />} />
+                <Route path="/comic/:comicId/chapter/:chapterId" element={<ChapterDetail />} />
                 <Route path="/search" element={<SearchResults />} />
                 <Route path="/policy" element={<Policy />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/terms" element={<Terms />} />
+                <Route path="/contact" element={<Contact />} />
                 {/* Admin */}
                 <Route path="/admin/statistics" element={<StatisticsDashboard />} />
                 <Route path="/admin/revenue" element={<RevenueManagement />} />
@@ -120,7 +135,7 @@ function App() {
                 <Route path="/showcase/paginations" element={<ModernPaginationShowcase />} />
                 <Route path="/showcase/animated-buttons" element={<AnimatedButtonShowcase />} />
               </Routes>
-              <ToastContainer position="top-right" autoClose={3000} theme="dark" />
+              <ThemedToastContainer />
             </BrowserRouter>
           </NotificationProvider>
         </LanguageProvider>

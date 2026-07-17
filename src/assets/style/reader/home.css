@@ -3,6 +3,12 @@
 :root {
   --color-bg-dark: #07040d;
   --color-pane-dark: #0d0919;
+  --reader-card-bg: #0d0919;
+  --reader-card-bg-subtle: rgba(255, 255, 255, 0.03);
+  --reader-card-border: rgba(255, 255, 255, 0.06);
+  --reader-heading: #ffffff;
+  --reader-text: #cbd5e1;
+  --reader-text-muted: #64748b;
   --color-primary-grad: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
   --color-accent-purple: #a855f7;
   --color-accent-pink: #ec4899;
@@ -726,7 +732,7 @@ html.light .btn-home-auth-link:hover {
 
 /* COMIC CARD (UNIVERSAL PREMIUM STYLE) */
 .home-comic-card {
-  background: #0d0919;
+  background: var(--reader-card-bg);
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.05);
   overflow: hidden;
@@ -806,14 +812,14 @@ html.light .btn-home-auth-link:hover {
   flex-direction: column;
   gap: 4px;
   flex-grow: 1;
-  background: linear-gradient(to bottom, #0d0919, #080510);
+  background: var(--reader-card-bg);
 }
 
 .card-title {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: white;
+  color: var(--reader-heading);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -825,11 +831,11 @@ html.light .btn-home-auth-link:hover {
   align-items: center;
   justify-content: space-between;
   font-size: 11px;
-  color: #64748b;
+  color: var(--reader-text-muted);
 }
 
 .card-chapter-number {
-  color: #cbd5e1;
+  color: var(--reader-text);
   font-weight: 500;
 }
 
@@ -870,7 +876,7 @@ html.light .btn-home-auth-link:hover {
 
 .hot-featured-card {
   position: relative;
-  background: #0d0919;
+  background: var(--reader-card-bg);
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.05);
   overflow: hidden;
@@ -915,7 +921,7 @@ html.light .btn-home-auth-link:hover {
 
 .hot-featured-info {
   padding: 24px;
-  background: linear-gradient(to bottom, #0d0919, #05030a);
+  background: var(--reader-card-bg);
 }
 
 .hot-featured-title {
@@ -1040,15 +1046,15 @@ html.light .btn-home-auth-link:hover {
 /* NEW UPDATES GRID */
 .updates-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 20px;
 }
 
 .update-card {
   display: flex;
   gap: 14px;
-  background: #0d0919;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--reader-card-bg);
+  border: 1px solid var(--reader-card-border);
   border-radius: 12px;
   padding: 12px;
   transition: all 0.25s ease;
@@ -1102,13 +1108,14 @@ html.light .btn-home-auth-link:hover {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .update-title {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: white;
+  color: var(--reader-heading);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1116,7 +1123,7 @@ html.light .btn-home-auth-link:hover {
 
 .update-genre {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--reader-text-muted);
 }
 
 .update-chapters-list {
@@ -1130,12 +1137,12 @@ html.light .btn-home-auth-link:hover {
   align-items: center;
   justify-content: space-between;
   font-size: 12px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--reader-card-bg-subtle);
   border-radius: 6px;
   padding: 4px 8px;
   transition: background 0.2s ease;
   text-decoration: none;
-  color: #cbd5e1;
+  color: var(--reader-text);
 }
 
 .update-chapter-row:hover {
@@ -1149,7 +1156,7 @@ html.light .btn-home-auth-link:hover {
 
 .update-chapter-time {
   font-size: 10px;
-  color: #64748b;
+  color: var(--reader-text-muted);
 }
 
 
@@ -1264,7 +1271,7 @@ html.light .btn-home-auth-link:hover {
     grid-template-columns: repeat(4, 1fr);
   }
   .updates-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -1312,7 +1319,7 @@ html.light .btn-home-auth-link:hover {
     grid-template-columns: repeat(3, 1fr);
   }
   .updates-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .footer-top-row {
     grid-template-columns: 1fr;
@@ -1325,7 +1332,7 @@ html.light .btn-home-auth-link:hover {
     grid-template-columns: repeat(2, 1fr);
   }
   .updates-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .hero-title {
     font-size: 32px;
@@ -1699,3 +1706,202 @@ html.light .home-search-input:focus {
   border-color: #7c3aed !important;
   box-shadow: 0 0 14px rgba(124, 58, 237, 0.2) !important;
 }
+
+/* EMOJI COVER FALLBACKS */
+.card-cover-emoji-fallback,
+.hero-cover-emoji-fallback,
+.hot-featured-cover-emoji-fallback,
+.rank-item-thumb-emoji-fallback,
+.update-thumb-emoji-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4rem;
+  background: radial-gradient(circle at center, rgba(168, 85, 247, 0.12) 0%, rgba(13, 9, 25, 0.95) 100%);
+  border-radius: 12px;
+  user-select: none;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.hero-cover-emoji-fallback {
+  font-size: 7rem;
+  border-radius: 20px;
+  background: radial-gradient(circle at center, rgba(168, 85, 247, 0.2) 0%, rgba(13, 9, 25, 0.98) 100%);
+}
+
+.hero-banner-bg-emoji-fallback {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15rem;
+  opacity: 0.15;
+  filter: blur(10px);
+  background: #090514;
+}
+
+.hot-featured-cover-emoji-fallback {
+  font-size: 6rem;
+}
+
+.rank-item-thumb-emoji-fallback,
+.update-thumb-emoji-fallback {
+  font-size: 2.2rem;
+  border-radius: 8px;
+}
+
+/* ── LIGHT MODE CARD OVERRIDES ── */
+html.light .home-comic-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light .home-comic-card:hover {
+  border-color: rgba(139, 92, 246, 0.3) !important;
+  box-shadow: 0 10px 20px rgba(139, 92, 246, 0.1) !important;
+}
+
+html.light .card-info-area {
+  background: #ffffff !important;
+}
+
+html.light .card-title {
+  color: #0f172a !important; /* Slate 900 */
+}
+
+html.light .home-comic-card:hover .card-title {
+  color: #7c3aed !important;
+}
+
+html.light .card-chapter-number {
+  color: #475569 !important; /* Slate 600 */
+}
+
+html.light .card-views {
+  color: #64748b !important; /* Slate 500 */
+}
+
+/* LIGHT MODE UPDATE CARD OVERRIDES */
+html.light .update-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .update-card:hover {
+  border-color: rgba(139, 92, 246, 0.3) !important;
+  box-shadow: 0 10px 20px rgba(139, 92, 246, 0.1) !important;
+}
+
+html.light .update-title {
+  color: #0f172a !important;
+}
+
+html.light .update-card:hover .update-title {
+  color: #7c3aed !important;
+}
+
+html.light .update-genre {
+  color: #475569 !important;
+}
+
+html.light .update-chapter-row {
+  background: rgba(0, 0, 0, 0.03) !important;
+  color: #334155 !important;
+}
+
+html.light .update-chapter-row:hover {
+  background: rgba(139, 92, 246, 0.08) !important;
+  color: #7c3aed !important;
+}
+
+/* LIGHT MODE EMOJI FALLBACK BG OVERRIDES */
+html.light .card-cover-emoji-fallback,
+html.light .hero-cover-emoji-fallback,
+html.light .hot-featured-cover-emoji-fallback,
+html.light .rank-item-thumb-emoji-fallback,
+html.light .update-thumb-emoji-fallback {
+  background: radial-gradient(circle at center, rgba(168, 85, 247, 0.08) 0%, #f8fafc 100%) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+/* ── LIGHT MODE HERO SPOTLIGHT OVERRIDES ── */
+html.light .home-hero-section {
+  background-color: #faf6f0 !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .hero-banner-bg {
+  filter: brightness(1.5) opacity(0.05) blur(2px) !important;
+}
+
+html.light .hero-banner-overlay {
+  background: radial-gradient(circle at 60% 30%, rgba(250, 246, 240, 0.2) 0%, #faf6f0 100%) !important;
+}
+
+html.light .home-hero-section,
+html.light .home-hero-section h1,
+html.light .home-hero-section h2,
+html.light .home-hero-section p,
+html.light .home-hero-section span,
+html.light .home-hero-section div,
+html.light .hero-title,
+html.light .hero-tagline,
+html.light .hero-meta-item {
+  color: #0f172a !important; /* dark slate-900 */
+}
+
+html.light .hero-meta-row,
+html.light .hero-meta-item {
+  color: #475569 !important; /* slate-600 */
+}
+
+html.light .hero-genre-tag {
+  color: #334155 !important;
+  background: rgba(0, 0, 0, 0.04) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .hero-meta-item.rating {
+  color: #d97706 !important; /* darker amber for readability */
+}
+
+html.light .hero-badge-hot {
+  color: #db2777 !important;
+  background: rgba(219, 39, 119, 0.08) !important;
+  border-color: rgba(219, 39, 119, 0.25) !important;
+}
+
+html.light .hero-badge-hot span {
+  color: #db2777 !important;
+}
+
+html.light .btn-hero-outline {
+  border: 1px solid rgba(0, 0, 0, 0.3) !important;
+  color: #475569 !important;
+  background: transparent !important;
+}
+
+html.light .btn-hero-outline:hover {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border-color: #0f172a !important;
+  color: #0f172a !important;
+}
+
+html.light .btn-home-primary {
+  color: #ffffff !important; /* keep white text on primary button */
+}
+
+html.light .hero-cover-emoji-fallback {
+  background: radial-gradient(circle at center, rgba(168, 85, 247, 0.08) 0%, #f8fafc 100%) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+
+

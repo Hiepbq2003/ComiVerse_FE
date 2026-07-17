@@ -1,35 +1,44 @@
 export const formatTimeAgo = (timestampOrDate) => {
-  if (!timestampOrDate) return 'Just now';
+  if (!timestampOrDate) return '';
   
-  let timeMs;
-  if (typeof timestampOrDate === 'number') {
-    timeMs = timestampOrDate;
-  } else if (timestampOrDate instanceof Date) {
-    timeMs = timestampOrDate.getTime();
-  } else {
-    const parsed = new Date(timestampOrDate);
-    if (isNaN(parsed.getTime())) {
+  try {
+    const date = (timestampOrDate instanceof Date) ? timestampOrDate : new Date(timestampOrDate);
+    const timeMs = date.getTime();
+    if (isNaN(timeMs)) return '';
+
+    const now = Date.now();
+    const diffMs = now - timeMs;
+
+    if (diffMs < 0) {
       return 'Just now';
     }
-    timeMs = parsed.getTime();
-  }
 
-  const now = Date.now();
-  const diffMs = now - timeMs;
-  const seconds = Math.floor(diffMs / 1000);
+    const seconds = Math.floor(diffMs / 1000);
+    if (seconds < 60) {
+      return 'Just now';
+    }
 
-  if (seconds < 0) {
-    const absSeconds = Math.abs(seconds);
-    if (absSeconds < 86400) {
-      if (absSeconds < 60) return 'Just now';
-      const minutes = Math.floor(absSeconds / 60);
-      if (minutes < 60) return `${minutes}m ago`;
-      const hours = Math.floor(minutes / 60);
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) {
+      return `${minutes}m ago`;
+    }
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) {
       return `${hours}h ago`;
     }
-    return 'Just now';
-  }
 
+    const days = Math.floor(hours / 24);
+    if (days < 7) {
+      if (days === 1) return '1 day ago';
+      return `${days} days ago`;
+    }
+
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch {
+    return '';
+  }
+};
   if (seconds < 60) {
     return 'Just now';
   }

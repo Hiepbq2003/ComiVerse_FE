@@ -20,7 +20,7 @@ export const unbanUserApi = (userId) => {
   return AxiosClient.put(`/admin/users/${userId}/unban`);
 };
 
-// Admin reset a user's password
+// Admin reset a user's password to the system default
 export const resetUserPasswordApi = (userId) => {
   return AxiosClient.post(`/admin/users/${userId}/reset-password`);
 };

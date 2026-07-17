@@ -5,6 +5,7 @@ import Login from './Login'
 import Register from './Register'
 import ForgotPassword from './ForgotPassword'
 import ResetPassword from './ResetPassword'
+import VerifyEmail from './VerifyEmail'
 import Profile from './Profile'
 import AdminDashboard from '../admin/AdminDashboard'
 import AuthorDashboard from '../author/AuthorDashboard'
@@ -17,10 +18,11 @@ import { setAuth } from '../../utils/Auth'
 function AuthPage() {
   const navigate = useNavigate()
   const { login, logout, isLoggedIn, user: authUser } = useAuth()
-  const [view, setView] = useState('signin') // 'signin' | 'signup' | 'forgot' | 'reset' | 'profile' | 'oauth-loading'
+  const [view, setView] = useState('signin') // 'signin' | 'signup' | 'verify-email' | 'forgot' | 'reset' | 'profile' | 'oauth-loading'
   const [alert, setAlert] = useState({ type: '', message: '' })
   const [loading, setLoading] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
+  const [verificationEmail, setVerificationEmail] = useState('')
   const [user, setUser] = useState(null)
   const [activeModal, setActiveModal] = useState('none') // 'none' | 'terms' | 'privacy'
 
@@ -29,7 +31,7 @@ function AuthPage() {
       setView('signin')
       return
     }
-    const roleUpper = (userData.role || '').toUpperCase()
+    const roleUpper = (userData.role || '').toUpperCase().replace(/[\s-]+/g, '_')
 
     if (roleUpper === 'ADMIN') {
       navigate('/admin/account-management', options)
@@ -41,7 +43,7 @@ function AuthPage() {
       return
     }
 
-    if (roleUpper === 'TRANSLATOR') {
+    if (roleUpper === 'TRANSLATOR' || roleUpper === 'PROJECT_LEADER') {
       navigate('/translator/dashboard', options)
       return
     }
@@ -114,7 +116,7 @@ function AuthPage() {
 
   const renderProfileDashboard = () => {
     if (!user) return null;
-    const roleUpper = (user.role || '').toUpperCase();
+    const roleUpper = (user.role || '').toUpperCase().replace(/[\s-]+/g, '_');
     switch (roleUpper) {
       case 'ADMIN':
         return <AdminDashboard user={user} onLogout={handleLogout} />;
@@ -124,6 +126,7 @@ function AuthPage() {
       case 'STAFF':
         return <ModeratorDashboard user={user} onLogout={handleLogout} />;
       case 'TRANSLATOR':
+      case 'PROJECT_LEADER':
         return <TranslatorDashboard user={user} onLogout={handleLogout} />;
       case 'READER':
       case 'USER':
@@ -150,6 +153,10 @@ function AuthPage() {
       {view === 'signin' && (
         <Login 
           onNavigate={setView} 
+          onVerificationRequired={(email) => {
+            setVerificationEmail(email);
+            setView('verify-email');
+          }}
           onLoginSuccess={(userData) => {
             openRoleDestination(userData, { replace: true });
           }} 
@@ -162,13 +169,24 @@ function AuthPage() {
       {view === 'signup' && (
         <Register 
           onNavigate={setView} 
-          onRegisterSuccess={(userData) => {
-            openRoleDestination(userData, { replace: true });
-          }} 
+          onVerificationRequired={(email) => {
+            setVerificationEmail(email);
+            setView('verify-email');
+          }}
           showAlert={showAlert} 
           loading={loading}
           setLoading={setLoading}
           onOpenModal={setActiveModal}
+        />
+      )}
+
+      {view === 'verify-email' && (
+        <VerifyEmail
+          email={verificationEmail}
+          onNavigate={setView}
+          showAlert={showAlert}
+          loading={loading}
+          setLoading={setLoading}
         />
       )}
 
@@ -198,7 +216,7 @@ function AuthPage() {
 
     {/* Terms and Privacy Modals at Root Level to avoid containing block transforms */}
     {activeModal !== 'none' && (
-      <div className="policy-modal-overlay" onClick={() => setActiveModal('none')}>
+      <div className="policy-modal-overlay" onClick={(event) => event.stopPropagation()}>
         <div className="policy-modal-container" onClick={(e) => e.stopPropagation()}>
           <div className="policy-modal-header">
             <h3 className="policy-modal-title">

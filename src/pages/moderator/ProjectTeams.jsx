@@ -80,26 +80,36 @@ function ProjectTeams({
     setShowAssignModal(true)
   }
 
-  const confirmAssignLeader = (translator) => {
+  const confirmAssignLeader = async (translator) => {
     const displayName = translator.fullName || translator.username;
-    setProjectTeams(prev =>
-      prev.map(t =>
-        t.id === assignTeamId
-          ? {
-              ...t,
-              leaderName: displayName,
-              leaderInitials: translator.initials || displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-            }
+    const team = projectTeams.find(t => t.id === assignTeamId)
+    if (!team) return
+
+    const leaderInitials = translator.initials || displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    try {
+      await updateProjectTeamApi(assignTeamId, {
+        ...team,
+        leaderId: translator.id,
+        leaderName: displayName,
+        leaderInitials
+      })
+      setProjectTeams(prev =>
+        prev.map(t => t.id === assignTeamId
+          ? { ...t, leaderId: translator.id, leaderName: displayName, leaderInitials }
           : t
+        )
       )
-    )
-    toast.success(`${displayName} assigned as Group Leader!`)
-    setShowAssignModal(false)
+      toast.success(`${displayName} assigned as Group Leader!`)
+      setShowAssignModal(false)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to assign the project leader.')
+    }
   }
 
   const selectCreateLeader = (translator) => {
     const displayName = translator.fullName || translator.username;
-    setCreateTeamForm(prev => ({ ...prev, leaderName: displayName }))
+    setCreateTeamForm(prev => ({ ...prev, leaderId: translator.id, leaderName: displayName }))
     setSelectedLeader(translator)
     setCreateLeaderSearch('')
     setCreateLeaderResults([])
@@ -107,7 +117,7 @@ function ProjectTeams({
 
   const clearSelectedLeader = () => {
     setSelectedLeader(null)
-    setCreateTeamForm(prev => ({ ...prev, leaderName: '' }))
+    setCreateTeamForm(prev => ({ ...prev, leaderId: '', leaderName: '' }))
     setCreateLeaderSearch('')
     setCreateLeaderResults([])
   }
@@ -138,6 +148,7 @@ function ProjectTeams({
       sourceLang: 'Japanese',
       targetLang: 'English',
       leaderName: '',
+      leaderId: '',
       priority: 'High'
     })
     setCreateLeaderSearch('')
