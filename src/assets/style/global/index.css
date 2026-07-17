@@ -884,3 +884,159 @@ html.light .skeleton-forum-card {
 .skeleton-forum-header .skeleton-info {
   flex: 1;
 }
+
+/* ==========================================================================
+   LIGHT MODE STYLE OVERRIDES FOR COMIC DETAIL PAGE
+   ========================================================================== */
+
+/* Change the banner gradient from fading to dark (#07040d) to fading to light (#faf6f0) */
+html.light .detail-banner-gradient {
+  background: linear-gradient(to top, #faf6f0 0%, transparent 100%) !important;
+}
+
+/* Override genres tag background and borders */
+html.light .detail-genre-tag {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #475569 !important;
+}
+
+/* Force light theme heading/text colors on details page */
+html.light .detail-title {
+  color: #0f172a !important;
+}
+
+html.light .detail-author-artist {
+  color: #475569 !important;
+}
+
+html.light .detail-author-artist strong {
+  color: #0f172a !important;
+}
+
+/* Stats Card in light mode */
+html.light .detail-stats-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light .detail-stats-label {
+  color: #64748b !important;
+}
+
+html.light .detail-stats-value {
+  color: #0f172a !important;
+}
+
+html.light .detail-stats-divider {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Hero outline buttons in light mode */
+html.light .detail-action-btn {
+  border-color: rgba(0, 0, 0, 0.15) !important;
+  color: #475569 !important;
+}
+
+html.light .detail-action-btn:hover {
+  border-color: #0f172a !important;
+  color: #0f172a !important;
+}
+
+/* Synopsis Card in light mode */
+html.light .detail-synopsis-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light .detail-section-title {
+  color: #0f172a !important;
+}
+
+html.light .detail-synopsis-text {
+  color: #334155 !important;
+}
+
+/* Tabs Selector in light mode */
+html.light .detail-tabs-selector {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .detail-tab-btn {
+  color: #64748b !important;
+}
+
+html.light .detail-tab-btn.active {
+  color: #7c3aed !important;
+}
+
+/* Chapter rows in light mode */
+html.light .detail-chapter-row {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+html.light .detail-chapter-row.read {
+  background: rgba(124, 58, 237, 0.04) !important;
+  border-color: rgba(124, 58, 237, 0.2) !important;
+}
+
+html.light .detail-chapter-row:hover {
+  background: rgba(124, 58, 237, 0.08) !important;
+  border-color: rgba(124, 58, 237, 0.4) !important;
+}
+
+html.light .detail-chapter-title {
+  color: #0f172a !important;
+}
+
+html.light .detail-chapter-row.read .detail-chapter-title {
+  color: #7c3aed !important;
+}
+
+html.light .detail-chapter-date {
+  color: #64748b !important;
+}
+
+/* Comment Input and cards in light mode */
+html.light .detail-comment-input {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  color: #0f172a !important;
+}
+
+html.light .detail-comment-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light .detail-comment-name {
+  color: #0f172a !important;
+}
+
+html.light .detail-comment-text {
+  color: #334155 !important;
+}
+
+/* Sidebar Info Card in light mode */
+html.light .detail-info-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light .detail-info-title {
+  color: #0f172a !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .detail-info-label {
+  color: #64748b !important;
+}
+
+html.light .detail-info-value {
+  color: #334155 !important;
+}

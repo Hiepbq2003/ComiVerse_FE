@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getComicsPageApi } from '../../services/api/ComicApi'
+import { getMyReadingHistoryApi, deleteReadingHistoryComicApi } from '../../services/api/ReadingHistoryApi'
+import { getMySavesApi, toggleSaveStatusApi } from '../../services/api/SaveApi'
+import { getMyLikesApi, toggleLikeStatusApi } from '../../services/api/LikeApi'
+import { useAuth } from '../../context/AuthContext'
+import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { toast } from 'react-toastify'
 import '../../assets/style/reader/library.css'
 
@@ -13,7 +18,7 @@ import comicScifi from '../../assets/comic_scifi.png'
 function Library() {
   const navigate = useNavigate()
   const location = useLocation()
-  const [comics, setComics] = useState([])
+  const { isLoggedIn } = useAuth()
   const [loading, setLoading] = useState(true)
 
   // Sub-tabs state
@@ -21,68 +26,82 @@ function Library() {
   
   // Library lists stored in state for interactivity
   const [savedList, setSavedList] = useState([])
-  const [followingList, setFollowingList] = useState([])
+  const [likedList, setLikedList] = useState([])
   const [historyList, setHistoryList] = useState([])
 
   // Pagination for the library lists
-  const [sortOption, setSortOption] = useState('Recently Saved')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalElements, setTotalElements] = useState(0)
   const ITEMS_PER_PAGE = 4
 
+  // Auth guard: redirect to sign-in page if not logged in
   useEffect(() => {
-    const params = new URLSearchParams(location.search)
-    const tab = params.get('tab')
-    if (['Saved', 'Following', 'History'].includes(tab)) {
-      setActiveTab(tab)
+    if (!isLoggedIn) {
+      navigate('/auth?mode=signin')
+    } else {
+      fetchLibraryData()
     }
-  }, [location.search])
+  }, [isLoggedIn, navigate])
 
-  // Reset page index on tab or filter update
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [activeTab, sortOption])
-
-  useEffect(() => {
-    fetchComics()
-  }, [currentPage])
-
-  const fetchComics = async () => {
+  const fetchLibraryData = async () => {
     try {
       setLoading(true)
-      const response = await getComicsPageApi(currentPage, ITEMS_PER_PAGE)
-      // response = { data: [...], metadata: { page, size, totalElements, totalPages } }
-      const list = response.data || []
-      setComics(list)
-
-      // Distribute fetched page data into tab lists
-      setSavedList(list)
-      setFollowingList(list)
-
-      // Reading History: augment with simulated read progress
-      const hist = list.map((c, idx) => ({
-        ...c,
-        lastReadCh: 10 + idx * 12,
-        readTime: `${idx + 1} day${idx !== 0 ? 's' : ''} ago`
-      }))
-      setHistoryList(hist)
-
-      if (response.metadata) {
-        setTotalPages(response.metadata.totalPages || 1)
-        setTotalElements(response.metadata.totalElements || 0)
-      }
+      const [historyData, savesData, likesData] = await Promise.all([
+        getMyReadingHistoryApi().catch(err => {
+          console.error("Failed to fetch reading history:", err)
+          return []
+        }),
+        getMySavesApi().catch(err => {
+          console.error("Failed to fetch saves:", err)
+          return []
+        }),
+        getMyLikesApi().catch(err => {
+          console.error("Failed to fetch likes:", err)
+          return []
+        })
+      ])
+      
+      setHistoryList(Array.isArray(historyData) ? historyData : [])
+      setSavedList(Array.isArray(savesData) ? savesData : [])
+      setLikedList(Array.isArray(likesData) ? likesData : [])
     } catch (err) {
       console.error(err)
-      toast.error('Failed to load library catalog.')
+      toast.error('Failed to load library data.')
     } finally {
       setLoading(false)
     }
   }
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const tab = params.get('tab')
+    if (['Saved', 'Liked', 'History'].includes(tab)) {
+      setActiveTab(tab)
+    }
+  }, [location.search])
+
+  // Reset page index on tab update
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [activeTab])
+
+  // Update total pages and total elements dynamically based on current tab list size
+  useEffect(() => {
+    const list = getActiveList()
+    setTotalPages(Math.ceil(list.length / ITEMS_PER_PAGE) || 1)
+    setTotalElements(list.length)
+  }, [activeTab, savedList, likedList, historyList])
+
+  // Helper to detect if cover is an emoji character
+  const isEmoji = (str) => {
+    if (!str) return false
+    return !str.includes('/') && !str.includes('.') && str.trim().length <= 4
+  }
+
   // Cover image helper
   const getCoverImage = (comic) => {
-    if (comic.cover && typeof comic.cover === 'string' && comic.cover.startsWith('data:image')) {
+    if (comic.cover && typeof comic.cover === 'string') {
       return comic.cover
     }
     const title = (comic.title || '').toLowerCase()
@@ -90,41 +109,74 @@ function Library() {
     if (title.includes('adventure') || title.includes('dragon')) return comicAdventure
     if (title.includes('sci-fi') || title.includes('neon') || title.includes('cyber')) return comicScifi
     const fallbacks = [comicAction, comicAdventure, comicScifi]
-    return fallbacks[comic.id % 3] || comicAction
+    const idHash = typeof comic.id === 'string' ? comic.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : comic.id || 0
+    return fallbacks[idHash % 3] || comicAction
   }
 
   // Action: delete / remove from library list
-  const handleRemoveItem = (id, event) => {
+  const handleRemoveItem = async (id, event) => {
     event.stopPropagation() // Prevent card click navigation
-    if (activeTab === 'Saved') {
-      setSavedList(prev => prev.filter(c => c.id !== id))
-      toast.success('Removed from saved comics.')
-    } else if (activeTab === 'Following') {
-      setFollowingList(prev => prev.filter(c => c.id !== id))
-      toast.success('Unfollowed comic series.')
-    } else {
-      setHistoryList(prev => prev.filter(c => c.id !== id))
-      toast.success('Cleared from reading history.')
+    try {
+      if (activeTab === 'Saved') {
+        await toggleSaveStatusApi(id)
+        setSavedList(prev => prev.filter(c => c.id !== id))
+        toast.success('Removed from saved comics.')
+      } else if (activeTab === 'Liked') {
+        await toggleLikeStatusApi(id)
+        setLikedList(prev => prev.filter(c => c.id !== id))
+        toast.success('Unliked comic series.')
+      } else {
+        await deleteReadingHistoryComicApi(id)
+        setHistoryList(prev => prev.filter(c => c.id !== id))
+        toast.success('Cleared from reading history.')
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to remove item from library.')
+    }
+  }
+
+  const handleClearAll = async () => {
+    const list = getActiveList()
+    if (list.length === 0) return
+
+    const confirmClear = window.confirm(`Are you sure you want to clear all items in your ${activeTab.toLowerCase()} list?`)
+    if (!confirmClear) return
+
+    try {
+      setLoading(true)
+      if (activeTab === 'Saved') {
+        await Promise.all(list.map(c => toggleSaveStatusApi(c.id)))
+        setSavedList([])
+        toast.success('Cleared all saved comics.')
+      } else if (activeTab === 'Liked') {
+        await Promise.all(list.map(c => toggleLikeStatusApi(c.id)))
+        setLikedList([])
+        toast.success('Cleared all liked comics.')
+      } else {
+        await Promise.all(list.map(c => deleteReadingHistoryComicApi(c.id)))
+        setHistoryList([])
+        toast.success('Cleared all reading history.')
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to clear some items. Please try again.')
+      fetchLibraryData()
+    } finally {
+      setLoading(false)
     }
   }
 
   // Pick correct list depending on activeTab
   const getActiveList = () => {
-    let currentList = []
-    if (activeTab === 'Saved') currentList = savedList
-    else if (activeTab === 'Following') currentList = followingList
-    else currentList = historyList
-
-    // Apply sort option if needed (deterministic for simulation)
-    if (sortOption === 'A-Z') {
-      return [...currentList].sort((a, b) => (a.title || '').localeCompare(b.title || ''))
-    }
-    return currentList
+    if (activeTab === 'Saved') return savedList
+    if (activeTab === 'Liked') return likedList
+    return historyList
   }
 
   const activeComics = getActiveList()
-  // Server handles pagination; paginatedComics is the current page's data
-  const paginatedComics = activeComics
+  // Client-side pagination
+  const paginatedComics = activeComics.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
 
   return (
     <HomeLayout>
@@ -144,7 +196,7 @@ function Library() {
               <div className="lib-stat-icon-wrapper">📖</div>
               <div className="lib-stat-info">
                 <span className="lib-stat-label">Comics Read</span>
-                <span className="lib-stat-value">48</span>
+                <span className="lib-stat-value">{historyList.length}</span>
                 <span className="lib-stat-subtext">+3 this week</span>
               </div>
             </div>
@@ -157,10 +209,10 @@ function Library() {
               </div>
             </div>
             <div className="lib-stat-card">
-              <div className="lib-stat-icon-wrapper">🔖</div>
+              <div className="lib-stat-icon-wrapper">❤️</div>
               <div className="lib-stat-info">
-                <span className="lib-stat-label">Following</span>
-                <span className="lib-stat-value">{followingList.length}</span>
+                <span className="lib-stat-label">Liked</span>
+                <span className="lib-stat-value">{likedList.length}</span>
                 <span className="lib-stat-subtext">latest updates</span>
               </div>
             </div>
@@ -198,8 +250,8 @@ function Library() {
             </div>
           </div>
 
-          {/* ── SUB-TABS ROW & SORTERS ─────────────────── */}
-          <div className="lib-tabs-row">
+          {/* ── SUB-TABS ROW ─────────────────── */}
+          <div className="lib-tabs-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <div className="lib-tabs-group">
               <div 
                 className={`lib-tab-item ${activeTab === 'Saved' ? 'active' : ''}`}
@@ -208,10 +260,10 @@ function Library() {
                 Saved <span className="lib-tab-badge">{savedList.length}</span>
               </div>
               <div 
-                className={`lib-tab-item ${activeTab === 'Following' ? 'active' : ''}`}
-                onClick={() => setActiveTab('Following')}
+                className={`lib-tab-item ${activeTab === 'Liked' ? 'active' : ''}`}
+                onClick={() => setActiveTab('Liked')}
               >
-                Following <span className="lib-tab-badge">{followingList.length}</span>
+                Liked <span className="lib-tab-badge">{likedList.length}</span>
               </div>
               <div 
                 className={`lib-tab-item ${activeTab === 'History' ? 'active' : ''}`}
@@ -221,26 +273,36 @@ function Library() {
               </div>
             </div>
 
-            <div className="lib-sort-group">
-              <button 
-                className={`lib-sort-btn ${sortOption === 'Recently Saved' ? 'active' : ''}`}
-                onClick={() => setSortOption('Recently Saved')}
+            {activeComics.length > 0 && (
+              <button
+                onClick={handleClearAll}
+                className="btn-hero-outline"
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '12.5px',
+                  borderRadius: '16px',
+                  borderColor: 'rgba(239, 68, 68, 0.4)',
+                  color: '#ef4444',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  background: 'rgba(239, 68, 68, 0.05)',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'
+                  e.currentTarget.style.borderColor = '#ef4444'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.05)'
+                  e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)'
+                }}
               >
-                {activeTab === 'History' ? 'Recently Read' : 'Recently Saved'}
+                🗑️ Clear All
               </button>
-              <button 
-                className={`lib-sort-btn ${sortOption === 'Recently Updated' ? 'active' : ''}`}
-                onClick={() => setSortOption('Recently Updated')}
-              >
-                Recently Updated
-              </button>
-              <button 
-                className={`lib-sort-btn ${sortOption === 'A-Z' ? 'active' : ''}`}
-                onClick={() => setSortOption('A-Z')}
-              >
-                A-Z
-              </button>
-            </div>
+            )}
           </div>
 
           {/* ── CONTENT CARDS GRID ─────────────────────── */}
@@ -264,17 +326,21 @@ function Library() {
                     onClick={() => navigate(`/comic/${comic.id}`)}
                     style={{ cursor: 'pointer' }}
                   >
-                    <img 
-                      src={getCoverImage(comic)} 
-                      alt={comic.title} 
-                      className="lib-comic-cover" 
-                    />
+                    {isEmoji(getCoverImage(comic)) ? (
+                      <div className="lib-comic-cover-emoji-fallback">{getCoverImage(comic)}</div>
+                    ) : (
+                      <img 
+                        src={getCoverImage(comic)} 
+                        alt={comic.title} 
+                        className="lib-comic-cover" 
+                      />
+                    )}
                     <div className="lib-comic-details">
                       <h4 className="lib-comic-title">{comic.title}</h4>
-                      <p className="lib-comic-author">{comic.author || 'Unknown Author'}</p>
+                      <p className="lib-comic-author">{comic.authorName || comic.author || 'Unknown Author'}</p>
                       
                       <div className="lib-comic-genres">
-                        {(comic.genres || ['Action']).slice(0, 2).map((g, idx) => (
+                        {(comic.genres && comic.genres.length > 0 ? comic.genres : ['Action']).slice(0, 2).map((g, idx) => (
                           <span key={idx} className="lib-comic-genre-tag">{g}</span>
                         ))}
                       </div>
@@ -282,12 +348,14 @@ function Library() {
                       <div className="lib-comic-meta">
                         {activeTab === 'History' ? (
                           <>
-                            <span className="lib-comic-chapter">Ch.{comic.lastReadCh || 1}</span>
-                            <span className="lib-comic-status-text">Read {comic.readTime}</span>
+                            <span className="lib-comic-chapter">Ch.{comic.latestChapterNumber || comic.chapterCount || 1}</span>
+                            <span className="lib-comic-status-text">
+                              {comic.lastChapterUpdatedAt ? `Read ${formatTimeAgo(comic.lastChapterUpdatedAt)}` : 'Recently'}
+                            </span>
                           </>
                         ) : (
                           <>
-                            <span className="lib-comic-chapter">Ch.{parseInt(comic.chapters) || 120}</span>
+                            <span className="lib-comic-chapter">Ch.{comic.latestChapterNumber || comic.chapterCount || parseInt(comic.chapters) || 0}</span>
                             <span className="lib-comic-status-dot"></span>
                             <span className="lib-comic-status-text">{comic.status || 'Ongoing'}</span>
                           </>

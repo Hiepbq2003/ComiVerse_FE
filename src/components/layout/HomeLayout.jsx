@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { MOCK_COMICS } from '../../utils/mockComics'
 import '../../assets/style/reader/home.css'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
+import { getComicsPageApi } from '../../services/api/ComicApi'
 
 function HomeLayout({ children }) {
   const navigate = useNavigate()
@@ -110,7 +110,7 @@ function HomeLayout({ children }) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Debounced search effect (using demo data)
+  // Debounced search effect (using real API)
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSuggestions([])
@@ -121,15 +121,18 @@ function HomeLayout({ children }) {
     setIsSearchLoading(true)
     setShowSearchDropdown(true)
 
-    // Delay 1s before searching demo data
-    const delayDebounceFn = setTimeout(() => {
-      const filtered = MOCK_COMICS.filter(comic =>
-        (comic.title && comic.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (comic.author && comic.author.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (comic.genres && comic.genres.some(g => g.toLowerCase().includes(searchQuery.toLowerCase())))
-      )
-      setSuggestions(filtered)
-      setIsSearchLoading(false)
+    // Delay 1s before searching database
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const response = await getComicsPageApi(1, 5, searchQuery)
+        const list = response.data || response || []
+        setSuggestions(list)
+      } catch (err) {
+        console.error(err)
+        setSuggestions([])
+      } finally {
+        setIsSearchLoading(false)
+      }
     }, 1000)
 
     return () => clearTimeout(delayDebounceFn)
@@ -473,14 +476,8 @@ function HomeLayout({ children }) {
                     <button type="button" className="home-user-menu-option" onClick={() => handleMenuNavigate('/profile')}>
                       <span>Profile</span>
                     </button>
-                    <button type="button" className="home-user-menu-option" onClick={() => handleMenuNavigate('/library?tab=History')}>
-                      <span>Reading History</span>
-                    </button>
-                    <button type="button" className="home-user-menu-option" onClick={() => handleMenuNavigate('/library?tab=Saved')}>
-                      <span>Favorites</span>
-                    </button>
-                    <button type="button" className="home-user-menu-option" onClick={() => handleMenuNavigate('/library?tab=Following')}>
-                      <span>Following</span>
+                    <button type="button" className="home-user-menu-option" onClick={() => handleMenuNavigate('/library')}>
+                      <span>Library</span>
                     </button>
                     {canOpenWorkspace() && (
                       <button type="button" className="home-user-menu-option" onClick={() => handleMenuNavigate(getDashboardPath())}>
