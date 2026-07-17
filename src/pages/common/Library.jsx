@@ -136,37 +136,6 @@ function Library() {
     }
   }
 
-  const handleClearAll = async () => {
-    const list = getActiveList()
-    if (list.length === 0) return
-
-    const confirmClear = window.confirm(`Are you sure you want to clear all items in your ${activeTab.toLowerCase()} list?`)
-    if (!confirmClear) return
-
-    try {
-      setLoading(true)
-      if (activeTab === 'Saved') {
-        await Promise.all(list.map(c => toggleSaveStatusApi(c.id)))
-        setSavedList([])
-        toast.success('Cleared all saved comics.')
-      } else if (activeTab === 'Liked') {
-        await Promise.all(list.map(c => toggleLikeStatusApi(c.id)))
-        setLikedList([])
-        toast.success('Cleared all liked comics.')
-      } else {
-        await Promise.all(list.map(c => deleteReadingHistoryComicApi(c.id)))
-        setHistoryList([])
-        toast.success('Cleared all reading history.')
-      }
-    } catch (err) {
-      console.error(err)
-      toast.error('Failed to clear some items. Please try again.')
-      fetchLibraryData()
-    } finally {
-      setLoading(false)
-    }
-  }
-
   // Pick correct list depending on activeTab
   const getActiveList = () => {
     if (activeTab === 'Saved') return savedList
@@ -272,37 +241,6 @@ function Library() {
                 Reading History <span className="lib-tab-badge">{historyList.length}</span>
               </div>
             </div>
-
-            {activeComics.length > 0 && (
-              <button
-                onClick={handleClearAll}
-                className="btn-hero-outline"
-                style={{
-                  padding: '6px 14px',
-                  fontSize: '12.5px',
-                  borderRadius: '16px',
-                  borderColor: 'rgba(239, 68, 68, 0.4)',
-                  color: '#ef4444',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  background: 'rgba(239, 68, 68, 0.05)',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'
-                  e.currentTarget.style.borderColor = '#ef4444'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.05)'
-                  e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)'
-                }}
-              >
-                🗑️ Clear All
-              </button>
-            )}
           </div>
 
           {/* ── CONTENT CARDS GRID ─────────────────────── */}
