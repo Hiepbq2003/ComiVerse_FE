@@ -179,7 +179,7 @@ function ComicPageCanvas({ src, pageIndex, isEncrypted = false, xorKey = 0x5A, f
         justifyContent: 'center',
         alignItems: 'center',
         minHeight: '400px',
-        backgroundColor: '#07040d'
+        backgroundColor: 'var(--chapter-bg)'
       }}
     >
       {/* Loading Shimmer */}
@@ -192,7 +192,7 @@ function ComicPageCanvas({ src, pageIndex, isEncrypted = false, xorKey = 0x5A, f
             left: 0,
             width: '100%',
             height: '100%',
-            backgroundColor: 'rgba(255, 255, 255, 0.03)',
+            backgroundColor: 'var(--chapter-control-bg)',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',

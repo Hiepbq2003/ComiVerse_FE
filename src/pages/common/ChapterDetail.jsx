@@ -7,6 +7,7 @@ import { toast } from 'react-toastify'
 import useReaderSecurity from '../../hooks/useReaderSecurity'
 import ComicPageCanvas from '../../components/common/ComicPageCanvas'
 import '../../assets/style/reader/chapter-detail.css'
+import { isValidUuid } from '../../utils/uuid'
 
 function ChapterDetail() {
   const { comicId, chapterId } = useParams()
@@ -62,6 +63,10 @@ function ChapterDetail() {
     const fetchChapterAndComicInfo = async () => {
       try {
         setLoading(true)
+
+        if (!isValidUuid(comicId) || !isValidUuid(chapterId)) {
+          throw new Error('Using local preview data for a demo route')
+        }
 
         // Fetch current chapter detail, comic detail, and all chapters of the comic in parallel
         const [chapterRes, chaptersListRes, comicRes] = await Promise.all([

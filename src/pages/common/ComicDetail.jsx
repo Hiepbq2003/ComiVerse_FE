@@ -9,6 +9,7 @@ import { checkSaveStatusApi, toggleSaveStatusApi } from '../../services/api/Save
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { toast } from 'react-toastify'
 import { getReadChaptersByComicIdApi } from '../../services/api/ReadingHistoryApi'
+import { isValidUuid } from '../../utils/uuid'
 
 // Import assets
 import comicAction from '../../assets/comic_action.png'
@@ -316,6 +317,7 @@ function ComicDetail() {
     <HomeLayout>
       {/* BACKGROUND BANNER */}
       <div
+        className="comic-detail-hero"
         style={{
           position: 'relative',
           minHeight: '380px',
@@ -347,7 +349,7 @@ function ComicDetail() {
           style={{
             position: 'absolute',
             inset: 0,
-            background: 'linear-gradient(to top, #07040d 0%, transparent 100%)',
+            background: 'linear-gradient(to top, var(--color-bg-dark) 0%, transparent 100%)',
             zIndex: 1
           }}
         />
@@ -366,6 +368,7 @@ function ComicDetail() {
         >
           {/* Cover */}
           <div
+            className="comic-detail-cover"
             style={{
               width: '200px',
               height: '280px',
@@ -572,6 +575,7 @@ function ComicDetail() {
             {/* TAB CONTENT: CHAPTERS LIST */}
             {activeTab === 'chapters' && (
               <div
+                className="comic-detail-chapter-list"
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
@@ -726,8 +730,8 @@ function ComicDetail() {
             <div
               className="detail-info-card"
               style={{
-                background: '#0d0919',
-                border: '1px solid rgba(255, 255, 255, 0.05)',
+                background: 'var(--reader-card-bg)',
+                border: '1px solid var(--reader-card-border)',
                 padding: '24px',
                 borderRadius: '16px',
                 display: 'flex',

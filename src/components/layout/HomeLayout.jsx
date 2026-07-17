@@ -67,17 +67,17 @@ function HomeLayout({ children }) {
 
   const getDashboardPath = () => {
     if (!isLoggedIn || !user) return '/auth'
-    const roleUpper = (user.role || '').toUpperCase()
+    const roleUpper = (user.role || '').toUpperCase().replace(/[\s-]+/g, '_')
     if (roleUpper === 'ADMIN') return '/admin/account-management'
     if (roleUpper === 'AUTHOR') return '/author/overview'
-    if (roleUpper === 'TRANSLATOR') return '/translator/dashboard'
+    if (roleUpper === 'TRANSLATOR' || roleUpper === 'PROJECT_LEADER') return '/translator/dashboard'
 
     return '/auth' // Reader dashboard is handled inside AuthPage
   }
 
   const canOpenWorkspace = () => {
     if (!isLoggedIn || !user) return false
-    const roleUpper = (user.role || '').toUpperCase()
+    const roleUpper = (user.role || '').toUpperCase().replace(/[\s-]+/g, '_')
     return !['READER', 'USER'].includes(roleUpper)
   }
 
@@ -344,8 +344,8 @@ function HomeLayout({ children }) {
                       right: '0',
                       top: '40px',
                       width: '320px',
-                      background: '#0d0919',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      background: 'var(--reader-card-bg)',
+                      border: '1px solid var(--reader-card-border)',
                       borderRadius: '12px',
                       boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
                       zIndex: 101,
@@ -561,34 +561,22 @@ function HomeLayout({ children }) {
             </div>
 
             <div className="footer-links-col">
-              <span className="footer-col-title">Showcases</span>
-              <div className="footer-links-list">
-                <Link to="/showcase/skeletons" className="footer-link">Skeleton Showcase</Link>
-                <Link to="/showcase/popovers" className="footer-link">AI Popover Showcase</Link>
-                <Link to="/showcase/profile-menu" className="footer-link">Profile Dropdown Showcase</Link>
-                <Link to="/showcase/buttons" className="footer-link">Buttons Showcase</Link>
-                <Link to="/showcase/paginations" className="footer-link">Paginations Showcase</Link>
-                <Link to="/showcase/animated-buttons" className="footer-link">Animated Buttons Showcase</Link>
-              </div>
-            </div>
-
-            <div className="footer-links-col">
               <span className="footer-col-title">For Creators</span>
               <div className="footer-links-list">
                 <Link to="/auth?mode=signup" className="footer-link">Publish Your Comic</Link>
-                <span className="footer-link" style={{ cursor: 'pointer' }}>Creator Portal</span>
-                <span className="footer-link" style={{ cursor: 'pointer' }}>Earning Models</span>
-                <span className="footer-link" style={{ cursor: 'pointer' }}>Community Forums</span>
+                <Link to="/author/overview" className="footer-link">Creator Portal</Link>
+                <Link to="/author/earnings" className="footer-link">Earning Models</Link>
+                <Link to="/forum" className="footer-link">Community Forums</Link>
               </div>
             </div>
 
             <div className="footer-links-col">
               <span className="footer-col-title">Company</span>
               <div className="footer-links-list">
-                <span className="footer-link" style={{ cursor: 'pointer' }}>About Us</span>
-                <span className="footer-link" style={{ cursor: 'pointer' }}>Privacy Policy</span>
-                <span className="footer-link" style={{ cursor: 'pointer' }}>Terms of Service</span>
-                <span className="footer-link" style={{ cursor: 'pointer' }}>Contact Support</span>
+                <Link to="/about" className="footer-link">About Us</Link>
+                <Link to="/policy" className="footer-link">Privacy Policy</Link>
+                <Link to="/terms" className="footer-link">Terms of Service</Link>
+                <Link to="/contact" className="footer-link">Contact Support</Link>
               </div>
             </div>
           </div>

@@ -6,6 +6,8 @@ function ForgotPassword({ onNavigate, onOTPSent, showAlert, loading, setLoading 
 
   const handleForgot = async (e) => {
     e.preventDefault()
+    if (loading) return
+
     setLoading(true)
     try {
       const normalizedEmail = email.trim();
@@ -13,7 +15,7 @@ function ForgotPassword({ onNavigate, onOTPSent, showAlert, loading, setLoading 
       onOTPSent(normalizedEmail);
       showAlert('success', 'OTP code sent! Please check your email.');
     } catch (err) {
-      const errMessage = err.response?.data?.message || 'Email not found.';
+      const errMessage = err.response?.data?.message || 'Cannot connect to the server. Please make sure the backend is running.';
       showAlert('error', errMessage);
     } finally {
       setLoading(false)
@@ -51,7 +53,7 @@ function ForgotPassword({ onNavigate, onOTPSent, showAlert, loading, setLoading 
         </div>
 
         <button type="submit" className="btn-primary auth-margin-top-16" disabled={loading}>
-          <span>{loading ? 'Sending Code...' : 'Send OTP Code'}</span> <span className="btn-arrow-icon">›</span>
+          <span>{loading ? 'Sending Code...' : 'Send OTP Code'}</span> <span className="btn-arrow-icon">&gt;</span>
         </button>
 
         <button type="button" className="btn-secondary auth-margin-top-12" onClick={() => onNavigate('signin')}>

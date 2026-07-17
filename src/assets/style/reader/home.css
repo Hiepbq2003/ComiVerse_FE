@@ -3,6 +3,12 @@
 :root {
   --color-bg-dark: #07040d;
   --color-pane-dark: #0d0919;
+  --reader-card-bg: #0d0919;
+  --reader-card-bg-subtle: rgba(255, 255, 255, 0.03);
+  --reader-card-border: rgba(255, 255, 255, 0.06);
+  --reader-heading: #ffffff;
+  --reader-text: #cbd5e1;
+  --reader-text-muted: #64748b;
   --color-primary-grad: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
   --color-accent-purple: #a855f7;
   --color-accent-pink: #ec4899;
@@ -726,7 +732,7 @@ html.light .btn-home-auth-link:hover {
 
 /* COMIC CARD (UNIVERSAL PREMIUM STYLE) */
 .home-comic-card {
-  background: #0d0919;
+  background: var(--reader-card-bg);
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.05);
   overflow: hidden;
@@ -806,14 +812,14 @@ html.light .btn-home-auth-link:hover {
   flex-direction: column;
   gap: 4px;
   flex-grow: 1;
-  background: linear-gradient(to bottom, #0d0919, #080510);
+  background: var(--reader-card-bg);
 }
 
 .card-title {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: white;
+  color: var(--reader-heading);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -825,11 +831,11 @@ html.light .btn-home-auth-link:hover {
   align-items: center;
   justify-content: space-between;
   font-size: 11px;
-  color: #64748b;
+  color: var(--reader-text-muted);
 }
 
 .card-chapter-number {
-  color: #cbd5e1;
+  color: var(--reader-text);
   font-weight: 500;
 }
 
@@ -870,7 +876,7 @@ html.light .btn-home-auth-link:hover {
 
 .hot-featured-card {
   position: relative;
-  background: #0d0919;
+  background: var(--reader-card-bg);
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.05);
   overflow: hidden;
@@ -915,7 +921,7 @@ html.light .btn-home-auth-link:hover {
 
 .hot-featured-info {
   padding: 24px;
-  background: linear-gradient(to bottom, #0d0919, #05030a);
+  background: var(--reader-card-bg);
 }
 
 .hot-featured-title {
@@ -1047,8 +1053,8 @@ html.light .btn-home-auth-link:hover {
 .update-card {
   display: flex;
   gap: 14px;
-  background: #0d0919;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--reader-card-bg);
+  border: 1px solid var(--reader-card-border);
   border-radius: 12px;
   padding: 12px;
   transition: all 0.25s ease;
@@ -1109,7 +1115,7 @@ html.light .btn-home-auth-link:hover {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: white;
+  color: var(--reader-heading);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1117,7 +1123,7 @@ html.light .btn-home-auth-link:hover {
 
 .update-genre {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--reader-text-muted);
 }
 
 .update-chapters-list {
@@ -1131,12 +1137,12 @@ html.light .btn-home-auth-link:hover {
   align-items: center;
   justify-content: space-between;
   font-size: 12px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--reader-card-bg-subtle);
   border-radius: 6px;
   padding: 4px 8px;
   transition: background 0.2s ease;
   text-decoration: none;
-  color: #cbd5e1;
+  color: var(--reader-text);
 }
 
 .update-chapter-row:hover {
@@ -1150,7 +1156,7 @@ html.light .btn-home-auth-link:hover {
 
 .update-chapter-time {
   font-size: 10px;
-  color: #64748b;
+  color: var(--reader-text-muted);
 }
 
 
