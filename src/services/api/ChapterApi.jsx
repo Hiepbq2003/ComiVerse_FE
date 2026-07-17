@@ -6,4 +6,6 @@ export const getChaptersByComicIdApi = (comicId) => {
 
 export const getChapterDetailApi = (chapterId) => {
   return AxiosClient.get(`/chapters/detail/${chapterId}`);
+export const deleteChapterApi = (chapterId) => {
+  return AxiosClient.delete(`/chapters/${chapterId}`);
 };
