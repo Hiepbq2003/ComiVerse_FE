@@ -7,6 +7,7 @@ import { toast } from 'react-toastify'
 import useReaderSecurity from '../../hooks/useReaderSecurity'
 import ComicPageCanvas from '../../components/common/ComicPageCanvas'
 import '../../assets/style/reader/chapter-detail.css'
+import { isValidUuid } from '../../utils/uuid'
 
 function ChapterDetail() {
   const { comicId, chapterId } = useParams()
@@ -63,6 +64,10 @@ function ChapterDetail() {
       try {
         setLoading(true)
 
+        if (!isValidUuid(comicId) || !isValidUuid(chapterId)) {
+          throw new Error('Using local preview data for a demo route')
+        }
+
         // Fetch current chapter detail, comic detail, and all chapters of the comic in parallel
         const [chapterRes, chaptersListRes, comicRes] = await Promise.all([
           getChapterDetailApi(chapterId),
@@ -89,6 +94,9 @@ function ChapterDetail() {
         // Try to fetch comic metadata alone if chapter API was the only one that failed
         let fallbackComic = null
         try {
+          if (!isValidUuid(comicId)) {
+            throw new Error('Demo comic ID')
+          }
           const cRes = await getComicByIdApi(comicId)
           fallbackComic = cRes?.data || cRes
         } catch (e) {
@@ -99,6 +107,9 @@ function ChapterDetail() {
         // Try to fetch chapters list if possible
         let fallbackChapters = []
         try {
+          if (!isValidUuid(comicId)) {
+            throw new Error('Demo comic ID')
+          }
           const lRes = await getChaptersByComicIdApi(comicId)
           fallbackChapters = lRes?.data || lRes || []
         } catch (e) {

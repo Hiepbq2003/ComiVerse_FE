@@ -164,7 +164,7 @@ function Ranking() {
                     <span>🏆</span> RANK #01
                   </div>
                 </div>
-                <div className="hot-featured-info" style={{ background: 'linear-gradient(to bottom, #0d0919, #05030a)' }}>
+                <div className="hot-featured-info" style={{ background: 'linear-gradient(to bottom, var(--reader-card-bg), var(--color-bg-dark))' }}>
                   <h3 className="hot-featured-title" style={{ fontSize: '24px' }}>{featuredComic.title}</h3>
                   <p className="hot-featured-tagline" style={{ fontSize: '14px', margin: '8px 0 20px' }}>{featuredComic.tagline || 'An epic fantasy series on ComiVerse.'}</p>
                   <div className="hot-featured-meta">

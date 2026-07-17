@@ -9,6 +9,7 @@ import { checkSaveStatusApi, toggleSaveStatusApi } from '../../services/api/Save
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { toast } from 'react-toastify'
 import { getReadChaptersByComicIdApi } from '../../services/api/ReadingHistoryApi'
+import { isValidUuid } from '../../utils/uuid'
 
 // Import assets
 import comicAction from '../../assets/comic_action.png'
@@ -185,6 +186,30 @@ function ComicDetail() {
     const fetchComicDetail = async () => {
       try {
         setLoading(true)
+
+        if (!isValidUuid(id)) {
+          const fallbackComic = comicsDb[id] || comicsDb['1']
+          const mockChapters = []
+          const totalCh = fallbackComic.chaptersCount || 10
+          for (let i = totalCh; i >= 1; i--) {
+            mockChapters.push({
+              id: `mock-${i}`,
+              chapterNumber: String(i),
+              title: `Chapter ${i}: ${i === totalCh ? 'The Final Confrontation' : `Story Arc Part ${i}`}`,
+              createdAt: new Date(Date.now() - (totalCh - i) * 24 * 60 * 60 * 1000).toISOString(),
+              viewCount: Math.floor(Math.random() * 20000 + 5000)
+            })
+          }
+          setComic(fallbackComic)
+          setChapters(mockChapters)
+          setInLibrary(false)
+          setIsLiked(false)
+          setReadChapterIds(['mock-1'])
+          serverSavedRef.current = false
+          serverLikedRef.current = false
+          setIsMockData(true)
+          return
+        }
         
         // Check user login status at call time
         const auth = getAuth()
@@ -271,6 +296,11 @@ function ComicDetail() {
         saveCount: Math.max(0, currentCount + diff)
       }
     })
+
+    if (isMockData) {
+      serverSavedRef.current = next
+      return
+    }
     
     // Clear any pending toggle API call to enforce 1s debounce
     if (saveTimeoutRef.current) {
@@ -320,6 +350,11 @@ function ComicDetail() {
         likeCount: Math.max(0, currentCount + diff)
       }
     })
+
+    if (isMockData) {
+      serverLikedRef.current = next
+      return
+    }
     
     // Clear any pending toggle API call to enforce 1s debounce
     if (likeTimeoutRef.current) {
@@ -443,6 +478,7 @@ function ComicDetail() {
     <HomeLayout>
       {/* BACKGROUND BANNER */}
       <div
+        className="comic-detail-hero"
         style={{
           position: 'relative',
           minHeight: '380px',
@@ -454,6 +490,7 @@ function ComicDetail() {
         }}
       >
         <div
+          className="comic-detail-hero-bg"
           style={{
             position: 'absolute',
             inset: 0,
@@ -466,10 +503,11 @@ function ComicDetail() {
           }}
         />
         <div
+          className="comic-detail-hero-overlay"
           style={{
             position: 'absolute',
             inset: 0,
-            background: 'linear-gradient(to top, #07040d 0%, transparent 100%)',
+            background: 'linear-gradient(to top, var(--color-bg-dark) 0%, transparent 100%)',
             zIndex: 1
           }}
         />
@@ -488,6 +526,7 @@ function ComicDetail() {
         >
           {/* Cover */}
           <div
+            className="comic-detail-cover"
             style={{
               width: '200px',
               height: '280px',
@@ -520,6 +559,7 @@ function ComicDetail() {
               {displayGenres.map((genre, idx) => (
                 <span
                   key={idx}
+                  className="comic-detail-genre"
                   style={{
                     background: 'rgba(255, 255, 255, 0.06)',
                     border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -536,6 +576,7 @@ function ComicDetail() {
             </div>
 
             <h1
+              className="comic-detail-title"
               style={{
                 fontFamily: 'var(--font-serif)',
                 fontSize: '42px',
@@ -548,7 +589,7 @@ function ComicDetail() {
               {displayTitle}
             </h1>
 
-            <p style={{ margin: '0 0 16px', color: '#94a3b8', fontSize: '15px' }}>
+            <p className="comic-detail-byline" style={{ margin: '0 0 16px', color: '#94a3b8', fontSize: '15px' }}>
               Story by <strong style={{ color: 'white' }}>{displayAuthor}</strong>  •  Art by <strong style={{ color: 'white' }}>{displayArtist}</strong>
             </p>
 
@@ -574,17 +615,17 @@ function ComicDetail() {
               <div style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
               <div style={{ textAlign: 'center' }}>
                 <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Views</span>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>👁️ {displayViews}</span>
+                <span className="comic-detail-stat-value" style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>👁️ {displayViews}</span>
               </div>
               <div style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
               <div style={{ textAlign: 'center' }}>
                 <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Likes</span>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>❤️ {displayLikes}</span>
+                <span className="comic-detail-stat-value" style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>❤️ {displayLikes}</span>
               </div>
               <div style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
               <div style={{ textAlign: 'center' }}>
                 <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Bookmarks</span>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>🔖 {displayBookmarks}</span>
+                <span className="comic-detail-stat-value" style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>🔖 {displayBookmarks}</span>
               </div>
             </div>
 
@@ -599,14 +640,14 @@ function ComicDetail() {
               </button>
               <button
                 onClick={handleAddToLibrary}
-                className="btn-hero-outline"
+                className={`btn-hero-outline ${inLibrary ? 'is-saved' : ''}`}
                 style={{ padding: '12px 24px', fontSize: '15px', borderColor: inLibrary ? '#10b981' : 'rgba(255, 255, 255, 0.15)', color: inLibrary ? '#10b981' : 'white' }}
               >
                 {inLibrary ? '✓ Saved to Library' : '🔖 Add to Library'}
               </button>
               <button
                 onClick={handleToggleLike}
-                className="btn-hero-outline"
+                className={`btn-hero-outline ${isLiked ? 'is-liked' : ''}`}
                 style={{ 
                   padding: '12px 24px', 
                   fontSize: '15px', 
@@ -637,6 +678,7 @@ function ComicDetail() {
 
             {/* Tabs Selector */}
             <div
+              className="comic-detail-stats"
               style={{
                 display: 'flex',
                 borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
@@ -680,6 +722,7 @@ function ComicDetail() {
             {/* TAB CONTENT: CHAPTERS LIST */}
             {activeTab === 'chapters' && (
               <div
+                className="comic-detail-chapter-list"
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
@@ -700,6 +743,7 @@ function ComicDetail() {
                   return (
                     <div
                       key={ch.id || ch.chapterNumber}
+                      className={`comic-detail-chapter-row ${isRead ? 'is-read' : ''}`}
                       style={{
                         display: 'flex',
                         justifyContent: 'space-between',
@@ -829,9 +873,10 @@ function ComicDetail() {
           {/* Right Column: Sidebar (About / Artist / Info) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div
+              className="comic-detail-info-card"
               style={{
-                background: '#0d0919',
-                border: '1px solid rgba(255, 255, 255, 0.05)',
+                background: 'var(--reader-card-bg)',
+                border: '1px solid var(--reader-card-border)',
                 padding: '24px',
                 borderRadius: '16px',
                 display: 'flex',

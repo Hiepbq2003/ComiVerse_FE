@@ -1404,8 +1404,8 @@ function TeamProjects() {
                         <p style={{ fontSize: '13px', margin: 0 }}>All approved chapters have been assigned tasks on your board.</p>
                       </div>
                     ) : (
-                      <div className="chapter-backlog-table" style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
-                        <div className="chapter-backlog-table-head" style={{ position: 'sticky', top: 0, background: '#130d24', zIndex: 10 }}>
+                      <div className="chapter-backlog-table" style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid var(--trans-border)', borderRadius: '8px' }}>
+                        <div className="chapter-backlog-table-head" style={{ position: 'sticky', top: 0, background: 'var(--trans-card-bg)', zIndex: 10 }}>
                           <span>CHAPTER</span>
                           <span>COMIC</span>
                           <span>PAGES</span>

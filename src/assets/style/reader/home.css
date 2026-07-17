@@ -3,6 +3,12 @@
 :root {
   --color-bg-dark: #07040d;
   --color-pane-dark: #0d0919;
+  --reader-card-bg: #0d0919;
+  --reader-card-bg-subtle: rgba(255, 255, 255, 0.03);
+  --reader-card-border: rgba(255, 255, 255, 0.06);
+  --reader-heading: #ffffff;
+  --reader-text: #cbd5e1;
+  --reader-text-muted: #64748b;
   --color-primary-grad: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
   --color-accent-purple: #a855f7;
   --color-accent-pink: #ec4899;
@@ -726,7 +732,7 @@ html.light .btn-home-auth-link:hover {
 
 /* COMIC CARD (UNIVERSAL PREMIUM STYLE) */
 .home-comic-card {
-  background: #0d0919;
+  background: var(--reader-card-bg);
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.05);
   overflow: hidden;
@@ -806,14 +812,14 @@ html.light .btn-home-auth-link:hover {
   flex-direction: column;
   gap: 4px;
   flex-grow: 1;
-  background: linear-gradient(to bottom, #0d0919, #080510);
+  background: var(--reader-card-bg);
 }
 
 .card-title {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: white;
+  color: var(--reader-heading);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -825,11 +831,11 @@ html.light .btn-home-auth-link:hover {
   align-items: center;
   justify-content: space-between;
   font-size: 11px;
-  color: #64748b;
+  color: var(--reader-text-muted);
 }
 
 .card-chapter-number {
-  color: #cbd5e1;
+  color: var(--reader-text);
   font-weight: 500;
 }
 
@@ -870,7 +876,7 @@ html.light .btn-home-auth-link:hover {
 
 .hot-featured-card {
   position: relative;
-  background: #0d0919;
+  background: var(--reader-card-bg);
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.05);
   overflow: hidden;
@@ -915,7 +921,7 @@ html.light .btn-home-auth-link:hover {
 
 .hot-featured-info {
   padding: 24px;
-  background: linear-gradient(to bottom, #0d0919, #05030a);
+  background: var(--reader-card-bg);
 }
 
 .hot-featured-title {
@@ -1047,8 +1053,8 @@ html.light .btn-home-auth-link:hover {
 .update-card {
   display: flex;
   gap: 14px;
-  background: #0d0919;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--reader-card-bg);
+  border: 1px solid var(--reader-card-border);
   border-radius: 12px;
   padding: 12px;
   transition: all 0.25s ease;
@@ -1108,7 +1114,7 @@ html.light .btn-home-auth-link:hover {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: white;
+  color: var(--reader-heading);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1116,7 +1122,7 @@ html.light .btn-home-auth-link:hover {
 
 .update-genre {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--reader-text-muted);
 }
 
 .update-chapters-list {
@@ -1130,12 +1136,12 @@ html.light .btn-home-auth-link:hover {
   align-items: center;
   justify-content: space-between;
   font-size: 12px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--reader-card-bg-subtle);
   border-radius: 6px;
   padding: 4px 8px;
   transition: background 0.2s ease;
   text-decoration: none;
-  color: #cbd5e1;
+  color: var(--reader-text);
 }
 
 .update-chapter-row:hover {
@@ -1149,7 +1155,7 @@ html.light .btn-home-auth-link:hover {
 
 .update-chapter-time {
   font-size: 10px;
-  color: #64748b;
+  color: var(--reader-text-muted);
 }
 
 
@@ -1698,4 +1704,186 @@ html.light .home-search-input {
 html.light .home-search-input:focus {
   border-color: #7c3aed !important;
   box-shadow: 0 0 14px rgba(124, 58, 237, 0.2) !important;
+}
+
+/* Reader content surfaces in light mode */
+html.light {
+  --reader-card-bg: #ffffff;
+  --reader-card-bg-subtle: #f5f1ec;
+  --reader-card-border: rgba(99, 87, 78, 0.13);
+  --reader-heading: #182235;
+  --reader-text: #475569;
+  --reader-text-muted: #64748b;
+}
+
+html.light .home-comic-card,
+html.light .hot-featured-card,
+html.light .update-card {
+  background: var(--reader-card-bg) !important;
+  border-color: var(--reader-card-border) !important;
+  box-shadow: 0 6px 18px rgba(44, 29, 17, 0.05);
+}
+
+html.light .home-comic-card .card-info-area,
+html.light .hot-featured-card .hot-featured-info {
+  background: var(--reader-card-bg) !important;
+}
+
+html.light .home-comic-card .card-title,
+html.light .update-card .update-title {
+  color: var(--reader-heading) !important;
+}
+
+html.light .home-comic-card .card-chapter-number,
+html.light .update-card .update-chapter-row {
+  color: var(--reader-text) !important;
+}
+
+html.light .home-comic-card .card-chapter-row,
+html.light .update-card .update-genre,
+html.light .update-card .update-chapter-time {
+  color: var(--reader-text-muted) !important;
+}
+
+html.light .update-card .update-chapter-row {
+  background: var(--reader-card-bg-subtle) !important;
+}
+
+html.light .home-comic-card:hover,
+html.light .hot-featured-card:hover,
+html.light .update-card:hover {
+  border-color: rgba(168, 85, 247, 0.32) !important;
+  box-shadow: 0 14px 28px rgba(124, 58, 237, 0.1);
+}
+
+/* Reader hero surfaces follow the active theme. */
+html.light .home-hero-section,
+html.light .comic-detail-hero {
+  background: #f8f5f0;
+  border-bottom-color: rgba(99, 87, 78, 0.14) !important;
+}
+
+html.light .home-hero-section .hero-banner-bg {
+  filter: brightness(0.92) saturate(0.7) blur(4px);
+  opacity: 0.32;
+}
+
+html.light .home-hero-section .hero-banner-overlay {
+  background:
+    linear-gradient(90deg, rgba(250, 248, 245, 0.98) 0%, rgba(250, 248, 245, 0.9) 42%, rgba(250, 248, 245, 0.62) 72%, rgba(250, 248, 245, 0.78) 100%),
+    linear-gradient(to top, #f8f5f0 0%, rgba(248, 245, 240, 0.2) 62%);
+}
+
+html.light .comic-detail-hero .comic-detail-hero-bg {
+  filter: brightness(0.9) saturate(0.7) blur(10px) !important;
+  opacity: 0.3;
+}
+
+html.light .comic-detail-hero .comic-detail-hero-overlay {
+  background:
+    linear-gradient(to top, #f8f5f0 4%, rgba(248, 245, 240, 0.8) 54%, rgba(248, 245, 240, 0.58) 100%) !important;
+}
+
+html.light .home-hero-section .hero-title,
+html.light .home-hero-section .hero-tagline,
+html.light .home-hero-section .hero-meta-item,
+html.light .home-hero-section .hero-genre-tag,
+html.light .home-hero-section .btn-hero-outline,
+html.light .comic-detail-hero .comic-detail-title,
+html.light .comic-detail-hero .comic-detail-byline,
+html.light .comic-detail-hero .comic-detail-byline strong,
+html.light .comic-detail-hero .comic-detail-stat-value,
+html.light .comic-detail-hero .comic-detail-genre,
+html.light .comic-detail-hero .btn-hero-outline {
+  color: #182235 !important;
+  text-shadow: none;
+}
+
+html.light .home-hero-section .hero-genre-tag,
+html.light .comic-detail-hero .comic-detail-genre {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border-color: rgba(99, 87, 78, 0.18) !important;
+}
+
+html.light .home-hero-section .btn-hero-outline,
+html.light .comic-detail-hero .btn-hero-outline {
+  background: rgba(255, 255, 255, 0.68) !important;
+  border-color: rgba(99, 87, 78, 0.24) !important;
+}
+
+html.light .home-hero-section .btn-hero-outline:hover,
+html.light .comic-detail-hero .btn-hero-outline:hover {
+  background: #ffffff !important;
+  border-color: rgba(124, 58, 237, 0.42) !important;
+}
+
+html.light .home-hero-section .hero-glow-card,
+html.light .comic-detail-hero .comic-detail-cover {
+  background: #ffffff !important;
+  border-color: rgba(99, 87, 78, 0.18) !important;
+  box-shadow: 0 22px 48px rgba(44, 29, 17, 0.2), 0 0 30px rgba(168, 85, 247, 0.12) !important;
+}
+
+html.light .comic-detail-hero .comic-detail-stats {
+  background: rgba(255, 255, 255, 0.66) !important;
+  border-color: rgba(99, 87, 78, 0.16) !important;
+}
+
+html.light .home-hero-section .hero-meta-item.rating {
+  color: #fbbf24 !important;
+}
+
+html.light .comic-detail-hero .btn-hero-outline.is-saved {
+  color: #10b981 !important;
+}
+
+html.light .comic-detail-hero .btn-hero-outline.is-liked {
+  color: #ec4899 !important;
+}
+
+html.light .comic-detail-info-card {
+  background: #ffffff !important;
+  border-color: var(--reader-card-border) !important;
+  box-shadow: 0 8px 24px rgba(44, 29, 17, 0.06);
+}
+
+html.light .comic-detail-info-card h3 {
+  border-bottom-color: var(--reader-card-border) !important;
+}
+
+.comic-detail-chapter-list {
+  scrollbar-width: thin;
+  scrollbar-color: #5b5368 #17131e;
+}
+
+.comic-detail-chapter-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.comic-detail-chapter-list::-webkit-scrollbar-track {
+  background: #17131e;
+  border-radius: 8px;
+}
+
+.comic-detail-chapter-list::-webkit-scrollbar-thumb {
+  background: #5b5368;
+  border: 2px solid #17131e;
+  border-radius: 8px;
+}
+
+html.light .comic-detail-chapter-list {
+  scrollbar-color: #b7aca2 #eee9e3;
+}
+
+html.light .comic-detail-chapter-list::-webkit-scrollbar-track {
+  background: #eee9e3;
+}
+
+html.light .comic-detail-chapter-list::-webkit-scrollbar-thumb {
+  background: #b7aca2;
+  border-color: #eee9e3;
+}
+
+html.light .comic-detail-chapter-list::-webkit-scrollbar-thumb:hover {
+  background: #9f9187;
 }

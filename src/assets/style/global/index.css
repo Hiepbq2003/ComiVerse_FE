@@ -8,6 +8,9 @@
   --accent-bg: rgba(170, 59, 255, 0.1);
   --accent-border: rgba(170, 59, 255, 0.5);
   --social-bg: rgba(244, 243, 236, 0.5);
+  --scroll-track: #eee9e3;
+  --scroll-thumb: #b7aca2;
+  --scroll-thumb-hover: #978a80;
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
@@ -41,6 +44,9 @@
     --accent-bg: rgba(192, 132, 252, 0.15);
     --accent-border: rgba(192, 132, 252, 0.5);
     --social-bg: rgba(47, 48, 58, 0.5);
+    --scroll-track: #17131e;
+    --scroll-thumb: #5b5368;
+    --scroll-thumb-hover: #766c84;
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
   }
@@ -50,8 +56,56 @@
   }
 }
 
+/* Keep the in-app theme deterministic, independent of the operating-system theme. */
+html.dark {
+  --text: #9ca3af;
+  --text-h: #f3f4f6;
+  --bg: #16171d;
+  --border: #2e303a;
+  --code-bg: #1f2028;
+  --accent: #c084fc;
+  --accent-bg: rgba(192, 132, 252, 0.15);
+  --accent-border: rgba(192, 132, 252, 0.5);
+  --social-bg: rgba(47, 48, 58, 0.5);
+  --scroll-track: #17131e;
+  --scroll-thumb: #5b5368;
+  --scroll-thumb-hover: #766c84;
+  --shadow:
+    rgba(0, 0, 0, 0.4) 0 10px 15px -3px,
+    rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+  color-scheme: dark;
+}
+
 body {
   margin: 0;
+}
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+  background: var(--scroll-track);
+}
+
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border: 2px solid var(--scroll-track);
+  border-radius: 8px;
+}
+
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
 }
 
 #root {
@@ -121,6 +175,10 @@ html.light {
   --accent: #a855f7 !important;
   --accent-bg: rgba(168, 85, 247, 0.08) !important;
   --accent-border: rgba(168, 85, 247, 0.4) !important;
+  --scroll-track: #eee9e3;
+  --scroll-thumb: #b7aca2;
+  --scroll-thumb-hover: #978a80;
+  color-scheme: light;
 
   /* Home.css override variables */
   --color-bg-dark: #faf6f0 !important;
