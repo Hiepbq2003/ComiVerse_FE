@@ -7,6 +7,8 @@ import { getChaptersByComicIdApi } from '../../services/api/ChapterApi'
 import { checkLikeStatusApi, toggleLikeStatusApi } from '../../services/api/LikeApi'
 import { checkSaveStatusApi, toggleSaveStatusApi } from '../../services/api/SaveApi'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
+import { toast } from 'react-toastify'
+import { getReadChaptersByComicIdApi } from '../../services/api/ReadingHistoryApi'
 
 // Import assets
 import comicAction from '../../assets/comic_action.png'
@@ -32,6 +34,7 @@ function ComicDetail() {
   const [loading, setLoading] = useState(true)
   const [isMockData, setIsMockData] = useState(false)
   const [isLiked, setIsLiked] = useState(false)
+  const [readChapterIds, setReadChapterIds] = useState([])
 
   // Spam prevention and state mapping refs
   const likeTimeoutRef = useRef(null)
@@ -188,11 +191,12 @@ function ComicDetail() {
         const isLoggedIn = !!(auth && auth.user)
 
         // Perform parallel async API calls to prevent sequential blocking
-        const [comicRes, chaptersRes, saveCheckRes, likeCheckRes] = await Promise.all([
+        const [comicRes, chaptersRes, saveCheckRes, likeCheckRes, readHistoryRes] = await Promise.all([
           getComicByIdApi(id),
           getChaptersByComicIdApi(id),
           isLoggedIn ? checkSaveStatusApi(id) : Promise.resolve(null),
-          isLoggedIn ? checkLikeStatusApi(id) : Promise.resolve(null)
+          isLoggedIn ? checkLikeStatusApi(id) : Promise.resolve(null),
+          isLoggedIn ? getReadChaptersByComicIdApi(id) : Promise.resolve(null)
         ])
 
         const comicData = comicRes?.data || comicRes
@@ -201,11 +205,13 @@ function ComicDetail() {
         // Save/Like check resolves to a boolean or object containing it
         const savedStatus = saveCheckRes?.data !== undefined ? saveCheckRes.data : !!saveCheckRes
         const likedStatus = likeCheckRes?.data !== undefined ? likeCheckRes.data : !!likeCheckRes
+        const readHistoryData = readHistoryRes?.data || readHistoryRes || []
 
         setComic(comicData)
         setChapters(chaptersData)
         setInLibrary(savedStatus)
         setIsLiked(likedStatus)
+        setReadChapterIds(readHistoryData)
 
         // Sync refs for debounce tracking
         serverSavedRef.current = savedStatus
@@ -234,6 +240,7 @@ function ComicDetail() {
         setChapters(mockChapters)
         setInLibrary(false)
         setIsLiked(false)
+        setReadChapterIds(['mock-1']) // fallback highlight for mock chapter 1
         serverSavedRef.current = false
         serverLikedRef.current = false
         setIsMockData(true)
@@ -369,9 +376,9 @@ function ComicDetail() {
       // Find the first chapter (sorting by chapter number ascending)
       const sorted = [...chapters].sort((a, b) => Number(a.chapterNumber) - Number(b.chapterNumber))
       const firstChap = sorted[0]
-      alert(`Opening Chapter ${firstChap.chapterNumber}! Reading features coming soon.`)
+      navigate(`/comic/${id}/chapter/${firstChap.id}`)
     } else {
-      alert('No chapters available for this comic yet.')
+      toast.warning('No chapters available for this comic yet.')
     }
   }
 
@@ -688,6 +695,8 @@ function ComicDetail() {
                   const chViewsStr = formatViews(ch.viewCount || 0)
                   const chDateStr = formatTimeAgo(ch.createdAt)
 
+                  const isRead = readChapterIds.includes(ch.id)
+
                   return (
                     <div
                       key={ch.id || ch.chapterNumber}
@@ -696,24 +705,31 @@ function ComicDetail() {
                         justifyContent: 'space-between',
                         alignItems: 'center',
                         padding: '14px 20px',
-                        background: 'rgba(255, 255, 255, 0.02)',
-                        border: '1px solid rgba(255, 255, 255, 0.04)',
+                        background: isRead ? 'rgba(168, 85, 247, 0.04)' : 'rgba(255, 255, 255, 0.02)',
+                        border: isRead ? '1px solid rgba(168, 85, 247, 0.25)' : '1px solid rgba(255, 255, 255, 0.04)',
                         borderRadius: '10px',
                         cursor: 'pointer',
                         transition: 'all 0.2s'
                       }}
-                      onClick={() => alert(`Opening Chapter ${chNumber}! Reading features coming soon.`)}
+                      onClick={() => navigate(`/comic/${id}/chapter/${ch.id}`)}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(168, 85, 247, 0.05)'
-                        e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.2)'
+                        e.currentTarget.style.background = 'rgba(168, 85, 247, 0.08)'
+                        e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.4)'
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)'
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.04)'
+                        e.currentTarget.style.background = isRead ? 'rgba(168, 85, 247, 0.04)' : 'rgba(255, 255, 255, 0.02)'
+                        e.currentTarget.style.borderColor = isRead ? 'rgba(168, 85, 247, 0.25)' : 'rgba(255, 255, 255, 0.04)'
                       }}
                     >
                       <div>
-                        <span style={{ fontWeight: '600', color: 'white', display: 'block', fontSize: '14px' }}>{chTitle}</span>
+                        <span style={{
+                          fontWeight: '600',
+                          color: isRead ? '#c084fc' : 'white',
+                          display: 'block',
+                          fontSize: '14px'
+                        }}>
+                          {chTitle}
+                        </span>
                         <span style={{ fontSize: '11px', color: '#64748b' }}>Views: {chViewsStr}</span>
                       </div>
                       <span style={{ fontSize: '12px', color: '#94a3b8' }}>{chDateStr}</span>
