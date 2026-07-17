@@ -83,57 +83,11 @@ function ChapterDetail() {
         setComic(comicData)
         setIsMockData(false)
       } catch (err) {
-        console.error('API failed for chapter detail, using mock fallbacks:', err.message)
-        setIsMockData(true)
-
-        // Try to fetch comic metadata alone if chapter API was the only one that failed
-        let fallbackComic = null
-        try {
-          const cRes = await getComicByIdApi(comicId)
-          fallbackComic = cRes?.data || cRes
-        } catch (e) {
-          fallbackComic = { id: comicId, title: 'Battle Chronicles' }
-        }
-        setComic(fallbackComic)
-
-        // Try to fetch chapters list if possible
-        let fallbackChapters = []
-        try {
-          const lRes = await getChaptersByComicIdApi(comicId)
-          fallbackChapters = lRes?.data || lRes || []
-        } catch (e) {
-          // Generate mock chapter list
-          fallbackChapters = [
-            { id: 'chap-1', chapterNumber: '1', title: 'Chapter 1: The Awakening' },
-            { id: 'chap-2', chapterNumber: '2', title: 'Chapter 2: Training Arc' },
-            { id: 'chap-3', chapterNumber: '3', title: 'Chapter 3: Unexpected Enemies' },
-            { id: 'chap-4', chapterNumber: '4', title: 'Chapter 4: Ultimate Strength' }
-          ]
-        }
-
-        // Ensure current chapter is mock represented
-        const currentMockChap = fallbackChapters.find(ch => ch.id === chapterId) || fallbackChapters[0] || {
-          id: chapterId,
-          chapterNumber: '1',
-          title: 'Chapter 1'
-        }
-
-        // Add real Cloudinary comic pages for full demonstration in mockup fallback mode
-        const mockImages = [
-          "https://res.cloudinary.com/dhabvzzaa/image/upload/v1783236066/comiverse/chapters/019f3126-d38a-70d1-8a1b-1637b91e1679/chapter-1/001-01-13357c12-9bdc-40c6-b0c3-b8f302f43e0c.jpg",
-          "https://res.cloudinary.com/dhabvzzaa/image/upload/v1783236069/comiverse/chapters/019f3126-d38a-70d1-8a1b-1637b91e1679/chapter-1/002-02-4e49699f-75d7-4b2a-b208-f2d69e61cb57.jpg",
-          "https://res.cloudinary.com/dhabvzzaa/image/upload/v1783236072/comiverse/chapters/019f3126-d38a-70d1-8a1b-1637b91e1679/chapter-1/003-03-0be649d7-12a9-4324-b426-3cf1c80177db.jpg",
-          "https://res.cloudinary.com/dhabvzzaa/image/upload/v1783236074/comiverse/chapters/019f3126-d38a-70d1-8a1b-1637b91e1679/chapter-1/004-04-fdbf37d5-83f1-4cc9-85f3-599cf61c6abc.jpg",
-          "https://res.cloudinary.com/dhabvzzaa/image/upload/v1783236077/comiverse/chapters/019f3126-d38a-70d1-8a1b-1637b91e1679/chapter-1/005-05-2d1b619a-fdf5-4d26-b19d-6c1c10f72386.jpg",
-          "https://res.cloudinary.com/dhabvzzaa/image/upload/v1783236080/comiverse/chapters/019f3126-d38a-70d1-8a1b-1637b91e1679/chapter-1/006-06-b76a1e0e-bdd9-4694-8155-e26a32b4168e.jpg",
-          "https://res.cloudinary.com/dhabvzzaa/image/upload/v1783236083/comiverse/chapters/019f3126-d38a-70d1-8a1b-1637b91e1679/chapter-1/007-07-01c276d3-cf7a-4e00-a638-0265021246ca.jpg"
-        ]
-
-        setCurrentChapter({
-          ...currentMockChap,
-          images: currentMockChap.images || mockImages
-        })
-        setChaptersList(fallbackChapters)
+        console.error('API failed for chapter detail:', err.message)
+        setIsMockData(false)
+        setCurrentChapter(null)
+        setChaptersList([])
+        setComic(null)
       } finally {
         setLoading(false)
       }
