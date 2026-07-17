@@ -393,3 +393,35 @@
     font-size: 13px;
   }
 }
+
+/* ═══════════════════════════════════════════════════
+   COPY-PROTECTION UTILITIES (LAYER 2)
+   ═══════════════════════════════════════════════════ */
+
+.no-select {
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none;    /* Firefox */
+  -ms-user-select: none;     /* IE10+ */
+  user-select: none;         /* Standard */
+}
+
+.no-pointer {
+  pointer-events: none;
+}
+
+.no-drag {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
+}
+
+/* Enhancing chapter reader viewport protection */
+.chapter-pages-viewport {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+

@@ -4,6 +4,8 @@ import HomeLayout from '../../components/layout/HomeLayout'
 import { getComicByIdApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi, getChapterDetailApi } from '../../services/api/ChapterApi'
 import { toast } from 'react-toastify'
+import useReaderSecurity from '../../hooks/useReaderSecurity'
+import ComicPageCanvas from '../../components/common/ComicPageCanvas'
 import '../../assets/style/reader/chapter-detail.css'
 
 function ChapterDetail() {
@@ -17,8 +19,27 @@ function ChapterDetail() {
   const [loading, setLoading] = useState(true)
   const [isMockData, setIsMockData] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [isDevToolsOpen, setIsDevToolsOpen] = useState(false)
 
   const dropdownRef = useRef(null)
+
+  // Enforce client-side copy-protection security
+  useReaderSecurity({
+    onDevToolsOpen: () => {
+      setIsDevToolsOpen(true)
+
+      setCurrentChapter(null)
+      setComic(null)
+      setChaptersList([])
+
+      toast.error('Security alert: Inspect element or developer tool opened. Reading session is suspended.', {
+        position: 'top-right',
+        autoClose: 5000,
+        theme: 'dark'
+      })
+    },
+    disableDetector: false
+  })
 
   // Scroll to top on chapter change
   useEffect(() => {
@@ -41,7 +62,7 @@ function ChapterDetail() {
     const fetchChapterAndComicInfo = async () => {
       try {
         setLoading(true)
-        
+
         // Fetch current chapter detail, comic detail, and all chapters of the comic in parallel
         const [chapterRes, chaptersListRes, comicRes] = await Promise.all([
           getChapterDetailApi(chapterId),
@@ -64,7 +85,7 @@ function ChapterDetail() {
       } catch (err) {
         console.error('API failed for chapter detail, using mock fallbacks:', err.message)
         setIsMockData(true)
-        
+
         // Try to fetch comic metadata alone if chapter API was the only one that failed
         let fallbackComic = null
         try {
@@ -155,6 +176,29 @@ function ChapterDetail() {
     if (targetId) {
       navigate(`/comic/${comicId}/chapter/${targetId}`)
     }
+  }
+
+  if (isDevToolsOpen) {
+    return (
+      <HomeLayout>
+        <div className="chapter-reader-container" style={{ justifyContent: 'center' }}>
+          <div className="reader-loading-container" style={{ padding: '80px 24px', background: 'rgba(239, 68, 68, 0.05)', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+            <span style={{ fontSize: '48px', marginBottom: '16px' }}>🛡️</span>
+            <h2 style={{ color: '#ef4444', fontWeight: '700', marginBottom: '8px' }}>Security Violation</h2>
+            <p style={{ color: '#94a3b8', fontSize: '15px', maxWidth: '400px', textAlign: 'center', lineHeight: '1.6' }}>
+              Developer tools are active. For copyrighted content protection, viewing is disabled while DevTools is open.
+            </p>
+            <button
+              className="btn-reader-action"
+              style={{ marginTop: '24px' }}
+              onClick={() => window.location.reload()}
+            >
+              Retry Reading
+            </button>
+          </div>
+        </div>
+      </HomeLayout>
+    )
   }
 
   if (loading) {
@@ -301,7 +345,7 @@ function ChapterDetail() {
         </div>
 
         {/* Comic Pages Viewport */}
-        <div className="chapter-pages-viewport">
+        <div className="chapter-pages-viewport" id="secure-comic-reader">
           {pages.length === 0 ? (
             <div style={{ padding: '80px 20px', color: '#64748b', textAlign: 'center' }}>
               <p style={{ fontSize: '36px', margin: '0 0 16px' }}>📖</p>
@@ -309,18 +353,13 @@ function ChapterDetail() {
             </div>
           ) : (
             pages.map((imgUrl, index) => (
-              <div className="chapter-page-image-wrapper" key={index}>
-                <img
-                  className="chapter-page-img"
-                  src={imgUrl}
-                  alt={`Page ${index + 1}`}
-                  loading={index < 3 ? "eager" : "lazy"} // Eager load first 3 pages, lazy load remaining
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&q=80"; // fallback error cover
-                  }}
-                />
-              </div>
+              <ComicPageCanvas
+                key={index}
+                src={imgUrl}
+                pageIndex={index}
+                isEncrypted={false} // Toggle to true if backend is encryption-enabled
+                fallbackSrc="https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&q=80"
+              />
             ))
           )}
         </div>
