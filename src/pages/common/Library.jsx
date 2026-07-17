@@ -116,23 +116,43 @@ function Library() {
   // Action: delete / remove from library list
   const handleRemoveItem = async (id, event) => {
     event.stopPropagation() // Prevent card click navigation
+    
+    // Save previous state for rollback
+    const previousSaved = [...savedList]
+    const previousLiked = [...likedList]
+    const previousHistory = [...historyList]
+
+    // Update state optimistically
+    if (activeTab === 'Saved') {
+      setSavedList(prev => prev.filter(c => c.id !== id))
+    } else if (activeTab === 'Liked') {
+      setLikedList(prev => prev.filter(c => c.id !== id))
+    } else {
+      setHistoryList(prev => prev.filter(c => c.id !== id))
+    }
+
     try {
       if (activeTab === 'Saved') {
         await toggleSaveStatusApi(id)
-        setSavedList(prev => prev.filter(c => c.id !== id))
         toast.success('Removed from saved comics.')
       } else if (activeTab === 'Liked') {
         await toggleLikeStatusApi(id)
-        setLikedList(prev => prev.filter(c => c.id !== id))
         toast.success('Unliked comic series.')
       } else {
         await deleteReadingHistoryComicApi(id)
-        setHistoryList(prev => prev.filter(c => c.id !== id))
         toast.success('Cleared from reading history.')
       }
     } catch (err) {
       console.error(err)
       toast.error('Failed to remove item from library.')
+      // Rollback state on failure
+      if (activeTab === 'Saved') {
+        setSavedList(previousSaved)
+      } else if (activeTab === 'Liked') {
+        setLikedList(previousLiked)
+      } else {
+        setHistoryList(previousHistory)
+      }
     }
   }
 
@@ -226,19 +246,19 @@ function Library() {
                 className={`lib-tab-item ${activeTab === 'Saved' ? 'active' : ''}`}
                 onClick={() => setActiveTab('Saved')}
               >
-                Saved <span className="lib-tab-badge">{savedList.length}</span>
+                Saved
               </div>
               <div 
                 className={`lib-tab-item ${activeTab === 'Liked' ? 'active' : ''}`}
                 onClick={() => setActiveTab('Liked')}
               >
-                Liked <span className="lib-tab-badge">{likedList.length}</span>
+                Liked
               </div>
               <div 
                 className={`lib-tab-item ${activeTab === 'History' ? 'active' : ''}`}
                 onClick={() => setActiveTab('History')}
               >
-                Reading History <span className="lib-tab-badge">{historyList.length}</span>
+                Reading History
               </div>
             </div>
           </div>
