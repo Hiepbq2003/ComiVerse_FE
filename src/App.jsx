@@ -28,6 +28,7 @@ import ModeratorDashboard from './pages/moderator/ModeratorDashboard'
 import TranslatorDashboard from './pages/translator/TranslatorDashboard'
 import Profile from './pages/common/Profile'
 import Policy from './pages/common/Policy'
+import TranslatorRegister from './pages/common/TranslatorRegister'
 import TranslateDashboard from './pages/translator/TranslatorDashboard'
 import TranslateWorkspace from './pages/translator/TranslateWorkspace'
 import TeamProjects from './pages/translator/TeamProjects'
@@ -81,6 +82,7 @@ function App() {
                 <Route path="/comic/:id" element={<ComicDetail />} />
                 <Route path="/search" element={<SearchResults />} />
                 <Route path="/policy" element={<Policy />} />
+                <Route path="/translator-register" element={<TranslatorRegister />} />
                 {/* Admin */}
                 <Route path="/admin/statistics" element={<StatisticsDashboard />} />
                 <Route path="/admin/revenue" element={<RevenueManagement />} />
