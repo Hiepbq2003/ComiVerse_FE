@@ -8,9 +8,6 @@
   --accent-bg: rgba(170, 59, 255, 0.1);
   --accent-border: rgba(170, 59, 255, 0.5);
   --social-bg: rgba(244, 243, 236, 0.5);
-  --scroll-track: #eee9e3;
-  --scroll-thumb: #b7aca2;
-  --scroll-thumb-hover: #978a80;
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
@@ -44,9 +41,6 @@
     --accent-bg: rgba(192, 132, 252, 0.15);
     --accent-border: rgba(192, 132, 252, 0.5);
     --social-bg: rgba(47, 48, 58, 0.5);
-    --scroll-track: #17131e;
-    --scroll-thumb: #5b5368;
-    --scroll-thumb-hover: #766c84;
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
   }
@@ -56,56 +50,8 @@
   }
 }
 
-/* Keep the in-app theme deterministic, independent of the operating-system theme. */
-html.dark {
-  --text: #9ca3af;
-  --text-h: #f3f4f6;
-  --bg: #16171d;
-  --border: #2e303a;
-  --code-bg: #1f2028;
-  --accent: #c084fc;
-  --accent-bg: rgba(192, 132, 252, 0.15);
-  --accent-border: rgba(192, 132, 252, 0.5);
-  --social-bg: rgba(47, 48, 58, 0.5);
-  --scroll-track: #17131e;
-  --scroll-thumb: #5b5368;
-  --scroll-thumb-hover: #766c84;
-  --shadow:
-    rgba(0, 0, 0, 0.4) 0 10px 15px -3px,
-    rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  color-scheme: dark;
-}
-
 body {
   margin: 0;
-}
-
-html {
-  scrollbar-width: thin;
-  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
-}
-
-html::-webkit-scrollbar,
-body::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-html::-webkit-scrollbar-track,
-body::-webkit-scrollbar-track {
-  background: var(--scroll-track);
-}
-
-html::-webkit-scrollbar-thumb,
-body::-webkit-scrollbar-thumb {
-  background: var(--scroll-thumb);
-  border: 2px solid var(--scroll-track);
-  border-radius: 8px;
-}
-
-html::-webkit-scrollbar-thumb:hover,
-body::-webkit-scrollbar-thumb:hover {
-  background: var(--scroll-thumb-hover);
 }
 
 #root {
@@ -175,10 +121,6 @@ html.light {
   --accent: #a855f7 !important;
   --accent-bg: rgba(168, 85, 247, 0.08) !important;
   --accent-border: rgba(168, 85, 247, 0.4) !important;
-  --scroll-track: #eee9e3;
-  --scroll-thumb: #b7aca2;
-  --scroll-thumb-hover: #978a80;
-  color-scheme: light;
 
   /* Home.css override variables */
   --color-bg-dark: #faf6f0 !important;
@@ -941,4 +883,160 @@ html.light .skeleton-forum-card {
 
 .skeleton-forum-header .skeleton-info {
   flex: 1;
+}
+
+/* ==========================================================================
+   LIGHT MODE STYLE OVERRIDES FOR COMIC DETAIL PAGE
+   ========================================================================== */
+
+/* Change the banner gradient from fading to dark (#07040d) to fading to light (#faf6f0) */
+html.light .detail-banner-gradient {
+  background: linear-gradient(to top, #faf6f0 0%, transparent 100%) !important;
+}
+
+/* Override genres tag background and borders */
+html.light .detail-genre-tag {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #475569 !important;
+}
+
+/* Force light theme heading/text colors on details page */
+html.light .detail-title {
+  color: #0f172a !important;
+}
+
+html.light .detail-author-artist {
+  color: #475569 !important;
+}
+
+html.light .detail-author-artist strong {
+  color: #0f172a !important;
+}
+
+/* Stats Card in light mode */
+html.light .detail-stats-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light .detail-stats-label {
+  color: #64748b !important;
+}
+
+html.light .detail-stats-value {
+  color: #0f172a !important;
+}
+
+html.light .detail-stats-divider {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Hero outline buttons in light mode */
+html.light .detail-action-btn {
+  border-color: rgba(0, 0, 0, 0.15) !important;
+  color: #475569 !important;
+}
+
+html.light .detail-action-btn:hover {
+  border-color: #0f172a !important;
+  color: #0f172a !important;
+}
+
+/* Synopsis Card in light mode */
+html.light .detail-synopsis-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light .detail-section-title {
+  color: #0f172a !important;
+}
+
+html.light .detail-synopsis-text {
+  color: #334155 !important;
+}
+
+/* Tabs Selector in light mode */
+html.light .detail-tabs-selector {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .detail-tab-btn {
+  color: #64748b !important;
+}
+
+html.light .detail-tab-btn.active {
+  color: #7c3aed !important;
+}
+
+/* Chapter rows in light mode */
+html.light .detail-chapter-row {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+html.light .detail-chapter-row.read {
+  background: rgba(124, 58, 237, 0.04) !important;
+  border-color: rgba(124, 58, 237, 0.2) !important;
+}
+
+html.light .detail-chapter-row:hover {
+  background: rgba(124, 58, 237, 0.08) !important;
+  border-color: rgba(124, 58, 237, 0.4) !important;
+}
+
+html.light .detail-chapter-title {
+  color: #0f172a !important;
+}
+
+html.light .detail-chapter-row.read .detail-chapter-title {
+  color: #7c3aed !important;
+}
+
+html.light .detail-chapter-date {
+  color: #64748b !important;
+}
+
+/* Comment Input and cards in light mode */
+html.light .detail-comment-input {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  color: #0f172a !important;
+}
+
+html.light .detail-comment-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light .detail-comment-name {
+  color: #0f172a !important;
+}
+
+html.light .detail-comment-text {
+  color: #334155 !important;
+}
+
+/* Sidebar Info Card in light mode */
+html.light .detail-info-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light .detail-info-title {
+  color: #0f172a !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .detail-info-label {
+  color: #64748b !important;
+}
+
+html.light .detail-info-value {
+  color: #334155 !important;
 }

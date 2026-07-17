@@ -7,3 +7,7 @@ export const checkLikeStatusApi = (comicId) => {
 export const toggleLikeStatusApi = (comicId) => {
   return AxiosClient.post(`/likes/toggle/${comicId}`, {});
 };
+
+export const getMyLikesApi = () => {
+  return AxiosClient.get('/likes/my-likes');
+};

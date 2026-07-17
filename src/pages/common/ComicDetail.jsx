@@ -43,121 +43,6 @@ function ComicDetail() {
   const serverLikedRef = useRef(false)
   const serverSavedRef = useRef(false)
 
-  // All comics data list for detail lookup (fallback)
-  const comicsDb = {
-    '1': {
-      id: '1',
-      title: 'Battle Chronicles',
-      cover: comicAction,
-      genres: ['Action', 'Fantasy', 'Adventure'],
-      author: 'Ji-Woo Park',
-      artist: 'Studio ComiVerse',
-      chaptersCount: 184,
-      views: '1.2M',
-      bookmarks: '45.2K',
-      rating: '4.9',
-      status: 'Ongoing',
-      tagline: 'An epic fantasy action-adventure following the legacy of the legendary warrior who shattered the heavens. Forces of darkness emerge, and a young apprentice must unlock the ancient power within.'
-    },
-    '2': {
-      id: '2',
-      title: 'Dragon Legacy',
-      cover: comicAdventure,
-      genres: ['Adventure', 'Fantasy'],
-      author: 'Sarah Jenkins',
-      artist: 'Team Dragon',
-      chaptersCount: 372,
-      views: '2.4M',
-      bookmarks: '98.7K',
-      rating: '4.8',
-      status: 'Ongoing',
-      tagline: 'The last dragon rider rises to save the kingdom from ancient ashes. Together with a young dragon hatchling, they must journey to the Edge of the World.'
-    },
-    '3': {
-      id: '3',
-      title: 'Neon Genesis',
-      cover: comicScifi,
-      genres: ['Sci-Fi', 'Action'],
-      author: 'Kenji Sato',
-      artist: 'NeoArt Studio',
-      chaptersCount: 95,
-      views: '850K',
-      bookmarks: '31.4K',
-      rating: '4.7',
-      status: 'Completed',
-      tagline: 'In a dystopian cyberpunk future, a rogue hacker discovers a secret AI that could either save humanity or wipe it out entirely. The neon streets are paved with danger.'
-    },
-    '4': {
-      id: '4',
-      title: 'Infinite Journey',
-      cover: comicAdventure,
-      genres: ['Adventure', 'Fantasy'],
-      author: 'Marcus Aurelius',
-      artist: 'Infinity Labs',
-      chaptersCount: 120,
-      views: '1.1M',
-      bookmarks: '38.5K',
-      rating: '4.8',
-      status: 'Ongoing',
-      tagline: 'An endless quest through dimensions to discover the ultimate truth of magic and science.'
-    },
-    '5': {
-      id: '5',
-      title: 'Solo Adventure',
-      cover: comicAction,
-      genres: ['Action', 'Fantasy'],
-      author: 'Kim Min-Jae',
-      artist: 'Solo Studio',
-      chaptersCount: 45,
-      views: '400K',
-      bookmarks: '18.9K',
-      rating: '4.6',
-      status: 'Ongoing',
-      tagline: 'Conquering dungeons alone to protect what matters most. In a world of guilds, one hunter goes solo.'
-    },
-    '6': {
-      id: '6',
-      title: 'Cyber Odyssey',
-      cover: comicScifi,
-      genres: ['Sci-Fi'],
-      author: 'Liz Chen',
-      artist: 'PixelWave',
-      chaptersCount: 62,
-      views: '320K',
-      bookmarks: '12.4K',
-      rating: '4.5',
-      status: 'Ongoing',
-      tagline: 'A space-opera journey across the galaxy to find the lost cradle of cybernetic life.'
-    },
-    '7': {
-      id: '7',
-      title: 'Shadow Legend',
-      cover: comicAction,
-      genres: ['Action', 'Fantasy'],
-      author: 'Jin-Woo Sung',
-      artist: 'Shadow Studio',
-      chaptersCount: 88,
-      views: '180K',
-      bookmarks: '9.2K',
-      rating: '4.4',
-      status: 'Ongoing',
-      tagline: 'The shadows rise to obey their monarch. Can he keep his humanity while wielding the power of death?'
-    },
-    '8': {
-      id: '8',
-      title: 'Sky Realm',
-      cover: comicAdventure,
-      genres: ['Adventure', 'Fantasy'],
-      author: 'Aria Vance',
-      artist: 'Nimbus',
-      chaptersCount: 104,
-      views: '210K',
-      bookmarks: '11.5K',
-      rating: '4.3',
-      status: 'Completed',
-      tagline: 'Floating islands, sky pirates, and a legendary treasure hidden in the eye of the eternal storm.'
-    }
-  }
 
   // Helper to format views
   const formatViews = (count) => {
@@ -187,30 +72,6 @@ function ComicDetail() {
       try {
         setLoading(true)
 
-        if (!isValidUuid(id)) {
-          const fallbackComic = comicsDb[id] || comicsDb['1']
-          const mockChapters = []
-          const totalCh = fallbackComic.chaptersCount || 10
-          for (let i = totalCh; i >= 1; i--) {
-            mockChapters.push({
-              id: `mock-${i}`,
-              chapterNumber: String(i),
-              title: `Chapter ${i}: ${i === totalCh ? 'The Final Confrontation' : `Story Arc Part ${i}`}`,
-              createdAt: new Date(Date.now() - (totalCh - i) * 24 * 60 * 60 * 1000).toISOString(),
-              viewCount: Math.floor(Math.random() * 20000 + 5000)
-            })
-          }
-          setComic(fallbackComic)
-          setChapters(mockChapters)
-          setInLibrary(false)
-          setIsLiked(false)
-          setReadChapterIds(['mock-1'])
-          serverSavedRef.current = false
-          serverLikedRef.current = false
-          setIsMockData(true)
-          return
-        }
-        
         // Check user login status at call time
         const auth = getAuth()
         const isLoggedIn = !!(auth && auth.user)
@@ -226,7 +87,7 @@ function ComicDetail() {
 
         const comicData = comicRes?.data || comicRes
         const chaptersData = chaptersRes?.data || chaptersRes || []
-        
+
         // Save/Like check resolves to a boolean or object containing it
         const savedStatus = saveCheckRes?.data !== undefined ? saveCheckRes.data : !!saveCheckRes
         const likedStatus = likeCheckRes?.data !== undefined ? likeCheckRes.data : !!likeCheckRes
@@ -244,36 +105,20 @@ function ComicDetail() {
 
         setIsMockData(false)
       } catch (err) {
-        console.error('API failed, using mock data:', err.message)
-        
-        // Fall back to mock data
-        const fallbackComic = comicsDb[id] || comicsDb['1']
-        setComic(fallbackComic)
-        
-        // Generate mock chapters list
-        const mockChapters = []
-        const totalCh = fallbackComic.chaptersCount || 10
-        for (let i = totalCh; i >= 1; i--) {
-          mockChapters.push({
-            id: `mock-${i}`,
-            chapterNumber: String(i),
-            title: `Chapter ${i}: ${i === totalCh ? 'The Final Confrontation' : `Story Arc Part ${i}`}`,
-            createdAt: new Date(Date.now() - (totalCh - i) * 24 * 60 * 60 * 1000).toISOString(),
-            viewCount: Math.floor(Math.random() * 20000 + 5000)
-          })
-        }
-        setChapters(mockChapters)
+        console.error('API failed:', err.message)
+        setComic(null)
+        setChapters([])
         setInLibrary(false)
         setIsLiked(false)
-        setReadChapterIds(['mock-1']) // fallback highlight for mock chapter 1
+        setReadChapterIds([])
         serverSavedRef.current = false
         serverLikedRef.current = false
-        setIsMockData(true)
+        setIsMockData(false)
       } finally {
         setLoading(false)
       }
     }
-    
+
     fetchComicDetail()
   }, [id, user])
 
@@ -285,7 +130,7 @@ function ComicDetail() {
 
     const next = !inLibrary
     setInLibrary(next)
-    
+
     // Update save count on screen immediately
     setComic(prevComic => {
       if (!prevComic) return prevComic
@@ -297,16 +142,11 @@ function ComicDetail() {
       }
     })
 
-    if (isMockData) {
-      serverSavedRef.current = next
-      return
-    }
-    
     // Clear any pending toggle API call to enforce 1s debounce
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
     }
-    
+
     saveTimeoutRef.current = setTimeout(async () => {
       try {
         if (next !== serverSavedRef.current) {
@@ -339,7 +179,7 @@ function ComicDetail() {
 
     const next = !isLiked
     setIsLiked(next)
-    
+
     // Update like count on screen immediately
     setComic(prevComic => {
       if (!prevComic) return prevComic
@@ -351,16 +191,11 @@ function ComicDetail() {
       }
     })
 
-    if (isMockData) {
-      serverLikedRef.current = next
-      return
-    }
-    
     // Clear any pending toggle API call to enforce 1s debounce
     if (likeTimeoutRef.current) {
       clearTimeout(likeTimeoutRef.current)
     }
-    
+
     likeTimeoutRef.current = setTimeout(async () => {
       try {
         if (next !== serverLikedRef.current) {
@@ -428,12 +263,16 @@ function ComicDetail() {
     )
   }
 
+  // Helper to detect if cover is an emoji character
+  const isEmoji = (str) => {
+    if (!str) return false
+    return !str.includes('/') && !str.includes('.') && str.trim().length <= 4
+  }
+
   // Cover image fallback picker
   const getCoverImage = (coverPath, titleVal, comicId) => {
     if (coverPath && typeof coverPath === 'string') {
-      if (coverPath.startsWith('data:image') || coverPath.startsWith('http://') || coverPath.startsWith('https://') || coverPath.startsWith('/')) {
-        return coverPath
-      }
+      return coverPath
     }
     const t = (titleVal || '').toLowerCase()
     if (t.includes('action') || t.includes('battle')) return comicAction
@@ -448,30 +287,30 @@ function ComicDetail() {
   const displayCover = getCoverImage(comic.cover, comic.title, comic.id)
   const displayTitle = comic.title || 'Untitled Comic'
   const displayStatus = comic.status ? (comic.status.charAt(0).toUpperCase() + comic.status.slice(1).toLowerCase()) : 'Ongoing'
-  
-  const displayGenres = comic.genres 
+
+  const displayGenres = comic.genres
     ? comic.genres.map(g => typeof g === 'object' && g !== null ? g.name : g)
     : []
-    
+
   const displayAuthor = comic.author || 'Unknown'
   const displayArtist = comic.artist || 'Unknown'
-  
-  const displayRating = comic.ratingAverage !== undefined 
-    ? comic.ratingAverage.toFixed(1) 
+
+  const displayRating = comic.ratingAverage !== undefined
+    ? comic.ratingAverage.toFixed(1)
     : (comic.rating || '0.0')
-    
-  const displayViews = comic.viewCount !== undefined 
-    ? formatViews(comic.viewCount) 
+
+  const displayViews = comic.viewCount !== undefined
+    ? formatViews(comic.viewCount)
     : (comic.views || '0')
-    
-  const displayBookmarks = comic.saveCount !== undefined 
-    ? formatViews(comic.saveCount) 
+
+  const displayBookmarks = comic.saveCount !== undefined
+    ? formatViews(comic.saveCount)
     : (comic.bookmarks || '0')
-    
-  const displayLikes = comic.likeCount !== undefined 
-    ? formatViews(comic.likeCount) 
+
+  const displayLikes = comic.likeCount !== undefined
+    ? formatViews(comic.likeCount)
     : (comic.likes || '0')
-    
+
   const displaySummary = comic.summary || comic.tagline || 'No synopsis available.'
 
   return (
@@ -489,21 +328,24 @@ function ComicDetail() {
           borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
         }}
       >
+        {isEmoji(displayCover) ? (
+          <div className="hero-banner-bg-emoji-fallback" style={{ zIndex: 0 }}>{displayCover}</div>
+        ) : (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `url(${displayCover})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center 25%',
+              filter: 'brightness(0.15) blur(10px)',
+              transform: 'scale(1.1)',
+              zIndex: 0
+            }}
+          />
+        )}
         <div
-          className="comic-detail-hero-bg"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage: `url(${displayCover})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center 25%',
-            filter: 'brightness(0.15) blur(10px)',
-            transform: 'scale(1.1)',
-            zIndex: 0
-          }}
-        />
-        <div
-          className="comic-detail-hero-overlay"
+          className="detail-banner-gradient"
           style={{
             position: 'absolute',
             inset: 0,
@@ -534,10 +376,18 @@ function ComicDetail() {
               overflow: 'hidden',
               boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(168, 85, 247, 0.15)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
-              flexShrink: 0
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(255, 255, 255, 0.03)'
             }}
           >
-            <img src={displayCover} alt={displayTitle} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            {isEmoji(displayCover) ? (
+              <div style={{ fontSize: '7rem', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at center, rgba(168, 85, 247, 0.2) 0%, rgba(13, 9, 25, 0.98) 100%)' }}>{displayCover}</div>
+            ) : (
+              <img src={displayCover} alt={displayTitle} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            )}
           </div>
 
           {/* Details */}
@@ -559,7 +409,7 @@ function ComicDetail() {
               {displayGenres.map((genre, idx) => (
                 <span
                   key={idx}
-                  className="comic-detail-genre"
+                  className="detail-genre-tag"
                   style={{
                     background: 'rgba(255, 255, 255, 0.06)',
                     border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -576,7 +426,7 @@ function ComicDetail() {
             </div>
 
             <h1
-              className="comic-detail-title"
+              className="detail-title"
               style={{
                 fontFamily: 'var(--font-serif)',
                 fontSize: '42px',
@@ -589,12 +439,13 @@ function ComicDetail() {
               {displayTitle}
             </h1>
 
-            <p className="comic-detail-byline" style={{ margin: '0 0 16px', color: '#94a3b8', fontSize: '15px' }}>
+            <p className="detail-author-artist" style={{ margin: '0 0 16px', color: '#94a3b8', fontSize: '15px' }}>
               Story by <strong style={{ color: 'white' }}>{displayAuthor}</strong>  •  Art by <strong style={{ color: 'white' }}>{displayArtist}</strong>
             </p>
 
             {/* Stats Row */}
             <div
+              className="detail-stats-card"
               style={{
                 display: 'flex',
                 gap: '24px',
@@ -609,23 +460,23 @@ function ComicDetail() {
               }}
             >
               <div style={{ textAlign: 'center' }}>
-                <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Rating</span>
+                <span className="detail-stats-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Rating</span>
                 <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#fbbf24' }}>⭐ {displayRating}</span>
               </div>
-              <div style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+              <div className="detail-stats-divider" style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
               <div style={{ textAlign: 'center' }}>
-                <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Views</span>
-                <span className="comic-detail-stat-value" style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>👁️ {displayViews}</span>
+                <span className="detail-stats-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Views</span>
+                <span className="detail-stats-value" style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>👁️ {displayViews}</span>
               </div>
-              <div style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+              <div className="detail-stats-divider" style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
               <div style={{ textAlign: 'center' }}>
-                <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Likes</span>
-                <span className="comic-detail-stat-value" style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>❤️ {displayLikes}</span>
+                <span className="detail-stats-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Likes</span>
+                <span className="detail-stats-value" style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>❤️ {displayLikes}</span>
               </div>
-              <div style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+              <div className="detail-stats-divider" style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
               <div style={{ textAlign: 'center' }}>
-                <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Bookmarks</span>
-                <span className="comic-detail-stat-value" style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>🔖 {displayBookmarks}</span>
+                <span className="detail-stats-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Bookmarks</span>
+                <span className="detail-stats-value" style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>🔖 {displayBookmarks}</span>
               </div>
             </div>
 
@@ -640,19 +491,19 @@ function ComicDetail() {
               </button>
               <button
                 onClick={handleAddToLibrary}
-                className={`btn-hero-outline ${inLibrary ? 'is-saved' : ''}`}
+                className="btn-hero-outline detail-action-btn"
                 style={{ padding: '12px 24px', fontSize: '15px', borderColor: inLibrary ? '#10b981' : 'rgba(255, 255, 255, 0.15)', color: inLibrary ? '#10b981' : 'white' }}
               >
                 {inLibrary ? '✓ Saved to Library' : '🔖 Add to Library'}
               </button>
               <button
                 onClick={handleToggleLike}
-                className={`btn-hero-outline ${isLiked ? 'is-liked' : ''}`}
-                style={{ 
-                  padding: '12px 24px', 
-                  fontSize: '15px', 
-                  borderColor: isLiked ? '#ec4899' : 'rgba(255, 255, 255, 0.15)', 
-                  color: isLiked ? '#ec4899' : 'white' 
+                className="btn-hero-outline detail-action-btn"
+                style={{
+                  padding: '12px 24px',
+                  fontSize: '15px',
+                  borderColor: isLiked ? '#ec4899' : 'rgba(255, 255, 255, 0.15)',
+                  color: isLiked ? '#ec4899' : 'white'
                 }}
               >
                 {isLiked ? '❤️ Liked' : '🤍 Like'}
@@ -671,14 +522,14 @@ function ComicDetail() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
 
             {/* Synopsis */}
-            <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', padding: '24px', borderRadius: '16px' }}>
-              <h3 style={{ margin: '0 0 12px', fontSize: '18px', color: 'white' }}>Synopsis</h3>
-              <p style={{ margin: 0, fontSize: '15px', color: '#cbd5e1', lineHeight: '1.6' }}>{displaySummary}</p>
+            <div className="detail-synopsis-card" style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', padding: '24px', borderRadius: '16px' }}>
+              <h3 className="detail-section-title" style={{ margin: '0 0 12px', fontSize: '18px', color: 'white' }}>Synopsis</h3>
+              <p className="detail-synopsis-text" style={{ margin: 0, fontSize: '15px', color: '#cbd5e1', lineHeight: '1.6' }}>{displaySummary}</p>
             </div>
 
             {/* Tabs Selector */}
             <div
-              className="comic-detail-stats"
+              className="detail-tabs-selector"
               style={{
                 display: 'flex',
                 borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
@@ -687,6 +538,7 @@ function ComicDetail() {
             >
               <button
                 onClick={() => setActiveTab('chapters')}
+                className={`detail-tab-btn ${activeTab === 'chapters' ? 'active' : ''}`}
                 style={{
                   background: 'transparent',
                   border: 'none',
@@ -703,6 +555,7 @@ function ComicDetail() {
               </button>
               <button
                 onClick={() => setActiveTab('comments')}
+                className={`detail-tab-btn ${activeTab === 'comments' ? 'active' : ''}`}
                 style={{
                   background: 'transparent',
                   border: 'none',
@@ -743,7 +596,7 @@ function ComicDetail() {
                   return (
                     <div
                       key={ch.id || ch.chapterNumber}
-                      className={`comic-detail-chapter-row ${isRead ? 'is-read' : ''}`}
+                      className={`detail-chapter-row ${isRead ? 'read' : ''}`}
                       style={{
                         display: 'flex',
                         justifyContent: 'space-between',
@@ -766,7 +619,7 @@ function ComicDetail() {
                       }}
                     >
                       <div>
-                        <span style={{
+                        <span className="detail-chapter-title" style={{
                           fontWeight: '600',
                           color: isRead ? '#c084fc' : 'white',
                           display: 'block',
@@ -776,7 +629,7 @@ function ComicDetail() {
                         </span>
                         <span style={{ fontSize: '11px', color: '#64748b' }}>Views: {chViewsStr}</span>
                       </div>
-                      <span style={{ fontSize: '12px', color: '#94a3b8' }}>{chDateStr}</span>
+                      <span className="detail-chapter-date" style={{ fontSize: '12px', color: '#94a3b8' }}>{chDateStr}</span>
                     </div>
                   )
                 })}
@@ -794,6 +647,7 @@ function ComicDetail() {
                     onChange={(e) => setCommentInput(e.target.value)}
                     placeholder={user ? "Share your thoughts about this comic..." : "Please log in to share your thoughts..."}
                     disabled={!user}
+                    className="detail-comment-input"
                     style={{
                       width: '100%',
                       background: 'rgba(255, 255, 255, 0.03)',
@@ -826,6 +680,7 @@ function ComicDetail() {
                   {comments.map((comment) => (
                     <div
                       key={comment.id}
+                      className="detail-comment-card"
                       style={{
                         display: 'flex',
                         gap: '16px',
@@ -854,13 +709,13 @@ function ComicDetail() {
                       </div>
                       <div style={{ flexGrow: 1 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', flexWrap: 'wrap' }}>
-                          <strong style={{ color: 'white', fontSize: '14px' }}>{comment.name}</strong>
+                          <strong className="detail-comment-name" style={{ color: 'white', fontSize: '14px' }}>{comment.name}</strong>
                           <span style={{ fontSize: '11px', color: '#64748b' }}>{comment.date}</span>
                         </div>
                         <div style={{ color: '#fbbf24', fontSize: '11px', marginBottom: '6px' }}>
                           {'★'.repeat(comment.rating)}{'☆'.repeat(5 - comment.rating)}
                         </div>
-                        <p style={{ margin: 0, fontSize: '14px', color: '#cbd5e1', lineHeight: '1.5' }}>{comment.content}</p>
+                        <p className="detail-comment-text" style={{ margin: 0, fontSize: '14px', color: '#cbd5e1', lineHeight: '1.5' }}>{comment.content}</p>
                       </div>
                     </div>
                   ))}
@@ -873,7 +728,7 @@ function ComicDetail() {
           {/* Right Column: Sidebar (About / Artist / Info) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div
-              className="comic-detail-info-card"
+              className="detail-info-card"
               style={{
                 background: 'var(--reader-card-bg)',
                 border: '1px solid var(--reader-card-border)',
@@ -884,26 +739,26 @@ function ComicDetail() {
                 gap: '16px'
               }}
             >
-              <h3 style={{ margin: 0, fontSize: '16px', color: 'white', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '8px' }}>Comic Info</h3>
+              <h3 className="detail-info-title" style={{ margin: 0, fontSize: '16px', color: 'white', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '8px' }}>Comic Info</h3>
 
               <div>
-                <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Author</span>
-                <span style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayAuthor}</span>
+                <span className="detail-info-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Author</span>
+                <span className="detail-info-value" style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayAuthor}</span>
               </div>
 
               <div>
-                <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Artist</span>
-                <span style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayArtist}</span>
+                <span className="detail-info-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Artist</span>
+                <span className="detail-info-value" style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayArtist}</span>
               </div>
 
               <div>
-                <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Status</span>
-                <span style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayStatus}</span>
+                <span className="detail-info-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Status</span>
+                <span className="detail-info-value" style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayStatus}</span>
               </div>
 
               <div>
-                <span style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Publish Date</span>
-                <span style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>Jan 12, 2025</span>
+                <span className="detail-info-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Publish Date</span>
+                <span className="detail-info-value" style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>Jan 12, 2025</span>
               </div>
             </div>
           </div>

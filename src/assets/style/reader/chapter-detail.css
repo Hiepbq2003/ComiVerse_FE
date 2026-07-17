@@ -476,3 +476,142 @@ html.light {
   user-select: none;
 }
 
+/* ── LIGHT MODE OVERRIDES ── */
+html.light .chapter-reader-container {
+  background-color: #faf6f0;
+  color: #0f172a;
+}
+
+html.light .reader-control-header {
+  background: rgba(250, 246, 240, 0.85);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03);
+}
+
+html.light .btn-reader-back {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: #475569;
+}
+
+html.light .btn-reader-back:hover {
+  background: rgba(168, 85, 247, 0.08);
+  border-color: rgba(168, 85, 247, 0.25);
+  color: #7c3aed;
+}
+
+html.light .reader-comic-meta-title {
+  color: #0f172a;
+}
+
+html.light .reader-chapter-meta-subtitle {
+  color: #475569;
+}
+
+html.light .btn-reader-nav {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+}
+
+html.light .btn-reader-nav:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.08);
+  border-color: rgba(168, 85, 247, 0.25);
+  color: #7c3aed;
+}
+
+html.light .btn-reader-nav:disabled {
+  color: #94a3b8;
+  border-color: rgba(0, 0, 0, 0.05);
+  background: #f1f5f9;
+}
+
+html.light .reader-chapter-dropdown-trigger {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+}
+
+html.light .reader-chapter-dropdown-trigger:hover {
+  background: #f8fafc;
+  border-color: rgba(168, 85, 247, 0.5);
+  color: #0f172a;
+}
+
+html.light .reader-chapter-dropdown-trigger.active {
+  background: #f8fafc;
+  border-color: #7c3aed;
+  color: #7c3aed;
+}
+
+html.light .reader-chapter-dropdown-trigger .dropdown-chevron {
+  color: #475569;
+}
+
+html.light .reader-chapter-dropdown-trigger.active .dropdown-chevron {
+  color: #7c3aed;
+}
+
+html.light .reader-chapter-dropdown-menu {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 0 15px rgba(0, 0, 0, 0.03);
+}
+
+html.light .reader-chapter-dropdown-item {
+  color: #475569;
+}
+
+html.light .reader-chapter-dropdown-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+  color: #0f172a;
+}
+
+html.light .reader-chapter-dropdown-item.selected {
+  color: #7c3aed;
+  background: rgba(168, 85, 247, 0.08);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+html.light .reader-chapter-dropdown-item .item-check-icon {
+  color: #7c3aed;
+}
+
+html.light .chapter-pages-viewport {
+  background-color: #faf6f0;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+html.light .chapter-page-image-wrapper {
+  background-color: #faf6f0;
+}
+
+html.light .chapter-page-image-wrapper::after {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+html.light .reader-bottom-nav {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+html.light .btn-reader-secondary-action {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: #475569;
+}
+
+html.light .btn-reader-secondary-action:hover {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.15);
+  color: #0f172a;
+}
+
+html.light .btn-reader-action:disabled {
+  background: #f1f5f9;
+  border-color: rgba(0, 0, 0, 0.05);
+  color: #94a3b8;
+}
+
+

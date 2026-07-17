@@ -49,6 +49,7 @@ import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { Import } from 'lucide-react'
 import TranslatorLayout from './components/layout/TranslatorLayout'
+import ScrollToTop from './components/common/ScrollToTop'
 
 function ProfileRouteWrapper() {
   const auth = getAuth()
@@ -74,6 +75,7 @@ function App() {
         <LanguageProvider>
           <NotificationProvider>
             <BrowserRouter>
+              <ScrollToTop />
               <Routes>
                 {/* Public Home */}
                 <Route path="/" element={<Home />} />
