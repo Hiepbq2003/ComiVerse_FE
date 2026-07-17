@@ -10,6 +10,7 @@ import Ranking from './pages/common/Ranking'
 import Library from './pages/common/Library'
 import Forum from './pages/common/Forum'
 import ComicDetail from './pages/common/ComicDetail'
+import ChapterDetail from './pages/common/ChapterDetail'
 import SearchResults from './pages/common/SearchResults'
 import AccountManagement from './pages/admin/AccountManagement'
 import BroadcastManagement from './pages/admin/BroadcastManagement'
@@ -79,6 +80,7 @@ function App() {
                 <Route path="/library" element={<Library />} />
                 <Route path="/forum" element={<Forum />} />
                 <Route path="/comic/:id" element={<ComicDetail />} />
+                <Route path="/comic/:comicId/chapter/:chapterId" element={<ChapterDetail />} />
                 <Route path="/search" element={<SearchResults />} />
                 <Route path="/policy" element={<Policy />} />
                 {/* Admin */}
