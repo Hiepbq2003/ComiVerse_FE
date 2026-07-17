@@ -3,7 +3,7 @@ import { loginApi, getMeApi } from '../../services/api/AuthApi'
 import { useAuth } from '../../context/AuthContext'
 import { setAuth } from '../../utils/Auth'
 
-function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
+function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, loading, setLoading }) {
   const { login } = useAuth()
   const [form, setForm] = useState({ username: '', password: '', rememberMe: false })
   const [showPassword, setShowPassword] = useState(false)
@@ -55,12 +55,22 @@ function Login({ onNavigate, onLoginSuccess, showAlert, loading, setLoading }) {
     } catch (err) {
       const errMessage = err.response?.data?.message || 'Invalid username or password.';
       const isInvalidCredentials = err.response?.status === 401 || /invalid username or password/i.test(errMessage)
+      const needsEmailVerification = err.response?.status === 403 && /verify your email/i.test(errMessage)
 
       if (isInvalidCredentials) {
         setFieldErrors({
           username: '',
           password: 'Invalid username/email or password.'
         })
+        return
+      }
+
+      if (needsEmailVerification) {
+        const loginIdentifier = form.username.trim()
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginIdentifier)) {
+          onVerificationRequired(loginIdentifier)
+        }
+        showAlert('error', errMessage)
         return
       }
 

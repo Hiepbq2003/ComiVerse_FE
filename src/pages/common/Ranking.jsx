@@ -1,35 +1,71 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
+import { getComicLeaderboardApi } from '../../services/api/ComicApi'
 
 // Import assets
 import comicAction from '../../assets/comic_action.png'
 import comicAdventure from '../../assets/comic_adventure.png'
 import comicScifi from '../../assets/comic_scifi.png'
 
+
 function Ranking() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const initialTimeframe = searchParams.get('timeframe') || 'day'
+
   const [currentPage, setCurrentPage] = useState(1)
-  const [timeframe, setTimeframe] = useState('weekly')
+  const [timeframe, setTimeframe] = useState(initialTimeframe)
+  const [comics, setComics] = useState([])
+  const [loading, setLoading] = useState(true)
   const ITEMS_PER_PAGE = 5
 
-  const trendingComics = [
-    { id: 2, title: 'Dragon Legacy', cover: comicAdventure, genre: 'Adventure', tagline: 'The last dragon rider rises to save the kingdom from ancient ashes.', chapters: '372', views: '2.4M', rating: '4.9', trend: 'stable' },
-    { id: 1, title: 'Battle Chronicles', cover: comicAction, genre: 'Action', chapters: '184', views: '1.2M', rating: '4.9', trend: 'up' },
-    { id: 4, title: 'Infinite Journey', cover: comicAdventure, genre: 'Adventure', chapters: '120', views: '1.1M', rating: '4.8', trend: 'up' },
-    { id: 3, title: 'Neon Genesis', cover: comicScifi, genre: 'Sci-Fi', chapters: '95', views: '850K', rating: '4.7', trend: 'down' },
-    { id: 5, title: 'Solo Adventure', cover: comicAction, genre: 'Action', chapters: '45', views: '400K', rating: '4.6', trend: 'stable' },
-    { id: 6, title: 'Cyber Odyssey', cover: comicScifi, genre: 'Sci-Fi', chapters: '62', views: '320K', rating: '4.5', trend: 'up' },
-    { id: 7, title: 'Shadow Legend', cover: comicAction, genre: 'Action', chapters: '88', views: '180K', rating: '4.4', trend: 'up' },
-    { id: 8, title: 'Sky Realm', cover: comicAdventure, genre: 'Adventure', chapters: '104', views: '210K', rating: '4.3', trend: 'down' },
-    { id: 9, title: 'Aether Hunter', cover: comicAction, genre: 'Action', chapters: '76', views: '195K', rating: '4.5', trend: 'up' },
-    { id: 10, title: 'Star Bound', cover: comicScifi, genre: 'Sci-Fi', chapters: '110', views: '340K', rating: '4.6', trend: 'stable' },
-    { id: 11, title: 'Mystic Blade', cover: comicAction, genre: 'Action', chapters: '54', views: '150K', rating: '4.2', trend: 'up' },
-    { id: 12, title: 'Chrono Rift', cover: comicScifi, genre: 'Sci-Fi', chapters: '40', views: '125K', rating: '4.1', trend: 'down' },
-    { id: 13, title: 'Wild Frontier', cover: comicAdventure, genre: 'Adventure', chapters: '92', views: '310K', rating: '4.4', trend: 'up' },
-    { id: 14, title: 'Void Walker', cover: comicScifi, genre: 'Sci-Fi', chapters: '67', views: '280K', rating: '4.5', trend: 'stable' },
-    { id: 15, title: 'Phoenix Rise', cover: comicAction, genre: 'Action', chapters: '130', views: '420K', rating: '4.7', trend: 'up' }
-  ]
+  const isEmoji = (str) => {
+    if (!str) return false
+    return !str.includes('/') && !str.includes('.') && str.trim().length <= 4
+  }
+
+  const getArrayOrData = (res) => {
+    if (!res) return []
+    if (Array.isArray(res)) return res
+    if (res.data && Array.isArray(res.data)) return res.data
+    if (res.data?.data && Array.isArray(res.data.data)) return res.data.data
+    return []
+  }
+
+  useEffect(() => {
+    const urlTimeframe = searchParams.get('timeframe')
+    if (urlTimeframe) {
+      setTimeframe(urlTimeframe)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    let isMounted = true
+    const fetchTrending = async () => {
+      try {
+        setLoading(true)
+        const res = await getComicLeaderboardApi({ timeframe })
+        const dataList = getArrayOrData(res)
+        if (isMounted) {
+          setComics(dataList)
+        }
+      } catch (err) {
+        console.error('Failed to fetch leaderboard:', err)
+        if (isMounted) {
+          setComics([])
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
+      }
+    }
+    fetchTrending()
+    return () => {
+      isMounted = false
+    }
+  }, [timeframe])
 
   const getTrendIcon = (trend) => {
     switch (trend) {
@@ -43,57 +79,61 @@ function Ranking() {
     }
   }
 
-  const getSortedTrendingComics = (tf) => {
-    let list = [...trendingComics];
-    if (tf === 'daily') {
-      return [
-        list[4], // Solo Adventure becomes #1
-        list[14], // Phoenix Rise #2
-        list[0],  // Dragon Legacy #3
-        list[5],  // Cyber Odyssey #4
-        list[1],  // Battle Chronicles #5
-        list[9],  // Star Bound #6
-        list[10], // Mystic Blade #7
-        list[2],  // Infinite Journey #8
-        list[3],  // Neon Genesis #9
-        list[6],  // Shadow Legend #10
-        list[7],  // Sky Realm #11
-        list[8],  // Aether Hunter #12
-        list[11], // Chrono Rift #13
-        list[12], // Wild Frontier #14
-        list[13], // Void Walker #15
-      ];
-    } else if (tf === 'weekly') {
-      return [
-        list[1],  // Battle Chronicles #1
-        list[0],  // Dragon Legacy #2
-        list[2],  // Infinite Journey #3
-        list[4],  // Solo Adventure #4
-        list[3],  // Neon Genesis #5
-        list[5],  // Cyber Odyssey #6
-        list[6],  // Shadow Legend #7
-        list[7],  // Sky Realm #8
-        list[8],  // Aether Hunter #9
-        list[9],  // Star Bound #10
-        list[10], // Mystic Blade #11
-        list[11], // Chrono Rift #12
-        list[12], // Wild Frontier #13
-        list[13], // Void Walker #14
-        list[14], // Phoenix Rise #15
-      ];
-    }
-    return list;
-  };
-
-  const sortedTrendingComics = getSortedTrendingComics(timeframe)
-  const featuredComic = sortedTrendingComics[0]
-  const rightListComics = sortedTrendingComics.slice(1)
+  const activeComics = comics || []
+  const featuredComic = activeComics[0]
+  const rightListComics = activeComics.slice(1)
   
   const totalPages = Math.ceil(rightListComics.length / ITEMS_PER_PAGE)
   const paginatedRightList = rightListComics.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   )
+
+  const getCoverImage = (comic) => {
+    if (comic.cover && typeof comic.cover === 'string') {
+      return comic.cover
+    }
+    const fallbacks = [comicAction, comicAdventure, comicScifi]
+    const idHash = typeof comic.id === 'string' ? comic.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : comic.id || 0
+    return fallbacks[idHash % 3] || comicAction
+  }
+
+  const formatViews = (count) => {
+    if (count === undefined || count === null) return '0'
+    const num = Number(count)
+    if (isNaN(num)) return String(count)
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M'
+    }
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K'
+    }
+    return String(num)
+  }
+
+  const getRating = (comic) => {
+    const val = comic.rating !== undefined ? comic.rating : comic.ratingAverage
+    return val !== undefined ? Number(val).toFixed(1) : '0.0'
+  }
+
+  const getViews = (comic) => {
+    const val = comic.views !== undefined ? comic.views : comic.viewCount
+    return val !== undefined ? formatViews(val) : '0'
+  }
+
+  const getChapters = (comic) => {
+    return comic.chapters || comic.chaptersCount || comic.chapterCount || '0'
+  }
+
+  const getPrimaryGenre = (comic) => {
+    if (comic.genres && comic.genres.length > 0) {
+      const first = comic.genres[0]
+      return typeof first === 'object' && first !== null ? first.name : first
+    } else if (comic.genre) {
+      return typeof comic.genre === 'object' && comic.genre !== null ? comic.genre.name : comic.genre
+    }
+    return 'Fantasy'
+  }
 
   return (
     <HomeLayout>
@@ -114,8 +154,9 @@ function Ranking() {
               padding: '4px',
               gap: '4px'
             }}>
-              {['daily', 'weekly', 'monthly'].map((t) => {
+              {['day', 'week', 'month'].map((t) => {
                 const isActive = timeframe === t
+                const labels = { day: 'Daily', week: 'Weekly', month: 'Monthly' }
                 return (
                   <button
                     key={t}
@@ -143,127 +184,160 @@ function Ranking() {
                       if (!isActive) e.currentTarget.style.color = '#cbd5e1'
                     }}
                   >
-                    {t}
+                    {labels[t]}
                   </button>
                 )
               })}
             </div>
           </div>
 
-          <div className="hot-section-split" style={{ marginTop: '20px' }}>
-            {/* Left Column: Rank #1 */}
-            <div className="hot-featured-wrapper">
-              <div
-                className="hot-featured-card"
-                onClick={() => navigate(`/comic/${featuredComic.id}`)}
-                style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
-              >
-                <div className="hot-featured-cover" style={{ flexGrow: 1, height: 'auto', minHeight: '340px' }}>
-                  <img src={featuredComic.cover} alt={featuredComic.title} style={{ height: '100%', width: '100%', objectFit: 'cover' }} />
-                  <div className="hot-rank-pill-featured">
-                    <span>🏆</span> RANK #01
-                  </div>
-                </div>
-                <div className="hot-featured-info" style={{ background: 'linear-gradient(to bottom, #0d0919, #05030a)' }}>
-                  <h3 className="hot-featured-title" style={{ fontSize: '24px' }}>{featuredComic.title}</h3>
-                  <p className="hot-featured-tagline" style={{ fontSize: '14px', margin: '8px 0 20px' }}>{featuredComic.tagline || 'An epic fantasy series on ComiVerse.'}</p>
-                  <div className="hot-featured-meta">
-                    <span style={{ color: '#ec4899', fontWeight: '700', fontSize: '14px' }}>{featuredComic.genre}</span>
-                    <span style={{ fontSize: '14px' }}>⭐ {featuredComic.rating}  •  👁️ {featuredComic.views}  •  📖 {featuredComic.chapters} Ch.</span>
-                  </div>
+          {loading ? (
+            <div className="hot-section-split" style={{ marginTop: '20px' }}>
+              <div className="hot-featured-wrapper">
+                <div className="skeleton-comic-card" style={{ height: '500px', width: '100%' }}>
+                  <div className="skeleton-img skeleton-shimmer" style={{ height: '70%' }}></div>
+                  <div className="skeleton-line skeleton-shimmer short" style={{ marginTop: '12px' }}></div>
+                  <div className="skeleton-line skeleton-shimmer long"></div>
                 </div>
               </div>
+              <div className="hot-ranking-list">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="ranking-item skeleton-shimmer" style={{ height: '70px', background: 'rgba(255,255,255,0.02)', padding: '10px 16px', display: 'flex', alignItems: 'center', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                    <div className="skeleton-circle" style={{ width: '40px', height: '40px', marginRight: '16px' }}></div>
+                    <div style={{ flex: 1 }}>
+                      <div className="skeleton-line short" style={{ margin: 0, height: '10px' }}></div>
+                      <div className="skeleton-line medium" style={{ marginTop: '8px', marginBottom: 0, height: '8px' }}></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-
-            {/* Right Column: Rank #2 to #15 */}
-            <div className="hot-ranking-list">
-              {paginatedRightList.map((comic, index) => {
-                const rankNum = (currentPage - 1) * ITEMS_PER_PAGE + index + 2
-                const formattedRankNum = String(rankNum).padStart(2, '0')
-                return (
+          ) : (
+            <div className="hot-section-split" style={{ marginTop: '20px' }}>
+              {/* Left Column: Rank #1 */}
+              {featuredComic && (
+                <div className="hot-featured-wrapper">
                   <div
-                    key={comic.id}
-                    className="ranking-item"
-                    onClick={() => navigate(`/comic/${comic.id}`)}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                    className="hot-featured-card"
+                    onClick={() => navigate(`/comic/${featuredComic.id}`)}
+                    style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                      <span className={`rank-number top-${rankNum}`} style={{ fontSize: '26px' }}>
-                        {formattedRankNum}
-                      </span>
-                      <div className="rank-item-thumb" style={{ width: '52px', height: '70px' }}>
-                        <img src={comic.cover} alt={comic.title} />
-                      </div>
-                      <div className="rank-item-details">
-                        <h4 className="rank-item-title" style={{ fontSize: '16px' }}>{comic.title}</h4>
-                        <span className="rank-item-genre" style={{ fontSize: '12px' }}>{comic.genre}</span>
+                    <div className="hot-featured-cover" style={{ flexGrow: 1, height: 'auto', minHeight: '340px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)' }}>
+                      {isEmoji(getCoverImage(featuredComic)) ? (
+                        <div style={{ fontSize: '10rem', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at center, rgba(168, 85, 247, 0.2) 0%, rgba(13, 9, 25, 0.98) 100%)' }}>{getCoverImage(featuredComic)}</div>
+                      ) : (
+                        <img src={getCoverImage(featuredComic)} alt={featuredComic.title} style={{ height: '100%', width: '100%', objectFit: 'cover' }} />
+                      )}
+                      <div className="hot-rank-pill-featured">
+                        <span>🏆</span> RANK #01
                       </div>
                     </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '30px' }}>
-                      <div className="rank-item-meta" style={{ display: 'flex', gap: '20px', fontSize: '13px' }}>
-                        <div className="rank-item-meta-item" style={{ color: '#fbbf24' }}>
-                          <span>⭐</span> {comic.rating}
-                        </div>
-                        <div className="rank-item-meta-item">
-                          <span>👁️</span> {comic.views}
-                        </div>
-                        <div className="rank-item-meta-item">
-                          <span>📖</span> {comic.chapters} Ch.
-                        </div>
-                      </div>
-                      <div style={{ width: '20px', textAlign: 'center', fontSize: '14px' }}>
-                        {getTrendIcon(comic.trend)}
+                    <div className="hot-featured-info" style={{ background: 'linear-gradient(to bottom, #0d0919, #05030a)' }}>
+                      <h3 className="hot-featured-title" style={{ fontSize: '24px' }}>{featuredComic.title}</h3>
+                      <p className="hot-featured-tagline" style={{ fontSize: '14px', margin: '8px 0 20px' }}>{featuredComic.tagline || featuredComic.summary || 'An epic fantasy series on ComiVerse.'}</p>
+                      <div className="hot-featured-meta">
+                        <span style={{ color: '#ec4899', fontWeight: '700', fontSize: '14px' }}>{getPrimaryGenre(featuredComic)}</span>
+                        <span style={{ fontSize: '14px' }}>⭐ {getRating(featuredComic)}  •  👁️ {getViews(featuredComic)}  •  📖 {getChapters(featuredComic)} Ch.</span>
                       </div>
                     </div>
                   </div>
-                )
-              })}
-
-              {/* Pagination Controls */}
-              {totalPages > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '24px' }}>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    style={{
-                      background: currentPage === 1 ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
-                      border: '1px solid rgba(255,255,255,0.06)',
-                      color: currentPage === 1 ? '#64748b' : 'white',
-                      borderRadius: '6px',
-                      padding: '6px 12px',
-                      fontSize: '12px',
-                      cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                      fontWeight: '600',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    Prev
-                  </button>
-                  <span style={{ fontSize: '12.5px', color: '#cbd5e1' }}>
-                    Page <strong>{currentPage}</strong> of {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    style={{
-                      background: currentPage === totalPages ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
-                      border: '1px solid rgba(255,255,255,0.06)',
-                      color: currentPage === totalPages ? '#64748b' : 'white',
-                      borderRadius: '6px',
-                      padding: '6px 12px',
-                      fontSize: '12px',
-                      cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                      fontWeight: '600',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    Next
-                  </button>
                 </div>
               )}
+
+              {/* Right Column: Rank #2 to #15 */}
+              <div className="hot-ranking-list">
+                {paginatedRightList.map((comic, index) => {
+                  const rankNum = (currentPage - 1) * ITEMS_PER_PAGE + index + 2
+                  const formattedRankNum = String(rankNum).padStart(2, '0')
+                  return (
+                    <div
+                      key={comic.id}
+                      className="ranking-item"
+                      onClick={() => navigate(`/comic/${comic.id}`)}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1, minWidth: 0 }}>
+                        <span className={`rank-number top-${rankNum}`} style={{ fontSize: '26px', flexShrink: 0 }}>
+                          {formattedRankNum}
+                        </span>
+                        <div className="rank-item-thumb" style={{ width: '52px', height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', overflow: 'hidden', flexShrink: 0 }}>
+                          {isEmoji(getCoverImage(comic)) ? (
+                            <div style={{ fontSize: '1.8rem' }}>{getCoverImage(comic)}</div>
+                          ) : (
+                            <img src={getCoverImage(comic)} alt={comic.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          )}
+                        </div>
+                        <div className="rank-item-details">
+                          <h4 className="rank-item-title" style={{ fontSize: '16px' }}>{comic.title}</h4>
+                          <span className="rank-item-genre" style={{ fontSize: '12px' }}>{getPrimaryGenre(comic)}</span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '30px', flexShrink: 0 }}>
+                        <div className="rank-item-meta" style={{ display: 'flex', gap: '20px', fontSize: '13px' }}>
+                          <div className="rank-item-meta-item" style={{ color: '#fbbf24' }}>
+                            <span>⭐</span> {getRating(comic)}
+                          </div>
+                          <div className="rank-item-meta-item">
+                            <span>👁️</span> {getViews(comic)}
+                          </div>
+                          <div className="rank-item-meta-item">
+                            <span>📖</span> {getChapters(comic)} Ch.
+                          </div>
+                        </div>
+                        <div style={{ width: '20px', textAlign: 'center', fontSize: '14px' }}>
+                          {getTrendIcon(comic.trend || 'stable')}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '24px' }}>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      style={{
+                        background: currentPage === 1 ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        color: currentPage === 1 ? '#64748b' : 'white',
+                        borderRadius: '6px',
+                        padding: '6px 12px',
+                        fontSize: '12px',
+                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                        fontWeight: '600',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      Prev
+                    </button>
+                    <span style={{ fontSize: '12.5px', color: '#cbd5e1' }}>
+                      Page <strong>{currentPage}</strong> of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      style={{
+                        background: currentPage === totalPages ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        color: currentPage === totalPages ? '#64748b' : 'white',
+                        borderRadius: '6px',
+                        padding: '6px 12px',
+                        fontSize: '12px',
+                        cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                        fontWeight: '600',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </HomeLayout>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useLocation, Link } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import ComicCard from '../../components/common/ComicCard'
-import { MOCK_COMICS } from '../../utils/mockComics'
+import { getComicsPageApi } from '../../services/api/ComicApi'
 
 function SearchResults() {
   const location = useLocation()
@@ -23,18 +23,21 @@ function SearchResults() {
       return
     }
 
-    setLoading(true)
-    const timer = setTimeout(() => {
-      const filtered = MOCK_COMICS.filter(comic => 
-        (comic.title && comic.title.toLowerCase().includes(query.toLowerCase())) ||
-        (comic.author && comic.author.toLowerCase().includes(query.toLowerCase())) ||
-        (comic.genres && comic.genres.some(g => g.toLowerCase().includes(query.toLowerCase())))
-      )
-      setComics(filtered)
-      setLoading(false)
-    }, 500)
+    const fetchResults = async () => {
+      try {
+        setLoading(true)
+        const response = await getComicsPageApi(1, 10, query)
+        const list = response.data || response || []
+        setComics(list)
+      } catch (err) {
+        console.error(err)
+        setComics([])
+      } finally {
+        setLoading(false)
+      }
+    }
 
-    return () => clearTimeout(timer)
+    fetchResults()
   }, [query])
 
   return (

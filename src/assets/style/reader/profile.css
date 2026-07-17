@@ -347,6 +347,70 @@
   color: var(--profile-text-primary);
 }
 
+.profile-cover-section {
+  max-width: 1200px;
+  min-height: 180px;
+  margin: 28px auto 0;
+  border: 1px solid var(--profile-border);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(168, 85, 247, 0.22), rgba(6, 182, 212, 0.14)),
+    var(--profile-card-bg);
+  background-position: center;
+  background-size: cover;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
+  overflow: hidden;
+}
+
+.profile-cover-overlay {
+  min-height: 180px;
+  padding: 24px 28px;
+  background: linear-gradient(90deg, rgba(7, 4, 13, 0.82), rgba(7, 4, 13, 0.32));
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.profile-cover-kicker {
+  color: var(--profile-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.profile-cover-overlay h2 {
+  color: var(--profile-text-primary);
+  font-size: 28px;
+  margin: 6px 0 0;
+}
+
+.profile-cover-upload-btn,
+.profile-background-upload-btn {
+  background: rgba(168, 85, 247, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px 14px;
+  white-space: nowrap;
+}
+
+.profile-cover-upload-btn:hover,
+.profile-background-upload-btn:hover {
+  background: var(--profile-purple);
+}
+
+.profile-background-upload-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
 .profile-grid-container {
   max-width: 1200px;
   margin: 30px auto;
@@ -357,6 +421,20 @@
 }
 
 @media (max-width: 768px) {
+  .profile-cover-section {
+    margin: 20px 20px 0;
+  }
+
+  .profile-cover-overlay {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+
+  .profile-background-upload-row {
+    grid-template-columns: 1fr;
+  }
+
   .profile-grid-container {
     grid-template-columns: 1fr;
   }
@@ -467,6 +545,12 @@
   background: rgba(239, 68, 68, 0.1);
   color: #fecdd3;
   border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.profile-role-badge.project-leader {
+  background: rgba(6, 182, 212, 0.1);
+  color: #67e8f9;
+  border: 1px solid rgba(6, 182, 212, 0.2);
 }
 
 .profile-sidebar-nav {

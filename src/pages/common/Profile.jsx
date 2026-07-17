@@ -50,6 +50,25 @@ function TranslatorStats() {
   )
 }
 
+function ProjectLeaderStats() {
+  return (
+    <div className="profile-stats-list">
+      <div className="profile-stats-row">
+        <span>Projects led</span>
+        <span className="profile-stats-value">8</span>
+      </div>
+      <div className="profile-stats-row">
+        <span>Active teams</span>
+        <span className="profile-stats-value">4</span>
+      </div>
+      <div className="profile-stats-row">
+        <span>Chapters delivered</span>
+        <span className="profile-stats-value">196</span>
+      </div>
+    </div>
+  )
+}
+
 function AuthorStats() {
   return (
     <div className="profile-stats-list">
@@ -132,6 +151,7 @@ function Profile({ user }) {
   const [dateOfBirth, setDateOfBirth] = useState('1999-05-15')
   const [bio, setBio] = useState('')
   const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || '')
+  const [backgroundImageUrl, setBackgroundImageUrl] = useState(user.backgroundImageUrl || '')
 
   // Password change states
   const [currentPassword, setCurrentPassword] = useState('')
@@ -139,17 +159,18 @@ function Profile({ user }) {
   const [confirmPassword, setConfirmPassword] = useState('')
 
   const roleName = user.role || 'Reader'
-  const roleUpper = roleName.toUpperCase()
+  const roleUpper = roleName.toUpperCase().replace(/[\s-]+/g, '_')
 
   const handleSaveInfo = async (e) => {
     e.preventDefault()
     const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
     try {
-      await updateProfileApi(fullName, avatarUrl)
+      await updateProfileApi(fullName, avatarUrl, backgroundImageUrl)
       const updatedUser = {
         ...user,
         fullName,
-        avatarUrl
+        avatarUrl,
+        backgroundImageUrl
       }
       updateUser(updatedUser)
       toast.success('Basic Info changes saved successfully!')
@@ -176,12 +197,13 @@ function Profile({ user }) {
       setAvatarUrl(uploadedUrl);
       
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-      await updateProfileApi(fullName, uploadedUrl);
+      await updateProfileApi(fullName, uploadedUrl, backgroundImageUrl);
       
       const updatedUser = {
         ...user,
         fullName,
-        avatarUrl: uploadedUrl
+        avatarUrl: uploadedUrl,
+        backgroundImageUrl
       };
       updateUser(updatedUser);
       
@@ -191,6 +213,39 @@ function Profile({ user }) {
       toast.error(errMsg);
     }
   };
+
+  const handleBackgroundChange = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    if (file.size > 4 * 1024 * 1024) {
+      toast.error('Background image must be 4MB or smaller.')
+      return
+    }
+
+    try {
+      const uploadToast = toast.info('Uploading background image...', { autoClose: false })
+      const uploadedUrl = await uploadAvatarApi(file)
+      toast.dismiss(uploadToast)
+
+      setBackgroundImageUrl(uploadedUrl)
+
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
+      await updateProfileApi(fullName, avatarUrl, uploadedUrl)
+
+      updateUser({
+        ...user,
+        fullName,
+        avatarUrl,
+        backgroundImageUrl: uploadedUrl
+      })
+
+      toast.success('Profile background uploaded successfully!')
+    } catch (err) {
+      const errMsg = err.response?.data?.message || 'Failed to upload background image.'
+      toast.error(errMsg)
+    }
+  }
 
   const handleSavePassword = async (e) => {
     e.preventDefault()
@@ -226,6 +281,8 @@ function Profile({ user }) {
         return <ModeratorStats />
       case 'TRANSLATOR':
         return <TranslatorStats />
+      case 'PROJECT_LEADER':
+        return <ProjectLeaderStats />
       case 'READER':
       case 'USER':
       default:
@@ -252,7 +309,9 @@ function Profile({ user }) {
     }
   }
 
-  const roleInfo = getRoleInfo()
+  const roleInfo = roleUpper === 'PROJECT_LEADER'
+    ? { label: 'Project Leader', className: 'project-leader', icon: 'PL' }
+    : getRoleInfo()
   const displayUserName = `${firstName} ${lastName}`.trim() || user.fullName || 'Minh Khoa'
   const userInitials = displayUserName.substring(0, 2).toUpperCase()
 
@@ -265,7 +324,7 @@ function Profile({ user }) {
   } else if (roleUpper === 'MODERATOR' || roleUpper === 'STAFF') {
     LayoutComponent = ModeratorLayout
     layoutProps = { activeNav: 'profile' }
-  } else if (roleUpper === 'TRANSLATOR') {
+  } else if (roleUpper === 'TRANSLATOR' || roleUpper === 'PROJECT_LEADER') {
     LayoutComponent = TranslatorLayout
     layoutProps = { activeNav: 'profile' }
   } else if (roleUpper === 'AUTHOR') {
@@ -287,6 +346,28 @@ function Profile({ user }) {
         <span>/</span>
         <span className="profile-page-title">My Profile</span>
       </div>
+
+      <section
+        className="profile-cover-section"
+        style={backgroundImageUrl ? { backgroundImage: `url(${backgroundImageUrl})` } : undefined}
+      >
+        <div className="profile-cover-overlay">
+          <div>
+            <span className="profile-cover-kicker">Profile background</span>
+            <h2>{displayUserName}</h2>
+          </div>
+          <label className="profile-cover-upload-btn" htmlFor="profile-background-input">
+            Upload background
+          </label>
+          <input
+            id="profile-background-input"
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handleBackgroundChange}
+          />
+        </div>
+      </section>
 
       {/* ── GRID LAYOUT ──────────────────────────────────── */}
       <div className="profile-grid-container">
@@ -365,6 +446,22 @@ function Profile({ user }) {
                     </label>
                     <p className="profile-picture-upload-text">PNG, JPG up to 2MB</p>
                   </div>
+                </div>
+
+                <div className="profile-input-group">
+                  <label>Profile Background</label>
+                  <div className="profile-background-upload-row">
+                    <input
+                      type="text"
+                      value={backgroundImageUrl}
+                      onChange={(e) => setBackgroundImageUrl(e.target.value)}
+                      placeholder="https://.../background.jpg"
+                    />
+                    <label className="profile-background-upload-btn" htmlFor="profile-background-input">
+                      Upload image
+                    </label>
+                  </div>
+                  <p className="profile-input-desc">PNG, JPG up to 4MB. This background is shown on profiles for every role.</p>
                 </div>
 
                 {/* Names row */}

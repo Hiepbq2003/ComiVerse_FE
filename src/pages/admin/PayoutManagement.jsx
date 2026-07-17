@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import AdminLayout from '../../components/layout/AdminLayout'
+import '../../assets/style/admin/payout.css'
 
 // ── Mock payout data ───────────────────────────────
 const MOCK_PAYOUTS = [

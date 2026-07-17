@@ -1,0 +1,6 @@
+/* Admin Account Management screen styles */
+
+.admin-account-management-screen .role-badge.project-leader {
+  min-width: 104px;
+  justify-content: center;
+}

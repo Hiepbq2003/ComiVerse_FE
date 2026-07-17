@@ -2,6 +2,7 @@
 import { toast } from 'react-toastify'
 import AdminLayout from '../../components/layout/AdminLayout'
 import { getAdminPremiumPlanSettingsApi, updateAdminPremiumPlanSettingsApi } from '../../services/api/PlanApi'
+import '../../assets/style/admin/system-settings.css'
 
 const DEFAULT_SETTINGS = {
   monthlyPrice: 79000,

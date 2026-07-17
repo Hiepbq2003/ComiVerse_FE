@@ -18,7 +18,7 @@ import {
   createTeamTaskApi,
   updateTeamTaskApi,
   getTeamRequestsApi,
-  deleteTeamRequestApi,
+  decideTeamRequestApi,
   createTeamRequestApi
 } from '../../services/api/TeamWorkspaceApi'
 import { toast } from 'react-toastify'
@@ -719,11 +719,13 @@ function TeamProjects() {
     }
   }
 
-  const handleApproveRequest = async (id, name) => {
+  const handleApproveRequest = async (request) => {
+    const { id, name } = request
     try {
-      await deleteTeamRequestApi(id)
+      await decideTeamRequestApi(id, 'approved')
       setJoinRequests(prev => prev.filter(req => req.id !== id))
       const newMem = {
+        id: request.requesterId,
         name,
         role: 'Member',
         status: 'Active',
@@ -741,7 +743,7 @@ function TeamProjects() {
 
   const handleRejectRequest = async (id, name) => {
     try {
-      await deleteTeamRequestApi(id)
+      await decideTeamRequestApi(id, 'rejected')
       setJoinRequests(prev => prev.filter(req => req.id !== id))
       toast.info(`Rejected ${name}'s request in database.`)
     } catch (err) {
@@ -763,6 +765,7 @@ function TeamProjects() {
     const comicName = selectedDetails?.comicName || selectedDetails?.title || 'Unknown Comic'
     const formattedTitle = `[${newTaskData.priority.toUpperCase()}] [${comicName}] ${newTaskData.title.trim()}`
     try {
+      const selectedAssignee = members.find(member => (member.id || member.avatar) === newTaskData.assignee)
       const taskPayload = {
         title: formattedTitle,
         status: newTaskData.column,

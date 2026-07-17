@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getExploreComicsApi } from '../../services/api/ComicApi'
 import { getAllGenresApi } from '../../services/api/GenreApi'
@@ -15,6 +15,8 @@ import comicScifi from '../../assets/comic_scifi.png'
 
 function Explore() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const initialSortBy = searchParams.get('sortBy') || 'Default'
   
   // Data states
   const [comics, setComics] = useState([])
@@ -25,7 +27,7 @@ function Explore() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedGenres, setSelectedGenres] = useState(['All'])
   const [selectedStatus, setSelectedStatus] = useState('All')
-  const [sortBy, setSortBy] = useState('Default')
+  const [sortBy, setSortBy] = useState(initialSortBy)
   
   // Dropdown visibility states & refs
   const [isSortOpen, setIsSortOpen] = useState(false)
@@ -45,6 +47,14 @@ function Explore() {
     sortBy,
     searchQuery
   })
+
+  // Sync sortBy state if search parameters change
+  useEffect(() => {
+    const urlSortBy = searchParams.get('sortBy')
+    if (urlSortBy) {
+      setSortBy(urlSortBy)
+    }
+  }, [searchParams])
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -104,9 +114,7 @@ function Explore() {
   // Cover image fallback picker
   const getCoverImage = (comic) => {
     if (comic.cover && typeof comic.cover === 'string') {
-      if (comic.cover.startsWith('data:image') || comic.cover.startsWith('http://') || comic.cover.startsWith('https://') || comic.cover.startsWith('/')) {
-        return comic.cover
-      }
+      return comic.cover
     }
     const title = (comic.title || '').toLowerCase()
     if (title.includes('action') || title.includes('battle')) return comicAction

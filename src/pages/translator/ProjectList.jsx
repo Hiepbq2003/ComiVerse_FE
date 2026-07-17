@@ -235,13 +235,13 @@ function ProjectList() {
           <div
             className="trans-modal-card"
             style={{
-              background: '#130d24',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'var(--trans-card-bg)',
+              border: '1px solid var(--trans-border)',
               borderRadius: '12px',
               padding: '24px',
               maxWidth: '500px',
               width: '90%',
-              color: '#fff',
+              color: 'var(--trans-text-primary)',
             }}
           >
             <div
@@ -250,7 +250,7 @@ function ProjectList() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                borderBottom: '1px solid var(--trans-border)',
                 paddingBottom: '14px',
                 marginBottom: '20px',
               }}
