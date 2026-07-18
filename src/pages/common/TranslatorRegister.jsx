@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { registerTranslatorApi, getMyTranslatorProfileApi } from '../../services/api/TranslatorApi'
 import HomeLayout from "../../components/layout/HomeLayout"
+import { useAuth } from '../../context/AuthContext'
 import { Languages, Sparkles, Phone, Link2, CheckCircle2, ArrowLeft, AlertCircle, X } from "lucide-react"
 
-// Chỉ là GỢI Ý bấm nhanh — không giới hạn, người dùng có thể gõ bất kỳ ngôn ngữ nào
-// (nền tảng cần hỗ trợ mọi ngôn ngữ, không chỉ vài ngôn ngữ phổ biến cố định).
 const SUGGESTED_LANGUAGES = [
   'English', 'Japanese', 'Korean', 'Chinese', 'Vietnamese',
   'French', 'German', 'Spanish', 'Thai', 'Indonesian'
@@ -19,10 +18,6 @@ const cardStyle = {
 }
 
 const errorTextStyle = { color: '#f87171', fontSize: '12px', marginTop: '4px' }
-
-// =============================================================================
-// Validation — bắt buộc điền đầy đủ tất cả các trường
-// =============================================================================
 
 function validateForm(form) {
   const errors = {}
@@ -52,10 +47,6 @@ function validateForm(form) {
   return errors
 }
 
-// =============================================================================
-// Language tag input — gõ tự do, không giới hạn danh sách cố định
-// =============================================================================
-
 function LanguageTagInput({ selected, onAdd, onRemove }) {
   const [inputValue, setInputValue] = useState('')
   const inputRef = useRef(null)
@@ -63,7 +54,6 @@ function LanguageTagInput({ selected, onAdd, onRemove }) {
   const commitValue = (raw) => {
     const value = raw.trim()
     if (!value) return
-    // So khớp không phân biệt hoa/thường để tránh trùng ("english" và "English")
     const alreadyAdded = selected.some((s) => s.toLowerCase() === value.toLowerCase())
     if (!alreadyAdded) {
       onAdd(value)
@@ -76,8 +66,6 @@ function LanguageTagInput({ selected, onAdd, onRemove }) {
       e.preventDefault()
       commitValue(inputValue)
     } else if (e.key === 'Backspace' && inputValue === '' && selected.length > 0) {
-      // Xoá tag cuối cùng khi bấm Backspace ở ô input trống — thao tác quen thuộc
-      // giống các trình soạn tag (Gmail, Notion...)
       onRemove(selected[selected.length - 1])
     }
   }
@@ -187,6 +175,7 @@ function FieldError({ message }) {
 
 function TranslatorRegister() {
   const navigate = useNavigate()
+  const { user, updateUser } = useAuth()
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -201,9 +190,6 @@ function TranslatorRegister() {
   const [errors, setErrors] = useState({})
   const [touched, setTouched] = useState({})
 
-  // Kiểm tra đã có hồ sơ Translator chưa — nếu có rồi thì không cho đăng ký lại,
-  // tránh tạo trùng (bảng translator có UNIQUE trên user_id, backend sẽ báo lỗi nếu
-  // cố tạo lần 2, nhưng chặn sớm ở đây cho trải nghiệm tốt hơn).
   useEffect(() => {
     let cancelled = false
     getMyTranslatorProfileApi()
@@ -212,9 +198,7 @@ function TranslatorRegister() {
           setAlreadyRegistered(true)
         }
       })
-      .catch(() => {
-        // 404 / chưa có hồ sơ — coi là bình thường, không cần báo lỗi gì
-      })
+      .catch(() => {})
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
@@ -239,7 +223,6 @@ function TranslatorRegister() {
     setTouched((t) => ({ ...t, [field]: true }))
   }
 
-  // Validate real-time mỗi khi form thay đổi, chỉ hiển thị lỗi cho trường đã "touched"
   useEffect(() => {
     setErrors(validateForm(form))
   }, [form])
@@ -265,12 +248,17 @@ function TranslatorRegister() {
     try {
       await registerTranslatorApi({
         specializations: form.specializations,
-        experienceYears: Number(form.experienceYears),
-        phoneNumber: form.phoneNumber.trim(),
+        experiencedYears: Number(form.experienceYears),
+        phone: form.phoneNumber.trim(),
         facebookUrl: form.facebookUrl.trim()
       })
+
+      if (user) {
+        updateUser({ ...user, role: 'TRANSLATOR' })
+      }
+
       toast.success('Translator profile created!')
-      navigate('/translator')
+      navigate('/translator/dashboard')
     } catch (err) {
       console.error(err)
       const serverMessage = err?.response?.data?.message
@@ -307,7 +295,7 @@ function TranslatorRegister() {
                 <button
                   className="btn btn-lg px-4 mt-3"
                   style={{ background: 'linear-gradient(135deg, #a855f7, #ec4899)', color: '#fff', border: 'none' }}
-                  onClick={() => navigate('/translator')}
+                  onClick={() => navigate('/translator/dashboard')}
                 >
                   Go to Translator Dashboard
                 </button>
@@ -322,7 +310,6 @@ function TranslatorRegister() {
   return (
     <HomeLayout>
       <div className="container py-5">
-        {/* Back button */}
         <div className="row mb-3">
           <div className="col-12">
             <button
@@ -340,7 +327,6 @@ function TranslatorRegister() {
           </div>
         </div>
 
-        {/* Header */}
         <div className="row mb-5">
           <div className="col-12 text-center">
             <h1 className="display-4 fw-bold" style={{ color: '#c084fc' }}>

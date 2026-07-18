@@ -37,8 +37,6 @@ const API_BASE = "http://localhost:8081/api";
 const TOKEN_KEY = "token";
 const IS_DEV = process.env.NODE_ENV === "development";
 
-// Constants
-
 const TABS = [
   { id: "translate", label: "Translate" },
   { id: "glossary", label: "Glossary" },
@@ -72,8 +70,6 @@ const COMIC_FONT_LIBRARY = [
   { name: "Architects Daughter", value: "'Architects Daughter', cursive", group: "Art & Handwriting" },
   { name: "Handlee", value: "'Handlee', cursive", group: "Art & Handwriting" },
 ];
-
-// Small presentational components
 
 function PageStatusDot({ status }) {
   if (status === "done") {
@@ -115,7 +111,7 @@ function ChapterList({ chapters, open, onToggle, currentChapterId, currentPageIn
           </button>
           {open[ch.chapterId] &&
             (ch.pages || []).map((page) => {
-              const pageIndex = page.pageNumber - 1; // API returns pageNumber (1-based), state uses index (0-based)
+              const pageIndex = page.pageNumber - 1;
               const isSameChapter = ch.chapterId === currentChapterId;
               const isCurrent = isSameChapter && pageIndex === currentPageIndex;
               const status = isCurrent ? "current" : page.status === "DONE" ? "done" : "todo";
@@ -198,7 +194,6 @@ function FontFamilyDropdown({ fontFamily, onChangeFontFamily, hasActiveSelection
 
   const selectedFont = COMIC_FONT_LIBRARY.find((f) => f.value === fontFamily);
 
-  // Đóng dropdown khi click ra ngoài
   useEffect(() => {
     if (!isOpen) return;
     const handleClickOutside = (e) => {
@@ -297,7 +292,6 @@ function CanvasToolbar({
         <AlignRight size={14} />
       </button>
 
-      {/* Font size — ONLY applies to the currently selected area, not a global setting (same pattern as text/bg color below) */}
       <div className={`tw-x-fontsize-group ${hasActiveSelection ? "" : "is-disabled"}`}>
         <button
           type="button"
@@ -320,7 +314,6 @@ function CanvasToolbar({
         </button>
       </div>
 
-      {/* Text color — ONLY applies to the currently selected area, not a global setting */}
       <div className={`tw-x-color-group ${hasActiveSelection ? "" : "is-disabled"}`}>
         <label
           title={hasActiveSelection ? "Text color of the selected area" : "Select an area first"}
@@ -346,7 +339,6 @@ function CanvasToolbar({
         </button>
       </div>
 
-      {/* Background color (of the box/text) — ONLY applies to the currently selected area */}
       <div className={`tw-x-color-group tight ${hasActiveSelection ? "" : "is-disabled"}`}>
         <label
           title={hasActiveSelection ? "Background color of the selected area" : "Select an area first"}
@@ -428,7 +420,6 @@ function PageNav({
   );
 }
 
-// PageImage receives the "selections" list (multiple speech bubbles) to render over the image
 const RESIZE_HANDLES = ["nw", "ne", "sw", "se"];
 
 function ShapeToolbar({ activeTool, onSetTool }) {
@@ -482,14 +473,12 @@ function PageImage({
 }) {
   return (
     <div className="tw-canvas">
-      {/* In color-picking mode -> remind the user to click the image, or press Esc to cancel */}
       {isPickingColor && (
         <div className="tw-x-picking-banner">
           Click the image to pick the color at that point — press Esc to cancel
         </div>
       )}
 
-      {/* Polygon in progress -> show finish/cancel buttons */}
       {polygonDraft && polygonDraft.length > 0 && (
         <div className="tw-x-polygon-draft-bar">
           <span className="tw-x-polygon-draft-label">
@@ -529,7 +518,6 @@ function PageImage({
           <div style={{ padding: 24, color: "#8286A0" }}>This chapter has no images yet.</div>
         )}
 
-        {/* Dashed outline: rect/ellipse being dragged out */}
         {drawing && (
           <div
             className={`tw-x-drawing-outline ${activeTool === "ellipse" ? "is-ellipse" : ""}`}
@@ -542,9 +530,7 @@ function PageImage({
           />
         )}
 
-        {/* SVG overlaying the whole frame, containing every polygon (finished + in progress) */}
         <svg width="100%" height="100%" className="tw-x-overlay-svg">
-          {/* Polygon in progress */}
           {polygonDraft && polygonDraft.length > 0 && (
             <>
               <polyline
@@ -560,7 +546,6 @@ function PageImage({
             </>
           )}
 
-          {/* Finished polygons */}
           {selections
             .filter((s) => s.shape === "polygon")
             .map((sel) => {
@@ -586,7 +571,6 @@ function PageImage({
               );
             })}
 
-          {/* Per-vertex drag handles — shown as soon as a polygon is selected, no tool switch needed */}
           {selections
             .filter((s) => s.shape === "polygon" && s.id === activeId)
             .flatMap((sel) =>
@@ -608,7 +592,6 @@ function PageImage({
                 />
               ))
             )}
-
         </svg>
 
         {selections
@@ -646,7 +629,6 @@ function PageImage({
             );
           })}
 
-        {/* List of finished rect/ellipse selections */}
         {selections
           .filter((s) => s.shape !== "polygon")
           .map((sel) => {
@@ -683,14 +665,12 @@ function PageImage({
                   </span>
                 )}
 
-                {/* Translation input DIRECTLY OVER the selection — type right there, see the text in its real position */}
                 <textarea
                   className={`tw-inline-translation-textarea tw-x-inline-textarea tw-x-inline-textarea--fill ${isActive ? "is-active" : ""} ${isPickingZoomPoint ? "is-zoom-picking" : ""}`}
                   value={sel.translation ?? ""}
                   onChange={(e) => onChangeTranslation(sel.id, e.target.value)}
                   onMouseDown={(e) => {
                     if (isPickingZoomPoint) return;
-                    // Allow clicking to place the text cursor, without triggering move/resize/reselect
                     e.stopPropagation();
                     if (!isActive) onSelectArea(sel.id);
                   }}
@@ -707,7 +687,6 @@ function PageImage({
                   }}
                 />
 
-                {/* 4-corner resize handles — shown as soon as the area is selected, no tool switch needed */}
                 {isActive &&
                   RESIZE_HANDLES.map((handle) => (
                     <div
@@ -769,7 +748,7 @@ function SourceImageCrop({ imageSrc, canvasRef, selection, imageNaturalSize, isP
       .join(", ");
     clipPath = `polygon(${pointsStr})`;
   } else {
-    clipPath = "none"; 
+    clipPath = "none";
   }
 
   return (
@@ -824,7 +803,6 @@ function TranslateTabPanel({
 
   return (
     <div className="tw-tabpanel">
-      {/* Navigate back and forth between bubbles on the current page */}
       {bubbleTotal > 0 && (
         <div className="tw-x-bubble-nav-row">
           <span className="tw-x-bubble-nav-label">
@@ -850,7 +828,6 @@ function TranslateTabPanel({
         </div>
       )}
 
-      {/* The ORIGINAL image of the selected area — for visual reference, no OCR text reading needed */}
       <div className="tw-translation-block tw-x-block-spaced">
         <p className="tw-caption tw-x-caption-tight">
           SOURCE IMAGE {isPickingColor && <span style={{ color: "#2563eb" }}>— click to pick color</span>}
@@ -876,8 +853,6 @@ function TranslateTabPanel({
         <p className="tw-caption tw-x-caption-tight">
           TRANSLATION
         </p>
-        {/* This box ALWAYS keeps a fixed white text color — it does NOT follow the custom
-            text color of the bubble on the canvas (the 2 are intentionally independent). */}
         <textarea
           value={translationValue}
           onChange={(e) => onChangeTranslation(e.target.value)}
@@ -979,8 +954,6 @@ function TranslationSidePanel({
   );
 }
 
-// Data layer
-
 function authHeaders() {
   const token = localStorage.getItem(TOKEN_KEY);
   return {
@@ -1045,7 +1018,8 @@ async function fetchChapterForTask(taskId, signal) {
     );
   }
 
-  return fetchChapterById(chapterId, signal);
+  const chapterResult = await fetchChapterById(chapterId, signal);
+  return { ...chapterResult, projectTeamId: task?.projectTeamId ?? null };
 }
 
 async function fetchPagesForTask(taskId, signal) {
@@ -1071,8 +1045,6 @@ function normalizeImages(chapterData) {
   const raw = chapterData?.images || [];
   return raw.map((item) => (typeof item === "string" ? item : item?.url)).filter(Boolean);
 }
-
-// Drawing logic — pure calculation functions (NOT Hooks, defined outside, any name)
 
 function calculateRect(start, end) {
   const x = Math.min(start.x, end.x);
@@ -1105,7 +1077,7 @@ function scalePointsToNewBox(origPoints, origBox, newBox) {
 function shapeToRing(selection) {
   if (selection.shape === "polygon") {
     const pts = selection.points.map((p) => [p.x, p.y]);
-    return [...pts, pts[0]]; // the ring must be closed: last point = first point
+    return [...pts, pts[0]];
   }
 
   if (selection.shape === "ellipse") {
@@ -1122,7 +1094,6 @@ function shapeToRing(selection) {
     return pts;
   }
 
-  // rect
   const { x, y, width, height } = selection;
   return [
     [x, y],
@@ -1159,11 +1130,10 @@ function mergeTwoSelections(a, b) {
     return Math.abs(area / 2);
   };
 
-  // unionResult: MultiPolygon = Polygon[] = Ring[][] (each Polygon can have multiple rings: 1 outer ring + holes)
   let biggestRing = null;
   let biggestArea = -1;
   for (const polygon of unionResult) {
-    const outerRing = polygon[0]; // the first ring is always the OUTER ring (not a hole)
+    const outerRing = polygon[0];
     const area = ringArea(outerRing);
     if (area > biggestArea) {
       biggestArea = area;
@@ -1173,7 +1143,6 @@ function mergeTwoSelections(a, b) {
 
   if (!biggestRing) return null;
 
-  // Drop the last point (duplicate of the first, since the library's ring is closed), convert to our internal {x,y} format
   const points = biggestRing.slice(0, -1).map(([x, y]) => ({ x, y }));
 
   return {
@@ -1206,15 +1175,14 @@ function computeDisplayedImageGeometry(containerWidth, containerHeight, naturalW
   return { displayedWidth, displayedHeight, offsetX, offsetY };
 }
 
-
 let selectionIdCounter = 0;
 
 function useSelectionAreas() {
-  const [selections, setSelections] = useState([]); 
-  const [drawing, setDrawing] = useState(null);      
+  const [selections, setSelections] = useState([]);
+  const [drawing, setDrawing] = useState(null);
   const [activeId, setActiveId] = useState(null);
-  const [activeTool, setActiveTool] = useState("rect"); 
-  const [polygonDraft, setPolygonDraft] = useState(null); 
+  const [activeTool, setActiveTool] = useState("rect");
+  const [polygonDraft, setPolygonDraft] = useState(null);
 
   const [zoomScale, setZoomScale] = useState(1);
   const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
@@ -1223,7 +1191,7 @@ function useSelectionAreas() {
   const ZOOM_MIN = 1;
   const ZOOM_MAX = 6;
 
-  const dragState = useRef(null); // { mode: 'move'|'resize'|'vertex', id, handle?, vertexIndex?, startPos, originalSelection }
+  const dragState = useRef(null);
 
   const startPoint = useRef({ x: 0, y: 0 });
   const containerRef = useRef(null);
@@ -1254,8 +1222,6 @@ function useSelectionAreas() {
     setIsPickingZoomPoint(false);
   };
 
-  // ============================== Drawing new shapes (rect/ellipse/polygon) ==============================
-
   const handleMouseDown = (e) => {
     if (isPickingZoomPoint) {
       const bounds = containerRef.current.getBoundingClientRect();
@@ -1266,13 +1232,11 @@ function useSelectionAreas() {
       return;
     }
 
-    // If a move/resize/vertex drag is in progress (started from a handle or shape body), skip — already handled elsewhere
     if (dragState.current) return;
 
     const pos = getRelativePos(e);
 
     if (activeTool === "polygon") {
-      // Each click adds a point to the in-progress polygon, no drag-and-drop
       setPolygonDraft((prev) => (prev ? [...prev, pos] : [pos]));
       return;
     }
@@ -1311,13 +1275,13 @@ function useSelectionAreas() {
           if (!boundingBoxesOverlap(currentBox, otherBox)) continue;
 
           const mergedSelection = mergeTwoSelections(current, other);
-          if (!mergedSelection) continue; // bounding boxes touch but the real shapes don't overlap
+          if (!mergedSelection) continue;
 
           list = list.filter((s) => s.id !== current.id && s.id !== other.id);
           list.push(mergedSelection);
           currentId = mergedSelection.id;
           keepMerging = true;
-          break; 
+          break;
         }
       }
 
@@ -1330,7 +1294,7 @@ function useSelectionAreas() {
     if (dragState.current) {
       const changedId = dragState.current.id;
       dragState.current = null;
-      mergeOverlappingWith(changedId); 
+      mergeOverlappingWith(changedId);
       return;
     }
 
@@ -1346,7 +1310,7 @@ function useSelectionAreas() {
       };
       setSelections((prev) => [...prev, newArea]);
       setActiveId(newArea.id);
-      mergeOverlappingWith(newArea.id); // new shape drawn -> check for overlaps
+      mergeOverlappingWith(newArea.id);
     }
     setDrawing(null);
   };
@@ -1371,8 +1335,6 @@ function useSelectionAreas() {
 
   const cancelPolygon = () => setPolygonDraft(null);
 
-  // ============================== Select / delete / translate ==============================
-
   const selectArea = (id) => setActiveId(id);
 
   const deleteArea = (id) => {
@@ -1394,7 +1356,7 @@ function useSelectionAreas() {
       fontSize: 13,
       fontFamily: COMIC_FONT_LIBRARY[0].value,
       ...box,
-      id: ++selectionIdCounter, 
+      id: ++selectionIdCounter,
     }));
     setSelections((prev) => [...prev, ...withIds]);
   };
@@ -1431,8 +1393,6 @@ function useSelectionAreas() {
     });
   };
 
-  // ============================== Move / Resize / drag polygon vertex ==============================
-
   const startMove = (e, id) => {
     const selection = selections.find((s) => s.id === id);
     if (!selection) return;
@@ -1453,7 +1413,7 @@ function useSelectionAreas() {
     dragState.current = {
       mode: "resize",
       id,
-      handle, 
+      handle,
       startPos: getRelativePos(e),
       original: selection,
     };
@@ -1605,25 +1565,21 @@ function useSelectionAreas() {
   };
 }
 
-// Main component
-
 export default function TranslateWorkspace() {
   const { taskId } = useParams();
   const navigate = useNavigate();
   const { isLoggedIn } = useAuth();
 
   const [chapterData, setChapterData] = useState(null);
-  const [taskPages, setTaskPages] = useState([]); 
-  const [status, setStatus] = useState("loading"); 
+  const [taskPages, setTaskPages] = useState([]);
+  const [status, setStatus] = useState("loading");
   const [error, setError] = useState(null);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
 
-  // ID of the chapter CURRENTLY shown on the canvas
   const [currentChapterId, setCurrentChapterId] = useState(null);
 
   const [activeTab, setActiveTab] = useState("translate");
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
-  // Starts empty — will auto-open the current chapter once the real list finishes loading
   const [open, setOpen] = useState({});
   const [isBold, setIsBold] = useState(false);
   const [isItalic, setIsItalic] = useState(false);
@@ -1633,7 +1589,6 @@ export default function TranslateWorkspace() {
     pixelCanvasRef.current = document.createElement("canvas");
   }
 
-  // null | "text" | "bg" — currently waiting for the user to click the image to pick a color
   const [pickingColorFor, setPickingColorFor] = useState(null);
 
   const handleImageLoad = (size) => {
@@ -1665,7 +1620,6 @@ export default function TranslateWorkspace() {
     }
   };
 
-  // Pick a color when clicking the MAIN IMAGE — click coordinates are relative to the container (containerBounds)
   const readColorAtDisplayPoint = (displayX, displayY, containerBounds) => {
     if (!imageNaturalSize) return null;
 
@@ -1679,7 +1633,7 @@ export default function TranslateWorkspace() {
     const xInImage = displayX - offsetX;
     const yInImage = displayY - offsetY;
     if (xInImage < 0 || yInImage < 0 || xInImage > displayedWidth || yInImage > displayedHeight) {
-      return null; // click landed on the empty letterbox area, not the real image
+      return null;
     }
 
     const naturalX = Math.floor((xInImage / displayedWidth) * imageNaturalSize.width);
@@ -1701,7 +1655,7 @@ export default function TranslateWorkspace() {
   };
 
   const pickTextColorFromScreen = () => {
-    if (activeId == null) return; 
+    if (activeId == null) return;
     cancelZoomPick();
     setPickingColorFor("text");
   };
@@ -1711,7 +1665,6 @@ export default function TranslateWorkspace() {
     setPickingColorFor("bg");
   };
 
-  // Allow pressing Esc to cancel color-picking mode partway through
   useEffect(() => {
     if (!pickingColorFor) return;
     const onKeyDown = (e) => {
@@ -1721,7 +1674,6 @@ export default function TranslateWorkspace() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [pickingColorFor]);
 
-  // Call the custom hook here — same level (top-level) as the other useState calls
   const {
     containerRef: canvasRef,
     selections,
@@ -1756,7 +1708,6 @@ export default function TranslateWorkspace() {
     cancelZoomPick,
   } = useSelectionAreas();
 
-  // Allow pressing Esc to cancel zoom-point-picking mode partway through
   useEffect(() => {
     if (!isPickingZoomPoint) return;
     const onKeyDown = (e) => {
@@ -1769,8 +1720,8 @@ export default function TranslateWorkspace() {
   useEffect(() => {
     if (!isPickingZoomPoint) return;
     const onMouseDown = (e) => {
-      if (canvasRef.current && canvasRef.current.contains(e.target)) return; 
-      if (e.target.closest("[data-zoom-toggle]")) return; 
+      if (canvasRef.current && canvasRef.current.contains(e.target)) return;
+      if (e.target.closest("[data-zoom-toggle]")) return;
       cancelZoomPick();
     };
     window.addEventListener("mousedown", onMouseDown);
@@ -1797,7 +1748,6 @@ export default function TranslateWorkspace() {
     textStyleSettingsRef.current = { isBold, isItalic, textAlign };
   }, [isBold, isItalic, textAlign]);
 
-  // The currently selected area (if any) — used to populate the source text + translation in the side panel
   const activeSelection = selections.find((s) => s.id === activeId) ?? null;
   const activeSelectionIndex = selections.findIndex((s) => s.id === activeId);
 
@@ -1894,8 +1844,14 @@ export default function TranslateWorkspace() {
   );
 
   const gotoProjectList = useCallback(() => {
-    navigate("/translator/dashboard");
-  }, [navigate]);
+    if (chapterData?.projectTeamId) {
+      navigate("/translator/project-teams", {
+        state: { teamId: chapterData.projectTeamId, tab: "tasks" },
+      });
+    } else {
+      navigate("/translator/dashboard");
+    }
+  }, [navigate, chapterData]);
 
   const persistBubbles = useCallback((pageId, selectionsArray, textStyleSettings) => {
     if (!pageId) return;
@@ -1919,7 +1875,6 @@ export default function TranslateWorkspace() {
     goToPage(currentPageIndex + 1);
   }, [goToPage, currentPageIndex, currentPageMeta, persistBubbles]);
 
-  // Manual "Save progress" button (header) — same explicit save, without navigating away.
   const handleSaveProgress = useCallback(() => {
     if (currentPageMeta?.pageId) {
       persistBubbles(currentPageMeta.pageId, selectionsRef.current, textStyleSettingsRef.current);
@@ -1941,7 +1896,7 @@ export default function TranslateWorkspace() {
     isLoadingPageRef.current = true;
     clearSelections();
     setImageNaturalSize(null);
-    setSaveStatus("saved"); 
+    setSaveStatus("saved");
 
     if (currentPageMeta?.bubbles) {
       try {
@@ -1972,7 +1927,6 @@ export default function TranslateWorkspace() {
     };
   }, [currentPageIndex, currentChapterId]);
 
-  // Apply the just-picked color to the right place (text or background) — shared by both eyedropper entry points
   const applyPickedColor = (hex) => {
     if (hex === "CORS_ERROR") {
       alert(
@@ -1983,7 +1937,6 @@ export default function TranslateWorkspace() {
       if (pickingColorFor === "text") updateSelectionStyle(activeId, { textColor: hex });
       else updateSelectionStyle(activeId, { textBgColor: hex });
     }
-    // hex === null means the click landed on the letterbox (empty bars around the image) — ignore, don't change the color
     setPickingColorFor(null);
   };
 
@@ -1999,7 +1952,6 @@ export default function TranslateWorkspace() {
     handleMouseDown(e);
   };
 
-  
   const handleCropColorPick = (clickX, clickY, _box, scale, boxXInImage, boxYInImage, displayedWidth, displayedHeight) => {
     if (!pickingColorFor) return;
     applyPickedColor(readColorInCrop(clickX, clickY, scale, boxXInImage, boxYInImage, displayedWidth, displayedHeight));
@@ -2053,7 +2005,6 @@ export default function TranslateWorkspace() {
 
         <main className="tw-x-main-content">
           <div style={{ display: "flex", flexDirection: "column" }}>
-            {/* Row 1: drawing tool + page navigation/zoom */}
             <div className="tw-canvas-toolbar">
               <ShapeToolbar
                 activeTool={activeTool}
@@ -2074,7 +2025,6 @@ export default function TranslateWorkspace() {
               />
             </div>
 
-            {/* Row 2: text styling — font, weight/style, alignment, size, colors */}
             <div className="tw-canvas-toolbar tw-x-toolbar-row2">
               <CanvasToolbar
                 isBold={isBold}

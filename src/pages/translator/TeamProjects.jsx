@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import '../../assets/style/translator/team-projects.css'
 import ModernButton from '../../components/common/ModernButton'
 import { getMyProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
@@ -29,10 +29,6 @@ import RequestsTab from './RequestsTab'
 import TasksTab, { CreateTaskModal, EditTaskModal, parseTaskTitle, getTaskColumn } from './TasksTab'
 import SettingsTab from './SettingsTab'
 
-// =============================================================================
-// Pure helper function — no closure over component state.
-// =============================================================================
-
 function getTimeAgo(date) {
   const seconds = Math.floor((new Date() - date) / 1000)
   if (seconds < 60) return 'Just now'
@@ -44,11 +40,6 @@ function getTimeAgo(date) {
   if (days < 30) return `${days} day${days > 1 ? 's' : ''} ago`
   return date.toLocaleDateString()
 }
-
-// =============================================================================
-// Projects listing view — the "no project open yet" screen with the searchable
-// grid of project cards.
-// =============================================================================
 
 function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpenDetails, onOpenEdit, isLeaderMatch }) {
   return (
@@ -126,10 +117,6 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
   )
 }
 
-// =============================================================================
-// Edit Project modal
-// =============================================================================
-
 function EditProjectModal({ editForm, setEditForm, onCancel, onSave }) {
   return (
     <div className="trans-modal-overlay">
@@ -180,10 +167,6 @@ function EditProjectModal({ editForm, setEditForm, onCancel, onSave }) {
     </div>
   )
 }
-
-// =============================================================================
-// Workspace breadcrumbs + tab switcher bar
-// =============================================================================
 
 function WorkspaceBreadcrumbs({ title, onBack }) {
   return (
@@ -241,10 +224,6 @@ function WorkspaceTabs({ workspaceTab, setWorkspaceTab, membersCount, isCurrentL
     </>
   )
 }
-
-// =============================================================================
-// Workspace detail view — composes breadcrumbs + tabs + whichever tab is active
-// =============================================================================
 
 function WorkspaceDetailView({
   selectedDetails,
@@ -410,13 +389,9 @@ function WorkspaceDetailView({
   )
 }
 
-// =============================================================================
-// Main component — holds ALL state + handlers, decides which top-level view to
-// render (projects list vs workspace detail), and passes everything down as props.
-// =============================================================================
-
 function TeamProjects() {
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [projects, setProjects] = useState([])
   const [loadingProjects, setLoadingProjects] = useState(true)
@@ -498,7 +473,6 @@ function TeamProjects() {
     return () => window.removeEventListener('click', handleGlobalClick)
   }, [])
 
-  // Fetch chapter options for THIS team whenever the Create Task modal opens.
   useEffect(() => {
     if (!showCreateTask || !selectedDetails?.id) {
       setChapterOptions([])
@@ -512,16 +486,12 @@ function TeamProjects() {
       })
   }, [showCreateTask, selectedDetails?.id])
 
-  // ── Handlers ─────────────────────────────────────
   const handleOpenDetails = async (project) => {
     setSelectedDetails(project)
     setWorkspaceTab('home')
     setShowUploadForm(false)
     setLoadingWorkspace(true)
 
-    // Placeholder shown (badge count, capacity calc, etc.) until MembersTab
-    // fetches the real roster from GET /{teamId}/members and reports it back
-    // up via its onMembersLoaded callback.
     setMembers([{
       name: project.leaderName || 'No Leader',
       role: 'Group Leader',
@@ -537,8 +507,6 @@ function TeamProjects() {
         getTeamMessagesApi(project.id),
         getTeamTasksApi(project.id),
         getTeamRequestsApi(project.id),
-        // GET /{teamId}/members — raw roster for the Tasks tab's assignee
-        // picker. MembersTab does its own separate fetch/mapping for display.
         getTeamMembersApi(project.id).catch((err) => {
           console.error('Could not load real team members for assignee picker:', err)
           return []
@@ -556,6 +524,22 @@ function TeamProjects() {
       setLoadingWorkspace(false)
     }
   }
+
+  useEffect(() => {
+    if (loadingProjects) return
+    const targetTeamId = location.state?.teamId
+    if (!targetTeamId) return
+
+    const targetProject = projects.find(p => p.id === targetTeamId)
+    if (targetProject) {
+      handleOpenDetails(targetProject).then(() => {
+        setWorkspaceTab(location.state?.tab || 'home')
+      })
+    }
+
+    navigate(location.pathname, { replace: true, state: {} })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingProjects, projects, location.state])
 
   const handleOpenEdit = (project, e) => {
     e.stopPropagation()
@@ -831,22 +815,14 @@ function TeamProjects() {
     const ln = leaderName.toLowerCase().trim()
     const username = (authUser?.username || '').toLowerCase().trim()
     const fullName = (authUser?.fullName || '').toLowerCase().trim()
-    if (ln === username || ln === fullName) return true
-    const isDevLeader = ln.includes('trans') || ln.includes('tran')
-    const isDevUser = username.includes('trans') || username.includes('tran') || fullName.includes('trans') || fullName.includes('tran')
-    return isDevLeader && isDevUser
+    return ln === username || ln === fullName
   }
 
-  // Backend's /my-teams endpoint already only returns projects the current user leads
-  // or is a member of — no need to re-filter by leader here anymore. isLeaderMatch is
-  // still used below for "isCurrentLeader" (deciding whether to show the Requests/
-  // Settings tabs INSIDE an already-opened project's workspace).
   const teamProjectsList = projects.filter(proj =>
     (proj.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (proj.comicName || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  // ── Render ─────────────────────────────────────
   if (loadingProjects) {
     return (
       <div style={{ textAlign: 'center', padding: '100px', color: 'var(--trans-text-primary)' }}>
