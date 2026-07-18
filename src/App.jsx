@@ -89,6 +89,7 @@ function App() {
                 <Route path="/ranking" element={<Ranking />} />
                 <Route path="/library" element={<Library />} />
                 <Route path="/forum" element={<Forum />} />
+                <Route path="/forum/thread/:threadId" element={<Forum />} />
                 <Route path="/comic/:id" element={<ComicDetail />} />
                 <Route path="/comic/:comicId/chapter/:chapterId" element={<ChapterDetail />} />
                 <Route path="/search" element={<SearchResults />} />

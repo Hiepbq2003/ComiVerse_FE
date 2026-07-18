@@ -34,6 +34,13 @@ AxiosClient.interceptors.response.use(
         const requestUrl = error.config?.url || '';
         const isLoginRequest = requestUrl.includes('/auth/login');
 
+        // Suppress error notifications if user is logging out (in-flight requests fail after credentials cleared)
+        const auth = getAuth();
+        const hasAuthHeader = !!(error.config?.headers?.Authorization || error.config?.headers?.authorization);
+        if (hasAuthHeader && (!auth || !auth.token)) {
+            return Promise.reject(error);
+        }
+
         if (status === 401) {
             if (isLoginRequest) {
                 return Promise.reject(error);
@@ -47,17 +54,23 @@ AxiosClient.interceptors.response.use(
             const isPrivate = privatePaths.some(path => currentPath.startsWith(path));
             
             if (isPrivate) {
-                toast.error("Session expired. Please log in again!");
+                toast.error("Session expired. Please log in again!", {
+                    toastId: "session-expired-401"
+                });
                 window.location.href = '/';
             }
         } 
         else if (status === 403 && !isLoginRequest) {
             // 403: Forbidden / Access Denied
-            toast.error("Access denied! There is an issue with your account permissions.");
+            toast.error("Access denied! There is an issue with your account permissions.", {
+                toastId: "forbidden-403"
+            });
         }
         else if (status === 500) {
             // 500: Internal Server Error
-            toast.error("System error (Server Error). Please try again later!");
+            toast.error("System error (Server Error). Please try again later!", {
+                toastId: "server-error-500"
+            });
         }
 
         return Promise.reject(error);

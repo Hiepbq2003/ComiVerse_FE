@@ -51,3 +51,7 @@ export const getChapterBacklogApi = async (teamId) => {
 export const createTeamRequestApi = async (teamId, request) => {
   return AxiosClient.post(`/team-workspace/${teamId}/requests`, request)
 }
+
+export const getRequestsByNameApi = async (name) => {
+  return AxiosClient.get('/team-workspace/requests/by-name', { params: { name } })
+}
