@@ -1,27 +1,15 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { Link, NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { AIPopover } from '../common/AIPopover'
 import '../../assets/style/author/author.css'
 
-function AuthorLayout({ children, activeNav = 'overview' }) {
+function AuthorLayout({ children }) {
   const navigate = useNavigate()
-  const location = useLocation()
   const { isLoggedIn, user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification()
-  const [authorized, setAuthorized] = useState(false)
-
-  useEffect(() => {
-    if (!isLoggedIn || !user || user.role?.toUpperCase() !== 'AUTHOR') {
-      navigate('/', { replace: true })
-    } else {
-      setAuthorized(true)
-    }
-  }, [isLoggedIn, user, navigate])
-
   const handleLogout = () => {
     logout()
     navigate('/', { replace: true })
@@ -59,8 +47,8 @@ function AuthorLayout({ children, activeNav = 'overview' }) {
     time: formatTimeAgo(n.createdAt)
   }))
 
-  if (!authorized || !user) {
-    return null
+  if (!isLoggedIn || !user || user.role?.toUpperCase() !== 'AUTHOR') {
+    return <Navigate to="/" replace />
   }
 
   const authorName = user.fullName || user.username || 'Author'
@@ -119,19 +107,16 @@ function AuthorLayout({ children, activeNav = 'overview' }) {
         </div>
 
         <nav className="author-sidebar-nav">
-          {navItems.map((item) => {
-            const isActive = activeNav === item.id || location.pathname === item.path
-            return (
-              <Link
-                key={item.id}
-                to={item.path}
-                className={`author-nav-item ${isActive ? 'active' : ''}`}
-              >
-                {renderNavIcon(item.icon)}
-                {item.label}
-              </Link>
-            )
-          })}
+          {navItems.map((item) => (
+            <NavLink
+              key={item.id}
+              to={item.path}
+              className={({ isActive }) => `author-nav-item ${isActive ? 'active' : ''}`}
+            >
+              {renderNavIcon(item.icon)}
+              {item.label}
+            </NavLink>
+          ))}
         </nav>
 
         <div className="author-sidebar-footer">
@@ -217,7 +202,7 @@ function AuthorLayout({ children, activeNav = 'overview' }) {
 
         {/* Page Content */}
         <div className="author-page-content fade-in-quick">
-          {children}
+          {children || <Outlet />}
         </div>
       </main>
     </div>

@@ -1,4 +1,3 @@
-import AuthorLayout from '../../components/layout/AuthorLayout'
 import '../../assets/style/author/earnings.css'
 function AuthorEarnings() {
   const chartData = [
@@ -16,7 +15,7 @@ function AuthorEarnings() {
     { date: 'Mar 15, 2026', amount: '3.4M', status: 'completed', method: 'Direct Deposit (**** 4321)' },
   ]
   return (
-    <AuthorLayout activeNav="earnings">
+    <>
       <div className="author-page-header">
         <h1>Earnings & Revenue</h1>
         <p>Track your monthly revenue stats, check payout trends, and view transaction records.</p>
@@ -110,7 +109,7 @@ function AuthorEarnings() {
           </div>
         </div>
       </div>
-    </AuthorLayout>
+    </>
   )
 }
 export default AuthorEarnings

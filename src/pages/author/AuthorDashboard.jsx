@@ -1,6 +1,5 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import AuthorLayout from '../../components/layout/AuthorLayout'
 import '../../assets/style/author/dashboard.css'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -89,7 +88,7 @@ function AuthorDashboard() {
   const barGroupW = (barW - barPadX * 2) / 12
 
   return (
-    <AuthorLayout activeNav="overview">
+    <>
       <div className="author-page-header author-page-header-row">
         <div>
           <h1>Author Dashboard</h1>
@@ -246,7 +245,7 @@ function AuthorDashboard() {
           ))}
         </div>
       </div>
-    </AuthorLayout>
+    </>
   )
 }
 
