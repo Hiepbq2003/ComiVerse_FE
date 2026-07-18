@@ -381,3 +381,18 @@
     justify-content: space-between;
   }
 }
+
+/* EMOJI COVER FALLBACK */
+.lib-comic-cover-emoji-fallback {
+  width: 90px;
+  height: 120px;
+  border-radius: 6px;
+  background: radial-gradient(circle at center, rgba(168, 85, 247, 0.12) 0%, rgba(13, 9, 25, 0.95) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  user-select: none;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}

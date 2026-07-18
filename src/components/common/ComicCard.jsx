@@ -9,9 +9,16 @@ function ComicCard({ comic }) {
   const id = comic.id
   const title = comic.title
   const cover = comic.cover
-  const rating = comic.rating || '0.0'
-  const views = comic.views || '0'
-  const chapters = comic.chapters || comic.chaptersCount || '0'
+
+  // Helper to detect if cover is an emoji character
+  const isEmoji = (str) => {
+    if (!str) return false
+    return !str.includes('/') && !str.includes('.') && str.trim().length <= 4
+  }
+  
+  const rating = comic.rating !== undefined ? comic.rating : (comic.ratingAverage ?? '0.0')
+  const views = comic.views || comic.viewCount || '0'
+  const chapters = comic.chapters || comic.chaptersCount || comic.chapterCount || '0'
   
   // Determine primary genre
   let genre = 'Fantasy'
@@ -40,7 +47,11 @@ function ComicCard({ comic }) {
   return (
     <div className="home-comic-card" onClick={handleClick}>
       <div className="card-cover-wrapper">
-        <img src={cover} alt={title} />
+        {isEmoji(cover) ? (
+          <div className="card-cover-emoji-fallback">{cover}</div>
+        ) : (
+          <img src={cover} alt={title} />
+        )}
         <div className={`card-badge ${badgeClass}`}>{genre.toUpperCase()}</div>
         <div className="card-rating-badge">
           <span>⭐</span> {rating}

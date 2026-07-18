@@ -7,6 +7,8 @@ import { createSubmissionApi } from '../../services/api/SubmissionApi'
 import { StepForward } from "lucide-react";
 import { GitCompare } from "lucide-react";
 import { getAuth } from '../../utils/Auth'
+import { formatTimeAgo } from '../../utils/formatTimeAgo'
+import { AIPopover } from '../../components/common/AIPopover'
 
 import {
   getTeamAnnouncementsApi,
@@ -18,7 +20,7 @@ import {
   createTeamTaskApi,
   updateTeamTaskApi,
   getTeamRequestsApi,
-  deleteTeamRequestApi,
+  decideTeamRequestApi,
   getChapterBacklogApi,
   createTeamRequestApi
 } from '../../services/api/TeamWorkspaceApi'
@@ -34,6 +36,181 @@ function TeamProjects() {
   const authUser = auth?.user
   const userFullName = authUser?.fullName || authUser?.username || 'Translator'
   const user = authUser || {}
+
+  const renderReviewModal = () => {
+    if (!selectedReviewRequest) return null;
+    return (
+      <div className="trans-modal-overlay" style={{ zIndex: 10000 }}>
+        <div className="trans-modal-card" style={{ maxWidth: '680px', width: '95%', borderRadius: '16px' }}>
+          <div className="trans-modal-header" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '14px' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#c084fc', margin: 0 }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+              </svg>
+              Application Details Review
+            </h3>
+            <button className="trans-modal-close-btn" onClick={() => setSelectedReviewRequest(null)}>×</button>
+          </div>
+
+          <div className="trans-modal-body" style={{ padding: '20px 24px 10px 24px' }}>
+            
+            {/* Applicant Profile Row */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '14px',
+              background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)',
+              borderRadius: '12px', padding: '16px', marginBottom: '20px'
+            }}>
+              <div className="chat-avatar" style={{ 
+                background: 'linear-gradient(135deg, #7c3aed, #a855f7)', 
+                color: '#ffffff', width: '48px', height: '48px', fontSize: '18px', fontWeight: '600'
+              }}>
+                {selectedReviewRequest.avatar || 'U'}
+              </div>
+              <div style={{ flex: 1 }}>
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: '700', color: 'var(--trans-text-primary)' }}>
+                  {selectedReviewRequest.name}
+                </h4>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--trans-text-muted)' }}>
+                  <span>Applied: {formatDisplayTime(selectedReviewRequest.time)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Introduction Message */}
+            <div style={{ marginBottom: '20px' }}>
+              <label className="trans-form-label" style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: 'var(--trans-text-secondary)' }}>
+                Introduction Message
+              </label>
+              <div className={`request-review-msg-box ${selectedReviewRequest.text?.trim() ? '' : 'empty'}`}>
+                {selectedReviewRequest.text?.trim() ? `"${selectedReviewRequest.text}"` : "No introduction message was provided by the applicant."}
+              </div>
+            </div>
+
+            {/* CV Section */}
+            <div>
+              <label className="trans-form-label" style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: 'var(--trans-text-secondary)' }}>
+                Attached CV / Resume
+              </label>
+              {selectedReviewRequest.cvUrl ? (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  background: 'rgba(168, 85, 247, 0.05)', border: '1px solid rgba(168, 85, 247, 0.15)',
+                  borderRadius: '10px', padding: '14px 16px'
+                }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                  </svg>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: '600', color: '#c084fc', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                      {selectedReviewRequest.cvFileName || 'CV_Resume.pdf'}
+                    </p>
+                    <p style={{ margin: 0, fontSize: '11px', color: 'var(--trans-text-muted)' }}>Ready to download</p>
+                  </div>
+                  <button
+                    onClick={() => handleDownloadCV(selectedReviewRequest.cvUrl, selectedReviewRequest.cvFileName)}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '6px',
+                      background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc',
+                      border: '1px solid rgba(168, 85, 247, 0.3)', borderRadius: '8px',
+                      padding: '6px 14px', fontSize: '12px', fontWeight: '600',
+                      textDecoration: 'none', cursor: 'pointer', transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(168, 85, 247, 0.25)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(168, 85, 247, 0.15)' }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Download CV
+                  </button>
+                </div>
+              ) : (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)',
+                  borderRadius: '10px', padding: '16px', color: 'var(--trans-text-muted)',
+                  fontSize: '13px', justifyContent: 'center'
+                }}>
+                  <span>No CV file attached. Only introduction message is provided.</span>
+                </div>
+              )}
+            </div>
+
+          </div>
+
+          <div className="trans-modal-footer" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            <button className="trans-btn secondary" onClick={() => setSelectedReviewRequest(null)}>
+              Cancel
+            </button>
+            <button 
+              className="trans-btn secondary" 
+              style={{ 
+                background: 'rgba(239, 68, 68, 0.08)', 
+                borderColor: 'rgba(239, 68, 68, 0.2)', 
+                color: '#f87171' 
+              }}
+              onClick={() => handleRejectRequest(selectedReviewRequest.id, selectedReviewRequest.name)}
+            >
+              Reject Application
+            </button>
+            <button className="trans-btn primary" onClick={() => handleApproveRequest(selectedReviewRequest)}>
+              Approve Application
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const handleDownloadCV = async (fileUrl, fileName) => {
+    if (!fileUrl) return;
+    try {
+      const response = await fetch(fileUrl);
+      if (!response.ok) throw new Error('Failed to fetch CV file');
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName || 'CV_Resume.pdf';
+      document.body.appendChild(link);
+      link.click();
+      
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error('Client-side download failed, falling back to new tab:', err);
+      window.open(fileUrl, '_blank');
+    }
+  };
+
+  const formatDisplayTime = (timeStr) => {
+    if (!timeStr) return '';
+    const ago = formatTimeAgo(timeStr);
+    if (ago) return ago;
+    try {
+      const date = new Date(timeStr);
+      if (isNaN(date.getTime())) return timeStr;
+      return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return timeStr;
+    }
+  };
 
   const fetchProjects = async (silent = false) => {
     try {
@@ -76,6 +253,7 @@ function TeamProjects() {
   const [chatMessages, setChatMessages] = useState([])
   const [chatInput, setChatInput] = useState('')
   const [joinRequests, setJoinRequests] = useState([])
+  const [selectedReviewRequest, setSelectedReviewRequest] = useState(null)
   const [tasks, setTasks] = useState([])
   const [chapterBacklog, setChapterBacklog] = useState([])
   const [showBacklogModal, setShowBacklogModal] = useState(false)
@@ -125,6 +303,56 @@ function TeamProjects() {
     setClaimedCurrentPage(1)
   }, [selectedDetails?.id])
   const [memberSearch, setMemberSearch] = useState('')
+
+  const handleRemoveMember = async (memberId, memberName) => {
+    if (window.confirm(`Are you sure you want to remove ${memberName} from the translation team?`)) {
+      try {
+        const updated = members.filter(m => m.id !== memberId)
+        setMembers(updated)
+        localStorage.setItem(`comiverse_project_members_${selectedDetails?.id}`, JSON.stringify(updated))
+
+        const nextMembersCount = Math.max(1, (selectedDetails?.membersCount || 1) - 1)
+        await updateProjectTeamApi(selectedDetails.id, {
+          id: selectedDetails.id,
+          title: selectedDetails.title || selectedDetails.team,
+          comicName: selectedDetails.comicName || selectedDetails.title,
+          status: selectedDetails.status,
+          membersCount: nextMembersCount,
+          chaptersCount: selectedDetails.chaptersCount,
+          progress: selectedDetails.progress,
+          leaderName: selectedDetails.leaderName,
+          leaderInitials: selectedDetails.leaderInitials,
+          deadline: selectedDetails.deadline,
+          sourceLang: selectedDetails.sourceLang,
+          targetLang: selectedDetails.targetLang,
+          priority: selectedDetails.priority,
+          cover: selectedDetails.cover,
+          description: selectedDetails.description,
+          notes: selectedDetails.notes,
+          isRecruiting: selectedDetails.isRecruiting,
+          maxMembers: selectedDetails.maxMembers
+        })
+
+        setSelectedDetails(prev => ({ ...prev, membersCount: nextMembersCount }))
+        setProjects(prev => prev.map(p => p.id === selectedDetails.id ? { ...p, membersCount: nextMembersCount } : p))
+        toast.success(`Removed ${memberName} from the team.`)
+      } catch (err) {
+        console.error(err)
+        toast.error('Failed to update team members count on backend.')
+      }
+    }
+  }
+
+  const getMemberMenuItems = (member) => {
+    if (member.role === 'Group Leader') {
+      return [
+        { label: 'Role: Group Leader', action: 'none', disabled: true }
+      ]
+    }
+    return [
+      { label: 'Remove from Team', action: 'remove', danger: true }
+    ]
+  }
   const [showCreateTask, setShowCreateTask] = useState(false)
   const [newTaskData, setNewTaskData] = useState({
     title: '',
@@ -192,7 +420,8 @@ function TeamProjects() {
 
   const claimedProjects = projects.filter(proj => {
     const isNotUnclaimed = !proj.status || proj.status.toUpperCase() !== 'UNCLAIMED'
-    const isUserLeader = proj.leaderName && (
+    const authenticatedUserId = authUser?.userId || authUser?.id
+    const isUserLeader = (authenticatedUserId && proj.leaderId === authenticatedUserId) || (proj.leaderName && (
       proj.leaderName === userFullName ||
       proj.leaderName === authUser?.fullName ||
       proj.leaderName === authUser?.username ||
@@ -200,7 +429,7 @@ function TeamProjects() {
       proj.leaderName.toLowerCase() === authUser?.username?.toLowerCase() ||
       proj.leaderName.toLowerCase() === user?.username?.toLowerCase() ||
       proj.leaderName.toLowerCase() === user?.fullName?.toLowerCase()
-    )
+    ))
     return isNotUnclaimed && isUserLeader
   })
 
@@ -255,6 +484,7 @@ function TeamProjects() {
 
     // Sync leader info dynamically in the members list
     const actualLeader = {
+      id: project.leaderId || 'leader-id',
       name: project.leaderName || 'No Leader',
       role: 'Group Leader',
       status: 'Active',
@@ -262,7 +492,20 @@ function TeamProjects() {
       contributions: `${project.chaptersCount || 0} chapters`,
       avatar: project.leaderInitials || 'TL'
     }
-    setMembers([actualLeader])
+
+    const savedMembers = localStorage.getItem(`comiverse_project_members_${project.id}`)
+    if (savedMembers) {
+      try {
+        const list = JSON.parse(savedMembers)
+        const filtered = list.filter(m => m.role !== 'Group Leader')
+        setMembers([actualLeader, ...filtered])
+      } catch (e) {
+        console.error(e)
+        setMembers([actualLeader])
+      }
+    } else {
+      setMembers([actualLeader])
+    }
 
     try {
       const [annList, msgList, taskList, reqList, backlogList] = await Promise.all([
@@ -471,12 +714,14 @@ function TeamProjects() {
   }
 
   // Action: Approve Join Request
-  const handleApproveRequest = async (id, name) => {
+  const handleApproveRequest = async (request) => {
+    const { id, name } = request
     try {
-      await deleteTeamRequestApi(id)
+      await decideTeamRequestApi(id, 'approved')
       setJoinRequests(prev => prev.filter(req => req.id !== id))
 
       const newMem = {
+        id: request.requesterId || `mem-${Date.now()}`,
         name,
         role: 'Member',
         status: 'Active',
@@ -484,8 +729,17 @@ function TeamProjects() {
         contributions: '0 chapters',
         avatar: name.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2)
       }
-      setMembers([...members, newMem])
+
+      const updatedMembers = [...members, newMem]
+      setMembers(updatedMembers)
+      localStorage.setItem(`comiverse_project_members_${selectedDetails?.id}`, JSON.stringify(updatedMembers))
+
+      const nextMembersCount = (selectedDetails?.membersCount || 1) + 1
+      setSelectedDetails(prev => ({ ...prev, membersCount: nextMembersCount }))
+      setProjects(prev => prev.map(p => p.id === selectedDetails.id ? { ...p, membersCount: nextMembersCount } : p))
+
       toast.success(`Approved ${name} in database!`)
+      setSelectedReviewRequest(null)
     } catch (err) {
       console.error(err)
       toast.error('Failed to approve request.')
@@ -495,9 +749,10 @@ function TeamProjects() {
   // Action: Reject Join Request
   const handleRejectRequest = async (id, name) => {
     try {
-      await deleteTeamRequestApi(id)
+      await decideTeamRequestApi(id, 'rejected')
       setJoinRequests(prev => prev.filter(req => req.id !== id))
       toast.info(`Rejected ${name}'s request in database.`)
+      setSelectedReviewRequest(null)
     } catch (err) {
       console.error(err)
       toast.error('Failed to reject request.')
@@ -509,11 +764,13 @@ function TeamProjects() {
     if (!newTaskData.title.trim()) return
     const formattedTitle = `[${newTaskData.priority.toUpperCase()}] [${newTaskData.comic}] ${newTaskData.title.trim()}`
     try {
+      const selectedAssignee = members.find(member => (member.id || member.avatar) === newTaskData.assignee)
       const taskPayload = {
         title: formattedTitle,
         columnName: newTaskData.column,
         progress: 0,
-        assignees: newTaskData.assignee,
+        assigneeId: selectedAssignee?.id || null,
+        assignees: selectedAssignee?.avatar || selectedAssignee?.name || newTaskData.assignee,
         dueDate: newTaskData.dueDate || new Date().toISOString().split('T')[0]
       }
       if (newTaskData.chapterId) {
@@ -862,22 +1119,33 @@ function TeamProjects() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredMembers.map((member, idx) => (
-                    <tr key={idx}>
-                      <td>
-                        <div className="member-cell-info">
-                          <div className="chat-avatar" style={{ background: member.role === 'Group Leader' ? '#f59e0b' : '', color: member.role === 'Group Leader' ? '#ffffff' : '' }}>
-                            {member.avatar}
-                          </div>
-                          <div className="member-status-details">
-                            <span className="member-name-text">{member.name}</span>
-                            <div className="member-status-row">
-                              <span className={`status-dot ${member.status.toLowerCase()}`}></span>
-                              <span>{member.status}</span>
+                  {filteredMembers.map((member, idx) => {
+                    const loggedInUsername = (authUser?.username || '').toLowerCase().trim();
+                    const loggedInFullName = (authUser?.fullName || '').toLowerCase().trim();
+                    const loggedInUserId = authUser?.userId || authUser?.id;
+                    const memberNameLower = (member.name || '').toLowerCase().trim();
+                    
+                    const isSelf = 
+                      (loggedInUsername && memberNameLower === loggedInUsername) || 
+                      (loggedInFullName && memberNameLower === loggedInFullName) || 
+                      (loggedInUserId && member.id === loggedInUserId);
+                    const displayStatus = isSelf ? 'Active' : 'Offline';
+                    return (
+                      <tr key={idx}>
+                        <td>
+                          <div className="member-cell-info">
+                            <div className="chat-avatar" style={{ background: member.role === 'Group Leader' ? '#f59e0b' : '', color: member.role === 'Group Leader' ? '#ffffff' : '' }}>
+                              {member.avatar}
+                            </div>
+                            <div className="member-status-details">
+                              <span className="member-name-text">{member.name}</span>
+                              <div className="member-status-row">
+                                <span className={`status-dot ${displayStatus.toLowerCase()}`}></span>
+                                <span>{displayStatus}</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </td>
+                        </td>
                       <td>
                         <span className={`member-role-badge ${member.role === 'Group Leader' ? 'leader' : ''}`}>
                           {member.role}
@@ -886,10 +1154,21 @@ function TeamProjects() {
                       <td style={{ color: 'var(--trans-text-secondary)' }}>{member.joinDate}</td>
                       <td style={{ fontWeight: '600' }}>{member.contributions}</td>
                       <td>
-                        <button className="table-action-dots-btn">⋮</button>
+                        <AIPopover
+                          variant="menu"
+                          triggerText=""
+                          triggerClass="table-action-dots-btn"
+                          data={{ menuItems: getMemberMenuItems(member) }}
+                          onAction={(action) => {
+                            if (action === 'remove') {
+                              handleRemoveMember(member.id, member.name);
+                            }
+                          }}
+                        />
                       </td>
-                    </tr>
-                  ))}
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -909,25 +1188,46 @@ function TeamProjects() {
             ) : (
               joinRequests.map(req => (
                 <div className="request-card-item" key={req.id}>
-                  <div className="request-header">
+                  <div className="request-header" style={{ marginBottom: '14px' }}>
                     <div className="chat-avatar" style={{ background: '#7c3aed', color: '#ffffff' }}>{req.avatar || 'U'}</div>
                     <div className="post-header-info">
                       <span className="member-name-text">{req.name}</span>
-                      <span className="post-time">{req.time}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className="post-time">{formatDisplayTime(req.time)}</span>
+                        {req.cvUrl && (
+                          <span style={{ 
+                            fontSize: '11px', 
+                            color: '#a855f7', 
+                            background: 'rgba(168, 85, 247, 0.08)',
+                            padding: '1px 8px',
+                            borderRadius: '4px',
+                            fontWeight: '600'
+                          }}>
+                            📄 Has CV Attachment
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="request-message">"{req.text}"</div>
-                  <div className="request-role-tags">
-                    {req.roles.map((r, i) => (
-                      <span className="role-tag" key={i}>{r}</span>
-                    ))}
-                  </div>
-                  <div className="request-actions-row">
-                    <button className="trans-btn primary" onClick={() => handleApproveRequest(req.id, req.name)}>
-                      Approve
-                    </button>
-                    <button className="trans-btn secondary" onClick={() => handleRejectRequest(req.id, req.name)}>
-                      Reject
+                  <div className="request-actions-row" style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                    <button 
+                      className="trans-btn primary" 
+                      onClick={() => setSelectedReviewRequest(req)}
+                      style={{ 
+                        background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+                        border: 'none',
+                        color: '#fff',
+                        padding: '8px 16px',
+                        fontSize: '12.5px',
+                        fontWeight: '600',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(168, 85, 247, 0.3)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
+                    >
+                      Review Application
                     </button>
                   </div>
                 </div>
@@ -1301,7 +1601,7 @@ function TeamProjects() {
                         onChange={(e) => setNewTaskData({ ...newTaskData, assignee: e.target.value })}
                       >
                         {members.map((m, idx) => (
-                          <option key={idx} value={m.avatar}>{m.name}</option>
+                          <option key={m.id || idx} value={m.id || m.avatar}>{m.name}</option>
                         ))}
                       </select>
                     </div>
@@ -1398,8 +1698,8 @@ function TeamProjects() {
                         <p style={{ fontSize: '13px', margin: 0 }}>All approved chapters have been assigned tasks on your board.</p>
                       </div>
                     ) : (
-                      <div className="chapter-backlog-table" style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
-                        <div className="chapter-backlog-table-head" style={{ position: 'sticky', top: 0, background: '#130d24', zIndex: 10 }}>
+                      <div className="chapter-backlog-table" style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid var(--trans-border)', borderRadius: '8px' }}>
+                        <div className="chapter-backlog-table-head" style={{ position: 'sticky', top: 0, background: 'var(--trans-card-bg)', zIndex: 10 }}>
                           <span>CHAPTER</span>
                           <span>COMIC</span>
                           <span>PAGES</span>
@@ -1650,7 +1950,7 @@ function TeamProjects() {
 
                 <div style={{ marginTop: '16px' }}>
                   {selectedDetails.isRecruiting ? (
-                    (selectedDetails.maxMembers || 5) - members.length > 0 ? (
+                    (selectedDetails.maxMembers || 5) - members.filter(m => m.role !== 'Group Leader').length > 0 ? (
                       <div className="capacity-info-alert recruiting" style={{
                         background: 'rgba(34, 197, 94, 0.08)',
                         border: '1px solid rgba(34, 197, 94, 0.15)',
@@ -1659,7 +1959,7 @@ function TeamProjects() {
                         borderRadius: '6px',
                         fontSize: '13px'
                       }}>
-                        <span>🟢 Open Recruiting: <strong>{Math.max(0, (selectedDetails.maxMembers || 5) - members.length)}</strong> spots available to join</span>
+                        <span>🟢 Open Recruiting: <strong>{Math.max(0, (selectedDetails.maxMembers || 5) - members.filter(m => m.role !== 'Group Leader').length)}</strong> spots available to join</span>
                       </div>
                     ) : (
                       <div className="capacity-info-alert full" style={{
@@ -1713,6 +2013,7 @@ function TeamProjects() {
             </div>
           </div>
         )}
+        {renderReviewModal()}
       </div>
     )
   }
@@ -1848,6 +2149,8 @@ function TeamProjects() {
           </div>
         </div>
       )}
+
+      {renderReviewModal()}
     </div>
   )
 }

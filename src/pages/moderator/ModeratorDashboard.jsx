@@ -102,6 +102,7 @@ function ModeratorDashboard() {
     sourceLang: 'Japanese',
     targetLang: 'English',
     leaderName: '',
+    leaderId: '',
     priority: 'High'
   })
 
@@ -266,6 +267,7 @@ function ModeratorDashboard() {
       sourceLang: 'Japanese',
       targetLang: 'English',
       leaderName: '',
+      leaderId: '',
       priority: 'High'
     })
     setCreateTeamStep(1)
@@ -292,6 +294,7 @@ function ModeratorDashboard() {
       chaptersCount: 0,
       progress: 0,
       leaderName: leaderName,
+      leaderId: createTeamForm.leaderId || null,
       leaderInitials: leaderInitials,
       deadline: 'unspecified',
       sourceLang: createTeamForm.sourceLang,
@@ -1045,7 +1048,7 @@ function ModeratorDashboard() {
 
           {/* Action Audit Log Modal (at root level to prevent stacking context scroll issues) */}
           {showAuditModal && (
-            <div className="mod-modal-overlay" onClick={() => setShowAuditModal(false)}>
+            <div className="mod-modal-overlay" onClick={(event) => event.stopPropagation()}>
               <div className="mod-modal-card wide" style={{ width: '95%', maxWidth: '1150px' }} onClick={e => e.stopPropagation()}>
                 <div className="mod-modal-header">
                   <h3>Action Audit Log</h3>

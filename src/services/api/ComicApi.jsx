@@ -24,6 +24,14 @@ export const getExploreComicsApi = (params) => {
   return AxiosClient.get('/comics/explore', { params });
 };
 
+export const getComicRecommendationsApi = (params) => {
+  return AxiosClient.get('/comics/recommendations', { params });
+};
+
+export const getComicLeaderboardApi = (params) => {
+  return AxiosClient.get('/comics/leaderboard', { params });
+};
+
 export const getComicByIdApi = (id) => {
   return AxiosClient.get(`/comics/${id}`);
 };

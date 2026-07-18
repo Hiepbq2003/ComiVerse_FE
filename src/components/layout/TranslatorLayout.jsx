@@ -12,6 +12,8 @@ function TranslatorLayout({ children }) {
   const { isLoggedIn, user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const userName = user?.fullName || user?.username || 'Translator'
+  const roleUpper = (user?.role || '').toUpperCase().replace(/[\s-]+/g, '_')
+  const workspaceLabel = roleUpper === 'PROJECT_LEADER' ? 'Project Leader' : 'Translator'
 
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification()
 
@@ -49,7 +51,7 @@ function TranslatorLayout({ children }) {
 
   useEffect(() => {
     if (!isLoggedIn || !user ||
-      user.role?.toLowerCase() !== 'translator') {
+      !['TRANSLATOR', 'PROJECT_LEADER'].includes((user.role || '').toUpperCase().replace(/[\s-]+/g, '_'))) {
       navigate('/', { replace: true })
     }
   }, [isLoggedIn, user, navigate])
@@ -151,7 +153,7 @@ function TranslatorLayout({ children }) {
         <header className="translator-topbar">
           <div className="translator-topbar-left">
             <span>Workspace:</span>
-            <span className="workspace-label">Translator</span>
+            <span className="workspace-label">{workspaceLabel}</span>
           </div>
 
           <div className="translator-topbar-right">

@@ -1,10 +1,7 @@
 import { useState } from 'react'
-import { registerApi, getMeApi } from '../../services/api/AuthApi'
-import { useAuth } from '../../context/AuthContext'
-import { setAuth } from '../../utils/Auth'
+import { registerApi } from '../../services/api/AuthApi'
 
-function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoading, onOpenModal }) {
-  const { login } = useAuth()
+function Register({ onNavigate, onVerificationRequired, showAlert, loading, setLoading, onOpenModal }) {
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -77,31 +74,16 @@ function Register({ onNavigate, onRegisterSuccess, showAlert, loading, setLoadin
     setLoading(true)
     try {
       const fullName = `${form.firstName.trim()} ${form.lastName.trim()}`.trim()
-      const data = await registerApi({
+      const email = form.email.trim()
+      await registerApi({
         username: form.username.trim(),
         fullName: fullName || 'Unspecified Name',
-        email: form.email.trim(),
+        email,
         password: form.password
       })
 
-      // Temporarily store token for getMeApi authentication
-      setAuth(data.token, '', data.refreshToken)
-
-      // Fetch user profile info
-      const meResponse = await getMeApi()
-      const meData = meResponse.data || meResponse
-
-      const userData = {
-        userId: meData.userId,
-        username: meData.username,
-        fullName: meData.fullName,
-        email: meData.email,
-        role: meData.role,
-        avatarUrl: meData.avatarUrl
-      }
-      login(data.token, userData)
-      onRegisterSuccess(userData)
-      showAlert('success', 'Account registered successfully!')
+      onVerificationRequired(email)
+      showAlert('success', 'Account created. Please check your email for the OTP code.')
     } catch (err) {
       let errMessage = 'Registration failed.'
       if (err.response?.data) {
