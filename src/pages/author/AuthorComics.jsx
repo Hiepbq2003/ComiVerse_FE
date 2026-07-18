@@ -1,29 +1,20 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
-import AuthorLayout from '../../components/layout/AuthorLayout'
 import '../../assets/style/author/comics.css'
+import '../../assets/style/author/upload-guide.css'
 import {
   createAuthorComicApi,
   getAuthorChapterUploadStatusApi,
-  getAuthorComicPackageUploadStatusApi,
   getAuthorComicsApi,
+  submitAuthorComicReviewApi,
   uploadAuthorChapterZipApi,
-  uploadAuthorComicPackageZipApi,
 } from '../../services/api/AuthorComicApi'
 import { uploadImageApi } from '../../services/api/UploadApi'
 
 const GENRE_OPTIONS = [
-  'Action',
-  'Adventure',
-  'Fantasy',
-  'Romance',
-  'Drama',
-  'Mystery',
-  'Cultivation',
-  'Sci-Fi',
-  'Comedy',
-  'Horror',
+  'Action', 'Adventure', 'Fantasy', 'Romance', 'Drama',
+  'Mystery', 'Cultivation', 'Sci-Fi', 'Comedy', 'Horror',
 ]
 
 const normalizeArrayResponse = (payload) => {
@@ -47,46 +38,45 @@ const normalizeGenres = (genres) => {
 }
 
 const getComicId = (comic) => comic?.id || comic?.comicId || comic?._id
-
-const getComicCover = (comic) => comic?.coverImageUrl || comic?.coverUrl || comic?.cover || comic?.thumbnail || ''
-
-const getChapterCount = (comic) => (
-  comic?.chapterCount ?? comic?.chapters ?? comic?.totalChapters ?? 0
-)
-
-const getViews = (comic) => comic?.views ?? comic?.viewCount ?? comic?.totalViews ?? 0
+const getComicCover = (comic) => comic?.cover || ''
+const getChapterCount = (comic) => comic?.chapterCount ?? 0
+const getViews = (comic) => comic?.viewCount ?? 0
+const getTaskId = (task) => task?.taskId || task?.id || task?.uploadTaskId
+const isFinalUploadStatus = (status) => ['COMPLETED', 'FAILED'].includes((status || '').toString().toUpperCase())
+const UPLOAD_POLL_INTERVAL_MS = 2500
+const CHAPTER_ARCHIVE_NAME_REGEX = /^chapter\s+[1-9][0-9]*(?:[,.][0-9]+)?\.cbz$/i
 
 const formatPublicationStatus = (status) => {
   const value = (status || 'ONGOING').toString().toUpperCase()
-  if (value === 'HIATUS' || value === 'PAUSED' || value === 'ON_HIATUS') return 'On Hiatus'
-  if (value === 'COMPLETED' || value === 'COMPLETE') return 'Completed'
-  if (value === 'ARCHIVED') return 'Archived'
+  if (value === 'HIATUS') return 'On Hiatus'
+  if (['COMPLETED', 'COMPLETE'].includes(value)) return 'Completed'
+  if (value === 'CANCEL') return 'Cancelled'
   return 'Ongoing'
 }
 
 const formatModerationStatus = (status) => {
-  const value = (status || 'SUBMITTED_FOR_REVIEW').toString().toUpperCase()
-  if (value === 'APPROVED' || value === 'PUBLISHED') return '✓ Approved'
-  if (value === 'HIDDEN' || value === 'UNPUBLISHED') return '👁 Hidden'
+  const value = (status || 'DRAFT').toString().toUpperCase()
+  if (['APPROVED', 'PUBLISHED'].includes(value)) return '✓ Approved'
+  if (['HIDDEN', 'UNPUBLISHED'].includes(value)) return '👁 Hidden'
   if (value === 'REJECTED') return '✕ Rejected'
+  if (value === 'NEEDS_CHANGES') return 'Needs Changes'
   if (value === 'DRAFT') return 'Draft'
-  if (value === 'PREVIEW_READY') return 'Preview Ready'
   return '⏳ Pending Review'
 }
 
 const getModerationClass = (status) => {
   const value = (status || '').toString().toUpperCase()
-  if (value === 'APPROVED' || value === 'PUBLISHED') return 'approved'
-  if (value === 'HIDDEN' || value === 'UNPUBLISHED') return 'hidden'
-  if (value === 'REJECTED') return 'rejected'
-  if (value === 'DRAFT' || value === 'PREVIEW_READY') return 'draft'
+  if (['APPROVED', 'PUBLISHED'].includes(value)) return 'approved'
+  if (['HIDDEN', 'UNPUBLISHED'].includes(value)) return 'hidden'
+  if (['REJECTED', 'NEEDS_CHANGES'].includes(value)) return 'rejected'
+  if (value === 'DRAFT') return 'draft'
   return 'pending'
 }
 
 const getPublicationClass = (status) => {
   const value = (status || 'ONGOING').toString().toUpperCase()
-  if (value === 'COMPLETED' || value === 'COMPLETE') return 'completed'
-  if (value === 'HIATUS' || value === 'PAUSED' || value === 'ON_HIATUS') return 'hiatus'
+  if (['COMPLETED', 'COMPLETE'].includes(value)) return 'completed'
+  if (value === 'HIATUS') return 'hiatus'
   return 'ongoing'
 }
 
@@ -94,28 +84,8 @@ const formatDate = (value) => {
   if (!value) return 'Recently'
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return value
-  return parsed.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
-
-const isComicPackageZipFile = (file) => {
-  const name = file?.name?.toLowerCase() || ''
-  return name.endsWith('.zip')
-}
-
-const isChapterCbzFile = (file) => {
-  const name = file?.name?.toLowerCase() || ''
-  return name.endsWith('.cbz')
-}
-
-const CHAPTER_ARCHIVE_NAME_REGEX = /^chapter\s+[1-9][0-9]*(?:[,.][0-9]+)?\.cbz$/i
-
-const UPLOAD_POLL_INTERVAL_MS = 2500
-const isFinalUploadStatus = (status) => ['COMPLETED', 'FAILED'].includes((status || '').toString().toUpperCase())
-const getTaskId = (task) => task?.taskId || task?.id || task?.uploadTaskId
 
 const formatUploadStatus = (status) => {
   const value = (status || 'QUEUED').toString().toUpperCase()
@@ -133,72 +103,12 @@ const buildChapterFormData = ({ chapterNumber, chapterTitle, zipFile }) => {
   return formData
 }
 
-function ZipPackagingGuide() {
-  return (
-    <div className="author-upload-guide-card">
-      <div>
-        <strong>Comic package ZIP rules</strong>
-        <p>Upload Comic uses one outer ZIP containing many chapter CBZ files.</p>
-      </div>
-      <ul>
-        <li>Outer file: <code>TenTruyen.zip</code>.</li>
-        <li>Required: <code>TenTruyen.zip/Chapter 1.cbz</code>, <code>TenTruyen.zip/Chapter 2.cbz</code>.</li>
-        <li>Do not wrap chapter CBZ files in another folder inside the outer ZIP.</li>
-        <li>Inside each chapter CBZ: page images directly at root like <code>01.jpg</code>, <code>02.jpg</code>.</li>
-        <li>Do not put page images directly in the outer comic package archive.</li>
-      </ul>
-      <Link to="/author/upload-guide" className="author-guide-link">Open full upload guide</Link>
-    </div>
-  )
-}
-
-
-function ChapterZipPackagingGuide() {
-  return (
-    <div className="author-upload-guide-card">
-      <div>
-        <strong>Chapter CBZ rules</strong>
-        <p>Add Chapter uses one CBZ containing page images directly at root.</p>
-      </div>
-      <ul>
-        <li>File: <code>Chapter 2.cbz</code>.</li>
-        <li>Inside CBZ: <code>01.jpg</code>, <code>02.jpg</code>, <code>03.jpg</code>.</li>
-        <li>Do not put another archive or wrapper folder inside a chapter CBZ.</li>
-        <li>Do not include PDF, TXT, PSD, README, hidden files, or <code>__MACOSX</code>.</li>
-      </ul>
-      <Link to="/author/upload-guide" className="author-guide-link">Open full upload guide</Link>
-    </div>
-  )
-}
-
-function buildComicPackageFormData({ title, slug, description, minimumAge, genres, publicationStatus, coverImageUrl, comicPackageZip }) {
-  const formData = new FormData()
-  formData.append('title', title || '')
-  formData.append('slug', slug || '')
-  formData.append('description', description || '')
-  formData.append('minimumAge', minimumAge ?? 13)
-  formData.append('publicationStatus', publicationStatus || 'ONGOING')
-  formData.append('coverImageUrl', coverImageUrl || '')
-  genres.forEach((genre) => formData.append('genres', genre))
-  formData.append('comicZip', comicPackageZip)
-  return formData
-}
-
 function CreateComicModal({ onClose, onCreated }) {
-  const navigate = useNavigate()
-  const [step, setStep] = useState(1)
-  const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({
-    title: '',
-    slug: '',
-    description: '',
-    minimumAge: 13,
-    genres: [],
-    publicationStatus: 'ONGOING',
-    coverImageUrl: '',
-    coverFile: null,
-    comicPackageZip: null,
+    title: '', summary: '', minimumAge: 13,
+    publicationStatus: 'ONGOING', genres: [], coverFile: null, cover: '',
   })
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   const toggleGenre = (genre) => {
@@ -210,275 +120,108 @@ function CreateComicModal({ onClose, onCreated }) {
     }))
   }
 
-  const goNext = () => {
-    if (step === 1 && !form.title.trim()) {
-      setError('Title is required.')
-      return
-    }
-    if (step === 1 && (Number(form.minimumAge) < 0 || Number(form.minimumAge) > 21)) {
-      setError('Minimum age must be between 0 and 21.')
-      return
-    }
-    if (step === 3 && form.comicPackageZip && !isComicPackageZipFile(form.comicPackageZip)) {
-      setError('Comic package must be an outer .zip file.')
-      return
-    }
-    setError('')
-    setStep((current) => Math.min(current + 1, 3))
-  }
-
-  const handleCreateRealComic = async () => {
+  const handleSubmit = async (event) => {
+    event.preventDefault()
     if (!form.title.trim()) {
       setError('Title is required.')
-      toast.warning('Title is required.')
       return
     }
-    if (Number(form.minimumAge) < 0 || Number(form.minimumAge) > 21) {
-      setError('Minimum age must be between 0 and 21.')
-      toast.warning('Minimum age must be between 0 and 21.')
-      return
-    }
-    if (form.comicPackageZip && !isComicPackageZipFile(form.comicPackageZip)) {
-      setError('Comic package must be an outer .zip file.')
-      toast.warning('Comic package must be an outer .zip file.')
+    if (!form.coverFile && !form.cover.trim()) {
+      setError('Please upload a cover image or provide a cover image URL.')
       return
     }
 
     setSubmitting(true)
     setError('')
     try {
-      let coverImageUrl = form.coverImageUrl.trim()
+      let cover = form.cover.trim()
       if (form.coverFile) {
-        toast.info('Uploading cover image, please wait...')
-        coverImageUrl = await uploadImageApi(form.coverFile)
-      }
-
-      const minimumAgeValue = form.minimumAge === '' ? 13 : Number(form.minimumAge)
-
-      if (form.comicPackageZip) {
-        toast.info('Uploading comic package ZIP, please wait...')
-        const packageTask = await uploadAuthorComicPackageZipApi(
-          buildComicPackageFormData({
-            title: form.title.trim(),
-            slug: form.slug.trim(),
-            description: form.description.trim(),
-            minimumAge: minimumAgeValue,
-            genres: form.genres,
-            publicationStatus: form.publicationStatus,
-            coverImageUrl,
-            comicPackageZip: form.comicPackageZip,
-          }),
-        )
-        onCreated(null, null, packageTask)
-        toast.success('Comic package uploaded successfully!')
-        onClose()
-        return
+        toast.info('Uploading cover image...')
+        cover = await uploadImageApi(form.coverFile)
       }
 
       const createdComic = await createAuthorComicApi({
         title: form.title.trim(),
-        slug: form.slug.trim(),
-        description: form.description.trim(),
-        minimumAge: minimumAgeValue,
-        genres: form.genres,
+        summary: form.summary.trim(),
+        minimumAge: Number(form.minimumAge) || 0,
         publicationStatus: form.publicationStatus,
-        coverImageUrl,
+        genres: form.genres,
+        cover,
       })
 
-      const comicId = getComicId(createdComic)
-      onCreated(createdComic, null, null)
-      toast.success('Comic created successfully!')
-      onClose()
-      if (comicId) {
-        navigate(`/author/comics/${comicId}`, {
-          state: { message: 'Comic created and submitted for moderator review.' },
-        })
-      }
+      toast.success('Comic draft created successfully.')
+      onCreated(createdComic)
     } catch (err) {
-      const message = err?.response?.data?.message || err?.message || 'Could not create comic. Please check API/backend connection.'
+      const message = err?.response?.data?.message || err?.message || 'Could not create comic draft.'
       setError(message)
-      toast.error(message)
     } finally {
       setSubmitting(false)
     }
   }
 
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    if (step < 3) {
-      goNext()
-      return
-    }
-    await handleCreateRealComic()
-  }
-
   return (
-    <div className="author-modal-backdrop" role="presentation">
+    <div className="author-modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <form className="author-modal author-comic-modal" onSubmit={handleSubmit}>
         <div className="author-modal-head">
           <div>
-            <h2>Upload New Comic</h2>
-            <p>Step {step} of 3 · real API upload</p>
+            <h2>Create Comic Draft</h2>
+            <p>Enter comic information and upload only the cover. Chapters are added after creation.</p>
           </div>
           <button type="button" className="author-icon-btn ghost" onClick={onClose} aria-label="Close">×</button>
         </div>
 
-        <div className="author-step-line three-step">
-          <span className="active" />
-          <span className={step >= 2 ? 'active' : ''} />
-          <span className={step === 3 ? 'active' : ''} />
+        <div className="author-modal-body">
+          <div className="author-chapter-form-grid">
+            <label className="author-form-label">Title *
+              <input className="author-input" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
+            </label>
+            <label className="author-form-label">Minimum Age
+              <input className="author-input" type="number" min="0" max="21" value={form.minimumAge} onChange={(event) => setForm({ ...form, minimumAge: event.target.value })} />
+            </label>
+            <label className="author-form-label">Publication Status
+              <select className="author-input" value={form.publicationStatus} onChange={(event) => setForm({ ...form, publicationStatus: event.target.value })}>
+                <option value="ONGOING">Ongoing</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="HIATUS">Hiatus</option>
+                <option value="CANCEL">Cancelled</option>
+              </select>
+            </label>
+          </div>
+
+          <label className="author-form-label">Description
+            <textarea className="author-input" rows="4" value={form.summary} onChange={(event) => setForm({ ...form, summary: event.target.value })} />
+          </label>
+
+          <div className="author-form-label">Genres
+            <div className="author-genre-pills selectable">
+              {GENRE_OPTIONS.map((genre) => (
+                <button key={genre} type="button" className={`author-genre-pill ${form.genres.includes(genre) ? 'selected' : ''}`} onClick={() => toggleGenre(genre)}>
+                  {genre}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <label className="author-upload-zone file-picker-zone">
+            <input type="file" accept="image/*" onChange={(event) => setForm({ ...form, coverFile: event.target.files?.[0] || null })} />
+            <div className="author-upload-icon">⇧</div>
+            <strong>{form.coverFile ? form.coverFile.name : 'Select cover image'}</strong>
+            <span>The image is uploaded to Cloudinary before the draft is created.</span>
+          </label>
+
+          <label className="author-form-label">Or Cover Image URL
+            <input className="author-input" value={form.cover} onChange={(event) => setForm({ ...form, cover: event.target.value })} placeholder="https://.../cover.png" />
+          </label>
+
+          <div className="author-alert info">
+            The comic is created with <strong>DRAFT</strong> status. Add at least one chapter before pressing Push Review.
+          </div>
+          {error && <div className="author-form-error">{error}</div>}
         </div>
 
-        {step === 1 && (
-          <div className="author-modal-body">
-            <label className="author-form-label">
-              Title *
-              <input
-                className="author-input"
-                value={form.title}
-                onChange={(event) => setForm({ ...form, title: event.target.value })}
-                placeholder="New Life"
-              />
-            </label>
-
-            <label className="author-form-label">
-              Slug
-              <input
-                className="author-input"
-                value={form.slug}
-                onChange={(event) => setForm({ ...form, slug: event.target.value })}
-                placeholder="new-life"
-              />
-              <span className="author-field-hint">Optional. Leave empty to let backend generate it from title.</span>
-            </label>
-
-            <label className="author-form-label">
-              Minimum Age
-              <input
-                className="author-input"
-                type="number"
-                min="0"
-                max="21"
-                value={form.minimumAge}
-                onChange={(event) => setForm({ ...form, minimumAge: event.target.value })}
-                placeholder="13"
-              />
-            </label>
-
-            <label className="author-form-label">
-              Description
-              <textarea
-                className="author-textarea"
-                value={form.description}
-                onChange={(event) => setForm({ ...form, description: event.target.value })}
-                placeholder="Write a short synopsis for readers and moderators."
-              />
-            </label>
-
-            <div className="author-form-label">
-              Genres
-              <div className="author-genre-pills selectable">
-                {GENRE_OPTIONS.map((genre) => (
-                  <button
-                    type="button"
-                    key={genre}
-                    className={`author-genre-pill ${form.genres.includes(genre) ? 'selected' : ''}`}
-                    onClick={() => toggleGenre(genre)}
-                  >
-                    {genre}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div className="author-modal-body">
-            <div className="author-form-label">
-              Publication Status
-              <div className="author-segmented">
-                {[
-                  ['ONGOING', 'Ongoing'],
-                  ['COMPLETED', 'Completed'],
-                  ['PAUSED', 'Paused'],
-                  ['ARCHIVED', 'Archived'],
-                ].map(([value, label]) => (
-                  <button
-                    type="button"
-                    key={value}
-                    className={form.publicationStatus === value ? 'active' : ''}
-                    onClick={() => setForm({ ...form, publicationStatus: value })}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <label className="author-form-label">
-              Cover Image File
-              <div className="author-upload-zone file-picker-zone">
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
-                  onChange={(event) => setForm({ ...form, coverFile: event.target.files?.[0] || null })}
-                />
-                <div className="author-upload-icon">⇧</div>
-                <strong>{form.coverFile ? form.coverFile.name : 'Select cover image'}</strong>
-                <span>Recommended for real upload. Backend stores it on Cloudinary through /upload/image.</span>
-              </div>
-            </label>
-
-            <label className="author-form-label">
-              Or Cover Image URL
-              <input
-                className="author-input"
-                value={form.coverImageUrl}
-                onChange={(event) => setForm({ ...form, coverImageUrl: event.target.value })}
-                placeholder="https://.../cover.png"
-              />
-            </label>
-
-            <div className="author-alert warning">
-              ⚠ On the next step, you can either create only the comic profile or attach a full comic package ZIP.
-            </div>
-          </div>
-        )}
-
-        {step === 3 && (
-          <div className="author-modal-body">
-            <div className="author-alert info">
-              Upload Comic accepts a full comic package. The outer ZIP is named after the comic and contains chapter CBZ files.
-            </div>
-
-            <label className="author-form-label">
-              Comic Package ZIP
-              <div className="author-upload-zone file-picker-zone">
-                <input
-                  type="file"
-                  accept=".zip,application/zip,application/x-zip-compressed"
-                  onChange={(event) => setForm({ ...form, comicPackageZip: event.target.files?.[0] || null })}
-                />
-                <div className="author-upload-icon">⇧</div>
-                <strong>{form.comicPackageZip ? form.comicPackageZip.name : 'Optional: select full comic package ZIP'}</strong>
-                <span>Example: TenTruyen.zip contains Chapter 1.cbz and Chapter 2.cbz directly. Leave empty to create only the comic profile.</span>
-              </div>
-            </label>
-            <ZipPackagingGuide />
-          </div>
-        )}
-
-        {error && <div className="author-form-error">{error}</div>}
-
         <div className="author-modal-actions">
-          {step > 1 && (
-            <button type="button" className="btn-author-action" onClick={() => setStep(step - 1)} disabled={submitting}>Back</button>
-          )}
           <button type="button" className="btn-author-action" onClick={onClose} disabled={submitting}>Cancel</button>
-          <button type="submit" className="btn-author-action black" disabled={submitting}>
-            {step < 3 ? 'Next' : submitting ? 'Sending file...' : form.comicPackageZip ? 'Upload Comic Package' : 'Create Comic Profile'}
-          </button>
+          <button type="submit" className="btn-author-action black" disabled={submitting}>{submitting ? 'Creating...' : 'Create Draft'}</button>
         </div>
       </form>
     </div>
@@ -486,7 +229,7 @@ function CreateComicModal({ onClose, onCreated }) {
 }
 
 function AddChapterModal({ comic, onClose, onUploaded }) {
-  const [chapterNumber, setChapterNumber] = useState((Number(getChapterCount(comic)) || 0) + 1)
+  const [chapterNumber, setChapterNumber] = useState(String((Number(getChapterCount(comic)) || 0) + 1))
   const [title, setTitle] = useState('')
   const [zipFile, setZipFile] = useState(null)
   const [submitting, setSubmitting] = useState(false)
@@ -496,101 +239,58 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
     event.preventDefault()
     if (!zipFile) {
       setError('Please select a .cbz chapter file.')
-      toast.warning('Please select a .cbz chapter file.')
       return
     }
-    if (!isChapterCbzFile(zipFile)) {
-      setError('Chapter file must be a .cbz file.')
-      toast.warning('Chapter file must be a .cbz file.')
-      return
-    }
-    if (!CHAPTER_ARCHIVE_NAME_REGEX.test(zipFile.name || '')) {
+    if (!CHAPTER_ARCHIVE_NAME_REGEX.test(zipFile.name)) {
       setError("Chapter archive name must be like 'Chapter 1.cbz' or 'Chapter 1,5.cbz'.")
-      toast.warning("Chapter archive name must be like 'Chapter 1.cbz' or 'Chapter 1,5.cbz'.")
       return
     }
 
     setSubmitting(true)
     setError('')
     try {
-      toast.info('Uploading chapter CBZ, please wait...')
-      const uploadTask = await uploadAuthorChapterZipApi(
+      const task = await uploadAuthorChapterZipApi(
         getComicId(comic),
         buildChapterFormData({ chapterNumber, chapterTitle: title, zipFile }),
       )
-      onUploaded(uploadTask, comic)
-      toast.success('Chapter uploaded successfully!')
+      toast.success('Chapter accepted for processing.')
+      onUploaded(task, comic)
       onClose()
     } catch (err) {
-      const message = err?.response?.data?.message || err?.message || 'Could not upload CBZ. Please check API/backend connection.'
-      setError(message)
-      toast.error(message)
+      setError(err?.response?.data?.message || err?.message || 'Could not upload chapter CBZ.')
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <div className="author-modal-backdrop" role="presentation">
+    <div className="author-modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <form className="author-modal author-chapter-modal" onSubmit={handleSubmit}>
         <div className="author-modal-head">
-          <div>
-            <h2>Add Chapter</h2>
-            <p>{comic.title}</p>
-          </div>
+          <div><h2>Add Chapter</h2><p>{comic?.title}</p></div>
           <button type="button" className="author-icon-btn ghost" onClick={onClose} aria-label="Close">×</button>
         </div>
-
-        <div className="author-chapter-form-grid">
-          <label className="author-form-label">
-            Chapter # *
-            <input
-              className="author-input"
-              type="text"
-              value={chapterNumber}
-              onChange={(event) => setChapterNumber(event.target.value)}
-              placeholder="1 or 1,5"
-            />
-          </label>
-
-          <label className="author-form-label">
-            Chapter Title
-            <input
-              className="author-input"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="Optional title"
-            />
-          </label>
-        </div>
-
-        <label className="author-form-label">
-          Upload Pages (.cbz) *
-          <div className="author-upload-zone file-picker-zone">
-            <input
-              type="file"
-              accept=".cbz,application/vnd.comicbook+zip,application/x-cbz"
-              onChange={(event) => setZipFile(event.target.files?.[0] || null)}
-            />
-            <div className="author-upload-icon">⇧</div>
-            <strong>{zipFile ? zipFile.name : 'Drop chapter CBZ or select file'}</strong>
-            <span>Backend extracts root images from CBZ, sorts by filename, uploads images to Cloudinary, then returns preview.</span>
+        <div className="author-modal-body">
+          <div className="author-chapter-form-grid">
+            <label className="author-form-label">Chapter Number
+              <input className="author-input" value={chapterNumber} onChange={(event) => setChapterNumber(event.target.value)} />
+            </label>
+            <label className="author-form-label">Chapter Title
+              <input className="author-input" value={title} onChange={(event) => setTitle(event.target.value)} />
+            </label>
           </div>
-        </label>
-
-        <ChapterZipPackagingGuide />
-
-        <div className="author-alert info">
-          ℹ Chapter is uploaded as preview first. Open the comic detail page and submit it for moderator review after checking pages.
+          <label className="author-upload-zone file-picker-zone">
+            <input type="file" accept=".cbz" onChange={(event) => setZipFile(event.target.files?.[0] || null)} />
+            <div className="author-upload-icon">⇧</div>
+            <strong>{zipFile ? zipFile.name : 'Select chapter CBZ'}</strong>
+            <span>After processing, the chapter status becomes PREVIEW_READY.</span>
+          </label>
+          <div className="author-alert info">Upload rules are available from the comic detail page.</div>
+          {error && <div className="author-form-error">{error}</div>}
         </div>
-
-        {error && <div className="author-form-error">{error}</div>}
-
         <div className="author-modal-actions">
           <button type="button" className="btn-author-action" onClick={onClose} disabled={submitting}>Cancel</button>
-          <button type="submit" className="btn-author-action black" disabled={submitting}>
-            {submitting ? 'Sending file...' : 'Upload CBZ'}
-          </button>
+          <button type="submit" className="btn-author-action black" disabled={submitting}>{submitting ? 'Uploading...' : 'Upload CBZ'}</button>
         </div>
       </form>
     </div>
@@ -605,76 +305,41 @@ function AuthorComics() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [chapterTarget, setChapterTarget] = useState(null)
   const [uploadTasks, setUploadTasks] = useState([])
+  const [reviewingId, setReviewingId] = useState(null)
+  const comicsLoadedRef = useRef(false)
+
+  const pendingReviewCount = useMemo(() => comics.filter((comic) => {
+    const status = (comic.moderationStatus || '').toString().toUpperCase()
+    return status.includes('REVIEW') || status.includes('SUBMITTED')
+  }).length, [comics])
 
   const loadComics = async () => {
     setLoading(true)
     setError('')
     try {
-      const response = await getAuthorComicsApi({ page: 1, size: 100 })
-      setComics(normalizeArrayResponse(response))
+      setComics(normalizeArrayResponse(await getAuthorComicsApi({ page: 1, size: 12 })))
     } catch (err) {
-      setError('Cannot load author comics. Please check login token, AUTHOR role, and backend API.')
-      setComics([])
+      setError(err?.response?.data?.message || 'Cannot load author comics. Please check the backend and AUTHOR token.')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
+    if (comicsLoadedRef.current) return
+    comicsLoadedRef.current = true
     loadComics()
   }, [])
-
-  const pendingReviewCount = useMemo(() => comics.filter((comic) => {
-    const status = (comic.moderationStatus || comic.status || '').toString().toUpperCase()
-    return status.includes('PENDING') || status.includes('REVIEW') || status.includes('SUBMITTED')
-  }).length, [comics])
 
   const upsertUploadTask = (task, extra = {}) => {
     const taskId = getTaskId(task)
     if (!taskId) return
-
     setUploadTasks((current) => {
-      const nextTask = { ...extra, ...task, taskId }
-      const exists = current.some((item) => getTaskId(item) === taskId)
-      if (exists) {
-        return current.map((item) => (getTaskId(item) === taskId ? { ...item, ...nextTask } : item))
-      }
-      return [nextTask, ...current]
+      const next = { ...task, ...extra, taskId }
+      return current.some((item) => getTaskId(item) === taskId)
+        ? current.map((item) => (getTaskId(item) === taskId ? { ...item, ...next } : item))
+        : [next, ...current]
     })
-  }
-
-  const pollComicPackageTask = (taskId) => {
-    const poll = async () => {
-      try {
-        const latest = await getAuthorComicPackageUploadStatusApi(taskId)
-        upsertUploadTask(latest)
-
-        if (!isFinalUploadStatus(latest?.status)) {
-          window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
-          return
-        }
-
-        if (latest?.status === 'COMPLETED') {
-          const createdComic = latest?.comicPackage?.comic || latest?.comic
-          const comicId = getComicId(createdComic)
-          if (createdComic) {
-            setComics((current) => {
-              const exists = current.some((comic) => getComicId(comic) === comicId)
-              return exists ? current.map((comic) => (getComicId(comic) === comicId ? createdComic : comic)) : [createdComic, ...current]
-            })
-          }
-          if (comicId) {
-            navigate(`/author/comics/${comicId}`, {
-              state: { message: latest?.message || 'Comic package processed. Preview chapters before submitting them for review.' },
-            })
-          }
-        }
-      } catch (err) {
-        upsertUploadTask({ taskId, status: 'FAILED', error: err?.message || 'Could not check upload status.' })
-      }
-    }
-
-    window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
   }
 
   const pollChapterTask = (comicId, taskId) => {
@@ -682,173 +347,130 @@ function AuthorComics() {
       try {
         const latest = await getAuthorChapterUploadStatusApi(comicId, taskId)
         upsertUploadTask(latest)
-
         if (!isFinalUploadStatus(latest?.status)) {
           window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
           return
         }
-
-        if (latest?.status === 'COMPLETED') {
-          const preview = latest?.chapter
-          setComics((current) => current.map((comic) => (
-            getComicId(comic) === comicId
-              ? { ...comic, chapterCount: Number(getChapterCount(comic)) + 1, chapters: Number(getChapterCount(comic)) + 1, latestChapterPreview: preview }
-              : comic
-          )))
-          navigate(`/author/comics/${comicId}`, {
-            state: { message: 'Chapter CBZ processed. Submit it for moderator review after checking preview pages.' },
-          })
+        if ((latest?.status || '').toString().toUpperCase() === 'COMPLETED') {
+          setComics((current) => current.map((comic) => getComicId(comic) === comicId
+            ? { ...comic, chapterCount: Number(getChapterCount(comic)) + 1 }
+            : comic))
+          toast.success('Chapter preview is ready.')
         }
       } catch (err) {
         upsertUploadTask({ taskId, status: 'FAILED', error: err?.message || 'Could not check upload status.' })
       }
     }
-
     window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
   }
 
-  const handleCreated = (createdComic, _chapterPreview, uploadTask) => {
-    const taskId = getTaskId(uploadTask)
-    if (taskId) {
-      upsertUploadTask(uploadTask, { title: 'Comic package upload' })
-      pollComicPackageTask(taskId)
-      return
-    }
-
-    if (createdComic) {
-      setComics((current) => [createdComic, ...current])
-    }
+  const handleCreated = (createdComic) => {
+    setShowCreateModal(false)
+    setComics((current) => [createdComic, ...current])
+    const comicId = getComicId(createdComic)
+    if (comicId) navigate(`/author/comics/${comicId}`, { state: { message: 'Comic draft created. Add a chapter, then push the comic for review.' } })
   }
 
-  const handleChapterUploaded = (uploadTask, targetComic = chapterTarget) => {
-    const taskId = getTaskId(uploadTask)
-    const comicId = getComicId(targetComic)
+  const handleChapterUploaded = (task, comic) => {
+    const taskId = getTaskId(task)
+    const comicId = getComicId(comic)
     if (!taskId || !comicId) return
-
-    upsertUploadTask(uploadTask, {
-      title: `Chapter upload · ${targetComic?.title || 'Comic'}`,
-      comicId,
-    })
+    upsertUploadTask(task, { title: `Chapter upload · ${comic?.title || 'Comic'}`, comicId })
     pollChapterTask(comicId, taskId)
   }
 
+  const handlePushReview = async (comic) => {
+    const comicId = getComicId(comic)
+    if (!comicId) return
+    setReviewingId(comicId)
+    setError('')
+    try {
+      const updated = await submitAuthorComicReviewApi(comicId)
+      setComics((current) => current.map((item) => getComicId(item) === comicId ? { ...item, ...updated } : item))
+      toast.success('Comic submitted for moderator review.')
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Could not submit comic for review.'
+      setError(message)
+      toast.warning(message)
+    } finally {
+      setReviewingId(null)
+    }
+  }
+
   return (
-    <AuthorLayout activeNav="comics">
-      <div className="author-comics-page">
-        <div className="author-list-header-row">
-          <div>
-            <h1>My Comics</h1>
-            <p>{loading ? 'Loading comics...' : `${comics.length} comics · ${pendingReviewCount} pending review`}</p>
-          </div>
-          <div className="author-header-actions">
-            <Link className="btn-author-action" to="/author/upload-guide">Upload Guide</Link>
-            <button className="btn-author-action black large" onClick={() => setShowCreateModal(true)}>
-              + Upload New Comic
-            </button>
-          </div>
+    <div className="author-comics-page">
+      <div className="author-list-header-row">
+        <div>
+          <h1>My Comics</h1>
+          <p>{loading ? 'Loading comics...' : `${comics.length} comics · ${pendingReviewCount} pending review`}</p>
         </div>
-
-        {error && <div className="author-alert warning">{error}</div>}
-
-        {uploadTasks.length > 0 && (
-          <div className="author-upload-task-list">
-            {uploadTasks.map((task) => {
-              const statusValue = (task.status || 'QUEUED').toString().toLowerCase()
-              return (
-                <div className={`author-upload-task-card ${statusValue}`} key={getTaskId(task)}>
-                  <div>
-                    <strong>{task.title || task.type || 'Upload task'}</strong>
-                    <p>{task.error || task.message || 'Waiting for backend status...'}</p>
-                  </div>
-                  <div className="author-upload-task-meta">
-                    <span>{formatUploadStatus(task.status)}</span>
-                    <small>{task.progress ?? 0}%</small>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {!loading && !error && comics.length === 0 && (
-          <div className="author-empty-state">
-            <h2>No real comics yet</h2>
-            <p>Create your first comic profile, upload a real cover image, then upload a chapter CBZ.</p>
-            <button className="btn-author-action black" onClick={() => setShowCreateModal(true)}>Create First Comic</button>
-          </div>
-        )}
-
-        <div className="author-comic-list">
-          {comics.map((comic) => {
-            const comicId = getComicId(comic)
-            const moderationStatus = comic.moderationStatus || comic.status
-            const publicationStatus = comic.publicationStatus || comic.comicStatus
-            const genres = normalizeGenres(comic.genres)
-            const cover = getComicCover(comic)
-
-            return (
-              <article className="author-comic-list-card" key={comicId || comic.title}>
-                <div className="author-comic-cover-box">
-                  {cover ? <img src={cover} alt={comic.title} /> : <span>Cover</span>}
-                </div>
-
-                <div className="author-comic-card-main">
-                  <div className="author-comic-title-line">
-                    <h2>{comic.title}</h2>
-                    <span className={`author-status-badge ${getModerationClass(moderationStatus)}`}>
-                      {formatModerationStatus(moderationStatus)}
-                    </span>
-                    <span className={`author-publication-badge ${getPublicationClass(publicationStatus)}`}>
-                      {formatPublicationStatus(publicationStatus)}
-                    </span>
-                  </div>
-
-                  <div className="author-comic-meta-line">
-                    <span>📖 {getChapterCount(comic)} chapters</span>
-                    <span>👁 {getViews(comic)} views</span>
-                    <span>💰 {comic.revenue || comic.totalRevenue || '0đ'}</span>
-                    <span>🔞 {comic.minimumAge ?? 13}+</span>
-                    <span>🕘 {formatDate(comic.updatedAt || comic.createdAt)}</span>
-                  </div>
-
-                  <p className="author-comic-card-summary">{comic.description || comic.summary || 'No description has been added yet.'}</p>
-
-                  <div className="author-genre-pills">
-                    {genres.slice(0, 4).map((genre) => (
-                      <span className="author-genre-pill" key={genre}>{genre}</span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="author-comic-card-actions">
-                  <button className="btn-author-action black" onClick={() => navigate(`/author/comics/${comicId}`)}>
-                    View Details
-                  </button>
-                  <button className="btn-author-action" onClick={() => setChapterTarget(comic)}>
-                    + Add Chapter
-                  </button>
-                </div>
-              </article>
-            )
-          })}
-        </div>
+        <button className="btn-author-action black large" onClick={() => setShowCreateModal(true)}>+ Create Comic</button>
       </div>
 
-      {showCreateModal && (
-        <CreateComicModal
-          onClose={() => setShowCreateModal(false)}
-          onCreated={handleCreated}
-        />
+      {error && <div className="author-alert warning">{error}</div>}
+
+      {uploadTasks.length > 0 && (
+        <div className="author-upload-task-list">
+          {uploadTasks.map((task) => (
+            <div className={`author-upload-task-card ${(task.status || 'queued').toString().toLowerCase()}`} key={getTaskId(task)}>
+              <div><strong>{task.title || 'Chapter upload'}</strong><p>{task.error || task.message || 'Waiting for backend status...'}</p></div>
+              <div className="author-upload-task-meta"><span>{formatUploadStatus(task.status)}</span><small>{task.progress ?? 0}%</small></div>
+            </div>
+          ))}
+        </div>
       )}
 
-      {chapterTarget && (
-        <AddChapterModal
-          comic={chapterTarget}
-          onClose={() => setChapterTarget(null)}
-          onUploaded={handleChapterUploaded}
-        />
+      {!loading && !error && comics.length === 0 && (
+        <div className="author-empty-state">
+          <h2>No comics yet</h2>
+          <p>Create a comic draft with its cover, then add chapters from the detail page.</p>
+          <button className="btn-author-action black" onClick={() => setShowCreateModal(true)}>Create First Comic</button>
+        </div>
       )}
-    </AuthorLayout>
+
+      <div className="author-comic-list">
+        {comics.map((comic) => {
+          const comicId = getComicId(comic)
+          const moderationStatus = comic.moderationStatus
+          const publicationStatus = comic.publicationStatus
+          const genres = normalizeGenres(comic.genres)
+          const cover = getComicCover(comic)
+          const statusValue = (moderationStatus || 'DRAFT').toString().toUpperCase()
+          const canPushReview = !['SUBMITTED_FOR_REVIEW', 'PUBLISHED', 'APPROVED'].includes(statusValue)
+
+          return (
+            <article className="author-comic-list-card" key={comicId || comic.title}>
+              <div className="author-comic-cover-box">{cover ? <img src={cover} alt={comic.title} loading="lazy" decoding="async" /> : <span>Cover</span>}</div>
+              <div className="author-comic-card-main">
+                <div className="author-comic-title-line">
+                  <h2>{comic.title}</h2>
+                  <span className={`author-status-badge ${getModerationClass(moderationStatus)}`}>{formatModerationStatus(moderationStatus)}</span>
+                  <span className={`author-publication-badge ${getPublicationClass(publicationStatus)}`}>{formatPublicationStatus(publicationStatus)}</span>
+                </div>
+                <div className="author-comic-meta-line">
+                  <span>📖 {getChapterCount(comic)} chapters</span><span>👁 {getViews(comic)} views</span>
+                  <span>🔞 {comic.minimumAge ?? 13}+</span><span>🕘 {formatDate(comic.updatedAt || comic.createdAt)}</span>
+                </div>
+                <p className="author-comic-card-summary">{comic.summary || 'No description has been added yet.'}</p>
+                <div className="author-genre-pills">{genres.slice(0, 4).map((genre) => <span className="author-genre-pill" key={genre}>{genre}</span>)}</div>
+              </div>
+              <div className="author-comic-card-actions">
+                <button className="btn-author-action black" onClick={() => navigate(`/author/comics/${comicId}`)}>View Details</button>
+                <button className="btn-author-action" onClick={() => setChapterTarget(comic)}>+ Add Chapter</button>
+                {canPushReview && (
+                  <button className="btn-author-action review" onClick={() => handlePushReview(comic)} disabled={reviewingId === comicId}>
+                    {reviewingId === comicId ? 'Submitting...' : 'Push Review'}
+                  </button>
+                )}
+              </div>
+            </article>
+          )
+        })}
+      </div>
+
+      {showCreateModal && <CreateComicModal onClose={() => setShowCreateModal(false)} onCreated={handleCreated} />}
+      {chapterTarget && <AddChapterModal comic={chapterTarget} onClose={() => setChapterTarget(null)} onUploaded={handleChapterUploaded} />}
+    </div>
   )
 }
 
