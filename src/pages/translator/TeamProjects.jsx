@@ -9,11 +9,16 @@ import { GitCompare } from "lucide-react";
 import { getAuth } from '../../utils/Auth'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { AIPopover } from '../../components/common/AIPopover'
+import { uploadImageApi } from '../../services/api/UploadApi'
 
 import {
   getTeamAnnouncementsApi,
   createTeamAnnouncementApi,
   likeTeamAnnouncementApi,
+  pinTeamAnnouncementApi,
+  getTeamPostCommentsApi,
+  createTeamPostCommentApi,
+  likeTeamPostCommentApi,
   getTeamMessagesApi,
   createTeamMessageApi,
   getTeamTasksApi,
@@ -250,6 +255,14 @@ function TeamProjects() {
   // Real DB Backed States
   const [announcements, setAnnouncements] = useState([])
   const [newPostText, setNewPostText] = useState('')
+  const [selectedImage, setSelectedImage] = useState(null)
+  const [selectedImagePreview, setSelectedImagePreview] = useState(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [expandedComments, setExpandedComments] = useState({})
+  const [postComments, setPostComments] = useState({})
+  const [newCommentTexts, setNewCommentTexts] = useState({})
+  const [replyTexts, setReplyTexts] = useState({})
+  const [activeReplyCommentId, setActiveReplyCommentId] = useState(null)
   const [chatMessages, setChatMessages] = useState([])
   const [chatInput, setChatInput] = useState('')
   const [joinRequests, setJoinRequests] = useState([])
@@ -418,6 +431,31 @@ function TeamProjects() {
     return date.toLocaleDateString()
   }
 
+  const displayPostTime = (timeStr) => {
+    if (!timeStr) return ''
+    if (!timeStr.includes('T') && !/^\d{4}-\d{2}-\d{2}/.test(timeStr)) {
+      return timeStr
+    }
+    try {
+      const d = new Date(timeStr)
+      return getTimeAgo(d)
+    } catch {
+      return timeStr
+    }
+  }
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setSelectedImage(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setSelectedImagePreview(reader.result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
   const claimedProjects = projects.filter(proj => {
     const isNotUnclaimed = !proj.status || proj.status.toUpperCase() !== 'UNCLAIMED'
     const authenticatedUserId = authUser?.userId || authUser?.id
@@ -515,7 +553,7 @@ function TeamProjects() {
         getTeamRequestsApi(project.id),
         getChapterBacklogApi(project.id).catch(() => [])
       ])
-      setAnnouncements(annList)
+      setAnnouncements(sortPosts(annList))
       setChatMessages(msgList.map(m => ({ ...m, isMe: m.sender === userFullName })))
       setTasks(taskList)
       setJoinRequests(reqList.map(r => ({
@@ -661,35 +699,259 @@ function TeamProjects() {
     }
   }
 
-  // Action: Add Announcement
+  const sortPosts = (postsList) => {
+    return [...(postsList || [])].sort((a, b) => {
+      const pinA = a.isPinned ? 1 : 0
+      const pinB = b.isPinned ? 1 : 0
+      if (pinA !== pinB) return pinB - pinA
+      const tA = (a.time && a.time.includes('T')) ? new Date(a.time).getTime() : 0
+      const tB = (b.time && b.time.includes('T')) ? new Date(b.time).getTime() : 0
+      if (tA && tB) return tB - tA
+      return (b.id || '').localeCompare(a.id || '')
+    })
+  }
+
+  // Action: Add Announcement (Post)
   const handlePostAnnouncement = async () => {
-    if (!newPostText.trim()) return
+    if (!newPostText.trim() && !selectedImage) return
+    
+    let imageUrl = null
+    if (selectedImage) {
+      setUploadingImage(true)
+      try {
+        const res = await uploadImageApi(selectedImage)
+        imageUrl = res.url || res.data?.url || res
+      } catch (uploadErr) {
+        console.error(uploadErr)
+        toast.error('Failed to upload image.')
+        setUploadingImage(false)
+        return
+      }
+    }
+
     try {
       const created = await createTeamAnnouncementApi(selectedDetails.id, {
         author: userFullName,
         role: selectedDetails.leaderName === userFullName ? 'Group Leader' : 'Member',
         avatar: userFullName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2),
-        time: 'Just now',
-        content: newPostText.trim()
+        time: new Date().toISOString(),
+        content: newPostText.trim(),
+        imageUrl: imageUrl,
+        isPinned: false
       })
-      setAnnouncements([created, ...announcements])
+      setAnnouncements(prev => sortPosts([created, ...prev]))
       setNewPostText('')
-      toast.success('Announcement saved to database!')
+      setSelectedImage(null)
+      setSelectedImagePreview(null)
+      toast.success('Post published successfully!')
     } catch (err) {
       console.error(err)
-      toast.error('Failed to post announcement.')
+      toast.error('Failed to publish post.')
+    } finally {
+      setUploadingImage(false)
     }
   }
 
-  // Action: Like Announcement
+  // Action: Like Announcement (Post)
   const handleLikePost = async (id) => {
+    const currentUserIdStr = (authUser?.userId || authUser?.id || '').toString()
+    let originalPost = null
+
+    // 1. Optimistic update
+    setAnnouncements(prev => prev.map(post => {
+      if (post.id === id) {
+        originalPost = { ...post }
+        const likedList = post.likedByUsers ? post.likedByUsers.split(',').filter(Boolean) : []
+        const isLiked = likedList.includes(currentUserIdStr)
+
+        let newLikedList = []
+        let newLikes = post.likes || 0
+        if (isLiked) {
+          newLikedList = likedList.filter(uid => uid !== currentUserIdStr)
+          newLikes = Math.max(0, newLikes - 1)
+        } else {
+          newLikedList = [...likedList, currentUserIdStr]
+          newLikes = newLikes + 1
+        }
+
+        return {
+          ...post,
+          likes: newLikes,
+          likedByUsers: newLikedList.join(',')
+        }
+      }
+      return post
+    }))
+
+    // 2. Perform API call
     try {
       const updated = await likeTeamAnnouncementApi(id)
-      setAnnouncements(prev =>
-        prev.map(post => post.id === id ? { ...post, likes: updated.likes } : post)
-      )
+      setAnnouncements(prev => prev.map(post => post.id === id ? { ...post, likes: updated.likes, likedByUsers: updated.likedByUsers } : post))
     } catch (err) {
       console.error(err)
+      toast.error('Failed to register post like.')
+      // 3. Rollback on failure
+      if (originalPost) {
+        setAnnouncements(prev => prev.map(post => post.id === id ? originalPost : post))
+      }
+    }
+  }
+
+  // Action: Pin Post (Leader only)
+  const handleTogglePin = async (id) => {
+    try {
+      const updated = await pinTeamAnnouncementApi(id)
+      setAnnouncements(prev => {
+        const list = prev.map(post => post.id === id ? { ...post, isPinned: updated.isPinned } : post)
+        return sortPosts(list)
+      })
+      toast.success(updated.isPinned ? 'Post pinned to top!' : 'Post unpinned.')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to toggle pin status.')
+    }
+  }
+
+  // Action: Toggle Comments Collapsible
+  const handleToggleComments = async (postId) => {
+    const isExpanding = !expandedComments[postId]
+    setExpandedComments(prev => ({
+      ...prev,
+      [postId]: isExpanding
+    }))
+    
+    if (isExpanding) {
+      try {
+        const comments = await getTeamPostCommentsApi(postId)
+        setPostComments(prev => ({
+          ...prev,
+          [postId]: comments
+        }))
+      } catch (err) {
+        console.error('Failed to load comments:', err)
+      }
+    }
+  }
+
+  // Action: Post Comment
+  const handlePostComment = async (postId) => {
+    const text = newCommentTexts[postId] || ''
+    if (!text.trim()) return
+    
+    try {
+      const created = await createTeamPostCommentApi(postId, {
+        author: userFullName,
+        role: selectedDetails.leaderName === userFullName ? 'Group Leader' : 'Member',
+        avatar: userFullName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2),
+        content: text.trim(),
+        time: new Date().toISOString()
+      })
+      
+      setPostComments(prev => ({
+        ...prev,
+        [postId]: [...(prev[postId] || []), created]
+      }))
+      
+      setNewCommentTexts(prev => ({
+        ...prev,
+        [postId]: ''
+      }))
+      
+      toast.success('Comment posted!')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to post comment.')
+    }
+  }
+
+  // Action: Like Comment
+  const handleLikeComment = async (postId, commentId) => {
+    const currentUserIdStr = (authUser?.userId || authUser?.id || '').toString()
+    let originalComment = null
+
+    // 1. Optimistic update
+    setPostComments(prev => {
+      const postCommentsList = prev[postId] || []
+      const updatedList = postCommentsList.map(c => {
+        if (c.id === commentId) {
+          originalComment = { ...c }
+          const likedList = c.likedByUsers ? c.likedByUsers.split(',').filter(Boolean) : []
+          const isLiked = likedList.includes(currentUserIdStr)
+
+          let newLikedList = []
+          let newLikes = c.likes || 0
+          if (isLiked) {
+            newLikedList = likedList.filter(uid => uid !== currentUserIdStr)
+            newLikes = Math.max(0, newLikes - 1)
+          } else {
+            newLikedList = [...likedList, currentUserIdStr]
+            newLikes = newLikes + 1
+          }
+
+          return {
+            ...c,
+            likes: newLikes,
+            likedByUsers: newLikedList.join(',')
+          }
+        }
+        return c
+      })
+
+      return {
+        ...prev,
+        [postId]: updatedList
+      }
+    })
+
+    // 2. Perform API call
+    try {
+      const updated = await likeTeamPostCommentApi(commentId)
+      setPostComments(prev => ({
+        ...prev,
+        [postId]: (prev[postId] || []).map(c => c.id === commentId ? { ...c, likes: updated.likes, likedByUsers: updated.likedByUsers } : c)
+      }))
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to toggle like on comment.')
+      // 3. Rollback
+      if (originalComment) {
+        setPostComments(prev => ({
+          ...prev,
+          [postId]: (prev[postId] || []).map(c => c.id === commentId ? originalComment : c)
+        }))
+      }
+    }
+  }
+
+  // Action: Post Reply
+  const handlePostReply = async (postId, parentCommentId) => {
+    const text = replyTexts[parentCommentId] || ''
+    if (!text.trim()) return
+
+    try {
+      const created = await createTeamPostCommentApi(postId, {
+        author: userFullName,
+        role: selectedDetails.leaderName === userFullName ? 'Group Leader' : 'Member',
+        avatar: userFullName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2),
+        content: text.trim(),
+        time: new Date().toISOString(),
+        parentId: parentCommentId
+      })
+
+      setPostComments(prev => ({
+        ...prev,
+        [postId]: [...(prev[postId] || []), created]
+      }))
+
+      setReplyTexts(prev => ({
+        ...prev,
+        [parentCommentId]: ''
+      }))
+      setActiveReplyCommentId(null)
+      toast.success('Reply posted!')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to post reply.')
     }
   }
 
@@ -948,75 +1210,73 @@ function TeamProjects() {
           )}
         </div>
 
-        {/* Tab 1: HOME WORKSPACE */}
         {workspaceTab === 'home' && (
           <div className="workspace-home-grid">
 
             {/* Left Feed Column */}
             <div className="workspace-feed-column">
 
-              {/* Draft Chapter Upload Form Toggle (Integrated original feature) */}
-              <div style={{ marginBottom: '20px' }}>
-                {!showUploadForm ? (
-                  <button className="trans-btn primary" onClick={() => setShowUploadForm(true)}>
-                    + Upload New Translated Chapter
-                  </button>
-                ) : (
-                  <div style={{ border: '1px solid var(--trans-border)', padding: '16px', borderRadius: '12px', background: '#ffffff', marginBottom: '20px' }}>
-                    <h4 style={{ margin: '0 0 12px', color: 'var(--trans-text-primary)' }}>Upload Chapter Draft</h4>
-                    <div className="trans-form-group">
-                      <label className="trans-form-label">Chapter Title / Number</label>
-                      <input
-                        type="text"
-                        className="trans-form-input"
-                        placeholder="e.g. Chapter 46: The Awakening"
-                        value={uploadData.chapterTitle}
-                        onChange={(e) => setUploadData({ ...uploadData, chapterTitle: e.target.value })}
-                      />
-                    </div>
-                    <div className="trans-form-group">
-                      <label className="trans-form-label">Word Count</label>
-                      <input
-                        type="number"
-                        className="trans-form-input"
-                        value={uploadData.wordsCount}
-                        onChange={(e) => setUploadData({ ...uploadData, wordsCount: e.target.value })}
-                      />
-                    </div>
-                    <div className="trans-form-group">
-                      <label className="trans-form-label">Translation Text Content</label>
-                      <textarea
-                        className="trans-form-input textarea"
-                        placeholder="Paste translated chapter contents here..."
-                        value={uploadData.chapterContent}
-                        onChange={(e) => setUploadData({ ...uploadData, chapterContent: e.target.value })}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
-                      <button className="trans-btn secondary" onClick={() => setShowUploadForm(false)}>
-                        Cancel
-                      </button>
-                      <button className="trans-btn primary" onClick={handleUploadChapter} disabled={!uploadData.chapterTitle.trim()}>
-                        Submit Draft
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Share box */}
               <div className="post-creation-card">
-                <div className="post-user-avatar">YS</div>
+                <div className="post-user-avatar" style={{ textTransform: 'uppercase', fontWeight: '700' }}>
+                  {userFullName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2)}
+                </div>
                 <div className="post-creation-input-wrapper">
                   <textarea
                     className="post-textarea"
-                    placeholder="Post an announcement, update, or share with the group..."
+                    placeholder="Write a new post or share an update..."
                     value={newPostText}
                     onChange={(e) => setNewPostText(e.target.value)}
+                    disabled={uploadingImage}
                   />
-                  <div className="post-creation-actions">
-                    <button className="trans-btn primary" onClick={handlePostAnnouncement} disabled={!newPostText.trim()}>
-                      Post
+
+                  {selectedImagePreview && (
+                    <div className="post-creation-image-preview" style={{ position: 'relative', marginTop: '10px', display: 'inline-block' }}>
+                      <img src={selectedImagePreview} alt="Selected preview" style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '8px', border: '1px solid var(--trans-border)' }} />
+                      <button 
+                        className="remove-preview-btn" 
+                        onClick={() => { setSelectedImage(null); setSelectedImagePreview(null); }}
+                        style={{
+                          position: 'absolute',
+                          top: '5px',
+                          right: '5px',
+                          background: 'rgba(0, 0, 0, 0.6)',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '24px',
+                          height: '24px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '14px',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="post-creation-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                    <label className="image-attach-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--trans-purple)', fontSize: '13px', fontWeight: '500' }}>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        style={{ display: 'none' }} 
+                        onChange={handleImageChange}
+                        disabled={uploadingImage}
+                      />
+                      <span>🖼️ Attach Image</span>
+                    </label>
+
+                    <button 
+                      className="trans-btn primary" 
+                      onClick={handlePostAnnouncement} 
+                      disabled={uploadingImage || (!newPostText.trim() && !selectedImage)}
+                    >
+                      {uploadingImage ? 'Publishing...' : 'Post'}
                     </button>
                   </div>
                 </div>
@@ -1025,30 +1285,243 @@ function TeamProjects() {
               {/* Feed Card list */}
               <div className="announcement-feed-list">
                 {announcements.length === 0 ? (
-                  <p style={{ fontStyle: 'italic', color: 'var(--trans-text-muted)', textAlign: 'center', padding: '20px' }}>No announcements yet.</p>
+                  <p style={{ fontStyle: 'italic', color: 'var(--trans-text-muted)', textAlign: 'center', padding: '20px' }}>No posts yet.</p>
                 ) : (
-                  announcements.map(post => (
-                    <div className="feed-post-card" key={post.id}>
-                      <div className="post-header">
-                        <div className="post-user-avatar" style={{ background: post.role === 'Group Leader' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : '' }}>
-                          {post.avatar || 'U'}
-                        </div>
-                        <div className="post-header-info">
-                          <div className="post-author-row">
-                            <span className="post-author-name">{post.author}</span>
-                            <span className={`post-role-badge ${post.role === 'Group Leader' ? 'leader' : ''}`}>{post.role || 'Member'}</span>
+                  announcements.map(post => {
+                    const isPinned = post.isPinned === true
+                    const hasComments = expandedComments[post.id] === true
+                    const commentsList = postComments[post.id] || []
+
+                    return (
+                      <div className={`feed-post-card ${isPinned ? 'pinned' : ''}`} key={post.id}>
+                        {isPinned && (
+                          <div className="post-pinned-badge" style={{
+                            background: 'rgba(245, 158, 11, 0.1)',
+                            border: '1px solid rgba(245, 158, 11, 0.25)',
+                            color: '#f59e0b',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            padding: '3px 8px',
+                            borderRadius: '12px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            marginBottom: '10px',
+                            width: 'fit-content'
+                          }}>
+                            📌 Pinned Post
                           </div>
-                          <span className="post-time">{post.time}</span>
+                        )}
+                        <div className="post-header">
+                          <div className="post-user-avatar" style={{ background: post.role === 'Group Leader' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : '' }}>
+                            {post.avatar || 'U'}
+                          </div>
+                          <div className="post-header-info">
+                            <div className="post-author-row">
+                              <span className="post-author-name">{post.author}</span>
+                              <span className={`post-role-badge ${post.role === 'Group Leader' ? 'leader' : ''}`}>{post.role || 'Member'}</span>
+                            </div>
+                            <span className="post-time">{displayPostTime(post.time)}</span>
+                          </div>
                         </div>
+                        <div className="post-body" style={{ color: 'var(--trans-text-primary)' }}>
+                          <p style={{ whiteSpace: 'pre-wrap', margin: '0 0 12px 0', fontSize: '14px', lineHeight: '1.5' }}>{post.content}</p>
+                          {post.imageUrl && (
+                            <div className="post-attached-image" style={{ marginTop: '10px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--trans-border)', maxWidth: '100%', maxHeight: '400px' }}>
+                              <img src={post.imageUrl} alt="Attached" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+                            </div>
+                          )}
+                        </div>
+                        <div className="post-footer-actions" style={{ display: 'flex', gap: '16px', borderTop: '1px solid var(--trans-border)', paddingTop: '10px', marginTop: '12px' }}>
+                          {(() => {
+                            const currentUserIdStr = (authUser?.userId || authUser?.id || '').toString()
+                            const isPostLiked = post.likedByUsers && post.likedByUsers.split(',').includes(currentUserIdStr)
+                            return (
+                              <button 
+                                className="post-action-btn" 
+                                onClick={() => handleLikePost(post.id)} 
+                                style={{ background: 'none', border: 'none', color: isPostLiked ? 'var(--trans-purple)' : 'var(--trans-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
+                              >
+                                👍 {post.likes || 0} {isPostLiked ? 'Liked' : 'Like'}
+                              </button>
+                            )
+                          })()}
+
+                          <button className="post-action-btn" onClick={() => handleToggleComments(post.id)} style={{ background: 'none', border: 'none', color: 'var(--trans-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                            💬 Comments ({commentsList.length})
+                          </button>
+
+                          {isCurrentLeader && (
+                            <button className="post-action-btn pin-btn" onClick={() => handleTogglePin(post.id)} style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', marginLeft: 'auto' }}>
+                              📌 {isPinned ? 'Unpin' : 'Pin to top'}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Collapsible comments thread */}
+                        {hasComments && (
+                          <div className="post-comments-section" style={{ marginTop: '14px', background: 'rgba(255,255,255,0.01)', borderRadius: '8px', padding: '12px', border: '1px solid var(--trans-border)' }}>
+                            <div className="comments-list" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                              {commentsList.length === 0 ? (
+                                <p style={{ fontStyle: 'italic', fontSize: '12px', color: 'var(--trans-text-muted)', margin: '4px 0' }}>No comments yet. Write the first comment!</p>
+                              ) : (
+                                commentsList.filter(c => !c.parentId).map(comment => {
+                                  const replies = commentsList.filter(c => c.parentId === comment.id)
+                                  const currentUserIdStr = (authUser?.userId || authUser?.id || '').toString()
+                                  const isCommentLiked = comment.likedByUsers && comment.likedByUsers.split(',').includes(currentUserIdStr)
+
+                                  return (
+                                    <div className="comment-thread-wrapper" key={comment.id} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                      {/* Root Comment Item */}
+                                      <div className="comment-item" style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                                        <div className="comment-avatar" style={{
+                                          width: '32px',
+                                          height: '32px',
+                                          borderRadius: '50%',
+                                          background: comment.role === 'Group Leader' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(255,255,255,0.1)',
+                                          color: '#fff',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontSize: '12px',
+                                          fontWeight: '700',
+                                          flexShrink: 0
+                                        }}>
+                                          {comment.avatar || 'U'}
+                                        </div>
+                                        <div className="comment-content-box" style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '10px', flex: 1, border: '1px solid rgba(255,255,255,0.03)' }}>
+                                          <div className="comment-header-row" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                                            <span className="comment-author" style={{ fontSize: '13px', fontWeight: '600', color: 'var(--trans-text-primary)' }}>{comment.author}</span>
+                                            <span className={`comment-role-badge ${comment.role === 'Group Leader' ? 'leader' : ''}`} style={{
+                                              fontSize: '9px',
+                                              padding: '1px 5px',
+                                              borderRadius: '6px',
+                                              background: comment.role === 'Group Leader' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255,255,255,0.08)',
+                                              color: comment.role === 'Group Leader' ? '#f59e0b' : 'var(--trans-text-secondary)'
+                                            }}>{comment.role || 'Member'}</span>
+                                            <span className="comment-time" style={{ fontSize: '11px', color: 'var(--trans-text-muted)', marginLeft: 'auto' }}>{displayPostTime(comment.time)}</span>
+                                          </div>
+                                          <div className="comment-text" style={{ fontSize: '13.5px', color: 'var(--trans-text-primary)', lineHeight: '1.4', marginBottom: '6px' }}>{comment.content}</div>
+
+                                          <div className="comment-actions" style={{ display: 'flex', gap: '12px', fontSize: '11.5px', color: 'var(--trans-text-muted)' }}>
+                                            <button 
+                                              onClick={() => handleLikeComment(post.id, comment.id)} 
+                                              style={{ background: 'none', border: 'none', color: isCommentLiked ? 'var(--trans-purple)' : 'var(--trans-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: 0 }}
+                                            >
+                                              👍 {comment.likes || 0} {isCommentLiked ? 'Liked' : 'Like'}
+                                            </button>
+                                            <button 
+                                              onClick={() => setActiveReplyCommentId(activeReplyCommentId === comment.id ? null : comment.id)}
+                                              style={{ background: 'none', border: 'none', color: 'var(--trans-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: 0 }}
+                                            >
+                                              💬 Reply
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Sub-replies List */}
+                                      {replies.length > 0 && (
+                                        <div className="replies-list" style={{ marginLeft: '42px', display: 'flex', flexDirection: 'column', gap: '10px', borderLeft: '1px dashed var(--trans-border)', paddingLeft: '12px' }}>
+                                          {replies.map(reply => {
+                                            const isReplyLiked = reply.likedByUsers && reply.likedByUsers.split(',').includes(currentUserIdStr)
+                                            return (
+                                              <div className="comment-item reply-item" key={reply.id} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                                                <div className="comment-avatar reply-avatar" style={{
+                                                  width: '26px',
+                                                  height: '26px',
+                                                  borderRadius: '50%',
+                                                  background: reply.role === 'Group Leader' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(255,255,255,0.08)',
+                                                  color: '#fff',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  fontSize: '10px',
+                                                  fontWeight: '700',
+                                                  flexShrink: 0
+                                                }}>
+                                                  {reply.avatar || 'U'}
+                                                </div>
+                                                <div className="comment-content-box reply-content-box" style={{ background: 'rgba(255,255,255,0.01)', padding: '6px 10px', borderRadius: '8px', flex: 1, border: '1px solid rgba(255,255,255,0.02)' }}>
+                                                  <div className="comment-header-row" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px', flexWrap: 'wrap' }}>
+                                                    <span className="comment-author" style={{ fontSize: '12.5px', fontWeight: '600', color: 'var(--trans-text-primary)' }}>{reply.author}</span>
+                                                    <span className={`comment-role-badge ${reply.role === 'Group Leader' ? 'leader' : ''}`} style={{
+                                                      fontSize: '8px',
+                                                      padding: '1px 4px',
+                                                      borderRadius: '4px',
+                                                      background: reply.role === 'Group Leader' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255,255,255,0.06)',
+                                                      color: reply.role === 'Group Leader' ? '#f59e0b' : 'var(--trans-text-secondary)'
+                                                    }}>{reply.role || 'Member'}</span>
+                                                    <span className="comment-time" style={{ fontSize: '10.5px', color: 'var(--trans-text-muted)', marginLeft: 'auto' }}>{displayPostTime(reply.time)}</span>
+                                                  </div>
+                                                  <div className="comment-text" style={{ fontSize: '13px', color: 'var(--trans-text-primary)', lineHeight: '1.4', marginBottom: '4px' }}>{reply.content}</div>
+
+                                                  <div className="comment-actions" style={{ display: 'flex', gap: '12px', fontSize: '11px', color: 'var(--trans-text-muted)' }}>
+                                                    <button 
+                                                      onClick={() => handleLikeComment(post.id, reply.id)} 
+                                                      style={{ background: 'none', border: 'none', color: isReplyLiked ? 'var(--trans-purple)' : 'var(--trans-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: 0 }}
+                                                    >
+                                                      👍 {reply.likes || 0} {isReplyLiked ? 'Liked' : 'Like'}
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            )
+                                          })}
+                                        </div>
+                                      )}
+
+                                      {/* Reply Input Box */}
+                                      {activeReplyCommentId === comment.id && (
+                                        <div className="reply-input-box" style={{ marginLeft: '42px', display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                          <input
+                                            type="text"
+                                            className="trans-form-input"
+                                            placeholder={`Reply to ${comment.author}...`}
+                                            value={replyTexts[comment.id] || ''}
+                                            onChange={(e) => setReplyTexts({ ...replyTexts, [comment.id]: e.target.value })}
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') {
+                                                handlePostReply(post.id, comment.id)
+                                              }
+                                            }}
+                                            style={{ flex: 1, height: '32px', padding: '0 10px', fontSize: '12.5px', borderRadius: '6px' }}
+                                          />
+                                          <button className="trans-btn primary" onClick={() => handlePostReply(post.id, comment.id)} style={{ height: '32px', padding: '0 12px', borderRadius: '6px', fontSize: '12px' }}>
+                                            Reply
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })
+                              )}
+                            </div>
+
+                            {/* Comment Input */}
+                            <div className="comment-input-row" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                              <input
+                                type="text"
+                                className="trans-form-input"
+                                placeholder="Write a comment..."
+                                value={newCommentTexts[post.id] || ''}
+                                onChange={(e) => setNewCommentTexts({ ...newCommentTexts, [post.id]: e.target.value })}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handlePostComment(post.id)
+                                  }
+                                }}
+                                style={{ flex: 1, height: '36px', padding: '0 12px', fontSize: '13px', borderRadius: '8px' }}
+                              />
+                              <button className="trans-btn primary" onClick={() => handlePostComment(post.id)} style={{ height: '36px', padding: '0 16px', borderRadius: '8px', fontSize: '13px' }}>
+                                Send
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="post-body">{post.content}</div>
-                      <div className="post-footer-actions">
-                        <button className="post-action-btn" onClick={() => handleLikePost(post.id)}>
-                          👍 {post.likes} likes
-                        </button>
-                      </div>
-                    </div>
-                  ))
+                    )
+                  })
                 )}
               </div>
             </div>
@@ -2065,10 +2538,9 @@ function TeamProjects() {
                     🧑‍🤝‍🧑 Language: <strong>{proj.sourceLang || 'Any'} ➔ {proj.targetLang}</strong>
                   </p>
                   
-                  {/* Capacity Info */}
                   <p className="trans-project-meta" style={{ marginTop: '4px' }}>
                     <span style={{ color: '#cbd5e1', fontSize: '12.5px' }}>
-                      👥 Capacity: {proj.membersCount || 0} / {proj.maxMembers || 5} members ({proj.isRecruiting ? 'Open' : 'Closed'})
+                      👥 Capacity: {Math.max(0, (proj.membersCount || 1) - 1)} / {proj.maxMembers || 5} members ({proj.isRecruiting ? 'Open' : 'Closed'})
                     </span>
                   </p>
 

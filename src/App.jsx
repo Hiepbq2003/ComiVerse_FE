@@ -31,7 +31,7 @@ import Policy from './pages/common/Policy'
 import About from './pages/common/About'
 import Terms from './pages/common/Terms'
 import Contact from './pages/common/Contact'
-import TranslateDashboard from './pages/translator/TranslatorDashboard'
+
 import TranslateWorkspace from './pages/translator/TranslateWorkspace'
 import TeamProjects from './pages/translator/TeamProjects'
 import ProjectList from './pages/translator/ProjectList'
@@ -105,8 +105,7 @@ function App() {
                 <Route path="/admin/settings" element={<AdminSystemSettings />} />
                 {/* Moderator */}
                 <Route path="/moderator" element={<ModeratorDashboard />} />
-                {/* Translator */}
-                <Route path="/translator" element={<TranslatorDashboard />} />
+
                 {/* Author - persistent layout prevents sidebar/topbar remount flicker */}
                 <Route path="/author" element={<AuthorLayout />}>
                   <Route index element={<Navigate to="overview" replace />} />
@@ -124,7 +123,7 @@ function App() {
                   <Route path="project-teams" element={<TeamProjects />} />
                   <Route path="revenue" element={<TranslatorRevenue />} />
                   <Route path="payout" element={<TranslatorPayout />} />
-                  <Route path="dashboard" element={<TranslateDashboard />} />
+                  <Route path="dashboard" element={<TranslatorDashboard />} />
                 </Route>
                 <Route path="/translator/translate-workspace/task/:taskId" element={<TranslateWorkspace />} />
                 
