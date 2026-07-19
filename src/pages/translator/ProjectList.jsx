@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, Filter, BookOpen, Users, Calendar, User } from 'lucide-react';
 import { toast } from 'react-toastify';
 import '../../assets/style/translator/project-list.css';
 import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi';
-import { createTeamRequestApi } from '../../services/api/TeamWorkspaceApi';
+import { createTeamRequestApi, getRequestsByNameApi } from '../../services/api/TeamWorkspaceApi';
+import { uploadFileApi } from '../../services/api/UploadApi';
 import { getAuth } from '../../utils/Auth';
 
 function ProjectList() {
@@ -14,7 +15,9 @@ function ProjectList() {
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [joinMessage, setJoinMessage] = useState('');
-  const [joinRole, setJoinRole] = useState('Translator');
+  const [cvFile, setCvFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Load auth details
   const auth = getAuth();
@@ -22,10 +25,16 @@ function ProjectList() {
   const userFullName = authUser?.fullName || authUser?.username || 'Translator';
 
   useEffect(() => {
-    const fetchProjects = async () => {
+    const fetchProjectsAndRequests = async () => {
       try {
-        const data = await getAllProjectTeamsApi();
-        setProjects(Array.isArray(data) ? data : []);
+        const [projectsData, requestsData] = await Promise.all([
+          getAllProjectTeamsApi(),
+          getRequestsByNameApi(userFullName).catch(() => [])
+        ]);
+        setProjects(Array.isArray(projectsData) ? projectsData : []);
+        if (Array.isArray(requestsData)) {
+          setAppliedIds(requestsData.map(req => req.projectTeamId));
+        }
       } catch (err) {
         console.error(err);
         toast.error('Failed to load available projects.');
@@ -33,8 +42,8 @@ function ProjectList() {
         setLoading(false);
       }
     };
-    fetchProjects();
-  }, []);
+    fetchProjectsAndRequests();
+  }, [userFullName]);
 
   const filteredProjects = projects.filter((p) => {
     // Only show active recruiting projects
@@ -66,14 +75,38 @@ function ProjectList() {
 
   const handleApplyClick = (project) => {
     setSelectedProject(project);
-    setJoinMessage(`Hi, I'm a Translator and I'd like to help with ${project.comicName || project.title || 'this series'}.`);
-    setJoinRole('Translator');
+    setJoinMessage('');
+    setCvFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
     setShowJoinModal(true);
+  };
+
+  const handleCvFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      toast.warn('Only PDF, DOC, DOCX files are accepted.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.warn('File size must be under 5MB.');
+      e.target.value = '';
+      return;
+    }
+    setCvFile(file);
   };
 
   const handleSendJoinRequest = async () => {
     if (!selectedProject) return;
+    if (uploading) return;
     try {
+      setUploading(true);
       const initials = userFullName
         .split(' ')
         .map((w) => w[0])
@@ -81,21 +114,40 @@ function ProjectList() {
         .toUpperCase()
         .substring(0, 2);
 
+      // Upload CV file if provided
+      let cvUrl = null;
+      if (cvFile) {
+        try {
+          const uploadResult = await uploadFileApi(cvFile);
+          cvUrl = typeof uploadResult === 'string' ? uploadResult : uploadResult?.url || uploadResult?.fileUrl || null;
+        } catch (uploadErr) {
+          console.error('CV upload failed:', uploadErr);
+          toast.error('Failed to upload CV file. Please try again.');
+          return;
+        }
+      }
+
       await createTeamRequestApi(selectedProject.id, {
         name: userFullName,
-        time: 'Just now',
-        text: joinMessage.trim() || 'Hi, I would love to join your translation team!',
-        roles: joinRole,
+        time: new Date().toISOString(),
+        text: joinMessage.trim(),
+        roles: 'Member',
         avatar: initials,
+        cvUrl: cvUrl,
+        cvFileName: cvFile ? cvFile.name : null,
       });
 
       toast.success(`Application sent successfully for "${selectedProject.comicName || selectedProject.title}"!`);
       setAppliedIds((prev) => [...prev, selectedProject.id]);
       setShowJoinModal(false);
       setSelectedProject(null);
+      setCvFile(null);
     } catch (err) {
       console.error(err);
-      toast.error('Failed to send application.');
+      const errMsg = err.response?.data?.message || 'Failed to send application.';
+      toast.error(errMsg);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -145,10 +197,10 @@ function ProjectList() {
       <div className="available-projects-grid">
         {filteredProjects.map((project) => {
           const alreadyApplied = appliedIds.includes(project.id);
-          const currentMembersCount = project.membersCount || 0;
+          const recruitedCount = Math.max(0, (project.membersCount || 1) - 1);
           const limit = project.maxMembers || 5;
-          const spotsLeft = Math.max(0, limit - currentMembersCount);
-          const progressPercent = Math.min(100, Math.round((currentMembersCount / limit) * 100));
+          const spotsLeft = Math.max(0, limit - recruitedCount);
+          const progressPercent = Math.min(100, Math.round((recruitedCount / limit) * 100));
 
           return (
             <div key={project.id} className="available-project-card">
@@ -290,28 +342,13 @@ function ProjectList() {
                 <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: 'var(--trans-text-secondary)' }}>Comic Project:</p>
                 <strong style={{ fontSize: '15px', color: '#c084fc' }}>{selectedProject.comicName || selectedProject.title}</strong>
                 <p style={{ margin: '8px 0 0 0', fontSize: '12.5px', color: '#10b981' }}>
-                  Open Positions: {(selectedProject.maxMembers || 5) - (selectedProject.membersCount || 0)} spots left
+                  Open Positions: {Math.max(0, (selectedProject.maxMembers || 5) - Math.max(0, (selectedProject.membersCount || 1) - 1))} spots left
                 </p>
               </div>
 
-              <div className="trans-form-group" style={{ marginBottom: '16px' }}>
-                <label className="trans-form-label" style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>
-                  Role you're applying for
-                </label>
-                <select
-                  className="trans-form-input"
-                  style={{ width: '100%' }}
-                  value={joinRole}
-                  onChange={(e) => setJoinRole(e.target.value)}
-                >
-                  <option value="Translator">Translator</option>
-                  <option value="Proofreader">Proofreader</option>
-                  <option value="Editor">Editor</option>
-                  <option value="Quality Checker">Quality Checker</option>
-                </select>
-              </div>
 
-              <div className="trans-form-group">
+
+              <div className="trans-form-group" style={{ marginBottom: '16px' }}>
                 <label className="trans-form-label" style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>
                   Introduction Message
                 </label>
@@ -321,6 +358,59 @@ function ProjectList() {
                   placeholder="Tell the group leader about your experience or why you want to join..."
                   value={joinMessage}
                   onChange={(e) => setJoinMessage(e.target.value)}
+                />
+              </div>
+
+              {/* CV / Resume Upload */}
+              <div className="trans-form-group">
+                <label className="trans-form-label" style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>
+                  Attach CV / Resume <span style={{ color: '#64748b', fontWeight: '400' }}>(optional — PDF, DOC, DOCX, max 5MB)</span>
+                </label>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.12)',
+                  borderRadius: '8px', padding: '12px 16px', cursor: 'pointer',
+                  transition: 'border-color 0.2s'
+                }}
+                  onClick={() => fileInputRef.current?.click()}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(168,85,247,0.5)'}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="12" y1="18" x2="12" y2="12"/>
+                    <line x1="9" y1="15" x2="15" y2="15"/>
+                  </svg>
+                  <div style={{ flex: 1 }}>
+                    {cvFile ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ color: '#c084fc', fontSize: '13px', fontWeight: '600' }}>📄 {cvFile.name}</span>
+                        <span style={{ color: '#64748b', fontSize: '11px' }}>({(cvFile.size / 1024).toFixed(0)} KB)</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCvFile(null);
+                            if (fileInputRef.current) fileInputRef.current.value = '';
+                          }}
+                          style={{
+                            background: 'rgba(239,68,68,0.15)', border: 'none', color: '#ef4444',
+                            borderRadius: '4px', padding: '2px 6px', fontSize: '11px', cursor: 'pointer',
+                            marginLeft: 'auto'
+                          }}
+                        >✕ Remove</button>
+                      </div>
+                    ) : (
+                      <span style={{ color: '#64748b', fontSize: '13px' }}>Click to browse or drag a file here</span>
+                    )}
+                  </div>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  style={{ display: 'none' }}
+                  onChange={handleCvFileChange}
                 />
               </div>
             </div>
@@ -338,15 +428,22 @@ function ProjectList() {
             >
               <button
                 className="trans-btn secondary"
+                disabled={uploading}
                 onClick={() => {
                   setShowJoinModal(false);
                   setSelectedProject(null);
+                  setCvFile(null);
                 }}
               >
                 Cancel
               </button>
-              <button className="trans-btn primary" onClick={handleSendJoinRequest}>
-                Send Application
+              <button
+                className="trans-btn primary"
+                onClick={handleSendJoinRequest}
+                disabled={uploading}
+                style={{ opacity: uploading ? 0.7 : 1 }}
+              >
+                {uploading ? 'Uploading & Sending...' : 'Send Application'}
               </button>
             </div>
           </div>

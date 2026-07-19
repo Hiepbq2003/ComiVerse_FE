@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'react-toastify'
-import AuthorLayout from '../../components/layout/AuthorLayout'
 import '../../assets/style/author/profile.css'
 import { getAuthorProfileApi, saveAuthorProfileApi } from '../../services/api/AuthorProfileApi'
 
@@ -14,6 +13,7 @@ const emptyProfile = {
   contactEmail: '',
   avatarUrl: '',
   bio: '',
+  language: '',
   note: '',
 }
 
@@ -50,6 +50,7 @@ function AuthorProfile() {
           contactEmail: data?.contactEmail || data?.email || '',
           avatarUrl: data?.avatarUrl || '',
           bio: data?.bio || '',
+          language: data?.language || '',
           note: data?.note || '',
         })
       } catch (error) {
@@ -83,6 +84,7 @@ function AuthorProfile() {
       contactEmail: profile.contactEmail?.trim() || null,
       avatarUrl: profile.avatarUrl?.trim() || null,
       bio: profile.bio?.trim() || null,
+      language: profile.language?.trim() || null,
       note: profile.note?.trim() || null,
     }
 
@@ -99,7 +101,7 @@ function AuthorProfile() {
   }
 
   return (
-    <AuthorLayout activeNav="profile">
+    <>
       <div className="author-page-header">
         <h1>Author Profile</h1>
         <p>Fill in the public author information used by your comics and moderation workflow.</p>
@@ -130,8 +132,11 @@ function AuthorProfile() {
               <span>Contact email</span>
               <strong>{profile.contactEmail || profile.email || 'Not set'}</strong>
             </div>
+            <div>
+              <span>Language</span>
+              <strong>{profile.language || 'Not set'}</strong>
+            </div>
           </div>
-
           <p className="author-profile-preview-bio">
             {profile.bio || 'No bio has been added yet.'}
           </p>
@@ -209,6 +214,17 @@ function AuthorProfile() {
                   />
                 </div>
 
+                <div className="form-group-cell">
+                  <label>Language</label>
+                  <input
+                    className="form-control-premium"
+                    value={profile.language || ''}
+                    onChange={(e) => updateField('language', e.target.value)}
+                    placeholder="Example: Vietnamese, English, Japanese"
+                    maxLength={100}
+                  />
+                </div>
+
                 <div className="form-group-cell full-width">
                   <label>Avatar URL</label>
                   <input
@@ -249,7 +265,7 @@ function AuthorProfile() {
           )}
         </div>
       </div>
-    </AuthorLayout>
+    </>
   )
 }
 

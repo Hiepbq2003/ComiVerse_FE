@@ -730,6 +730,114 @@ html.light .btn-home-auth-link:hover {
   gap: 20px;
 }
 
+/* RECOMMENDED SLIDER/CAROUSEL */
+.recommended-slider-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.recommended-slider-viewport {
+  overflow: hidden;
+  width: 100%;
+  padding: 10px 0; /* Add padding so scale-up hover animations and card shadows aren't clipped */
+  margin: -10px 0;
+}
+
+.recommended-slider-track {
+  display: flex;
+  gap: 20px;
+  will-change: transform;
+  transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.recommended-slider-item {
+  flex: 0 0 calc((100% - 100px) / 6);
+  min-width: 0;
+}
+
+/* Responsive visible items sizes matching the JS state */
+@media (max-width: 1200px) {
+  .recommended-slider-item {
+    flex: 0 0 calc((100% - 60px) / 4);
+  }
+}
+
+@media (max-width: 768px) {
+  .recommended-slider-item {
+    flex: 0 0 calc((100% - 40px) / 3);
+  }
+}
+
+@media (max-width: 480px) {
+  .recommended-slider-item {
+    flex: 0 0 calc((100% - 20px) / 2);
+  }
+}
+
+.slider-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(13, 9, 25, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+}
+
+.slider-nav-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.6);
+  transform: translateY(-50%) scale(1.15);
+}
+
+.slider-nav-btn:active:not(:disabled) {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.slider-nav-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.slider-nav-btn.prev-btn {
+  left: -22px;
+}
+
+.slider-nav-btn.next-btn {
+  right: -22px;
+}
+
+.slider-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: slider-spin 0.8s linear infinite;
+}
+
+@keyframes slider-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
 /* COMIC CARD (UNIVERSAL PREMIUM STYLE) */
 .home-comic-card {
   background: var(--reader-card-bg);

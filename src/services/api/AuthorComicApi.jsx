@@ -20,18 +20,12 @@ export const createAuthorComicApi = (payload) => {
   return AxiosClient.post('/author/comics', payload)
 }
 
-export const uploadAuthorComicPackageZipApi = (formData) => {
-  return AxiosClient.post('/author/comics/upload-package', formData, {
-    timeout: 300000,
-  })
-}
-
-export const getAuthorComicPackageUploadStatusApi = (taskId) => {
-  return AxiosClient.get(`/author/comics/upload-package/status/${taskId}`)
-}
-
 export const updateAuthorComicApi = (comicId, payload) => {
   return AxiosClient.put(`/author/comics/${comicId}`, payload)
+}
+
+export const submitAuthorComicReviewApi = (comicId) => {
+  return AxiosClient.post(`/author/comics/${comicId}/submit-review`)
 }
 
 export const uploadAuthorChapterZipApi = (comicId, formData) => {

@@ -20,20 +20,20 @@ export const searchComicsApi = (query) => {
   return AxiosClient.get(`/comics/search?query=${encodeURIComponent(query)}`);
 };
 
-export const getExploreComicsApi = (params) => {
-  return AxiosClient.get('/comics/explore', { params });
+export const getExploreComicsApi = (params, config = {}) => {
+  return AxiosClient.get('/comics/explore', { params, ...config });
 };
 
-export const getComicRecommendationsApi = (params) => {
-  return AxiosClient.get('/comics/recommendations', { params });
+export const getComicRecommendationsApi = (params, config = {}) => {
+  return AxiosClient.get('/comics/recommendations', { params, ...config });
 };
 
-export const getComicLeaderboardApi = (params) => {
-  return AxiosClient.get('/comics/leaderboard', { params });
+export const getComicLeaderboardApi = (params, config = {}) => {
+  return AxiosClient.get('/comics/leaderboard', { params, ...config });
 };
 
-export const getComicByIdApi = (id) => {
-  return AxiosClient.get(`/comics/${id}`);
+export const getComicByIdApi = (id, config = {}) => {
+  return AxiosClient.get(`/comics/${id}`, config);
 };
 
 
