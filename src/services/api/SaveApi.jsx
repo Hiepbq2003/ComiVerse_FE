@@ -1,7 +1,7 @@
 import AxiosClient from './AxiosClient';
 
-export const checkSaveStatusApi = (comicId) => {
-  return AxiosClient.get(`/saves/check/${comicId}`);
+export const checkSaveStatusApi = (comicId, config = {}) => {
+  return AxiosClient.get(`/saves/check/${comicId}`, config);
 };
 
 export const toggleSaveStatusApi = (comicId) => {

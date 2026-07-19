@@ -47,6 +47,7 @@ import { getAuth, clearAuth } from './utils/Auth'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import TranslatorLayout from './components/layout/TranslatorLayout'
+import AuthorLayout from './components/layout/AuthorLayout'
 import ScrollToTop from './components/common/ScrollToTop'
 
 function ProfileRouteWrapper() {

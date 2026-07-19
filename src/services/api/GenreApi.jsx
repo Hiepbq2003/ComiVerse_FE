@@ -1,7 +1,7 @@
 import AxiosClient from './AxiosClient';
 
-export const getAllGenresApi = () => {
-  return AxiosClient.get('/genres', { params: { size: 1000 } });
+export const getAllGenresApi = (config = {}) => {
+  return AxiosClient.get('/genres', { params: { size: 1000 }, ...config });
 };
 
 export const createGenreApi = (data) => {
