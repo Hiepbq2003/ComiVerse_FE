@@ -1,7 +1,7 @@
 import AxiosClient from './AxiosClient';
 
-export const getReadChaptersByComicIdApi = (comicId) => {
-  return AxiosClient.get(`/reading-histories/chapters/${comicId}`);
+export const getReadChaptersByComicIdApi = (comicId, config = {}) => {
+  return AxiosClient.get(`/reading-histories/chapters/${comicId}`, config);
 };
 
 export const getMyReadingHistoryApi = () => {

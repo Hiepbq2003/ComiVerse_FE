@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import axios from 'axios'
 import HomeLayout from '../../components/layout/HomeLayout'
 import ComicCard from '../../components/common/ComicCard'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
@@ -35,6 +36,43 @@ function Home() {
   const [trendingLoading, setTrendingLoading] = useState(true)
   const [updatesLoading, setUpdatesLoading] = useState(true)
 
+  // Carousel Slider & Prefetch States
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [visibleItems, setVisibleItems] = useState(6)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+
+  const isMountedRef = useRef(true)
+  const nextCursorRef = useRef(null)
+  const nextReferenceIdRef = useRef(null)
+  const loadingMoreRef = useRef(false)
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  // Handle responsive visible items matching the CSS breakpoints
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth
+      if (width <= 480) {
+        setVisibleItems(2)
+      } else if (width <= 768) {
+        setVisibleItems(3)
+      } else if (width <= 1200) {
+        setVisibleItems(4)
+      } else {
+        setVisibleItems(6)
+      }
+    }
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   // Helper to detect if cover is an emoji character
   const isEmoji = (str) => {
     if (!str) return false
@@ -50,45 +88,137 @@ function Home() {
     return []
   }
 
-  useEffect(() => {
-    let isMounted = true
+  const handleFetchRecommendations = async (isInitial = false, signal = undefined) => {
+    if (!isInitial && loadingMoreRef.current) return
+    if (!isInitial && !hasMore) return
 
-    // 1. Fetch recommendations (size = 6)
-    getComicRecommendationsApi({ size: 6 })
-      .then((res) => {
-        if (isMounted) {
-          setRecommended(getArrayOrData(res))
+    try {
+      if (isInitial) {
+        setRecsLoading(true)
+      } else {
+        setLoadingMore(true)
+        loadingMoreRef.current = true
+      }
+
+      const params = {
+        size: 8,
+        cursor: isInitial ? undefined : (nextCursorRef.current || undefined),
+        referenceId: isInitial ? undefined : (nextReferenceIdRef.current || undefined)
+      }
+
+      const res = await getComicRecommendationsApi(params, { signal })
+      
+      let newList = []
+      let newNextCursor = null
+      let newNextReferenceId = null
+      let newHasMore = false
+
+      if (res) {
+        if (Array.isArray(res)) {
+          newList = res
+          newHasMore = false
+        } else if (res.data && Array.isArray(res.data)) {
+          newList = res.data
+          newNextCursor = res.nextCursor
+          newNextReferenceId = res.nextReferenceId
+          newHasMore = res.hasMore || false
+        } else if (res.success && res.data) {
+          const nested = res.data
+          newList = nested.data || []
+          newNextCursor = nested.nextCursor
+          newNextReferenceId = nested.nextReferenceId
+          newHasMore = nested.hasMore || false
         }
-      })
-      .catch((err) => {
+      }
+
+      if (!isMountedRef.current) return
+
+      nextCursorRef.current = newNextCursor
+      nextReferenceIdRef.current = newNextReferenceId
+      setHasMore(newHasMore)
+
+      if (isInitial) {
+        setRecommended(newList)
+      } else {
+        setRecommended(prev => {
+          const existingIds = new Set(prev.map(item => item.id))
+          const filteredNewList = newList.filter(item => !existingIds.has(item.id))
+          return [...prev, ...filteredNewList]
+        })
+      }
+    } catch (err) {
+      if (err.name !== 'CanceledError' && !axios.isCancel(err)) {
         console.error('Failed to fetch recommendations:', err)
-        if (isMounted) setRecommended([])
-      })
-      .finally(() => {
-        if (isMounted) setRecsLoading(false)
-      })
+        if (isInitial && isMountedRef.current) {
+          setRecommended([])
+        }
+      }
+    } finally {
+      if (isMountedRef.current) {
+        // Prevent setting loading state if request was aborted
+        if (!isInitial || (signal && !signal.aborted) || !signal) {
+          if (isInitial) {
+            setRecsLoading(false)
+          } else {
+            setLoadingMore(false)
+            loadingMoreRef.current = false
+          }
+        }
+      }
+    }
+  }
+
+  const handlePrev = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(prev => prev - 1)
+    }
+  }
+
+  const handleNext = () => {
+    if (currentIndex < recommended.length - visibleItems) {
+      const nextIndex = currentIndex + 1
+      setCurrentIndex(nextIndex)
+
+      // Prefetch check: trigger when the 7th item (index = nextIndex + visibleItems - 1) is visible
+      // but only if we have more and aren't already loading.
+      if (hasMore && !loadingMoreRef.current && nextIndex + visibleItems - 1 >= recommended.length - 2) {
+        handleFetchRecommendations(false)
+      }
+    }
+  }
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const { signal } = controller
+
+    // 1. Fetch initial recommendations
+    handleFetchRecommendations(true, signal)
 
     // 2. Fetch trending/leaderboard (timeframe = day)
-    getComicLeaderboardApi({ timeframe: 'day' })
+    getComicLeaderboardApi({ timeframe: 'day' }, { signal })
       .then((res) => {
-        if (isMounted) {
+        if (isMountedRef.current) {
           setTrending(getArrayOrData(res))
         }
       })
       .catch((err) => {
-        console.error('Failed to fetch leaderboard:', err)
-        if (isMounted) setTrending([])
+        if (err.name !== 'CanceledError' && !axios.isCancel(err)) {
+          console.error('Failed to fetch leaderboard:', err)
+          if (isMountedRef.current) setTrending([])
+        }
       })
       .finally(() => {
-        if (isMounted) setTrendingLoading(false)
+        if (isMountedRef.current && !signal.aborted) {
+          setTrendingLoading(false)
+        }
       })
 
     // 3. Fetch explore/recently updated (sortBy = Recently Updated, size = 8)
-    getExploreComicsApi({ sortBy: 'Recently Updated', size: 8 })
+    getExploreComicsApi({ sortBy: 'Recently Updated', size: 8 }, { signal })
       .then(async (res) => {
         const exploreList = getArrayOrData(res)
         if (exploreList.length === 0) {
-          if (isMounted) {
+          if (isMountedRef.current) {
             setNewUpdates([])
             setUpdatesLoading(false)
           }
@@ -99,7 +229,7 @@ function Home() {
           const resolved = await Promise.all(
             exploreList.map(async (comic) => {
               try {
-                const chRes = await getChaptersByComicIdApi(comic.id)
+                const chRes = await getChaptersByComicIdApi(comic.id, { signal })
                 const chData = getArrayOrData(chRes)
                 const chapters = chData.slice(0, 2).map((ch) => ({
                   id: ch.id,
@@ -108,6 +238,9 @@ function Home() {
                 }))
                 return { ...comic, chapters }
               } catch (chErr) {
+                if (chErr.name === 'CanceledError' || axios.isCancel(chErr)) {
+                  throw chErr // Bubble up to cancel the whole Promise.all if aborted
+                }
                 console.warn(`Failed to fetch chapters for ${comic.id}:`, chErr.message)
                 const chapters = []
                 if (comic.latestChapterNumber !== undefined && comic.latestChapterNumber !== null) {
@@ -120,28 +253,34 @@ function Home() {
               }
             })
           )
-          if (isMounted) {
+          if (isMountedRef.current) {
             setNewUpdates(resolved)
           }
         } catch (err) {
-          console.error('Failed to resolve chapters:', err)
-          if (isMounted) {
-            setNewUpdates(exploreList)
+          if (err.name !== 'CanceledError' && !axios.isCancel(err)) {
+            console.error('Failed to resolve chapters:', err)
+            if (isMountedRef.current) {
+              setNewUpdates(exploreList)
+            }
           }
         } finally {
-          if (isMounted) setUpdatesLoading(false)
+          if (isMountedRef.current && !signal.aborted) {
+            setUpdatesLoading(false)
+          }
         }
       })
       .catch((err) => {
-        console.error('Failed to fetch recently updated explore:', err)
-        if (isMounted) {
-          setNewUpdates([])
-          setUpdatesLoading(false)
+        if (err.name !== 'CanceledError' && !axios.isCancel(err)) {
+          console.error('Failed to fetch recently updated explore:', err)
+          if (isMountedRef.current) {
+            setNewUpdates([])
+            setUpdatesLoading(false)
+          }
         }
       })
 
     return () => {
-      isMounted = false
+      controller.abort()
     }
   }, [])
 
@@ -249,10 +388,50 @@ function Home() {
               ))}
             </div>
           ) : (
-            <div className="recommended-grid">
-              {recommended.map((comic) => (
-                <ComicCard key={comic.id} comic={comic} />
-              ))}
+            <div className="recommended-slider-container">
+              {/* Back button */}
+              <button 
+                className="slider-nav-btn prev-btn" 
+                onClick={handlePrev}
+                disabled={currentIndex === 0}
+                aria-label="Previous recommendations"
+              >
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
+
+              {/* Slider Viewport */}
+              <div className="recommended-slider-viewport">
+                <div 
+                  className="recommended-slider-track"
+                  style={{
+                    transform: `translateX(calc(-${currentIndex} * ((100% - ${(visibleItems - 1) * 20}px) / ${visibleItems} + 20px)))`
+                  }}
+                >
+                  {recommended.map((comic) => (
+                    <div key={comic.id} className="recommended-slider-item">
+                      <ComicCard comic={comic} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Next button */}
+              <button 
+                className="slider-nav-btn next-btn" 
+                onClick={handleNext}
+                disabled={(currentIndex >= recommended.length - visibleItems && !hasMore) || (currentIndex >= recommended.length - visibleItems && loadingMore)}
+                aria-label="Next recommendations"
+              >
+                {loadingMore && currentIndex >= recommended.length - visibleItems ? (
+                  <span className="slider-spinner" />
+                ) : (
+                  <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                )}
+              </button>
             </div>
           )}
         </section>

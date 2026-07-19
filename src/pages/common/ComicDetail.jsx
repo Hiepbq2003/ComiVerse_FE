@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getAuth } from '../../utils/Auth'
+import axios from 'axios'
 import { getComicByIdApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi } from '../../services/api/ChapterApi'
 import { checkLikeStatusApi, toggleLikeStatusApi } from '../../services/api/LikeApi'
@@ -68,6 +69,9 @@ function ComicDetail() {
 
   // Load details from API or fall back to mock
   useEffect(() => {
+    const controller = new AbortController()
+    const { signal } = controller
+
     const fetchComicDetail = async () => {
       try {
         setLoading(true)
@@ -78,11 +82,11 @@ function ComicDetail() {
 
         // Perform parallel async API calls to prevent sequential blocking
         const [comicRes, chaptersRes, saveCheckRes, likeCheckRes, readHistoryRes] = await Promise.all([
-          getComicByIdApi(id),
-          getChaptersByComicIdApi(id),
-          isLoggedIn ? checkSaveStatusApi(id) : Promise.resolve(null),
-          isLoggedIn ? checkLikeStatusApi(id) : Promise.resolve(null),
-          isLoggedIn ? getReadChaptersByComicIdApi(id) : Promise.resolve(null)
+          getComicByIdApi(id, { signal }),
+          getChaptersByComicIdApi(id, { signal }),
+          isLoggedIn ? checkSaveStatusApi(id, { signal }) : Promise.resolve(null),
+          isLoggedIn ? checkLikeStatusApi(id, { signal }) : Promise.resolve(null),
+          isLoggedIn ? getReadChaptersByComicIdApi(id, { signal }) : Promise.resolve(null)
         ])
 
         const comicData = comicRes?.data || comicRes
@@ -105,21 +109,29 @@ function ComicDetail() {
 
         setIsMockData(false)
       } catch (err) {
-        console.error('API failed:', err.message)
-        setComic(null)
-        setChapters([])
-        setInLibrary(false)
-        setIsLiked(false)
-        setReadChapterIds([])
-        serverSavedRef.current = false
-        serverLikedRef.current = false
-        setIsMockData(false)
+        if (err.name !== 'CanceledError' && !axios.isCancel(err)) {
+          console.error('API failed:', err.message)
+          setComic(null)
+          setChapters([])
+          setInLibrary(false)
+          setIsLiked(false)
+          setReadChapterIds([])
+          serverSavedRef.current = false
+          serverLikedRef.current = false
+          setIsMockData(false)
+        }
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
       }
     }
 
     fetchComicDetail()
+
+    return () => {
+      controller.abort()
+    }
   }, [id, user])
 
   const handleAddToLibrary = () => {

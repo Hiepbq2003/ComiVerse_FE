@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
+import axios from 'axios'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getExploreComicsApi } from '../../services/api/ComicApi'
 import { getAllGenresApi } from '../../services/api/GenreApi'
@@ -98,17 +99,34 @@ function Explore() {
   const [hoveredGenre, setHoveredGenre] = useState(null)
   const [hoveredStatus, setHoveredStatus] = useState(null)
 
+  const abortControllerRef = useRef(null)
+
   // Load genres on mount
   useEffect(() => {
+    const controller = new AbortController()
     const fetchGenres = async () => {
       try {
-        const data = await getAllGenresApi()
+        const data = await getAllGenresApi({ signal: controller.signal })
         setGenres(data?.data || data || [])
       } catch (err) {
-        console.error('Failed to load genres:', err)
+        if (err.name !== 'CanceledError' && !axios.isCancel(err)) {
+          console.error('Failed to load genres:', err)
+        }
       }
     }
     fetchGenres()
+    return () => {
+      controller.abort()
+    }
+  }, [])
+
+  // Cancel any active fetchData request on component unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
   }, [])
 
   // Cover image fallback picker
@@ -142,6 +160,12 @@ function Explore() {
 
   // Fetch explore comics logic
   const fetchData = async (page, cursorObj) => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     try {
       setLoading(true)
       
@@ -163,7 +187,7 @@ function Explore() {
         sortBy: sortByParam
       }
 
-      const response = await getExploreComicsApi(params)
+      const response = await getExploreComicsApi(params, { signal: controller.signal })
       
       let comicsList = []
       let nextCursor = null
@@ -213,10 +237,14 @@ function Explore() {
         pageCursorsRef.current[page] = { cursor: nextCursor, referenceId: nextReferenceId }
       }
     } catch (err) {
-      console.error('Failed to load explore comics:', err)
-      toast.error('Failed to load comics!')
+      if (err.name !== 'CanceledError' && !axios.isCancel(err)) {
+        console.error('Failed to load explore comics:', err)
+        toast.error('Failed to load comics!')
+      }
     } finally {
-      setLoading(false)
+      if (!controller.signal.aborted) {
+        setLoading(false)
+      }
     }
   }
 
