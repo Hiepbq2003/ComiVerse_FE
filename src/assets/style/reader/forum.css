@@ -1255,3 +1255,62 @@ html.light .forum-card-action-btn.liked-active:hover {
   border-color: #f87171;
   color: #b91c1c;
 }
+.forum-comments-loading {
+  margin: 0;
+  padding: 24px 0;
+  color: var(--reader-text-muted, #94a3b8);
+  font-size: 13px;
+  text-align: center;
+}
+
+.forum-comment-card--reply {
+  margin-left: 28px;
+  border-left: 3px solid rgba(168, 85, 247, 0.45);
+}
+
+.forum-comment-card--highlighted {
+  border-color: #a855f7;
+  background: rgba(168, 85, 247, 0.14);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
+  animation: forum-comment-highlight 0.75s ease-out;
+}
+
+.forum-replying-to {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--reader-card-border, rgba(148, 163, 184, 0.2));
+  color: var(--reader-text-muted, #94a3b8);
+  font-size: 12px;
+}
+
+.forum-replying-to button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@keyframes forum-comment-highlight {
+  from {
+    transform: translateY(6px);
+    opacity: 0.65;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .forum-comment-card--reply {
+    margin-left: 14px;
+  }
+}

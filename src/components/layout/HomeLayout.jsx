@@ -51,6 +51,16 @@ function HomeLayout({ children }) {
     await markAllAsRead()
   }
 
+  const handleNotificationClick = async (notification) => {
+    await handleMarkAsRead(notification.id, notification.isRead)
+    setShowNotificationDropdown(false)
+
+    const actionUrl = notification.actionUrl
+    if (typeof actionUrl === 'string' && actionUrl.startsWith('/') && !actionUrl.startsWith('//')) {
+      navigate(actionUrl)
+    }
+  }
+
   const handleLogout = () => {
     logout()
     setShowUserMenu(false)
@@ -424,7 +434,7 @@ function HomeLayout({ children }) {
                               cursor: 'pointer',
                               transition: 'all 0.2s'
                             }}
-                            onClick={() => handleMarkAsRead(item.id, item.isRead)}
+                            onClick={() => handleNotificationClick(item)}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                               <span
