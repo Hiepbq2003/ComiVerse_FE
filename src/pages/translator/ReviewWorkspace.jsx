@@ -1,0 +1,984 @@
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  Layers,
+  Link2,
+  Link2Off,
+  ZoomIn,
+  ZoomOut,
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle2,
+  XCircle,
+  MessageSquare,
+  HelpCircle,
+  Send,
+  X,
+  Trash2,
+  Pencil,
+} from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
+import "../../assets/style/translator/review-workspace.css";
+
+const API_BASE = "http://localhost:8081/api";
+const TOKEN_KEY = "token";
+
+function authHeaders() {
+  const token = localStorage.getItem(TOKEN_KEY);
+  return {
+    "Content-Type": "application/json",
+    ...(token && { Authorization: `Bearer ${token}` }),
+  };
+}
+
+async function fetchJson(url, options = {}) {
+  const res = await fetch(url, { ...options, headers: { ...authHeaders(), ...(options.headers || {}) } });
+  let json;
+  try {
+    json = await res.json();
+  } catch {
+    throw new Error(`Invalid response from ${url}`);
+  }
+  if (!res.ok || json?.success === false) {
+    throw new Error(json?.message || `Request failed (${res.status})`);
+  }
+  return json?.data !== undefined ? json.data : json;
+}
+
+async function fetchTaskAndChapter(taskId, signal) {
+  const task = await fetchJson(`${API_BASE}/team-workspace/tasks/${taskId}`, { signal });
+  const chapterId =
+    task?.chapter?.id ??
+    task?.chapterId ??
+    task?.chapter_id ??
+    (Array.isArray(task) ? task[0]?.chapterId : undefined);
+
+  let chapterTitle = null;
+  let comicTitle = null;
+  if (chapterId) {
+    try {
+      const chapter = await fetchJson(`${API_BASE}/chapters/detail/${chapterId}`, { signal });
+      chapterTitle = chapter?.title ?? null;
+      if (chapter?.comicId) {
+        const comic = await fetchJson(`${API_BASE}/comics/${chapter.comicId}`, { signal });
+        comicTitle = comic?.title ?? comic?.name ?? null;
+      }
+    } catch {}
+  }
+
+  return {
+    chapterTitle,
+    comicTitle,
+    projectTeamId: task?.projectTeamId ?? null,
+  };
+}
+
+async function fetchReviewPages(taskId, signal) {
+  const list = await fetchJson(`${API_BASE}/review-workspace/${taskId}`, { signal });
+  return Array.isArray(list) ? list : [];
+}
+
+async function fetchComments(pageId, signal) {
+  const list = await fetchJson(`${API_BASE}/review-workspace/pages/${pageId}/comments`, { signal });
+  return Array.isArray(list) ? list : [];
+}
+
+async function postComment(pageId, payload) {
+  return fetchJson(`${API_BASE}/review-workspace/pages/${pageId}/comments`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+async function updateCommentApi(commentId, content) {
+  return fetchJson(`${API_BASE}/review-workspace/comments/${commentId}`, {
+    method: "PUT",
+    body: JSON.stringify({ content }),
+  });
+}
+
+async function deleteCommentApi(commentId) {
+  return fetchJson(`${API_BASE}/review-workspace/comments/${commentId}`, {
+    method: "DELETE",
+  });
+}
+
+async function resolveComment(commentId) {
+  return fetchJson(`${API_BASE}/review-workspace/comments/${commentId}/resolve`, {
+    method: "PUT",
+  });
+}
+
+async function submitDecision(taskId, decision) {
+  return fetchJson(`${API_BASE}/review-workspace/tasks/${taskId}/decision`, {
+    method: "PUT",
+    body: JSON.stringify({ decision }),
+  });
+}
+
+function getBoundingBox(selection) {
+  if (selection.shape === "polygon" && selection.points?.length) {
+    const xs = selection.points.map((p) => p.x);
+    const ys = selection.points.map((p) => p.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    return { x: minX, y: minY, width: Math.max(...xs) - minX, height: Math.max(...ys) - minY };
+  }
+  return { x: selection.x, y: selection.y, width: selection.width, height: selection.height };
+}
+
+function parseBubblesPayload(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+    return Array.isArray(parsed?.selections) ? parsed.selections : [];
+  } catch {
+    return [];
+  }
+}
+
+function computeChangedFlags(currentSelections, baselineSelections) {
+  if (!baselineSelections || baselineSelections.length === 0) {
+    return currentSelections.map(() => false);
+  }
+  const baselineById = new Map(baselineSelections.map((b) => [b.id, b]));
+  return currentSelections.map((sel) => {
+    const base = baselineById.get(sel.id);
+    if (!base) return true;
+    return (sel.translation ?? "") !== (base.translation ?? "");
+  });
+}
+
+function formatTime(dateStr) {
+  return new Date(dateStr).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function Avatar({ initials }) {
+  return <div className="rvw-avatar">{initials}</div>;
+}
+
+function Bubble({ box, index, text, changed, selected, showText, fontSizePx, bgColor, textColor, onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      className={`rvw-bubble ${changed ? "rvw-bubble--changed" : ""} ${selected ? "rvw-bubble--selected" : ""} ${showText ? "rvw-bubble--text-only" : "rvw-bubble--outline-only"}`}
+      style={{
+        "--x": `${box.x}%`,
+        "--y": `${box.y}%`,
+        "--w": `${box.width}%`,
+        "--h": `${box.height}%`,
+        ...(fontSizePx ? { fontSize: `${fontSizePx}px` } : {}),
+        ...(showText && bgColor ? { "--bg-color": bgColor } : {}),
+        ...(showText && textColor ? { "--text-color": textColor } : {}),
+      }}
+    >
+      {!showText && <span className="rvw-bubble-index">{index}</span>}
+      {changed && <span className="rvw-bubble-alert">!</span>}
+      {showText && text}
+    </div>
+  );
+}
+
+function CommentThread({ comment, onResolve, onDelete, onStartEdit, currentUserId, resolveBubbleLabel }) {
+  const isOwner = comment.authorId === currentUserId;
+
+  return (
+    <div className="rvw-comment">
+      <Avatar initials={comment.authorInitials} />
+      <div className="rvw-comment-body">
+        <div className="rvw-comment-header">
+          <span className="rvw-comment-author">{comment.authorName}</span>
+          <div className="rvw-comment-header-right">
+            <span className="rvw-comment-time">{formatTime(comment.createdAt)}</span>
+            {isOwner && (
+              <>
+                <button type="button" onClick={() => onStartEdit(comment)} className="rvw-delete-btn" title="Edit comment">
+                  <Pencil size={12} />
+                </button>
+                <button type="button" onClick={() => onDelete(comment.id)} className="rvw-delete-btn" title="Delete comment">
+                  <Trash2 size={12} />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {comment.bubbleId && <span className="rvw-comment-bubble-tag">{resolveBubbleLabel(comment.bubbleId)}</span>}
+
+        <p className="rvw-comment-text">{comment.content}</p>
+
+        {!comment.resolved && (
+          <button type="button" onClick={() => onResolve(comment.id)} className="rvw-resolve-btn">
+            <CheckCircle2 size={13} /> Resolve
+          </button>
+        )}
+
+        {comment.resolved && (
+          <span className="rvw-resolved-tag">
+            <CheckCircle2 size={12} /> Resolved
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SelectedBubblePreview({ index, translation, onClear }) {
+  return (
+    <div className="rvw-selected-preview">
+      <div className="rvw-selected-preview-header">
+        <span className="rvw-selected-preview-title">Bubble {index}</span>
+        <button type="button" onClick={onClear} className="rvw-selected-preview-close">
+          <X size={13} />
+        </button>
+      </div>
+      <p className="rvw-selected-preview-text">{translation || "No translation entered for this bubble yet."}</p>
+    </div>
+  );
+}
+
+function ReviewHeader({
+  chapterMeta,
+  pageNumber,
+  changeCount,
+  onBack,
+  syncScroll,
+  onToggleSyncScroll,
+  zoomScale,
+  isPickingZoomPoint,
+  onToggleZoomIn,
+  onZoomOut,
+  onResetZoom,
+  pageIndex,
+  totalPages,
+  onPrevPage,
+  onNextPage,
+  deciding,
+  isLastPage,
+  onApprove,
+  onRequestChanges,
+}) {
+  return (
+    <header className="rvw-header">
+      <div className="rvw-header-left">
+        <button type="button" onClick={onBack} className="rvw-back-btn">
+          <ArrowLeft size={15} /> Back to Task
+        </button>
+
+        <div className="rvw-divider-v" />
+
+        <div className="rvw-title-group">
+          <div className="rvw-title-icon">
+            <Layers size={16} color="#fff" />
+          </div>
+          <div>
+            <p className="rvw-title">Review: {chapterMeta?.chapterTitle || "Chapter"}</p>
+            <p className="rvw-subtitle">
+              {chapterMeta?.comicTitle || "Comic"} · Page {pageNumber}
+            </p>
+          </div>
+        </div>
+
+        <span className="rvw-changes-badge">{changeCount} changes</span>
+      </div>
+
+      <div className="rvw-header-right">
+        <button
+          type="button"
+          onClick={onToggleSyncScroll}
+          className={`rvw-sync-btn ${syncScroll ? "rvw-sync-btn--active" : ""}`}
+        >
+          {syncScroll ? <Link2 size={14} /> : <Link2Off size={14} />} Sync scroll
+        </button>
+
+        <div className={`rvw-zoom-group ${isPickingZoomPoint ? "rvw-zoom-group--active" : ""}`}>
+          <button
+            type="button"
+            data-zoom-toggle="true"
+            onClick={onToggleZoomIn}
+            className={`rvw-zoom-btn ${isPickingZoomPoint ? "rvw-zoom-btn--active" : ""}`}
+            title={isPickingZoomPoint ? "Click a point on the image to zoom into (Esc to cancel)" : "Zoom in (pick a point)"}
+          >
+            <ZoomIn size={15} />
+          </button>
+          <button type="button" onClick={onZoomOut} className="rvw-zoom-btn" disabled={zoomScale <= 1}>
+            <ZoomOut size={15} />
+          </button>
+          <span
+            onClick={onResetZoom}
+            title="Reset zoom to 100%"
+            className={`rvw-zoom-value ${zoomScale !== 1 ? "rvw-zoom-value--clickable" : ""}`}
+          >
+            {Math.round(zoomScale * 100)}%
+          </span>
+        </div>
+
+        <div className="rvw-pagenav-group">
+          <button type="button" disabled={pageIndex === 0} onClick={onPrevPage} className="rvw-pagenav-btn">
+            <ChevronLeft size={14} /> Prev
+          </button>
+          <span className="rvw-pagenav-sep">|</span>
+          <span className="rvw-pagenav-label">
+            Page {pageIndex + 1} / {totalPages}
+          </span>
+          <span className="rvw-pagenav-sep">|</span>
+          <button
+            type="button"
+            disabled={pageIndex === totalPages - 1}
+            onClick={onNextPage}
+            className="rvw-pagenav-btn"
+          >
+            Next <ChevronRight size={14} />
+          </button>
+        </div>
+
+        <button
+          type="button"
+          disabled={deciding || !isLastPage}
+          onClick={onApprove}
+          className="rvw-approve-btn"
+          title={isLastPage ? undefined : "Only available on the last page"}
+        >
+          <CheckCircle2 size={15} /> Approve
+        </button>
+
+        <button
+          type="button"
+          disabled={deciding || !isLastPage}
+          onClick={onRequestChanges}
+          className="rvw-reject-btn"
+          title={isLastPage ? undefined : "Only available on the last page"}
+        >
+          <XCircle size={15} /> Request Changes
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function BubbleOverlayPanel({
+  scrollRef,
+  onScroll,
+  frameRef,
+  zoomScale,
+  zoomOrigin,
+  isPickingZoomPoint,
+  onFrameMouseDown,
+  imageUrl,
+  pageIndex,
+  labelText,
+  labelClassName,
+  selections,
+  changedFlags,
+  showText,
+  frameHeight,
+  selectedBubbleId,
+  onSelectBubble,
+}) {
+  return (
+    <div ref={scrollRef} onScroll={onScroll} className="rvw-panel">
+      <p className={`rvw-panel-label ${labelClassName}`}>{labelText}</p>
+      <div
+        ref={frameRef}
+        onMouseDown={(e) => {
+          const handled = onFrameMouseDown(e, frameRef.current);
+          if (handled) e.stopPropagation();
+        }}
+        className={`rvw-panel-frame ${isPickingZoomPoint ? "rvw-panel-frame--zoom-picking" : ""}`}
+        style={{
+          "--zoom-scale": zoomScale,
+          "--zoom-origin-x": `${zoomOrigin.x}%`,
+          "--zoom-origin-y": `${zoomOrigin.y}%`,
+        }}
+      >
+        {imageUrl ? (
+          <img src={imageUrl} alt={`Page ${pageIndex + 1} ${labelText}`} className="rvw-panel-image" draggable={false} />
+        ) : (
+          <div className="rvw-panel-empty">No image for this page.</div>
+        )}
+        {!isPickingZoomPoint &&
+          selections.map((sel, i) => {
+            const fontSizePx =
+              showText && typeof sel.fontSize === "number" && frameHeight > 0
+                ? (sel.fontSize / 100) * frameHeight
+                : undefined;
+            return (
+              <Bubble
+                key={sel.id}
+                box={getBoundingBox(sel)}
+                index={i + 1}
+                text={sel.translation || ""}
+                changed={showText && changedFlags[i]}
+                showText={showText}
+                fontSizePx={fontSizePx}
+                bgColor={sel.textBgColor}
+                textColor={sel.textColor}
+                selected={selectedBubbleId === sel.id}
+                onClick={() => onSelectBubble(selectedBubbleId === sel.id ? null : sel.id)}
+              />
+            );
+          })}
+      </div>
+    </div>
+  );
+}
+
+function CommentsSidebar({
+  comments,
+  totalCommentCount,
+  commentsLoading,
+  onResolve,
+  onDelete,
+  onStartEdit,
+  currentUserId,
+  resolveBubbleLabel,
+  composeValue,
+  onComposeChange,
+  onPostComment,
+  editingComment,
+  onCancelEdit,
+  selectedBubbleId,
+  selectedBubbleIndex,
+  selectedBubbleTranslation,
+  onClearSelectedBubble,
+  bubbleAlreadyHasComment,
+}) {
+  return (
+    <aside className="rvw-sidebar">
+      <div className="rvw-sidebar-header">
+        <MessageSquare size={16} color="#a855f7" />
+        <span className="rvw-sidebar-title">Comments</span>
+        <span className="rvw-sidebar-count">{totalCommentCount}</span>
+      </div>
+
+      {selectedBubbleId != null && (
+        <SelectedBubblePreview
+          index={selectedBubbleIndex}
+          translation={selectedBubbleTranslation}
+          onClear={onClearSelectedBubble}
+        />
+      )}
+
+      <div className="rvw-sidebar-list">
+        {commentsLoading && selectedBubbleId != null && (
+          <p className="rvw-sidebar-empty">Loading comments…</p>
+        )}
+        {!commentsLoading && selectedBubbleId == null && (
+          <p className="rvw-sidebar-empty">Select a bubble on the translated image to view its comment.</p>
+        )}
+        {!commentsLoading && selectedBubbleId != null && comments.length === 0 && (
+          <p className="rvw-sidebar-empty">No comment on this bubble yet.</p>
+        )}
+        {comments.map((c) => (
+          <CommentThread
+            key={c.id}
+            comment={c}
+            onResolve={onResolve}
+            onDelete={onDelete}
+            onStartEdit={onStartEdit}
+            currentUserId={currentUserId}
+            resolveBubbleLabel={resolveBubbleLabel}
+          />
+        ))}
+      </div>
+
+      <div className="rvw-composer">
+        {editingComment && (
+          <span className="rvw-composer-tag">
+            Editing comment
+            <button type="button" onClick={onCancelEdit} className="rvw-composer-tag-close">
+              <X size={11} />
+            </button>
+          </span>
+        )}
+        {!editingComment && selectedBubbleId == null && (
+          <p className="rvw-sidebar-empty" style={{ padding: "0 0 8px" }}>
+            Select a bubble on the translated image to leave a comment.
+          </p>
+        )}
+        {!editingComment && selectedBubbleId != null && bubbleAlreadyHasComment && (
+          <p className="rvw-sidebar-empty" style={{ padding: "0 0 8px" }}>
+            This bubble already has a comment. Edit it above instead.
+          </p>
+        )}
+        <div className="rvw-composer-row">
+          <input
+            value={composeValue}
+            onChange={(e) => onComposeChange(e.target.value)}
+            placeholder={
+              editingComment
+                ? "Edit comment..."
+                : selectedBubbleId != null
+                ? `Comment on bubble ${selectedBubbleIndex}...`
+                : "Select a bubble first..."
+            }
+            className="rvw-composer-input"
+            disabled={!editingComment && (selectedBubbleId == null || bubbleAlreadyHasComment)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onPostComment();
+            }}
+          />
+          <button
+            type="button"
+            onClick={onPostComment}
+            className="rvw-composer-send-btn"
+            disabled={!editingComment && (selectedBubbleId == null || bubbleAlreadyHasComment)}
+          >
+            <Send size={14} />
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function HelpButton() {
+  return (
+    <div className="rvw-help-btn">
+      <HelpCircle size={16} />
+    </div>
+  );
+}
+
+function useElementHeight(ref) {
+  const [height, setHeight] = useState(0);
+
+  useEffect(() => {
+    let observer;
+    let rafId;
+
+    const attach = () => {
+      const el = ref.current;
+      if (!el) {
+        rafId = requestAnimationFrame(attach);
+        return;
+      }
+      setHeight(el.offsetHeight);
+      observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setHeight(entry.contentRect.height);
+        }
+      });
+      observer.observe(el);
+    };
+
+    attach();
+
+    return () => {
+      if (observer) observer.disconnect();
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [ref]);
+
+  return height;
+}
+
+function useSyncScroll(enabled) {
+  const originalRef = useRef(null);
+  const translatedRef = useRef(null);
+  const isSyncingRef = useRef(false);
+
+  const handleScroll = useCallback(
+    (source) => (e) => {
+      if (!enabled || isSyncingRef.current) return;
+      const target = source === "original" ? translatedRef.current : originalRef.current;
+      if (!target) return;
+      isSyncingRef.current = true;
+      target.scrollTop = e.target.scrollTop;
+      target.scrollLeft = e.target.scrollLeft;
+      requestAnimationFrame(() => {
+        isSyncingRef.current = false;
+      });
+    },
+    [enabled]
+  );
+
+  return { originalRef, translatedRef, handleScroll };
+}
+
+function useReviewZoom() {
+  const ZOOM_STEP = 1.5;
+  const ZOOM_MIN = 1;
+  const ZOOM_MAX = 6;
+
+  const [zoomScale, setZoomScale] = useState(1);
+  const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
+  const [isPickingZoomPoint, setIsPickingZoomPoint] = useState(false);
+
+  const toggleZoomIn = () => setIsPickingZoomPoint((v) => !v);
+  const cancelZoomPick = () => setIsPickingZoomPoint(false);
+
+  const zoomOut = () => {
+    setZoomScale((prev) => {
+      const next = Math.max(ZOOM_MIN, prev / ZOOM_STEP);
+      if (next === ZOOM_MIN) setZoomOrigin({ x: 50, y: 50 });
+      return next;
+    });
+  };
+
+  const resetZoom = () => {
+    setZoomScale(1);
+    setZoomOrigin({ x: 50, y: 50 });
+    setIsPickingZoomPoint(false);
+  };
+
+  const handleFrameMouseDown = (e, frameEl) => {
+    if (!isPickingZoomPoint || !frameEl) return false;
+    const bounds = frameEl.getBoundingClientRect();
+    const percentX = ((e.clientX - bounds.left) / bounds.width) * 100;
+    const percentY = ((e.clientY - bounds.top) / bounds.height) * 100;
+    setZoomOrigin({ x: percentX, y: percentY });
+    setZoomScale((prev) => Math.min(ZOOM_MAX, prev * ZOOM_STEP));
+    return true;
+  };
+
+  return {
+    zoomScale,
+    zoomOrigin,
+    isPickingZoomPoint,
+    toggleZoomIn,
+    cancelZoomPick,
+    zoomOut,
+    resetZoom,
+    handleFrameMouseDown,
+  };
+}
+
+function useReviewData(taskId) {
+  const [chapterMeta, setChapterMeta] = useState(null);
+  const [pages, setPages] = useState([]);
+  const [status, setStatus] = useState("loading");
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!taskId) return;
+    const controller = new AbortController();
+    setStatus("loading");
+    setError(null);
+
+    Promise.all([fetchTaskAndChapter(taskId, controller.signal), fetchReviewPages(taskId, controller.signal)])
+      .then(([meta, pagesResult]) => {
+        setChapterMeta(meta);
+        setPages(pagesResult);
+        setStatus("ready");
+      })
+      .catch((err) => {
+        if (err.name === "AbortError") return;
+        setError(err.message);
+        setStatus("error");
+      });
+
+    return () => controller.abort();
+  }, [taskId]);
+
+  return { chapterMeta, pages, status, error };
+}
+
+function usePageComments(pageId) {
+  const [comments, setComments] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!pageId) {
+      setComments([]);
+      return;
+    }
+    const controller = new AbortController();
+    setLoading(true);
+    fetchComments(pageId, controller.signal)
+      .then(setComments)
+      .catch((err) => {
+        if (err.name !== "AbortError") console.error("Failed to load comments:", err);
+      })
+      .finally(() => setLoading(false));
+    return () => controller.abort();
+  }, [pageId]);
+
+  return { comments, setComments, loading };
+}
+
+export default function ReviewWorkspace() {
+  const { taskId } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const currentUserId = user?.id ?? null;
+
+  const { chapterMeta, pages, status, error } = useReviewData(taskId);
+  const [pageIndex, setPageIndex] = useState(0);
+  const currentPage = pages[pageIndex] ?? null;
+  const isLastPage = pages.length > 0 && pageIndex === pages.length - 1;
+
+  const { comments, setComments, loading: commentsLoading } = usePageComments(currentPage?.pageId);
+  const [composeValue, setComposeValue] = useState("");
+  const [selectedBubbleId, setSelectedBubbleId] = useState(null);
+  const [editingComment, setEditingComment] = useState(null);
+
+  const [syncScroll, setSyncScroll] = useState(true);
+  const [deciding, setDeciding] = useState(false);
+
+  const { originalRef, translatedRef, handleScroll } = useSyncScroll(syncScroll);
+
+  const {
+    zoomScale,
+    zoomOrigin,
+    isPickingZoomPoint,
+    toggleZoomIn,
+    cancelZoomPick,
+    zoomOut,
+    resetZoom,
+    handleFrameMouseDown,
+  } = useReviewZoom();
+
+  const originalFrameRef = useRef(null);
+  const translatedFrameRef = useRef(null);
+  const translatedFrameHeight = useElementHeight(translatedFrameRef);
+
+  useEffect(() => {
+    setSelectedBubbleId(null);
+    setEditingComment(null);
+    setComposeValue("");
+  }, [currentPage?.pageId]);
+
+  useEffect(() => {
+    if (!isPickingZoomPoint) return;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") cancelZoomPick();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isPickingZoomPoint, cancelZoomPick]);
+
+  useEffect(() => {
+    if (!isPickingZoomPoint) return;
+    const onMouseDown = (e) => {
+      if (originalFrameRef.current && originalFrameRef.current.contains(e.target)) return;
+      if (translatedFrameRef.current && translatedFrameRef.current.contains(e.target)) return;
+      if (e.target.closest("[data-zoom-toggle]")) return;
+      cancelZoomPick();
+    };
+    window.addEventListener("mousedown", onMouseDown);
+    return () => window.removeEventListener("mousedown", onMouseDown);
+  }, [isPickingZoomPoint, cancelZoomPick]);
+
+  const currentSelections = useMemo(() => parseBubblesPayload(currentPage?.bubbles), [currentPage]);
+  const baselineSelections = useMemo(() => parseBubblesPayload(currentPage?.reviewBaselineBubbles), [currentPage]);
+  const changedFlags = useMemo(() => computeChangedFlags(currentSelections, baselineSelections), [currentSelections, baselineSelections]);
+  const changeCount = changedFlags.filter(Boolean).length;
+
+  const resolveBubbleLabel = useCallback(
+    (bubbleId) => {
+      const idx = currentSelections.findIndex((s) => s.id === bubbleId);
+      return idx >= 0 ? `Bubble ${idx + 1}` : "Bubble (deleted)";
+    },
+    [currentSelections]
+  );
+
+  const selectedBubbleIndex = useMemo(() => {
+    if (selectedBubbleId == null) return null;
+    const idx = currentSelections.findIndex((s) => s.id === selectedBubbleId);
+    return idx >= 0 ? idx + 1 : null;
+  }, [selectedBubbleId, currentSelections]);
+
+  const selectedBubbleTranslation = useMemo(() => {
+    if (selectedBubbleId == null) return "";
+    const bubble = currentSelections.find((s) => s.id === selectedBubbleId);
+    return bubble?.translation ?? "";
+  }, [selectedBubbleId, currentSelections]);
+
+  const displayedComments = useMemo(() => {
+    if (selectedBubbleId == null) return [];
+    return comments.filter((c) => c.bubbleId === selectedBubbleId);
+  }, [comments, selectedBubbleId]);
+
+  const bubbleAlreadyHasComment = useMemo(() => {
+    if (selectedBubbleId == null || editingComment) return false;
+    return comments.some((c) => c.bubbleId === selectedBubbleId);
+  }, [selectedBubbleId, comments, editingComment]);
+
+  const handlePostComment = async () => {
+    if (!composeValue.trim() || !currentPage?.pageId) return;
+    if (!editingComment && selectedBubbleId == null) return;
+
+    if (editingComment) {
+      try {
+        const updated = await updateCommentApi(editingComment.id, composeValue.trim());
+        setComments((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+        setComposeValue("");
+        setEditingComment(null);
+      } catch (err) {
+        console.error("Failed to update comment:", err);
+        alert("Failed to update comment. Please try again.");
+      }
+      return;
+    }
+
+    try {
+      const created = await postComment(currentPage.pageId, {
+        bubbleId: selectedBubbleId,
+        content: composeValue.trim(),
+      });
+      setComments((prev) => [...prev, created]);
+      setComposeValue("");
+    } catch (err) {
+      console.error("Failed to post comment:", err);
+      alert(err?.message || "Failed to post comment. Please try again.");
+    }
+  };
+
+  const handleStartEdit = (comment) => {
+    setEditingComment(comment);
+    setComposeValue(comment.content);
+    setSelectedBubbleId(comment.bubbleId ?? null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingComment(null);
+    setComposeValue("");
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm("Delete this comment? This cannot be undone.")) return;
+    try {
+      await deleteCommentApi(commentId);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      if (editingComment?.id === commentId) {
+        setEditingComment(null);
+        setComposeValue("");
+      }
+    } catch (err) {
+      console.error("Failed to delete comment:", err);
+      alert("Failed to delete comment. Please try again.");
+    }
+  };
+
+  const handleResolve = async (commentId) => {
+    try {
+      await resolveComment(commentId);
+      setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, resolved: true } : c)));
+    } catch (err) {
+      console.error("Failed to resolve comment:", err);
+    }
+  };
+
+  const goBackToProjectTeams = useCallback(() => {
+    navigate("/translator/project-teams", {
+      state: { teamId: chapterMeta?.projectTeamId, tab: "tasks" },
+    });
+  }, [navigate, chapterMeta]);
+
+  const handleDecision = async (decision) => {
+    if (deciding) return;
+    setDeciding(true);
+    try {
+      await submitDecision(taskId, decision);
+      goBackToProjectTeams();
+    } catch (err) {
+      console.error("Failed to submit decision:", err);
+      alert("Failed to submit your decision. Please try again.");
+    } finally {
+      setDeciding(false);
+    }
+  };
+
+  if (status === "loading") {
+    return <div className="rvw-loading">Loading review…</div>;
+  }
+
+  if (status === "error") {
+    return <div className="rvw-error">{error}</div>;
+  }
+
+  return (
+    <div className="rvw-root">
+      <ReviewHeader
+        chapterMeta={chapterMeta}
+        pageNumber={pageIndex + 1}
+        changeCount={changeCount}
+        onBack={goBackToProjectTeams}
+        syncScroll={syncScroll}
+        onToggleSyncScroll={() => setSyncScroll((v) => !v)}
+        zoomScale={zoomScale}
+        isPickingZoomPoint={isPickingZoomPoint}
+        onToggleZoomIn={toggleZoomIn}
+        onZoomOut={zoomOut}
+        onResetZoom={resetZoom}
+        pageIndex={pageIndex}
+        totalPages={pages.length}
+        onPrevPage={() => setPageIndex((p) => p - 1)}
+        onNextPage={() => setPageIndex((p) => p + 1)}
+        deciding={deciding}
+        isLastPage={isLastPage}
+        onApprove={() => handleDecision("approved")}
+        onRequestChanges={() => handleDecision("changes_requested")}
+      />
+
+      <div className="rvw-body">
+        <BubbleOverlayPanel
+          scrollRef={originalRef}
+          onScroll={handleScroll("original")}
+          frameRef={originalFrameRef}
+          zoomScale={zoomScale}
+          zoomOrigin={zoomOrigin}
+          isPickingZoomPoint={isPickingZoomPoint}
+          onFrameMouseDown={handleFrameMouseDown}
+          imageUrl={currentPage?.imageUrl}
+          pageIndex={pageIndex}
+          labelText="ORIGINAL (SOURCE)"
+          labelClassName="rvw-panel-label--original"
+          selections={currentSelections}
+          changedFlags={changedFlags}
+          showText={false}
+          selectedBubbleId={selectedBubbleId}
+          onSelectBubble={setSelectedBubbleId}
+        />
+
+        <div className="rvw-divider-h" />
+
+        <BubbleOverlayPanel
+          scrollRef={translatedRef}
+          onScroll={handleScroll("translated")}
+          frameRef={translatedFrameRef}
+          zoomScale={zoomScale}
+          zoomOrigin={zoomOrigin}
+          isPickingZoomPoint={isPickingZoomPoint}
+          onFrameMouseDown={handleFrameMouseDown}
+          imageUrl={currentPage?.imageUrl}
+          pageIndex={pageIndex}
+          labelText="CURRENT TRANSLATION"
+          labelClassName="rvw-panel-label--translated"
+          selections={currentSelections}
+          changedFlags={changedFlags}
+          showText={true}
+          frameHeight={translatedFrameHeight}
+          selectedBubbleId={selectedBubbleId}
+          onSelectBubble={setSelectedBubbleId}
+        />
+      </div>
+
+      <CommentsSidebar
+        comments={displayedComments}
+        totalCommentCount={comments.length}
+        commentsLoading={commentsLoading}
+        onResolve={handleResolve}
+        onDelete={handleDeleteComment}
+        onStartEdit={handleStartEdit}
+        currentUserId={currentUserId}
+        resolveBubbleLabel={resolveBubbleLabel}
+        composeValue={composeValue}
+        onComposeChange={setComposeValue}
+        onPostComment={handlePostComment}
+        editingComment={editingComment}
+        onCancelEdit={handleCancelEdit}
+        selectedBubbleId={selectedBubbleId}
+        selectedBubbleIndex={selectedBubbleIndex}
+        selectedBubbleTranslation={selectedBubbleTranslation}
+        onClearSelectedBubble={() => setSelectedBubbleId(null)}
+        bubbleAlreadyHasComment={bubbleAlreadyHasComment}
+      />
+
+      <HelpButton />
+    </div>
+  );
+}

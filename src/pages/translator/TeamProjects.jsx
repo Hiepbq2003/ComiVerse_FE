@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import '../../assets/style/translator/team-projects.css'
 import ModernButton from '../../components/common/ModernButton'
-import { getAllProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
+import { getMyProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { createSubmissionApi } from '../../services/api/SubmissionApi'
-import { StepForward } from "lucide-react";
-import { GitCompare } from "lucide-react";
 import { getAuth } from '../../utils/Auth'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { AIPopover } from '../../components/common/AIPopover'
@@ -22,19 +20,388 @@ import {
   getTeamMessagesApi,
   createTeamMessageApi,
   getTeamTasksApi,
+  getTeamMembersApi,
+  getTeamChaptersApi,
   createTeamTaskApi,
   updateTeamTaskApi,
   getTeamRequestsApi,
   decideTeamRequestApi,
-  getChapterBacklogApi,
   createTeamRequestApi
 } from '../../services/api/TeamWorkspaceApi'
 import { toast } from 'react-toastify'
 
+import HomeTab from './HomeTab'
+import MembersTab from './MembersTab'
+import RequestsTab from './RequestsTab'
+import TasksTab, { CreateTaskModal, EditTaskModal, parseTaskTitle, getTaskColumn } from './TasksTab'
+import SettingsTab from './SettingsTab'
+
+function getTimeAgo(date) {
+  const seconds = Math.floor((new Date() - date) / 1000)
+  if (seconds < 60) return 'Just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days} day${days > 1 ? 's' : ''} ago`
+  return date.toLocaleDateString()
+}
+
+function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpenDetails, onOpenEdit, isLeaderMatch }) {
+  return (
+    <div className="fade-in">
+      <div className="translator-page-header">
+        <div className="translator-page-header-info">
+          <h1>Translation Projects</h1>
+          <p>All group translation project teams registered on the platform.</p>
+        </div>
+        <div>
+          <input
+            type="text"
+            className="trans-form-input"
+            placeholder="Search translation projects..."
+            style={{ width: '250px' }}
+            value={searchTerm}
+            onChange={(e) => onSearchChange(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="trans-projects-list">
+        {teamProjectsList.length === 0 ? (
+          <div className="translator-empty-state">
+            <h3>No translation projects found</h3>
+            <p>Change your search filters and try again.</p>
+          </div>
+        ) : (
+          teamProjectsList.map(proj => (
+            <div className="trans-project-card" key={proj.id}>
+              <div className="trans-project-cover">
+                {proj.cover && /^(https?:)?\/\//.test(proj.cover) ? (
+                  <img
+                    src={proj.cover}
+                    alt={proj.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }}
+                  />
+                ) : (
+                  proj.cover || '📚'
+                )}
+              </div>
+              <div className="trans-project-info">
+                <h3 className="trans-project-title">{proj.title}</h3>
+                <p className="trans-project-meta">
+                  🧑‍🤝‍🧑 Language: <strong>{proj.sourceLang || 'Any'} ➔ {proj.targetLang}</strong>
+                </p>
+                <p className="trans-project-meta" style={{ marginTop: '4px' }}>
+                  <span style={{ color: '#cbd5e1', fontSize: '12.5px' }}>
+                    👥 Capacity: {proj.membersCount || 0} / {proj.maxMembers || 5} members ({proj.isRecruiting ? 'Open' : 'Closed'})
+                  </span>
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                  <span className={`status-badge ${proj.status.toLowerCase()}`}>{proj.status}</span>
+                  {isLeaderMatch(proj.leaderName) ? (
+                    <span className="status-badge leader">⭐ Led by Me</span>
+                  ) : (
+                    <span className="status-badge">👤 Member</span>
+                  )}
+                </div>
+              </div>
+              <div className="trans-project-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <ModernButton variant={2} label="Workspace" onClick={() => onOpenDetails(proj)} />
+                <button className="trans-btn icon-edit" onClick={(e) => onOpenEdit(proj, e)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
+function EditProjectModal({ editForm, setEditForm, onCancel, onSave }) {
+  return (
+    <div className="trans-modal-overlay">
+      <div className="trans-modal-card">
+        <div className="trans-modal-header">
+          <h3>Edit Translation Project Info</h3>
+          <button className="trans-modal-close-btn" onClick={onCancel}>×</button>
+        </div>
+
+        <div className="trans-modal-body">
+          <div className="trans-form-group">
+            <label className="trans-form-label">Project Team Name</label>
+            <input
+              type="text"
+              className="trans-form-input"
+              value={editForm.team}
+              onChange={(e) => setEditForm({ ...editForm, team: e.target.value })}
+            />
+          </div>
+
+          <div className="trans-form-group">
+            <label className="trans-form-label">Project Status</label>
+            <select
+              className="trans-form-input"
+              value={editForm.status}
+              onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+            >
+              <option value="Active">Active</option>
+              <option value="Paused">Paused</option>
+            </select>
+          </div>
+
+          <div className="trans-form-group">
+            <label className="trans-form-label">Description / Synopses</label>
+            <textarea
+              className="trans-form-input textarea"
+              value={editForm.description}
+              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <div className="trans-modal-footer">
+          <button className="trans-btn secondary" onClick={onCancel}>Cancel</button>
+          <button className="trans-btn primary" onClick={onSave}>Save Changes</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function WorkspaceBreadcrumbs({ title, onBack }) {
+  return (
+    <div className="workspace-breadcrumbs">
+      <button className="breadcrumb-back" onClick={onBack}>&lt; Projects</button>
+      <span className="breadcrumb-divider">/</span>
+      <span className="breadcrumb-current">{title}</span>
+    </div>
+  )
+}
+
+function WorkspaceTabs({ workspaceTab, setWorkspaceTab, membersCount, isCurrentLeader, joinRequestsCount, tasksCount }) {
+  return (
+    <>
+      <style>{`.workspace-tabs::-webkit-scrollbar { display: none; }`}</style>
+      <div
+        className="workspace-tabs"
+        style={{ overflowY: 'hidden', overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        <button
+          className={`workspace-tab-btn ${workspaceTab === 'home' ? 'active' : ''}`}
+          onClick={() => setWorkspaceTab('home')}
+        >
+          Home
+        </button>
+        <button
+          className={`workspace-tab-btn ${workspaceTab === 'members' ? 'active' : ''}`}
+          onClick={() => setWorkspaceTab('members')}
+        >
+          Members <span className={`tab-badge ${workspaceTab === 'members' ? 'active-badge' : ''}`}>{membersCount}</span>
+        </button>
+        {isCurrentLeader && (
+          <button
+            className={`workspace-tab-btn ${workspaceTab === 'requests' ? 'active' : ''}`}
+            onClick={() => setWorkspaceTab('requests')}
+          >
+            Requests {joinRequestsCount > 0 && <span className="tab-badge alert-badge">{joinRequestsCount}</span>}
+          </button>
+        )}
+        <button
+          className={`workspace-tab-btn ${workspaceTab === 'tasks' ? 'active' : ''}`}
+          onClick={() => setWorkspaceTab('tasks')}
+        >
+          Tasks <span className={`tab-badge ${workspaceTab === 'tasks' ? 'active-badge' : ''}`}>{tasksCount}</span>
+        </button>
+        {isCurrentLeader && (
+          <button
+            className={`workspace-tab-btn ${workspaceTab === 'settings' ? 'active' : ''}`}
+            onClick={() => setWorkspaceTab('settings')}
+          >
+            Group Settings
+          </button>
+        )}
+      </div>
+    </>
+  )
+}
+
+function WorkspaceDetailView({
+  selectedDetails,
+  setSelectedDetails,
+  onBackToProjects,
+  workspaceTab,
+  setWorkspaceTab,
+  isCurrentLeader,
+  members,
+  memberSearch,
+  setMemberSearch,
+  onMembersLoaded,
+  joinRequests,
+  onApproveRequest,
+  onRejectRequest,
+  showUploadForm,
+  setShowUploadForm,
+  uploadData,
+  setUploadData,
+  onUploadChapter,
+  newPostText,
+  setNewPostText,
+  onPostAnnouncement,
+  announcements,
+  onLikePost,
+  chatMessages,
+  chatInput,
+  setChatInput,
+  onSendChat,
+  comicName,
+  tasks,
+  activeTasks,
+  pausedTasks,
+  lockedColumns,
+  setLockedColumns,
+  highlightedColumns,
+  setHighlightedColumns,
+  sortedColumns,
+  setSortedColumns,
+  openDropdownCol,
+  setOpenDropdownCol,
+  onCreateTaskClick,
+  onMoveAllToDone,
+  onMoveTask,
+  onOpenTaskDetails,
+  getAssigneeInitials,
+  showCreateTask,
+  newTaskData,
+  setNewTaskData,
+  chapterOptions,
+  teamMembersForAssign,
+  onCancelCreateTask,
+  onCreateTask,
+  selectedTask,
+  editTaskData,
+  setEditTaskData,
+  onCancelEditTask,
+  onContinueToWorkspace,
+  onSaveWorkspaceSettings,
+  onContinueToReviewWorkspace
+}) {
+  return (
+    <div className="project-detail-workspace fade-in">
+      <WorkspaceBreadcrumbs title={selectedDetails.title} onBack={onBackToProjects} />
+
+      <WorkspaceTabs
+        workspaceTab={workspaceTab}
+        setWorkspaceTab={setWorkspaceTab}
+        membersCount={members.length}
+        isCurrentLeader={isCurrentLeader}
+        joinRequestsCount={joinRequests.length}
+        tasksCount={tasks.length}
+      />
+
+      {workspaceTab === 'home' && (
+        <HomeTab
+          showUploadForm={showUploadForm}
+          setShowUploadForm={setShowUploadForm}
+          uploadData={uploadData}
+          setUploadData={setUploadData}
+          onUploadChapter={onUploadChapter}
+          newPostText={newPostText}
+          setNewPostText={setNewPostText}
+          onPostAnnouncement={onPostAnnouncement}
+          announcements={announcements}
+          onLikePost={onLikePost}
+          chatMessages={chatMessages}
+          chatInput={chatInput}
+          setChatInput={setChatInput}
+          onSendChat={onSendChat}
+        />
+      )}
+
+      {workspaceTab === 'members' && (
+        <MembersTab
+          teamId={selectedDetails.id}
+          leaderName={selectedDetails.leaderName}
+          memberSearch={memberSearch}
+          setMemberSearch={setMemberSearch}
+          onMembersLoaded={onMembersLoaded}
+        />
+      )}
+
+      {workspaceTab === 'requests' && (
+        <RequestsTab joinRequests={joinRequests} onApprove={onApproveRequest} onReject={onRejectRequest} />
+      )}
+
+      {workspaceTab === 'tasks' && (
+        <>
+          <TasksTab
+            comicName={comicName}
+            tasks={tasks}
+            activeTasks={activeTasks}
+            pausedTasks={pausedTasks}
+            lockedColumns={lockedColumns}
+            setLockedColumns={setLockedColumns}
+            highlightedColumns={highlightedColumns}
+            setHighlightedColumns={setHighlightedColumns}
+            sortedColumns={sortedColumns}
+            setSortedColumns={setSortedColumns}
+            openDropdownCol={openDropdownCol}
+            setOpenDropdownCol={setOpenDropdownCol}
+            onCreateTaskClick={onCreateTaskClick}
+            onMoveAllToDone={onMoveAllToDone}
+            onMoveTask={onMoveTask}
+            onOpenTaskDetails={onOpenTaskDetails}
+            getAssigneeInitials={getAssigneeInitials}
+            members={members}
+          />
+
+          {showCreateTask && (
+            <CreateTaskModal
+              comicName={comicName}
+              newTaskData={newTaskData}
+              setNewTaskData={setNewTaskData}
+              chapterOptions={chapterOptions}
+              teamMembersForAssign={teamMembersForAssign}
+              onCancel={onCancelCreateTask}
+              onCreate={onCreateTask}
+            />
+          )}
+
+          {selectedTask && (
+            <EditTaskModal
+              editTaskData={editTaskData}
+              setEditTaskData={setEditTaskData}
+              teamMembersForAssign={teamMembersForAssign}
+              onCancel={onCancelEditTask}
+              onContinue={onContinueToWorkspace}
+              onReview={onContinueToReviewWorkspace}
+            />
+          )}
+        </>
+      )}
+
+      {workspaceTab === 'settings' && (
+        <SettingsTab
+          selectedDetails={selectedDetails}
+          setSelectedDetails={setSelectedDetails}
+          members={members}
+          onSaveWorkspaceSettings={onSaveWorkspaceSettings}
+        />
+      )}
+    </div>
+  )
+}
+
 function TeamProjects() {
   const navigate = useNavigate()
+  const location = useLocation()
 
-  // ── Projects data (previously received via props, now fetched locally) ──
   const [projects, setProjects] = useState([])
   const [loadingProjects, setLoadingProjects] = useState(true)
   const auth = getAuth()
@@ -220,12 +587,8 @@ function TeamProjects() {
   const fetchProjects = async (silent = false) => {
     try {
       if (!silent) setLoadingProjects(true)
-      const data = await getAllProjectTeamsApi()
-      const mapped = (data || []).map(p => ({
-        ...p,
-        team: p.title,
-        title: p.comicName
-      }))
+      const data = await getMyProjectTeamsApi()
+      const mapped = (data || []).map(p => ({ ...p, team: p.title, title: p.comicName }))
       setProjects(mapped)
     } catch (err) {
       console.error(err)
@@ -235,24 +598,18 @@ function TeamProjects() {
     }
   }
 
-  useEffect(() => {
-    fetchProjects()
-  }, [])
+  useEffect(() => { fetchProjects() }, [])
 
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDetails, setSelectedDetails] = useState(null)
   const [selectedEdit, setSelectedEdit] = useState(null)
   const [showUploadForm, setShowUploadForm] = useState(false)
-
   const [uploadData, setUploadData] = useState({ chapterTitle: '', chapterContent: '', wordsCount: 3000 })
   const [editForm, setEditForm] = useState({ description: '', status: 'Active', team: '' })
 
-  // ── Workspace State ──────────────────────────────
-  const [activeProjectTab, setActiveProjectTab] = useState('my-projects') // 'my-projects' | 'job-pool'
-  const [workspaceTab, setWorkspaceTab] = useState('home') // 'home' | 'members' | 'requests' | 'tasks' | 'settings'
+  const [workspaceTab, setWorkspaceTab] = useState('home')
   const [loadingWorkspace, setLoadingWorkspace] = useState(false)
 
-  // Real DB Backed States
   const [announcements, setAnnouncements] = useState([])
   const [newPostText, setNewPostText] = useState('')
   const [selectedImage, setSelectedImage] = useState(null)
@@ -268,53 +625,18 @@ function TeamProjects() {
   const [joinRequests, setJoinRequests] = useState([])
   const [selectedReviewRequest, setSelectedReviewRequest] = useState(null)
   const [tasks, setTasks] = useState([])
-  const [chapterBacklog, setChapterBacklog] = useState([])
-  const [showBacklogModal, setShowBacklogModal] = useState(false)
-  const [showJoinModal, setShowJoinModal] = useState(false)
-  const [selectedJoinProject, setSelectedJoinProject] = useState(null)
-  const [joinMessage, setJoinMessage] = useState('')
-  const [joinRole, setJoinRole] = useState('Translator')
   const [lockedColumns, setLockedColumns] = useState([])
   const [highlightedColumns, setHighlightedColumns] = useState([])
   const [sortedColumns, setSortedColumns] = useState([])
   const [openDropdownCol, setOpenDropdownCol] = useState(null)
   const [selectedTask, setSelectedTask] = useState(null)
   const [editTaskData, setEditTaskData] = useState({
-    title: '',
-    columnName: 'backlog',
-    progress: 0,
-    priority: 'Medium',
-    assignee: '',
-    dueDate: ''
+    title: '', status: 'backlog', priority: 'Medium', assignees: [], dueDate: ''
   })
 
-  // Dynamic user mapping from auth token
-  const authStr = localStorage.getItem('user')
-
-  const parseTaskTitle = (title) => {
-    const match = (title || '').match(/^\[(URGENT|HIGH|MEDIUM|LOW)\]\s*(?:\[([^\]]+)\])?\s*(.*)$/i)
-    if (match) {
-      return {
-        priority: match[1].toUpperCase(),
-        comicProject: match[2] || selectedDetails?.comicName || selectedDetails?.title || 'Unknown Comic',
-        cleanTitle: match[3]
-      }
-    }
-    return {
-      priority: 'MEDIUM',
-      comicProject: selectedDetails?.comicName || selectedDetails?.title || 'Unknown Comic',
-      cleanTitle: title
-    }
-  }
-
-
-
   const [members, setMembers] = useState([])
-  const [claimedCurrentPage, setClaimedCurrentPage] = useState(1)
-
-  useEffect(() => {
-    setClaimedCurrentPage(1)
-  }, [selectedDetails?.id])
+  const [teamMembersForAssign, setTeamMembersForAssign] = useState([])
+  const [chapterOptions, setChapterOptions] = useState([])
   const [memberSearch, setMemberSearch] = useState('')
 
   const handleRemoveMember = async (memberId, memberName) => {
@@ -368,31 +690,20 @@ function TeamProjects() {
   }
   const [showCreateTask, setShowCreateTask] = useState(false)
   const [newTaskData, setNewTaskData] = useState({
-    title: '',
-    column: 'backlog',
-    assignee: '',
-    dueDate: '',
-    priority: 'Medium',
-    comic: ''
+    title: '', column: 'backlog', assignees: [], dueDate: '', priority: 'Medium', chapterId: null
   })
 
+  const getAssigneeInitials = (memberId) => {
+    const member = teamMembersForAssign.find(m => m.id === memberId)
+    return member?.avatar || '?'
+  }
+
   const openCreateTaskModal = () => {
-    const claimedComics = projects.filter(p =>
-      p.status === 'ACTIVE' &&
-      (p.leaderName === userFullName || p.leaderName === authUser?.fullName || p.leaderName === authUser?.username) &&
-      p.title && p.title !== '-'
-    )
-    setNewTaskData({
-      title: '',
-      column: 'backlog',
-      assignee: selectedDetails?.leaderInitials || 'TL',
-      dueDate: '',
-      priority: 'Medium',
-      comic: claimedComics[0]?.title || selectedDetails?.comicName || selectedDetails?.title || ''
-    })
+    setNewTaskData({ title: '', column: 'backlog', assignees: [], dueDate: '', priority: 'Medium', chapterId: null })
     setShowCreateTask(true)
   }
 
+<<<<<<< HEAD
   const openCreateTaskModalWithComic = (comicName) => {
     setNewTaskData({
       title: '',
@@ -489,46 +800,54 @@ function TeamProjects() {
 
   const claimedTotalPages = Math.ceil(claimedJobsWithTaskStatus.length / 10)
   const paginatedClaimedJobs = claimedJobsWithTaskStatus.slice((claimedCurrentPage - 1) * 10, claimedCurrentPage * 10)
+=======
+>>>>>>> buihung
   useEffect(() => {
     if (selectedDetails) {
       const updated = projects.find(p => p.id === selectedDetails.id)
-      if (updated) {
-        setSelectedDetails(updated)
-      }
+      if (updated) setSelectedDetails(updated)
     }
   }, [projects])
 
   useEffect(() => {
-    const handleGlobalClick = () => {
-      setOpenDropdownCol(null)
-    }
+    const handleGlobalClick = () => setOpenDropdownCol(null)
     window.addEventListener('click', handleGlobalClick)
     return () => window.removeEventListener('click', handleGlobalClick)
   }, [])
 
-  const COLUMN_LIST = [
-    { id: 'backlog', title: 'Backlog', dotClass: 'column__dot--backlog', defaultProgress: 0 },
-    { id: 'in_progress', title: 'In Progress', dotClass: 'column__dot--progress', defaultProgress: 40 },
-    { id: 'under_review', title: 'Under Review', dotClass: 'column__dot--review', defaultProgress: 80 },
-    { id: 'completed', title: 'Completed', dotClass: 'column__dot--done', defaultProgress: 100 }
-  ]
+  useEffect(() => {
+    if (!showCreateTask || !selectedDetails?.id) {
+      setChapterOptions([])
+      return
+    }
+    getTeamChaptersApi(selectedDetails.id)
+      .then(list => setChapterOptions(Array.isArray(list) ? list : []))
+      .catch(err => {
+        console.error('Could not load chapters for this team:', err)
+        setChapterOptions([])
+      })
+  }, [showCreateTask, selectedDetails?.id])
 
-  // ── Handlers ─────────────────────────────────────
   const handleOpenDetails = async (project) => {
     setSelectedDetails(project)
     setWorkspaceTab('home')
     setShowUploadForm(false)
     setLoadingWorkspace(true)
 
+<<<<<<< HEAD
     // Sync leader info dynamically in the members list
     const actualLeader = {
       id: project.leaderId || 'leader-id',
+=======
+    setMembers([{
+>>>>>>> buihung
       name: project.leaderName || 'No Leader',
       role: 'Group Leader',
       status: 'Active',
       joinDate: '01/15/2024',
       contributions: `${project.chaptersCount || 0} chapters`,
       avatar: project.leaderInitials || 'TL'
+<<<<<<< HEAD
     }
 
     const savedMembers = localStorage.getItem(`comiverse_project_members_${project.id}`)
@@ -544,23 +863,26 @@ function TeamProjects() {
     } else {
       setMembers([actualLeader])
     }
+=======
+    }])
+>>>>>>> buihung
 
     try {
-      const [annList, msgList, taskList, reqList, backlogList] = await Promise.all([
+      const [annList, msgList, taskList, reqList, teamMembersList] = await Promise.all([
         getTeamAnnouncementsApi(project.id),
         getTeamMessagesApi(project.id),
         getTeamTasksApi(project.id),
         getTeamRequestsApi(project.id),
-        getChapterBacklogApi(project.id).catch(() => [])
+        getTeamMembersApi(project.id).catch((err) => {
+          console.error('Could not load real team members for assignee picker:', err)
+          return []
+        })
       ])
       setAnnouncements(sortPosts(annList))
       setChatMessages(msgList.map(m => ({ ...m, isMe: m.sender === userFullName })))
       setTasks(taskList)
-      setJoinRequests(reqList.map(r => ({
-        ...r,
-        roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles
-      })))
-      setChapterBacklog(Array.isArray(backlogList) ? backlogList : [])
+      setJoinRequests(reqList.map(r => ({ ...r, roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles })))
+      setTeamMembersForAssign(Array.isArray(teamMembersList) ? teamMembersList : [])
     } catch (err) {
       console.error(err)
       toast.error('Failed to load real workspace data from DB.')
@@ -569,13 +891,29 @@ function TeamProjects() {
     }
   }
 
+  useEffect(() => {
+    if (loadingProjects) return
+    const targetTeamId = location.state?.teamId
+    if (!targetTeamId) return
+
+    const targetProject = projects.find(p => p.id === targetTeamId)
+    if (targetProject) {
+      handleOpenDetails(targetProject).then(() => {
+        setWorkspaceTab(location.state?.tab || 'home')
+      })
+    }
+
+    navigate(location.pathname, { replace: true, state: {} })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingProjects, projects, location.state])
+
   const handleOpenEdit = (project, e) => {
     e.stopPropagation()
     setSelectedEdit(project)
     setEditForm({
       description: project.description || '',
       status: project.status || 'Active',
-      team: project.title || '' // project title matches the team name column
+      team: project.title || ''
     })
   }
 
@@ -602,14 +940,8 @@ function TeamProjects() {
         progress: selectedEdit.progress,
         assignedToMe: selectedEdit.assignedToMe
       })
-      const mappedUpdated = {
-        ...updated,
-        team: updated.title,
-        title: updated.comicName
-      }
-      setProjects(prev =>
-        prev.map(proj => (proj.id === selectedEdit.id ? mappedUpdated : proj))
-      )
+      const mappedUpdated = { ...updated, team: updated.title, title: updated.comicName }
+      setProjects(prev => prev.map(proj => (proj.id === selectedEdit.id ? mappedUpdated : proj)))
       toast.success('Project details updated successfully!')
       setSelectedEdit(null)
       if (selectedDetails && selectedDetails.id === selectedEdit.id) {
@@ -644,14 +976,8 @@ function TeamProjects() {
         progress: selectedDetails.progress,
         assignedToMe: selectedDetails.assignedToMe
       })
-      const mappedUpdated = {
-        ...updated,
-        team: updated.title,
-        title: updated.comicName
-      }
-      setProjects(prev =>
-        prev.map(proj => (proj.id === selectedDetails.id ? mappedUpdated : proj))
-      )
+      const mappedUpdated = { ...updated, team: updated.title, title: updated.comicName }
+      setProjects(prev => prev.map(proj => (proj.id === selectedDetails.id ? mappedUpdated : proj)))
       setSelectedDetails(mappedUpdated)
       toast.success('Workspace details saved to database!')
     } catch (err) {
@@ -664,9 +990,9 @@ function TeamProjects() {
     if (!selectedDetails || !uploadData.chapterTitle.trim()) return
 
     const submission = {
-      title: selectedDetails.title, // Comic Title
+      title: selectedDetails.title,
       chapter: uploadData.chapterTitle.trim(),
-      submittedBy: selectedDetails.team, // Team Name
+      submittedBy: selectedDetails.team,
       queueType: 'translator',
       timeLabel: 'Just now',
       timestamp: Date.now(),
@@ -681,8 +1007,6 @@ function TeamProjects() {
     try {
       await createSubmissionApi(submission)
       toast.success('Chapter uploaded successfully and sent for review!')
-
-      // Update local history preview
       if (selectedDetails.chaptersList) {
         selectedDetails.chaptersList.unshift({
           num: uploadData.chapterTitle.trim(),
@@ -690,7 +1014,6 @@ function TeamProjects() {
           date: 'Just now'
         })
       }
-
       setUploadData({ chapterTitle: '', chapterContent: '', wordsCount: 3000 })
       setShowUploadForm(false)
     } catch (err) {
@@ -699,6 +1022,7 @@ function TeamProjects() {
     }
   }
 
+<<<<<<< HEAD
   const sortPosts = (postsList) => {
     return [...(postsList || [])].sort((a, b) => {
       const pinA = a.isPinned ? 1 : 0
@@ -712,6 +1036,8 @@ function TeamProjects() {
   }
 
   // Action: Add Announcement (Post)
+=======
+>>>>>>> buihung
   const handlePostAnnouncement = async () => {
     if (!newPostText.trim() && !selectedImage) return
     
@@ -752,7 +1078,10 @@ function TeamProjects() {
     }
   }
 
+<<<<<<< HEAD
   // Action: Like Announcement (Post)
+=======
+>>>>>>> buihung
   const handleLikePost = async (id) => {
     const currentUserIdStr = (authUser?.userId || authUser?.id || '').toString()
     let originalPost = null
@@ -786,7 +1115,11 @@ function TeamProjects() {
     // 2. Perform API call
     try {
       const updated = await likeTeamAnnouncementApi(id)
+<<<<<<< HEAD
       setAnnouncements(prev => prev.map(post => post.id === id ? { ...post, likes: updated.likes, likedByUsers: updated.likedByUsers } : post))
+=======
+      setAnnouncements(prev => prev.map(post => post.id === id ? { ...post, likes: updated.likes } : post))
+>>>>>>> buihung
     } catch (err) {
       console.error(err)
       toast.error('Failed to register post like.')
@@ -955,7 +1288,6 @@ function TeamProjects() {
     }
   }
 
-  // Action: Group Chat Send
   const handleSendChat = async (e) => {
     e.preventDefault()
     if (!chatInput.trim()) return
@@ -975,13 +1307,11 @@ function TeamProjects() {
     }
   }
 
-  // Action: Approve Join Request
   const handleApproveRequest = async (request) => {
     const { id, name } = request
     try {
       await decideTeamRequestApi(id, 'approved')
       setJoinRequests(prev => prev.filter(req => req.id !== id))
-
       const newMem = {
         id: request.requesterId || `mem-${Date.now()}`,
         name,
@@ -1008,7 +1338,6 @@ function TeamProjects() {
     }
   }
 
-  // Action: Reject Join Request
   const handleRejectRequest = async (id, name) => {
     try {
       await decideTeamRequestApi(id, 'rejected')
@@ -1021,29 +1350,30 @@ function TeamProjects() {
     }
   }
 
-  // Action: Create Kanban Task
   const handleCreateTask = async () => {
     if (!newTaskData.title.trim()) return
-    const formattedTitle = `[${newTaskData.priority.toUpperCase()}] [${newTaskData.comic}] ${newTaskData.title.trim()}`
+    if (!newTaskData.chapterId) {
+      toast.error('Please select a chapter.')
+      return
+    }
+    if (newTaskData.assignees.length === 0) {
+      toast.error('Please assign at least one person.')
+      return
+    }
+    const comicName = selectedDetails?.comicName || selectedDetails?.title || 'Unknown Comic'
+    const formattedTitle = `[${newTaskData.priority.toUpperCase()}] [${comicName}] ${newTaskData.title.trim()}`
     try {
       const selectedAssignee = members.find(member => (member.id || member.avatar) === newTaskData.assignee)
       const taskPayload = {
         title: formattedTitle,
-        columnName: newTaskData.column,
-        progress: 0,
-        assigneeId: selectedAssignee?.id || null,
-        assignees: selectedAssignee?.avatar || selectedAssignee?.name || newTaskData.assignee,
+        status: newTaskData.column,
+        assigneeIds: newTaskData.assignees,
+        chapterId: newTaskData.chapterId,
         dueDate: newTaskData.dueDate || new Date().toISOString().split('T')[0]
-      }
-      if (newTaskData.chapterId) {
-        taskPayload.chapterId = newTaskData.chapterId
       }
       const created = await createTeamTaskApi(selectedDetails.id, taskPayload)
       setTasks([...tasks, created])
-      if (newTaskData.chapterId) {
-        setChapterBacklog(prev => prev.filter(c => c.chapterId !== newTaskData.chapterId))
-      }
-      setNewTaskData({ title: '', column: 'backlog', assignee: '', dueDate: '', priority: 'Medium', comic: '', chapterId: null })
+      setNewTaskData({ title: '', column: 'backlog', assignees: [], dueDate: '', priority: 'Medium', chapterId: null })
       setShowCreateTask(false)
       toast.success('Task saved to database!')
     } catch (err) {
@@ -1052,21 +1382,10 @@ function TeamProjects() {
     }
   }
 
-  // Action: Move Task Column
   const handleMoveTask = async (id, newCol) => {
-    const progressVal = newCol === 'completed' ? 100 : (newCol === 'backlog' ? 0 : undefined)
     try {
-      const updated = await updateTeamTaskApi(id, {
-        columnName: newCol,
-        progress: progressVal
-      })
-      setTasks(prev =>
-        prev.map(task => task.id === id ? {
-          ...task,
-          columnName: updated.columnName,
-          progress: updated.progress
-        } : task)
-      )
+      const updated = await updateTeamTaskApi(id, { status: newCol })
+      setTasks(prev => prev.map(task => task.id === id ? { ...task, status: newCol } : task))
     } catch (err) {
       console.error(err)
       toast.error('Failed to update task state in DB.')
@@ -1074,39 +1393,30 @@ function TeamProjects() {
   }
 
   const handleOpenTaskDetails = (task) => {
-    // In toàn bộ đối tượng ra console để xem nó có chứa gì
-    console.log("Đối tượng task đầy đủ:", JSON.stringify(task, null, 2));
-
-    const { priority, cleanTitle, comicProject } = parseTaskTitle(task.title);
-    setSelectedTask(task);
-    
+    const comicFallback = selectedDetails?.comicName || selectedDetails?.title || 'Unknown Comic'
+    const { priority, cleanTitle, comicProject } = parseTaskTitle(task.title, comicFallback)
+    setSelectedTask(task)
     setEditTaskData({
       title: cleanTitle,
       comic: comicProject || '',
-      columnName: task.columnName || 'backlog',
-      progress: task.progress || 0,
+      status: getTaskColumn(task),
       priority: priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase(),
-      assignees: task.assignees || '',      
+      assignees: task.assigneeIds || [],
       dueDate: task.dueDate || '',
-      // Dùng logic này để tìm mọi khả năng có thể là ID
       taskId: task.id || task._id || task.taskId || task.TaskID || 'KHONG-TIM-THAY-ID'
-    });
-}
+    })
+  }
 
-
-
-  // Action: Move All Column Tasks to Done
   const handleMoveAllToDone = async (colId) => {
-    const targets = tasks.filter(t => t.columnName === colId)
+    const targets = tasks.filter(t => getTaskColumn(t) === colId)
     if (targets.length === 0) return
     try {
       await Promise.all(targets.map(t => updateTeamTaskApi(t.id, {
-        columnName: 'completed',
-        progress: 100,
+        status: 'completed',
         dueDate: t.dueDate,
-        assignees: t.assignees
+        assigneeIds: t.assigneeIds
       })))
-      setTasks(prev => prev.map(t => t.columnName === colId ? { ...t, columnName: 'completed', progress: 100 } : t))
+      setTasks(prev => prev.map(t => getTaskColumn(t) === colId ? { ...t, status: 'completed' } : t))
       toast.success(`Moved all tasks from ${colId} to Completed!`)
     } catch (err) {
       console.error(err)
@@ -1119,24 +1429,14 @@ function TeamProjects() {
     const ln = leaderName.toLowerCase().trim()
     const username = (authUser?.username || '').toLowerCase().trim()
     const fullName = (authUser?.fullName || '').toLowerCase().trim()
-    
-    if (ln === username || ln === fullName) return true
-    
-    const isDevLeader = ln.includes('trans') || ln.includes('tran')
-    const isDevUser = username.includes('trans') || username.includes('tran') || fullName.includes('trans') || fullName.includes('tran')
-    
-    return isDevLeader && isDevUser
+    return ln === username || ln === fullName
   }
 
-  const teamProjectsList = projects.filter(proj => {
-    const matchesSearch = (proj.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (proj.comicName || '').toLowerCase().includes(searchTerm.toLowerCase())
-    if (!matchesSearch) return false
+  const teamProjectsList = projects.filter(proj =>
+    (proj.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (proj.comicName || '').toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
-    return isLeaderMatch(proj.leaderName)
-  })
-
-  // ── PROJECTS DATA LOADING GUARD ───────────────────
   if (loadingProjects) {
     return (
       <div style={{ textAlign: 'center', padding: '100px', color: 'var(--trans-text-primary)' }}>
@@ -1145,7 +1445,6 @@ function TeamProjects() {
     )
   }
 
-  // ── WORKSPACE DETAIL VIEW ────────────────────────
   if (selectedDetails) {
     if (loadingWorkspace) {
       return (
@@ -1156,12 +1455,12 @@ function TeamProjects() {
     }
 
     const isCurrentLeader = isLeaderMatch(selectedDetails.leaderName)
-
-    const activeTasks = tasks.filter(t => t.columnName !== 'paused')
-    const pausedTasks = tasks.filter(t => t.columnName === 'paused')
-    const filteredMembers = members.filter(m => m.name.toLowerCase().includes(memberSearch.toLowerCase()))
+    const activeTasks = tasks.filter(t => getTaskColumn(t) !== 'paused')
+    const pausedTasks = tasks.filter(t => getTaskColumn(t) === 'paused')
+    const comicName = selectedDetails?.comicName || selectedDetails?.title
 
     return (
+<<<<<<< HEAD
       <div className="project-detail-workspace fade-in">
         {/* Breadcrumbs Row */}
         <div className="workspace-breadcrumbs">
@@ -2488,11 +2787,73 @@ function TeamProjects() {
         )}
         {renderReviewModal()}
       </div>
+=======
+      <WorkspaceDetailView
+        selectedDetails={selectedDetails}
+        setSelectedDetails={setSelectedDetails}
+        onBackToProjects={() => setSelectedDetails(null)}
+        workspaceTab={workspaceTab}
+        setWorkspaceTab={setWorkspaceTab}
+        isCurrentLeader={isCurrentLeader}
+        members={members}
+        memberSearch={memberSearch}
+        setMemberSearch={setMemberSearch}
+        onMembersLoaded={setMembers}
+        joinRequests={joinRequests}
+        onApproveRequest={handleApproveRequest}
+        onRejectRequest={handleRejectRequest}
+        showUploadForm={showUploadForm}
+        setShowUploadForm={setShowUploadForm}
+        uploadData={uploadData}
+        setUploadData={setUploadData}
+        onUploadChapter={handleUploadChapter}
+        newPostText={newPostText}
+        setNewPostText={setNewPostText}
+        onPostAnnouncement={handlePostAnnouncement}
+        announcements={announcements}
+        onLikePost={handleLikePost}
+        chatMessages={chatMessages}
+        chatInput={chatInput}
+        setChatInput={setChatInput}
+        onSendChat={handleSendChat}
+        comicName={comicName}
+        tasks={tasks}
+        activeTasks={activeTasks}
+        pausedTasks={pausedTasks}
+        lockedColumns={lockedColumns}
+        setLockedColumns={setLockedColumns}
+        highlightedColumns={highlightedColumns}
+        setHighlightedColumns={setHighlightedColumns}
+        sortedColumns={sortedColumns}
+        setSortedColumns={setSortedColumns}
+        openDropdownCol={openDropdownCol}
+        setOpenDropdownCol={setOpenDropdownCol}
+        onCreateTaskClick={openCreateTaskModal}
+        onMoveAllToDone={handleMoveAllToDone}
+        onMoveTask={handleMoveTask}
+        onOpenTaskDetails={handleOpenTaskDetails}
+        getAssigneeInitials={getAssigneeInitials}
+        showCreateTask={showCreateTask}
+        newTaskData={newTaskData}
+        setNewTaskData={setNewTaskData}
+        chapterOptions={chapterOptions}
+        teamMembersForAssign={teamMembersForAssign}
+        onCancelCreateTask={() => setShowCreateTask(false)}
+        onCreateTask={handleCreateTask}
+        selectedTask={selectedTask}
+        editTaskData={editTaskData}
+        setEditTaskData={setEditTaskData}
+        onCancelEditTask={() => setSelectedTask(null)}
+        onContinueToWorkspace={() => navigate(`/translator/translate-workspace/task/${selectedTask.id}`)}
+        onContinueToReviewWorkspace={() => navigate(`/translator/review-workspace/task/${selectedTask.id}`)}
+        onSaveWorkspaceSettings={handleSaveWorkspaceSettings}
+      />
+>>>>>>> buihung
     )
   }
 
-  // ── PROJECTS LISTING VIEW ────────────────────────
   return (
+<<<<<<< HEAD
     <div className="fade-in">
       <div className="translator-page-header">
         <div className="translator-page-header-info">
@@ -2569,62 +2930,33 @@ function TeamProjects() {
       </div>
 
       {/* ── MODAL: EDIT PROJECT ─────────────────────── */}
+=======
+    <>
+      <ProjectsListView
+        teamProjectsList={teamProjectsList}
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        onOpenDetails={handleOpenDetails}
+        onOpenEdit={handleOpenEdit}
+        isLeaderMatch={isLeaderMatch}
+      />
+>>>>>>> buihung
       {selectedEdit && (
-        <div className="trans-modal-overlay">
-          <div className="trans-modal-card">
-            <div className="trans-modal-header">
-              <h3>Edit Translation Project Info</h3>
-              <button className="trans-modal-close-btn" onClick={() => setSelectedEdit(null)}>×</button>
-            </div>
-
-            <div className="trans-modal-body">
-              <div className="trans-form-group">
-                <label className="trans-form-label">Project Team Name</label>
-                <input
-                  type="text"
-                  className="trans-form-input"
-                  value={editForm.team}
-                  onChange={(e) => setEditForm({ ...editForm, team: e.target.value })}
-                />
-              </div>
-
-              <div className="trans-form-group">
-                <label className="trans-form-label">Project Status</label>
-                <select
-                  className="trans-form-input"
-                  value={editForm.status}
-                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                >
-                  <option value="Active">Active</option>
-                  <option value="Paused">Paused</option>
-                </select>
-              </div>
-
-              <div className="trans-form-group">
-                <label className="trans-form-label">Description / Synopses</label>
-                <textarea
-                  className="trans-form-input textarea"
-                  value={editForm.description}
-                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="trans-modal-footer">
-              <button className="trans-btn secondary" onClick={() => setSelectedEdit(null)}>
-                Cancel
-              </button>
-              <button className="trans-btn primary" onClick={handleSaveEdit}>
-                Save Changes
-              </button>
-            </div>
-          </div>
-        </div>
+        <EditProjectModal
+          editForm={editForm}
+          setEditForm={setEditForm}
+          onCancel={() => setSelectedEdit(null)}
+          onSave={handleSaveEdit}
+        />
       )}
+<<<<<<< HEAD
 
       {renderReviewModal()}
     </div>
+=======
+    </>
+>>>>>>> buihung
   )
 }
 
-export default TeamProjects;
+export default TeamProjects

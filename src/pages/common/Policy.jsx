@@ -19,7 +19,6 @@ const Policy = () => {
 
         <div className="row justify-content-center">
           <div className="col-lg-8">
-            {/* Card Nội dung */}
             <div className="card shadow-sm border-0 p-4 mb-4">
               <div className="card-body">
                 <section className="mb-5">
@@ -46,7 +45,6 @@ const Policy = () => {
               </div>
             </div>
 
-            {/* Phần Action: Kết hợp Liên hệ và Đăng ký */}
             <div className="card border-0 shadow-sm bg-light p-4">
               <div className="d-flex flex-column flex-md-row align-items-center justify-content-between gap-3">
                 <div className="d-flex align-items-center">
