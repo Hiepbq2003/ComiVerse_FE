@@ -6,7 +6,6 @@ import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import { createTranslationRequestApi } from '../../services/api/TranslationPoolApi'
 import { toast } from 'react-toastify'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
-import { updateComicApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi, deleteChapterApi } from '../../services/api/ChapterApi'
 
 function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, handleArchiveComic, handleTriggerAssignTeam, fetchAllData }) {
@@ -29,7 +28,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   const [editComicForm, setEditComicForm] = useState({
     title: '',
     author: '',
-    status: 'Ongoing',
+    publicationStatus: 'ONGOING',
     genres: ''
   })
 
@@ -186,17 +185,11 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
         deadline: directAssignForm.deadline || 'unspecified'
       })
 
-      await updateComicApi(directAssignComic.id, {
-        ...directAssignComic,
-        projectTeam: selectedTeamObj.title
-      })
 
       toast.success(`Successfully assigned team ${selectedTeamObj.title} for ${directAssignForm.targetLang} (pending leader approval)!`)
       setShowDirectAssignModal(false)
       if (fetchAllData) {
         await fetchAllData()
-      } else if (handleSaveEditComic) {
-        handleSaveEditComic(directAssignComic.id, { projectTeam: selectedTeamObj.title })
       } else {
         window.location.reload()
       }
@@ -211,7 +204,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
     setEditComicForm({
       title: comic.title,
       author: comic.authorName || comic.author || '',
-      status: comic.status,
+      publicationStatus: comic.publicationStatus || 'ONGOING',
       genres: comic.genres.map(g => typeof g === 'object' && g !== null ? g.name : g).join(', ')
     })
   }
@@ -225,8 +218,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
 
     const updatedData = {
       title: editComicForm.title.trim(),
-      authorName: editComicForm.author.trim(),
-      status: editComicForm.status?.toUpperCase(),
+      publicationStatus: editComicForm.publicationStatus?.toUpperCase(),
       genreIds: matchedGenreIds
     }
     handleSaveEditComic(editingComic.id, updatedData)
@@ -260,7 +252,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               <path d="M0 25 C 20 25, 40 5, 60 10 C 80 15, 90 2, 100 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value active-count">{comics.filter(c => c.status?.toUpperCase() === 'ONGOING').length}</span>
+          <span className="stat-value active-count">{comics.filter(c => c.publicationStatus?.toUpperCase() === 'ONGOING').length}</span>
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -269,16 +261,16 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               <path d="M0 25 C 30 25, 50 20, 70 8 C 85 2, 95 10, 100 2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value" style={{ color: '#3b82f6' }}>{comics.filter(c => c.status?.toUpperCase() === 'COMPLETED').length}</span>
+          <span className="stat-value" style={{ color: '#3b82f6' }}>{comics.filter(c => c.publicationStatus?.toUpperCase() === 'COMPLETED').length}</span>
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <span className="stat-label">Paused</span>
+            <span className="stat-label">Hiatus</span>
             <svg viewBox="0 0 100 30" className="stat-sparkline" style={{ width: '50px', height: '18px', color: '#d97706', opacity: 0.7 }}>
               <path d="M0 10 C 20 10, 40 25, 60 20 C 80 15, 90 25, 100 25" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value paused-count">{comics.filter(c => c.status?.toUpperCase() === 'PAUSED').length}</span>
+          <span className="stat-value paused-count">{comics.filter(c => c.publicationStatus?.toUpperCase() === 'HIATUS').length}</span>
         </div>
       </div>
 
@@ -301,7 +293,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
           >
             <option>All Status</option>
             <option>Ongoing</option>
-            <option>Paused</option>
+            <option>Hiatus</option>
             <option>Completed</option>
           </select>
 
@@ -394,7 +386,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                   (c.author || '').toLowerCase().includes(searchLower) ||
                   c.projectTeam.toLowerCase().includes(searchLower);
                 
-                const matchesStatus = comicStatusFilter === 'All Status' || c.status?.toUpperCase() === comicStatusFilter.toUpperCase();
+                const matchesStatus = comicStatusFilter === 'All Status' || c.publicationStatus?.toUpperCase() === comicStatusFilter.toUpperCase();
                 const matchesGenre = comicGenreFilter === 'All Genres' || c.genres.some(g => (typeof g === 'object' && g !== null ? g.name : g) === comicGenreFilter);
                 const matchesAuthor = comicAuthorFilter === 'All Authors' || c.authorName === comicAuthorFilter || c.author === comicAuthorFilter;
                 const matchesTeam = comicTeamFilter === 'All Project Teams' || c.projectTeam === comicTeamFilter;
@@ -500,8 +492,8 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                     </div>
                   </td>
                   <td>
-                    <span className={`comic-status-badge ${comic.status.toLowerCase()}`}>
-                      {comic.status}
+                    <span className={`comic-status-badge ${(comic.publicationStatus || 'ONGOING').toLowerCase()}`}>
+                      {comic.publicationStatus || 'ONGOING'}
                     </span>
                   </td>
                   <td>
@@ -558,7 +550,8 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                   type="text" 
                   className="mod-input" 
                   value={editComicForm.author}
-                  onChange={(e) => setEditComicForm({ ...editComicForm, author: e.target.value })}
+                  readOnly
+                  title="Author name is resolved from the author account and cannot be changed from Comic Management."
                 />
               </div>
 
@@ -567,11 +560,11 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                   <label className="mod-label">Status</label>
                   <select 
                     className="mod-select-field"
-                    value={editComicForm.status}
-                    onChange={(e) => setEditComicForm({ ...editComicForm, status: e.target.value })}
+                    value={editComicForm.publicationStatus}
+                    onChange={(e) => setEditComicForm({ ...editComicForm, publicationStatus: e.target.value })}
                   >
                     <option value="ONGOING">Ongoing</option>
-                    <option value="PAUSED">Paused</option>
+                    <option value="HIATUS">Hiatus</option>
                     <option value="COMPLETED">Completed</option>
                   </select>
                 </div>

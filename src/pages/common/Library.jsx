@@ -290,7 +290,7 @@ function Library() {
                   const comicGenres = actualComic.genres && actualComic.genres.length > 0 ? actualComic.genres : ['Action'];
                   const comicChapter = item.latestChapterNumber || actualComic.latestChapterNumber || actualComic.chapterCount || parseInt(actualComic.chapters) || 0;
                   const lastReadTime = item.lastChapterUpdatedAt || actualComic.lastChapterUpdatedAt;
-                  const comicStatus = actualComic.status || 'Ongoing';
+                  const comicStatus = actualComic.publicationStatus || 'ONGOING';
 
                   return (
                     <div 
