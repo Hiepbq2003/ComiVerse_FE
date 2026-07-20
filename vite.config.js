@@ -7,6 +7,7 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:8081',
+        // target: 'http://sep490g37sum26java-production.up.railway.app',
         changeOrigin: true,
       }
     }
