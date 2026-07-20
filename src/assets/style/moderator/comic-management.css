@@ -192,7 +192,8 @@
   color: var(--mod-green) !important;
 }
 
-.comic-status-badge.paused {
+.comic-status-badge.paused,
+.comic-status-badge.hiatus {
   background: rgba(217, 119, 6, 0.1) !important;
   color: #d97706 !important;
 }

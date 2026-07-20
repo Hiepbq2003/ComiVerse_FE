@@ -8,12 +8,16 @@ export const getAuthorComicByIdApi = (comicId) => {
   return AxiosClient.get(`/author/comics/${comicId}`)
 }
 
-export const getAuthorComicChaptersApi = (comicId) => {
-  return AxiosClient.get(`/author/comics/${comicId}/chapters`)
+export const getAuthorComicChaptersApi = (comicId, params = {}) => {
+  return AxiosClient.get(`/author/comics/${comicId}/chapters`, { params })
 }
 
 export const getAuthorComicMetricsApi = (comicId) => {
   return AxiosClient.get(`/author/comics/${comicId}/metrics`)
+}
+
+export const getAuthorDashboardMetricsApi = (months = 12) => {
+  return AxiosClient.get('/author/dashboard/metrics', { params: { months } })
 }
 
 export const createAuthorComicApi = (payload) => {

@@ -298,7 +298,8 @@ function ComicDetail() {
 
   const displayCover = getCoverImage(comic.cover, comic.title, comic.id)
   const displayTitle = comic.title || 'Untitled Comic'
-  const displayStatus = comic.status ? (comic.status.charAt(0).toUpperCase() + comic.status.slice(1).toLowerCase()) : 'Ongoing'
+  const publicationStatus = comic.publicationStatus || 'ONGOING'
+  const displayStatus = publicationStatus.charAt(0).toUpperCase() + publicationStatus.slice(1).toLowerCase()
 
   const displayGenres = comic.genres
     ? comic.genres.map(g => typeof g === 'object' && g !== null ? g.name : g)
