@@ -588,7 +588,7 @@ export function CreateTaskModal({
 }
 
 
-export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAssign, onCancel, onContinue }) {
+export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAssign, onCancel, onContinue, onReview }) {
   const [submitted, setSubmitted] = useState(false)
 
   const errors = {
@@ -612,6 +612,12 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
     setSubmitted(true)
     if (Object.values(errors).some(Boolean)) return
     onContinue()
+  }
+
+  const handleReviewClick = () => {
+    setSubmitted(true)
+    if (Object.values(errors).some(Boolean)) return
+    onReview()
   }
 
   return (
@@ -699,7 +705,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
         </div>
         <div className="trans-modal-footer">
           <button className="trans-btn secondary" onClick={onCancel}>Cancel</button>
-          <button className="trans-btn secondary" onClick={onCancel}><GitCompare />Review</button>
+          <button className="trans-btn secondary" onClick={handleReviewClick}><GitCompare />Review</button>
           <button className="trans-btn primary" onClick={handleContinueClick}>
             <StepForward />Continue
           </button>

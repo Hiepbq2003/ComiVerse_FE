@@ -282,7 +282,8 @@ function WorkspaceDetailView({
   setEditTaskData,
   onCancelEditTask,
   onContinueToWorkspace,
-  onSaveWorkspaceSettings
+  onSaveWorkspaceSettings,
+  onContinueToReviewWorkspace
 }) {
   return (
     <div className="project-detail-workspace fade-in">
@@ -372,6 +373,7 @@ function WorkspaceDetailView({
               teamMembersForAssign={teamMembersForAssign}
               onCancel={onCancelEditTask}
               onContinue={onContinueToWorkspace}
+              onReview={onContinueToReviewWorkspace}
             />
           )}
         </>
@@ -903,6 +905,7 @@ function TeamProjects() {
         setEditTaskData={setEditTaskData}
         onCancelEditTask={() => setSelectedTask(null)}
         onContinueToWorkspace={() => navigate(`/translator/translate-workspace/task/${selectedTask.id}`)}
+        onContinueToReviewWorkspace={() => navigate(`/translator/review-workspace/task/${selectedTask.id}`)}
         onSaveWorkspaceSettings={handleSaveWorkspaceSettings}
       />
     )

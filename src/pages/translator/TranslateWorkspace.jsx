@@ -40,7 +40,7 @@ const IS_DEV = process.env.NODE_ENV === "development";
 const TABS = [
   { id: "translate", label: "Translate" },
   { id: "glossary", label: "Glossary" },
-  { id: "chat", label: "Chat" },
+  { id: "changes", label: "Change Requests" },
 ];
 
 const COMIC_FONT_LIBRARY = [
@@ -136,7 +136,7 @@ function ChapterList({ chapters, open, onToggle, currentChapterId, currentPageIn
   );
 }
 
-function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSaveProgress, saveStatus }) {
+function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend, sending, saveStatus }) {
   const badgeConfig = {
     saving: { icon: <Loader2 size={11} strokeWidth={3} className="tw-spin" />, label: "SAVING" },
     saved: { icon: <Check size={11} strokeWidth={3} />, label: "SAVED" },
@@ -168,11 +168,14 @@ function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSaveProgress, 
         <button className="tw-btn">
           <Upload size={14} /> Upload
         </button>
-        <button className="tw-btn" onClick={onSaveProgress}>
-          <Save size={14} /> Save progress
-        </button>
-        <button className="tw-btn-primary">
-          <Send size={14} /> Send
+        <button
+          className="tw-btn-primary"
+          onClick={onSend}
+          disabled={!canSend || sending}
+          title={canSend ? "Submit chapter for review" : "Only available on the last page"}
+          style={{ opacity: canSend ? 1 : 0.5, cursor: canSend ? "pointer" : "not-allowed" }}
+        >
+          <Send size={14} /> {sending ? "Sending…" : "Send"}
         </button>
       </div>
     </header>
@@ -276,19 +279,49 @@ function CanvasToolbar({
   return (
     <div className="tw-toolbar-group">
       <FontFamilyDropdown fontFamily={fontFamily} onChangeFontFamily={onChangeFontFamily} hasActiveSelection={hasActiveSelection} />
-      <button type="button" onClick={onToggleBold} className={`tw-btn-icon ${isBold ? "active" : ""}`} title="Bold">
+      <button
+        type="button"
+        onClick={onToggleBold}
+        disabled={!hasActiveSelection}
+        className={`tw-btn-icon ${isBold ? "active" : ""}`}
+        title={hasActiveSelection ? "Bold (selected bubble)" : "Select an area first"}
+      >
         <Bold size={14} />
       </button>
-      <button type="button" onClick={onToggleItalic} className={`tw-btn-icon ${isItalic ? "active" : ""}`} title="Italic">
+      <button
+        type="button"
+        onClick={onToggleItalic}
+        disabled={!hasActiveSelection}
+        className={`tw-btn-icon ${isItalic ? "active" : ""}`}
+        title={hasActiveSelection ? "Italic (selected bubble)" : "Select an area first"}
+      >
         <Italic size={14} />
       </button>
-      <button type="button" onClick={() => onSetTextAlign("left")} className={`tw-btn-icon ${textAlign === "left" ? "active" : ""}`} title="Align left">
+      <button
+        type="button"
+        onClick={() => onSetTextAlign("left")}
+        disabled={!hasActiveSelection}
+        className={`tw-btn-icon ${textAlign === "left" ? "active" : ""}`}
+        title={hasActiveSelection ? "Align left (selected bubble)" : "Select an area first"}
+      >
         <AlignLeft size={14} />
       </button>
-      <button type="button" onClick={() => onSetTextAlign("center")} className={`tw-btn-icon ${textAlign === "center" ? "active" : ""}`} title="Align center">
+      <button
+        type="button"
+        onClick={() => onSetTextAlign("center")}
+        disabled={!hasActiveSelection}
+        className={`tw-btn-icon ${textAlign === "center" ? "active" : ""}`}
+        title={hasActiveSelection ? "Align center (selected bubble)" : "Select an area first"}
+      >
         <AlignCenter size={14} />
       </button>
-      <button type="button" onClick={() => onSetTextAlign("right")} className={`tw-btn-icon ${textAlign === "right" ? "active" : ""}`} title="Align right">
+      <button
+        type="button"
+        onClick={() => onSetTextAlign("right")}
+        disabled={!hasActiveSelection}
+        className={`tw-btn-icon ${textAlign === "right" ? "active" : ""}`}
+        title={hasActiveSelection ? "Align right (selected bubble)" : "Select an area first"}
+      >
         <AlignRight size={14} />
       </button>
 
@@ -449,6 +482,7 @@ function PageImage({
   currentImage,
   currentPageIndex,
   canvasRef,
+  imgRef,
   drawing,
   selections,
   activeId,
@@ -465,7 +499,6 @@ function PageImage({
   onStartResize,
   onStartVertexDrag,
   onChangeTranslation,
-  textStyle,
   isPickingColor,
   zoomScale,
   zoomOrigin,
@@ -508,11 +541,17 @@ function PageImage({
       >
         {currentImage ? (
           <img
+            ref={imgRef}
             src={currentImage}
             alt={`Page ${currentPageIndex + 1}`}
             style={{ width: "100%", height: "100%", objectFit: "contain" }}
             draggable={false}
-            onLoad={(e) => onImageLoad?.({ width: e.target.naturalWidth, height: e.target.naturalHeight })}
+            onLoad={(e) =>
+              onImageLoad?.(
+                { width: e.target.naturalWidth, height: e.target.naturalHeight },
+                e.currentTarget.currentSrc || e.currentTarget.src
+              )
+            }
           />
         ) : (
           <div style={{ padding: 24, color: "#8286A0" }}>This chapter has no images yet.</div>
@@ -621,9 +660,9 @@ function PageImage({
                   "--text-color": sel.textColor ?? "#000000",
                   "--font-size": `${sel.fontSize ?? 13}px`,
                   "--font-family": sel.fontFamily ?? COMIC_FONT_LIBRARY[0].value,
-                  "--text-align": textStyle.textAlign,
-                  "--font-weight": textStyle.fontWeight,
-                  "--font-style": textStyle.fontStyle,
+                  "--text-align": sel.textAlign ?? "left",
+                  "--font-weight": sel.isBold ? 700 : 400,
+                  "--font-style": sel.isItalic ? "italic" : "normal",
                 }}
               />
             );
@@ -681,9 +720,9 @@ function PageImage({
                     "--text-color": sel.textColor ?? "#000000",
                     "--font-size": `${sel.fontSize ?? 13}px`,
                     "--font-family": sel.fontFamily ?? COMIC_FONT_LIBRARY[0].value,
-                    "--text-align": textStyle.textAlign,
-                    "--font-weight": textStyle.fontWeight,
-                    "--font-style": textStyle.fontStyle,
+                    "--text-align": sel.textAlign ?? "left",
+                    "--font-weight": sel.isBold ? 700 : 400,
+                    "--font-style": sel.isItalic ? "italic" : "normal",
                   }}
                 />
 
@@ -885,11 +924,38 @@ function GlossaryTabPanel() {
   );
 }
 
-function ChatTabPanel() {
+function ChangeRequestsTabPanel({ comments, loading, resolveBubbleLabel }) {
+  if (loading) {
+    return (
+      <div className="tw-placeholder">
+        <p style={{ margin: 0 }}>Loading change requests…</p>
+      </div>
+    );
+  }
+
+  if (comments.length === 0) {
+    return (
+      <div className="tw-placeholder">
+        <MessageSquare size={24} />
+        <p style={{ margin: 0 }}>No change requests on this page.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="tw-placeholder">
-      <MessageSquare size={24} />
-      <p style={{ margin: 0 }}>Ask about tone, context, or phrasing for this page.</p>
+    <div className="tw-tabpanel">
+      {comments.map((c) => (
+        <div key={c.id} className="tw-x-change-request-card">
+          <div className="tw-x-change-request-header">
+            <span className="tw-x-change-request-author">{c.authorName}</span>
+            {c.resolved && <span className="tw-x-change-request-resolved">Resolved</span>}
+          </div>
+          {c.bubbleId && (
+            <span className="tw-x-change-request-bubble-tag">{resolveBubbleLabel(c.bubbleId)}</span>
+          )}
+          <p className="tw-x-change-request-text">{c.content}</p>
+        </div>
+      ))}
     </div>
   );
 }
@@ -912,44 +978,53 @@ function TranslationSidePanel({
   onPickColorInCrop,
   onDeleteArea,
   zoomScale,
+  changeRequests,
+  changeRequestsLoading,
+  resolveBubbleLabel,
 }) {
   return (
     <aside className="tw-rightpanel">
-        <div className="tw-tabs">
-          {TABS.map((t) => (
-            <button key={t.id} onClick={() => onChangeTab(t.id)} className={`tw-tab ${activeTab === t.id ? "active" : ""}`}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {activeTab === "translate" && (
-          <TranslateTabPanel
-            activeSelection={activeSelection}
-            bubbleIndex={bubbleIndex}
-            bubbleTotal={bubbleTotal}
-            onSelectPrev={onSelectPrev}
-            onSelectNext={onSelectNext}
-            onChangeTranslation={onChangeTranslation}
-            textStyle={textStyle}
-            onSaveAndNext={onSaveAndNext}
-            currentImage={currentImage}
-            canvasRef={canvasRef}
-            imageNaturalSize={imageNaturalSize}
-            isPickingColor={isPickingColor}
-            onPickColorInCrop={onPickColorInCrop}
-            onDeleteArea={onDeleteArea}
-            zoomScale={zoomScale}
-          />
-        )}
-        {activeTab === "glossary" && <GlossaryTabPanel />}
-        {activeTab === "chat" && <ChatTabPanel />}
-
-        <div className="tw-panel-footer">
-          <button className="tw-help-btn">
-            <HelpCircle size={14} />
+      <div className="tw-tabs">
+        {TABS.map((t) => (
+          <button key={t.id} onClick={() => onChangeTab(t.id)} className={`tw-tab ${activeTab === t.id ? "active" : ""}`}>
+            {t.label}
           </button>
-        </div>
+        ))}
+      </div>
+
+      {activeTab === "translate" && (
+        <TranslateTabPanel
+          activeSelection={activeSelection}
+          bubbleIndex={bubbleIndex}
+          bubbleTotal={bubbleTotal}
+          onSelectPrev={onSelectPrev}
+          onSelectNext={onSelectNext}
+          onChangeTranslation={onChangeTranslation}
+          textStyle={textStyle}
+          onSaveAndNext={onSaveAndNext}
+          currentImage={currentImage}
+          canvasRef={canvasRef}
+          imageNaturalSize={imageNaturalSize}
+          isPickingColor={isPickingColor}
+          onPickColorInCrop={onPickColorInCrop}
+          onDeleteArea={onDeleteArea}
+          zoomScale={zoomScale}
+        />
+      )}
+      {activeTab === "glossary" && <GlossaryTabPanel />}
+      {activeTab === "changes" && (
+        <ChangeRequestsTabPanel
+          comments={changeRequests}
+          loading={changeRequestsLoading}
+          resolveBubbleLabel={resolveBubbleLabel}
+        />
+      )}
+
+      <div className="tw-panel-footer">
+        <button className="tw-help-btn">
+          <HelpCircle size={14} />
+        </button>
+      </div>
     </aside>
   );
 }
@@ -1027,6 +1102,11 @@ async function fetchPagesForTask(taskId, signal) {
   return Array.isArray(list) ? list : [];
 }
 
+async function fetchPageChangeRequests(pageId, signal) {
+  const list = await fetchJson(`${API_BASE}/review-workspace/pages/${pageId}/comments`, signal);
+  return Array.isArray(list) ? list : [];
+}
+
 async function saveBubblesForPage(pageId, payload, signal) {
   const res = await fetch(`${API_BASE}/translate-workspace/pages/${pageId}/bubbles`, {
     method: "PUT",
@@ -1037,6 +1117,18 @@ async function saveBubblesForPage(pageId, payload, signal) {
   if (!res.ok) {
     console.error(`Failed to save bubbles for page ${pageId}: HTTP ${res.status}`);
     return false;
+  }
+  return true;
+}
+
+async function submitTaskForReview(taskId, signal) {
+  const res = await fetch(`${API_BASE}/team-workspace/tasks/${taskId}/submit-for-review`, {
+    method: "PUT",
+    headers: authHeaders(),
+    signal,
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to submit for review (${res.status})`);
   }
   return true;
 }
@@ -1146,11 +1238,14 @@ function mergeTwoSelections(a, b) {
   const points = biggestRing.slice(0, -1).map(([x, y]) => ({ x, y }));
 
   return {
-    id: ++selectionIdCounter,
+    id: generateId(),
     shape: "polygon",
     points,
     textColor: a.textColor ?? b.textColor ?? "#000000",
     textBgColor: a.textBgColor ?? b.textBgColor ?? "#ffffff",
+    isBold: a.isBold ?? b.isBold ?? false,
+    isItalic: a.isItalic ?? b.isItalic ?? false,
+    textAlign: a.textAlign ?? b.textAlign ?? "left",
     translation: [a.translation, b.translation].filter(Boolean).join(" ") || undefined,
   };
 }
@@ -1175,7 +1270,90 @@ function computeDisplayedImageGeometry(containerWidth, containerHeight, naturalW
   return { displayedWidth, displayedHeight, offsetX, offsetY };
 }
 
-let selectionIdCounter = 0;
+function generateId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function measureCanvasSize(canvasRef) {
+  if (!canvasRef.current) return { width: 0, height: 0 };
+  return {
+    width: canvasRef.current.offsetWidth,
+    height: canvasRef.current.offsetHeight,
+  };
+}
+
+function toPercent(value, size) {
+  return size > 0 ? (value / size) * 100 : 0;
+}
+
+function fromPercent(value, size) {
+  return (value / 100) * size;
+}
+
+function selectionsToImagePercent(selections, canvasSize, naturalSize) {
+  if (!naturalSize || canvasSize.width <= 0 || canvasSize.height <= 0) return selections;
+  const { displayedWidth, displayedHeight, offsetX, offsetY } = computeDisplayedImageGeometry(
+    canvasSize.width,
+    canvasSize.height,
+    naturalSize.width,
+    naturalSize.height
+  );
+  return selections.map((s) => {
+    const fontSizePercent = typeof s.fontSize === "number" ? toPercent(s.fontSize, displayedHeight) : s.fontSize;
+    if (s.shape === "polygon") {
+      return {
+        ...s,
+        fontSize: fontSizePercent,
+        points: s.points.map((p) => ({
+          x: toPercent(p.x - offsetX, displayedWidth),
+          y: toPercent(p.y - offsetY, displayedHeight),
+        })),
+      };
+    }
+    return {
+      ...s,
+      fontSize: fontSizePercent,
+      x: toPercent(s.x - offsetX, displayedWidth),
+      y: toPercent(s.y - offsetY, displayedHeight),
+      width: toPercent(s.width, displayedWidth),
+      height: toPercent(s.height, displayedHeight),
+    };
+  });
+}
+
+function selectionsFromImagePercent(selections, canvasSize, naturalSize) {
+  if (!naturalSize || canvasSize.width <= 0 || canvasSize.height <= 0) return selections;
+  const { displayedWidth, displayedHeight, offsetX, offsetY } = computeDisplayedImageGeometry(
+    canvasSize.width,
+    canvasSize.height,
+    naturalSize.width,
+    naturalSize.height
+  );
+  return selections.map((s) => {
+    const fontSizePx = typeof s.fontSize === "number" ? fromPercent(s.fontSize, displayedHeight) : s.fontSize;
+    if (s.shape === "polygon") {
+      return {
+        ...s,
+        fontSize: fontSizePx,
+        points: s.points.map((p) => ({
+          x: fromPercent(p.x, displayedWidth) + offsetX,
+          y: fromPercent(p.y, displayedHeight) + offsetY,
+        })),
+      };
+    }
+    return {
+      ...s,
+      fontSize: fontSizePx,
+      x: fromPercent(s.x, displayedWidth) + offsetX,
+      y: fromPercent(s.y, displayedHeight) + offsetY,
+      width: fromPercent(s.width, displayedWidth),
+      height: fromPercent(s.height, displayedHeight),
+    };
+  });
+}
 
 function useSelectionAreas() {
   const [selections, setSelections] = useState([]);
@@ -1300,12 +1478,15 @@ function useSelectionAreas() {
 
     if (drawing && drawing.width > 8 && drawing.height > 8) {
       const newArea = {
-        id: ++selectionIdCounter,
+        id: generateId(),
         shape: activeTool === "ellipse" ? "ellipse" : "rect",
         textColor: "#000000",
         textBgColor: "#ffffff",
         fontSize: 13,
         fontFamily: COMIC_FONT_LIBRARY[0].value,
+        isBold: false,
+        isItalic: false,
+        textAlign: "left",
         ...drawing,
       };
       setSelections((prev) => [...prev, newArea]);
@@ -1318,13 +1499,16 @@ function useSelectionAreas() {
   const finishPolygon = () => {
     if (polygonDraft && polygonDraft.length >= 3) {
       const newArea = {
-        id: ++selectionIdCounter,
+        id: generateId(),
         shape: "polygon",
         points: polygonDraft,
         textColor: "#000000",
         textBgColor: "#ffffff",
         fontSize: 13,
         fontFamily: COMIC_FONT_LIBRARY[0].value,
+        isBold: false,
+        isItalic: false,
+        textAlign: "left",
       };
       setSelections((prev) => [...prev, newArea]);
       setActiveId(newArea.id);
@@ -1355,8 +1539,11 @@ function useSelectionAreas() {
       textBgColor: "#ffffff",
       fontSize: 13,
       fontFamily: COMIC_FONT_LIBRARY[0].value,
+      isBold: false,
+      isItalic: false,
+      textAlign: "left",
       ...box,
-      id: ++selectionIdCounter,
+      id: box.id || generateId(),
     }));
     setSelections((prev) => [...prev, ...withIds]);
   };
@@ -1581,18 +1768,113 @@ export default function TranslateWorkspace() {
   const [activeTab, setActiveTab] = useState("translate");
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
   const [open, setOpen] = useState({});
-  const [isBold, setIsBold] = useState(false);
-  const [isItalic, setIsItalic] = useState(false);
-  const [textAlign, setTextAlign] = useState("left");
   const pixelCanvasRef = useRef(null);
   if (!pixelCanvasRef.current && typeof document !== "undefined") {
     pixelCanvasRef.current = document.createElement("canvas");
   }
 
+  const pendingBubblesRef = useRef(null);
+
   const [pickingColorFor, setPickingColorFor] = useState(null);
 
-  const handleImageLoad = (size) => {
+  const [imageNaturalSize, setImageNaturalSize] = useState(null);
+
+  // Real DOM node of the page <img>. persistBubbles() reads naturalWidth/
+  // naturalHeight straight off this element instead of trusting state/refs
+  // that get updated asynchronously via onLoad — that async update is exactly
+  // what caused the race condition (state could still reflect a previous
+  // page's image at the moment we needed to save). Reading the live DOM
+  // element right before navigating away is synchronous and can't race.
+  const imgElRef = useRef(null);
+
+  useEffect(() => {
+    if (!pickingColorFor) return;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setPickingColorFor(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [pickingColorFor]);
+
+  const {
+    containerRef: canvasRef,
+    selections,
+    drawing,
+    activeId,
+    activeTool,
+    setActiveTool,
+    polygonDraft,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
+    finishPolygon,
+    cancelPolygon,
+    selectArea,
+    deleteArea,
+    clearSelections,
+    loadSelections,
+    updateTranslation,
+    updateName,
+    updateSelectionStyle,
+    selectNext,
+    selectPrev,
+    startMove,
+    startResize,
+    startVertexDrag,
+    zoomScale,
+    zoomOrigin,
+    isPickingZoomPoint,
+    toggleZoomIn,
+    zoomOut,
+    resetZoom,
+    cancelZoomPick,
+  } = useSelectionAreas();
+
+  const applyPendingBubbles = useCallback(
+    (naturalSize) => {
+      const bubblesJson = pendingBubblesRef.current;
+      pendingBubblesRef.current = null;
+      if (!bubblesJson) return;
+      try {
+        const parsed = JSON.parse(bubblesJson);
+        const selectionsToLoad = Array.isArray(parsed) ? parsed : parsed?.selections;
+        // Legacy pages (saved before bold/italic/align became per-bubble)
+        // stored a single page-wide textStyle. Use it only as a fallback
+        // default for bubbles that don't already carry their own
+        // isBold/isItalic/textAlign, so old pages keep their previous look
+        // instead of silently resetting. Any bubble saved in the new format
+        // already has its own fields and simply overrides this default.
+        const legacyPageTextStyle = Array.isArray(parsed) ? null : parsed?.textStyle;
+
+        if (Array.isArray(selectionsToLoad) && selectionsToLoad.length > 0) {
+          const canvasSize = measureCanvasSize(canvasRef);
+          const pxSelections = selectionsFromImagePercent(selectionsToLoad, canvasSize, naturalSize).map((s) => ({
+            isBold: legacyPageTextStyle?.isBold ?? false,
+            isItalic: legacyPageTextStyle?.isItalic ?? false,
+            textAlign: legacyPageTextStyle?.textAlign ?? "left",
+            ...s,
+          }));
+          loadSelections(pxSelections);
+        }
+      } catch (err) {
+        console.error("Could not parse this page's saved bubbles:", err);
+      }
+    },
+    [canvasRef, loadSelections]
+  );
+
+  const handleImageLoad = (size, loadedSrc) => {
+    // Ignore late onLoad events firing for an image that is no longer the
+    // one currently displayed (e.g. user flipped pages before it finished
+    // loading). This only protects UI-facing state (crop preview, color
+    // picker) — it is NOT what guarantees save-time correctness anymore;
+    // persistBubbles() below reads the DOM directly instead.
+    if (loadedSrc && currentImage && loadedSrc !== currentImage) {
+      return;
+    }
+
     setImageNaturalSize(size);
+    applyPendingBubbles(size);
 
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -1666,49 +1948,6 @@ export default function TranslateWorkspace() {
   };
 
   useEffect(() => {
-    if (!pickingColorFor) return;
-    const onKeyDown = (e) => {
-      if (e.key === "Escape") setPickingColorFor(null);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [pickingColorFor]);
-
-  const {
-    containerRef: canvasRef,
-    selections,
-    drawing,
-    activeId,
-    activeTool,
-    setActiveTool,
-    polygonDraft,
-    handleMouseDown,
-    handleMouseMove,
-    handleMouseUp,
-    finishPolygon,
-    cancelPolygon,
-    selectArea,
-    deleteArea,
-    clearSelections,
-    loadSelections,
-    updateTranslation,
-    updateName,
-    updateSelectionStyle,
-    selectNext,
-    selectPrev,
-    startMove,
-    startResize,
-    startVertexDrag,
-    zoomScale,
-    zoomOrigin,
-    isPickingZoomPoint,
-    toggleZoomIn,
-    zoomOut,
-    resetZoom,
-    cancelZoomPick,
-  } = useSelectionAreas();
-
-  useEffect(() => {
     if (!isPickingZoomPoint) return;
     const onKeyDown = (e) => {
       if (e.key === "Escape") cancelZoomPick();
@@ -1734,6 +1973,7 @@ export default function TranslateWorkspace() {
   }, [selections]);
 
   const [saveStatus, setSaveStatus] = useState("unsaved");
+  const [sending, setSending] = useState(false);
   const isLoadingPageRef = useRef(false);
   useEffect(() => {
     if (isLoadingPageRef.current) {
@@ -1741,12 +1981,7 @@ export default function TranslateWorkspace() {
       return;
     }
     setSaveStatus("unsaved");
-  }, [selections, isBold, isItalic, textAlign]);
-
-  const textStyleSettingsRef = useRef(null);
-  useEffect(() => {
-    textStyleSettingsRef.current = { isBold, isItalic, textAlign };
-  }, [isBold, isItalic, textAlign]);
+  }, [selections]);
 
   const activeSelection = selections.find((s) => s.id === activeId) ?? null;
   const activeSelectionIndex = selections.findIndex((s) => s.id === activeId);
@@ -1763,15 +1998,16 @@ export default function TranslateWorkspace() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeId, deleteArea]);
 
-  const [imageNaturalSize, setImageNaturalSize] = useState(null);
-
+  // Bold/Italic/Align now live on the active bubble itself, not on
+  // page-wide state — this just reflects the active selection's own values
+  // (for the toolbar's toggle states and the translation-editor preview).
   const textStyle = useMemo(
     () => ({
-      fontWeight: isBold ? 700 : 400,
-      fontStyle: isItalic ? "italic" : "normal",
-      textAlign,
+      fontWeight: activeSelection?.isBold ? 700 : 400,
+      fontStyle: activeSelection?.isItalic ? "italic" : "normal",
+      textAlign: activeSelection?.textAlign ?? "left",
     }),
-    [isBold, isItalic, textAlign]
+    [activeSelection]
   );
 
   useEffect(() => {
@@ -1808,6 +2044,30 @@ export default function TranslateWorkspace() {
   const currentImage = images[currentPageIndex];
   const currentPageMeta = taskPages[currentPageIndex] ?? null;
 
+  const [changeRequests, setChangeRequests] = useState([]);
+  const [changeRequestsLoading, setChangeRequestsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!currentPageMeta?.pageId) {
+      setChangeRequests([]);
+      return;
+    }
+    const controller = new AbortController();
+    setChangeRequestsLoading(true);
+    fetchPageChangeRequests(currentPageMeta.pageId, controller.signal)
+      .then(setChangeRequests)
+      .catch((err) => {
+        if (err.name !== "AbortError") console.error("Failed to load change requests:", err);
+      })
+      .finally(() => setChangeRequestsLoading(false));
+    return () => controller.abort();
+  }, [currentPageMeta?.pageId]);
+
+  const resolveBubbleLabel = useCallback((bubbleId) => {
+    const idx = selectionsRef.current.findIndex((s) => s.id === bubbleId);
+    return idx >= 0 ? `Bubble ${idx + 1}` : "Bubble (deleted)";
+  }, []);
+
   const sidebarChapters = useMemo(() => {
     if (!chapterData) return [];
     const doneCount = taskPages.filter((p) => p.status === "DONE").length;
@@ -1821,14 +2081,75 @@ export default function TranslateWorkspace() {
     ];
   }, [chapterData, taskPages]);
 
-  const goToPage = useCallback(
-    (index) => {
-      setCurrentPageIndex((prev) => {
-        if (index < 0 || index >= images.length) return prev;
-        return index;
+  const persistBubbles = useCallback(
+    (pageId, selectionsArray, expectedImageUrl) => {
+      if (!pageId) return Promise.resolve(false);
+
+      const imgEl = imgElRef.current;
+      const imgLoaded = !!imgEl && imgEl.complete && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0;
+      // If we know which image URL this save is *supposed* to correspond to,
+      // require the live DOM <img> to actually be showing that exact image
+      // right now. This is checked synchronously, at the moment of saving —
+      // there is no async gap left for a different page's image to sneak in.
+      const imgMatchesExpected =
+        !expectedImageUrl || imgEl?.currentSrc === expectedImageUrl || imgEl?.src === expectedImageUrl;
+
+      if (!imgLoaded || !imgMatchesExpected) {
+        console.warn(
+          `Skipped saving page ${pageId}: source image not confirmed loaded for this page yet, avoiding corrupted coordinates.`
+        );
+        return Promise.resolve(false);
+      }
+
+      const naturalSize = { width: imgEl.naturalWidth, height: imgEl.naturalHeight };
+
+      setSaveStatus("saving");
+      const canvasSize = measureCanvasSize(canvasRef);
+      const percentSelections = selectionsToImagePercent(selectionsArray, canvasSize, naturalSize);
+      // Each selection already carries its own isBold/isItalic/textAlign
+      // (plus fontSize/fontFamily/textColor/textBgColor), so there's no
+      // separate page-wide textStyle to save anymore.
+      const payload = { selections: percentSelections };
+      const bubblesJson = JSON.stringify(payload);
+      return saveBubblesForPage(pageId, payload).then((success) => {
+        if (!success) {
+          setSaveStatus("unsaved");
+          return false;
+        }
+        setTaskPages((prev) => prev.map((p) => (p.pageId === pageId ? { ...p, bubbles: bubblesJson } : p)));
+        setSaveStatus("saved");
+        return true;
       });
     },
-    [images.length]
+    [canvasRef]
+  );
+
+  // Saves the page currently being viewed, using values that are guaranteed
+  // to still correspond to it (selectionsRef is a ref updated synchronously
+  // on every change, and currentImage/currentPageMeta come straight from
+  // render state for the page we're still on).
+  // Returns a Promise — callers that need the server to actually have the
+  // latest bubbles before doing something else (e.g. submit-for-review,
+  // which reads bubbles straight from the DB) MUST await this.
+  const persistCurrentPage = useCallback(() => {
+    if (currentPageMeta?.pageId) {
+      return persistBubbles(currentPageMeta.pageId, selectionsRef.current, currentImage);
+    }
+    return Promise.resolve(false);
+  }, [currentPageMeta, currentImage, persistBubbles]);
+
+  const goToPage = useCallback(
+    (index) => {
+      if (index < 0 || index >= images.length) return;
+      // Persist the outgoing page's bubbles BEFORE React re-renders the
+      // <img src> to the new page. At this exact point in time, imgElRef
+      // still points at the DOM node showing the CURRENT page's image, so
+      // reading its naturalWidth/naturalHeight here is guaranteed correct —
+      // there is no async callback in between that could swap it out.
+      persistCurrentPage();
+      setCurrentPageIndex(index);
+    },
+    [images.length, persistCurrentPage]
   );
 
   const toggleChapter = useCallback((id) => {
@@ -1838,12 +2159,14 @@ export default function TranslateWorkspace() {
   const handleSelectPage = useCallback(
     (chapterId, pageIndex) => {
       if (chapterId !== currentChapterId) return;
-      setCurrentPageIndex(pageIndex);
+      goToPage(pageIndex);
     },
-    [currentChapterId]
+    [currentChapterId, goToPage]
   );
 
   const gotoProjectList = useCallback(() => {
+    persistCurrentPage();
+
     if (chapterData?.projectTeamId) {
       navigate("/translator/project-teams", {
         state: { teamId: chapterData.projectTeamId, tab: "tasks" },
@@ -1851,35 +2174,44 @@ export default function TranslateWorkspace() {
     } else {
       navigate("/translator/dashboard");
     }
-  }, [navigate, chapterData]);
-
-  const persistBubbles = useCallback((pageId, selectionsArray, textStyleSettings) => {
-    if (!pageId) return;
-    setSaveStatus("saving");
-    const payload = { selections: selectionsArray, textStyle: textStyleSettings };
-    const bubblesJson = JSON.stringify(payload);
-    saveBubblesForPage(pageId, payload).then((success) => {
-      if (!success) {
-        setSaveStatus("unsaved");
-        return;
-      }
-      setTaskPages((prev) => prev.map((p) => (p.pageId === pageId ? { ...p, bubbles: bubblesJson } : p)));
-      setSaveStatus("saved");
-    });
-  }, []);
+  }, [navigate, chapterData, persistCurrentPage]);
 
   const handleSaveAndNext = useCallback(() => {
-    if (currentPageMeta?.pageId) {
-      persistBubbles(currentPageMeta.pageId, selectionsRef.current, textStyleSettingsRef.current);
-    }
+    // goToPage already persists the current page synchronously before
+    // switching, so there's no need to call persistCurrentPage separately
+    // here (that used to cause the exact double-call/race pattern).
     goToPage(currentPageIndex + 1);
-  }, [goToPage, currentPageIndex, currentPageMeta, persistBubbles]);
+  }, [goToPage, currentPageIndex]);
 
   const handleSaveProgress = useCallback(() => {
-    if (currentPageMeta?.pageId) {
-      persistBubbles(currentPageMeta.pageId, selectionsRef.current, textStyleSettingsRef.current);
+    persistCurrentPage();
+  }, [persistCurrentPage]);
+
+  const isLastPage = images.length > 0 && currentPageIndex === images.length - 1;
+
+  const handleSend = useCallback(async () => {
+    if (!isLastPage || sending) return;
+
+    setSending(true);
+    try {
+      // MUST await this: submit-for-review reads `bubbles` straight from the
+      // DB on the backend to snapshot it into reviewBaselineBubbles. If we
+      // don't wait for the save PUT to land first, the two requests race —
+      // submit-for-review can reach the server and read the OLD bubbles
+      // before our save finishes, silently dropping the last edit from the
+      // review baseline (looks like "coordinates changed after Send").
+      await persistCurrentPage();
+      await submitTaskForReview(taskId);
+      navigate("/translator/project-teams", {
+        state: { teamId: chapterData?.projectTeamId, tab: "tasks" },
+      });
+    } catch (err) {
+      console.error("Failed to submit for review:", err);
+      alert("Failed to submit chapter for review. Please try again.");
+    } finally {
+      setSending(false);
     }
-  }, [currentPageMeta, persistBubbles]);
+  }, [isLastPage, sending, persistCurrentPage, taskId, navigate, chapterData]);
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -1898,33 +2230,30 @@ export default function TranslateWorkspace() {
     setImageNaturalSize(null);
     setSaveStatus("saved");
 
-    if (currentPageMeta?.bubbles) {
-      try {
-        const parsed = JSON.parse(currentPageMeta.bubbles);
+    pendingBubblesRef.current = currentPageMeta?.bubbles ?? null;
 
-        const selectionsToLoad = Array.isArray(parsed) ? parsed : parsed?.selections;
-        const savedTextStyle = Array.isArray(parsed) ? null : parsed?.textStyle;
-
-        if (Array.isArray(selectionsToLoad) && selectionsToLoad.length > 0) {
-          loadSelections(selectionsToLoad);
-        }
-        if (savedTextStyle) {
-          if (typeof savedTextStyle.isBold === "boolean") setIsBold(savedTextStyle.isBold);
-          if (typeof savedTextStyle.isItalic === "boolean") setIsItalic(savedTextStyle.isItalic);
-          if (typeof savedTextStyle.textAlign === "string") setTextAlign(savedTextStyle.textAlign);
-        }
-      } catch (err) {
-        console.error("Could not parse this page's saved bubbles:", err);
-      }
+    if (!currentImage) {
+      applyPendingBubbles(null);
     }
 
+    // These are captured from THIS render, i.e. they describe the page being
+    // left, not whatever page we land on next.
     const pageIdBeingViewed = currentPageMeta?.pageId;
+    const imageUrlBeingViewed = currentImage;
 
+    // Best-effort fallback only (e.g. route unmount without going through
+    // goToPage/persistCurrentPage). The primary save now always happens
+    // synchronously inside goToPage/persistCurrentPage BEFORE the page
+    // changes, so this cleanup is usually a safe no-op: by the time it runs,
+    // the DOM <img> has already switched to the next page's image, so
+    // persistBubbles' expectedImageUrl check will correctly skip it instead
+    // of saving corrupted coordinates.
     return () => {
       if (pageIdBeingViewed) {
-        persistBubbles(pageIdBeingViewed, selectionsRef.current, textStyleSettingsRef.current);
+        persistBubbles(pageIdBeingViewed, selectionsRef.current, imageUrlBeingViewed);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPageIndex, currentChapterId]);
 
   const applyPickedColor = (hex) => {
@@ -1971,7 +2300,9 @@ export default function TranslateWorkspace() {
         comicTitle={chapterData?.comicTitle}
         chapterTitle={chapterData?.title}
         onBack={gotoProjectList}
-        onSaveProgress={handleSaveProgress}
+        onSend={handleSend}
+        canSend={isLastPage}
+        sending={sending}
         saveStatus={saveStatus}
       />
 
@@ -2027,24 +2358,28 @@ export default function TranslateWorkspace() {
 
             <div className="tw-canvas-toolbar tw-x-toolbar-row2">
               <CanvasToolbar
-                isBold={isBold}
-                isItalic={isItalic}
-                textAlign={textAlign}
+                isBold={activeSelection?.isBold ?? false}
+                isItalic={activeSelection?.isItalic ?? false}
+                textAlign={activeSelection?.textAlign ?? "left"}
                 fontSize={activeSelection?.fontSize ?? 13}
                 fontFamily={activeSelection?.fontFamily ?? COMIC_FONT_LIBRARY[0].value}
                 textColor={activeSelection?.textColor ?? "#000000"}
                 textBgColor={activeSelection?.textBgColor ?? "#ffffff"}
                 hasActiveSelection={activeSelection != null}
-                onToggleBold={() => setIsBold((v) => !v)}
-                onToggleItalic={() => setIsItalic((v) => !v)}
-                onSetTextAlign={setTextAlign}
+                onToggleBold={() =>
+                  activeId != null && updateSelectionStyle(activeId, { isBold: !(activeSelection?.isBold) })
+                }
+                onToggleItalic={() =>
+                  activeId != null && updateSelectionStyle(activeId, { isItalic: !(activeSelection?.isItalic) })
+                }
+                onSetTextAlign={(align) => activeId != null && updateSelectionStyle(activeId, { textAlign: align })}
                 onIncreaseFontSize={() =>
                   activeId != null &&
-                  updateSelectionStyle(activeId, { fontSize: Math.min((activeSelection?.fontSize ?? 13) + 1, 48) })
+                  updateSelectionStyle(activeId, { fontSize: Math.min((activeSelection?.fontSize ?? 13) + 1, 72) })
                 }
                 onDecreaseFontSize={() =>
                   activeId != null &&
-                  updateSelectionStyle(activeId, { fontSize: Math.max((activeSelection?.fontSize ?? 13) - 1, 8) })
+                  updateSelectionStyle(activeId, { fontSize: Math.max((activeSelection?.fontSize ?? 13) - 1, 1) })
                 }
                 onChangeFontFamily={(value) => activeId != null && updateSelectionStyle(activeId, { fontFamily: value })}
                 onChangeTextColor={(color) => activeId != null && updateSelectionStyle(activeId, { textColor: color })}
@@ -2059,6 +2394,7 @@ export default function TranslateWorkspace() {
             currentImage={currentImage}
             currentPageIndex={currentPageIndex}
             canvasRef={canvasRef}
+            imgRef={imgElRef}
             drawing={drawing}
             selections={selections}
             activeId={activeId}
@@ -2075,7 +2411,6 @@ export default function TranslateWorkspace() {
             onStartResize={startResize}
             onStartVertexDrag={startVertexDrag}
             onChangeTranslation={updateTranslation}
-            textStyle={textStyle}
             isPickingColor={pickingColorFor != null}
             zoomScale={zoomScale}
             zoomOrigin={zoomOrigin}
@@ -2101,6 +2436,9 @@ export default function TranslateWorkspace() {
           onPickColorInCrop={handleCropColorPick}
           onDeleteArea={deleteArea}
           zoomScale={zoomScale}
+          changeRequests={changeRequests}
+          changeRequestsLoading={changeRequestsLoading}
+          resolveBubbleLabel={resolveBubbleLabel}
         />
       </div>
     </div>

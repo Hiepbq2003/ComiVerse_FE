@@ -35,6 +35,7 @@ import Contact from './pages/common/Contact'
 import TranslatorRegister from './pages/common/TranslatorRegister'
 import TranslateDashboard from './pages/translator/TranslatorDashboard'
 import TranslateWorkspace from './pages/translator/TranslateWorkspace'
+import ReviewWorkspace from './pages/translator/ReviewWorkspace'
 import TeamProjects from './pages/translator/TeamProjects'
 import ProjectList from './pages/translator/ProjectList'
 import TranslatorRevenue from './pages/translator/Revenue'
@@ -127,7 +128,7 @@ function App() {
                   <Route path="dashboard" element={<TranslateDashboard />} />
                 </Route>
                 <Route path="/translator/translate-workspace/task/:taskId" element={<TranslateWorkspace />} />
-                
+                <Route path="/translator/review-workspace/task/:taskId" element={<ReviewWorkspace />} />
 
                 {/* Showcase Demos */}
                 <Route path="/showcase/skeletons" element={<SkeletonLoaderShowcase />} />
