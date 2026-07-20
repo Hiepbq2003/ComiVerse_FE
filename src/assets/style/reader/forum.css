@@ -164,6 +164,15 @@
   font-size: 9px;
   color: white;
   font-weight: 700;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.forum-user-avatar-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .forum-author-name {
@@ -437,6 +446,7 @@ html.light .forum-select-field option {
   font-weight: 700;
   font-size: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
 }
 
 .forum-card-pin-stv {

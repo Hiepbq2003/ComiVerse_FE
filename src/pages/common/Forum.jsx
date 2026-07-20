@@ -133,14 +133,41 @@ const renderFormattedContent = (content) => {
 
 const normalizeForumComment = (comment) => ({
   ...comment,
+  avatarUrl: comment.avatarUrl || comment.userAvatar || null,
   timestamp: comment.createdAt || comment.timestamp,
   likesCount: comment.likesCount || 0
 })
+
+const ForumAvatar = ({ avatarUrl, name, className = 'forum-avatar-placeholder', style }) => {
+  const [imageFailed, setImageFailed] = useState(false)
+
+  useEffect(() => {
+    setImageFailed(false)
+  }, [avatarUrl])
+
+  const displayName = String(name || 'User')
+
+  return (
+    <div className={className} style={style}>
+      {avatarUrl && !imageFailed ? (
+        <img
+          src={avatarUrl}
+          alt={`${displayName} avatar`}
+          className="forum-user-avatar-image"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        displayName[0].toUpperCase()
+      )}
+    </div>
+  )
+}
 
 function Forum() {
   const { threadId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
+  const currentUser = getAuth()?.user
   const [threads, setThreads] = useState([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -253,10 +280,21 @@ function Forum() {
         const fetchThread = async () => {
           try {
             const res = await getForumThreadByIdApi(threadId)
-            const threadData = res.data?.data || res.data
-            if (threadData) {
-              setSelectedThread(threadData)
-              incrementViews(threadData)
+            const threadData = res?.data?.data ?? res?.data ?? res
+            if (threadData?.id) {
+              const formattedThread = {
+                ...threadData,
+                title: threadData.title || 'Untitled Thread',
+                content: threadData.content || '',
+                author: threadData.author || 'Guest User',
+                category: threadData.category || 'General',
+                views: threadData.views !== undefined && threadData.views !== null ? String(threadData.views) : '0',
+                replies: threadData.replies ?? 0,
+                likes: threadData.likes || 0,
+                timeAgo: formatTimeAgo(threadData.createdAt)
+              }
+              setSelectedThread(formattedThread)
+              incrementViews(formattedThread)
             } else {
               toast.error('Discussion thread not found.')
               navigate('/forum')
@@ -787,9 +825,11 @@ function Forum() {
                             >
                               <div className="forum-comment-header" style={{ marginBottom: '12px' }}>
                                 <div className="forum-comment-author">
-                                  <div className="forum-avatar-placeholder" style={{ width: '22px', height: '22px', fontSize: '11px', background: '#7c3aed' }}>
-                                    {String(comment.author)[0].toUpperCase()}
-                                  </div>
+                                  <ForumAvatar
+                                    avatarUrl={comment.avatarUrl}
+                                    name={comment.author}
+                                    style={{ width: '22px', height: '22px', fontSize: '11px', background: '#7c3aed' }}
+                                  />
                                   <span>{comment.author}</span>
                                 </div>
                                 <span className="forum-comment-time">{formatTimeAgo(comment.timestamp)}</span>
@@ -814,9 +854,18 @@ function Forum() {
                                   onClick={() => {
                                     setReplyingToComment(comment)
                                     if (replyInputRef.current) {
-                                      replyInputRef.current.focus()
-                                      if (!replyInputRef.current.textContent.trim()) {
-                                        replyInputRef.current.textContent = `@${comment.author} `
+                                      const editor = replyInputRef.current
+                                      if (!editor.textContent.trim()) {
+                                        editor.textContent = `@${comment.author} `
+                                      }
+                                      editor.focus()
+                                      const range = document.createRange()
+                                      range.selectNodeContents(editor)
+                                      range.collapse(false)
+                                      const selection = window.getSelection()
+                                      if (selection) {
+                                        selection.removeAllRanges()
+                                        selection.addRange(range)
                                       }
                                     }
                                   }}
@@ -836,9 +885,12 @@ function Forum() {
 
                       {/* Reply Editor Row */}
                       <div className="forum-editor-row-stv">
-                        <div className="forum-card-avatar-stv" style={{ background: '#4f46e5', width: '32px', height: '32px', fontSize: '13px' }}>
-                          {getAuth()?.user?.fullName ? String(getAuth().user.fullName)[0].toUpperCase() : 'G'}
-                        </div>
+                        <ForumAvatar
+                          avatarUrl={currentUser?.avatarUrl}
+                          name={currentUser?.fullName || currentUser?.username || 'Guest'}
+                          className="forum-card-avatar-stv"
+                          style={{ background: '#4f46e5', width: '32px', height: '32px', fontSize: '13px' }}
+                        />
                         <div className="forum-editor-container-stv">
                           {replyingToComment && (
                             <div className="forum-replying-to">
