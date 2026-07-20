@@ -317,7 +317,7 @@ function AuthorComics() {
     setLoading(true)
     setError('')
     try {
-      setComics(normalizeArrayResponse(await getAuthorComicsApi({ page: 1, size: 12 })))
+      setComics(normalizeArrayResponse(await getAuthorComicsApi({ page: 1, size: 100 })))
     } catch (err) {
       setError(err?.response?.data?.message || 'Cannot load author comics. Please check the backend and AUTHOR token.')
     } finally {
