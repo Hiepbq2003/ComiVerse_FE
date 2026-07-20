@@ -249,3 +249,134 @@
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
 }
+
+/* ── POST IMAGES, COMMENTS & PINNING STYLING ────────── */
+.post-creation-image-preview img {
+  object-fit: cover;
+  transition: transform 0.2s ease;
+}
+
+.post-creation-image-preview img:hover {
+  transform: scale(1.02);
+}
+
+.remove-preview-btn:hover {
+  background: #ef4444 !important;
+  transform: scale(1.1);
+}
+
+.post-attached-image img {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.post-attached-image img:hover {
+  transform: scale(1.015);
+  cursor: zoom-in;
+}
+
+.post-comments-section {
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.12);
+  animation: slideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.comment-item {
+  animation: fadeIn 0.2s ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+  padding-bottom: 8px;
+}
+
+.comment-item:last-child {
+  border-bottom: none;
+}
+
+.comment-content-box {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.comment-role-badge.leader {
+  font-weight: 700;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.feed-post-card {
+  transition: all 0.3s ease;
+  position: relative;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.feed-post-card:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}
+
+.feed-post-card.pinned {
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.03) 0%, rgba(255, 255, 255, 0.02) 100%);
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.05);
+}
+
+.post-action-btn {
+  transition: all 0.2s ease;
+}
+
+.post-action-btn:hover {
+  color: var(--trans-purple) !important;
+  transform: translateY(-1px);
+}
+
+.post-action-btn.pin-btn:hover {
+  color: #f59e0b !important;
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+}
+
+/* Light mode overrides */
+html.light .feed-post-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.03) !important;
+}
+
+html.light .feed-post-card:hover {
+  border-color: rgba(124, 58, 237, 0.15) !important;
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.06) !important;
+}
+
+html.light .feed-post-card.pinned {
+  border: 1px solid rgba(245, 158, 11, 0.4) !important;
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.04) 0%, #ffffff 100%) !important;
+}
+
+html.light .post-comments-section {
+  background: #f8fafc !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02) !important;
+}
+
+html.light .comment-content-box {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .comment-avatar {
+  background: rgba(15, 23, 42, 0.05) !important;
+  color: #334155 !important;
+}
+
+html.light .comment-item {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04) !important;
+}

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
-import { getForumThreadsPageApi, deleteForumThreadApi, createForumThreadApi, getAllForumThreadsApi } from '../../services/api/ForumThreadApi'
+import { getForumThreadsPageApi, deleteForumThreadApi, createForumThreadApi, getAllForumThreadsApi, updateForumThreadApi, getForumThreadByIdApi } from '../../services/api/ForumThreadApi'
 import { getAuth } from '../../utils/Auth'
 import { toast } from 'react-toastify'
 import '../../assets/style/reader/forum.css'
@@ -46,9 +47,95 @@ const formatTimeAgo = (createdAtString) => {
   return `${days} days ago`
 }
 
+const sanitizeHtml = (html) => {
+  if (!html) return ''
+  // Only allow safe inline tags for forum comments
+  const div = document.createElement('div')
+  div.innerHTML = html
+  // Remove script tags and event handlers
+  div.querySelectorAll('script, style, iframe, object, embed').forEach(el => el.remove())
+  div.querySelectorAll('*').forEach(el => {
+    const attrs = [...el.attributes]
+    attrs.forEach(attr => {
+      if (attr.name.startsWith('on') || attr.name === 'style') {
+        el.removeAttribute(attr.name)
+      }
+    })
+  })
+  return div.innerHTML
+}
+
+const isHtmlContent = (text) => {
+  if (!text) return false
+  return /<(b|i|em|strong|u|code|a|blockquote|br|div|span)\b/i.test(text)
+}
+
+const parseInlineMarkdown = (text) => {
+  if (!text) return []
+  // Process tokens left-to-right: **bold**, *italic*, `code`, [link](url)
+  const tokenRegex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|\[(.+?)\]\((.*?)\))/g
+  const result = []
+  let lastIndex = 0
+  let keyCounter = 0
+  let match
+  while ((match = tokenRegex.exec(text)) !== null) {
+    // Push plain text before this match
+    if (match.index > lastIndex) {
+      result.push(text.substring(lastIndex, match.index))
+    }
+    if (match[2] !== undefined) {
+      // **bold**
+      result.push(<strong key={`fmt-${keyCounter++}`}>{match[2]}</strong>)
+    } else if (match[3] !== undefined) {
+      // *italic*
+      result.push(<em key={`fmt-${keyCounter++}`}>{match[3]}</em>)
+    } else if (match[4] !== undefined) {
+      // `code`
+      result.push(<code key={`fmt-${keyCounter++}`} className="forum-inline-code">{match[4]}</code>)
+    } else if (match[5] !== undefined) {
+      // [link](url)
+      result.push(
+        <a key={`fmt-${keyCounter++}`} href={match[6] || '#'} target="_blank" rel="noopener noreferrer" className="forum-inline-link">
+          {match[5]}
+        </a>
+      )
+    }
+    lastIndex = match.index + match[0].length
+  }
+  // Push remaining plain text
+  if (lastIndex < text.length) {
+    result.push(text.substring(lastIndex))
+  }
+  return result.length > 0 ? result : [text]
+}
+
+const renderFormattedContent = (content) => {
+  if (!content) return null
+  const lines = content.split('\n')
+  return lines.map((line, lineIndex) => {
+    const trimmedLine = line.trim()
+    if (trimmedLine.startsWith('>')) {
+      const quoteText = line.substring(line.indexOf('>') + 1).trim()
+      return (
+        <blockquote key={lineIndex} className="forum-blockquote">
+          {parseInlineMarkdown(quoteText)}
+        </blockquote>
+      )
+    }
+    return (
+      <div key={lineIndex} style={{ minHeight: '1.2em' }}>
+        {parseInlineMarkdown(line)}
+      </div>
+    )
+  })
+}
+
 function Forum() {
+  const { threadId } = useParams()
+  const navigate = useNavigate()
   const [threads, setThreads] = useState([])
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   
   // Navigation & Filter states
   const [selectedCategory, setSelectedCategory] = useState('All')
@@ -76,6 +163,116 @@ function Forum() {
     category: 'General',
     content: ''
   })
+
+  // Selected Thread Detail Modal State
+  const [selectedThread, setSelectedThread] = useState(null)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [threadComments, setThreadComments] = useState([])
+
+  // Report Modal State
+  const [showReportModal, setShowReportModal] = useState(false)
+  const [reportReason, setReportReason] = useState('')
+  const [threadToReport, setThreadToReport] = useState(null)
+
+  // Followed threads state (localStorage)
+  const [followedThreads, setFollowedThreads] = useState(() => {
+    const saved = localStorage.getItem('comiverse_followed_threads')
+    return saved ? JSON.parse(saved) : []
+  })
+
+  useEffect(() => {
+    localStorage.setItem('comiverse_followed_threads', JSON.stringify(followedThreads))
+  }, [followedThreads])
+
+  // Liking comments state (localStorage)
+  const [likedComments, setLikedComments] = useState(() => {
+    const saved = localStorage.getItem('comiverse_liked_comments')
+    return saved ? JSON.parse(saved) : []
+  })
+
+  useEffect(() => {
+    localStorage.setItem('comiverse_liked_comments', JSON.stringify(likedComments))
+  }, [likedComments])
+
+  const incrementViews = async (thread) => {
+    try {
+      const nextViews = parseInt(thread.views || 0) + 1
+      await updateForumThreadApi(thread.id, {
+        id: thread.id,
+        title: thread.title,
+        author: thread.author,
+        category: thread.category,
+        content: thread.content,
+        isPinned: thread.isPinned || false,
+        isLocked: thread.isLocked || false,
+        isReported: thread.isReported || false,
+        reportReason: thread.reportReason || '',
+        replies: thread.replies,
+        views: nextViews
+      })
+      // Update locally
+      setThreads(prev => prev.map(t => t.id === thread.id ? { ...t, views: String(nextViews) } : t))
+      setAllThreadsForCounts(prev => prev.map(t => t.id === thread.id ? { ...t, views: nextViews } : t))
+    } catch (err) {
+      console.error('Failed to increment views:', err)
+    }
+  }
+
+  // Active three-dot dropdown and detail follow dropdown
+  const [activeDropdownThreadId, setActiveDropdownThreadId] = useState(null)
+  const [showDetailFollowDropdown, setShowDetailFollowDropdown] = useState(false)
+
+  // Ref for rich editor text area and tracking views count guard
+  const replyInputRef = useRef(null)
+  const lastViewedThreadIdRef = useRef(null)
+
+  // Fetch specific thread if URL has threadId
+  useEffect(() => {
+    if (threadId) {
+      if (lastViewedThreadIdRef.current === threadId) {
+        return
+      }
+      lastViewedThreadIdRef.current = threadId
+
+      const found = allThreadsForCounts.find(t => String(t.id) === String(threadId)) || threads.find(t => String(t.id) === String(threadId))
+      if (found) {
+        setSelectedThread(found)
+        incrementViews(found)
+      } else {
+        const fetchThread = async () => {
+          try {
+            const res = await getForumThreadByIdApi(threadId)
+            const threadData = res.data?.data || res.data
+            if (threadData) {
+              setSelectedThread(threadData)
+              incrementViews(threadData)
+            } else {
+              toast.error('Discussion thread not found.')
+              navigate('/forum')
+            }
+          } catch (err) {
+            console.error('Failed to load thread detail:', err)
+            toast.error('Failed to load discussion thread.')
+            navigate('/forum')
+          }
+        }
+        fetchThread()
+      }
+    } else {
+      setSelectedThread(null)
+      lastViewedThreadIdRef.current = null
+    }
+  }, [threadId])
+
+  // Dismiss dropdowns on clicking outside
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      setActiveDropdownThreadId(null)
+      setShowDetailFollowDropdown(false)
+    }
+    window.addEventListener('click', handleOutsideClick)
+    return () => window.removeEventListener('click', handleOutsideClick)
+  }, [])
 
   // Categories list derived dynamically from database threads (synced with customCategories)
   const categoriesList = [
@@ -169,6 +366,7 @@ function Forum() {
 
   // Publish new thread post
   const handlePublishPost = async () => {
+    if (submitting) return
     if (!newPostForm.title.trim()) {
       toast.warn('Please enter a thread title.')
       return
@@ -182,6 +380,7 @@ function Forum() {
     const authorName = auth?.user?.fullName || auth?.user?.username || 'Guest User'
 
     try {
+      setSubmitting(true)
       setLoading(true)
       await createForumThreadApi({
         title: newPostForm.title.trim(),
@@ -204,12 +403,231 @@ function Forum() {
       toast.error('Failed to publish discussion thread.')
     } finally {
       setLoading(false)
+      setSubmitting(false)
+    }
+  }
+
+  // Load comments for the selected thread
+  useEffect(() => {
+    if (selectedThread) {
+      const stored = localStorage.getItem(`comiverse_forum_comments_${selectedThread.id}`)
+      if (stored) {
+        setThreadComments(JSON.parse(stored))
+      } else {
+        const initialComments = [
+          {
+            id: 1,
+            author: 'System Moderator',
+            content: 'Welcome to this discussion! Please follow the community guidelines.',
+            timestamp: new Date(Date.now() - 3600000 * 2).toISOString(),
+            likesCount: 0
+          }
+        ]
+        localStorage.setItem(`comiverse_forum_comments_${selectedThread.id}`, JSON.stringify(initialComments))
+        setThreadComments(initialComments)
+      }
+    }
+  }, [selectedThread])
+
+  // Open thread detail view via route navigation
+  const handleOpenThread = (thread) => {
+    navigate(`/forum/thread/${thread.id}`)
+  }
+
+  // Handle reporting a thread
+  const handleTriggerReport = (thread, event) => {
+    if (event) event.stopPropagation()
+    setThreadToReport(thread)
+    setReportReason('')
+    setShowReportModal(true)
+  }
+
+  const handleReportThreadSubmit = async () => {
+    if (submitting) return
+    if (!reportReason.trim()) {
+      toast.warn('Please enter a reason for reporting.')
+      return
+    }
+    try {
+      setSubmitting(true)
+      await updateForumThreadApi(threadToReport.id, {
+        id: threadToReport.id,
+        title: threadToReport.title,
+        author: threadToReport.author,
+        category: threadToReport.category,
+        content: threadToReport.content,
+        isPinned: threadToReport.isPinned || false,
+        isLocked: threadToReport.isLocked || false,
+        isReported: true,
+        reportReason: reportReason.trim(),
+        replies: threadToReport.replies,
+        views: parseInt(threadToReport.views || 0)
+      })
+      toast.success('Thread reported successfully. A moderator will review it shortly.')
+      setShowReportModal(false)
+      fetchThreads(currentPage)
+      fetchAllThreadsForCounts()
+    } catch (err) {
+      console.error('Failed to report thread:', err)
+      toast.error('Failed to submit report.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Post a comment reply
+  const handlePostReply = async () => {
+    if (submitting) return
+    const editor = replyInputRef.current
+    const htmlContent = editor ? editor.innerHTML : ''
+    const textContent = editor ? editor.textContent.trim() : ''
+    if (!textContent) {
+      toast.warn('Please enter your reply.')
+      return
+    }
+    const auth = getAuth()
+    const authorName = auth?.user?.fullName || auth?.user?.username || 'Guest User'
+    const newReply = {
+      id: Date.now(),
+      author: authorName,
+      content: sanitizeHtml(htmlContent),
+      timestamp: new Date().toISOString(),
+      likesCount: 0
+    }
+
+    try {
+      setSubmitting(true)
+      const nextRepliesCount = (selectedThread.replies || 0) + 1
+      await updateForumThreadApi(selectedThread.id, {
+        id: selectedThread.id,
+        title: selectedThread.title,
+        author: selectedThread.author,
+        category: selectedThread.category,
+        content: selectedThread.content,
+        isPinned: selectedThread.isPinned || false,
+        isLocked: selectedThread.isLocked || false,
+        isReported: selectedThread.isReported || false,
+        reportReason: selectedThread.reportReason || '',
+        views: parseInt(selectedThread.views || 0),
+        replies: nextRepliesCount
+      })
+
+      const updated = [...threadComments, newReply]
+      localStorage.setItem(`comiverse_forum_comments_${selectedThread.id}`, JSON.stringify(updated))
+      setThreadComments(updated)
+      if (editor) editor.innerHTML = ''
+
+      setThreads(prev => prev.map(t => t.id === selectedThread.id ? { ...t, replies: nextRepliesCount } : t))
+      setSelectedThread(prev => ({ ...prev, replies: nextRepliesCount }))
+      setAllThreadsForCounts(prev => prev.map(t => t.id === selectedThread.id ? { ...t, replies: nextRepliesCount } : t))
+      
+      toast.success('Reply posted!')
+    } catch (err) {
+      console.error('Failed to update reply count:', err)
+      toast.error('Failed to post reply.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Follow thread toggle helper
+  const handleToggleFollow = (threadId, event) => {
+    if (event) event.stopPropagation()
+    setFollowedThreads(prev => {
+      const isFollowing = prev.includes(threadId)
+      const next = isFollowing 
+        ? prev.filter(id => id !== threadId)
+        : [...prev, threadId]
+      
+      toast.info(isFollowing ? 'Thread unfollowed.' : 'Thread followed!')
+      return next
+    })
+  }
+
+  // WYSIWYG formatting — uses execCommand for visual rich text editing
+  const handleInsertFormat = (formatType) => {
+    const editor = replyInputRef.current
+    if (!editor) return
+    editor.focus()
+    switch (formatType) {
+      case 'bold':
+        document.execCommand('bold', false, null)
+        break
+      case 'italic':
+        document.execCommand('italic', false, null)
+        break
+      case 'quote': {
+        const sel = window.getSelection()
+        const selectedText = sel.toString() || 'quoted text'
+        document.execCommand('insertHTML', false, `<blockquote class="forum-blockquote">${selectedText}</blockquote>`)
+        break
+      }
+      case 'code': {
+        const sel2 = window.getSelection()
+        const codeText = sel2.toString() || 'code'
+        document.execCommand('insertHTML', false, `<code class="forum-inline-code">${codeText}</code>`)
+        break
+      }
+      case 'link': {
+        const url = prompt('Enter URL:', 'https://')
+        if (url) {
+          const sel3 = window.getSelection()
+          const linkLabel = sel3.toString() || url
+          document.execCommand('insertHTML', false, `<a href="${url}" target="_blank" rel="noopener noreferrer" class="forum-inline-link">${linkLabel}</a>`)
+        }
+        break
+      }
+      default:
+        return
+    }
+  }
+
+  // Category tags theme color mapper
+  const getCategoryColor = (catName) => {
+    const colors = {
+      'All': '#7c3aed',
+      'General': '#94a3b8',
+      'Spoilers': '#ef4444',
+      'Suggestions': '#3b82f6',
+      'Support': '#10b981',
+      'Off-topic': '#f59e0b',
+      'Announcements': '#8b5cf6',
+      'News': '#ec4899'
+    }
+    return colors[catName] || '#a855f7'
+  }
+
+  // Toggle comment liked state
+  const handleToggleCommentLike = (commentId) => {
+    const isAlreadyLiked = likedComments.includes(commentId)
+    const nextLikedComments = isAlreadyLiked 
+      ? likedComments.filter(id => id !== commentId)
+      : [...likedComments, commentId]
+    
+    setLikedComments(nextLikedComments)
+
+    // Update likes count on selected thread comment object in localStorage
+    if (selectedThread) {
+      const stored = JSON.parse(localStorage.getItem(`comiverse_forum_comments_${selectedThread.id}`) || '[]')
+      const updated = stored.map(c => {
+        if (c.id === commentId) {
+          const count = c.likesCount || 0
+          return {
+            ...c,
+            likesCount: isAlreadyLiked ? Math.max(0, count - 1) : count + 1
+          }
+        }
+        return c
+      })
+      localStorage.setItem(`comiverse_forum_comments_${selectedThread.id}`, JSON.stringify(updated))
+      setThreadComments(updated)
     }
   }
 
   // Count threads inside category
   const getCategoryCount = (catName) => {
     if (catName === 'All') return allThreadsForCounts.length
+    if (catName === 'Following') return allThreadsForCounts.filter(t => followedThreads.includes(t.id)).length
     return allThreadsForCounts.filter(t => (t.category || 'General') === catName).length
   }
 
@@ -218,7 +636,9 @@ function Forum() {
     let result = [...threads]
 
     // 1. Sidebar Category Filter
-    if (selectedCategory !== 'All') {
+    if (selectedCategory === 'Following') {
+      result = result.filter(t => followedThreads.includes(t.id))
+    } else if (selectedCategory !== 'All') {
       result = result.filter(t => t.category === selectedCategory)
     }
 
@@ -252,243 +672,533 @@ function Forum() {
     <HomeLayout>
       <div className="home-sections-container" style={{ paddingTop: '40px' }}>
         <div className="home-section">
-          {/* Header */}
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            marginBottom: '28px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-            paddingBottom: '16px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
-              <h2 className="section-title" style={{ margin: 0 }}>💬 Forum</h2>
-              <span style={{ fontSize: '12.5px', color: '#64748b' }}>
-                {totalElements} posts
-              </span>
-            </div>
-            <button 
-              className="mod-btn approve" 
-              style={{ background: '#0f172a', padding: '10px 18px', display: 'flex', alignItems: 'center', gap: '6px' }}
-              onClick={() => setShowNewPostModal(true)}
-            >
-              <span>+</span> New Post
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', gap: '32px' }}>
-            {/* ── LEFT SIDEBAR (CATEGORIES & STATS) ───────── */}
-            <aside style={{ width: '220px', flexShrink: 0 }}>
-              <h4 style={{ color: 'white', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', paddingLeft: '8px' }}>
-                Categories
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {categoriesList.map(cat => (
-                  <div
-                    key={cat.name}
-                    onClick={() => setSelectedCategory(cat.name)}
-                    onMouseEnter={() => setHoveredCategory(cat.name)}
-                    onMouseLeave={() => setHoveredCategory(null)}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      background: selectedCategory === cat.name ? 'rgba(168, 85, 247, 0.1)' : hoveredCategory === cat.name ? 'rgba(255, 255, 255, 0.02)' : 'transparent',
-                      color: selectedCategory === cat.name ? '#c084fc' : '#cbd5e1',
-                      cursor: 'pointer',
-                      fontWeight: selectedCategory === cat.name ? '600' : '500',
-                      fontSize: '13px',
-                      transition: 'all 0.2s ease',
-                      borderLeft: selectedCategory === cat.name ? '3px solid #a855f7' : '3px solid transparent',
-                      paddingLeft: selectedCategory === cat.name ? '12px' : '9px'
-                    }}
+          {threadId && selectedThread ? (
+            /* ── DETAILED THREAD FULL PAGE VIEW (STV STYLE - PAGE) ── */
+            <div style={{ display: 'flex', gap: '32px' }}>
+              {/* Left Column: Threads list sidebar */}
+              <aside style={{ width: '320px', flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.06)', paddingRight: '24px' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '20px' }}>
+                  <button 
+                    className="forum-back-btn-stv" 
+                    onClick={() => navigate('/forum')}
                   >
-                    <span>{cat.name}</span>
-                    <span style={{ fontSize: '10.5px', color: selectedCategory === cat.name ? '#c084fc' : '#64748b' }}>
-                      {getCategoryCount(cat.name)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-
-            </aside>
-
-            {/* ── RIGHT MAIN CONTENT AREA ────────────────── */}
-            <main style={{ flexGrow: 1 }}>
-              {/* Sorter tabs & Search input row */}
-              <div className="forum-search-row">
-                {/* Tabs */}
-                <div style={{ display: 'flex', gap: '16px', borderBottom: '1px solid rgba(255,255,255,0.04)', flexGrow: 1, paddingBottom: '1px' }}>
-                  {['All', 'Hot', 'New', 'Announcements'].map(tab => (
-                    <div
-                      key={tab}
-                      onClick={() => setActiveSortTab(tab)}
-                      style={{
-                        color: activeSortTab === tab ? 'white' : '#94a3b8',
-                        fontSize: '13.5px',
-                        fontWeight: '600',
-                        padding: '8px 4px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        borderBottom: '2px solid transparent',
-                        borderBottomColor: activeSortTab === tab ? '#a855f7' : 'transparent'
-                      }}
+                    ← Back
+                  </button>
+                  <h4 className="forum-sidebar-header-stv" style={{ fontSize: '13px', margin: 0, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Threads
+                  </h4>
+                </div>
+                
+                {/* Scrollable list of other threads */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', paddingRight: '4px' }}>
+                  {allThreadsForCounts.map(otherThread => (
+                    <div 
+                      key={otherThread.id}
+                      onClick={() => navigate(`/forum/thread/${otherThread.id}`)}
+                      className={`forum-sidebar-thread-card-stv ${String(otherThread.id) === String(threadId) ? 'active' : ''}`}
                     >
-                      {tab}
+                      <div className="forum-card-avatar-stv" style={{ background: getCategoryColor(otherThread.category), width: '28px', height: '28px', fontSize: '12px' }}>
+                        {String(otherThread.author)[0].toUpperCase()}
+                      </div>
+                      <div style={{ flexGrow: 1, minWidth: 0 }}>
+                        <div className="forum-sidebar-thread-title-stv">
+                          {otherThread.title}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', fontSize: '11px', color: '#64748b' }}>
+                          <span>{otherThread.category || 'General'}</span>
+                          <span>💬 {otherThread.replies}</span>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
+              </aside>
+              <div style={{ flexGrow: 1, minWidth: 0 }}>
+                {/* Colored Banner Header */}
+                <div className="forum-detail-banner-stv" style={{ borderRadius: '8px 8px 0 0' }}>
+                  <span className="forum-detail-banner-tag">{selectedThread.category || 'General'}</span>
+                  <h3 className="forum-detail-banner-title">{selectedThread.title}</h3>
+                </div>
+                
+                {/* 2-Columns Body Layout */}
+                <div className="forum-detail-columns-stv" style={{ padding: '24px 0 0 0' }}>
+                  {/* Left Column: Post & Comments */}
+                  <div className="forum-detail-left-stv">
+                    {/* Original Post */}
+                    <div className="forum-post-card-stv">
+                      <div className="forum-post-header-stv">
+                        <div className="forum-author-box-stv">
+                          <div className="forum-card-avatar-stv" style={{ background: getCategoryColor(selectedThread.category) }}>
+                            {String(selectedThread.author)[0].toUpperCase()}
+                          </div>
+                          <div className="forum-author-details">
+                            <span className="forum-author-name-stv">{selectedThread.author}</span>
+                            <span className="forum-author-role-badge author">Author</span>
+                          </div>
+                        </div>
+                        <span className="forum-post-time-stv">{selectedThread.timeAgo || 'recently'}</span>
+                      </div>
+                      <div className="forum-post-content-stv">{renderFormattedContent(selectedThread.content)}</div>
+                      
+                      <div className="forum-post-likes-row">
+                        <span>👁️ {selectedThread.views} views</span>
+                        <span>❤️ {selectedThread.likes || 0} likes</span>
+                      </div>
+                    </div>
 
-                {/* Search posts inside thread list */}
-                <div className="forum-search-input-wrapper" style={{ width: '240px', flexGrow: 0 }}>
-                  <input 
-                    type="text" 
-                    placeholder="Search posts..." 
-                    className="forum-search-field"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{ padding: '8px 12px 8px 34px' }}
-                  />
-                  <svg 
-                    viewBox="0 0 24 24" 
-                    width="14" 
-                    height="14" 
-                    fill="none" 
-                    stroke="#64748b" 
-                    strokeWidth="2.5" 
-                    style={{ position: 'absolute', left: '12px', top: '11px' }}
-                  >
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                  </svg>
+                    {/* Comments / Discussion List */}
+                    <div className="forum-comments-section" style={{ borderTop: 'none', paddingTop: 0 }}>
+                      <h4 className="forum-comments-title" style={{ marginBottom: '12px' }}>
+                        💬 Comments ({threadComments.length})
+                      </h4>
+
+                      <div className="forum-comments-list" style={{ maxHeight: 'none' }}>
+                        {threadComments.map((comment) => {
+                          const isCommentLiked = likedComments.includes(comment.id)
+                          return (
+                            <div key={comment.id} className="forum-comment-card">
+                              <div className="forum-comment-header" style={{ marginBottom: '12px' }}>
+                                <div className="forum-comment-author">
+                                  <div className="forum-avatar-placeholder" style={{ width: '22px', height: '22px', fontSize: '11px', background: '#7c3aed' }}>
+                                    {String(comment.author)[0].toUpperCase()}
+                                  </div>
+                                  <span>{comment.author}</span>
+                                </div>
+                                <span className="forum-comment-time">{formatTimeAgo(comment.timestamp)}</span>
+                              </div>
+                              
+                              <div className="forum-comment-body">
+                                {isHtmlContent(comment.content)
+                                  ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(comment.content) }} />
+                                  : renderFormattedContent(comment.content)
+                                }
+                              </div>
+                              
+                              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                                <button 
+                                  className={`forum-card-action-btn ${isCommentLiked ? 'liked-active' : ''}`}
+                                  onClick={() => handleToggleCommentLike(comment.id)}
+                                >
+                                  <span>❤️</span> {comment.likesCount || 0}
+                                </button>
+                                <button 
+                                  className="forum-card-action-btn"
+                                  onClick={() => {
+                                    if (replyInputRef.current) {
+                                      replyInputRef.current.focus();
+                                      document.execCommand('insertHTML', false, `<strong>@${comment.author}</strong>&nbsp;`);
+                                    }
+                                  }}
+                                >
+                                  Reply
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        {threadComments.length === 0 && (
+                          <p style={{ fontStyle: 'italic', fontSize: '13.5px', color: '#64748b', textAlign: 'center', padding: '24px 0' }}>
+                            No comments yet. Start the conversation!
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Reply Editor Row */}
+                      <div className="forum-editor-row-stv">
+                        <div className="forum-card-avatar-stv" style={{ background: '#4f46e5', width: '32px', height: '32px', fontSize: '13px' }}>
+                          {getAuth()?.user?.fullName ? String(getAuth().user.fullName)[0].toUpperCase() : 'G'}
+                        </div>
+                        <div className="forum-editor-container-stv">
+                          <div 
+                            ref={replyInputRef}
+                            className="forum-editor-box-stv" 
+                            contentEditable
+                            data-placeholder="Write a reply..."
+                            style={{ minHeight: '80px', outline: 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                          />
+                          
+                          {/* Formatting Toolbar */}
+                          <div className="forum-editor-toolbar-stv">
+                            <button className="forum-toolbar-btn-stv" title="Bold" onClick={() => handleInsertFormat('bold')}>B</button>
+                            <button className="forum-toolbar-btn-stv" title="Italic" onClick={() => handleInsertFormat('italic')}>I</button>
+                            <button className="forum-toolbar-btn-stv" title="Quote" onClick={() => handleInsertFormat('quote')}>”</button>
+                            <button className="forum-toolbar-btn-stv" title="Code" onClick={() => handleInsertFormat('code')}>&lt;/&gt;</button>
+                            <button className="forum-toolbar-btn-stv" title="Link" onClick={() => handleInsertFormat('link')}>🔗</button>
+                            <button 
+                              className="mod-btn approve" 
+                              onClick={handlePostReply}
+                              disabled={submitting}
+                              style={{ marginLeft: 'auto', padding: '6px 12px', fontSize: '12px', height: '28px', minHeight: '28px', opacity: submitting ? 0.7 : 1 }}
+                            >
+                              {submitting ? 'Posting...' : 'Reply'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Sidebar Control Column */}
+                  <div className="forum-detail-right-stv">
+                    <div className="forum-sidebar-panel">
+                      {/* Action buttons */}
+                      <button 
+                        className="forum-panel-btn primary"
+                        onClick={() => {
+                          if (replyInputRef.current) {
+                            replyInputRef.current.focus();
+                            replyInputRef.current.scrollIntoView({ behavior: 'smooth' });
+                          }
+                        }}
+                      >
+                        Reply
+                      </button>
+                      
+                      {/* Follow dropdown setting */}
+                      <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                        <button 
+                          className="forum-panel-btn follow" 
+                          onClick={() => setShowDetailFollowDropdown(!showDetailFollowDropdown)}
+                        >
+                          ⭐ {followedThreads.includes(selectedThread.id) ? 'Following' : 'Not Tracking'}
+                        </button>
+                        
+                        {showDetailFollowDropdown && (
+                          <div className="forum-threedots-dropdown" style={{ top: '100%', left: 0, width: '100%' }}>
+                            <button 
+                              className="forum-dropdown-item"
+                              onClick={() => {
+                                if (!followedThreads.includes(selectedThread.id)) {
+                                  setFollowedThreads(prev => [...prev, selectedThread.id]);
+                                  toast.info('Thread followed!');
+                                }
+                                setShowDetailFollowDropdown(false);
+                              }}
+                            >
+                              <span>⭐</span> Tracking (All replies)
+                            </button>
+                            <button 
+                              className="forum-dropdown-item"
+                              onClick={() => {
+                                if (followedThreads.includes(selectedThread.id)) {
+                                  setFollowedThreads(prev => prev.filter(id => id !== selectedThread.id));
+                                  toast.info('Thread unfollowed.');
+                                }
+                                setShowDetailFollowDropdown(false);
+                              }}
+                            >
+                              <span>☆</span> Not Tracking
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <button 
+                        className="forum-panel-btn report" 
+                        onClick={() => handleTriggerReport(selectedThread)}
+                      >
+                        🚩 Report Thread
+                      </button>
+
+                      {/* progression tracker */}
+                      <div className="forum-progress-tracker">
+                        <div className="forum-progress-title">Post Count</div>
+                        <div className="forum-progress-bar-stv">
+                          <div 
+                            className="forum-progress-bar-fill" 
+                            style={{ width: `${Math.min(100, (threadComments.length / 10) * 100)}%` }} 
+                          />
+                        </div>
+                        <div className="forum-progress-label-stv">
+                          <span>{threadComments.length + 1} posts</span>
+                          <span>{threadComments.length >= 10 ? 'Hot' : 'Quiet'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* ── NORMAL LIST LAYOUT ── */
+            <>
+              {/* Header */}
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                marginBottom: '28px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                paddingBottom: '16px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
+                  <h2 className="section-title" style={{ margin: 0 }}>💬 Forum Discussions</h2>
+                  <span style={{ fontSize: '12.5px', color: '#64748b' }}>
+                    {totalElements} posts total
+                  </span>
                 </div>
               </div>
 
-              {/* Threads list */}
-              {loading ? (
-                <div className="skeleton-forum-feed">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="skeleton-forum-card">
-                      <div className="skeleton-forum-header">
-                        <div className="skeleton-circle skeleton-shimmer" style={{ width: '24px', height: '24px' }}></div>
-                        <div className="skeleton-line skeleton-shimmer short" style={{ height: '16px', margin: 0, width: '120px' }}></div>
-                        <div className="skeleton-line skeleton-shimmer long" style={{ height: '16px', margin: 0, flex: 1 }}></div>
-                      </div>
-                      <div className="skeleton-line skeleton-shimmer long" style={{ marginTop: '12px' }}></div>
-                      <div className="skeleton-line skeleton-shimmer medium"></div>
+              <div style={{ display: 'flex', gap: '32px' }}>
+                {/* ── LEFT SIDEBAR (STV STYLE) ───────── */}
+                <aside style={{ width: '240px', flexShrink: 0 }}>
+                  <button 
+                    className="forum-btn-create-stv" 
+                    onClick={() => setShowNewPostModal(true)}
+                  >
+                    <span>+</span> Create Discussion
+                  </button>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div 
+                      className={`forum-sidebar-item-stv ${selectedCategory === 'All' ? 'active' : ''}`}
+                      onClick={() => setSelectedCategory('All')}
+                    >
+                      <span>💬 All Discussions</span>
+                      <span style={{ fontSize: '11px', opacity: 0.8 }}>{getCategoryCount('All')}</span>
                     </div>
-                  ))}
-                </div>
-              ) : processedThreads.length > 0 ? (
-                <>
-                  <div className="forum-threads-list">
-                    {paginatedThreads.map((thread) => (
-                      <div key={thread.id} className="forum-thread-card">
-                        <div className="forum-thread-header">
-                          {thread.isPinned && <span className="forum-badge pinned">Pinned</span>}
-                          {thread.isHot && <span className="forum-badge hot">🔥 Hot</span>}
-                          <span className="forum-badge category">{thread.category}</span>
-                          <h4 className="forum-thread-title">{thread.title}</h4>
+                    <div 
+                      className={`forum-sidebar-item-stv ${selectedCategory === 'Following' ? 'active' : ''}`}
+                      onClick={() => setSelectedCategory('Following')}
+                    >
+                      <span>⭐ Following</span>
+                      <span style={{ fontSize: '11px', opacity: 0.8 }}>{getCategoryCount('Following')}</span>
+                    </div>
+
+                    {/* Category Divider */}
+                    <h4 style={{ color: '#64748b', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginTop: '20px', marginBottom: '8px', paddingLeft: '14px' }}>
+                      🏷️ Categories
+                    </h4>
+
+                    {/* Categories List */}
+                    {categoriesList.filter(c => c.name !== 'All').map(cat => (
+                      <div
+                        key={cat.name}
+                        className={`forum-sidebar-item-stv ${selectedCategory === cat.name ? 'active' : ''}`}
+                        onClick={() => setSelectedCategory(cat.name)}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className="forum-cat-dot" style={{ background: getCategoryColor(cat.name) }} />
+                          <span>{cat.name}</span>
                         </div>
-
-                        <p className="forum-thread-body">{thread.content}</p>
-
-                        <div className="forum-thread-footer">
-                          <div className="forum-thread-footer-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                            <div className="forum-author-badge">
-                              <div className="forum-avatar-placeholder">
-                                {String(thread.author)[0].toUpperCase()}
-                              </div>
-                              <span className="forum-author-name">{thread.author}</span>
-                            </div>
-                            <span className="forum-time-posted">{thread.timeAgo}</span>
-                          </div>
-
-                          <div className="forum-thread-footer-right" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                            <div className="forum-metric-item">
-                              <span>👁️</span> {thread.views}
-                            </div>
-                            <div className="forum-metric-item">
-                              <span>💬</span> {thread.replies}
-                            </div>
-                            <div 
-                              className={`forum-metric-item ${thread.isLiked ? 'liked-active' : ''}`}
-                              onClick={(e) => handleToggleLike(thread.id, e)}
-                            >
-                              <span>❤️</span> {thread.likes}
-                            </div>
-                          </div>
-                        </div>
+                        <span style={{ fontSize: '11px', opacity: 0.8 }}>{getCategoryCount(cat.name)}</span>
                       </div>
                     ))}
                   </div>
+                </aside>
 
-                  {/* Pagination Controls */}
-                  {totalPages > 1 && (
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '32px' }}>
-                      <button
-                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                        disabled={currentPage === 1}
-                        style={{
-                          background: currentPage === 1 ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
-                          border: '1px solid rgba(255,255,255,0.06)',
-                          color: currentPage === 1 ? '#64748b' : 'white',
-                          borderRadius: '6px',
-                          padding: '8px 16px',
-                          fontSize: '13px',
-                          cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                          fontWeight: '600',
-                          transition: 'all 0.2s ease'
-                        }}
+                {/* ── RIGHT MAIN CONTENT AREA ────────────────── */}
+                <main style={{ flexGrow: 1, minWidth: 0 }}>
+                  {/* Sorter tabs & Search input row */}
+                  <div className="forum-search-row">
+                    {/* Tabs */}
+                    <div style={{ display: 'flex', gap: '16px', borderBottom: '1px solid rgba(255,255,255,0.04)', flexGrow: 1, paddingBottom: '1px' }}>
+                      {['All', 'Hot', 'New', 'Announcements'].map(tab => (
+                        <div
+                          key={tab}
+                          onClick={() => setActiveSortTab(tab)}
+                          style={{
+                            color: activeSortTab === tab ? 'white' : '#94a3b8',
+                            fontSize: '13.5px',
+                            fontWeight: '600',
+                            padding: '8px 4px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            borderBottom: '2px solid transparent',
+                            borderBottomColor: activeSortTab === tab ? '#a855f7' : 'transparent'
+                          }}
+                        >
+                          {tab}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Search posts inside thread list */}
+                    <div className="forum-search-input-wrapper" style={{ width: '240px', flexGrow: 0 }}>
+                      <input 
+                        type="text" 
+                        placeholder="Search posts..." 
+                        className="forum-search-field"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        style={{ padding: '8px 12px 8px 34px' }}
+                      />
+                      <svg 
+                        viewBox="0 0 24 24" 
+                        width="14" 
+                        height="14" 
+                        fill="none" 
+                        stroke="#64748b" 
+                        strokeWidth="2.5" 
+                        style={{ position: 'absolute', left: '12px', top: '11px' }}
                       >
-                        Previous
-                      </button>
-                      <span style={{ fontSize: '13px', color: '#cbd5e1' }}>
-                        Page <strong>{currentPage}</strong> of {totalPages}
-                      </span>
-                      <button
-                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                        disabled={currentPage === totalPages}
-                        style={{
-                          background: currentPage === totalPages ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
-                          border: '1px solid rgba(255,255,255,0.06)',
-                          color: currentPage === totalPages ? '#64748b' : 'white',
-                          borderRadius: '6px',
-                          padding: '8px 16px',
-                          fontSize: '13px',
-                          cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                          fontWeight: '600',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        Next
-                      </button>
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Threads list */}
+                  {loading ? (
+                    <div className="skeleton-forum-feed">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="skeleton-forum-card">
+                          <div className="skeleton-forum-header">
+                            <div className="skeleton-circle skeleton-shimmer" style={{ width: '24px', height: '24px' }}></div>
+                            <div className="skeleton-line skeleton-shimmer short" style={{ height: '16px', margin: 0, width: '120px' }}></div>
+                            <div className="skeleton-line skeleton-shimmer long" style={{ height: '16px', margin: 0, flex: 1 }}></div>
+                          </div>
+                          <div className="skeleton-line skeleton-shimmer long" style={{ marginTop: '12px' }}></div>
+                          <div className="skeleton-line skeleton-shimmer medium"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : processedThreads.length > 0 ? (
+                    <>
+                      <div className="forum-threads-list">
+                        {paginatedThreads.map((thread) => (
+                          <div 
+                            key={thread.id} 
+                            className="forum-thread-card-stv" 
+                          >
+                            {/* Left avatar and pin */}
+                            <div className="forum-card-left-stv">
+                              <div 
+                                className="forum-card-avatar-stv" 
+                                style={{ background: getCategoryColor(thread.category) }}
+                              >
+                                {String(thread.author)[0].toUpperCase()}
+                              </div>
+                              {thread.isPinned && (
+                                <span className="forum-card-pin-stv" title="Pinned">📌</span>
+                              )}
+                            </div>
+
+                            {/* Middle details */}
+                            <div className="forum-card-middle-stv">
+                              <h4 
+                                className="forum-card-title-stv" 
+                                onClick={() => handleOpenThread(thread)}
+                              >
+                                {thread.title}
+                              </h4>
+                              <div className="forum-card-subtitle-stv">
+                                <span>by <strong>{thread.author}</strong></span>
+                                <span>•</span>
+                                <span>{thread.timeAgo || 'recently'}</span>
+                              </div>
+                            </div>
+
+                            {/* Right tags and actions */}
+                            <div className="forum-card-right-stv">
+                              <span className="forum-card-badge-stv">{thread.category || 'General'}</span>
+                              <span className="forum-card-replies-stv">
+                                <span>💬</span> {thread.replies}
+                              </span>
+                              
+                              <div className="forum-threedots-container" onClick={(e) => e.stopPropagation()}>
+                                <button 
+                                  className={`forum-threedots-trigger ${activeDropdownThreadId === thread.id ? 'active' : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveDropdownThreadId(activeDropdownThreadId === thread.id ? null : thread.id);
+                                  }}
+                                >
+                                  ⋮
+                                </button>
+                                {activeDropdownThreadId === thread.id && (
+                                  <div className="forum-threedots-dropdown">
+                                    <button 
+                                      className="forum-dropdown-item" 
+                                      onClick={(e) => {
+                                        handleToggleFollow(thread.id, e);
+                                        setActiveDropdownThreadId(null);
+                                      }}
+                                    >
+                                      <span>⭐</span> {followedThreads.includes(thread.id) ? 'Unfollow' : 'Follow'}
+                                    </button>
+                                    <button 
+                                      className="forum-dropdown-item" 
+                                      onClick={(e) => {
+                                        handleTriggerReport(thread, e);
+                                        setActiveDropdownThreadId(null);
+                                      }}
+                                    >
+                                      <span>🚩</span> Report
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Pagination Controls */}
+                      {totalPages > 1 && (
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '32px' }}>
+                          <button
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                            style={{
+                              background: currentPage === 1 ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                              border: '1px solid rgba(255,255,255,0.06)',
+                              color: currentPage === 1 ? '#64748b' : 'white',
+                              borderRadius: '6px',
+                              padding: '8px 16px',
+                              fontSize: '13px',
+                              cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                              fontWeight: '600',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            Previous
+                          </button>
+                          <span style={{ fontSize: '13px', color: '#cbd5e1' }}>
+                            Page <strong>{currentPage}</strong> of {totalPages}
+                          </span>
+                          <button
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={currentPage === totalPages}
+                            style={{
+                              background: currentPage === totalPages ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                              border: '1px solid rgba(255,255,255,0.06)',
+                              color: currentPage === totalPages ? '#64748b' : 'white',
+                              borderRadius: '6px',
+                              padding: '8px 16px',
+                              fontSize: '13px',
+                              cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                              fontWeight: '600',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            Next
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        padding: '80px 20px',
+                        background: 'rgba(255,255,255,0.02)',
+                        borderRadius: '16px',
+                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        color: '#64748b'
+                      }}
+                    >
+                      <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>💬</span>
+                      <h3 style={{ color: 'white', margin: '0 0 8px' }}>No Posts Found</h3>
+                      <p style={{ margin: 0, fontSize: '13.5px' }}>
+                        There are no discussions matching your current category filter or search query. Start a new thread!
+                      </p>
                     </div>
                   )}
-                </>
-              ) : (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    padding: '80px 20px',
-                    background: 'rgba(255,255,255,0.02)',
-                    borderRadius: '16px',
-                    border: '1px solid rgba(255, 255, 255, 0.05)',
-                    color: '#64748b'
-                  }}
-                >
-                  <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>💬</span>
-                  <h3 style={{ color: 'white', margin: '0 0 8px' }}>No Posts Found</h3>
-                  <p style={{ margin: 0, fontSize: '13.5px' }}>
-                    There are no discussions matching your current category filter or search query. Start a new thread!
-                  </p>
-                </div>
-              )}
-            </main>
-          </div>
+                </main>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -542,21 +1252,67 @@ function Forum() {
                   onChange={(e) => setNewPostForm({ ...newPostForm, content: e.target.value })}
                 />
               </div>
-
               {/* Buttons */}
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
                 <button 
                   className="mod-btn" 
                   style={{ background: 'rgba(255,255,255,0.05)', color: 'white' }}
                   onClick={() => setShowNewPostModal(false)}
+                  disabled={submitting}
                 >
                   Cancel
                 </button>
                 <button 
                   className="mod-btn approve" 
                   onClick={handlePublishPost}
+                  disabled={submitting}
+                  style={{ opacity: submitting ? 0.7 : 1 }}
                 >
-                  Publish Post
+                  {submitting ? 'Publishing...' : 'Publish Post'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── MODAL: REPORT THREAD (STV STYLE) ────────────────── */}
+      {showReportModal && threadToReport && (
+        <div className="mod-modal-overlay" style={{ zIndex: 10000 }} onClick={() => setShowReportModal(false)}>
+          <div className="mod-modal-card" style={{ maxWidth: '440px' }} onClick={e => e.stopPropagation()}>
+            <div className="mod-modal-header">
+              <h3>Report Discussion Thread</h3>
+              <button className="mod-modal-close-btn" onClick={() => setShowReportModal(false)}>×</button>
+            </div>
+            <div className="mod-modal-body" style={{ padding: '20px 24px' }}>
+              <p style={{ fontSize: '13.5px', color: '#94a3b8', margin: '0 0 16px', lineHeight: '1.5' }}>
+                You are reporting: <strong>"{threadToReport.title}"</strong>. Please provide a reason below for the moderators to review.
+              </p>
+              <div className="forum-form-group">
+                <label>Reason for Report *</label>
+                <textarea 
+                  className="forum-textarea-field" 
+                  placeholder="Spam, harassment, spoilers, off-topic..."
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  style={{ minHeight: '80px' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button 
+                  className="mod-btn" 
+                  style={{ background: 'rgba(255,255,255,0.05)', color: 'white' }}
+                  onClick={() => setShowReportModal(false)}
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+                <button 
+                  className="mod-btn reject" 
+                  onClick={handleReportThreadSubmit}
+                  style={{ background: '#ef4444', opacity: submitting ? 0.7 : 1 }}
+                  disabled={submitting}
+                >
+                  {submitting ? 'Submitting...' : 'Submit Report'}
                 </button>
               </div>
             </div>

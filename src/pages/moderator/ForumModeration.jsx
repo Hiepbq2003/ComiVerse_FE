@@ -54,6 +54,7 @@ function ForumModeration({ fetchAllData }) {
   const [activeTab, setActiveTab] = useState('threads') // 'threads' | 'reports' | 'categories'
   const [threads, setThreads] = useState([])
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   
   // Local state for dynamically added custom categories (persisted in localStorage)
   const [customCategories, setCustomCategories] = useState(() => {
@@ -106,9 +107,11 @@ function ForumModeration({ fetchAllData }) {
 
   // ── THREAD ACTIONS ─────────────────────────────────
   const togglePin = async (id) => {
+    if (submitting) return
     const thread = threads.find(t => t.id === id)
     if (!thread) return
     try {
+      setSubmitting(true)
       const nextState = !thread.isPinned
       await updateForumThreadApi(id, {
         ...thread,
@@ -120,13 +123,17 @@ function ForumModeration({ fetchAllData }) {
     } catch (err) {
       console.error(err)
       toast.error('Failed to update pin state in DB!')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   const toggleLock = async (id) => {
+    if (submitting) return
     const thread = threads.find(t => t.id === id)
     if (!thread) return
     try {
+      setSubmitting(true)
       const nextState = !thread.isLocked
       await updateForumThreadApi(id, {
         ...thread,
@@ -138,12 +145,16 @@ function ForumModeration({ fetchAllData }) {
     } catch (err) {
       console.error(err)
       toast.error('Failed to update lock state in DB!')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   const handleDeleteThread = async (id, title) => {
+    if (submitting) return
     if (window.confirm(`Are you sure you want to delete the thread "${title}"?`)) {
       try {
+        setSubmitting(true)
         await deleteForumThreadApi(id)
         setThreads(prev => prev.filter(t => t.id !== id))
         fetchAllData?.()
@@ -151,15 +162,19 @@ function ForumModeration({ fetchAllData }) {
       } catch (err) {
         console.error(err)
         toast.error('Failed to delete thread!')
+      } finally {
+        setSubmitting(false)
       }
     }
   }
 
   // ── REPORT ACTIONS ─────────────────────────────────
   const handleResolveReport = async (threadId) => {
+    if (submitting) return
     const thread = threads.find(t => t.id === threadId)
     if (!thread) return
     try {
+      setSubmitting(true)
       await updateForumThreadApi(threadId, {
         ...thread,
         isReported: false,
@@ -171,13 +186,17 @@ function ForumModeration({ fetchAllData }) {
     } catch (err) {
       console.error(err)
       toast.error('Failed to resolve report!')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   const handleDismissReport = async (threadId) => {
+    if (submitting) return
     const thread = threads.find(t => t.id === threadId)
     if (!thread) return
     try {
+      setSubmitting(true)
       await updateForumThreadApi(threadId, {
         ...thread,
         isReported: false,
@@ -189,12 +208,16 @@ function ForumModeration({ fetchAllData }) {
     } catch (err) {
       console.error(err)
       toast.error('Failed to dismiss report!')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   const handleRemoveReportThread = async (threadId, title) => {
+    if (submitting) return
     if (window.confirm(`Are you sure you want to remove the reported thread "${title}"?`)) {
       try {
+        setSubmitting(true)
         await deleteForumThreadApi(threadId)
         setThreads(prev => prev.filter(t => t.id !== threadId))
         fetchAllData?.()
@@ -202,29 +225,39 @@ function ForumModeration({ fetchAllData }) {
       } catch (err) {
         console.error(err)
         toast.error('Failed to remove thread!')
+      } finally {
+        setSubmitting(false)
       }
     }
   }
 
   // ── CATEGORY ACTIONS ───────────────────────────────
   const handleAddCategory = () => {
+    if (submitting) return
     if (!newCatName.trim()) return
     const name = newCatName.trim()
-    if (!customCategories.includes(name)) {
-      setCustomCategories(prev => [...prev, name])
+    try {
+      setSubmitting(true)
+      if (!customCategories.includes(name)) {
+        setCustomCategories(prev => [...prev, name])
+      }
+      fetchAllData?.()
+      setNewCatName('')
+      setShowAddCategoryModal(false)
+      toast.success('New category added locally!')
+    } finally {
+      setSubmitting(false)
     }
-    fetchAllData?.()
-    setNewCatName('')
-    setShowAddCategoryModal(false)
-    toast.success('New category added locally!')
   }
 
   const handleEditCategory = async () => {
+    if (submitting) return
     if (!editCatName.trim() || editingCategory === null) return
     const oldName = categoriesList[editingCategory].name
     const newName = editCatName.trim()
     
     try {
+      setSubmitting(true)
       // Update all threads in DB that match the old category name
       const threadsToUpdate = threads.filter(t => t.category === oldName)
       await Promise.all(threadsToUpdate.map(t => 
@@ -242,12 +275,15 @@ function ForumModeration({ fetchAllData }) {
     } finally {
       setEditingCategory(null)
       setEditCatName('')
+      setSubmitting(false)
     }
   }
 
   const handleDeleteCategory = async (index, name) => {
+    if (submitting) return
     if (window.confirm(`Are you sure you want to delete the category "${name}"? Threads under this category will become uncategorized.`)) {
       try {
+        setSubmitting(true)
         // Set category to blank for all matching threads in DB
         const threadsToUpdate = threads.filter(t => t.category === name)
         await Promise.all(threadsToUpdate.map(t => 
@@ -261,6 +297,8 @@ function ForumModeration({ fetchAllData }) {
       } catch (err) {
         console.error(err)
         toast.error('Failed to clear category on database threads!')
+      } finally {
+        setSubmitting(false)
       }
     }
   }
@@ -422,6 +460,8 @@ function ForumModeration({ fetchAllData }) {
                             <button 
                               className={`mod-icon-action-btn ${t.isPinned ? 'pinned' : ''}`}
                               onClick={() => togglePin(t.id)}
+                              disabled={submitting}
+                              style={{ opacity: submitting ? 0.5 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}
                               title="Pin Thread"
                             >
                               📌
@@ -429,6 +469,8 @@ function ForumModeration({ fetchAllData }) {
                             <button 
                               className={`mod-icon-action-btn ${t.isLocked ? 'locked' : ''}`}
                               onClick={() => toggleLock(t.id)}
+                              disabled={submitting}
+                              style={{ opacity: submitting ? 0.5 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}
                               title="Lock Thread"
                             >
                               🔒
@@ -436,6 +478,8 @@ function ForumModeration({ fetchAllData }) {
                             <button 
                               className="mod-icon-action-btn delete"
                               onClick={() => handleDeleteThread(t.id, t.title)}
+                              disabled={submitting}
+                              style={{ opacity: submitting ? 0.5 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}
                               title="Delete Thread"
                             >
                               🗑️
@@ -488,24 +532,27 @@ function ForumModeration({ fetchAllData }) {
                   <div className="report-actions-row" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                     <ModernButton 
                       variant={2}
-                      label="✓ Mark Resolved"
+                      label={submitting ? 'Resolving...' : '✓ Mark Resolved'}
                       className="btn-approve"
                       onClick={() => handleResolveReport(rep.id)}
-                      style={{ height: '32px', minHeight: '32px', fontSize: '12px' }}
+                      disabled={submitting}
+                      style={{ height: '32px', minHeight: '32px', fontSize: '12px', opacity: submitting ? 0.7 : 1 }}
                     />
                     <ModernButton 
                       variant={2}
-                      label="🗑️ Remove Thread"
+                      label={submitting ? 'Removing...' : '🗑️ Remove Thread'}
                       className="btn-reject"
                       onClick={() => handleRemoveReportThread(rep.id, rep.title)}
-                      style={{ height: '32px', minHeight: '32px', fontSize: '12px' }}
+                      disabled={submitting}
+                      style={{ height: '32px', minHeight: '32px', fontSize: '12px', opacity: submitting ? 0.7 : 1 }}
                     />
                     <ModernButton 
                       variant={2}
-                      label="Dismiss"
+                      label={submitting ? 'Dismissing...' : 'Dismiss'}
                       className="btn-cancel"
                       onClick={() => handleDismissReport(rep.id)}
-                      style={{ height: '32px', minHeight: '32px', fontSize: '12px' }}
+                      disabled={submitting}
+                      style={{ height: '32px', minHeight: '32px', fontSize: '12px', opacity: submitting ? 0.7 : 1 }}
                     />
                   </div>
                 </div>
@@ -545,6 +592,8 @@ function ForumModeration({ fetchAllData }) {
                 <div className="category-card-actions" style={{ display: 'flex', gap: '6px', marginTop: '16px' }}>
                   <button 
                     className="cat-btn-action edit"
+                    disabled={submitting}
+                    style={{ opacity: submitting ? 0.6 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}
                     onClick={() => {
                       setEditingCategory(idx)
                       setEditCatName(cat.name)
@@ -554,6 +603,8 @@ function ForumModeration({ fetchAllData }) {
                   </button>
                   <button 
                     className="cat-btn-action delete"
+                    disabled={submitting}
+                    style={{ opacity: submitting ? 0.6 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}
                     onClick={() => handleDeleteCategory(idx, cat.name)}
                   >
                     🗑️
@@ -594,13 +645,14 @@ function ForumModeration({ fetchAllData }) {
                 label="Cancel" 
                 className="btn-cancel"
                 onClick={() => setShowAddCategoryModal(false)}
+                disabled={submitting}
               />
               <ModernButton 
                 variant={2} 
-                label="Create" 
+                label={submitting ? 'Creating...' : 'Create'} 
                 className="btn-approve"
                 onClick={handleAddCategory}
-                disabled={!newCatName.trim()}
+                disabled={submitting || !newCatName.trim()}
               />
             </div>
           </div>
@@ -636,13 +688,14 @@ function ForumModeration({ fetchAllData }) {
                 label="Cancel" 
                 className="btn-cancel"
                 onClick={() => setEditingCategory(null)}
+                disabled={submitting}
               />
               <ModernButton 
                 variant={2} 
-                label="Save" 
+                label={submitting ? 'Saving...' : 'Save'} 
                 className="btn-approve"
                 onClick={handleEditCategory}
-                disabled={!editCatName.trim()}
+                disabled={submitting || !editCatName.trim()}
               />
             </div>
           </div>

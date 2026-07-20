@@ -87,7 +87,7 @@ export const AIPopover = ({
           <img className="trigger__avatar" style={{ marginRight: '6px' }} src={data.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=80"} alt="" />
         )}
         {variant === 'menu' && (
-          <svg style={{ marginRight: '6px' }} xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+          <svg style={triggerText ? { marginRight: '6px' } : {}} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" strokeWidth="0"><circle cx="12" cy="5" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="12" cy="19" r="2.5"/></svg>
         )}
         {variant === 'notif' && (
           <svg style={triggerText ? { marginRight: '6px' } : {}} xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>

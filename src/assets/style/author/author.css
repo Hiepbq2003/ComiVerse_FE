@@ -393,3 +393,27 @@ html.light .author-sidebar-footer {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Persistent author shell: only route content changes during navigation. */
+.author-sidebar,
+.author-topbar {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.author-page-content.fade-in-quick {
+  animation: authorContentIn 0.18s ease-out;
+}
+
+@keyframes authorContentIn {
+  from { transform: translateY(3px); }
+  to { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .author-page-content.fade-in-quick,
+  .author-nav-item {
+    animation: none !important;
+    transition: none !important;
+  }
+}

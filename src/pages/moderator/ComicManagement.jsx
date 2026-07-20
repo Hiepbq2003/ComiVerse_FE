@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import '../../assets/style/moderator/comic-management.css'
 import ModernButton from '../../components/common/ModernButton'
+import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import { createTranslationRequestApi } from '../../services/api/TranslationPoolApi'
 import { toast } from 'react-toastify'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { updateComicApi } from '../../services/api/ComicApi'
+import { getChaptersByComicIdApi, deleteChapterApi } from '../../services/api/ChapterApi'
 
 function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, handleArchiveComic, handleTriggerAssignTeam, fetchAllData }) {
   // Search & Filters local states
@@ -51,6 +53,51 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
     deadline: ''
   })
   const [selectedTeamId, setSelectedTeamId] = useState('')
+
+  // Chapter Management modal states
+  const [showChaptersModal, setShowChaptersModal] = useState(false)
+  const [chaptersComic, setChaptersComic] = useState(null)
+  const [chaptersList, setChaptersList] = useState([])
+  const [chaptersLoading, setChaptersLoading] = useState(false)
+
+  const openChaptersModal = async (comic) => {
+    setChaptersComic(comic)
+    setChaptersList([])
+    setChaptersLoading(true)
+    setShowChaptersModal(true)
+    try {
+      const response = await getChaptersByComicIdApi(comic.id)
+      const data = response?.data?.data || response?.data || response || []
+      setChaptersList(Array.isArray(data) ? data : [])
+    } catch (err) {
+      toast.error('Failed to load chapters.')
+    } finally {
+      setChaptersLoading(false)
+    }
+  }
+
+  const handleDeleteChapter = async (chapterId) => {
+    if (!window.confirm('Are you sure you want to delete this chapter? This action cannot be undone.')) {
+      return
+    }
+    try {
+      await deleteChapterApi(chapterId)
+      toast.success('Chapter deleted successfully!')
+      // Refresh the chapters list
+      if (chaptersComic) {
+        const response = await getChaptersByComicIdApi(chaptersComic.id)
+        const data = response?.data?.data || response?.data || response || []
+        setChaptersList(Array.isArray(data) ? data : [])
+      }
+      // Refresh the main comics table to update the chapter count!
+      if (fetchAllData) {
+        fetchAllData()
+      }
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Failed to delete chapter.'
+      toast.error(message)
+    }
+  }
 
   const openTranslationRequestModal = (comic) => {
     setTransReqComic(comic)
@@ -461,9 +508,9 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                     <div className="comic-actions-cell">
                       <ModernButton 
                         variant={2} 
-                        label="👁️ View" 
+                        label="📖 Chapters" 
                         className="btn-view"
-                        onClick={() => window.open(`/comic/${comic.id}`, '_blank')} 
+                        onClick={() => openChaptersModal(comic)} 
                       />
                       <ModernButton 
                         variant={2} 
@@ -832,6 +879,77 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                 label="Confirm Assignment" 
                 onClick={handleSubmitDirectAssignment}
                 disabled={!directAssignForm.targetLang || !selectedTeamId}
+              />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+      {/* ── MODAL: MANAGE CHAPTERS ─────────────── */}
+      {showChaptersModal && chaptersComic && createPortal(
+        <div className="mod-modal-overlay">
+          <div className="mod-modal-card" style={{ maxWidth: '800px', width: '90%' }}>
+            <div className="mod-modal-header">
+              <h3>📖 Chapters of {chaptersComic.title}</h3>
+              <button className="mod-modal-close-btn" onClick={() => setShowChaptersModal(false)}>×</button>
+            </div>
+
+            <div className="mod-modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+              {chaptersLoading ? (
+                <SkeletonLoader count={5} height={40} style={{ marginBottom: '10px' }} />
+              ) : chaptersList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--mod-text-secondary)' }}>
+                  No chapters found for this comic.
+                </div>
+              ) : (
+                <table className="mod-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--mod-border)' }}>
+                      <th style={{ textAlign: 'left', padding: '12px' }}>Chapter #</th>
+                      <th style={{ textAlign: 'left', padding: '12px' }}>Title</th>
+                      <th style={{ textAlign: 'left', padding: '12px' }}>Type</th>
+                      <th style={{ textAlign: 'left', padding: '12px' }}>Created Date</th>
+                      <th style={{ textAlign: 'left', padding: '12px' }}>Views</th>
+                      <th style={{ textAlign: 'right', padding: '12px' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {chaptersList.map((chap) => (
+                      <tr key={chap.id} style={{ borderBottom: '1px solid var(--mod-border)' }}>
+                        <td style={{ padding: '12px', fontWeight: 'bold' }}>Chapter {chap.chapterNumber}</td>
+                        <td style={{ padding: '12px' }}>{chap.title || <span style={{ color: 'var(--mod-text-muted)', fontStyle: 'italic' }}>Untitled</span>}</td>
+                        <td style={{ padding: '12px' }}>
+                          <span className={`comic-status-badge ${chap.isPremium ? 'paused' : 'ongoing'}`} style={{ fontSize: '11px', padding: '2px 6px' }}>
+                            {chap.isPremium ? 'Premium' : 'Free'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', fontSize: '13px' }}>
+                          {chap.createdAt ? new Date(chap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+                        </td>
+                        <td style={{ padding: '12px' }}>{chap.viewCount || 0}</td>
+                        <td style={{ padding: '12px', textAlign: 'right' }}>
+                          <ModernButton 
+                            variant={5} 
+                            label="🗑️ Delete" 
+                            className="btn-archive"
+                            onClick={() => handleDeleteChapter(chap.id)}
+                            style={{ height: '30px', minHeight: '30px', minWidth: '70px', padding: '0 10px', fontSize: '12px' }}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="mod-modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 0 0' }}>
+              <ModernButton 
+                variant={2} 
+                label="Close" 
+                className="btn-cancel"
+                onClick={() => setShowChaptersModal(false)}
+                style={{ width: '100px' }}
               />
             </div>
           </div>

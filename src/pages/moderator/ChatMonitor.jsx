@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import '../../assets/style/moderator/chat-monitor.css'
 import { getAllChatFlagsApi, warnChatFlagApi, deleteChatFlagApi } from '../../services/api/ChatFlagApi'
 import { toast } from 'react-toastify'
-
 function ChatMonitor({ fetchAllData }) {
   const [flags, setFlags] = useState([])
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     fetchFlags()
@@ -26,19 +26,25 @@ function ChatMonitor({ fetchAllData }) {
   }
 
   const handleSendWarning = async (id, user) => {
+    if (submitting) return
     try {
+      setSubmitting(true)
       const updated = await warnChatFlagApi(id)
       setFlags(prev => prev.map(f => f.id === id ? updated : f))
       toast.success(`Warning sent to user: ${user}`)
     } catch (err) {
       console.error(err)
       toast.error('Failed to send warning!')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   const handleBanUser = async (id, user) => {
+    if (submitting) return
     if (window.confirm(`Are you sure you want to permanently ban user: ${user}?`)) {
       try {
+        setSubmitting(true)
         await deleteChatFlagApi(id)
         setFlags(prev => prev.filter(f => f.id !== id))
         fetchAllData?.()
@@ -46,6 +52,8 @@ function ChatMonitor({ fetchAllData }) {
       } catch (err) {
         console.error(err)
         toast.error('Failed to ban user!')
+      } finally {
+        setSubmitting(false)
       }
     }
   }
@@ -82,17 +90,20 @@ function ChatMonitor({ fetchAllData }) {
                   ) : (
                     <button 
                       className="mod-btn review" 
-                      style={{ borderColor: 'var(--mod-red)', color: 'var(--mod-red)' }}
+                      style={{ borderColor: 'var(--mod-red)', color: 'var(--mod-red)', opacity: submitting ? 0.7 : 1 }}
                       onClick={() => handleSendWarning(f.id, f.user)}
+                      disabled={submitting}
                     >
-                      ⚠️ Send Warning
+                      {submitting ? 'Sending...' : '⚠️ Send Warning'}
                     </button>
                   )}
                   <button 
                     className="mod-btn reject"
                     onClick={() => handleBanUser(f.id, f.user)}
+                    disabled={submitting}
+                    style={{ opacity: submitting ? 0.7 : 1 }}
                   >
-                    🚫 Ban User
+                    {submitting ? 'Banning...' : '🚫 Ban User'}
                   </button>
                 </div>
               </div>

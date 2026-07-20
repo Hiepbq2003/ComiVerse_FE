@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getComicLeaderboardApi } from '../../services/api/ComicApi'
+import axios from 'axios'
 
 // Import assets
 import comicAction from '../../assets/comic_action.png'
@@ -41,29 +42,27 @@ function Ranking() {
   }, [searchParams])
 
   useEffect(() => {
-    let isMounted = true
+    const controller = new AbortController()
     const fetchTrending = async () => {
       try {
         setLoading(true)
-        const res = await getComicLeaderboardApi({ timeframe })
+        const res = await getComicLeaderboardApi({ timeframe }, { signal: controller.signal })
         const dataList = getArrayOrData(res)
-        if (isMounted) {
-          setComics(dataList)
-        }
+        setComics(dataList)
       } catch (err) {
-        console.error('Failed to fetch leaderboard:', err)
-        if (isMounted) {
+        if (err.name !== 'CanceledError' && !axios.isCancel(err)) {
+          console.error('Failed to fetch leaderboard:', err)
           setComics([])
         }
       } finally {
-        if (isMounted) {
+        if (!controller.signal.aborted) {
           setLoading(false)
         }
       }
     }
     fetchTrending()
     return () => {
-      isMounted = false
+      controller.abort()
     }
   }, [timeframe])
 

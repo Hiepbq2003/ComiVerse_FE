@@ -7,6 +7,7 @@ import { toast } from 'react-toastify'
 function GenreManagement({ comics }) {
   const [genres, setGenres] = useState([])
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
 
   // Custom modal states
   const [showAddModal, setShowAddModal] = useState(false)
@@ -37,6 +38,7 @@ function GenreManagement({ comics }) {
   }
 
   const submitAddGenre = async () => {
+    if (submitting) return
     if (!addGenreName || !addGenreName.trim()) {
       toast.warn('Please enter a genre name.')
       return
@@ -48,6 +50,7 @@ function GenreManagement({ comics }) {
       return
     }
     try {
+      setSubmitting(true)
       const newGenre = await createGenreApi({
         name: nameTrimmed,
         slug: nameTrimmed.toLowerCase().replace(/\s+/g, '-')
@@ -59,6 +62,8 @@ function GenreManagement({ comics }) {
     } catch (err) {
       console.error(err)
       toast.error('Failed to add genre!')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -69,6 +74,7 @@ function GenreManagement({ comics }) {
   }
 
   const submitEditGenre = async () => {
+    if (submitting) return
     if (!editGenreName || !editGenreName.trim()) {
       toast.warn('Please enter a genre name.')
       return
@@ -79,6 +85,7 @@ function GenreManagement({ comics }) {
       return
     }
     try {
+      setSubmitting(true)
       const updated = await updateGenreApi(editingGenre.id, {
         name: nameTrimmed,
         slug: nameTrimmed.toLowerCase().replace(/\s+/g, '-')
@@ -92,6 +99,8 @@ function GenreManagement({ comics }) {
     } catch (err) {
       console.error(err)
       toast.error('Failed to update genre!')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -101,8 +110,10 @@ function GenreManagement({ comics }) {
   }
 
   const submitDeleteGenre = async () => {
+    if (submitting) return
     if (!genreToDelete) return
     try {
+      setSubmitting(true)
       await deleteGenreApi(genreToDelete.id)
       setGenres(prev => prev.filter(g => g.id !== genreToDelete.id))
       toast.success('Genre deleted successfully!')
@@ -111,6 +122,8 @@ function GenreManagement({ comics }) {
     } catch (err) {
       console.error(err)
       toast.error('Failed to delete genre!')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -240,14 +253,17 @@ function GenreManagement({ comics }) {
                   className="mod-btn" 
                   style={{ background: 'rgba(128,128,128,0.1)', color: 'var(--mod-text-primary)', border: '1px solid var(--mod-border)' }}
                   onClick={() => setShowAddModal(false)}
+                  disabled={submitting}
                 >
                   Cancel
                 </button>
                 <button 
                   className="mod-btn approve" 
                   onClick={submitAddGenre}
+                  disabled={submitting}
+                  style={{ opacity: submitting ? 0.7 : 1 }}
                 >
-                  Create
+                  {submitting ? 'Creating...' : 'Create'}
                 </button>
               </div>
             </div>
@@ -280,14 +296,17 @@ function GenreManagement({ comics }) {
                   className="mod-btn" 
                   style={{ background: 'rgba(128,128,128,0.1)', color: 'var(--mod-text-primary)', border: '1px solid var(--mod-border)' }}
                   onClick={() => setShowEditModal(false)}
+                  disabled={submitting}
                 >
                   Cancel
                 </button>
                 <button 
                   className="mod-btn approve" 
                   onClick={submitEditGenre}
+                  disabled={submitting}
+                  style={{ opacity: submitting ? 0.7 : 1 }}
                 >
-                  Save Changes
+                  {submitting ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </div>
@@ -330,6 +349,7 @@ function GenreManagement({ comics }) {
                       padding: '8px 20px' 
                     }}
                     onClick={() => setShowDeleteModal(false)}
+                    disabled={submitting}
                   >
                     Cancel
                   </button>
@@ -339,11 +359,13 @@ function GenreManagement({ comics }) {
                       padding: '8px 20px', 
                       background: 'linear-gradient(135deg, #f59e0b, #d97706)',
                       border: 'none',
-                      color: '#ffffff'
+                      color: '#ffffff',
+                      opacity: submitting ? 0.7 : 1
                     }}
                     onClick={submitDeleteGenre}
+                    disabled={submitting}
                   >
-                    Archive
+                    {submitting ? 'Archiving...' : 'Archive'}
                   </button>
                 </div>
               </div>

@@ -12,6 +12,22 @@ export const likeTeamAnnouncementApi = async (id) => {
   return AxiosClient.put(`/team-workspace/announcements/${id}/like`)
 }
 
+export const pinTeamAnnouncementApi = async (id) => {
+  return AxiosClient.put(`/team-workspace/announcements/${id}/pin`)
+}
+
+export const getTeamPostCommentsApi = async (announcementId) => {
+  return AxiosClient.get(`/team-workspace/announcements/${announcementId}/comments`)
+}
+
+export const createTeamPostCommentApi = async (announcementId, comment) => {
+  return AxiosClient.post(`/team-workspace/announcements/${announcementId}/comments`, comment)
+}
+
+export const likeTeamPostCommentApi = async (id) => {
+  return AxiosClient.put(`/team-workspace/comments/${id}/like`)
+}
+
 export const getTeamMessagesApi = async (teamId) => {
   return AxiosClient.get(`/team-workspace/${teamId}/messages`)
 }
@@ -50,4 +66,8 @@ export const getChapterBacklogApi = async (teamId) => {
 
 export const createTeamRequestApi = async (teamId, request) => {
   return AxiosClient.post(`/team-workspace/${teamId}/requests`, request)
+}
+
+export const getRequestsByNameApi = async (name) => {
+  return AxiosClient.get('/team-workspace/requests/by-name', { params: { name } })
 }
