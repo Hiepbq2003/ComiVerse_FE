@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { AIPopover } from '../common/AIPopover'
-import '../../assets/style/translator.css'
+import '../../assets/style/translator/translator.css'
 
 function TranslatorLayout({ children }) {
   const navigate = useNavigate()
@@ -34,18 +34,23 @@ function TranslatorLayout({ children }) {
     }
   }
 
-  const handleNotificationAction = (actionId) => {
-    if (actionId === 'markAllRead') {
+  const handleNotificationAction = async (action) => {
+    if (action === 'markAllRead') {
       markAllAsRead()
     } else {
-      markAsRead(actionId)
+      if (action.unread) await markAsRead(action.id)
+      if (action.actionUrl?.startsWith('/') && !action.actionUrl.startsWith('//')) {
+        navigate(action.actionUrl)
+      }
     }
   }
 
   const formattedNotifications = notifications.map(n => ({
     id: n.id,
     unread: !n.isRead,
-    msg: `<strong>${n.title || 'Notification'}</strong>: ${n.message || ''}`,
+    title: n.title || 'Notification',
+    message: n.message || '',
+    actionUrl: n.actionUrl,
     time: formatTimeAgo(n.createdAt)
   }))
 

@@ -438,7 +438,7 @@ function ModeratorDashboard() {
                 <div className="mod-sec-card">
                   <span className="mod-sec-icon-circle">📈</span>
                   <div className="mod-sec-details">
-                    <span className="mod-sec-value">{comics.filter(c => c.status?.toUpperCase() === 'ONGOING').length}</span>
+                    <span className="mod-sec-value">{comics.filter(c => c.publicationStatus?.toUpperCase() === 'ONGOING').length}</span>
                     <span className="mod-sec-title">Ongoing</span>
                   </div>
                 </div>
@@ -446,7 +446,7 @@ function ModeratorDashboard() {
                 <div className="mod-sec-card">
                   <span className="mod-sec-icon-circle">🏁</span>
                   <div className="mod-sec-details">
-                    <span className="mod-sec-value">{comics.filter(c => c.status?.toUpperCase() === 'COMPLETED').length}</span>
+                    <span className="mod-sec-value">{comics.filter(c => c.publicationStatus?.toUpperCase() === 'COMPLETED').length}</span>
                     <span className="mod-sec-title">Completed</span>
                   </div>
                 </div>

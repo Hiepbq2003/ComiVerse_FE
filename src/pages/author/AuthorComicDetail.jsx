@@ -448,7 +448,7 @@ function AuthorComicDetail() {
     try {
       const [comicResponse, chaptersResponse, metricsResponse] = await Promise.allSettled([
         getAuthorComicByIdApi(id),
-        getAuthorComicChaptersApi(id),
+        getAuthorComicChaptersApi(id, { page: 1, size: 100 }),
         getAuthorComicMetricsApi(id),
       ])
 

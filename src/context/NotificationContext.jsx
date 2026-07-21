@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { useAuth } from './AuthContext'
 import {
   getMyNotificationsApi,
@@ -15,7 +15,7 @@ export function NotificationProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
 
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     if (!isLoggedIn) return
     setLoading(true)
     try {
@@ -54,7 +54,7 @@ export function NotificationProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [isLoggedIn])
 
   const markAsRead = async (id) => {
     try {
@@ -114,6 +114,8 @@ export function NotificationProvider({ children }) {
   useEffect(() => {
     if (isLoggedIn) {
       loadNotifications()
+      const interval = window.setInterval(loadNotifications, 30000)
+      return () => window.clearInterval(interval)
       
       const handleUpdate = () => {
         loadNotifications()
@@ -134,7 +136,8 @@ export function NotificationProvider({ children }) {
       setNotifications([])
       setUnreadCount(0)
     }
-  }, [isLoggedIn])
+    return undefined
+  }, [isLoggedIn, loadNotifications])
 
   return (
     <NotificationContext.Provider value={{

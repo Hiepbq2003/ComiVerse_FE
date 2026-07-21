@@ -387,12 +387,14 @@ export const AIPopover = ({
                   <div 
                     key={n.id} 
                     className={`pop-notif__item ${n.unread ? 'pop-notif__item--unread' : ''}`}
-                    onClick={() => { onAction(n.id); }}
+                    onClick={() => { setIsOpen(false); onAction(n); }}
                     style={{ cursor: 'pointer' }}
                   >
                     <span className="pop-notif__dot"></span>
                     <div>
-                      <p className="pop-notif__msg" dangerouslySetInnerHTML={{ __html: n.msg }} style={{ margin: '0 0 4px' }}></p>
+                      <p className="pop-notif__msg" style={{ margin: '0 0 4px' }}>
+                        {n.title ? <><strong>{n.title}</strong>: {n.message}</> : n.msg}
+                      </p>
                       <p className="pop-notif__time" style={{ margin: 0 }}>{n.time}</p>
                     </div>
                   </div>
