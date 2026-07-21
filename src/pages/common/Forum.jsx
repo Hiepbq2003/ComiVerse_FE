@@ -131,12 +131,23 @@ const renderFormattedContent = (content) => {
   })
 }
 
-const normalizeForumComment = (comment) => ({
-  ...comment,
-  avatarUrl: comment.avatarUrl || comment.userAvatar || null,
-  timestamp: comment.createdAt || comment.timestamp,
-  likesCount: comment.likesCount || 0
-})
+const normalizeForumComment = (comment) => {
+  const auth = getAuth()
+  const currentUser = auth?.user
+  const fallbackName = currentUser?.fullName || currentUser?.username || 'User'
+  const fallbackAvatar = currentUser?.avatarUrl || null
+
+  const authorVal = comment.author || comment.userName || comment.user?.fullName || comment.user?.username
+  const isGenericUser = !authorVal || authorVal === 'User' || authorVal === 'Guest User'
+
+  return {
+    ...comment,
+    author: !isGenericUser ? authorVal : fallbackName,
+    avatarUrl: comment.avatarUrl || comment.userAvatar || comment.user?.avatarUrl || (isGenericUser ? fallbackAvatar : null),
+    timestamp: comment.createdAt || comment.timestamp || new Date().toISOString(),
+    likesCount: comment.likesCount || 0
+  }
+}
 
 const ForumAvatar = ({ avatarUrl, name, className = 'forum-avatar-placeholder', style }) => {
   const [imageFailed, setImageFailed] = useState(false)
@@ -148,12 +159,12 @@ const ForumAvatar = ({ avatarUrl, name, className = 'forum-avatar-placeholder', 
   const displayName = String(name || 'User')
 
   return (
-    <div className={className} style={style}>
+    <div className={className} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, borderRadius: '50%', ...style }}>
       {avatarUrl && !imageFailed ? (
         <img
           src={avatarUrl}
           alt={`${displayName} avatar`}
-          className="forum-user-avatar-image"
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           onError={() => setImageFailed(true)}
         />
       ) : (
@@ -171,6 +182,12 @@ function Forum() {
   const [threads, setThreads] = useState([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+
+  const auth = getAuth()
+  const isModerator = auth?.user && (
+    auth.user.role?.toUpperCase() === 'MODERATOR' || 
+    auth.user.role?.toUpperCase() === 'ADMIN'
+  )
   
   // Navigation & Filter states
   const [selectedCategory, setSelectedCategory] = useState('All')
@@ -184,7 +201,7 @@ function Forum() {
     const saved = localStorage.getItem('comiverse_forum_categories')
     return saved ? JSON.parse(saved) : []
   })
-  const ITEMS_PER_PAGE = 5
+  const ITEMS_PER_PAGE = 10
 
   // Reset page when category or sorting tab changes
   useEffect(() => {
@@ -231,6 +248,16 @@ function Forum() {
   useEffect(() => {
     localStorage.setItem('comiverse_liked_comments', JSON.stringify(likedComments))
   }, [likedComments])
+
+  // Liking threads state (localStorage)
+  const [likedThreads, setLikedThreads] = useState(() => {
+    const saved = localStorage.getItem('comiverse_liked_threads')
+    return saved ? JSON.parse(saved) : []
+  })
+
+  useEffect(() => {
+    localStorage.setItem('comiverse_liked_threads', JSON.stringify(likedThreads))
+  }, [likedThreads])
 
   const incrementViews = async (thread) => {
     try {
@@ -323,6 +350,19 @@ function Forum() {
     return () => window.removeEventListener('click', handleOutsideClick)
   }, [])
 
+  // Scroll to comment if highlighted
+  useEffect(() => {
+    const highlightId = new URLSearchParams(window.location.search).get('highlight')
+    if (highlightId && threadComments.length > 0) {
+      setTimeout(() => {
+        const el = document.getElementById(`comment-${highlightId}`)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 500)
+    }
+  }, [threadId, threadComments])
+
   // Categories list derived dynamically from database threads (synced with customCategories)
   const categoriesList = [
     { name: 'All' },
@@ -351,7 +391,12 @@ function Forum() {
     try {
       const response = await getAllForumThreadsApi()
       const list = response.data || response || []
-      setAllThreadsForCounts(list)
+      const mapped = list.map(t => ({
+        ...t,
+        isPinned: t.isPinned || false,
+        isLocked: t.isLocked || false
+      }))
+      setAllThreadsForCounts(mapped)
     } catch (err) {
       console.error('Failed to load thread counts:', err)
     }
@@ -380,6 +425,8 @@ function Forum() {
         replies: t.replies ?? 0,
         likes: t.likes || 0,
         isLiked: false,
+        isPinned: t.isPinned || false,
+        isLocked: t.isLocked || false,
         timeAgo: formatTimeAgo(t.createdAt)
       }))
 
@@ -428,10 +475,14 @@ function Forum() {
     try {
       setSubmitting(true)
       setLoading(true)
+      const auth = getAuth()
+      const authorName = auth?.user?.fullName || auth?.user?.username || 'Guest User'
+
       await createForumThreadApi({
         title: newPostForm.title.trim(),
         category: newPostForm.category,
-        content: newPostForm.content.trim()
+        content: newPostForm.content.trim(),
+        author: authorName
       })
       toast.success('Thread published successfully!')
       setShowNewPostModal(false)
@@ -465,13 +516,20 @@ function Forum() {
         setCommentsLoading(true)
         const comments = await getForumCommentsApi(selectedThread.id)
         if (!cancelled) {
-          setThreadComments((comments || []).map(normalizeForumComment))
+          const loaded = (comments || []).map(normalizeForumComment)
+          if (loaded.length > 0) {
+            setThreadComments(loaded)
+          } else {
+            const stored = localStorage.getItem(`comiverse_forum_comments_${selectedThread.id}`)
+            const parsed = stored ? JSON.parse(stored) : []
+            setThreadComments(parsed.map(normalizeForumComment))
+          }
         }
       } catch (err) {
-        console.error('Failed to load forum comments:', err)
         if (!cancelled) {
-          setThreadComments([])
-          toast.error('Failed to load discussion comments.')
+          const stored = localStorage.getItem(`comiverse_forum_comments_${selectedThread.id}`)
+          const parsed = stored ? JSON.parse(stored) : []
+          setThreadComments(parsed.map(normalizeForumComment))
         }
       } finally {
         if (!cancelled) setCommentsLoading(false)
@@ -563,16 +621,105 @@ function Forum() {
       toast.warn('Please enter your reply.')
       return
     }
+    const auth = getAuth()
+    const authorName = auth?.user?.fullName || auth?.user?.username || 'Guest User'
+    const authorAvatar = auth?.user?.avatarUrl || ''
+
     try {
       setSubmitting(true)
       const nextRepliesCount = (selectedThread.replies || 0) + 1
-      const created = await createForumCommentApi(selectedThread.id, {
-        content: sanitizeHtml(htmlContent),
-        parentId: replyingToComment?.id || null
+      let newReply
+
+      try {
+        const created = await createForumCommentApi(selectedThread.id, {
+          content: sanitizeHtml(htmlContent),
+          parentId: replyingToComment?.id || null
+        })
+        newReply = normalizeForumComment(created)
+      } catch (apiErr) {
+        console.warn('Backend comment API unavailable or failed, falling back to local storage:', apiErr)
+        newReply = {
+          id: Date.now(),
+          author: authorName,
+          avatarUrl: authorAvatar,
+          content: sanitizeHtml(htmlContent),
+          timestamp: new Date().toISOString(),
+          likesCount: 0,
+          parentId: replyingToComment?.id || null
+        }
+      }
+
+      const updated = [...threadComments, newReply]
+      localStorage.setItem(`comiverse_forum_comments_${selectedThread.id}`, JSON.stringify(updated))
+      setThreadComments(updated)
+      
+      // Notify thread author, parent comment author, and @mentioned users
+      const existingNotifs = JSON.parse(localStorage.getItem('comiverse_forum_notifications') || '[]')
+      const notifiedRecipients = new Set([authorName.toLowerCase()])
+      let notifCreated = false
+
+      const addNotification = (recipient, title, message, type) => {
+        if (!recipient) return
+        const recTrimmed = String(recipient).trim()
+        if (notifiedRecipients.has(recTrimmed.toLowerCase())) return
+
+        notifiedRecipients.add(recTrimmed.toLowerCase())
+        existingNotifs.push({
+          id: `forum-${Date.now()}-${existingNotifs.length}`,
+          recipient: recTrimmed,
+          title,
+          message,
+          type,
+          targetUrl: `/forum/thread/${selectedThread.id}?highlight=${newReply.id}`,
+          isRead: false,
+          createdAt: new Date().toISOString()
+        })
+        notifCreated = true
+      }
+
+      // 1. Notify Parent Comment Author if replying via "Reply" button
+      if (replyingToComment && replyingToComment.author) {
+        addNotification(
+          replyingToComment.author,
+          'New Reply on Forum',
+          `${authorName} replied to your comment: "${textContent.substring(0, 45)}..."`,
+          'FORUM_REPLY'
+        )
+      }
+
+      // 2. Notify any @mentioned users in the comment text
+      const candidateUsers = new Set([
+        selectedThread.author,
+        ...threadComments.map(c => c.author)
+      ])
+
+      candidateUsers.forEach(user => {
+        if (user && textContent.toLowerCase().includes(`@${user.toLowerCase()}`)) {
+          addNotification(
+            user,
+            'Mentioned in Discussion',
+            `${authorName} mentioned you: "${textContent.substring(0, 45)}..."`,
+            'FORUM_MENTION'
+          )
+        }
       })
 
-      const newReply = normalizeForumComment(created)
-      setThreadComments(prev => [...prev, newReply])
+      // 3. Notify Thread Author if someone else commented on their thread
+      if (selectedThread.author) {
+        addNotification(
+          selectedThread.author,
+          'New Comment on your Thread',
+          `${authorName} commented on your thread: "${selectedThread.title.substring(0, 45)}..."`,
+          'FORUM_COMMENT'
+        )
+      }
+
+      if (notifCreated) {
+        localStorage.setItem('comiverse_forum_notifications', JSON.stringify(existingNotifs))
+        window.dispatchEvent(new Event('forum_notification_update'))
+      }
+      
+      setReplyingToComment(null)
       if (editor) editor.innerHTML = ''
       setReplyingToComment(null)
 
@@ -601,6 +748,97 @@ function Forum() {
       toast.info(isFollowing ? 'Thread unfollowed.' : 'Thread followed!')
       return next
     })
+  }
+
+  // Direct moderator actions from Reader UI
+  const handleTogglePinDirect = async (thread) => {
+    if (submitting) return
+    try {
+      setSubmitting(true)
+      const nextState = !thread.isPinned
+      await updateForumThreadApi(thread.id, {
+        id: thread.id,
+        title: thread.title,
+        author: thread.author,
+        category: thread.category,
+        content: thread.content,
+        isPinned: nextState,
+        isLocked: thread.isLocked || false,
+        isReported: thread.isReported || false,
+        reportReason: thread.reportReason || '',
+        views: parseInt(thread.views || 0),
+        replies: parseInt(thread.replies || 0)
+      })
+      
+      // Update local states
+      setThreads(prev => prev.map(t => t.id === thread.id ? { ...t, isPinned: nextState } : t))
+      setAllThreadsForCounts(prev => prev.map(t => t.id === thread.id ? { ...t, isPinned: nextState } : t))
+      if (selectedThread && selectedThread.id === thread.id) {
+        setSelectedThread(prev => ({ ...prev, isPinned: nextState }))
+      }
+      toast.info(nextState ? `Thread "${thread.title}" pinned!` : `Thread "${thread.title}" unpinned!`)
+    } catch (err) {
+      console.error('Failed to toggle pin direct:', err)
+      toast.error('Failed to update pin state.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleToggleLockDirect = async (thread) => {
+    if (submitting) return
+    try {
+      setSubmitting(true)
+      const nextState = !thread.isLocked
+      await updateForumThreadApi(thread.id, {
+        id: thread.id,
+        title: thread.title,
+        author: thread.author,
+        category: thread.category,
+        content: thread.content,
+        isPinned: thread.isPinned || false,
+        isLocked: nextState,
+        isReported: thread.isReported || false,
+        reportReason: thread.reportReason || '',
+        views: parseInt(thread.views || 0),
+        replies: parseInt(thread.replies || 0)
+      })
+      
+      // Update local states
+      setThreads(prev => prev.map(t => t.id === thread.id ? { ...t, isLocked: nextState } : t))
+      setAllThreadsForCounts(prev => prev.map(t => t.id === thread.id ? { ...t, isLocked: nextState } : t))
+      if (selectedThread && selectedThread.id === thread.id) {
+        setSelectedThread(prev => ({ ...prev, isLocked: nextState }))
+      }
+      toast.info(nextState ? `Thread "${thread.title}" locked!` : `Thread "${thread.title}" unlocked!`)
+    } catch (err) {
+      console.error('Failed to toggle lock direct:', err)
+      toast.error('Failed to update lock state.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDeleteThreadDirect = async (thread) => {
+    if (submitting) return
+    if (window.confirm(`Are you sure you want to delete the thread "${thread.title}"?`)) {
+      try {
+        setSubmitting(true)
+        await deleteForumThreadApi(thread.id)
+        setThreads(prev => prev.filter(t => t.id !== thread.id))
+        setAllThreadsForCounts(prev => prev.filter(t => t.id !== thread.id))
+        toast.success(`Thread "${thread.title}" deleted successfully.`)
+        if (selectedThread && selectedThread.id === thread.id) {
+          navigate('/forum', { replace: true })
+          setSelectedThread(null)
+        }
+      } catch (err) {
+        console.error('Failed to delete thread direct:', err)
+        toast.error('Failed to delete thread.')
+      } finally {
+        setSubmitting(false)
+      }
+    }
   }
 
   // WYSIWYG formatting — uses execCommand for visual rich text editing
@@ -683,6 +921,48 @@ function Forum() {
     }
   }
 
+  // Toggle thread liked state
+  const handleToggleThreadLike = async (threadToLike, event) => {
+    if (event) event.stopPropagation()
+    if (!threadToLike) return
+    const targetId = threadToLike.id
+    const isLiked = likedThreads.includes(targetId)
+    const newLikedThreads = isLiked
+      ? likedThreads.filter(id => id !== targetId)
+      : [...likedThreads, targetId]
+
+    setLikedThreads(newLikedThreads)
+
+    const currentLikes = parseInt(threadToLike.likes || 0)
+    const nextLikes = isLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1
+
+    if (selectedThread && selectedThread.id === targetId) {
+      setSelectedThread(prev => prev ? { ...prev, likes: nextLikes } : null)
+    }
+
+    setThreads(prev => prev.map(t => t.id === targetId ? { ...t, likes: nextLikes } : t))
+    setAllThreadsForCounts(prev => prev.map(t => t.id === targetId ? { ...t, likes: nextLikes } : t))
+
+    try {
+      await updateForumThreadApi(targetId, {
+        id: targetId,
+        title: threadToLike.title,
+        author: threadToLike.author,
+        category: threadToLike.category,
+        content: threadToLike.content,
+        isPinned: threadToLike.isPinned || false,
+        isLocked: threadToLike.isLocked || false,
+        isReported: threadToLike.isReported || false,
+        reportReason: threadToLike.reportReason || '',
+        replies: threadToLike.replies || 0,
+        views: parseInt(threadToLike.views || 0),
+        likes: nextLikes
+      })
+    } catch (err) {
+      console.error('Failed to update thread likes count:', err)
+    }
+  }
+
   // Count threads inside category
   const getCategoryCount = (catName) => {
     if (catName === 'All') return allThreadsForCounts.length
@@ -720,7 +1000,52 @@ function Forum() {
       )
     }
 
+    // Pinned threads always default to the top
+    result.sort((a, b) => {
+      const aPinned = a.isPinned || false
+      const bPinned = b.isPinned || false
+      if (aPinned && !bPinned) return -1
+      if (!aPinned && bPinned) return 1
+      return 0
+    })
+
     return result
+  }
+
+  const getThreadedComments = (comments) => {
+    if (!comments || comments.length === 0) return []
+    
+    const roots = []
+    const childrenMap = {}
+
+    comments.forEach(c => {
+      if (!c.parentId) {
+        roots.push(c)
+      } else {
+        const parentKey = String(c.parentId)
+        if (!childrenMap[parentKey]) {
+          childrenMap[parentKey] = []
+        }
+        childrenMap[parentKey].push(c)
+      }
+    })
+
+    const ordered = []
+    const visit = (comment, depth = 0) => {
+      ordered.push({ ...comment, depth })
+      const replies = childrenMap[String(comment.id)] || []
+      replies.forEach(reply => visit(reply, depth + 1))
+    }
+
+    roots.forEach(root => visit(root, 0))
+
+    comments.forEach(c => {
+      if (c.parentId && !ordered.some(item => String(item.id) === String(c.id))) {
+        ordered.push({ ...c, depth: 1 })
+      }
+    })
+
+    return ordered
   }
 
   const processedThreads = getProcessedThreads()
@@ -756,9 +1081,12 @@ function Forum() {
                       onClick={() => navigate(`/forum/thread/${otherThread.id}`)}
                       className={`forum-sidebar-thread-card-stv ${String(otherThread.id) === String(threadId) ? 'active' : ''}`}
                     >
-                      <div className="forum-card-avatar-stv" style={{ background: getCategoryColor(otherThread.category), width: '28px', height: '28px', fontSize: '12px' }}>
-                        {String(otherThread.author)[0].toUpperCase()}
-                      </div>
+                      <ForumAvatar
+                        avatarUrl={otherThread.avatarUrl || (otherThread.author === currentUser?.fullName || otherThread.author === currentUser?.username ? currentUser?.avatarUrl : null)}
+                        name={otherThread.author || 'User'}
+                        className="forum-card-avatar-stv"
+                        style={{ background: getCategoryColor(otherThread.category), width: '28px', height: '28px', fontSize: '12px' }}
+                      />
                       <div style={{ flexGrow: 1, minWidth: 0 }}>
                         <div className="forum-sidebar-thread-title-stv">
                           {otherThread.title}
@@ -787,9 +1115,12 @@ function Forum() {
                     <div className="forum-post-card-stv">
                       <div className="forum-post-header-stv">
                         <div className="forum-author-box-stv">
-                          <div className="forum-card-avatar-stv" style={{ background: getCategoryColor(selectedThread.category) }}>
-                            {String(selectedThread.author)[0].toUpperCase()}
-                          </div>
+                          <ForumAvatar
+                            avatarUrl={selectedThread.avatarUrl || (selectedThread.author === currentUser?.fullName || selectedThread.author === currentUser?.username ? currentUser?.avatarUrl : null)}
+                            name={selectedThread.author || 'User'}
+                            className="forum-card-avatar-stv"
+                            style={{ background: getCategoryColor(selectedThread.category) }}
+                          />
                           <div className="forum-author-details">
                             <span className="forum-author-name-stv">{selectedThread.author}</span>
                             <span className="forum-author-role-badge author">Author</span>
@@ -801,7 +1132,13 @@ function Forum() {
                       
                       <div className="forum-post-likes-row">
                         <span>👁️ {selectedThread.views} views</span>
-                        <span>❤️ {selectedThread.likes || 0} likes</span>
+                        <button 
+                          className={`forum-card-action-btn ${likedThreads.includes(selectedThread.id) ? 'liked-active' : ''}`}
+                          onClick={() => handleToggleThreadLike(selectedThread)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <span>❤️</span> {selectedThread.likes || 0} likes
+                        </button>
                       </div>
                     </div>
 
@@ -815,13 +1152,17 @@ function Forum() {
                         {commentsLoading && (
                           <p className="forum-comments-loading">Loading comments...</p>
                         )}
-                        {!commentsLoading && threadComments.map((comment) => {
+                        {!commentsLoading && getThreadedComments(threadComments).map((comment) => {
                           const isCommentLiked = likedComments.includes(comment.id)
+                          const highlightId = new URLSearchParams(window.location.search).get('highlight')
+                          const isHighlighted = String(comment.id) === String(highlightId)
+                          const depthIndent = comment.depth ? Math.min(comment.depth * 28, 112) : 0
                           return (
-                            <div
-                              id={`forum-comment-${comment.id}`}
-                              key={comment.id}
-                              className={`forum-comment-card ${comment.parentId ? 'forum-comment-card--reply' : ''} ${String(highlightedCommentId) === String(comment.id) ? 'forum-comment-card--highlighted' : ''}`}
+                            <div 
+                              key={comment.id} 
+                              id={`forum-comment-${comment.id}`} 
+                              className={`forum-comment-card ${comment.parentId || comment.depth ? 'forum-comment-card--reply' : ''} ${isHighlighted || String(highlightedCommentId) === String(comment.id) ? 'highlight-pulse forum-comment-card--highlighted' : ''}`}
+                              style={depthIndent ? { marginLeft: `${depthIndent}px` } : undefined}
                             >
                               <div className="forum-comment-header" style={{ marginBottom: '12px' }}>
                                 <div className="forum-comment-author">
@@ -849,29 +1190,32 @@ function Forum() {
                                 >
                                   <span>❤️</span> {comment.likesCount || 0}
                                 </button>
-                                <button 
-                                  className="forum-card-action-btn"
-                                  onClick={() => {
-                                    setReplyingToComment(comment)
-                                    if (replyInputRef.current) {
+                                {!selectedThread.isLocked && (
+                                  <button 
+                                    className="forum-card-action-btn"
+                                    onClick={() => {
+                                      setReplyingToComment(comment)
                                       const editor = replyInputRef.current
-                                      if (!editor.textContent.trim()) {
-                                        editor.textContent = `@${comment.author} `
+                                      const targetAuthor = comment.author || comment.userName || comment.user?.fullName || comment.user?.username || 'User'
+                                      if (editor && !editor.textContent.trim()) {
+                                        editor.textContent = `@${targetAuthor} `
                                       }
-                                      editor.focus()
-                                      const range = document.createRange()
-                                      range.selectNodeContents(editor)
-                                      range.collapse(false)
-                                      const selection = window.getSelection()
-                                      if (selection) {
-                                        selection.removeAllRanges()
-                                        selection.addRange(range)
+                                      if (editor) {
+                                        editor.focus()
+                                        const range = document.createRange()
+                                        range.selectNodeContents(editor)
+                                        range.collapse(false)
+                                        const selection = window.getSelection()
+                                        if (selection) {
+                                          selection.removeAllRanges()
+                                          selection.addRange(range)
+                                        }
                                       }
-                                    }
-                                  }}
-                                >
-                                  Reply
-                                </button>
+                                    }}
+                                  >
+                                    Reply
+                                  </button>
+                                )}
                               </div>
                             </div>
                           )
@@ -884,53 +1228,59 @@ function Forum() {
                       </div>
 
                       {/* Reply Editor Row */}
-                      <div className="forum-editor-row-stv">
-                        <ForumAvatar
-                          avatarUrl={currentUser?.avatarUrl}
-                          name={currentUser?.fullName || currentUser?.username || 'Guest'}
-                          className="forum-card-avatar-stv"
-                          style={{ background: '#4f46e5', width: '32px', height: '32px', fontSize: '13px' }}
-                        />
-                        <div className="forum-editor-container-stv">
-                          {replyingToComment && (
-                            <div className="forum-replying-to">
-                              <span>Replying to <strong>{replyingToComment.author}</strong></span>
-                              <button
-                                type="button"
-                                aria-label="Cancel reply"
-                                title="Cancel reply"
-                                onClick={() => setReplyingToComment(null)}
+                      {selectedThread.isLocked ? (
+                        <div className="forum-locked-message-stv">
+                          🔒 This discussion has been locked by a moderator. No further replies can be posted.
+                        </div>
+                      ) : (
+                        <div className="forum-editor-row-stv">
+                          <ForumAvatar
+                            avatarUrl={currentUser?.avatarUrl}
+                            name={currentUser?.fullName || currentUser?.username || 'Guest'}
+                            className="forum-card-avatar-stv"
+                            style={{ background: '#4f46e5', width: '32px', height: '32px', fontSize: '13px' }}
+                          />
+                          <div className="forum-editor-container-stv">
+                            {replyingToComment && (
+                              <div className="forum-replying-to">
+                                <span>Replying to <strong>{replyingToComment.author || replyingToComment.userName || 'User'}</strong></span>
+                                <button
+                                  type="button"
+                                  aria-label="Cancel reply"
+                                  title="Cancel reply"
+                                  onClick={() => setReplyingToComment(null)}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            )}
+                            <div 
+                              ref={replyInputRef}
+                              className="forum-editor-box-stv" 
+                              contentEditable
+                              data-placeholder="Write a reply..."
+                              style={{ minHeight: '80px', outline: 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                            />
+                            
+                            {/* Formatting Toolbar */}
+                            <div className="forum-editor-toolbar-stv">
+                              <button className="forum-toolbar-btn-stv" title="Bold" onClick={() => handleInsertFormat('bold')}>B</button>
+                              <button className="forum-toolbar-btn-stv" title="Italic" onClick={() => handleInsertFormat('italic')}>I</button>
+                              <button className="forum-toolbar-btn-stv" title="Quote" onClick={() => handleInsertFormat('quote')}>”</button>
+                              <button className="forum-toolbar-btn-stv" title="Code" onClick={() => handleInsertFormat('code')}>&lt;/&gt;</button>
+                              <button className="forum-toolbar-btn-stv" title="Link" onClick={() => handleInsertFormat('link')}>🔗</button>
+                              <button 
+                                className="mod-btn approve" 
+                                onClick={handlePostReply}
+                                disabled={submitting}
+                                style={{ marginLeft: 'auto', padding: '6px 12px', fontSize: '12px', height: '28px', minHeight: '28px', opacity: submitting ? 0.7 : 1 }}
                               >
-                                ×
+                                {submitting ? 'Posting...' : 'Reply'}
                               </button>
                             </div>
-                          )}
-                          <div 
-                            ref={replyInputRef}
-                            className="forum-editor-box-stv" 
-                            contentEditable
-                            data-placeholder="Write a reply..."
-                            style={{ minHeight: '80px', outline: 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-                          />
-                          
-                          {/* Formatting Toolbar */}
-                          <div className="forum-editor-toolbar-stv">
-                            <button className="forum-toolbar-btn-stv" title="Bold" onClick={() => handleInsertFormat('bold')}>B</button>
-                            <button className="forum-toolbar-btn-stv" title="Italic" onClick={() => handleInsertFormat('italic')}>I</button>
-                            <button className="forum-toolbar-btn-stv" title="Quote" onClick={() => handleInsertFormat('quote')}>”</button>
-                            <button className="forum-toolbar-btn-stv" title="Code" onClick={() => handleInsertFormat('code')}>&lt;/&gt;</button>
-                            <button className="forum-toolbar-btn-stv" title="Link" onClick={() => handleInsertFormat('link')}>🔗</button>
-                            <button 
-                              className="mod-btn approve" 
-                              onClick={handlePostReply}
-                              disabled={submitting}
-                              style={{ marginLeft: 'auto', padding: '6px 12px', fontSize: '12px', height: '28px', minHeight: '28px', opacity: submitting ? 0.7 : 1 }}
-                            >
-                              {submitting ? 'Posting...' : 'Reply'}
-                            </button>
                           </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
 
@@ -940,14 +1290,16 @@ function Forum() {
                       {/* Action buttons */}
                       <button 
                         className="forum-panel-btn primary"
+                        disabled={selectedThread.isLocked}
                         onClick={() => {
                           if (replyInputRef.current) {
                             replyInputRef.current.focus();
                             replyInputRef.current.scrollIntoView({ behavior: 'smooth' });
                           }
                         }}
+                        style={{ opacity: selectedThread.isLocked ? 0.5 : 1, cursor: selectedThread.isLocked ? 'not-allowed' : 'pointer' }}
                       >
-                        Reply
+                        {selectedThread.isLocked ? '🔒 Locked' : 'Reply'}
                       </button>
                       
                       {/* Follow dropdown setting */}
@@ -989,12 +1341,58 @@ function Forum() {
                         )}
                       </div>
                       
-                      <button 
-                        className="forum-panel-btn report" 
-                        onClick={() => handleTriggerReport(selectedThread)}
-                      >
-                        🚩 Report Thread
-                      </button>
+                      {(() => {
+                        const auth = getAuth();
+                        const isCreator = auth?.user && (selectedThread.author === auth.user.fullName || selectedThread.author === auth.user.username);
+                        if (isCreator) return null;
+                        return (
+                          <button 
+                            className="forum-panel-btn report" 
+                            onClick={() => handleTriggerReport(selectedThread)}
+                          >
+                            🚩 Report Thread
+                          </button>
+                        );
+                      })()}
+
+                      {isModerator && (
+                        <div className="forum-moderator-actions-panel" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                          <span style={{ fontSize: '11px', color: '#a855f7', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>🛡️ Moderation</span>
+                          <button 
+                            className={`forum-panel-btn ${selectedThread.isPinned ? 'active-pin' : ''}`}
+                            onClick={() => handleTogglePinDirect(selectedThread)}
+                            style={{ 
+                              background: selectedThread.isPinned ? 'rgba(168, 85, 247, 0.15)' : 'rgba(255,255,255,0.03)', 
+                              color: selectedThread.isPinned ? '#c084fc' : 'white', 
+                              border: selectedThread.isPinned ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid rgba(255,255,255,0.06)' 
+                            }}
+                          >
+                            📌 {selectedThread.isPinned ? 'Unpin Thread' : 'Pin Thread'}
+                          </button>
+                          <button 
+                            className={`forum-panel-btn ${selectedThread.isLocked ? 'active-lock' : ''}`}
+                            onClick={() => handleToggleLockDirect(selectedThread)}
+                            style={{ 
+                              background: selectedThread.isLocked ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255,255,255,0.03)', 
+                              color: selectedThread.isLocked ? '#f87171' : 'white', 
+                              border: selectedThread.isLocked ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255,255,255,0.06)' 
+                            }}
+                          >
+                            🔒 {selectedThread.isLocked ? 'Unlock Thread' : 'Lock Thread'}
+                          </button>
+                          <button 
+                            className="forum-panel-btn delete"
+                            onClick={() => handleDeleteThreadDirect(selectedThread)}
+                            style={{ 
+                              background: 'rgba(239, 68, 68, 0.1)', 
+                              color: '#f87171', 
+                              border: '1px solid rgba(239, 68, 68, 0.2)' 
+                            }}
+                          >
+                            🗑️ Delete Thread
+                          </button>
+                        </div>
+                      )}
 
                       {/* progression tracker */}
                       <div className="forum-progress-tracker">
@@ -1062,7 +1460,7 @@ function Forum() {
                     </div>
 
                     {/* Category Divider */}
-                    <h4 style={{ color: '#64748b', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginTop: '20px', marginBottom: '8px', paddingLeft: '14px' }}>
+                    <h4 className="forum-sidebar-heading-stv">
                       🏷️ Categories
                     </h4>
 
@@ -1159,14 +1557,17 @@ function Forum() {
                           >
                             {/* Left avatar and pin */}
                             <div className="forum-card-left-stv">
-                              <div 
-                                className="forum-card-avatar-stv" 
+                              <ForumAvatar
+                                avatarUrl={thread.avatarUrl || (thread.author === currentUser?.fullName || thread.author === currentUser?.username ? currentUser?.avatarUrl : null)}
+                                name={thread.author || 'User'}
+                                className="forum-card-avatar-stv"
                                 style={{ background: getCategoryColor(thread.category) }}
-                              >
-                                {String(thread.author)[0].toUpperCase()}
-                              </div>
+                              />
                               {thread.isPinned && (
                                 <span className="forum-card-pin-stv" title="Pinned">📌</span>
+                              )}
+                              {thread.isLocked && (
+                                <span className="forum-card-lock-stv" title="Locked" style={{ display: 'block', fontSize: '11px', marginTop: '2px', textAlign: 'center' }}>🔒</span>
                               )}
                             </div>
 
@@ -1188,6 +1589,13 @@ function Forum() {
                             {/* Right tags and actions */}
                             <div className="forum-card-right-stv">
                               <span className="forum-card-badge-stv">{thread.category || 'General'}</span>
+                              <button 
+                                className={`forum-card-action-btn ${likedThreads.includes(thread.id) ? 'liked-active' : ''}`}
+                                onClick={(e) => handleToggleThreadLike(thread, e)}
+                                style={{ padding: '3px 8px', fontSize: '12px' }}
+                              >
+                                <span>❤️</span> {thread.likes || 0}
+                              </button>
                               <span className="forum-card-replies-stv">
                                 <span>💬</span> {thread.replies}
                               </span>
@@ -1213,15 +1621,57 @@ function Forum() {
                                     >
                                       <span>⭐</span> {followedThreads.includes(thread.id) ? 'Unfollow' : 'Follow'}
                                     </button>
-                                    <button 
-                                      className="forum-dropdown-item" 
-                                      onClick={(e) => {
-                                        handleTriggerReport(thread, e);
-                                        setActiveDropdownThreadId(null);
-                                      }}
-                                    >
-                                      <span>🚩</span> Report
-                                    </button>
+                                    {isModerator && (
+                                      <>
+                                        <button 
+                                          className="forum-dropdown-item" 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleTogglePinDirect(thread);
+                                            setActiveDropdownThreadId(null);
+                                          }}
+                                        >
+                                          <span>📌</span> {thread.isPinned ? 'Unpin Thread' : 'Pin Thread'}
+                                        </button>
+                                        <button 
+                                          className="forum-dropdown-item" 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleToggleLockDirect(thread);
+                                            setActiveDropdownThreadId(null);
+                                          }}
+                                        >
+                                          <span>🔒</span> {thread.isLocked ? 'Unlock Thread' : 'Lock Thread'}
+                                        </button>
+                                        <button 
+                                          className="forum-dropdown-item delete-item" 
+                                          style={{ color: '#f87171' }}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteThreadDirect(thread);
+                                            setActiveDropdownThreadId(null);
+                                          }}
+                                        >
+                                          <span>🗑️</span> Delete Thread
+                                        </button>
+                                      </>
+                                    )}
+                                    {!isModerator && (() => {
+                                       const auth = getAuth();
+                                       const isCreator = auth?.user && (thread.author === auth.user.fullName || thread.author === auth.user.username);
+                                       if (isCreator) return null;
+                                       return (
+                                         <button 
+                                           className="forum-dropdown-item" 
+                                           onClick={(e) => {
+                                             handleTriggerReport(thread, e);
+                                             setActiveDropdownThreadId(null);
+                                           }}
+                                         >
+                                           <span>🚩</span> Report
+                                         </button>
+                                       );
+                                     })()}
                                   </div>
                                 )}
                               </div>

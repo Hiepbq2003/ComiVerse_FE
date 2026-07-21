@@ -31,8 +31,10 @@ import Policy from './pages/common/Policy'
 import About from './pages/common/About'
 import Terms from './pages/common/Terms'
 import Contact from './pages/common/Contact'
-
+import TranslatorRegister from './pages/common/TranslatorRegister'
+import TranslateDashboard from './pages/translator/TranslatorDashboard'
 import TranslateWorkspace from './pages/translator/TranslateWorkspace'
+import ReviewWorkspace from './pages/translator/ReviewWorkspace'
 import TeamProjects from './pages/translator/TeamProjects'
 import ProjectList from './pages/translator/ProjectList'
 import TranslatorRevenue from './pages/translator/Revenue'
@@ -96,6 +98,7 @@ function App() {
                 <Route path="/about" element={<About />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/contact" element={<Contact />} />
+                <Route path="/translator-register" element={<TranslatorRegister />} />
                 {/* Admin */}
                 <Route path="/admin/statistics" element={<StatisticsDashboard />} />
                 <Route path="/admin/revenue" element={<RevenueManagement />} />
@@ -126,7 +129,7 @@ function App() {
                   <Route path="dashboard" element={<TranslatorDashboard />} />
                 </Route>
                 <Route path="/translator/translate-workspace/task/:taskId" element={<TranslateWorkspace />} />
-                
+                <Route path="/translator/review-workspace/task/:taskId" element={<ReviewWorkspace />} />
 
                 {/* Showcase Demos */}
                 <Route path="/showcase/skeletons" element={<SkeletonLoaderShowcase />} />

@@ -183,7 +183,7 @@ function Explore() {
         cursor: cursorObj?.cursor || undefined,
         referenceId: cursorObj?.referenceId || undefined,
         genres: genreIds.length > 0 ? genreIds.join(',') : undefined,
-        status: statusParam,
+        publicationStatus: statusParam,
         sortBy: sortByParam
       }
 
@@ -573,7 +573,7 @@ function Explore() {
                       boxSizing: 'border-box'
                     }}
                   >
-                    {['All', 'Ongoing', 'Completed', 'Paused'].map((status) => {
+                    {['All', 'Ongoing', 'Completed', 'Hiatus'].map((status) => {
                       const isSelected = selectedStatus === status
                       return (
                         <div

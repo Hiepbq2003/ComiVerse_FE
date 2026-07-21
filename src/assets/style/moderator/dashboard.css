@@ -1348,3 +1348,53 @@ html.light .team-leader-avatar {
 html.light .team-progress-bar {
   background: rgba(0, 0, 0, 0.04) !important;
 }
+
+/* Timeframe Toggles and Buttons */
+.timeframe-toggles {
+  display: flex;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+html.light .timeframe-toggles {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+.timeframe-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: var(--mod-text-secondary);
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.timeframe-btn:hover {
+  color: var(--mod-text-primary);
+}
+
+.timeframe-btn.active {
+  background: var(--mod-purple) !important;
+  color: #ffffff !important;
+}
+
+html.light .timeframe-btn {
+  color: #555555;
+}
+
+html.light .timeframe-btn:hover {
+  color: #000000;
+}
+
+html.light .timeframe-btn.active {
+  background: var(--mod-purple) !important;
+  color: #ffffff !important;
+}
+

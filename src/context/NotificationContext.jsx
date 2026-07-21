@@ -21,10 +21,34 @@ export function NotificationProvider({ children }) {
     try {
       const res = await getMyNotificationsApi()
       const data = res?.data || res || []
-      setNotifications(data)
+      
+      const auth = JSON.parse(localStorage.getItem('auth') || 'null')
+      const fullName = auth?.user?.fullName || ''
+      const username = auth?.user?.username || ''
+      const userId = auth?.user?.id || auth?.user?.userId || ''
+      const email = auth?.user?.email || ''
 
+      const isUserMatch = (recipient) => {
+        if (!recipient) return false
+        const recLower = String(recipient).trim().toLowerCase()
+        return (
+          (fullName && recLower === fullName.trim().toLowerCase()) ||
+          (username && recLower === username.trim().toLowerCase()) ||
+          (userId && String(recipient).trim() === String(userId).trim()) ||
+          (email && recLower === email.trim().toLowerCase())
+        )
+      }
+
+      const allForumNotifs = JSON.parse(localStorage.getItem('comiverse_forum_notifications') || '[]')
+      const forumNotifs = allForumNotifs.filter(n => isUserMatch(n.recipient))
+
+      const merged = [...forumNotifs, ...data]
+      setNotifications(merged)
+
+      const localUnread = forumNotifs.filter(n => !n.isRead).length
       const countRes = await getUnreadCountApi()
-      setUnreadCount(countRes?.data ?? countRes ?? 0)
+      const apiUnread = countRes?.data ?? countRes ?? 0
+      setUnreadCount(apiUnread + localUnread)
     } catch (err) {
       console.error('Failed to load notifications:', err)
     } finally {
@@ -34,9 +58,23 @@ export function NotificationProvider({ children }) {
 
   const markAsRead = async (id) => {
     try {
-      await markAsReadApi(id)
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n))
-      setUnreadCount(prev => Math.max(0, prev - 1))
+      if (String(id).startsWith('forum-')) {
+        const forumNotifs = JSON.parse(localStorage.getItem('comiverse_forum_notifications') || '[]')
+        const updated = forumNotifs.map(n => n.id === id ? { ...n, isRead: true } : n)
+        localStorage.setItem('comiverse_forum_notifications', JSON.stringify(updated))
+        
+        const notif = forumNotifs.find(n => n.id === id)
+        if (notif?.targetUrl) {
+          window.location.href = notif.targetUrl
+        }
+        
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n))
+        setUnreadCount(prev => Math.max(0, prev - 1))
+      } else {
+        await markAsReadApi(id)
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n))
+        setUnreadCount(prev => Math.max(0, prev - 1))
+      }
     } catch (err) {
       console.error('Failed to mark notification as read:', err)
     }
@@ -44,6 +82,27 @@ export function NotificationProvider({ children }) {
 
   const markAllAsRead = async () => {
     try {
+      const auth = JSON.parse(localStorage.getItem('auth') || 'null')
+      const fullName = auth?.user?.fullName || ''
+      const username = auth?.user?.username || ''
+      const userId = auth?.user?.id || auth?.user?.userId || ''
+      const email = auth?.user?.email || ''
+
+      const isUserMatch = (recipient) => {
+        if (!recipient) return false
+        const recLower = String(recipient).trim().toLowerCase()
+        return (
+          (fullName && recLower === fullName.trim().toLowerCase()) ||
+          (username && recLower === username.trim().toLowerCase()) ||
+          (userId && String(recipient).trim() === String(userId).trim()) ||
+          (email && recLower === email.trim().toLowerCase())
+        )
+      }
+
+      const forumNotifs = JSON.parse(localStorage.getItem('comiverse_forum_notifications') || '[]')
+      const updated = forumNotifs.map(n => isUserMatch(n.recipient) ? { ...n, isRead: true } : n)
+      localStorage.setItem('comiverse_forum_notifications', JSON.stringify(updated))
+
       await markAllAsReadApi()
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
       setUnreadCount(0)
@@ -57,6 +116,22 @@ export function NotificationProvider({ children }) {
       loadNotifications()
       const interval = window.setInterval(loadNotifications, 30000)
       return () => window.clearInterval(interval)
+      
+      const handleUpdate = () => {
+        loadNotifications()
+      }
+
+      const pollInterval = setInterval(() => {
+        loadNotifications()
+      }, 4000)
+
+      window.addEventListener('forum_notification_update', handleUpdate)
+      window.addEventListener('storage', handleUpdate)
+      return () => {
+        clearInterval(pollInterval)
+        window.removeEventListener('forum_notification_update', handleUpdate)
+        window.removeEventListener('storage', handleUpdate)
+      }
     } else {
       setNotifications([])
       setUnreadCount(0)
