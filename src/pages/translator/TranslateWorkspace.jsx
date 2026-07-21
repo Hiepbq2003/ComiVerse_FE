@@ -29,7 +29,6 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import polygonClipping from "polygon-clipping";
 import { useAuth } from "../../context/AuthContext";
 import "../../assets/style/translator/translate-workspace.css";
 
