@@ -51,6 +51,16 @@ function HomeLayout({ children }) {
     await markAllAsRead()
   }
 
+  const handleNotificationClick = async (notification) => {
+    await handleMarkAsRead(notification.id, notification.isRead)
+    setShowNotificationDropdown(false)
+
+    const actionUrl = notification.actionUrl
+    if (typeof actionUrl === 'string' && actionUrl.startsWith('/') && !actionUrl.startsWith('//')) {
+      navigate(actionUrl)
+    }
+  }
+
   const handleLogout = () => {
     logout()
     setShowUserMenu(false)
@@ -151,10 +161,27 @@ function HomeLayout({ children }) {
     }
   }
 
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true)
+  const lastScrollY = useRef(0)
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+      if (currentScrollY > lastScrollY.current && currentScrollY > 80) {
+        setIsHeaderVisible(false)
+      } else {
+        setIsHeaderVisible(true)
+      }
+      lastScrollY.current = currentScrollY
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
   return (
     <div className="home-layout-container">
       {/* HEADER */}
-      <header className="home-header">
+      <header className={`home-header ${!isHeaderVisible ? 'hidden' : ''}`}>
         <div className="home-header-left">
           {/* Logo */}
           <Link to="/" className="home-brand">
@@ -407,7 +434,7 @@ function HomeLayout({ children }) {
                               cursor: 'pointer',
                               transition: 'all 0.2s'
                             }}
-                            onClick={() => handleMarkAsRead(item.id, item.isRead)}
+                            onClick={() => handleNotificationClick(item)}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                               <span

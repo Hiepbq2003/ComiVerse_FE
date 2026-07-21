@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getForumThreadsPageApi, deleteForumThreadApi, createForumThreadApi, getAllForumThreadsApi, updateForumThreadApi, getForumThreadByIdApi } from '../../services/api/ForumThreadApi'
+import { createForumCommentApi, getForumCommentsApi } from '../../services/api/ForumCommentApi'
 import { getAuth } from '../../utils/Auth'
 import { toast } from 'react-toastify'
 import '../../assets/style/reader/forum.css'
@@ -130,9 +131,43 @@ const renderFormattedContent = (content) => {
   })
 }
 
+const normalizeForumComment = (comment) => ({
+  ...comment,
+  avatarUrl: comment.avatarUrl || comment.userAvatar || null,
+  timestamp: comment.createdAt || comment.timestamp,
+  likesCount: comment.likesCount || 0
+})
+
+const ForumAvatar = ({ avatarUrl, name, className = 'forum-avatar-placeholder', style }) => {
+  const [imageFailed, setImageFailed] = useState(false)
+
+  useEffect(() => {
+    setImageFailed(false)
+  }, [avatarUrl])
+
+  const displayName = String(name || 'User')
+
+  return (
+    <div className={className} style={style}>
+      {avatarUrl && !imageFailed ? (
+        <img
+          src={avatarUrl}
+          alt={`${displayName} avatar`}
+          className="forum-user-avatar-image"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        displayName[0].toUpperCase()
+      )}
+    </div>
+  )
+}
+
 function Forum() {
   const { threadId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const currentUser = getAuth()?.user
   const [threads, setThreads] = useState([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -168,6 +203,9 @@ function Forum() {
   const [selectedThread, setSelectedThread] = useState(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [threadComments, setThreadComments] = useState([])
+  const [commentsLoading, setCommentsLoading] = useState(false)
+  const [replyingToComment, setReplyingToComment] = useState(null)
+  const [highlightedCommentId, setHighlightedCommentId] = useState(null)
 
   // Report Modal State
   const [showReportModal, setShowReportModal] = useState(false)
@@ -242,10 +280,21 @@ function Forum() {
         const fetchThread = async () => {
           try {
             const res = await getForumThreadByIdApi(threadId)
-            const threadData = res.data?.data || res.data
-            if (threadData) {
-              setSelectedThread(threadData)
-              incrementViews(threadData)
+            const threadData = res?.data?.data ?? res?.data ?? res
+            if (threadData?.id) {
+              const formattedThread = {
+                ...threadData,
+                title: threadData.title || 'Untitled Thread',
+                content: threadData.content || '',
+                author: threadData.author || 'Guest User',
+                category: threadData.category || 'General',
+                views: threadData.views !== undefined && threadData.views !== null ? String(threadData.views) : '0',
+                replies: threadData.replies ?? 0,
+                likes: threadData.likes || 0,
+                timeAgo: formatTimeAgo(threadData.createdAt)
+              }
+              setSelectedThread(formattedThread)
+              incrementViews(formattedThread)
             } else {
               toast.error('Discussion thread not found.')
               navigate('/forum')
@@ -376,15 +425,11 @@ function Forum() {
       return
     }
 
-    const auth = getAuth()
-    const authorName = auth?.user?.fullName || auth?.user?.username || 'Guest User'
-
     try {
       setSubmitting(true)
       setLoading(true)
       await createForumThreadApi({
         title: newPostForm.title.trim(),
-        author: authorName,
         category: newPostForm.category,
         content: newPostForm.content.trim()
       })
@@ -409,25 +454,58 @@ function Forum() {
 
   // Load comments for the selected thread
   useEffect(() => {
-    if (selectedThread) {
-      const stored = localStorage.getItem(`comiverse_forum_comments_${selectedThread.id}`)
-      if (stored) {
-        setThreadComments(JSON.parse(stored))
-      } else {
-        const initialComments = [
-          {
-            id: 1,
-            author: 'System Moderator',
-            content: 'Welcome to this discussion! Please follow the community guidelines.',
-            timestamp: new Date(Date.now() - 3600000 * 2).toISOString(),
-            likesCount: 0
-          }
-        ]
-        localStorage.setItem(`comiverse_forum_comments_${selectedThread.id}`, JSON.stringify(initialComments))
-        setThreadComments(initialComments)
+    if (!selectedThread?.id) {
+      setThreadComments([])
+      return undefined
+    }
+
+    let cancelled = false
+    const loadComments = async () => {
+      try {
+        setCommentsLoading(true)
+        const comments = await getForumCommentsApi(selectedThread.id)
+        if (!cancelled) {
+          setThreadComments((comments || []).map(normalizeForumComment))
+        }
+      } catch (err) {
+        console.error('Failed to load forum comments:', err)
+        if (!cancelled) {
+          setThreadComments([])
+          toast.error('Failed to load discussion comments.')
+        }
+      } finally {
+        if (!cancelled) setCommentsLoading(false)
       }
     }
-  }, [selectedThread])
+
+    setReplyingToComment(null)
+    loadComments()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedThread?.id])
+
+  // Deep-link a notification to the exact comment after it has loaded.
+  useEffect(() => {
+    const targetCommentId = new URLSearchParams(location.search).get('comment')
+    if (!targetCommentId || !threadComments.some(comment => String(comment.id) === targetCommentId)) {
+      return undefined
+    }
+
+    setHighlightedCommentId(targetCommentId)
+    const scrollTimer = window.setTimeout(() => {
+      document.getElementById(`forum-comment-${targetCommentId}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      })
+    }, 120)
+    const highlightTimer = window.setTimeout(() => setHighlightedCommentId(null), 3500)
+
+    return () => {
+      window.clearTimeout(scrollTimer)
+      window.clearTimeout(highlightTimer)
+    }
+  }, [location.search, threadComments])
 
   // Open thread detail view via route navigation
   const handleOpenThread = (thread) => {
@@ -485,37 +563,18 @@ function Forum() {
       toast.warn('Please enter your reply.')
       return
     }
-    const auth = getAuth()
-    const authorName = auth?.user?.fullName || auth?.user?.username || 'Guest User'
-    const newReply = {
-      id: Date.now(),
-      author: authorName,
-      content: sanitizeHtml(htmlContent),
-      timestamp: new Date().toISOString(),
-      likesCount: 0
-    }
-
     try {
       setSubmitting(true)
       const nextRepliesCount = (selectedThread.replies || 0) + 1
-      await updateForumThreadApi(selectedThread.id, {
-        id: selectedThread.id,
-        title: selectedThread.title,
-        author: selectedThread.author,
-        category: selectedThread.category,
-        content: selectedThread.content,
-        isPinned: selectedThread.isPinned || false,
-        isLocked: selectedThread.isLocked || false,
-        isReported: selectedThread.isReported || false,
-        reportReason: selectedThread.reportReason || '',
-        views: parseInt(selectedThread.views || 0),
-        replies: nextRepliesCount
+      const created = await createForumCommentApi(selectedThread.id, {
+        content: sanitizeHtml(htmlContent),
+        parentId: replyingToComment?.id || null
       })
 
-      const updated = [...threadComments, newReply]
-      localStorage.setItem(`comiverse_forum_comments_${selectedThread.id}`, JSON.stringify(updated))
-      setThreadComments(updated)
+      const newReply = normalizeForumComment(created)
+      setThreadComments(prev => [...prev, newReply])
       if (editor) editor.innerHTML = ''
+      setReplyingToComment(null)
 
       setThreads(prev => prev.map(t => t.id === selectedThread.id ? { ...t, replies: nextRepliesCount } : t))
       setSelectedThread(prev => ({ ...prev, replies: nextRepliesCount }))
@@ -523,7 +582,7 @@ function Forum() {
       
       toast.success('Reply posted!')
     } catch (err) {
-      console.error('Failed to update reply count:', err)
+      console.error('Failed to post forum reply:', err)
       toast.error('Failed to post reply.')
     } finally {
       setSubmitting(false)
@@ -753,15 +812,24 @@ function Forum() {
                       </h4>
 
                       <div className="forum-comments-list" style={{ maxHeight: 'none' }}>
-                        {threadComments.map((comment) => {
+                        {commentsLoading && (
+                          <p className="forum-comments-loading">Loading comments...</p>
+                        )}
+                        {!commentsLoading && threadComments.map((comment) => {
                           const isCommentLiked = likedComments.includes(comment.id)
                           return (
-                            <div key={comment.id} className="forum-comment-card">
+                            <div
+                              id={`forum-comment-${comment.id}`}
+                              key={comment.id}
+                              className={`forum-comment-card ${comment.parentId ? 'forum-comment-card--reply' : ''} ${String(highlightedCommentId) === String(comment.id) ? 'forum-comment-card--highlighted' : ''}`}
+                            >
                               <div className="forum-comment-header" style={{ marginBottom: '12px' }}>
                                 <div className="forum-comment-author">
-                                  <div className="forum-avatar-placeholder" style={{ width: '22px', height: '22px', fontSize: '11px', background: '#7c3aed' }}>
-                                    {String(comment.author)[0].toUpperCase()}
-                                  </div>
+                                  <ForumAvatar
+                                    avatarUrl={comment.avatarUrl}
+                                    name={comment.author}
+                                    style={{ width: '22px', height: '22px', fontSize: '11px', background: '#7c3aed' }}
+                                  />
                                   <span>{comment.author}</span>
                                 </div>
                                 <span className="forum-comment-time">{formatTimeAgo(comment.timestamp)}</span>
@@ -784,9 +852,21 @@ function Forum() {
                                 <button 
                                   className="forum-card-action-btn"
                                   onClick={() => {
+                                    setReplyingToComment(comment)
                                     if (replyInputRef.current) {
-                                      replyInputRef.current.focus();
-                                      document.execCommand('insertHTML', false, `<strong>@${comment.author}</strong>&nbsp;`);
+                                      const editor = replyInputRef.current
+                                      if (!editor.textContent.trim()) {
+                                        editor.textContent = `@${comment.author} `
+                                      }
+                                      editor.focus()
+                                      const range = document.createRange()
+                                      range.selectNodeContents(editor)
+                                      range.collapse(false)
+                                      const selection = window.getSelection()
+                                      if (selection) {
+                                        selection.removeAllRanges()
+                                        selection.addRange(range)
+                                      }
                                     }
                                   }}
                                 >
@@ -796,7 +876,7 @@ function Forum() {
                             </div>
                           )
                         })}
-                        {threadComments.length === 0 && (
+                        {!commentsLoading && threadComments.length === 0 && (
                           <p style={{ fontStyle: 'italic', fontSize: '13.5px', color: '#64748b', textAlign: 'center', padding: '24px 0' }}>
                             No comments yet. Start the conversation!
                           </p>
@@ -805,10 +885,26 @@ function Forum() {
 
                       {/* Reply Editor Row */}
                       <div className="forum-editor-row-stv">
-                        <div className="forum-card-avatar-stv" style={{ background: '#4f46e5', width: '32px', height: '32px', fontSize: '13px' }}>
-                          {getAuth()?.user?.fullName ? String(getAuth().user.fullName)[0].toUpperCase() : 'G'}
-                        </div>
+                        <ForumAvatar
+                          avatarUrl={currentUser?.avatarUrl}
+                          name={currentUser?.fullName || currentUser?.username || 'Guest'}
+                          className="forum-card-avatar-stv"
+                          style={{ background: '#4f46e5', width: '32px', height: '32px', fontSize: '13px' }}
+                        />
                         <div className="forum-editor-container-stv">
+                          {replyingToComment && (
+                            <div className="forum-replying-to">
+                              <span>Replying to <strong>{replyingToComment.author}</strong></span>
+                              <button
+                                type="button"
+                                aria-label="Cancel reply"
+                                title="Cancel reply"
+                                onClick={() => setReplyingToComment(null)}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          )}
                           <div 
                             ref={replyInputRef}
                             className="forum-editor-box-stv" 

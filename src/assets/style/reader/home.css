@@ -1317,6 +1317,10 @@ html.light .btn-home-auth-link:hover {
   letter-spacing: 1px;
 }
 
+html.light .footer-col-title {
+  color: #0f172a !important;
+}
+
 .footer-links-list {
   display: flex;
   flex-direction: column;
@@ -2009,6 +2013,11 @@ html.light .btn-home-primary {
 html.light .hero-cover-emoji-fallback {
   background: radial-gradient(circle at center, rgba(168, 85, 247, 0.08) 0%, #f8fafc 100%) !important;
   border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+.home-header.hidden {
+  transform: translateY(-100%);
+  pointer-events: none;
 }
 
 
