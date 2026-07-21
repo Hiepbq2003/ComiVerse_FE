@@ -14,7 +14,6 @@ import { getAllSubmissionsApi, approveSubmissionApi, rejectSubmissionApi } from 
 import { getAllGenresApi } from '../../services/api/GenreApi'
 import { getAllForumThreadsApi } from '../../services/api/ForumThreadApi'
 import { getAllChatFlagsApi } from '../../services/api/ChatFlagApi'
-import { getAllAuditLogsApi } from '../../services/api/AuditLogApi'
 import { toast } from 'react-toastify'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import ModernButton from '../../components/common/ModernButton'
@@ -77,6 +76,7 @@ function ModeratorDashboard() {
   const [hoveredPoint, setHoveredPoint] = useState(null)
   const [pinnedPoint, setPinnedPoint] = useState(null)
   const [hoveredGenre, setHoveredGenre] = useState(null)
+  const [chartTimeframe, setChartTimeframe] = useState('week') // 'week' | 'month'
   
   // Dynamic API backed states
   const [submissions, setSubmissions] = useState([])
@@ -90,12 +90,6 @@ function ModeratorDashboard() {
   // Creation Team Modal Shared triggers
   const [showCreateTeamModal, setShowCreateTeamModal] = useState(false)
   const [createTeamStep, setCreateTeamStep] = useState(1)
-  const [showAuditModal, setShowAuditModal] = useState(false)
-  const [auditSearch, setAuditSearch] = useState('')
-  const [auditTypeFilter, setAuditTypeFilter] = useState('All')
-  const [auditLogs, setAuditLogs] = useState([])
-  const [auditCategoryFilter, setAuditCategoryFilter] = useState('All')
-  const [auditTimeFilter, setAuditTimeFilter] = useState('All')
   const [createTeamForm, setCreateTeamForm] = useState({
     title: '',
     comicName: '',
@@ -159,26 +153,16 @@ function ModeratorDashboard() {
     }
   }
 
-  const fetchAuditLogsData = async () => {
-    try {
-      const data = await getAllAuditLogsApi()
-      setAuditLogs(data || [])
-    } catch (err) {
-      console.error('Failed to fetch audit logs:', err)
-    }
-  }
-
   const fetchAllData = async () => {
     try {
       setLoading(true)
-      const [comicsData, teamsData, submissionsData, genresData, forumData, chatData, auditData] = await Promise.all([
+      const [comicsData, teamsData, submissionsData, genresData, forumData, chatData] = await Promise.all([
         getAllComicsApi(),
         getAllProjectTeamsApi(),
         getAllSubmissionsApi(),
         getAllGenresApi(),
         getAllForumThreadsApi(),
-        getAllChatFlagsApi(),
-        getAllAuditLogsApi()
+        getAllChatFlagsApi()
       ])
       const mappedComics = (comicsData || []).map(c => {
         const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === c.title.toLowerCase())
@@ -193,7 +177,6 @@ function ModeratorDashboard() {
       setGenres(genresData?.data || genresData || [])
       setForumThreads(forumData || [])
       setChatFlags(chatData || [])
-      setAuditLogs(auditData || [])
     } catch (err) {
       console.error(err)
       toast.error('Failed to retrieve control panel data from server.')
@@ -217,7 +200,6 @@ function ModeratorDashboard() {
       toast.success('Submission approved!')
       setSubmissions(prev => prev.filter(item => item.id !== id))
       fetchComicsAndTeams()
-      fetchAuditLogsData()
     } catch (err) {
       console.error(err)
       toast.error('Failed to approve submission.')
@@ -229,7 +211,6 @@ function ModeratorDashboard() {
       await rejectSubmissionApi(id, reason)
       toast.success('Submission rejected.')
       setSubmissions(prev => prev.filter(item => item.id !== id))
-      fetchAuditLogsData()
     } catch (err) {
       console.error(err)
       toast.error('Failed to reject submission.')
@@ -311,7 +292,6 @@ function ModeratorDashboard() {
       toast.success('Project team created successfully!')
       setShowCreateTeamModal(false)
       fetchComicsAndTeams()
-      fetchAuditLogsData()
     } catch (err) {
       console.error(err)
       toast.error('Failed to create translation project team.')
@@ -326,7 +306,6 @@ function ModeratorDashboard() {
         toast.success('Project team removed successfully.')
         setProjectTeams(prev => prev.filter(t => t.id !== id))
         setComics(prev => prev.map(c => c.projectTeam === teamTitle ? { ...c, projectTeam: '-' } : c))
-        fetchAuditLogsData()
       } catch (err) {
         console.error(err)
         toast.error('Failed to remove project team.')
@@ -502,10 +481,26 @@ function ModeratorDashboard() {
               <div className="mod-charts-grid">
                 {/* Area Curve Line Chart (7 Day Submissions Trend) */}
                 <div className="mod-chart-card">
-                  <div className="mod-chart-header">
+                  <div className="mod-chart-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <h3 className="mod-chart-title">Submission Activity</h3>
-                      <span className="mod-chart-subtitle">Daily chapter uploads volume over the last 7 days</span>
+                      <span className="mod-chart-subtitle">
+                        {chartTimeframe === 'week' ? 'Daily chapter uploads volume over the last 7 days' : 'Daily chapter uploads volume over the last 30 days'}
+                      </span>
+                    </div>
+                    <div className="timeframe-toggles">
+                      <button 
+                        onClick={() => { setChartTimeframe('week'); setPinnedPoint(null); setHoveredPoint(null); }}
+                        className={`timeframe-btn ${chartTimeframe === 'week' ? 'active' : ''}`}
+                      >
+                        Week
+                      </button>
+                      <button 
+                        onClick={() => { setChartTimeframe('month'); setPinnedPoint(null); setHoveredPoint(null); }}
+                        className={`timeframe-btn ${chartTimeframe === 'month' ? 'active' : ''}`}
+                      >
+                        Month
+                      </button>
                     </div>
                   </div>
                   <div className="mod-chart-svg-container">
@@ -514,7 +509,8 @@ function ModeratorDashboard() {
                         const days = [];
                         const counts = [];
                         const details = [];
-                        for (let i = 6; i >= 0; i--) {
+                        const numDays = chartTimeframe === 'week' ? 7 : 30;
+                        for (let i = numDays - 1; i >= 0; i--) {
                           const d = new Date();
                           d.setDate(d.getDate() - i);
                           const dateStr = d.toDateString();
@@ -525,7 +521,9 @@ function ModeratorDashboard() {
                             return new Date(s.timestamp).toDateString() === dateStr;
                           });
                           
-                          const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                          const label = chartTimeframe === 'week' 
+                            ? d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                            : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                           days.push(label);
                           counts.push(items.length);
                           details.push(items);
@@ -536,8 +534,9 @@ function ModeratorDashboard() {
                       const width = 580;
                       const height = 140;
                       const maxVal = Math.max(...trend.counts, 4);
+                      const divisor = trend.counts.length > 1 ? trend.counts.length - 1 : 1;
                       const points = trend.counts.map((c, i) => {
-                        const x = 50 + i * (width - 70) / 6;
+                        const x = 50 + i * (width - 70) / divisor;
                         const y = 110 - (c / maxVal) * 90;
                         return { x, y, count: c, label: trend.days[i], items: trend.details[i] };
                       });
@@ -647,24 +646,28 @@ function ModeratorDashboard() {
                                        }
                                      }}
                                    />
-                                   <text 
-                                     x={p.x} 
-                                     y={isActive ? p.y - 14 : p.y - 10} 
-                                     textAnchor="middle" 
-                                     className={`mod-chart-value-text ${isActive ? 'active' : ''}`} 
-                                     fontSize={isActive ? "11" : "10"} 
-                                     fontWeight="700"
-                                   >
-                                     {p.count || ''}
-                                   </text>
-                                   <text 
-                                     x={p.x} 
-                                     y="130" 
-                                     textAnchor="middle" 
-                                     className={`mod-chart-axis-text ${isActive ? 'active' : ''}`}
-                                   >
-                                     {p.label.split(',')[0]}
-                                   </text>
+                                   {(p.count > 0 && (chartTimeframe === 'week' || isActive)) && (
+                                     <text 
+                                       x={p.x} 
+                                       y={isActive ? p.y - 14 : p.y - 10} 
+                                       textAnchor="middle" 
+                                       className={`mod-chart-value-text ${isActive ? 'active' : ''}`} 
+                                       fontSize={isActive ? "11" : "10"} 
+                                       fontWeight="700"
+                                     >
+                                       {p.count}
+                                     </text>
+                                   )}
+                                   {(chartTimeframe === 'week' || idx % 5 === 0 || idx === points.length - 1) && (
+                                     <text 
+                                       x={p.x} 
+                                       y="130" 
+                                       textAnchor="middle" 
+                                       className={`mod-chart-axis-text ${isActive ? 'active' : ''}`}
+                                     >
+                                       {p.label.split(',')[0]}
+                                     </text>
+                                   )}
                                  </g>
                                );
                              })}
@@ -941,51 +944,7 @@ function ModeratorDashboard() {
                 </div>
               </div>
 
-              {/* Row 3: Recent Activity / Audit Log */}
-              <div className="mod-overview-card" style={{ width: '100%', marginTop: '24px' }}>
-                <div className="mod-overview-card-header">
-                  <h3 className="mod-overview-card-title">Recent Activity</h3>
-                  <span className="mod-overview-link" onClick={() => setShowAuditModal(true)}>View all activity</span>
-                </div>
-                <div className="mod-activity-list">
-                  {auditLogs.slice(0, 5).map(log => {
-                    const isReject = log.description.toLowerCase().includes('reject') || log.description.toLowerCase().includes('remove') || log.description.toLowerCase().includes('delete') || log.description.toLowerCase().includes('ban') || log.description.toLowerCase().includes('warn');
-                    const icon = isReject ? '🔴' : '🟢';
-                    const badgeText = log.actionType.replace('_', ' ');
-                    const badgeStyle = getCategoryStyle(log.actionType);
-                    return (
-                      <div key={log.id} className="mod-activity-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
-                        <div className="mod-activity-content" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          <span>{icon}</span>
-                          <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <span style={{ color: 'var(--mod-text-primary)', fontWeight: '500' }}>
-                              {renderDescription(log.description)}
-                            </span>
-                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '2px', fontSize: '11px', color: 'var(--mod-text-secondary)' }}>
-                              <span style={{ 
-                                textTransform: 'uppercase', 
-                                padding: '1px 5px', 
-                                fontSize: '8px', 
-                                fontWeight: '600',
-                                borderRadius: '3px',
-                                ...badgeStyle
-                              }}>{badgeText}</span>
-                              <span>•</span>
-                              <span>Auditor: <strong style={{ color: 'var(--mod-purple)' }}>{log.actorName}</strong></span>
-                            </div>
-                          </div>
-                        </div>
-                        <span className="mod-activity-time" style={{ fontSize: '11px', color: 'var(--mod-text-muted)', marginLeft: '12px', whiteSpace: 'nowrap' }}>
-                          {formatTimeAgo(log.createdAt)}
-                        </span>
-                      </div>
-                    );
-                  })}
-                  {auditLogs.length === 0 && (
-                    <p style={{ fontStyle: 'italic', fontSize: '13px', color: 'var(--mod-text-muted)', margin: 0 }}>No activity records available.</p>
-                  )}
-                </div>
-              </div>
+
 
             </div>
           )}
@@ -1044,196 +1003,6 @@ function ModeratorDashboard() {
           {/* VIEW: FORUM */}
           {activeNav === 'forum' && (
             <ForumModeration fetchAllData={fetchForumThreadsData} />
-          )}
-
-          {/* Action Audit Log Modal (at root level to prevent stacking context scroll issues) */}
-          {showAuditModal && (
-            <div className="mod-modal-overlay" onClick={(event) => event.stopPropagation()}>
-              <div className="mod-modal-card wide" style={{ width: '95%', maxWidth: '1150px' }} onClick={e => e.stopPropagation()}>
-                <div className="mod-modal-header">
-                  <h3>Action Audit Log</h3>
-                  <button className="mod-modal-close-btn" onClick={() => setShowAuditModal(false)}>×</button>
-                </div>
-                <div className="mod-modal-body">
-                  {/* Filter Row */}
-                  <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                    <input
-                      type="text"
-                      placeholder="Search by description, action type, or auditor name..."
-                      value={auditSearch}
-                      onChange={e => setAuditSearch(e.target.value)}
-                      style={{
-                        flex: 1,
-                        minWidth: '200px',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        color: 'var(--mod-text-primary)',
-                        outline: 'none',
-                      }}
-                    />
-                    <select
-                      value={auditCategoryFilter}
-                      onChange={e => setAuditCategoryFilter(e.target.value)}
-                      style={{
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        color: 'var(--mod-text-primary)',
-                        outline: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value="All" style={{ background: 'var(--mod-bg)', color: 'var(--mod-text-primary)' }}>All Categories</option>
-                      <option value="REVIEW_QUEUE" style={{ background: 'var(--mod-bg)', color: 'var(--mod-text-primary)' }}>Review Queue</option>
-                      <option value="PROJECT_TEAMS" style={{ background: 'var(--mod-bg)', color: 'var(--mod-text-primary)' }}>Project Teams</option>
-                      <option value="COMIC_MANAGEMENT" style={{ background: 'var(--mod-bg)', color: 'var(--mod-text-primary)' }}>Comic Management</option>
-                      <option value="CHAT_MODERATION" style={{ background: 'var(--mod-bg)', color: 'var(--mod-text-primary)' }}>Chat Monitor</option>
-                      <option value="FORUM_MODERATION" style={{ background: 'var(--mod-bg)', color: 'var(--mod-text-primary)' }}>Forum Moderation</option>
-                    </select>
-                    <select
-                      value={auditTypeFilter}
-                      onChange={e => setAuditTypeFilter(e.target.value)}
-                      style={{
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        color: 'var(--mod-text-primary)',
-                        outline: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value="All" style={{ background: 'var(--mod-bg)', color: 'var(--mod-text-primary)' }}>All Actions</option>
-                      <option value="Approved" style={{ background: 'var(--mod-bg)', color: 'var(--mod-text-primary)' }}>Approved / Resolved</option>
-                      <option value="Rejected" style={{ background: 'var(--mod-bg)', color: 'var(--mod-text-primary)' }}>Rejected / Removed / Warned</option>
-                    </select>
-                    <select
-                      value={auditTimeFilter}
-                      onChange={e => setAuditTimeFilter(e.target.value)}
-                      style={{
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        color: 'var(--mod-text-primary)',
-                        outline: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value="All" style={{ background: 'var(--mod-bg)', color: 'var(--mod-text-primary)' }}>All Time</option>
-                      <option value="Today" style={{ background: 'var(--mod-bg)', color: 'var(--mod-text-primary)' }}>Today</option>
-                      <option value="Week" style={{ background: 'var(--mod-bg)', color: 'var(--mod-text-primary)' }}>Last 7 Days</option>
-                      <option value="Month" style={{ background: 'var(--mod-bg)', color: 'var(--mod-text-primary)' }}>Last 30 Days</option>
-                    </select>
-                  </div>
-
-                  {/* Scrollable list */}
-                  <div className="mod-activity-list" style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '4px' }}>
-                    {(() => {
-                      const filteredLogs = auditLogs
-                        .filter(log => auditCategoryFilter === 'All' || log.actionType === auditCategoryFilter)
-                        .filter(log => {
-                          if (auditTypeFilter === 'All') return true;
-                          const descLower = log.description.toLowerCase();
-                          const isReject = descLower.includes('reject') || descLower.includes('remove') || descLower.includes('delete') || descLower.includes('ban') || descLower.includes('warn');
-                          return auditTypeFilter === 'Rejected' ? isReject : !isReject;
-                        })
-                        .filter(log => {
-                          if (auditTimeFilter === 'All') return true;
-                          const logDate = new Date(log.createdAt);
-                          const now = new Date();
-                          if (auditTimeFilter === 'Today') {
-                            const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-                            return logDate >= oneDayAgo;
-                          }
-                          if (auditTimeFilter === 'Week') {
-                            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                            return logDate >= sevenDaysAgo;
-                          }
-                          if (auditTimeFilter === 'Month') {
-                            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-                            return logDate >= thirtyDaysAgo;
-                          }
-                          return true;
-                        })
-                        .filter(log => {
-                          if (!auditSearch.trim()) return true;
-                          const query = auditSearch.toLowerCase();
-                          return (
-                            (log.description || '').toLowerCase().includes(query) ||
-                            (log.actorName || '').toLowerCase().includes(query) ||
-                            (log.actionType || '').toLowerCase().includes(query)
-                          );
-                        });
-
-                      if (filteredLogs.length === 0) {
-                        return (
-                          <p style={{ fontStyle: 'italic', fontSize: '13px', color: 'var(--mod-text-muted)', textAlign: 'center', padding: '24px' }}>
-                            No activity records found matching filters.
-                          </p>
-                        );
-                      }
-
-                      return filteredLogs.map(log => {
-                        const descLower = log.description.toLowerCase();
-                        const isReject = descLower.includes('reject') || descLower.includes('remove') || descLower.includes('delete') || descLower.includes('ban') || descLower.includes('warn');
-                        const icon = isReject ? '🔴' : '🟢';
-                        const badgeText = log.actionType.replace('_', ' ');
-                        const badgeStyle = getCategoryStyle(log.actionType);
-                        
-                        const relativeTime = formatTimeAgo(log.createdAt);
-                        const absoluteTime = new Date(log.createdAt).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          hour12: false
-                        });
-
-                        return (
-                          <div key={log.id} className="mod-activity-item" style={{ padding: '12px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.02)', marginBottom: '8px', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-                              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                <span style={{ fontSize: '16px' }}>{icon}</span>
-                                <div>
-                                  <span style={{ fontWeight: '500', color: 'var(--mod-text-primary)' }}>
-                                    {renderDescription(log.description)}
-                                  </span>
-                                  <div style={{ fontSize: '12px', color: 'var(--mod-text-secondary)', marginTop: '6px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                    <span style={{ 
-                                      margin: 0, 
-                                      textTransform: 'uppercase', 
-                                      padding: '2px 8px', 
-                                      fontSize: '9px', 
-                                      fontWeight: '600',
-                                      borderRadius: '4px',
-                                      ...badgeStyle
-                                    }}>{badgeText}</span>
-                                    <span>•</span>
-                                    <span>Auditor: <strong style={{ color: 'var(--mod-purple)' }}>{log.actorName}</strong></span>
-                                  </div>
-                                </div>
-                              </div>
-                              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--mod-text-primary)' }}>{relativeTime}</span>
-                                <span style={{ fontSize: '10px', color: 'var(--mod-text-muted)' }}>{absoluteTime}</span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                </div>
-                <div className="mod-modal-footer">
-                  <ModernButton variant={2} label="Close" onClick={() => setShowAuditModal(false)} className="btn-cancel" />
-                </div>
-              </div>
-            </div>
           )}
         </>
       )}
