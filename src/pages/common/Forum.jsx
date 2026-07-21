@@ -131,13 +131,23 @@ const renderFormattedContent = (content) => {
   })
 }
 
-const normalizeForumComment = (comment) => ({
-  ...comment,
-  author: comment.author || comment.userName || comment.user?.fullName || comment.user?.username || 'User',
-  avatarUrl: comment.avatarUrl || comment.userAvatar || comment.user?.avatarUrl || null,
-  timestamp: comment.createdAt || comment.timestamp || new Date().toISOString(),
-  likesCount: comment.likesCount || 0
-})
+const normalizeForumComment = (comment) => {
+  const auth = getAuth()
+  const currentUser = auth?.user
+  const fallbackName = currentUser?.fullName || currentUser?.username || 'User'
+  const fallbackAvatar = currentUser?.avatarUrl || null
+
+  const authorVal = comment.author || comment.userName || comment.user?.fullName || comment.user?.username
+  const isGenericUser = !authorVal || authorVal === 'User' || authorVal === 'Guest User'
+
+  return {
+    ...comment,
+    author: !isGenericUser ? authorVal : fallbackName,
+    avatarUrl: comment.avatarUrl || comment.userAvatar || comment.user?.avatarUrl || (isGenericUser ? fallbackAvatar : null),
+    timestamp: comment.createdAt || comment.timestamp || new Date().toISOString(),
+    likesCount: comment.likesCount || 0
+  }
+}
 
 const ForumAvatar = ({ avatarUrl, name, className = 'forum-avatar-placeholder', style }) => {
   const [imageFailed, setImageFailed] = useState(false)
@@ -149,12 +159,12 @@ const ForumAvatar = ({ avatarUrl, name, className = 'forum-avatar-placeholder', 
   const displayName = String(name || 'User')
 
   return (
-    <div className={className} style={style}>
+    <div className={className} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, borderRadius: '50%', ...style }}>
       {avatarUrl && !imageFailed ? (
         <img
           src={avatarUrl}
           alt={`${displayName} avatar`}
-          className="forum-user-avatar-image"
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           onError={() => setImageFailed(true)}
         />
       ) : (
@@ -1071,9 +1081,12 @@ function Forum() {
                       onClick={() => navigate(`/forum/thread/${otherThread.id}`)}
                       className={`forum-sidebar-thread-card-stv ${String(otherThread.id) === String(threadId) ? 'active' : ''}`}
                     >
-                      <div className="forum-card-avatar-stv" style={{ background: getCategoryColor(otherThread.category), width: '28px', height: '28px', fontSize: '12px' }}>
-                        {String(otherThread.author)[0].toUpperCase()}
-                      </div>
+                      <ForumAvatar
+                        avatarUrl={otherThread.avatarUrl || (otherThread.author === currentUser?.fullName || otherThread.author === currentUser?.username ? currentUser?.avatarUrl : null)}
+                        name={otherThread.author || 'User'}
+                        className="forum-card-avatar-stv"
+                        style={{ background: getCategoryColor(otherThread.category), width: '28px', height: '28px', fontSize: '12px' }}
+                      />
                       <div style={{ flexGrow: 1, minWidth: 0 }}>
                         <div className="forum-sidebar-thread-title-stv">
                           {otherThread.title}
@@ -1102,9 +1115,12 @@ function Forum() {
                     <div className="forum-post-card-stv">
                       <div className="forum-post-header-stv">
                         <div className="forum-author-box-stv">
-                          <div className="forum-card-avatar-stv" style={{ background: getCategoryColor(selectedThread.category) }}>
-                            {String(selectedThread.author)[0].toUpperCase()}
-                          </div>
+                          <ForumAvatar
+                            avatarUrl={selectedThread.avatarUrl || (selectedThread.author === currentUser?.fullName || selectedThread.author === currentUser?.username ? currentUser?.avatarUrl : null)}
+                            name={selectedThread.author || 'User'}
+                            className="forum-card-avatar-stv"
+                            style={{ background: getCategoryColor(selectedThread.category) }}
+                          />
                           <div className="forum-author-details">
                             <span className="forum-author-name-stv">{selectedThread.author}</span>
                             <span className="forum-author-role-badge author">Author</span>
@@ -1541,12 +1557,12 @@ function Forum() {
                           >
                             {/* Left avatar and pin */}
                             <div className="forum-card-left-stv">
-                              <div 
-                                className="forum-card-avatar-stv" 
+                              <ForumAvatar
+                                avatarUrl={thread.avatarUrl || (thread.author === currentUser?.fullName || thread.author === currentUser?.username ? currentUser?.avatarUrl : null)}
+                                name={thread.author || 'User'}
+                                className="forum-card-avatar-stv"
                                 style={{ background: getCategoryColor(thread.category) }}
-                              >
-                                {String(thread.author)[0].toUpperCase()}
-                              </div>
+                              />
                               {thread.isPinned && (
                                 <span className="forum-card-pin-stv" title="Pinned">📌</span>
                               )}
