@@ -133,8 +133,9 @@ const renderFormattedContent = (content) => {
 
 const normalizeForumComment = (comment) => ({
   ...comment,
-  avatarUrl: comment.avatarUrl || comment.userAvatar || null,
-  timestamp: comment.createdAt || comment.timestamp,
+  author: comment.author || comment.userName || comment.user?.fullName || comment.user?.username || 'User',
+  avatarUrl: comment.avatarUrl || comment.userAvatar || comment.user?.avatarUrl || null,
+  timestamp: comment.createdAt || comment.timestamp || new Date().toISOString(),
   likesCount: comment.likesCount || 0
 })
 
@@ -190,7 +191,7 @@ function Forum() {
     const saved = localStorage.getItem('comiverse_forum_categories')
     return saved ? JSON.parse(saved) : []
   })
-  const ITEMS_PER_PAGE = 5
+  const ITEMS_PER_PAGE = 10
 
   // Reset page when category or sorting tab changes
   useEffect(() => {
@@ -212,7 +213,6 @@ function Forum() {
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [replyingToComment, setReplyingToComment] = useState(null)
   const [highlightedCommentId, setHighlightedCommentId] = useState(null)
-  const [replyingToComment, setReplyingToComment] = useState(null)
 
   // Report Modal State
   const [showReportModal, setShowReportModal] = useState(false)
@@ -465,10 +465,14 @@ function Forum() {
     try {
       setSubmitting(true)
       setLoading(true)
+      const auth = getAuth()
+      const authorName = auth?.user?.fullName || auth?.user?.username || 'Guest User'
+
       await createForumThreadApi({
         title: newPostForm.title.trim(),
         category: newPostForm.category,
-        content: newPostForm.content.trim()
+        content: newPostForm.content.trim(),
+        author: authorName
       })
       toast.success('Thread published successfully!')
       setShowNewPostModal(false)
@@ -502,24 +506,23 @@ function Forum() {
         setCommentsLoading(true)
         const comments = await getForumCommentsApi(selectedThread.id)
         if (!cancelled) {
-          setThreadComments((comments || []).map(normalizeForumComment))
+          const loaded = (comments || []).map(normalizeForumComment)
+          if (loaded.length > 0) {
+            setThreadComments(loaded)
+          } else {
+            const stored = localStorage.getItem(`comiverse_forum_comments_${selectedThread.id}`)
+            const parsed = stored ? JSON.parse(stored) : []
+            setThreadComments(parsed.map(normalizeForumComment))
+          }
         }
       } catch (err) {
-        console.error('Failed to load forum comments:', err)
         if (!cancelled) {
-          setThreadComments([])
-          toast.error('Failed to load discussion comments.')
+          const stored = localStorage.getItem(`comiverse_forum_comments_${selectedThread.id}`)
+          const parsed = stored ? JSON.parse(stored) : []
+          setThreadComments(parsed.map(normalizeForumComment))
         }
       } finally {
         if (!cancelled) setCommentsLoading(false)
-    if (selectedThread) {
-      const stored = localStorage.getItem(`comiverse_forum_comments_${selectedThread.id}`)
-      if (stored) {
-        setThreadComments(JSON.parse(stored))
-      } else {
-        const initialComments = []
-        localStorage.setItem(`comiverse_forum_comments_${selectedThread.id}`, JSON.stringify(initialComments))
-        setThreadComments(initialComments)
       }
     }
 
@@ -608,16 +611,34 @@ function Forum() {
       toast.warn('Please enter your reply.')
       return
     }
+    const auth = getAuth()
+    const authorName = auth?.user?.fullName || auth?.user?.username || 'Guest User'
+    const authorAvatar = auth?.user?.avatarUrl || ''
+
     try {
       setSubmitting(true)
       const nextRepliesCount = (selectedThread.replies || 0) + 1
-      const created = await createForumCommentApi(selectedThread.id, {
-        content: sanitizeHtml(htmlContent),
-        parentId: replyingToComment?.id || null
-      })
+      let newReply
 
-      const newReply = normalizeForumComment(created)
-      setThreadComments(prev => [...prev, newReply])
+      try {
+        const created = await createForumCommentApi(selectedThread.id, {
+          content: sanitizeHtml(htmlContent),
+          parentId: replyingToComment?.id || null
+        })
+        newReply = normalizeForumComment(created)
+      } catch (apiErr) {
+        console.warn('Backend comment API unavailable or failed, falling back to local storage:', apiErr)
+        newReply = {
+          id: Date.now(),
+          author: authorName,
+          avatarUrl: authorAvatar,
+          content: sanitizeHtml(htmlContent),
+          timestamp: new Date().toISOString(),
+          likesCount: 0,
+          parentId: replyingToComment?.id || null
+        }
+      }
+
       const updated = [...threadComments, newReply]
       localStorage.setItem(`comiverse_forum_comments_${selectedThread.id}`, JSON.stringify(updated))
       setThreadComments(updated)
@@ -981,6 +1002,42 @@ function Forum() {
     return result
   }
 
+  const getThreadedComments = (comments) => {
+    if (!comments || comments.length === 0) return []
+    
+    const roots = []
+    const childrenMap = {}
+
+    comments.forEach(c => {
+      if (!c.parentId) {
+        roots.push(c)
+      } else {
+        const parentKey = String(c.parentId)
+        if (!childrenMap[parentKey]) {
+          childrenMap[parentKey] = []
+        }
+        childrenMap[parentKey].push(c)
+      }
+    })
+
+    const ordered = []
+    const visit = (comment, depth = 0) => {
+      ordered.push({ ...comment, depth })
+      const replies = childrenMap[String(comment.id)] || []
+      replies.forEach(reply => visit(reply, depth + 1))
+    }
+
+    roots.forEach(root => visit(root, 0))
+
+    comments.forEach(c => {
+      if (c.parentId && !ordered.some(item => String(item.id) === String(c.id))) {
+        ordered.push({ ...c, depth: 1 })
+      }
+    })
+
+    return ordered
+  }
+
   const processedThreads = getProcessedThreads()
   // Server handles pagination; client filters are applied on the current page's data
   const paginatedThreads = processedThreads
@@ -1079,19 +1136,17 @@ function Forum() {
                         {commentsLoading && (
                           <p className="forum-comments-loading">Loading comments...</p>
                         )}
-                        {!commentsLoading && threadComments.map((comment) => {
+                        {!commentsLoading && getThreadedComments(threadComments).map((comment) => {
                           const isCommentLiked = likedComments.includes(comment.id)
                           const highlightId = new URLSearchParams(window.location.search).get('highlight')
                           const isHighlighted = String(comment.id) === String(highlightId)
+                          const depthIndent = comment.depth ? Math.min(comment.depth * 28, 112) : 0
                           return (
-                            <div
-                              id={`forum-comment-${comment.id}`}
-                              key={comment.id}
-                              className={`forum-comment-card ${comment.parentId ? 'forum-comment-card--reply' : ''} ${String(highlightedCommentId) === String(comment.id) ? 'forum-comment-card--highlighted' : ''}`}
                             <div 
                               key={comment.id} 
-                              id={`comment-${comment.id}`} 
-                              className={`forum-comment-card ${isHighlighted ? 'highlight-pulse' : ''}`}
+                              id={`forum-comment-${comment.id}`} 
+                              className={`forum-comment-card ${comment.parentId || comment.depth ? 'forum-comment-card--reply' : ''} ${isHighlighted || String(highlightedCommentId) === String(comment.id) ? 'highlight-pulse forum-comment-card--highlighted' : ''}`}
+                              style={depthIndent ? { marginLeft: `${depthIndent}px` } : undefined}
                             >
                               <div className="forum-comment-header" style={{ marginBottom: '12px' }}>
                                 <div className="forum-comment-author">
@@ -1119,37 +1174,26 @@ function Forum() {
                                 >
                                   <span>❤️</span> {comment.likesCount || 0}
                                 </button>
-                                <button 
-                                  className="forum-card-action-btn"
-                                  onClick={() => {
-                                    setReplyingToComment(comment)
-                                    if (replyInputRef.current) {
-                                      const editor = replyInputRef.current
-                                      if (!editor.textContent.trim()) {
-                                        editor.textContent = `@${comment.author} `
-                                      }
-                                      editor.focus()
-                                      const range = document.createRange()
-                                      range.selectNodeContents(editor)
-                                      range.collapse(false)
-                                      const selection = window.getSelection()
-                                      if (selection) {
-                                        selection.removeAllRanges()
-                                        selection.addRange(range)
-                                      }
-                                    }
-                                  }}
-                                >
-                                  Reply
-                                </button>
                                 {!selectedThread.isLocked && (
                                   <button 
                                     className="forum-card-action-btn"
                                     onClick={() => {
-                                      setReplyingToComment(comment);
-                                      if (replyInputRef.current) {
-                                        replyInputRef.current.focus();
-                                        document.execCommand('insertHTML', false, `<strong>@${comment.author}</strong>&nbsp;`);
+                                      setReplyingToComment(comment)
+                                      const editor = replyInputRef.current
+                                      const targetAuthor = comment.author || comment.userName || comment.user?.fullName || comment.user?.username || 'User'
+                                      if (editor && !editor.textContent.trim()) {
+                                        editor.textContent = `@${targetAuthor} `
+                                      }
+                                      if (editor) {
+                                        editor.focus()
+                                        const range = document.createRange()
+                                        range.selectNodeContents(editor)
+                                        range.collapse(false)
+                                        const selection = window.getSelection()
+                                        if (selection) {
+                                          selection.removeAllRanges()
+                                          selection.addRange(range)
+                                        }
                                       }
                                     }}
                                   >
@@ -1168,60 +1212,32 @@ function Forum() {
                       </div>
 
                       {/* Reply Editor Row */}
-                      <div className="forum-editor-row-stv">
-                        <ForumAvatar
-                          avatarUrl={currentUser?.avatarUrl}
-                          name={currentUser?.fullName || currentUser?.username || 'Guest'}
-                          className="forum-card-avatar-stv"
-                          style={{ background: '#4f46e5', width: '32px', height: '32px', fontSize: '13px' }}
-                        />
-                        <div className="forum-editor-container-stv">
-                          {replyingToComment && (
-                            <div className="forum-replying-to">
-                              <span>Replying to <strong>{replyingToComment.author}</strong></span>
-                              <button
-                                type="button"
-                                aria-label="Cancel reply"
-                                title="Cancel reply"
-                                onClick={() => setReplyingToComment(null)}
-                              >
-                                ×
-                              </button>
-                            </div>
-                          )}
-                          <div 
-                            ref={replyInputRef}
-                            className="forum-editor-box-stv" 
-                            contentEditable
-                            data-placeholder="Write a reply..."
-                            style={{ minHeight: '80px', outline: 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-                          />
-                          
-                          {/* Formatting Toolbar */}
-                          <div className="forum-editor-toolbar-stv">
-                            <button className="forum-toolbar-btn-stv" title="Bold" onClick={() => handleInsertFormat('bold')}>B</button>
-                            <button className="forum-toolbar-btn-stv" title="Italic" onClick={() => handleInsertFormat('italic')}>I</button>
-                            <button className="forum-toolbar-btn-stv" title="Quote" onClick={() => handleInsertFormat('quote')}>”</button>
-                            <button className="forum-toolbar-btn-stv" title="Code" onClick={() => handleInsertFormat('code')}>&lt;/&gt;</button>
-                            <button className="forum-toolbar-btn-stv" title="Link" onClick={() => handleInsertFormat('link')}>🔗</button>
-                            <button 
-                              className="mod-btn approve" 
-                              onClick={handlePostReply}
-                              disabled={submitting}
-                              style={{ marginLeft: 'auto', padding: '6px 12px', fontSize: '12px', height: '28px', minHeight: '28px', opacity: submitting ? 0.7 : 1 }}
-                            >
-                              {submitting ? 'Posting...' : 'Reply'}
-                            </button>
                       {selectedThread.isLocked ? (
                         <div className="forum-locked-message-stv">
                           🔒 This discussion has been locked by a moderator. No further replies can be posted.
                         </div>
                       ) : (
                         <div className="forum-editor-row-stv">
-                          <div className="forum-card-avatar-stv" style={{ background: '#4f46e5', width: '32px', height: '32px', fontSize: '13px' }}>
-                            {getAuth()?.user?.fullName ? String(getAuth().user.fullName)[0].toUpperCase() : 'G'}
-                          </div>
+                          <ForumAvatar
+                            avatarUrl={currentUser?.avatarUrl}
+                            name={currentUser?.fullName || currentUser?.username || 'Guest'}
+                            className="forum-card-avatar-stv"
+                            style={{ background: '#4f46e5', width: '32px', height: '32px', fontSize: '13px' }}
+                          />
                           <div className="forum-editor-container-stv">
+                            {replyingToComment && (
+                              <div className="forum-replying-to">
+                                <span>Replying to <strong>{replyingToComment.author || replyingToComment.userName || 'User'}</strong></span>
+                                <button
+                                  type="button"
+                                  aria-label="Cancel reply"
+                                  title="Cancel reply"
+                                  onClick={() => setReplyingToComment(null)}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            )}
                             <div 
                               ref={replyInputRef}
                               className="forum-editor-box-stv" 
