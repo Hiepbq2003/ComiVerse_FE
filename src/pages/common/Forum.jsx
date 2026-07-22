@@ -1297,18 +1297,24 @@ function Forum() {
                         </div>
                       )}
 
-                      {/* progression tracker */}
+                      {/* Discussion Status & Activity */}
                       <div className="forum-progress-tracker">
-                        <div className="forum-progress-title">Post Count</div>
-                        <div className="forum-progress-bar-stv">
-                          <div 
-                            className="forum-progress-bar-fill" 
-                            style={{ width: `${Math.min(100, (threadComments.length / 10) * 100)}%` }} 
-                          />
+                        <div className="forum-progress-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>Discussion Activity</span>
+                          <span style={{ 
+                            fontSize: '11px', 
+                            padding: '3px 9px', 
+                            borderRadius: '12px', 
+                            background: threadComments.length >= 10 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(168, 85, 247, 0.15)', 
+                            color: threadComments.length >= 10 ? '#f87171' : '#c084fc', 
+                            fontWeight: '700' 
+                          }}>
+                            {threadComments.length >= 10 ? '🔥 Hot Topic' : threadComments.length >= 5 ? '💬 Active' : '🌱 New'}
+                          </span>
                         </div>
-                        <div className="forum-progress-label-stv">
-                          <span>{threadComments.length + 1} posts</span>
-                          <span>{threadComments.length >= 10 ? 'Hot' : 'Quiet'}</span>
+                        <div className="forum-progress-label-stv" style={{ marginTop: '8px', fontSize: '13px' }}>
+                          <span>Total Posts: <strong>{threadComments.length + 1}</strong></span>
+                          <span style={{ fontSize: '11px', color: '#64748b' }}>No Limit</span>
                         </div>
                       </div>
                     </div>
