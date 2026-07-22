@@ -156,7 +156,7 @@ function ModeratorDashboard() {
   const fetchAllData = async () => {
     try {
       setLoading(true)
-      const [comicsData, teamsData, submissionsData, genresData, forumData, chatData] = await Promise.all([
+      const results = await Promise.allSettled([
         getAllComicsApi(),
         getAllProjectTeamsApi(),
         getAllSubmissionsApi(),
@@ -164,6 +164,14 @@ function ModeratorDashboard() {
         getAllForumThreadsApi(),
         getAllChatFlagsApi()
       ])
+
+      const comicsData = results[0].status === 'fulfilled' ? results[0].value : []
+      const teamsData = results[1].status === 'fulfilled' ? results[1].value : []
+      const submissionsData = results[2].status === 'fulfilled' ? results[2].value : []
+      const genresData = results[3].status === 'fulfilled' ? results[3].value : []
+      const forumData = results[4].status === 'fulfilled' ? results[4].value : []
+      const chatData = results[5].status === 'fulfilled' ? results[5].value : []
+
       const mappedComics = (comicsData || []).map(c => {
         const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === c.title.toLowerCase())
         return {
@@ -174,7 +182,7 @@ function ModeratorDashboard() {
       setComics(mappedComics)
       setProjectTeams(teamsData || [])
       setSubmissions(submissionsData || [])
-      setGenres(genresData?.data || genresData || [])
+      setGenres(genresData?.data || (Array.isArray(genresData) ? genresData : []))
       setForumThreads(forumData || [])
       setChatFlags(chatData || [])
     } catch (err) {

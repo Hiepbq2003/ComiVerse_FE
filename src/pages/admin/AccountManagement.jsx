@@ -6,6 +6,7 @@ import AnimatedButton from '../../components/common/AnimatedButton'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import { AIPopover } from '../../components/common/AIPopover'
 import { ModernPagination } from '../../components/common/ModernPagination'
+import { exportToCsv } from '../../utils/exportToCsv'
 import { useTheme } from '../../context/ThemeContext'
 import '../../assets/style/common/ai-popover.css'
 import '../../assets/style/common/modern-pagination.css'
@@ -425,6 +426,21 @@ function AccountManagement() {
     ))
   )
 
+  const handleExportAccounts = () => {
+    const headers = ['User ID', 'Full Name', 'Username', 'Email', 'Role', 'Status', 'Created Date', 'Last Active']
+    const rows = accounts.map(a => [
+      a.userId || a.id,
+      a.fullName || '',
+      a.username || '',
+      a.email || '',
+      a.role || '',
+      a.status || '',
+      a.createdDate || '',
+      a.lastActive || ''
+    ])
+    exportToCsv('ComiVerse_User_Accounts_Export', headers, rows)
+  }
+
   return (
     <AdminLayout activeNav="account-management">
       <div className="admin-account-management-screen">
@@ -448,12 +464,22 @@ function AccountManagement() {
           <h1>Account Management</h1>
           <p>{totalElements} account{totalElements !== 1 ? 's' : ''} found</p>
         </div>
-        <AnimatedButton
-          variant={3}
-          label="+ Create User Account"
-          tooltip=""
-          onClick={() => setShowCreateModal(true)}
-        />
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <AnimatedButton
+            variant={3}
+            label="+ Create User Account"
+            tooltip=""
+            onClick={() => setShowCreateModal(true)}
+          />
+          <AnimatedButton
+            variant={3}
+            label="📥 Export Accounts"
+            tooltip="Export CSV"
+            className="btn-excel"
+            onClick={handleExportAccounts}
+            disabled={isLoading || accounts.length === 0}
+          />
+        </div>
       </div>
 
       {/* Filters Bar */}

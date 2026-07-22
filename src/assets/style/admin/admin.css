@@ -38,6 +38,22 @@
   --admin-transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+html.light {
+  --admin-bg: #f8fafc;
+  --admin-sidebar-bg: #ffffff;
+  --admin-topbar-bg: #ffffff;
+  --admin-card-bg: #ffffff;
+  --admin-hover-bg: rgba(168, 85, 247, 0.05);
+  --admin-active-bg: rgba(168, 85, 247, 0.12);
+
+  --admin-border: #e2e8f0;
+  --admin-border-hover: #cbd5e1;
+
+  --admin-text-primary: #0f172a;
+  --admin-text-secondary: #334155;
+  --admin-text-muted: #64748b;
+}
+
 /* ═══════════════════════════════════════════════════
    ADMIN LAYOUT SHELL
    ═══════════════════════════════════════════════════ */
@@ -2515,4 +2531,154 @@ html.light .admin-form-input:focus {
   background: rgba(21, 17, 32, 0.9) !important;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+}
+
+/* ═══════════════════════════════════════════════════
+   ADMIN LIGHT MODE SPECIFIC COMPONENT STYLES
+   ═══════════════════════════════════════════════════ */
+html.light .admin-layout {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+html.light .admin-sidebar {
+  background: #ffffff;
+  border-right-color: #e2e8f0;
+}
+
+html.light .admin-sidebar-brand h2 {
+  background: linear-gradient(135deg, #9333ea, #db2777);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+html.light .admin-topbar {
+  background: #ffffff;
+  border-bottom-color: #e2e8f0;
+}
+
+html.light .admin-nav-item {
+  color: #475569;
+}
+
+html.light .admin-nav-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+html.light .admin-nav-item.active {
+  background: rgba(168, 85, 247, 0.12);
+  color: #7c3aed;
+}
+
+html.light .broadcast-card,
+html.light .broadcast-history,
+html.light .stats-card,
+html.light .stats-chart-card,
+html.light .admin-data-table-wrapper,
+html.light .admin-modal {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+}
+
+html.light .broadcast-card-title,
+html.light .broadcast-label,
+html.light .admin-page-header-info h1,
+html.light .stats-chart-title {
+  color: #0f172a !important;
+}
+
+html.light .broadcast-input,
+html.light .broadcast-textarea,
+html.light .admin-search-input,
+html.light .admin-filter-select,
+html.light .admin-form-input {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+html.light .broadcast-input::placeholder,
+html.light .broadcast-textarea::placeholder,
+html.light .admin-search-input::placeholder,
+html.light .admin-form-input::placeholder {
+  color: #94a3b8 !important;
+}
+
+html.light .broadcast-input:focus,
+html.light .broadcast-textarea:focus,
+html.light .admin-search-input:focus,
+html.light .admin-filter-select:focus,
+html.light .admin-form-input:focus {
+  background: #ffffff !important;
+  border-color: #a855f7 !important;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15) !important;
+}
+
+html.light .broadcast-chip {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+html.light .broadcast-chip:hover {
+  background: #e2e8f0 !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+html.light .broadcast-chip.type-chip.info.active {
+  background: rgba(59, 130, 246, 0.12) !important;
+  color: #2563eb !important;
+  border-color: #3b82f6 !important;
+}
+
+html.light .broadcast-chip.type-chip.warning.active {
+  background: rgba(249, 115, 22, 0.12) !important;
+  color: #ea580c !important;
+  border-color: #f97316 !important;
+}
+
+html.light .broadcast-chip.type-chip.update.active {
+  background: rgba(16, 185, 129, 0.12) !important;
+  color: #059669 !important;
+  border-color: #10b981 !important;
+}
+
+html.light .broadcast-chip.type-chip.maintenance.active {
+  background: rgba(168, 85, 247, 0.12) !important;
+  color: #7c3aed !important;
+  border-color: #a855f7 !important;
+}
+
+html.light .broadcast-chip.role-chip.active {
+  background: rgba(168, 85, 247, 0.12) !important;
+  color: #7c3aed !important;
+  border-color: #a855f7 !important;
+}
+
+html.light .admin-data-table thead th {
+  background: #f8fafc !important;
+  border-bottom-color: #e2e8f0 !important;
+  color: #475569 !important;
+}
+
+html.light .admin-data-table tbody tr {
+  border-bottom-color: #f1f5f9 !important;
+}
+
+html.light .admin-data-table tbody tr:hover {
+  background: #f8fafc !important;
+}
+
+html.light .admin-data-table tbody td {
+  color: #334155 !important;
+}
+
+html.light .admin-data-table tbody td.cell-name,
+html.light .admin-data-table tbody td.cell-user-id {
+  color: #0f172a !important;
+  font-weight: 500;
 }
