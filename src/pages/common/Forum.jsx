@@ -132,20 +132,19 @@ const renderFormattedContent = (content) => {
 }
 
 const normalizeForumComment = (comment) => {
-  const auth = getAuth()
-  const currentUser = auth?.user
-  const fallbackName = currentUser?.fullName || currentUser?.username || 'User'
-  const fallbackAvatar = currentUser?.avatarUrl || null
-
-  const authorVal = comment.author || comment.userName || comment.user?.fullName || comment.user?.username
-  const isGenericUser = !authorVal || authorVal === 'User' || authorVal === 'Guest User'
+  const safeComment = comment || {}
+  const author = safeComment.author
+    || safeComment.userName
+    || safeComment.user?.fullName
+    || safeComment.user?.username
+    || 'Deleted user'
 
   return {
-    ...comment,
-    author: !isGenericUser ? authorVal : fallbackName,
-    avatarUrl: comment.avatarUrl || comment.userAvatar || comment.user?.avatarUrl || (isGenericUser ? fallbackAvatar : null),
-    timestamp: comment.createdAt || comment.timestamp || new Date().toISOString(),
-    likesCount: comment.likesCount || 0
+    ...safeComment,
+    author,
+    avatarUrl: safeComment.avatarUrl || safeComment.userAvatar || safeComment.user?.avatarUrl || null,
+    timestamp: safeComment.createdAt || safeComment.timestamp || new Date().toISOString(),
+    likesCount: safeComment.likesCount || 0
   }
 }
 
@@ -516,20 +515,13 @@ function Forum() {
         setCommentsLoading(true)
         const comments = await getForumCommentsApi(selectedThread.id)
         if (!cancelled) {
-          const loaded = (comments || []).map(normalizeForumComment)
-          if (loaded.length > 0) {
-            setThreadComments(loaded)
-          } else {
-            const stored = localStorage.getItem(`comiverse_forum_comments_${selectedThread.id}`)
-            const parsed = stored ? JSON.parse(stored) : []
-            setThreadComments(parsed.map(normalizeForumComment))
-          }
+          setThreadComments((comments || []).map(normalizeForumComment))
         }
       } catch (err) {
+        console.error('Failed to load forum comments:', err)
         if (!cancelled) {
-          const stored = localStorage.getItem(`comiverse_forum_comments_${selectedThread.id}`)
-          const parsed = stored ? JSON.parse(stored) : []
-          setThreadComments(parsed.map(normalizeForumComment))
+          setThreadComments([])
+          toast.error('Failed to load discussion comments.')
         }
       } finally {
         if (!cancelled) setCommentsLoading(false)
@@ -621,105 +613,16 @@ function Forum() {
       toast.warn('Please enter your reply.')
       return
     }
-    const auth = getAuth()
-    const authorName = auth?.user?.fullName || auth?.user?.username || 'Guest User'
-    const authorAvatar = auth?.user?.avatarUrl || ''
-
     try {
       setSubmitting(true)
       const nextRepliesCount = (selectedThread.replies || 0) + 1
-      let newReply
-
-      try {
-        const created = await createForumCommentApi(selectedThread.id, {
-          content: sanitizeHtml(htmlContent),
-          parentId: replyingToComment?.id || null
-        })
-        newReply = normalizeForumComment(created)
-      } catch (apiErr) {
-        console.warn('Backend comment API unavailable or failed, falling back to local storage:', apiErr)
-        newReply = {
-          id: Date.now(),
-          author: authorName,
-          avatarUrl: authorAvatar,
-          content: sanitizeHtml(htmlContent),
-          timestamp: new Date().toISOString(),
-          likesCount: 0,
-          parentId: replyingToComment?.id || null
-        }
-      }
-
-      const updated = [...threadComments, newReply]
-      localStorage.setItem(`comiverse_forum_comments_${selectedThread.id}`, JSON.stringify(updated))
-      setThreadComments(updated)
-      
-      // Notify thread author, parent comment author, and @mentioned users
-      const existingNotifs = JSON.parse(localStorage.getItem('comiverse_forum_notifications') || '[]')
-      const notifiedRecipients = new Set([authorName.toLowerCase()])
-      let notifCreated = false
-
-      const addNotification = (recipient, title, message, type) => {
-        if (!recipient) return
-        const recTrimmed = String(recipient).trim()
-        if (notifiedRecipients.has(recTrimmed.toLowerCase())) return
-
-        notifiedRecipients.add(recTrimmed.toLowerCase())
-        existingNotifs.push({
-          id: `forum-${Date.now()}-${existingNotifs.length}`,
-          recipient: recTrimmed,
-          title,
-          message,
-          type,
-          targetUrl: `/forum/thread/${selectedThread.id}?highlight=${newReply.id}`,
-          isRead: false,
-          createdAt: new Date().toISOString()
-        })
-        notifCreated = true
-      }
-
-      // 1. Notify Parent Comment Author if replying via "Reply" button
-      if (replyingToComment && replyingToComment.author) {
-        addNotification(
-          replyingToComment.author,
-          'New Reply on Forum',
-          `${authorName} replied to your comment: "${textContent.substring(0, 45)}..."`,
-          'FORUM_REPLY'
-        )
-      }
-
-      // 2. Notify any @mentioned users in the comment text
-      const candidateUsers = new Set([
-        selectedThread.author,
-        ...threadComments.map(c => c.author)
-      ])
-
-      candidateUsers.forEach(user => {
-        if (user && textContent.toLowerCase().includes(`@${user.toLowerCase()}`)) {
-          addNotification(
-            user,
-            'Mentioned in Discussion',
-            `${authorName} mentioned you: "${textContent.substring(0, 45)}..."`,
-            'FORUM_MENTION'
-          )
-        }
+      const created = await createForumCommentApi(selectedThread.id, {
+        content: sanitizeHtml(htmlContent),
+        parentId: replyingToComment?.id || null
       })
+      const newReply = normalizeForumComment(created)
 
-      // 3. Notify Thread Author if someone else commented on their thread
-      if (selectedThread.author) {
-        addNotification(
-          selectedThread.author,
-          'New Comment on your Thread',
-          `${authorName} commented on your thread: "${selectedThread.title.substring(0, 45)}..."`,
-          'FORUM_COMMENT'
-        )
-      }
-
-      if (notifCreated) {
-        localStorage.setItem('comiverse_forum_notifications', JSON.stringify(existingNotifs))
-        window.dispatchEvent(new Event('forum_notification_update'))
-      }
-      
-      setReplyingToComment(null)
+      setThreadComments(prev => [...prev, newReply])
       if (editor) editor.innerHTML = ''
       setReplyingToComment(null)
 
