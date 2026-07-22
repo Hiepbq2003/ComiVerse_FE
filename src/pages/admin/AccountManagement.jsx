@@ -115,7 +115,7 @@ function AccountManagement() {
       }
 
       const response = await getAllAccountsApi(params)
-      const accountsList = response?.data || []
+      const accountsList = Array.isArray(response) ? response : (Array.isArray(response?.data) ? response.data : [])
       const metadata = response?.metadata || {}
 
       const normalized = accountsList.map((acc) => ({
