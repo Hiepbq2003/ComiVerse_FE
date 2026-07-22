@@ -52,12 +52,14 @@ function HomeLayout({ children }) {
   }
 
   const handleNotificationClick = async (notification) => {
-    await handleMarkAsRead(notification.id, notification.isRead)
-    setShowNotificationDropdown(false)
-
     const actionUrl = notification.actionUrl
-    if (typeof actionUrl === 'string' && actionUrl.startsWith('/') && !actionUrl.startsWith('//')) {
-      navigate(actionUrl)
+    try {
+      await handleMarkAsRead(notification.id, notification.isRead)
+    } finally {
+      setShowNotificationDropdown(false)
+      if (typeof actionUrl === 'string' && actionUrl.startsWith('/') && !actionUrl.startsWith('//')) {
+        navigate(actionUrl)
+      }
     }
   }
 
