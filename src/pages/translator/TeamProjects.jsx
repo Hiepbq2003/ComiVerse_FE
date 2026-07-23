@@ -352,6 +352,7 @@ function WorkspaceDetailView({
             onOpenTaskDetails={onOpenTaskDetails}
             getAssigneeInitials={getAssigneeInitials}
             members={members}
+            isProjectLeader={isCurrentLeader}
           />
 
           {showCreateTask && (
@@ -371,6 +372,7 @@ function WorkspaceDetailView({
               editTaskData={editTaskData}
               setEditTaskData={setEditTaskData}
               teamMembersForAssign={teamMembersForAssign}
+              isProjectLeader={isCurrentLeader}
               onCancel={onCancelEditTask}
               onContinue={onContinueToWorkspace}
               onReview={onContinueToReviewWorkspace}
