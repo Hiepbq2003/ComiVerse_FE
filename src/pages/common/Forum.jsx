@@ -812,44 +812,6 @@ function Forum() {
     }
   }
 
-  // WYSIWYG formatting — uses execCommand for visual rich text editing
-  const handleInsertFormat = (formatType) => {
-    const editor = replyInputRef.current
-    if (!editor) return
-    editor.focus()
-    switch (formatType) {
-      case 'bold':
-        document.execCommand('bold', false, null)
-        break
-      case 'italic':
-        document.execCommand('italic', false, null)
-        break
-      case 'quote': {
-        const sel = window.getSelection()
-        const selectedText = sel.toString() || 'quoted text'
-        document.execCommand('insertHTML', false, `<blockquote class="forum-blockquote">${selectedText}</blockquote>`)
-        break
-      }
-      case 'code': {
-        const sel2 = window.getSelection()
-        const codeText = sel2.toString() || 'code'
-        document.execCommand('insertHTML', false, `<code class="forum-inline-code">${codeText}</code>`)
-        break
-      }
-      case 'link': {
-        const url = prompt('Enter URL:', 'https://')
-        if (url) {
-          const sel3 = window.getSelection()
-          const linkLabel = sel3.toString() || url
-          document.execCommand('insertHTML', false, `<a href="${url}" target="_blank" rel="noopener noreferrer" class="forum-inline-link">${linkLabel}</a>`)
-        }
-        break
-      }
-      default:
-        return
-    }
-  }
-
   // Category tags theme color mapper
   const getCategoryColor = (catName) => {
     const colors = {
