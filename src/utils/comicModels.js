@@ -10,6 +10,7 @@
  * @property {string} id
  * @property {string} title
  * @property {string} summary
+ * @property {string} language - Original/source language of the comic.
  * @property {number} minimumAge
  * @property {string} authorId
  * @property {string} authorName - Read-only value resolved by the backend mapper.
@@ -41,6 +42,7 @@ export const mapToComicDTO = (raw) => {
     id: raw.id || '',
     title: raw.title || '',
     summary: raw.summary || '',
+    language: raw.language || 'Unknown',
     minimumAge: Number(raw.minimumAge) || 0,
     authorId: raw.authorId || '',
     authorName: raw.authorName || '',

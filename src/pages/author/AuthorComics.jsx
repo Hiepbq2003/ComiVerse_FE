@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
+import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 import '../../assets/style/author/comics.css'
 import '../../assets/style/author/upload-guide.css'
 import {
@@ -105,7 +106,7 @@ const buildChapterFormData = ({ chapterNumber, chapterTitle, zipFile }) => {
 
 function CreateComicModal({ onClose, onCreated }) {
   const [form, setForm] = useState({
-    title: '', summary: '', minimumAge: 13,
+    title: '', summary: '', language: '', minimumAge: 13,
     publicationStatus: 'ONGOING', genres: [], coverFile: null, cover: '',
   })
   const [submitting, setSubmitting] = useState(false)
@@ -126,6 +127,10 @@ function CreateComicModal({ onClose, onCreated }) {
       setError('Title is required.')
       return
     }
+    if (!form.language.trim()) {
+      setError('Comic language is required.')
+      return
+    }
     if (!form.coverFile && !form.cover.trim()) {
       setError('Please upload a cover image or provide a cover image URL.')
       return
@@ -143,6 +148,7 @@ function CreateComicModal({ onClose, onCreated }) {
       const createdComic = await createAuthorComicApi({
         title: form.title.trim(),
         summary: form.summary.trim(),
+        language: form.language.trim(),
         minimumAge: Number(form.minimumAge) || 0,
         publicationStatus: form.publicationStatus,
         genres: form.genres,
@@ -174,6 +180,12 @@ function CreateComicModal({ onClose, onCreated }) {
           <div className="author-chapter-form-grid">
             <label className="author-form-label">Title *
               <input className="author-input" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
+            </label>
+            <label className="author-form-label">Original Language *
+              <select className="author-input" value={form.language} onChange={(event) => setForm({ ...form, language: event.target.value })} required>
+                <option value="" disabled>Select original language</option>
+                {COMIC_LANGUAGE_OPTIONS.map((language) => <option key={language} value={language}>{language}</option>)}
+              </select>
             </label>
             <label className="author-form-label">Minimum Age
               <input className="author-input" type="number" min="0" max="21" value={form.minimumAge} onChange={(event) => setForm({ ...form, minimumAge: event.target.value })} />
@@ -449,7 +461,7 @@ function AuthorComics() {
                 </div>
                 <div className="author-comic-meta-line">
                   <span>📖 {getChapterCount(comic)} chapters</span><span>👁 {getViews(comic)} views</span>
-                  <span>🔞 {comic.minimumAge ?? 13}+</span><span>🕘 {formatDate(comic.updatedAt || comic.createdAt)}</span>
+                  <span>🌐 {comic.language || 'Unknown'}</span><span>🔞 {comic.minimumAge ?? 13}+</span><span>🕘 {formatDate(comic.updatedAt || comic.createdAt)}</span>
                 </div>
                 <p className="author-comic-card-summary">{comic.summary || 'No description has been added yet.'}</p>
                 <div className="author-genre-pills">{genres.slice(0, 4).map((genre) => <span className="author-genre-pill" key={genre}>{genre}</span>)}</div>
