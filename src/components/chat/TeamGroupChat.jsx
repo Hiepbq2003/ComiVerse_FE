@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useChat } from '../../hooks/useChat';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
 
-function TeamGroupChat({ groupId, teamName }) {
+function TeamGroupChat({ groupId}) {
     const [inputValue, setInputValue] = useState('');
 
     const {
@@ -11,7 +11,6 @@ function TeamGroupChat({ groupId, teamName }) {
         isLoadingInitial,
         isLoadingMore,
         isSending,
-        isConnected,
         currentUser,
         scrollContainerRef,
         isNearBottomRef,
@@ -85,7 +84,7 @@ function TeamGroupChat({ groupId, teamName }) {
         <div className="group-chat-sidebar-card">
             <div className="chat-card-header">
                 <h3>
-                    💬 Group Chat {teamName ? `• ${teamName}` : ''}
+                    💬 Group Chat
                 </h3>
             </div>
 
