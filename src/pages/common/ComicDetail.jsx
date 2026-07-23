@@ -424,6 +424,7 @@ function ComicDetail() {
 
   const displayAuthor = comic.author || 'Unknown'
   const displayArtist = comic.artist || 'Unknown'
+  const displayLanguage = comic.language || 'Unknown'
 
   const displayRating = comic.ratingAverage !== undefined
     ? comic.ratingAverage.toFixed(1)
@@ -1045,6 +1046,11 @@ function ComicDetail() {
               <div>
                 <span className="detail-info-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Artist</span>
                 <span className="detail-info-value" style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayArtist}</span>
+              </div>
+
+              <div>
+                <span className="detail-info-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Original Language</span>
+                <span className="detail-info-value" style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayLanguage}</span>
               </div>
 
               <div>
