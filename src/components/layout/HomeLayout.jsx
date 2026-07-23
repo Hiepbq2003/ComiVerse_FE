@@ -6,6 +6,7 @@ import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { getComicsPageApi } from '../../services/api/ComicApi'
+import ChatWidget from '../chat/ChatWidget'
 
 function HomeLayout({ children }) {
   const navigate = useNavigate()
@@ -49,6 +50,18 @@ function HomeLayout({ children }) {
 
   const handleMarkAllAsRead = async () => {
     await markAllAsRead()
+  }
+
+  const handleNotificationClick = async (notification) => {
+    const actionUrl = notification.actionUrl
+    try {
+      await handleMarkAsRead(notification.id, notification.isRead)
+    } finally {
+      setShowNotificationDropdown(false)
+      if (typeof actionUrl === 'string' && actionUrl.startsWith('/') && !actionUrl.startsWith('//')) {
+        navigate(actionUrl)
+      }
+    }
   }
 
   const handleLogout = () => {
@@ -151,10 +164,27 @@ function HomeLayout({ children }) {
     }
   }
 
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true)
+  const lastScrollY = useRef(0)
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+      if (currentScrollY > lastScrollY.current && currentScrollY > 80) {
+        setIsHeaderVisible(false)
+      } else {
+        setIsHeaderVisible(true)
+      }
+      lastScrollY.current = currentScrollY
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
   return (
     <div className="home-layout-container">
       {/* HEADER */}
-      <header className="home-header">
+      <header className={`home-header ${!isHeaderVisible ? 'hidden' : ''}`}>
         <div className="home-header-left">
           {/* Logo */}
           <Link to="/" className="home-brand">
@@ -407,7 +437,7 @@ function HomeLayout({ children }) {
                               cursor: 'pointer',
                               transition: 'all 0.2s'
                             }}
-                            onClick={() => handleMarkAsRead(item.id, item.isRead)}
+                            onClick={() => handleNotificationClick(item)}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                               <span
@@ -531,6 +561,9 @@ function HomeLayout({ children }) {
           </div>
         </div>
       )}
+
+      {/* FLOATING CHAT WIDGET */}
+      {isLoggedIn && <ChatWidget />}
 
       {/* FOOTER */}
       <footer className="home-footer">

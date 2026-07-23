@@ -87,10 +87,10 @@ export const AIPopover = ({
           <img className="trigger__avatar" style={{ marginRight: '6px' }} src={data.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=80"} alt="" />
         )}
         {variant === 'menu' && (
-          <svg style={{ marginRight: '6px' }} xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+          <svg style={triggerText ? { marginRight: '6px' } : {}} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" strokeWidth="0"><circle cx="12" cy="5" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="12" cy="19" r="2.5"/></svg>
         )}
         {variant === 'notif' && (
-          <svg style={triggerText ? { marginRight: '6px' } : {}} xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <svg style={triggerText ? { marginRight: '6px' } : {}} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         )}
         {variant === 'command' && (
           <svg style={{ marginRight: '6px' }} xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/></svg>
@@ -387,12 +387,14 @@ export const AIPopover = ({
                   <div 
                     key={n.id} 
                     className={`pop-notif__item ${n.unread ? 'pop-notif__item--unread' : ''}`}
-                    onClick={() => { onAction(n.id); }}
+                    onClick={() => { setIsOpen(false); onAction(n); }}
                     style={{ cursor: 'pointer' }}
                   >
                     <span className="pop-notif__dot"></span>
                     <div>
-                      <p className="pop-notif__msg" dangerouslySetInnerHTML={{ __html: n.msg }} style={{ margin: '0 0 4px' }}></p>
+                      <p className="pop-notif__msg" style={{ margin: '0 0 4px' }}>
+                        {n.title ? <><strong>{n.title}</strong>: {n.message}</> : n.msg}
+                      </p>
                       <p className="pop-notif__time" style={{ margin: 0 }}>{n.time}</p>
                     </div>
                   </div>

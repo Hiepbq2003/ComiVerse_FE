@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import AuthorLayout from '../../components/layout/AuthorLayout'
 import '../../assets/style/author/settings.css'
 
 function AuthorSettings() {
@@ -28,7 +27,7 @@ function AuthorSettings() {
   }
 
   return (
-    <AuthorLayout activeNav="settings">
+    <>
       <div className="author-page-header">
         <h1>Settings</h1>
         <p>Manage payout information and notification preferences for your author workspace.</p>
@@ -128,7 +127,7 @@ function AuthorSettings() {
           </div>
         </div>
       </div>
-    </AuthorLayout>
+    </>
   )
 }
 

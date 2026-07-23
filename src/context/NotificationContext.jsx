@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { useAuth } from './AuthContext'
 import {
   getMyNotificationsApi,
@@ -15,22 +15,32 @@ export function NotificationProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
 
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     if (!isLoggedIn) return
     setLoading(true)
     try {
       const res = await getMyNotificationsApi()
       const data = res?.data || res || []
-      setNotifications(data)
+      const nextNotifications = Array.isArray(data) ? data : []
+      setNotifications(nextNotifications)
 
-      const countRes = await getUnreadCountApi()
-      setUnreadCount(countRes?.data ?? countRes ?? 0)
+      try {
+        const countRes = await getUnreadCountApi()
+        setUnreadCount(Number(countRes?.data ?? countRes ?? 0))
+      } catch (countError) {
+        if (countError?.response?.status !== 401) {
+          console.warn('Failed to load unread notification count:', countError?.message)
+        }
+        setUnreadCount(nextNotifications.filter(notification => !notification.isRead).length)
+      }
     } catch (err) {
-      console.error('Failed to load notifications:', err)
+      if (err?.response?.status !== 401) {
+        console.warn('Failed to load notifications:', err?.message)
+      }
     } finally {
       setLoading(false)
     }
-  }
+  }, [isLoggedIn])
 
   const markAsRead = async (id) => {
     try {
@@ -55,11 +65,27 @@ export function NotificationProvider({ children }) {
   useEffect(() => {
     if (isLoggedIn) {
       loadNotifications()
+      const pollInterval = window.setInterval(loadNotifications, 10000)
+      const handleRefresh = () => loadNotifications()
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') loadNotifications()
+      }
+
+      window.addEventListener('focus', handleRefresh)
+      window.addEventListener('notification:refresh', handleRefresh)
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+      return () => {
+        window.clearInterval(pollInterval)
+        window.removeEventListener('focus', handleRefresh)
+        window.removeEventListener('notification:refresh', handleRefresh)
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+      }
     } else {
       setNotifications([])
       setUnreadCount(0)
     }
-  }, [isLoggedIn])
+    return undefined
+  }, [isLoggedIn, loadNotifications])
 
   return (
     <NotificationContext.Provider value={{

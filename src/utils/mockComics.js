@@ -15,7 +15,7 @@ export const MOCK_COMICS = [
     views: '1.2M',
     bookmarks: '45.2K',
     rating: '4.9',
-    status: 'Ongoing',
+    publicationStatus: 'Ongoing',
     tagline: 'An epic fantasy action-adventure following the legacy of the legendary warrior who shattered the heavens. Forces of darkness emerge, and a young apprentice must unlock the ancient power within.'
   },
   {
@@ -30,7 +30,7 @@ export const MOCK_COMICS = [
     views: '2.4M',
     bookmarks: '98.7K',
     rating: '4.8',
-    status: 'Ongoing',
+    publicationStatus: 'Ongoing',
     tagline: 'The last dragon rider rises to save the kingdom from ancient ashes. Together with a young dragon hatchling, they must journey to the Edge of the World.'
   },
   {
@@ -45,7 +45,7 @@ export const MOCK_COMICS = [
     views: '850K',
     bookmarks: '31.4K',
     rating: '4.7',
-    status: 'Completed',
+    publicationStatus: 'Completed',
     tagline: 'In a dystopian cyberpunk future, a rogue hacker discovers a secret AI that could either save humanity or wipe it out entirely. The neon streets are paved with danger.'
   },
   {
@@ -60,7 +60,7 @@ export const MOCK_COMICS = [
     views: '1.1M',
     bookmarks: '38.5K',
     rating: '4.8',
-    status: 'Ongoing',
+    publicationStatus: 'Ongoing',
     tagline: 'An endless quest through dimensions to discover the ultimate truth of magic and science.'
   },
   {
@@ -75,7 +75,7 @@ export const MOCK_COMICS = [
     views: '400K',
     bookmarks: '18.9K',
     rating: '4.6',
-    status: 'Ongoing',
+    publicationStatus: 'Ongoing',
     tagline: 'Conquering dungeons alone to protect what matters most. In a world of guilds, one hunter goes solo.'
   },
   {
@@ -90,7 +90,7 @@ export const MOCK_COMICS = [
     views: '320K',
     bookmarks: '12.4K',
     rating: '4.5',
-    status: 'Ongoing',
+    publicationStatus: 'Ongoing',
     tagline: 'A journey into the deep web to retrieve a stolen digital soul. In the virtual world, death is permanent.'
   }
 ]

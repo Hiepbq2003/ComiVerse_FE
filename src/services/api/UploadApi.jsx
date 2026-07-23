@@ -8,3 +8,12 @@ export const uploadImageApi = (file) => {
     timeout: 60000,
   })
 }
+
+export const uploadFileApi = (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  return AxiosClient.post('/upload/file', formData, {
+    timeout: 60000,
+  })
+}

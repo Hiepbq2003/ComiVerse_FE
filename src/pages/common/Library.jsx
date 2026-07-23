@@ -35,6 +35,10 @@ function Library() {
   const [totalElements, setTotalElements] = useState(0)
   const ITEMS_PER_PAGE = 4
 
+  const handleTabClick = (tabName) => {
+    navigate(`/library?tab=${tabName}`, { replace: true })
+  }
+
   // Auth guard: redirect to sign-in page if not logged in
   useEffect(() => {
     if (!isLoggedIn) {
@@ -124,11 +128,11 @@ function Library() {
 
     // Update state optimistically
     if (activeTab === 'Saved') {
-      setSavedList(prev => prev.filter(c => c.id !== id))
+      setSavedList(prev => prev.filter(c => (c.comic?.id || c.id) !== id))
     } else if (activeTab === 'Liked') {
-      setLikedList(prev => prev.filter(c => c.id !== id))
+      setLikedList(prev => prev.filter(c => (c.comic?.id || c.id) !== id))
     } else {
-      setHistoryList(prev => prev.filter(c => c.id !== id))
+      setHistoryList(prev => prev.filter(c => (c.comic?.id || c.id) !== id))
     }
 
     try {
@@ -244,19 +248,19 @@ function Library() {
             <div className="lib-tabs-group">
               <div 
                 className={`lib-tab-item ${activeTab === 'Saved' ? 'active' : ''}`}
-                onClick={() => setActiveTab('Saved')}
+                onClick={() => handleTabClick('Saved')}
               >
                 Saved
               </div>
               <div 
                 className={`lib-tab-item ${activeTab === 'Liked' ? 'active' : ''}`}
-                onClick={() => setActiveTab('Liked')}
+                onClick={() => handleTabClick('Liked')}
               >
                 Liked
               </div>
               <div 
                 className={`lib-tab-item ${activeTab === 'History' ? 'active' : ''}`}
-                onClick={() => setActiveTab('History')}
+                onClick={() => handleTabClick('History')}
               >
                 Reading History
               </div>
@@ -277,60 +281,73 @@ function Library() {
           ) : activeComics.length > 0 ? (
             <>
               <div className="lib-comics-list">
-                {paginatedComics.map((comic) => (
-                  <div 
-                    key={comic.id} 
-                    className="lib-comic-card"
-                    onClick={() => navigate(`/comic/${comic.id}`)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    {isEmoji(getCoverImage(comic)) ? (
-                      <div className="lib-comic-cover-emoji-fallback">{getCoverImage(comic)}</div>
-                    ) : (
-                      <img 
-                        src={getCoverImage(comic)} 
-                        alt={comic.title} 
-                        className="lib-comic-cover" 
-                      />
-                    )}
-                    <div className="lib-comic-details">
-                      <h4 className="lib-comic-title">{comic.title}</h4>
-                      <p className="lib-comic-author">{comic.authorName || comic.author || 'Unknown Author'}</p>
-                      
-                      <div className="lib-comic-genres">
-                        {(comic.genres && comic.genres.length > 0 ? comic.genres : ['Action']).slice(0, 2).map((g, idx) => (
-                          <span key={idx} className="lib-comic-genre-tag">{g}</span>
-                        ))}
-                      </div>
+                {paginatedComics.map((item) => {
+                  const actualComic = item.comic || item;
+                  const comicId = actualComic.id;
+                  const comicTitle = actualComic.title || '';
+                  const comicCover = getCoverImage(actualComic);
+                  const comicAuthor = actualComic.authorName || actualComic.author || 'Unknown Author';
+                  const comicGenres = actualComic.genres && actualComic.genres.length > 0 ? actualComic.genres : ['Action'];
+                  const comicChapter = item.latestChapterNumber || actualComic.latestChapterNumber || actualComic.chapterCount || parseInt(actualComic.chapters) || 0;
+                  const lastReadTime = item.lastChapterUpdatedAt || actualComic.lastChapterUpdatedAt;
+                  const comicStatus = actualComic.publicationStatus || 'ONGOING';
 
-                      <div className="lib-comic-meta">
-                        {activeTab === 'History' ? (
-                          <>
-                            <span className="lib-comic-chapter">Ch.{comic.latestChapterNumber || comic.chapterCount || 1}</span>
-                            <span className="lib-comic-status-text">
-                              {comic.lastChapterUpdatedAt ? `Read ${formatTimeAgo(comic.lastChapterUpdatedAt)}` : 'Recently'}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="lib-comic-chapter">Ch.{comic.latestChapterNumber || comic.chapterCount || parseInt(comic.chapters) || 0}</span>
-                            <span className="lib-comic-status-dot"></span>
-                            <span className="lib-comic-status-text">{comic.status || 'Ongoing'}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Remove action button */}
-                    <button 
-                      className="lib-comic-delete-btn"
-                      onClick={(e) => handleRemoveItem(comic.id, e)}
-                      title="Remove from List"
+                  return (
+                    <div 
+                      key={item.id || comicId} 
+                      className="lib-comic-card"
+                      onClick={() => navigate(`/comic/${comicId}`)}
+                      style={{ cursor: 'pointer' }}
                     >
-                      🗑️
-                    </button>
-                  </div>
-                ))}
+                      {isEmoji(comicCover) ? (
+                        <div className="lib-comic-cover-emoji-fallback">{comicCover}</div>
+                      ) : (
+                        <img 
+                          src={comicCover} 
+                          alt={comicTitle} 
+                          className="lib-comic-cover" 
+                        />
+                      )}
+                      <div className="lib-comic-details">
+                        <h4 className="lib-comic-title">{comicTitle}</h4>
+                        <p className="lib-comic-author">{comicAuthor}</p>
+                        
+                        <div className="lib-comic-genres">
+                          {comicGenres.slice(0, 2).map((g, idx) => {
+                            const genreName = typeof g === 'object' && g !== null ? g.name : g;
+                            return <span key={idx} className="lib-comic-genre-tag">{genreName}</span>;
+                          })}
+                        </div>
+
+                        <div className="lib-comic-meta">
+                          {activeTab === 'History' ? (
+                            <>
+                              <span className="lib-comic-chapter">Ch.{comicChapter || 1}</span>
+                              <span className="lib-comic-status-text">
+                                {lastReadTime ? `Read ${formatTimeAgo(lastReadTime)}` : 'Recently'}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="lib-comic-chapter">Ch.{comicChapter}</span>
+                              <span className="lib-comic-status-dot"></span>
+                              <span className="lib-comic-status-text">{comicStatus}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Remove action button */}
+                      <button 
+                        className="lib-comic-delete-btn"
+                        onClick={(e) => handleRemoveItem(comicId, e)}
+                        title="Remove from List"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Pagination Controls */}

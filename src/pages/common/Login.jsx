@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { toast } from 'react-toastify'
 import { loginApi, getMeApi } from '../../services/api/AuthApi'
 import { useAuth } from '../../context/AuthContext'
-import { setAuth } from '../../utils/Auth'
+import { setAuth, clearAuth } from '../../utils/Auth'
 
 function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, loading, setLoading }) {
   const { login } = useAuth()
@@ -40,6 +41,21 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
       const meResponse = await getMeApi()
       const meData = meResponse.data || meResponse
 
+      // Check if account is banned/inactive
+      const userStatus = (meData.status || '').toUpperCase()
+      if (userStatus === 'INACTIVE' || userStatus === 'BANNED' || meData.banned) {
+        clearAuth()
+        setFieldErrors({
+          username: 'Your account has been banned.',
+          password: ''
+        })
+        toast.error('Your account has been banned. Please contact administration for support.')
+        if (typeof showAlert === 'function') {
+          showAlert('error', 'Your account has been banned. Please contact administration for support.')
+        }
+        return
+      }
+
       const userData = {
         userId: meData.userId,
         username: meData.username,
@@ -51,11 +67,28 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
 
       login(data.token, userData)
       onLoginSuccess(userData)
-      showAlert('success', 'Welcome back to ComiVerse!')
+      toast.success('Welcome back to ComiVerse!')
+      if (typeof showAlert === 'function') {
+        showAlert('success', 'Welcome back to ComiVerse!')
+      }
     } catch (err) {
-      const errMessage = err.response?.data?.message || 'Invalid username or password.';
+      const errMessage = err.response?.data?.message || err.message || 'Invalid username or password.';
+      const isBanned = (err.response?.status === 403 || err.response?.status === 400) && /banned|inactive|disabled|blocked|lock/i.test(errMessage)
       const isInvalidCredentials = err.response?.status === 401 || /invalid username or password/i.test(errMessage)
       const needsEmailVerification = err.response?.status === 403 && /verify your email/i.test(errMessage)
+
+      if (isBanned) {
+        clearAuth()
+        setFieldErrors({
+          username: 'Your account has been banned.',
+          password: ''
+        })
+        toast.error(errMessage || 'Your account has been banned. Please contact support.')
+        if (typeof showAlert === 'function') {
+          showAlert('error', errMessage || 'Your account has been banned.')
+        }
+        return
+      }
 
       if (isInvalidCredentials) {
         setFieldErrors({
@@ -70,11 +103,17 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
         if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginIdentifier)) {
           onVerificationRequired(loginIdentifier)
         }
-        showAlert('error', errMessage)
+        toast.error(errMessage)
+        if (typeof showAlert === 'function') {
+          showAlert('error', errMessage)
+        }
         return
       }
 
-      showAlert('error', errMessage);
+      toast.error(errMessage)
+      if (typeof showAlert === 'function') {
+        showAlert('error', errMessage)
+      }
     } finally {
       setLoading(false)
     }

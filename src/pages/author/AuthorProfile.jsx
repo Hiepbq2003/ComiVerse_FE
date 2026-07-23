@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'react-toastify'
-import AuthorLayout from '../../components/layout/AuthorLayout'
 import '../../assets/style/author/profile.css'
 import { getAuthorProfileApi, saveAuthorProfileApi } from '../../services/api/AuthorProfileApi'
 
@@ -99,7 +98,7 @@ function AuthorProfile() {
   }
 
   return (
-    <AuthorLayout activeNav="profile">
+    <>
       <div className="author-page-header">
         <h1>Author Profile</h1>
         <p>Fill in the public author information used by your comics and moderation workflow.</p>
@@ -131,7 +130,6 @@ function AuthorProfile() {
               <strong>{profile.contactEmail || profile.email || 'Not set'}</strong>
             </div>
           </div>
-
           <p className="author-profile-preview-bio">
             {profile.bio || 'No bio has been added yet.'}
           </p>
@@ -249,7 +247,7 @@ function AuthorProfile() {
           )}
         </div>
       </div>
-    </AuthorLayout>
+    </>
   )
 }
 

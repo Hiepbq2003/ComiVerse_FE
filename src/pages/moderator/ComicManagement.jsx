@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import '../../assets/style/moderator/comic-management.css'
 import ModernButton from '../../components/common/ModernButton'
+import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import { createTranslationRequestApi } from '../../services/api/TranslationPoolApi'
 import { toast } from 'react-toastify'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
-import { updateComicApi } from '../../services/api/ComicApi'
+import { getChaptersByComicIdApi, deleteChapterApi } from '../../services/api/ChapterApi'
 
 function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, handleArchiveComic, handleTriggerAssignTeam, fetchAllData }) {
   // Search & Filters local states
@@ -27,7 +28,8 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   const [editComicForm, setEditComicForm] = useState({
     title: '',
     author: '',
-    status: 'Ongoing',
+    publicationStatus: 'ONGOING',
+    language: '',
     genres: ''
   })
 
@@ -36,7 +38,6 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   const [showTransReqModal, setShowTransReqModal] = useState(false)
   const [transReqComic, setTransReqComic] = useState(null)
   const [transReqForm, setTransReqForm] = useState({
-    sourceLang: 'Japanese',
     targetLanguages: [],
     priority: 'Medium',
     deadline: '',
@@ -52,10 +53,54 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   })
   const [selectedTeamId, setSelectedTeamId] = useState('')
 
+  // Chapter Management modal states
+  const [showChaptersModal, setShowChaptersModal] = useState(false)
+  const [chaptersComic, setChaptersComic] = useState(null)
+  const [chaptersList, setChaptersList] = useState([])
+  const [chaptersLoading, setChaptersLoading] = useState(false)
+
+  const openChaptersModal = async (comic) => {
+    setChaptersComic(comic)
+    setChaptersList([])
+    setChaptersLoading(true)
+    setShowChaptersModal(true)
+    try {
+      const response = await getChaptersByComicIdApi(comic.id)
+      const data = response?.data?.data || response?.data || response || []
+      setChaptersList(Array.isArray(data) ? data : [])
+    } catch (err) {
+      toast.error('Failed to load chapters.')
+    } finally {
+      setChaptersLoading(false)
+    }
+  }
+
+  const handleDeleteChapter = async (chapterId) => {
+    if (!window.confirm('Are you sure you want to delete this chapter? This action cannot be undone.')) {
+      return
+    }
+    try {
+      await deleteChapterApi(chapterId)
+      toast.success('Chapter deleted successfully!')
+      // Refresh the chapters list
+      if (chaptersComic) {
+        const response = await getChaptersByComicIdApi(chaptersComic.id)
+        const data = response?.data?.data || response?.data || response || []
+        setChaptersList(Array.isArray(data) ? data : [])
+      }
+      // Refresh the main comics table to update the chapter count!
+      if (fetchAllData) {
+        fetchAllData()
+      }
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Failed to delete chapter.'
+      toast.error(message)
+    }
+  }
+
   const openTranslationRequestModal = (comic) => {
     setTransReqComic(comic)
     setTransReqForm({
-      sourceLang: 'Japanese',
       targetLanguages: [],
       priority: 'Medium',
       deadline: '',
@@ -74,15 +119,17 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   }
 
   const handleSubmitTranslationRequest = async () => {
-    if (!transReqComic || transReqForm.targetLanguages.length === 0) {
+    if (!transReqComic?.language || transReqComic.language === 'Unknown') {
+      toast.warn('Configure the comic original language before requesting translation.')
+      return
+    }
+    if (transReqForm.targetLanguages.length === 0) {
       toast.warn('Please select at least one target language.')
       return
     }
     try {
       await createTranslationRequestApi({
         comicId: transReqComic.id,
-        comicTitle: transReqComic.title,
-        sourceLang: transReqForm.sourceLang,
         targetLanguages: transReqForm.targetLanguages,
         priority: transReqForm.priority,
         deadline: transReqForm.deadline || null,
@@ -117,6 +164,10 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   }
 
   const handleSubmitDirectAssignment = async () => {
+    if (!directAssignComic?.language || directAssignComic.language === 'Unknown') {
+      toast.warn('Configure the comic original language before assigning a translation team.')
+      return
+    }
     if (!directAssignForm.targetLang) {
       toast.warn('Please select a target language.')
       return
@@ -134,22 +185,17 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
       await updateProjectTeamApi(selectedTeamId, {
         ...selectedTeamObj,
         comicName: directAssignComic.title,
+        sourceLang: directAssignComic.language,
         targetLang: directAssignForm.targetLang,
         status: 'PENDING',
         deadline: directAssignForm.deadline || 'unspecified'
       })
 
-      await updateComicApi(directAssignComic.id, {
-        ...directAssignComic,
-        projectTeam: selectedTeamObj.title
-      })
 
       toast.success(`Successfully assigned team ${selectedTeamObj.title} for ${directAssignForm.targetLang} (pending leader approval)!`)
       setShowDirectAssignModal(false)
       if (fetchAllData) {
         await fetchAllData()
-      } else if (handleSaveEditComic) {
-        handleSaveEditComic(directAssignComic.id, { projectTeam: selectedTeamObj.title })
       } else {
         window.location.reload()
       }
@@ -164,13 +210,18 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
     setEditComicForm({
       title: comic.title,
       author: comic.authorName || comic.author || '',
-      status: comic.status,
+      publicationStatus: comic.publicationStatus || 'ONGOING',
+      language: comic.language && comic.language !== 'Unknown' ? comic.language : '',
       genres: comic.genres.map(g => typeof g === 'object' && g !== null ? g.name : g).join(', ')
     })
   }
 
   const saveEditModal = () => {
     if (!editingComic) return
+    if (!editComicForm.language.trim()) {
+      toast.warn('Comic original language is required.')
+      return
+    }
     const inputGenreNames = editComicForm.genres.split(',').map(g => g.trim().toLowerCase()).filter(Boolean)
     const matchedGenreIds = (genres || [])
       .filter(g => inputGenreNames.includes((g.name || '').toLowerCase()))
@@ -178,8 +229,8 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
 
     const updatedData = {
       title: editComicForm.title.trim(),
-      authorName: editComicForm.author.trim(),
-      status: editComicForm.status?.toUpperCase(),
+      language: editComicForm.language.trim(),
+      publicationStatus: editComicForm.publicationStatus?.toUpperCase(),
       genreIds: matchedGenreIds
     }
     handleSaveEditComic(editingComic.id, updatedData)
@@ -213,7 +264,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               <path d="M0 25 C 20 25, 40 5, 60 10 C 80 15, 90 2, 100 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value active-count">{comics.filter(c => c.status?.toUpperCase() === 'ONGOING').length}</span>
+          <span className="stat-value active-count">{comics.filter(c => c.publicationStatus?.toUpperCase() === 'ONGOING').length}</span>
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -222,16 +273,16 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               <path d="M0 25 C 30 25, 50 20, 70 8 C 85 2, 95 10, 100 2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value" style={{ color: '#3b82f6' }}>{comics.filter(c => c.status?.toUpperCase() === 'COMPLETED').length}</span>
+          <span className="stat-value" style={{ color: '#3b82f6' }}>{comics.filter(c => c.publicationStatus?.toUpperCase() === 'COMPLETED').length}</span>
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <span className="stat-label">Paused</span>
+            <span className="stat-label">Hiatus</span>
             <svg viewBox="0 0 100 30" className="stat-sparkline" style={{ width: '50px', height: '18px', color: '#d97706', opacity: 0.7 }}>
               <path d="M0 10 C 20 10, 40 25, 60 20 C 80 15, 90 25, 100 25" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value paused-count">{comics.filter(c => c.status?.toUpperCase() === 'PAUSED').length}</span>
+          <span className="stat-value paused-count">{comics.filter(c => c.publicationStatus?.toUpperCase() === 'HIATUS').length}</span>
         </div>
       </div>
 
@@ -254,7 +305,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
           >
             <option>All Status</option>
             <option>Ongoing</option>
-            <option>Paused</option>
+            <option>Hiatus</option>
             <option>Completed</option>
           </select>
 
@@ -347,7 +398,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                   (c.author || '').toLowerCase().includes(searchLower) ||
                   c.projectTeam.toLowerCase().includes(searchLower);
                 
-                const matchesStatus = comicStatusFilter === 'All Status' || c.status?.toUpperCase() === comicStatusFilter.toUpperCase();
+                const matchesStatus = comicStatusFilter === 'All Status' || c.publicationStatus?.toUpperCase() === comicStatusFilter.toUpperCase();
                 const matchesGenre = comicGenreFilter === 'All Genres' || c.genres.some(g => (typeof g === 'object' && g !== null ? g.name : g) === comicGenreFilter);
                 const matchesAuthor = comicAuthorFilter === 'All Authors' || c.authorName === comicAuthorFilter || c.author === comicAuthorFilter;
                 const matchesTeam = comicTeamFilter === 'All Project Teams' || c.projectTeam === comicTeamFilter;
@@ -453,17 +504,17 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                     </div>
                   </td>
                   <td>
-                    <span className={`comic-status-badge ${comic.status.toLowerCase()}`}>
-                      {comic.status}
+                    <span className={`comic-status-badge ${(comic.publicationStatus || 'ONGOING').toLowerCase()}`}>
+                      {comic.publicationStatus || 'ONGOING'}
                     </span>
                   </td>
                   <td>
                     <div className="comic-actions-cell">
                       <ModernButton 
                         variant={2} 
-                        label="👁️ View" 
+                        label="📖 Chapters" 
                         className="btn-view"
-                        onClick={() => window.open(`/comic/${comic.id}`, '_blank')} 
+                        onClick={() => openChaptersModal(comic)} 
                       />
                       <ModernButton 
                         variant={2} 
@@ -511,20 +562,36 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                   type="text" 
                   className="mod-input" 
                   value={editComicForm.author}
-                  onChange={(e) => setEditComicForm({ ...editComicForm, author: e.target.value })}
+                  readOnly
+                  title="Author name is resolved from the author account and cannot be changed from Comic Management."
                 />
               </div>
 
               <div className="mod-form-row">
                 <div className="mod-form-group">
+                  <label className="mod-label">Original Language</label>
+                  <select
+                    className="mod-select-field"
+                    value={editComicForm.language}
+                    onChange={(e) => setEditComicForm({ ...editComicForm, language: e.target.value })}
+                    required
+                  >
+                    <option value="" disabled>Select original language</option>
+                    {AVAILABLE_LANGUAGES.map((language) => (
+                      <option key={language} value={language}>{language}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="mod-form-group">
                   <label className="mod-label">Status</label>
                   <select 
                     className="mod-select-field"
-                    value={editComicForm.status}
-                    onChange={(e) => setEditComicForm({ ...editComicForm, status: e.target.value })}
+                    value={editComicForm.publicationStatus}
+                    onChange={(e) => setEditComicForm({ ...editComicForm, publicationStatus: e.target.value })}
                   >
                     <option value="ONGOING">Ongoing</option>
-                    <option value="PAUSED">Paused</option>
+                    <option value="HIATUS">Hiatus</option>
                     <option value="COMPLETED">Completed</option>
                   </select>
                 </div>
@@ -637,18 +704,10 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                 <div className="trans-req-comic-name">{transReqComic.title}</div>
               </div>
 
-              {/* Source Language */}
+              {/* Source language belongs to Comic and is read-only in this request. */}
               <div className="mod-form-group">
                 <label className="mod-label">Source Language</label>
-                <select 
-                  className="mod-select-field"
-                  value={transReqForm.sourceLang}
-                  onChange={(e) => setTransReqForm({ ...transReqForm, sourceLang: e.target.value })}
-                >
-                  {AVAILABLE_LANGUAGES.map(lang => (
-                    <option key={lang} value={lang}>{lang}</option>
-                  ))}
-                </select>
+                <div className="trans-req-comic-name">{transReqComic.language || 'Not configured'}</div>
               </div>
 
               {/* Target Languages - Checkbox Grid */}
@@ -656,7 +715,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                 <label className="mod-label">Target Languages <span style={{ fontSize: '11px', color: 'var(--mod-text-secondary)' }}>(select one or more)</span></label>
                 <div className="lang-checkbox-grid">
                   {AVAILABLE_LANGUAGES
-                    .filter(lang => lang !== transReqForm.sourceLang)
+                    .filter(lang => lang.toLowerCase() !== (transReqComic.language || '').toLowerCase())
                     .filter(lang => {
                       const existing = projectTeams
                         ? projectTeams.filter(t => t.comicName && transReqComic && t.comicName.toLowerCase() === transReqComic.title.toLowerCase())
@@ -832,6 +891,77 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                 label="Confirm Assignment" 
                 onClick={handleSubmitDirectAssignment}
                 disabled={!directAssignForm.targetLang || !selectedTeamId}
+              />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+      {/* ── MODAL: MANAGE CHAPTERS ─────────────── */}
+      {showChaptersModal && chaptersComic && createPortal(
+        <div className="mod-modal-overlay">
+          <div className="mod-modal-card" style={{ maxWidth: '800px', width: '90%' }}>
+            <div className="mod-modal-header">
+              <h3>📖 Chapters of {chaptersComic.title}</h3>
+              <button className="mod-modal-close-btn" onClick={() => setShowChaptersModal(false)}>×</button>
+            </div>
+
+            <div className="mod-modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+              {chaptersLoading ? (
+                <SkeletonLoader count={5} height={40} style={{ marginBottom: '10px' }} />
+              ) : chaptersList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--mod-text-secondary)' }}>
+                  No chapters found for this comic.
+                </div>
+              ) : (
+                <table className="mod-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--mod-border)' }}>
+                      <th style={{ textAlign: 'left', padding: '12px' }}>Chapter #</th>
+                      <th style={{ textAlign: 'left', padding: '12px' }}>Title</th>
+                      <th style={{ textAlign: 'left', padding: '12px' }}>Type</th>
+                      <th style={{ textAlign: 'left', padding: '12px' }}>Created Date</th>
+                      <th style={{ textAlign: 'left', padding: '12px' }}>Views</th>
+                      <th style={{ textAlign: 'right', padding: '12px' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {chaptersList.map((chap) => (
+                      <tr key={chap.id} style={{ borderBottom: '1px solid var(--mod-border)' }}>
+                        <td style={{ padding: '12px', fontWeight: 'bold' }}>Chapter {chap.chapterNumber}</td>
+                        <td style={{ padding: '12px' }}>{chap.title || <span style={{ color: 'var(--mod-text-muted)', fontStyle: 'italic' }}>Untitled</span>}</td>
+                        <td style={{ padding: '12px' }}>
+                          <span className={`comic-status-badge ${chap.isPremium ? 'paused' : 'ongoing'}`} style={{ fontSize: '11px', padding: '2px 6px' }}>
+                            {chap.isPremium ? 'Premium' : 'Free'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', fontSize: '13px' }}>
+                          {chap.createdAt ? new Date(chap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+                        </td>
+                        <td style={{ padding: '12px' }}>{chap.viewCount || 0}</td>
+                        <td style={{ padding: '12px', textAlign: 'right' }}>
+                          <ModernButton 
+                            variant={5} 
+                            label="🗑️ Delete" 
+                            className="btn-archive"
+                            onClick={() => handleDeleteChapter(chap.id)}
+                            style={{ height: '30px', minHeight: '30px', minWidth: '70px', padding: '0 10px', fontSize: '12px' }}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="mod-modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 0 0' }}>
+              <ModernButton 
+                variant={2} 
+                label="Close" 
+                className="btn-cancel"
+                onClick={() => setShowChaptersModal(false)}
+                style={{ width: '100px' }}
               />
             </div>
           </div>

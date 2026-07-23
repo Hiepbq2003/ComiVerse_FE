@@ -23,7 +23,6 @@ import AuthorComics from './pages/author/AuthorComics'
 import AuthorComicDetail from './pages/author/AuthorComicDetail'
 import AuthorEarnings from './pages/author/AuthorEarnings'
 import AuthorSettings from './pages/author/AuthorSettings'
-import AuthorUploadGuide from './pages/author/AuthorUploadGuide'
 import AuthorProfile from './pages/author/AuthorProfile'
 import ModeratorDashboard from './pages/moderator/ModeratorDashboard'
 import TranslatorDashboard from './pages/translator/TranslatorDashboard'
@@ -49,8 +48,8 @@ import { AnimatedButtonShowcase } from './components/common/AnimatedButtonShowca
 import { getAuth, clearAuth } from './utils/Auth'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
-import { Import } from 'lucide-react'
 import TranslatorLayout from './components/layout/TranslatorLayout'
+import AuthorLayout from './components/layout/AuthorLayout'
 import ScrollToTop from './components/common/ScrollToTop'
 
 function ProfileRouteWrapper() {
@@ -91,6 +90,7 @@ function App() {
                 <Route path="/ranking" element={<Ranking />} />
                 <Route path="/library" element={<Library />} />
                 <Route path="/forum" element={<Forum />} />
+                <Route path="/forum/thread/:threadId" element={<Forum />} />
                 <Route path="/comic/:id" element={<ComicDetail />} />
                 <Route path="/comic/:comicId/chapter/:chapterId" element={<ChapterDetail />} />
                 <Route path="/search" element={<SearchResults />} />
@@ -108,16 +108,17 @@ function App() {
                 <Route path="/admin/settings" element={<AdminSystemSettings />} />
                 {/* Moderator */}
                 <Route path="/moderator" element={<ModeratorDashboard />} />
-                {/* Translator */}
-                <Route path="/translator" element={<TranslatorDashboard />} />
-                {/* Author */}
-                <Route path="/author/overview" element={<AuthorDashboard />} />
-                <Route path="/author/comics" element={<AuthorComics />} />
-                <Route path="/author/comics/:id" element={<AuthorComicDetail />} />
-                <Route path="/author/upload-guide" element={<AuthorUploadGuide />} />
-                <Route path="/author/profile" element={<AuthorProfile />} />
-                <Route path="/author/earnings" element={<AuthorEarnings />} />
-                <Route path="/author/settings" element={<AuthorSettings />} />
+
+                {/* Author - persistent layout prevents sidebar/topbar remount flicker */}
+                <Route path="/author" element={<AuthorLayout />}>
+                  <Route index element={<Navigate to="overview" replace />} />
+                  <Route path="overview" element={<AuthorDashboard />} />
+                  <Route path="comics" element={<AuthorComics />} />
+                  <Route path="comics/:id" element={<AuthorComicDetail />} />
+                  <Route path="profile" element={<AuthorProfile />} />
+                  <Route path="earnings" element={<AuthorEarnings />} />
+                  <Route path="settings" element={<AuthorSettings />} />
+                </Route>
                 {/* Translator */}
                 <Route path="/translator" element={<TranslatorLayout />}>
                   
@@ -125,7 +126,7 @@ function App() {
                   <Route path="project-teams" element={<TeamProjects />} />
                   <Route path="revenue" element={<TranslatorRevenue />} />
                   <Route path="payout" element={<TranslatorPayout />} />
-                  <Route path="dashboard" element={<TranslateDashboard />} />
+                  <Route path="dashboard" element={<TranslatorDashboard />} />
                 </Route>
                 <Route path="/translator/translate-workspace/task/:taskId" element={<TranslateWorkspace />} />
                 <Route path="/translator/review-workspace/task/:taskId" element={<ReviewWorkspace />} />

@@ -18,8 +18,7 @@ import {
   createTeamTaskApi,
   updateTeamTaskApi,
   getTeamRequestsApi,
-  decideTeamRequestApi,
-  createTeamRequestApi
+  decideTeamRequestApi
 } from '../../services/api/TeamWorkspaceApi'
 import { toast } from 'react-toastify'
 
@@ -300,6 +299,7 @@ function WorkspaceDetailView({
 
       {workspaceTab === 'home' && (
         <HomeTab
+          selectedDetails={selectedDetails}
           showUploadForm={showUploadForm}
           setShowUploadForm={setShowUploadForm}
           uploadData={uploadData}
@@ -845,9 +845,11 @@ function TeamProjects() {
     }
 
     const isCurrentLeader = isLeaderMatch(selectedDetails.leaderName)
+
     const activeTasks = tasks.filter(t => getTaskColumn(t) !== 'paused')
     const pausedTasks = tasks.filter(t => getTaskColumn(t) === 'paused')
     const comicName = selectedDetails?.comicName || selectedDetails?.title
+    const filteredMembers = members.filter(m => m.name.toLowerCase().includes(memberSearch.toLowerCase()))
 
     return (
       <WorkspaceDetailView

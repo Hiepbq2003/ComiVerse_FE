@@ -1,7 +1,7 @@
 import AxiosClient from './AxiosClient';
 
-export const checkLikeStatusApi = (comicId) => {
-  return AxiosClient.get(`/likes/check/${comicId}`);
+export const checkLikeStatusApi = (comicId, config = {}) => {
+  return AxiosClient.get(`/likes/check/${comicId}`, config);
 };
 
 export const toggleLikeStatusApi = (comicId) => {

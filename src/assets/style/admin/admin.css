@@ -38,6 +38,22 @@
   --admin-transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+html.light {
+  --admin-bg: #f8fafc;
+  --admin-sidebar-bg: #ffffff;
+  --admin-topbar-bg: #ffffff;
+  --admin-card-bg: #ffffff;
+  --admin-hover-bg: rgba(168, 85, 247, 0.05);
+  --admin-active-bg: rgba(168, 85, 247, 0.12);
+
+  --admin-border: #e2e8f0;
+  --admin-border-hover: #cbd5e1;
+
+  --admin-text-primary: #0f172a;
+  --admin-text-secondary: #334155;
+  --admin-text-muted: #64748b;
+}
+
 /* ═══════════════════════════════════════════════════
    ADMIN LAYOUT SHELL
    ═══════════════════════════════════════════════════ */
@@ -88,52 +104,75 @@
 
 .admin-sidebar-nav {
   flex: 1;
-  padding: 0 12px;
+  padding: 16px 12px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
+  overflow-y: auto;
 }
 
 .admin-nav-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border-radius: 8px;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border-radius: 10px;
   font-size: 14px;
-  font-weight: 400;
+  font-weight: 500;
   color: var(--admin-text-secondary);
   text-decoration: none;
   cursor: pointer;
-  transition: all var(--admin-transition);
-  border: 1px solid transparent;
-  background: transparent;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   width: 100%;
   box-sizing: border-box;
-  font-family: var(--admin-font);
+  text-align: left;
 }
 
 .admin-nav-item:hover {
-  background: var(--admin-hover-bg);
+  background: rgba(168, 85, 247, 0.08);
+  border-color: rgba(168, 85, 247, 0.25);
   color: var(--admin-text-primary);
+  transform: translateX(2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .admin-nav-item.active {
-  background: var(--admin-active-bg);
-  color: #c084fc;
-  font-weight: 500;
-  border-color: rgba(168, 85, 247, 0.15);
+  background: linear-gradient(90deg, rgba(168, 85, 247, 0.2) 0%, rgba(236, 72, 153, 0.05) 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(168, 85, 247, 0.35) !important;
+  border-left: 4px solid #a855f7 !important;
+  padding-left: 10px !important;
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 4px 15px rgba(168, 85, 247, 0.12) !important;
+  font-weight: 600 !important;
 }
 
-.admin-nav-item .nav-icon {
+.admin-nav-label-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-nav-icon {
   width: 18px;
   height: 18px;
-  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   opacity: 0.7;
+  flex-shrink: 0;
 }
 
-.admin-nav-item.active .nav-icon {
+.admin-nav-item.active .admin-nav-icon,
+.admin-nav-item:hover .admin-nav-icon {
   opacity: 1;
+}
+
+.admin-nav-item.active .admin-nav-icon svg {
+  filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.5));
 }
 
 .admin-sidebar-footer {
@@ -149,6 +188,28 @@
 
 .admin-sidebar-footer .admin-nav-item:hover {
   color: var(--admin-text-secondary);
+}
+
+/* Light mode overrides for sidebar */
+html.light .admin-nav-item {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #334155;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+html.light .admin-nav-item:hover {
+  background: rgba(124, 58, 237, 0.06);
+  border-color: rgba(124, 58, 237, 0.25);
+  color: #6d28d9;
+}
+
+html.light .admin-nav-item.active {
+  background: linear-gradient(90deg, rgba(124, 58, 237, 0.12) 0%, rgba(219, 39, 119, 0.04) 100%) !important;
+  color: #6d28d9 !important;
+  border: 1px solid rgba(124, 58, 237, 0.3) !important;
+  border-left: 4px solid #7c3aed !important;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.08) !important;
 }
 
 /* ── MAIN CONTENT AREA ───────────────────────────── */
@@ -237,27 +298,54 @@
 
 .admin-notification-btn {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  color: var(--admin-text-secondary);
-  cursor: pointer;
-  transition: all var(--admin-transition);
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 10px !important;
+  border: 1px solid var(--admin-border) !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  color: var(--admin-text-secondary, #94a3b8) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
 }
 
 .admin-notification-btn:hover {
-  background: var(--admin-hover-bg);
-  color: var(--admin-text-primary);
+  background: var(--admin-hover-bg, rgba(255, 255, 255, 0.08)) !important;
+  color: var(--admin-text-primary, #ffffff) !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
 }
 
 .admin-notification-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 18px !important;
+  height: 18px !important;
+  stroke: currentColor !important;
+  fill: none !important;
+  flex-shrink: 0 !important;
+  display: block !important;
+}
+
+/* Light Mode Notification Bell Button */
+html.light .admin-notification-btn {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #475569 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .admin-notification-btn:hover {
+  background: rgba(168, 85, 247, 0.08) !important;
+  color: #7c3aed !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
+}
+
+html.light .admin-notification-btn svg {
+  stroke: #475569 !important;
+}
+
+html.light .admin-notification-btn:hover svg {
+  stroke: #7c3aed !important;
 }
 
 /* ── PAGE CONTENT ────────────────────────────────── */
@@ -561,10 +649,145 @@
 }
 
 /* Action Buttons in Table */
+/* Action Buttons in Table */
 .table-actions {
   display: flex;
   align-items: center;
+  gap: 8px;
+}
+
+.btn-action-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: transparent;
+  outline: none;
+  white-space: nowrap;
+}
+
+.btn-action-sm svg {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.btn-action-sm:hover svg {
+  transform: scale(1.15);
+}
+
+/* Edit action button (Purple/Violet Glass) */
+/* Edit action button (Vibrant Purple Gradient Pill) */
+.btn-action-sm--edit {
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%) !important;
+  box-shadow: 0 3px 10px rgba(168, 85, 247, 0.3) !important;
+  border-radius: 500px !important;
+  border: none !important;
+}
+
+.btn-action-sm--edit:hover {
+  background: linear-gradient(135deg, #9333ea 0%, #6d28d9 100%) !important;
+  box-shadow: 0 5px 15px rgba(168, 85, 247, 0.45) !important;
+  transform: translateY(-1px);
+}
+
+/* Ban action button (Vibrant Red Gradient Pill) */
+.btn-action-sm--ban {
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+  box-shadow: 0 3px 10px rgba(239, 68, 68, 0.3) !important;
+  border-radius: 500px !important;
+  border: none !important;
+}
+
+.btn-action-sm--ban:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+  box-shadow: 0 5px 15px rgba(239, 68, 68, 0.45) !important;
+  transform: translateY(-1px);
+}
+
+/* Unban action button (Vibrant Emerald Gradient Pill) */
+.btn-action-sm--unban {
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3) !important;
+  border-radius: 500px !important;
+  border: none !important;
+}
+
+.btn-action-sm--unban:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+  box-shadow: 0 5px 15px rgba(16, 185, 129, 0.45) !important;
+  transform: translateY(-1px);
+}
+
+/* Reset Password action button (Vibrant Blue Gradient Pill) */
+.btn-action-sm--reset {
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+  box-shadow: 0 3px 10px rgba(59, 130, 246, 0.3) !important;
+  border-radius: 500px !important;
+  border: none !important;
+}
+
+.btn-action-sm--reset:hover {
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+  box-shadow: 0 5px 15px rgba(59, 130, 246, 0.45) !important;
+  transform: translateY(-1px);
+}
+
+/* Light mode overrides for table action buttons - keep solid vibrant colors! */
+html.light .btn-action-sm--edit {
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%) !important;
+  box-shadow: 0 3px 10px rgba(139, 92, 246, 0.3) !important;
+}
+
+html.light .btn-action-sm--edit:hover {
+  background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%) !important;
+  box-shadow: 0 5px 15px rgba(139, 92, 246, 0.45) !important;
+}
+
+html.light .btn-action-sm--ban {
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%) !important;
+  box-shadow: 0 3px 10px rgba(239, 68, 68, 0.3) !important;
+}
+
+html.light .btn-action-sm--ban:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%) !important;
+  box-shadow: 0 5px 15px rgba(239, 68, 68, 0.45) !important;
+}
+
+html.light .btn-action-sm--unban {
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #10b981 0%, #047857 100%) !important;
+  box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3) !important;
+}
+
+html.light .btn-action-sm--unban:hover {
+  background: linear-gradient(135deg, #059669 0%, #065f46 100%) !important;
+  box-shadow: 0 5px 15px rgba(16, 185, 129, 0.45) !important;
+}
+
+html.light .btn-action-sm--reset {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.2);
+}
+
+html.light .btn-action-sm--reset:hover {
+  color: #ffffff;
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
 }
 
 .btn-table-action {
@@ -2108,57 +2331,74 @@ html.light .admin-sidebar-footer .admin-nav-item:hover {
 }
 
 /* ==========================================================================
-   TABLE ACTIONS - MODERNBUTTON STYLING AND CUSTOM COLOR THEMES
+   TABLE ACTIONS - SOLID VIBRANT GRADIENT BUTTON STYLING
    ========================================================================== */
 .table-actions .modern-btn-container {
   display: inline-block !important;
   margin: 0 !important;
 }
 
-.table-actions .modern-btn-container .btn-2 {
-  min-height: 28px !important;
-  height: 28px !important;
+.table-actions .modern-btn-container .btn-2,
+.table-actions .modern-btn-container .btn-5 {
+  min-height: 32px !important;
+  height: 32px !important;
   width: auto !important;
   min-width: 76px !important;
-  padding: 0 12px !important;
-  font-size: 11px !important;
+  padding: 0 14px !important;
+  font-size: 12px !important;
   font-weight: 600 !important;
-  border-radius: 6px !important;
+  border-radius: 500px !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
+  border: none !important;
+  transition: all 0.2s ease !important;
 }
 
-/* Edit Button style (Purple) */
+/* Edit Button style (Solid Vibrant Purple) */
 .table-actions .modern-btn-container .btn-2.btn-edit {
-  background: var(--admin-purple, #a855f7) !important;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 10px rgba(168, 85, 247, 0.3) !important;
 }
-.table-actions .modern-btn-container .btn-2.btn-edit::before {
-  background: #7c3aed !important;
-}
-
-/* Reset PW Button style (Blue) */
-.table-actions .modern-btn-container .btn-2.btn-reset {
-  background: var(--admin-blue, #3b82f6) !important;
-}
-.table-actions .modern-btn-container .btn-2.btn-reset::before {
-  background: #2563eb !important;
+.table-actions .modern-btn-container .btn-2.btn-edit span {
+  color: #ffffff !important;
 }
 
-/* Ban Button style (Red) */
-.table-actions .modern-btn-container .btn-2.btn-ban {
-  background: var(--admin-red, #ef4444) !important;
+/* Ban Button style (Solid Vibrant Red) */
+.table-actions .modern-btn-container .btn-2.btn-ban,
+.table-actions .modern-btn-container .btn-5.btn-ban {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 10px rgba(239, 68, 68, 0.3) !important;
 }
-.table-actions .modern-btn-container .btn-2.btn-ban::before {
-  background: #dc2626 !important;
+.table-actions .modern-btn-container .btn-2.btn-ban span {
+  color: #ffffff !important;
 }
 
-/* Unban Button style (Green) */
+/* Unban Button style (Solid Vibrant Green) */
 .table-actions .modern-btn-container .btn-2.btn-unban {
-  background: var(--admin-green, #10b981) !important;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3) !important;
 }
-.table-actions .modern-btn-container .btn-2.btn-unban::before {
-  background: #059669 !important;
+.table-actions .modern-btn-container .btn-2.btn-unban span {
+  color: #ffffff !important;
+}
+
+/* Light mode overrides for table action buttons */
+html.light .table-actions .modern-btn-container .btn-2.btn-edit {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%) !important;
+  color: #ffffff !important;
+}
+html.light .table-actions .modern-btn-container .btn-2.btn-ban,
+html.light .table-actions .modern-btn-container .btn-5.btn-ban {
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%) !important;
+  color: #ffffff !important;
+}
+html.light .table-actions .modern-btn-container .btn-2.btn-unban {
+  background: linear-gradient(135deg, #10b981 0%, #047857 100%) !important;
+  color: #ffffff !important;
 }
 
 /* Top Create Staff Button style (ModernButton Variant 5) */
@@ -2515,4 +2755,154 @@ html.light .admin-form-input:focus {
   background: rgba(21, 17, 32, 0.9) !important;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+}
+
+/* ═══════════════════════════════════════════════════
+   ADMIN LIGHT MODE SPECIFIC COMPONENT STYLES
+   ═══════════════════════════════════════════════════ */
+html.light .admin-layout {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+html.light .admin-sidebar {
+  background: #ffffff;
+  border-right-color: #e2e8f0;
+}
+
+html.light .admin-sidebar-brand h2 {
+  background: linear-gradient(135deg, #9333ea, #db2777);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+html.light .admin-topbar {
+  background: #ffffff;
+  border-bottom-color: #e2e8f0;
+}
+
+html.light .admin-nav-item {
+  color: #475569;
+}
+
+html.light .admin-nav-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+html.light .admin-nav-item.active {
+  background: rgba(168, 85, 247, 0.12);
+  color: #7c3aed;
+}
+
+html.light .broadcast-card,
+html.light .broadcast-history,
+html.light .stats-card,
+html.light .stats-chart-card,
+html.light .admin-data-table-wrapper,
+html.light .admin-modal {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+}
+
+html.light .broadcast-card-title,
+html.light .broadcast-label,
+html.light .admin-page-header-info h1,
+html.light .stats-chart-title {
+  color: #0f172a !important;
+}
+
+html.light .broadcast-input,
+html.light .broadcast-textarea,
+html.light .admin-search-input,
+html.light .admin-filter-select,
+html.light .admin-form-input {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+html.light .broadcast-input::placeholder,
+html.light .broadcast-textarea::placeholder,
+html.light .admin-search-input::placeholder,
+html.light .admin-form-input::placeholder {
+  color: #94a3b8 !important;
+}
+
+html.light .broadcast-input:focus,
+html.light .broadcast-textarea:focus,
+html.light .admin-search-input:focus,
+html.light .admin-filter-select:focus,
+html.light .admin-form-input:focus {
+  background: #ffffff !important;
+  border-color: #a855f7 !important;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15) !important;
+}
+
+html.light .broadcast-chip {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+html.light .broadcast-chip:hover {
+  background: #e2e8f0 !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+html.light .broadcast-chip.type-chip.info.active {
+  background: rgba(59, 130, 246, 0.12) !important;
+  color: #2563eb !important;
+  border-color: #3b82f6 !important;
+}
+
+html.light .broadcast-chip.type-chip.warning.active {
+  background: rgba(249, 115, 22, 0.12) !important;
+  color: #ea580c !important;
+  border-color: #f97316 !important;
+}
+
+html.light .broadcast-chip.type-chip.update.active {
+  background: rgba(16, 185, 129, 0.12) !important;
+  color: #059669 !important;
+  border-color: #10b981 !important;
+}
+
+html.light .broadcast-chip.type-chip.maintenance.active {
+  background: rgba(168, 85, 247, 0.12) !important;
+  color: #7c3aed !important;
+  border-color: #a855f7 !important;
+}
+
+html.light .broadcast-chip.role-chip.active {
+  background: rgba(168, 85, 247, 0.12) !important;
+  color: #7c3aed !important;
+  border-color: #a855f7 !important;
+}
+
+html.light .admin-data-table thead th {
+  background: #f8fafc !important;
+  border-bottom-color: #e2e8f0 !important;
+  color: #475569 !important;
+}
+
+html.light .admin-data-table tbody tr {
+  border-bottom-color: #f1f5f9 !important;
+}
+
+html.light .admin-data-table tbody tr:hover {
+  background: #f8fafc !important;
+}
+
+html.light .admin-data-table tbody td {
+  color: #334155 !important;
+}
+
+html.light .admin-data-table tbody td.cell-name,
+html.light .admin-data-table tbody td.cell-user-id {
+  color: #0f172a !important;
+  font-weight: 500;
 }

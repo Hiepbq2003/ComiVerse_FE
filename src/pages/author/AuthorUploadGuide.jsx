@@ -114,7 +114,7 @@ Content-Type: multipart/form-data
 
 Fields:
 - title: Ten Truyen
-- slug: ten-truyen
+- language: Japanese
 - description: Short synopsis
 - minimumAge: 13
 - publicationStatus: ONGOING
