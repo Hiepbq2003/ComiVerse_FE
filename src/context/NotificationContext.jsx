@@ -28,11 +28,15 @@ export function NotificationProvider({ children }) {
         const countRes = await getUnreadCountApi()
         setUnreadCount(Number(countRes?.data ?? countRes ?? 0))
       } catch (countError) {
-        console.error('Failed to load unread notification count:', countError)
+        if (countError?.response?.status !== 401) {
+          console.warn('Failed to load unread notification count:', countError?.message)
+        }
         setUnreadCount(nextNotifications.filter(notification => !notification.isRead).length)
       }
     } catch (err) {
-      console.error('Failed to load notifications:', err)
+      if (err?.response?.status !== 401) {
+        console.warn('Failed to load notifications:', err?.message)
+      }
     } finally {
       setLoading(false)
     }

@@ -862,20 +862,29 @@ html.light .forum-select-field option {
 
 .forum-editor-container-stv {
   flex-grow: 1;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(15, 10, 26, 0.6);
+  backdrop-filter: blur(12px);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.forum-editor-container-stv:focus-within {
+  border-color: #a855f7 !important;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2), 0 6px 20px rgba(0, 0, 0, 0.25) !important;
 }
 
 .forum-editor-box-stv {
   width: 100%;
   background: transparent;
   border: none;
-  color: white;
-  font-size: 13.5px;
-  padding: 12px;
-  min-height: 100px;
+  color: #f8fafc;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 14px 16px;
+  min-height: 90px;
   outline: none;
   font-family: inherit;
   box-sizing: border-box;
@@ -892,31 +901,45 @@ html.light .forum-select-field option {
 .forum-editor-toolbar-stv {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 10px;
-  background: rgba(255, 255, 255, 0.02);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+/* Formatting toolbar button - MS Word style active box */
 .forum-toolbar-btn-stv {
+  position: relative;
   background: transparent;
-  border: none;
-  color: #64748b;
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  display: flex;
+  border: 1.5px solid transparent;
+  color: #94a3b8;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: bold;
-  transition: all 0.15s ease;
+  font-size: 13.5px;
+  font-weight: 600;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
 }
 
 .forum-toolbar-btn-stv:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #cbd5e1;
+  background: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
+  border-color: rgba(168, 85, 247, 0.25);
+}
+
+/* MS Word / Rich Text Active Mode Button Box */
+.forum-toolbar-btn-stv.active {
+  background: rgba(168, 85, 247, 0.22) !important;
+  color: #ffffff !important;
+  border: 1.5px solid #a855f7 !important;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.35), inset 0 1px 2px rgba(255, 255, 255, 0.2) !important;
+  font-weight: 800 !important;
+  transform: translateY(-1px);
 }
 
 /* Light mode overrides for STV elements */
@@ -1040,17 +1063,45 @@ html.light .forum-editor-row-stv {
 }
 
 html.light .forum-editor-container-stv {
-  border-color: #cbd5e1;
-  background: #ffffff;
+  background: #ffffff !important;
+  border: 1.5px solid #cbd5e1 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .forum-editor-container-stv:focus-within {
+  border-color: #7c3aed !important;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15), 0 4px 12px rgba(124, 58, 237, 0.1) !important;
 }
 
 html.light .forum-editor-box-stv {
-  color: #1f2937;
+  color: #1e293b !important;
+}
+
+html.light .forum-editor-box-stv:empty:before {
+  color: #94a3b8 !important;
 }
 
 html.light .forum-editor-toolbar-stv {
-  background: #f8fafc;
-  border-top-color: #cbd5e1;
+  background: #f8fafc !important;
+  border-top: 1px solid #e2e8f0 !important;
+}
+
+html.light .forum-toolbar-btn-stv {
+  color: #475569 !important;
+}
+
+html.light .forum-toolbar-btn-stv:hover {
+  background: rgba(124, 58, 237, 0.08) !important;
+  color: #7c3aed !important;
+  border-color: rgba(124, 58, 237, 0.2) !important;
+}
+
+html.light .forum-toolbar-btn-stv.active {
+  background: #ede9fe !important;
+  color: #6d28d9 !important;
+  border: 1.5px solid #7c3aed !important;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25) !important;
+  font-weight: 800 !important;
 }
 
 /* ──────────────────────────────────────────────────────────
