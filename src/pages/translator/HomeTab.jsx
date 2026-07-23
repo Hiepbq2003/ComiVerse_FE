@@ -1,8 +1,7 @@
-// =============================================================================
-// Tab 1: Home (announcements feed + group chat)
-// =============================================================================
+import TeamGroupChat from '../../components/chat/TeamGroupChat'
 
 function HomeTab({
+  selectedDetails,
   showUploadForm,
   setShowUploadForm,
   uploadData,
@@ -13,10 +12,6 @@ function HomeTab({
   onPostAnnouncement,
   announcements,
   onLikePost,
-  chatMessages,
-  chatInput,
-  setChatInput,
-  onSendChat
 }) {
   return (
     <div className="workspace-home-grid">
@@ -115,41 +110,11 @@ function HomeTab({
         </div>
       </div>
 
-      {/* Right Chat Sidebar */}
-      <div className="group-chat-sidebar-card">
-        <div className="chat-card-header">
-          <h3>💬 Group Chat</h3>
-          <span className="chat-online-badge">● 6 online</span>
-        </div>
-
-        <div className="chat-messages-container">
-          {chatMessages.length === 0 ? (
-            <p style={{ fontStyle: 'italic', color: 'var(--trans-text-muted)', textAlign: 'center', padding: '20px' }}>Send the first message!</p>
-          ) : (
-            chatMessages.map(msg => (
-              <div className={`chat-message-item ${msg.isMe ? 'me' : ''}`} key={msg.id}>
-                <div className="chat-avatar">{msg.avatar || 'U'}</div>
-                <div className="chat-bubble-wrapper">
-                  {!msg.isMe && <span className="chat-sender-info">{msg.sender}</span>}
-                  <div className="chat-bubble">{msg.text}</div>
-                  <span className="chat-time">{msg.time}</span>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        <form className="chat-input-wrapper" onSubmit={onSendChat}>
-          <input
-            type="text"
-            className="chat-input"
-            placeholder="Send a message..."
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-          />
-          <button type="submit" className="chat-send-btn">➔</button>
-        </form>
-      </div>
+      {/* Right Chat Sidebar — Real-time WebSocket Group Chat */}
+      <TeamGroupChat
+        groupId={selectedDetails?.id}
+        teamName={selectedDetails?.title || selectedDetails?.team}
+      />
     </div>
   )
 }

@@ -13,7 +13,6 @@ const emptyProfile = {
   contactEmail: '',
   avatarUrl: '',
   bio: '',
-  language: '',
   note: '',
 }
 
@@ -50,7 +49,6 @@ function AuthorProfile() {
           contactEmail: data?.contactEmail || data?.email || '',
           avatarUrl: data?.avatarUrl || '',
           bio: data?.bio || '',
-          language: data?.language || '',
           note: data?.note || '',
         })
       } catch (error) {
@@ -84,7 +82,6 @@ function AuthorProfile() {
       contactEmail: profile.contactEmail?.trim() || null,
       avatarUrl: profile.avatarUrl?.trim() || null,
       bio: profile.bio?.trim() || null,
-      language: profile.language?.trim() || null,
       note: profile.note?.trim() || null,
     }
 
@@ -131,10 +128,6 @@ function AuthorProfile() {
             <div>
               <span>Contact email</span>
               <strong>{profile.contactEmail || profile.email || 'Not set'}</strong>
-            </div>
-            <div>
-              <span>Language</span>
-              <strong>{profile.language || 'Not set'}</strong>
             </div>
           </div>
           <p className="author-profile-preview-bio">
@@ -211,17 +204,6 @@ function AuthorProfile() {
                     onChange={(e) => updateField('contactEmail', e.target.value)}
                     placeholder="Public/business contact email"
                     maxLength={255}
-                  />
-                </div>
-
-                <div className="form-group-cell">
-                  <label>Language</label>
-                  <input
-                    className="form-control-premium"
-                    value={profile.language || ''}
-                    onChange={(e) => updateField('language', e.target.value)}
-                    placeholder="Example: Vietnamese, English, Japanese"
-                    maxLength={100}
                   />
                 </div>
 

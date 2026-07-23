@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
+import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 import '../../assets/style/author/comics.css'
 import '../../assets/style/author/upload-guide.css'
 import UploadGuideModal from '../../components/author/UploadGuideModal'
@@ -279,6 +280,7 @@ function EditComicModal({ comic, onClose, onSaved }) {
   const [form, setForm] = useState({
     title: comic?.title || '',
     summary: comic?.summary || '',
+    language: comic?.language && comic.language !== 'Unknown' ? comic.language : '',
     cover: getComicCover(comic),
     minimumAge: comic?.minimumAge ?? 13,
     publicationStatus: normalizePublicationStatusValue(comic?.publicationStatus),
@@ -299,6 +301,11 @@ function EditComicModal({ comic, onClose, onSaved }) {
       return
     }
 
+    if (!form.language.trim()) {
+      setError('Comic language is required.')
+      return
+    }
+
     setSaving(true)
     setError('')
 
@@ -306,6 +313,7 @@ function EditComicModal({ comic, onClose, onSaved }) {
       const payload = {
         title: form.title.trim(),
         summary: form.summary.trim(),
+        language: form.language.trim(),
         cover: form.cover.trim(),
         minimumAge: Number(form.minimumAge) || 0,
         publicationStatus: form.publicationStatus,
@@ -343,6 +351,14 @@ function EditComicModal({ comic, onClose, onSaved }) {
             <input className="author-input" value={form.title} onChange={(event) => updateField('title', event.target.value)} />
           </label>
 
+
+          <label className="author-form-label">
+            Original Language *
+            <select className="author-input" value={form.language} onChange={(event) => updateField('language', event.target.value)} required>
+              <option value="" disabled>Select original language</option>
+              {COMIC_LANGUAGE_OPTIONS.map((language) => <option key={language} value={language}>{language}</option>)}
+            </select>
+          </label>
 
           <label className="author-form-label">
             Minimum Age
@@ -711,6 +727,10 @@ function AuthorComicDetail() {
               <div className="author-detail-stat-card">
                 <span>Revenue</span>
                 <strong>{summary.revenue}</strong>
+              </div>
+              <div className="author-detail-stat-card">
+                <span>Original Language</span>
+                <strong>{comic.language || 'Unknown'}</strong>
               </div>
               <div className="author-detail-stat-card">
                 <span>Minimum Age</span>

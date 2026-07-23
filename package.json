@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@stomp/stompjs": "^7.3.0",
     "axios": "^1.18.1",
     "bootstrap": "^5.3.8",
     "e": "^0.2.33",
@@ -20,7 +21,8 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.0",
-    "react-toastify": "^11.1.0"
+    "react-toastify": "^11.1.0",
+    "sockjs-client": "^1.6.1"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
