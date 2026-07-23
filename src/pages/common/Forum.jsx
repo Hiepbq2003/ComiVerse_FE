@@ -223,6 +223,74 @@ function Forum() {
   const [replyingToComment, setReplyingToComment] = useState(null)
   const [highlightedCommentId, setHighlightedCommentId] = useState(null)
 
+  // Active Rich Text formatting states for editor (Bold, Italic, Quote, Code, Link)
+  const [activeFormats, setActiveFormats] = useState({
+    bold: false,
+    italic: false,
+    quote: false,
+    code: false,
+    link: false
+  })
+
+  const updateActiveFormats = useCallback(() => {
+    try {
+      const isBold = document.queryCommandState('bold')
+      const isItalic = document.queryCommandState('italic')
+      setActiveFormats(prev => ({
+        ...prev,
+        bold: !!isBold,
+        italic: !!isItalic
+      }))
+    } catch {
+      // fallback
+    }
+  }, [])
+
+  const handleInsertFormat = (formatType) => {
+    const editor = replyInputRef.current
+    if (!editor) return
+
+    editor.focus()
+
+    if (formatType === 'bold') {
+      document.execCommand('bold', false, null)
+      setActiveFormats(prev => ({ ...prev, bold: !prev.bold }))
+    } else if (formatType === 'italic') {
+      document.execCommand('italic', false, null)
+      setActiveFormats(prev => ({ ...prev, italic: !prev.italic }))
+    } else if (formatType === 'quote') {
+      const selection = window.getSelection()
+      if (selection && selection.toString()) {
+        document.execCommand('formatBlock', false, 'blockquote')
+        setActiveFormats(prev => ({ ...prev, quote: true }))
+      } else {
+        document.execCommand('insertHTML', false, '<blockquote>Quote</blockquote>')
+        setActiveFormats(prev => ({ ...prev, quote: !prev.quote }))
+      }
+    } else if (formatType === 'code') {
+      const selection = window.getSelection()
+      if (selection && selection.toString()) {
+        const range = selection.getRangeAt(0)
+        const codeNode = document.createElement('code')
+        codeNode.textContent = selection.toString()
+        range.deleteContents()
+        range.insertNode(codeNode)
+        setActiveFormats(prev => ({ ...prev, code: true }))
+      } else {
+        document.execCommand('insertHTML', false, '<code>code</code>')
+        setActiveFormats(prev => ({ ...prev, code: !prev.code }))
+      }
+    } else if (formatType === 'link') {
+      const url = prompt('Enter link URL (e.g. https://example.com):', 'https://')
+      if (url && url !== 'https://') {
+        document.execCommand('createLink', false, url)
+        setActiveFormats(prev => ({ ...prev, link: true }))
+      }
+    }
+
+    updateActiveFormats()
+  }
+
   // Report Modal State
   const [showReportModal, setShowReportModal] = useState(false)
   const [reportReason, setReportReason] = useState('')

@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
+import { useNotification } from '../../context/NotificationContext'
+import { AIPopover } from '../common/AIPopover'
 import '../../assets/style/admin/admin.css'
 
 function AdminLayout({ children, activeNav = 'account-management' }) {
@@ -10,6 +12,45 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
   const { user, isLoggedIn, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const adminName = user?.fullName || user?.username || 'Admin'
+
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification()
+
+  const formatTimeAgo = (dateStr) => {
+    if (!dateStr) return ''
+    try {
+      const date = new Date(dateStr)
+      const now = new Date()
+      const diffMs = now - date
+      const diffMins = Math.floor(diffMs / 60000)
+      if (diffMins < 1) return 'Just now'
+      if (diffMins < 60) return `${diffMins}m ago`
+      const diffHrs = Math.floor(diffMins / 60)
+      if (diffHrs < 24) return `${diffHrs}h ago`
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    } catch {
+      return ''
+    }
+  }
+
+  const handleNotificationAction = async (action) => {
+    if (action === 'markAllRead') {
+      markAllAsRead()
+    } else {
+      if (action.unread) await markAsRead(action.id)
+      if (action.actionUrl?.startsWith('/') && !action.actionUrl.startsWith('//')) {
+        navigate(action.actionUrl)
+      }
+    }
+  }
+
+  const formattedNotifications = notifications.map(n => ({
+    id: n.id,
+    unread: !n.isRead,
+    title: n.title || 'Notification',
+    message: n.message || '',
+    actionUrl: n.actionUrl,
+    time: formatTimeAgo(n.createdAt)
+  }))
 
   useEffect(() => {
     if (!isLoggedIn || !user || user.role?.toLowerCase() !== 'admin') {
@@ -90,18 +131,24 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
               to={item.path}
               className={`admin-nav-item ${activeNav === item.id ? 'active' : ''}`}
             >
-              {renderNavIcon(item.icon)}
-              {item.label}
+              <span className="admin-nav-label-group">
+                <span className="admin-nav-icon">{renderNavIcon(item.icon)}</span>
+                <span>{item.label}</span>
+              </span>
             </Link>
           ))}
         </nav>
 
         <div className="admin-sidebar-footer">
           <button className="admin-nav-item" onClick={() => navigate('/')}>
-            <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-            ← Back to Home
+            <span className="admin-nav-label-group">
+              <span className="admin-nav-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              ← Back to Home
+            </span>
           </button>
         </div>
       </aside>
@@ -143,12 +190,14 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
             </button>
 
             {/* Notification Bell */}
-            <button className="admin-notification-btn" title="Notifications">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              </svg>
-            </button>
+            <AIPopover 
+              variant="notif"
+              triggerText=""
+              triggerClass="admin-notification-btn"
+              popoverClass="pop--down pop--right-align"
+              data={{ notifications: formattedNotifications, unreadCount: unreadCount }}
+              onAction={handleNotificationAction}
+            />
 
             <div className="topbar-divider" />
 
