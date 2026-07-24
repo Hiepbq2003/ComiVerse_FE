@@ -320,32 +320,46 @@ function ProjectTeams({
                     <select 
                       className="mod-input select"
                       value={createTeamForm.comicName}
-                      onChange={(e) => setCreateTeamForm({ ...createTeamForm, comicName: e.target.value })}
+                      onChange={(e) => {
+                        const selectedTitle = e.target.value;
+                        const selectedComic = comics.find(c => c.title === selectedTitle);
+                        const autoLang = selectedComic?.language && selectedComic.language !== 'Unknown' ? selectedComic.language : 'Japanese';
+                        setCreateTeamForm({ 
+                          ...createTeamForm, 
+                          comicName: selectedTitle,
+                          sourceLang: autoLang
+                        });
+                      }}
                     >
                       <option value="">-- Select a Comic --</option>
                       {comics.map((c) => (
-                        <option key={c.id} value={c.title}>{c.title}</option>
+                        <option key={c.id} value={c.title}>
+                          {c.title} ({c.language || 'Unknown'})
+                        </option>
                       ))}
                     </select>
                   </div>
 
                   <div className="mod-form-row">
                     <div className="mod-form-group half">
-                      <label className="mod-label">Source Language</label>
-                      <select 
-                        className="mod-input select"
-                        value={createTeamForm.sourceLang}
-                        onChange={(e) => setCreateTeamForm({ ...createTeamForm, sourceLang: e.target.value })}
-                      >
-                        <option value="Japanese">Japanese</option>
-                        <option value="Korean">Korean</option>
-                        <option value="Chinese">Chinese</option>
-                        <option value="English">English</option>
-                      </select>
+                      <label className="mod-label">Source Language 🔒</label>
+                      <input 
+                        type="text"
+                        className="mod-input"
+                        value={createTeamForm.sourceLang || 'Auto-detected'}
+                        disabled
+                        readOnly
+                        style={{ 
+                          opacity: 0.85, 
+                          cursor: 'not-allowed', 
+                          fontWeight: '600'
+                        }}
+                        title="Source language is inherited directly from the original comic specification."
+                      />
                     </div>
 
                     <div className="mod-form-group half">
-                      <label className="mod-label">Target Language</label>
+                      <label className="mod-label">Target Language *</label>
                       <select 
                         className="mod-input select"
                         value={createTeamForm.targetLang}
@@ -354,6 +368,11 @@ function ProjectTeams({
                         <option value="English">English</option>
                         <option value="Vietnamese">Vietnamese</option>
                         <option value="Spanish">Spanish</option>
+                        <option value="French">French</option>
+                        <option value="Japanese">Japanese</option>
+                        <option value="Korean">Korean</option>
+                        <option value="Chinese">Chinese</option>
+                        <option value="German">German</option>
                       </select>
                     </div>
                   </div>

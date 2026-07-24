@@ -992,6 +992,12 @@ function ModeratorDashboard() {
               comics={comics
                 .filter(c => !submissions.some(s => s.queueType === 'author' && s.status === 'pending' && s.title === c.title))
                 .filter((value, index, self) => self.findIndex(t => t.title === value.title) === index)
+                .filter(c => {
+                  const modLangs = Array.isArray(user?.assignedLanguages) && user.assignedLanguages.length > 0
+                    ? user.assignedLanguages
+                    : ['Japanese', 'Korean'];
+                  return modLangs.includes('All') || modLangs.some(l => l.toLowerCase() === (c.language || 'Japanese').toLowerCase());
+                })
               }
               showCreateTeamModal={showCreateTeamModal}
               setShowCreateTeamModal={setShowCreateTeamModal}
