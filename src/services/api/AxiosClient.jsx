@@ -62,9 +62,13 @@ AxiosClient.interceptors.response.use(
         } 
         else if (status === 403 && !isLoginRequest) {
             // 403: Forbidden / Access Denied
-            toast.error("Access denied! There is an issue with your account permissions.", {
-                toastId: "forbidden-403"
-            });
+            // Suppress global toast for background chat & workspace endpoints to prevent intrusive popups
+            const isBackgroundEndpoint = requestUrl.includes('/chat/') || requestUrl.includes('/team-workspace/');
+            if (!isBackgroundEndpoint) {
+                toast.error("Access denied! There is an issue with your account permissions.", {
+                    toastId: "forbidden-403"
+                });
+            }
         }
         else if (status === 500) {
             // 500: Internal Server Error

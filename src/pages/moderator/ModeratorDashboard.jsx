@@ -17,6 +17,7 @@ import { getAllChatFlagsApi } from '../../services/api/ChatFlagApi'
 import { toast } from 'react-toastify'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import ModernButton from '../../components/common/ModernButton'
+import { getAuth } from '../../utils/Auth'
 
 
 const formatSubmitterName = (submittedBy) => {
@@ -208,6 +209,30 @@ function ModeratorDashboard() {
       toast.success('Submission approved!')
       setSubmissions(prev => prev.filter(item => item.id !== id))
       fetchComicsAndTeams()
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to approve submission.')
+    }
+  }
+
+  const handleApproveAndCreateProject = async (item) => {
+    try {
+      await approveSubmissionApi(item.id)
+      toast.success(`Approved "${item.title}"! Opening Translation Project setup...`)
+      setSubmissions(prev => prev.filter(s => s.id !== item.id))
+      fetchComicsAndTeams()
+
+      setCreateTeamForm({
+        title: `${item.title} - Translation Team`,
+        comicName: item.title,
+        sourceLang: item.language || 'Japanese',
+        targetLang: 'English',
+        leaderName: '',
+        leaderId: ''
+      })
+      setCreateTeamStep(1)
+      setShowCreateTeamModal(true)
+      setActiveNav('project-teams')
     } catch (err) {
       console.error(err)
       toast.error('Failed to approve submission.')
@@ -963,6 +988,7 @@ function ModeratorDashboard() {
               submissions={submissions} 
               handleApprove={handleApprove} 
               handleConfirmReject={handleConfirmReject} 
+              handleApproveAndCreateProject={handleApproveAndCreateProject}
             />
           )}
 
@@ -993,8 +1019,9 @@ function ModeratorDashboard() {
                 .filter(c => !submissions.some(s => s.queueType === 'author' && s.status === 'pending' && s.title === c.title))
                 .filter((value, index, self) => self.findIndex(t => t.title === value.title) === index)
                 .filter(c => {
-                  const modLangs = Array.isArray(user?.assignedLanguages) && user.assignedLanguages.length > 0
-                    ? user.assignedLanguages
+                  const currentUser = getAuth()?.user;
+                  const modLangs = Array.isArray(currentUser?.assignedLanguages) && currentUser.assignedLanguages.length > 0
+                    ? currentUser.assignedLanguages
                     : ['Japanese', 'Korean'];
                   return modLangs.includes('All') || modLangs.some(l => l.toLowerCase() === (c.language || 'Japanese').toLowerCase());
                 })
