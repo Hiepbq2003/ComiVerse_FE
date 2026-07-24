@@ -13,10 +13,10 @@
   --mod-sidebar-text: #94a3b8;
   --mod-sidebar-active: #ffffff;
 
-  --mod-text-primary: #f1f5f9;
-  --mod-text-secondary: #94a3b8;
-  --mod-text-muted: #64748b;
-  --mod-border: rgba(255, 255, 255, 0.08);
+  --mod-text-primary: #f8fafc;
+  --mod-text-secondary: #cbd5e1;
+  --mod-text-muted: #94a3b8;
+  --mod-border: rgba(255, 255, 255, 0.18);
 
   --mod-purple: #a855f7;
   --mod-purple-hover: #c084fc;
@@ -44,19 +44,19 @@
   background: linear-gradient(180deg, #0e0a1f 0%, #070512 100%) !important;
   backdrop-filter: blur(20px) saturate(140%) !important;
   -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-right: 1.5px solid rgba(255, 255, 255, 0.18) !important;
   display: flex;
   flex-direction: column;
   position: fixed;
   top: 0;
   left: 0;
   z-index: 100;
-  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.35);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5), 1px 0 0 rgba(168, 85, 247, 0.25) !important;
 }
 
 .moderator-sidebar-brand {
   padding: 24px 20px 28px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.14);
 }
 
 .moderator-sidebar-brand h2 {
@@ -208,9 +208,41 @@
 }
 
 .moderator-topbar-left {
-  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--mod-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.mod-lang-scope-badge {
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+html.light .mod-lang-scope-badge {
+  background: #f3e8ff !important;
+  color: #6b21a8 !important;
+  border: 1.5px solid #c084fc !important;
+}
+
+@media (max-width: 900px) {
+  .mod-lang-scope-badge {
+    display: none;
+  }
 }
 
 .moderator-topbar-right {

@@ -46,6 +46,7 @@ function ChatWidget({ defaultGroupId = null, isEmbedded = false }) {
                     isLoadingInitial={isLoadingInitial}
                     isLoadingMore={isLoadingMore}
                     hasMore={hasMore}
+                    isConnected={isConnected}
                     onLoadMore={fetchOlderMessages}
                     scrollContainerRef={scrollContainerRef}
                     isNearBottomRef={isNearBottomRef}

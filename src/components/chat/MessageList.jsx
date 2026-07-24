@@ -8,6 +8,7 @@ function MessageList({
     isLoadingInitial,
     isLoadingMore,
     hasMore,
+    isConnected = true,
     onLoadMore,
     scrollContainerRef,
     isNearBottomRef,
@@ -53,11 +54,11 @@ function MessageList({
                 </div>
             )}
 
-            {/* Initial Loading Spinner */}
-            {isLoadingInitial ? (
+            {/* Initial Loading or Connection State */}
+            {isLoadingInitial || (!isConnected && messages.length === 0) ? (
                 <div className="cv-chat-empty-state">
                     <div className="cv-chat-spinner" style={{ margin: '0 auto 8px', width: '24px', height: '24px' }}></div>
-                    <span>Loading chat history...</span>
+                    <span>{isLoadingInitial ? 'Loading chat history...' : 'Connecting to chat server...'}</span>
                 </div>
             ) : messages.length === 0 ? (
                 <div className="cv-chat-empty-state">

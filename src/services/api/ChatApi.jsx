@@ -17,7 +17,7 @@ export const getChatMessagesApi = ({ chatType, groupId, page = 1, limit = 20 }) 
     if (chatType === 'GROUP' && groupId) {
         params.group_id = groupId;
     }
-    return AxiosClient.get('/chat/messages', { params });
+    return AxiosClient.get('/chat/messages', { params, timeout: 3000 });
 };
 
 /**

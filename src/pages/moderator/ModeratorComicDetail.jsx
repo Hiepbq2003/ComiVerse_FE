@@ -8,6 +8,7 @@ import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import ModernButton from '../../components/common/ModernButton'
 import { toast } from 'react-toastify'
+import { useTheme } from '../../context/ThemeContext'
 import '../../assets/style/moderator/comic-detail.css'
 
 const getLanguageFlag = (lang) => {
@@ -24,27 +25,37 @@ const getLanguageFlag = (lang) => {
 }
 
 const getAuthorRawLanguage = (comic) => {
-  if (!comic) return 'Not Specified'
+  if (!comic) return 'Original Raw'
   const raw = comic.language || comic.rawLanguage || comic.originalLanguage || comic.lang || comic.originalLang
-  if (raw && String(raw).trim()) {
+  if (raw && String(raw).trim() && String(raw).trim().toLowerCase() !== 'unknown') {
     return String(raw).trim()
   }
-  return 'Not Specified'
+  return 'Original Raw'
 }
 
-function ChapterReaderInspectorModal({ chapter, comic, targetLang, assignedTeam, onClose }) {
+function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = [], projectTeams = [], initialTargetLang, onClose }) {
+  const { theme } = useTheme()
   const [loading, setLoading] = useState(true)
   const [pages, setPages] = useState([])
   const [currentPageIndex, setCurrentPageIndex] = useState(0)
-  
-  const rawLangLabel = getAuthorRawLanguage(comic)
-  const displayTargetLang = (targetLang && targetLang !== 'raw')
-    ? targetLang
-    : (assignedTeam?.targetLang || assignedTeam?.language || null)
 
-  // Default viewMode: 'raw' if inspecting raw, else 'translated'
-  const isRawOnlyView = !targetLang || targetLang === 'raw'
-  const [viewMode, setViewMode] = useState(isRawOnlyView ? 'raw' : (displayTargetLang ? 'translated' : 'raw')) // 'raw' | 'translated' | 'side-by-side'
+  // Local state to hold chosen parallel checking language
+  const [selectedLang, setSelectedLang] = useState(initialTargetLang || 'raw')
+  const displayTargetLang = selectedLang !== 'raw' ? selectedLang : null
+
+  // Find active team for the chosen language
+  const assignedTeam = useMemo(() => {
+    if (!displayTargetLang) return null
+    return projectTeams.find(
+      t => t.targetLang && t.targetLang.toLowerCase() === displayTargetLang.toLowerCase()
+    ) || null
+  }, [displayTargetLang, projectTeams])
+
+  const rawLangLabel = getAuthorRawLanguage(comic)
+
+  // Default viewMode: 'raw' if inspecting raw, else 'side-by-side'
+  const isRawOnlyView = selectedLang === 'raw'
+  const [viewMode, setViewMode] = useState(isRawOnlyView ? 'raw' : 'side-by-side') // 'raw' | 'translated' | 'side-by-side'
   const [renderLayout, setRenderLayout] = useState('single') // 'single' (Page by page) | 'vertical' (Continuous scroll)
   const scrollContainerRef = useRef(null)
 
@@ -96,7 +107,7 @@ function ChapterReaderInspectorModal({ chapter, comic, targetLang, assignedTeam,
   }
 
   return createPortal(
-    <div className="mod-inspector-overlay fade-in">
+    <div className={`mod-inspector-overlay fade-in ${theme === 'light' ? 'light-theme' : 'dark-theme'}`}>
       {/* Top Navigation & Language / View Mode Controls */}
       <div className="mod-inspector-topbar">
         <div className="mod-inspector-title-group">
@@ -104,27 +115,52 @@ function ChapterReaderInspectorModal({ chapter, comic, targetLang, assignedTeam,
             <h3 className="mod-inspector-title">
               📖 {comic?.title} — Chapter {chapter.chapterNumber}
             </h3>
-            <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+            <span className="mod-inspector-subtitle">
               {chapter.title || 'Untitled Chapter'} {assignedTeam && displayTargetLang ? `• Team: ${assignedTeam.title}` : ''}
             </span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          {/* Parallel Language Check Dropdown */}
+          <div className="mod-inspect-select-container">
+            <span className="mod-inspect-select-label">Parallel Check:</span>
+            <select
+              className="mod-inspect-select"
+              value={selectedLang}
+              onChange={(e) => {
+                const val = e.target.value
+                setSelectedLang(val)
+                if (val === 'raw') {
+                  setViewMode('raw')
+                } else {
+                  setViewMode('side-by-side')
+                }
+              }}
+            >
+              <option value="raw">{getLanguageFlag(rawLangLabel)} Raw Original Only</option>
+              {availableTargetLangs.map(lang => (
+                <option key={lang} value={lang}>
+                  {getLanguageFlag(lang)} {lang} Translation
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Language / View Mode Switcher */}
           <div className="mod-inspector-mode-tabs">
             <button
               className={`mod-mode-tab ${viewMode === 'raw' ? 'active' : ''}`}
               onClick={() => setViewMode('raw')}
             >
-              {getLanguageFlag(rawLangLabel)} Raw ({rawLangLabel})
+              {getLanguageFlag(rawLangLabel)} Raw
             </button>
             {displayTargetLang && (
               <button
                 className={`mod-mode-tab ${viewMode === 'translated' ? 'active' : ''}`}
                 onClick={() => setViewMode('translated')}
               >
-                {getLanguageFlag(displayTargetLang)} Translated ({displayTargetLang})
+                {getLanguageFlag(displayTargetLang)} Translated
               </button>
             )}
             {displayTargetLang && (
@@ -132,125 +168,126 @@ function ChapterReaderInspectorModal({ chapter, comic, targetLang, assignedTeam,
                 className={`mod-mode-tab ${viewMode === 'side-by-side' ? 'active' : ''}`}
                 onClick={() => setViewMode('side-by-side')}
               >
-                ↔️ Compare (Song Song)
+                ↔️ Compare
               </button>
             )}
           </div>
-        </div>
 
-        <button className="mod-inspector-close-btn" onClick={onClose} title="Close Inspector">
-          ×
-        </button>
+          <button className="mod-inspector-close-btn" onClick={onClose} title="Close Inspector">
+            ×
+          </button>
+        </div>
       </div>
 
       {/* Main Inspection Area */}
       <div className="mod-inspector-body">
-        {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', gap: '16px', color: '#94a3b8' }}>
-            <SkeletonLoader count={1} width={300} height={400} />
-            <p>Loading chapter pages for inspection...</p>
-          </div>
-        ) : pages.length === 0 ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', color: '#94a3b8' }}>
-            No pages found for this chapter.
-          </div>
-        ) : renderLayout === 'single' ? (
-          /* SINGLE PAGE DISPLAY MODE */
-          <div className="mod-comparison-view">
-            {/* RAW ORIGINAL PANE */}
-            {(viewMode === 'side-by-side' || viewMode === 'raw') && (
-              <div className="mod-pane">
-                <div className="mod-pane-header">
-                  <span className="mod-pane-title mod-pane-title--raw">
-                    {getLanguageFlag(rawLangLabel)} Raw Original — {rawLangLabel} (Page {currentPageIndex + 1})
-                  </span>
-                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>Submitted by Author</span>
-                </div>
-                <div className="mod-pane-content">
-                  <img
-                    src={currentPage?.imageUrl || currentPage?.pageUrl || currentPage?.url || ''}
-                    alt={`Raw Page ${currentPageIndex + 1}`}
-                    className="mod-page-image"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* TRANSLATED PANE */}
-            {(viewMode === 'side-by-side' || viewMode === 'translated') && (
-              <div className="mod-pane">
-                <div className="mod-pane-header">
-                  <span className="mod-pane-title mod-pane-title--translated">
-                    {getLanguageFlag(displayTargetLang || 'Target')} Translated ({displayTargetLang || 'No Language'}) — Page {currentPageIndex + 1}
-                  </span>
-                  <span style={{ fontSize: '11px', color: assignedTeam ? '#34d399' : '#f87171', fontWeight: 600 }}>
-                    {assignedTeam ? `Team: ${assignedTeam.title}` : '⚠️ No Team Assigned'}
-                  </span>
-                </div>
-                <div className="mod-pane-content" style={{ position: 'relative' }}>
-                  {currentPage?.translatedImageUrl ? (
+        <div className="mod-inspector-main-content">
+          {loading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', gap: '16px', color: '#94a3b8' }}>
+              <SkeletonLoader count={1} width={300} height={400} />
+              <p>Loading chapter pages for inspection...</p>
+            </div>
+          ) : pages.length === 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: '#94a3b8' }}>
+              No pages found for this chapter.
+            </div>
+          ) : renderLayout === 'single' ? (
+            /* SINGLE PAGE DISPLAY MODE */
+            <div className="mod-comparison-view">
+              {/* RAW ORIGINAL PANE */}
+              {(viewMode === 'side-by-side' || viewMode === 'raw') && (
+                <div className="mod-pane">
+                  <div className="mod-pane-header">
+                    <span className="mod-pane-title mod-pane-title--raw">
+                      {getLanguageFlag(rawLangLabel)} Raw Original — {rawLangLabel} (Page {currentPageIndex + 1})
+                    </span>
+                  </div>
+                  <div className="mod-pane-content">
                     <img
-                      src={currentPage.translatedImageUrl}
-                      alt={`Translated Page ${currentPageIndex + 1}`}
+                      src={currentPage?.imageUrl || currentPage?.pageUrl || currentPage?.url || ''}
+                      alt={`Raw Page ${currentPageIndex + 1}`}
                       className="mod-page-image"
                     />
-                  ) : (
-                    <div className="mod-no-translation-notice">
-                      <div className="mod-no-trans-icon">🌐</div>
-                      <h4 style={{ color: 'var(--mod-text-primary)', margin: '8px 0 4px 0' }}>Not Translated Yet</h4>
-                      <p style={{ fontSize: '13px', margin: 0, maxWidth: '340px' }}>
-                        {displayTargetLang
-                          ? `Page ${currentPageIndex + 1} has not been translated into ${displayTargetLang} yet.`
-                          : 'No target translation language selected.'}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          /* CONTINUOUS VERTICAL SCROLL MODE (WEBTOON) */
-          <div className="mod-continuous-scroll-container" ref={scrollContainerRef}>
-            {pages.map((page, idx) => (
-              <div key={idx} className="mod-continuous-row">
-                {/* RAW COLUMN */}
-                {(viewMode === 'side-by-side' || viewMode === 'raw') && (
-                  <div className="mod-continuous-column mod-continuous-column--raw">
-                    <div className="mod-page-label">
-                      {getLanguageFlag(rawLangLabel)} Raw Page {idx + 1} ({rawLangLabel})
-                    </div>
-                    <img
-                      src={page.imageUrl || page.url || ''}
-                      alt={`Raw Page ${idx + 1}`}
-                      className="mod-webtoon-image"
-                    />
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* TRANSLATED COLUMN */}
-                {(viewMode === 'side-by-side' || viewMode === 'translated') && (
-                  <div className="mod-continuous-column mod-continuous-column--translated">
-                    <div className="mod-page-label">
-                      {getLanguageFlag(displayTargetLang || 'Target')} Translated Page {idx + 1} ({displayTargetLang || 'Target'})
-                    </div>
-                    {page.translatedImageUrl ? (
+              {/* TRANSLATED PANE */}
+              {(viewMode === 'side-by-side' || viewMode === 'translated') && (
+                <div className="mod-pane">
+                  <div className="mod-pane-header">
+                    <span className="mod-pane-title mod-pane-title--translated">
+                      {getLanguageFlag(displayTargetLang || 'Target')} Translated ({displayTargetLang || 'No Language'}) — Page {currentPageIndex + 1}
+                    </span>
+                    <span style={{ fontSize: '11px', color: assignedTeam ? '#34d399' : '#f87171', fontWeight: 600 }}>
+                      {assignedTeam ? `Team: ${assignedTeam.title}` : '⚠️ No Team Assigned'}
+                    </span>
+                  </div>
+                  <div className="mod-pane-content" style={{ position: 'relative' }}>
+                    {currentPage?.translatedImageUrl ? (
                       <img
-                        src={page.translatedImageUrl}
-                        alt={`Translated Page ${idx + 1}`}
-                        className="mod-webtoon-image"
+                        src={currentPage.translatedImageUrl}
+                        alt={`Translated Page ${currentPageIndex + 1}`}
+                        className="mod-page-image"
                       />
                     ) : (
-                      <div className="mod-webtoon-no-trans">
-                        ⚠️ Page {idx + 1} Not Translated {displayTargetLang ? `(${displayTargetLang})` : ''}
+                      <div className="mod-no-translation-notice">
+                        <div className="mod-no-trans-icon">🌐</div>
+                        <h4 style={{ color: 'var(--mod-text-primary)', margin: '8px 0 4px 0' }}>Not Translated Yet</h4>
+                        <p style={{ fontSize: '13px', margin: 0, maxWidth: '340px' }}>
+                          {displayTargetLang
+                            ? `Page ${currentPageIndex + 1} has not been translated into ${displayTargetLang} yet.`
+                            : 'No target translation language selected.'}
+                        </p>
                       </div>
                     )}
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* CONTINUOUS VERTICAL SCROLL MODE (WEBTOON) */
+            <div className="mod-continuous-scroll-container" ref={scrollContainerRef}>
+              {pages.map((page, idx) => (
+                <div key={idx} className="mod-continuous-row">
+                  {/* RAW COLUMN */}
+                  {(viewMode === 'side-by-side' || viewMode === 'raw') && (
+                    <div className="mod-continuous-column mod-continuous-column--raw">
+                      <div className="mod-page-label">
+                        {getLanguageFlag(rawLangLabel)} Raw Page {idx + 1} ({rawLangLabel})
+                      </div>
+                      <img
+                        src={page.imageUrl || page.url || ''}
+                        alt={`Raw Page ${idx + 1}`}
+                        className="mod-webtoon-image"
+                      />
+                    </div>
+                  )}
+
+                  {/* TRANSLATED COLUMN */}
+                  {(viewMode === 'side-by-side' || viewMode === 'translated') && (
+                    <div className="mod-continuous-column mod-continuous-column--translated">
+                      <div className="mod-page-label">
+                        {getLanguageFlag(displayTargetLang || 'Target')} Translated Page {idx + 1} ({displayTargetLang || 'Target'})
+                      </div>
+                      {page.translatedImageUrl ? (
+                        <img
+                          src={page.translatedImageUrl}
+                          alt={`Translated Page ${idx + 1}`}
+                          className="mod-webtoon-image"
+                        />
+                      ) : (
+                        <div className="mod-webtoon-no-trans">
+                          ⚠️ Page {idx + 1} Not Translated {displayTargetLang ? `(${displayTargetLang})` : ''}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Bottom Control Bar */}
@@ -287,22 +324,19 @@ function ChapterReaderInspectorModal({ chapter, comic, targetLang, assignedTeam,
             </>
           )}
 
-          {/* Compact Reading Mode Switcher (Single Page vs Continuous Scroll) */}
-          <div className="mod-render-layout-toggle-sm">
-            <button
-              className={`mod-layout-btn-sm ${renderLayout === 'single' ? 'active' : ''}`}
-              onClick={() => setRenderLayout('single')}
-              title="Single Page View (Trang đơn)"
+          <div className="mod-inspector-divider" />
+
+          {/* Layout Dropdown Selector */}
+          <div className="mod-inspect-select-container">
+            <span className="mod-inspect-select-label">Reader Layout:</span>
+            <select
+              className="mod-inspect-select"
+              value={renderLayout}
+              onChange={(e) => setRenderLayout(e.target.value)}
             >
-              📄 Single Page
-            </button>
-            <button
-              className={`mod-layout-btn-sm ${renderLayout === 'vertical' ? 'active' : ''}`}
-              onClick={() => setRenderLayout('vertical')}
-              title="Continuous Scroll Mode (Cuộn vô cực)"
-            >
-              📜 Scroll Mode
-            </button>
+              <option value="single">📄 Single Page</option>
+              <option value="vertical">📜 Scroll Mode</option>
+            </select>
           </div>
         </div>
 
@@ -613,8 +647,9 @@ function ModeratorComicDetail() {
           <ChapterReaderInspectorModal
             chapter={inspectingChapter}
             comic={comic}
-            targetLang={selectedViewLang === 'raw' ? null : selectedViewLang}
-            assignedTeam={activeSelectedTeam}
+            availableTargetLangs={availableTargetLangs}
+            projectTeams={assignedTeamsForComic}
+            initialTargetLang={selectedViewLang === 'raw' ? null : selectedViewLang}
             onClose={() => setInspectingChapter(null)}
           />
         )}

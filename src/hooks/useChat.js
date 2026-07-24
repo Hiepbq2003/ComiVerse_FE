@@ -3,6 +3,8 @@ import stompService from '../services/websocket/StompService';
 import { getChatMessagesApi, sendChatMessageApi } from '../services/api/ChatApi';
 import { getTeamMessagesApi, createTeamMessageApi } from '../services/api/TeamWorkspaceApi';
 import { getAuth } from '../utils/Auth';
+import { checkBannedContent } from '../services/api/BannedKeywordApi';
+import { toast } from 'react-toastify';
 
 const PAGE_SIZE = 20;
 
@@ -83,7 +85,7 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
             setHasMore(items.length >= PAGE_SIZE);
         } catch (err) {
             console.error('[useChat] Failed to load initial chat history:', err);
-            setMessages([]);
+            setMessages((prev) => (prev.length > 0 ? prev : []));
         } finally {
             setIsLoadingInitial(false);
         }
@@ -202,13 +204,22 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
             cleanupConnect();
             cleanupDisconnect();
         };
-    }, [chatType, groupId, currentUser?.id, fetchInitialMessages, handleIncomingMessage]);
+    }, [chatType, groupId, currentUser?.id]);
 
     // 5. Send Message Handler
     const sendMessage = useCallback(async (content) => {
         if (!content || !content.trim()) return;
 
         const trimmedContent = content.trim();
+
+        // 0ms Instant Client-Side Keyword Pre-filter
+        const filterCheck = checkBannedContent(trimmedContent);
+        if (filterCheck.isBanned) {
+            toast.error(`🚫 Message blocked by Client Pre-filter! Contains banned keyword: "${filterCheck.matchedWord}" (${filterCheck.category})`);
+            setIsSending(false);
+            return false;
+        }
+
         setIsSending(true);
 
         const payload = {
@@ -255,7 +266,7 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
         } finally {
             setIsSending(false);
         }
-    }, [chatType, groupId, handleIncomingMessage]);
+    }, [chatType, groupId, handleIncomingMessage, currentUser]);
 
     // 6. Switch Tab Handler
     const switchTab = useCallback((newType, newGroupId = null) => {

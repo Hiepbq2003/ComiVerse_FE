@@ -152,7 +152,7 @@ html.light .author-sidebar-footer {
   background: linear-gradient(180deg, #0e0a1f 0%, #070512 100%) !important;
   backdrop-filter: blur(20px) saturate(140%) !important;
   -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-right: 1.5px solid rgba(255, 255, 255, 0.18) !important;
   color: #f8fafc;
   display: flex;
   flex-direction: column;
@@ -160,12 +160,12 @@ html.light .author-sidebar-footer {
   top: 0;
   left: 0;
   z-index: 100;
-  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.35);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5), 1px 0 0 rgba(168, 85, 247, 0.25) !important;
 }
 
 .author-sidebar-brand {
   padding: 24px 20px 28px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.14) !important;
 }
 
 .author-sidebar-brand h2 {

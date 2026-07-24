@@ -17,6 +17,7 @@ import { getAllChatFlagsApi } from '../../services/api/ChatFlagApi'
 import { toast } from 'react-toastify'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import ModernButton from '../../components/common/ModernButton'
+import { getAuth } from '../../utils/Auth'
 
 
 const formatSubmitterName = (submittedBy) => {
@@ -993,8 +994,9 @@ function ModeratorDashboard() {
                 .filter(c => !submissions.some(s => s.queueType === 'author' && s.status === 'pending' && s.title === c.title))
                 .filter((value, index, self) => self.findIndex(t => t.title === value.title) === index)
                 .filter(c => {
-                  const modLangs = Array.isArray(user?.assignedLanguages) && user.assignedLanguages.length > 0
-                    ? user.assignedLanguages
+                  const currentUser = getAuth()?.user;
+                  const modLangs = Array.isArray(currentUser?.assignedLanguages) && currentUser.assignedLanguages.length > 0
+                    ? currentUser.assignedLanguages
                     : ['Japanese', 'Korean'];
                   return modLangs.includes('All') || modLangs.some(l => l.toLowerCase() === (c.language || 'Japanese').toLowerCase());
                 })

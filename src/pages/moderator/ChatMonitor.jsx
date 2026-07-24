@@ -1,37 +1,83 @@
 import { useState, useEffect } from 'react'
 import '../../assets/style/moderator/chat-monitor.css'
-import { getAllChatFlagsApi, warnChatFlagApi, deleteChatFlagApi } from '../../services/api/ChatFlagApi'
+import {
+  getAllChatFlagsApi,
+  warnChatFlagApi,
+  muteUserChatApi,
+  unmuteUserChatApi,
+  dismissChatFlagApi,
+  deleteChatFlagApi
+} from '../../services/api/ChatFlagApi'
+import {
+  getBannedKeywordsApi,
+  addBannedKeywordApi,
+  deleteBannedKeywordApi
+} from '../../services/api/BannedKeywordApi'
+import ChatWidget from '../../components/chat/ChatWidget'
+import { SkeletonLoader } from '../../components/common/SkeletonLoader'
+import ModernButton from '../../components/common/ModernButton'
 import { toast } from 'react-toastify'
+
 function ChatMonitor({ fetchAllData }) {
+  const [activeTab, setActiveTab] = useState('flags') // 'flags' | 'keywords' | 'live'
+  
+  // Data states
   const [flags, setFlags] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [keywords, setKeywords] = useState([])
+  const [loadingFlags, setLoadingFlags] = useState(true)
+  const [loadingKeywords, setLoadingKeywords] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+
+  // Banned keyword form states
+  const [newWord, setNewWord] = useState('')
+  const [newCategory, setNewCategory] = useState('Profanity')
+  const [keywordFilter, setKeywordFilter] = useState('')
+
+  // Mute user modal state
+  const [muteTarget, setMuteTarget] = useState(null) // { userId, username, flagId }
+  const [muteHours, setMuteHours] = useState(24)
+  const [muteReason, setMuteReason] = useState('')
 
   useEffect(() => {
     fetchFlags()
+    fetchKeywords()
   }, [])
 
   const fetchFlags = async () => {
     try {
-      setLoading(true)
+      setLoadingFlags(true)
       const data = await getAllChatFlagsApi()
-      setFlags(data || [])
+      setFlags(Array.isArray(data) ? data : (data?.data || []))
       fetchAllData?.()
     } catch (err) {
       console.error(err)
       toast.error('Failed to load chat flags!')
     } finally {
-      setLoading(false)
+      setLoadingFlags(false)
     }
   }
 
+  const fetchKeywords = async () => {
+    try {
+      setLoadingKeywords(true)
+      const data = await getBannedKeywordsApi()
+      setKeywords(Array.isArray(data) ? data : (data?.data || []))
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to load banned keywords!')
+    } finally {
+      setLoadingKeywords(false)
+    }
+  }
+
+  // Action: Warn user
   const handleSendWarning = async (id, user) => {
     if (submitting) return
     try {
       setSubmitting(true)
-      const updated = await warnChatFlagApi(id)
-      setFlags(prev => prev.map(f => f.id === id ? updated : f))
-      toast.success(`Warning sent to user: ${user}`)
+      await warnChatFlagApi(id)
+      setFlags(prev => prev.map(f => f.id === id ? { ...f, status: 'warned' } : f))
+      toast.success(`⚠️ Issued warning strike to user: ${user}`)
     } catch (err) {
       console.error(err)
       toast.error('Failed to send warning!')
@@ -40,15 +86,32 @@ function ChatMonitor({ fetchAllData }) {
     }
   }
 
+  // Action: Dismiss flag
+  const handleDismissFlag = async (id) => {
+    if (submitting) return
+    try {
+      setSubmitting(true)
+      await dismissChatFlagApi(id)
+      setFlags(prev => prev.filter(f => f.id !== id))
+      toast.info('Flag dismissed.')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to dismiss flag.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Action: Ban user permanently
   const handleBanUser = async (id, user) => {
     if (submitting) return
-    if (window.confirm(`Are you sure you want to permanently ban user: ${user}?`)) {
+    if (window.confirm(`Are you sure you want to permanently ban chat access for user: ${user}?`)) {
       try {
         setSubmitting(true)
         await deleteChatFlagApi(id)
         setFlags(prev => prev.filter(f => f.id !== id))
         fetchAllData?.()
-        toast.success(`User ${user} has been banned and flag removed.`)
+        toast.success(`🚫 Chat access permanently banned for user ${user}.`)
       } catch (err) {
         console.error(err)
         toast.error('Failed to ban user!')
@@ -58,57 +121,370 @@ function ChatMonitor({ fetchAllData }) {
     }
   }
 
+  // Action: Open Mute Modal
+  const handleOpenMuteModal = (flag) => {
+    setMuteTarget({
+      userId: flag.userId || flag.id,
+      username: flag.user || flag.username || 'User',
+      flagId: flag.id
+    })
+    setMuteHours(24)
+    setMuteReason(flag.reason || 'Violating chat guidelines')
+  }
+
+  // Action: Confirm Mute
+  const handleConfirmMute = async () => {
+    if (!muteTarget || submitting) return
+    try {
+      setSubmitting(true)
+      await muteUserChatApi(muteTarget.userId, muteHours, muteReason)
+      setFlags(prev => prev.map(f => f.id === muteTarget.flagId ? { ...f, status: 'muted', mutedUntil: `${muteHours}h` } : f))
+      toast.success(`🔇 User ${muteTarget.username} muted for ${muteHours} hours.`)
+      setMuteTarget(null)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to mute user!')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Action: Add Banned Keyword
+  const handleAddKeyword = async (e) => {
+    e.preventDefault()
+    if (!newWord.trim() || submitting) return
+    try {
+      setSubmitting(true)
+      const added = await addBannedKeywordApi({
+        word: newWord.trim(),
+        category: newCategory
+      })
+      setKeywords(prev => [added, ...prev])
+      setNewWord('')
+      toast.success(`🚫 Banned keyword "${added.word}" added & updated to Client pre-filter!`)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to add keyword!')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Action: Delete Banned Keyword
+  const handleDeleteKeyword = async (id, word) => {
+    if (submitting) return
+    try {
+      setSubmitting(true)
+      await deleteBannedKeywordApi(id)
+      setKeywords(prev => prev.filter(k => k.id !== id))
+      toast.info(`Removed keyword "${word}" from pre-filter.`)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to delete keyword!')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const filteredKeywords = keywords.filter(k => 
+    !keywordFilter || k.word?.toLowerCase().includes(keywordFilter.toLowerCase()) || k.category?.toLowerCase().includes(keywordFilter.toLowerCase())
+  )
+
   return (
-    <div className="fade-in">
+    <div className="fade-in cv-chat-monitor-container">
+      {/* Header & Metrics */}
       <div className="moderator-page-header">
-        <h1>Chat Monitor</h1>
-        <p>Review chat logs flagged by users or automated toxic filters.</p>
+        <div>
+          <h1>Chat Moderation Center</h1>
+          <p>Manage violating accounts, update instant client-side keyword pre-filters, and inspect live streams.</p>
+        </div>
+
+        <div className="cv-chat-metrics-bar">
+          <div className="cv-metric-pill">
+            <span className="cv-metric-val">{flags.length}</span>
+            <span className="cv-metric-lbl">Active Flags</span>
+          </div>
+          <div className="cv-metric-pill">
+            <span className="cv-metric-val">{keywords.length}</span>
+            <span className="cv-metric-lbl">Banned Keywords</span>
+          </div>
+        </div>
       </div>
 
-      {loading ? (
-        <div className="moderator-empty-state">
-          <p>Loading flags...</p>
-        </div>
-      ) : (
-        <div className="moderator-cards-list">
-          {flags.length === 0 ? (
+      {/* Workspace Tabs */}
+      <div className="cv-chat-tabs-header">
+        <button
+          className={`cv-chat-tab-btn ${activeTab === 'flags' ? 'active' : ''}`}
+          onClick={() => setActiveTab('flags')}
+        >
+          🚩 Flagged Accounts & Violations ({flags.length})
+        </button>
+        <button
+          className={`cv-chat-tab-btn ${activeTab === 'keywords' ? 'active' : ''}`}
+          onClick={() => setActiveTab('keywords')}
+        >
+          🚫 Banned Keywords & Filter ({keywords.length})
+        </button>
+        <button
+          className={`cv-chat-tab-btn ${activeTab === 'live' ? 'active' : ''}`}
+          onClick={() => setActiveTab('live')}
+        >
+          📡 Live Stream Inspector
+        </button>
+      </div>
+
+      {/* TAB 1: VIOLATING ACCOUNTS & FLAGGED MESSAGES */}
+      {activeTab === 'flags' && (
+        <div className="cv-tab-pane">
+          {loadingFlags ? (
+            <div style={{ padding: '24px 0' }}>
+              <SkeletonLoader type="staggered" count={3} />
+            </div>
+          ) : flags.length === 0 ? (
             <div className="moderator-empty-state">
-              <h3>No flagged chats pending</h3>
-              <p>ComiVerse chatrooms are clear and healthy!</p>
+              <h3>🎉 Zero Pending Violations</h3>
+              <p>All chatrooms are clear. No flagged messages or accounts pending review.</p>
             </div>
           ) : (
-            flags.map(f => (
-              <div className="submission-card" key={f.id}>
-                <div className="submission-info">
-                  <h3 className="submission-title">User: {f.user}</h3>
-                  <p className="submission-meta">Flagged in chapter chat: <em>{f.message}</em></p>
-                  <p style={{ fontSize: '12px', color: 'var(--mod-red)' }}><strong>Automated Filter Match:</strong> {f.reason}</p>
-                </div>
-                <div className="submission-actions">
-                  {f.status === 'warned' ? (
-                    <span style={{ fontSize: '13px', color: 'var(--mod-gray)', fontWeight: '600', padding: '6px 12px' }}>⚠️ Warning Sent</span>
-                  ) : (
-                    <button 
-                      className="mod-btn review" 
-                      style={{ borderColor: 'var(--mod-red)', color: 'var(--mod-red)', opacity: submitting ? 0.7 : 1 }}
-                      onClick={() => handleSendWarning(f.id, f.user)}
+            <div className="cv-flags-list">
+              {flags.map(f => (
+                <div className="cv-flag-card" key={f.id}>
+                  <div className="cv-flag-user-info">
+                    <div className="cv-user-avatar">
+                      {(f.user || 'U').substring(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <h3 className="cv-user-name">User: {f.user}</h3>
+                      <span className="cv-flag-meta">
+                        Flagged in Chapter Chat • {f.createdAt ? new Date(f.createdAt).toLocaleTimeString() : 'Recent'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="cv-flag-body">
+                    <div className="cv-flag-msg-box">
+                      <strong>Flagged Message:</strong> <em>"{f.message}"</em>
+                    </div>
+                    <div className="cv-flag-reason-tag">
+                      ⚠️ <strong>Automated Filter Match:</strong> {f.reason || 'Profanity / Toxic Content'}
+                    </div>
+                  </div>
+
+                  <div className="cv-flag-actions">
+                    {f.status === 'warned' ? (
+                      <span className="cv-status-badge warned">⚠️ Warning Issued</span>
+                    ) : f.status === 'muted' ? (
+                      <span className="cv-status-badge muted">🔇 Muted ({f.mutedUntil || 'Temp'})</span>
+                    ) : (
+                      <button
+                        className="mod-btn review"
+                        onClick={() => handleSendWarning(f.id, f.user)}
+                        disabled={submitting}
+                      >
+                        ⚠️ Warn User
+                      </button>
+                    )}
+
+                    <button
+                      className="mod-btn warning-opt"
+                      onClick={() => handleOpenMuteModal(f)}
                       disabled={submitting}
                     >
-                      {submitting ? 'Sending...' : '⚠️ Send Warning'}
+                      🔇 Mute Account
                     </button>
-                  )}
-                  <button 
-                    className="mod-btn reject"
-                    onClick={() => handleBanUser(f.id, f.user)}
-                    disabled={submitting}
-                    style={{ opacity: submitting ? 0.7 : 1 }}
-                  >
-                    {submitting ? 'Banning...' : '🚫 Ban User'}
-                  </button>
+
+                    <button
+                      className="mod-btn reject"
+                      onClick={() => handleBanUser(f.id, f.user)}
+                      disabled={submitting}
+                    >
+                      🚫 Ban Chat
+                    </button>
+
+                    <button
+                      className="mod-btn dismiss"
+                      onClick={() => handleDismissFlag(f.id)}
+                      disabled={submitting}
+                    >
+                      ✅ Dismiss
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
+        </div>
+      )}
+
+      {/* TAB 2: BANNED KEYWORDS & PRE-FILTER DICTIONARY */}
+      {activeTab === 'keywords' && (
+        <div className="cv-tab-pane">
+          {/* Add Keyword Form */}
+          <form className="cv-add-keyword-card" onSubmit={handleAddKeyword}>
+            <h3>🚫 Add New Banned Keyword / Pattern</h3>
+            <p className="cv-card-desc">
+              Keywords added here are cached instantly on client devices to intercept enter submits with 0ms DB impact.
+            </p>
+
+            <div className="cv-keyword-form-row">
+              <div className="cv-form-group flex-2">
+                <label>Keyword / Phrase:</label>
+                <input
+                  type="text"
+                  className="cv-input"
+                  placeholder="e.g. toxic_phrase, spam_link..."
+                  value={newWord}
+                  onChange={e => setNewWord(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="cv-form-group">
+                <label>Category:</label>
+                <select
+                  className="cv-select"
+                  value={newCategory}
+                  onChange={e => setNewCategory(e.target.value)}
+                >
+                  <option value="Profanity">Profanity</option>
+                  <option value="Spam / Scam">Spam / Scam</option>
+                  <option value="Policy Violation">Policy Violation</option>
+                  <option value="Adverts">Adverts</option>
+                  <option value="Hate Speech">Hate Speech</option>
+                </select>
+              </div>
+
+              <div className="cv-form-group btn-align">
+                <button type="submit" className="cv-btn-primary" disabled={!newWord.trim() || submitting}>
+                  ➕ Add to Pre-filter
+                </button>
+              </div>
+            </div>
+          </form>
+
+          {/* Search Bar */}
+          <div className="cv-keyword-search-bar">
+            <input
+              type="text"
+              className="cv-input"
+              placeholder="Search banned keywords or categories..."
+              value={keywordFilter}
+              onChange={e => setKeywordFilter(e.target.value)}
+            />
+            <span className="cv-search-count">Showing {filteredKeywords.length} of {keywords.length} rules</span>
+          </div>
+
+          {/* Keywords Cloud / Grid */}
+          {loadingKeywords ? (
+            <div style={{ padding: '24px 0' }}>
+              <SkeletonLoader type="cards" count={6} />
+            </div>
+          ) : (
+            <div className="cv-keywords-grid">
+              {filteredKeywords.length === 0 ? (
+                <div className="moderator-empty-state" style={{ gridColumn: '1 / -1' }}>
+                  <p>No matching keywords found.</p>
+                </div>
+              ) : (
+                filteredKeywords.map(k => (
+                  <div className="cv-keyword-chip" key={k.id}>
+                    <div className="cv-chip-header">
+                      <span className="cv-chip-word">"{k.word}"</span>
+                    </div>
+
+                    <div className="cv-chip-footer">
+                      <span className="cv-chip-category">{k.category || 'General'}</span>
+                      <button
+                        type="button"
+                        className="cv-chip-del-btn"
+                        onClick={() => handleDeleteKeyword(k.id, k.word)}
+                        title="Remove Keyword"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: LIVE STREAM & ROOM INSPECTOR */}
+      {activeTab === 'live' && (
+        <div className="cv-tab-pane">
+          <div className="cv-live-inspector-container">
+            <div className="cv-live-inspector-header">
+              <div>
+                <h3>📡 Realtime Global Room Stream</h3>
+                <p>Live stream of messages broadcasted via STOMP WebSocket endpoints.</p>
+              </div>
+            </div>
+
+            <div className="cv-embedded-chat-box">
+              <ChatWidget isEmbedded={true} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MUTE DURATION MODAL DIALOG */}
+      {muteTarget && (
+        <div className="cv-modal-overlay fade-in">
+          <div className="cv-modal-box">
+            <div className="cv-modal-header">
+              <h3>🔇 Mute Account Chat Access</h3>
+              <button className="cv-modal-close" onClick={() => setMuteTarget(null)}>×</button>
+            </div>
+
+            <div className="cv-modal-body">
+              <p>Set chat restriction duration for <strong>{muteTarget.username}</strong>:</p>
+
+              <div className="cv-mute-durations">
+                <button
+                  type="button"
+                  className={`cv-dur-btn ${muteHours === 1 ? 'selected' : ''}`}
+                  onClick={() => setMuteHours(1)}
+                >
+                  1 Hour
+                </button>
+                <button
+                  type="button"
+                  className={`cv-dur-btn ${muteHours === 24 ? 'selected' : ''}`}
+                  onClick={() => setMuteHours(24)}
+                >
+                  24 Hours (1 Day)
+                </button>
+                <button
+                  type="button"
+                  className={`cv-dur-btn ${muteHours === 168 ? 'selected' : ''}`}
+                  onClick={() => setMuteHours(168)}
+                >
+                  7 Days
+                </button>
+              </div>
+
+              <div className="cv-form-group" style={{ marginTop: '16px' }}>
+                <label>Restriction Note / Reason:</label>
+                <textarea
+                  className="cv-textarea"
+                  value={muteReason}
+                  onChange={e => setMuteReason(e.target.value)}
+                  placeholder="Reason for temporary mute..."
+                />
+              </div>
+            </div>
+
+            <div className="cv-modal-footer">
+              <button type="button" className="cv-btn-secondary" onClick={() => setMuteTarget(null)}>
+                Cancel
+              </button>
+              <button type="button" className="cv-btn-danger" onClick={handleConfirmMute} disabled={submitting}>
+                {submitting ? 'Applying Mute...' : `Confirm Mute (${muteHours}h)`}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
