@@ -25,6 +25,7 @@ import AuthorEarnings from './pages/author/AuthorEarnings'
 import AuthorSettings from './pages/author/AuthorSettings'
 import AuthorProfile from './pages/author/AuthorProfile'
 import ModeratorDashboard from './pages/moderator/ModeratorDashboard'
+import ModeratorComicDetail from './pages/moderator/ModeratorComicDetail'
 import TranslatorDashboard from './pages/translator/TranslatorDashboard'
 import Profile from './pages/common/Profile'
 import Policy from './pages/common/Policy'
@@ -108,6 +109,7 @@ function App() {
                 <Route path="/admin/settings" element={<AdminSystemSettings />} />
                 {/* Moderator */}
                 <Route path="/moderator" element={<ModeratorDashboard />} />
+                <Route path="/moderator/comic/:id" element={<ModeratorComicDetail />} />
 
                 {/* Author - persistent layout prevents sidebar/topbar remount flicker */}
                 <Route path="/author" element={<AuthorLayout />}>

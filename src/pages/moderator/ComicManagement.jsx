@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import '../../assets/style/moderator/comic-management.css'
 import ModernButton from '../../components/common/ModernButton'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
@@ -9,6 +10,8 @@ import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getChaptersByComicIdApi, deleteChapterApi } from '../../services/api/ChapterApi'
 
 function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, handleArchiveComic, handleTriggerAssignTeam, fetchAllData }) {
+  const navigate = useNavigate()
+
   // Search & Filters local states
   const [comicSearch, setComicSearch] = useState('')
   const [comicStatusFilter, setComicStatusFilter] = useState('All Status')
@@ -59,20 +62,8 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   const [chaptersList, setChaptersList] = useState([])
   const [chaptersLoading, setChaptersLoading] = useState(false)
 
-  const openChaptersModal = async (comic) => {
-    setChaptersComic(comic)
-    setChaptersList([])
-    setChaptersLoading(true)
-    setShowChaptersModal(true)
-    try {
-      const response = await getChaptersByComicIdApi(comic.id)
-      const data = response?.data?.data || response?.data || response || []
-      setChaptersList(Array.isArray(data) ? data : [])
-    } catch (err) {
-      toast.error('Failed to load chapters.')
-    } finally {
-      setChaptersLoading(false)
-    }
+  const openChaptersModal = (comic) => {
+    navigate(`/moderator/comic/${comic.id}`)
   }
 
   const handleDeleteChapter = async (chapterId) => {
@@ -466,7 +457,14 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                         )}
                       </div>
                       <div className="comic-cell-details">
-                        <span className="comic-cell-title">{comic.title}</span>
+                        <span 
+                          className="comic-cell-title" 
+                          style={{ cursor: 'pointer' }} 
+                          onClick={() => navigate(`/moderator/comic/${comic.id}`)}
+                          title="Click to view comic details & chapters"
+                        >
+                          {comic.title}
+                        </span>
                         <div className="comic-cell-genres">
                           {comic.genres.map((g, idx) => (
                             <span key={idx} className="comic-genre-tag">

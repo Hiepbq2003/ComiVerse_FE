@@ -70,7 +70,7 @@ html.light {
   width: var(--admin-sidebar-w);
   min-height: 100vh;
   background: var(--admin-sidebar-bg);
-  border-right: 1px solid var(--admin-border);
+  border-right: 1.5px solid rgba(255, 255, 255, 0.18) !important;
   display: flex;
   flex-direction: column;
   position: fixed;
@@ -78,10 +78,12 @@ html.light {
   left: 0;
   z-index: 100;
   overflow-y: auto;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5), 1px 0 0 rgba(168, 85, 247, 0.25) !important;
 }
 
 .admin-sidebar-brand {
   padding: 24px 20px 32px;
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.14) !important;
 }
 
 .admin-sidebar-brand h2 {

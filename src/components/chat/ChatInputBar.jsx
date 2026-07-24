@@ -8,10 +8,11 @@ function ChatInputBar({ onSendMessage, isSending, disabled }) {
         if (!content.trim() || isSending || disabled) return;
 
         const textToSend = content;
-        setContent(''); // Clear input immediately for smooth UX
-
         try {
-            await onSendMessage(textToSend);
+            const success = await onSendMessage(textToSend);
+            if (success !== false) {
+                setContent('');
+            }
         } catch (err) {
             // Restore content if send fails
             setContent(textToSend);

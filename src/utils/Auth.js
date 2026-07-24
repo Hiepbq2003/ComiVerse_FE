@@ -1,3 +1,5 @@
+import stompService from '../services/websocket/StompService';
+
 export const getAuth = () => {
   const token = localStorage.getItem('token');
   const user = localStorage.getItem('user');
@@ -22,6 +24,11 @@ export const clearAuth = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
   localStorage.removeItem('refreshToken');
+  try {
+    stompService.disconnect();
+  } catch (e) {
+    console.warn("Failed to disconnect WebSocket on logout:", e);
+  }
 };
 
 export const setAuth = (token, user, refreshToken) => {

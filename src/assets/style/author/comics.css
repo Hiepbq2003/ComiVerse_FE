@@ -1126,8 +1126,7 @@
 
 .btn-author-action,
 .btn-table-action,
-.btn-table-icon,
-.author-secondary-btn {
+.btn-table-icon {
   background: transparent;
   color: var(--author-text-secondary);
   border: 1px solid var(--author-border);
@@ -1135,8 +1134,7 @@
 
 .btn-author-action:hover,
 .btn-table-action:hover,
-.btn-table-icon:hover,
-.author-secondary-btn:hover {
+.btn-table-icon:hover {
   background: var(--author-hover-bg);
   border-color: var(--author-border-hover);
   color: var(--author-text-primary);
