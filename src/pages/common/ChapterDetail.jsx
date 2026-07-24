@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getComicByIdApi } from '../../services/api/ComicApi'
-import { getChaptersByComicIdApi, getChapterDetailApi } from '../../services/api/ChapterApi'
+import { getChaptersByComicIdApi, getChapterDetailApi, getChapterTranslationsApi } from '../../services/api/ChapterApi'
 import { toast } from 'react-toastify'
 import useReaderSecurity from '../../hooks/useReaderSecurity'
 import ComicPageCanvas from '../../components/common/ComicPageCanvas'
@@ -14,9 +14,36 @@ import { getAuth } from '../../utils/Auth'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { getChapterCommentsApi, createChapterCommentApi } from '../../services/api/CommentApi'
 
+// pagesBubbles is a JSON string: [{ pageNumber, imageUrl, bubbles }, ...]
+// where `bubbles` is itself a JSON string ({"selections":[...]}) — same
+// shape ReviewController.buildPagesBubblesJson produces. Returns a
+// { [pageNumber]: selections[] } lookup for quick per-page access.
+function parseTranslationBubblesByPage(pagesBubblesJson) {
+  if (!pagesBubblesJson) return {}
+  try {
+    const pages = JSON.parse(pagesBubblesJson)
+    if (!Array.isArray(pages)) return {}
+    const map = {}
+    pages.forEach((p) => {
+      let selections = []
+      try {
+        const parsed = JSON.parse(p.bubbles || '{}')
+        selections = Array.isArray(parsed) ? parsed : parsed?.selections || []
+      } catch {
+        selections = []
+      }
+      map[p.pageNumber] = selections
+    })
+    return map
+  } catch {
+    return {}
+  }
+}
+
 function ChapterDetail() {
   const { comicId, chapterId } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   // States
   const [comic, setComic] = useState(null)
@@ -26,6 +53,8 @@ function ChapterDetail() {
   const [isMockData, setIsMockData] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isDevToolsOpen, setIsDevToolsOpen] = useState(false)
+  const [translations, setTranslations] = useState([])
+  const [selectedLanguage, setSelectedLanguage] = useState(searchParams.get('lang') || '')
 
   // User & Comments state variables
   const [user, setUser] = useState(null)
@@ -63,7 +92,7 @@ function ChapterDetail() {
         theme: 'dark'
       })
     },
-    disableDetector: false
+    disableDetector: true
   })
 
   // Scroll to top on chapter change
@@ -223,16 +252,19 @@ function ChapterDetail() {
           throw new Error('Using local preview data for a demo route')
         }
 
-        // Fetch current chapter detail, comic detail, and all chapters of the comic in parallel
-        const [chapterRes, chaptersListRes, comicRes] = await Promise.all([
+        // Fetch current chapter detail, comic detail, all chapters of the
+        // comic, and available translations, in parallel
+        const [chapterRes, chaptersListRes, comicRes, translationsRes] = await Promise.all([
           getChapterDetailApi(chapterId),
           getChaptersByComicIdApi(comicId),
-          getComicByIdApi(comicId)
+          getComicByIdApi(comicId),
+          getChapterTranslationsApi(chapterId).catch(() => ({ data: [] }))
         ])
 
         const chapterData = chapterRes?.data || chapterRes
         const listData = chaptersListRes?.data || chaptersListRes || []
         const comicData = comicRes?.data || comicRes
+        const translationsData = translationsRes?.data || translationsRes || []
 
         if (!chapterData) {
           throw new Error('Chapter details not found')
@@ -241,6 +273,7 @@ function ChapterDetail() {
         setCurrentChapter(chapterData)
         setChaptersList(listData)
         setComic(comicData)
+        setTranslations(Array.isArray(translationsData) ? translationsData : [])
         setIsMockData(false)
       } catch (err) {
         console.error('API failed for chapter detail:', err.message)
@@ -248,6 +281,7 @@ function ChapterDetail() {
         setCurrentChapter(null)
         setChaptersList([])
         setComic(null)
+        setTranslations([])
       } finally {
         setLoading(false)
       }
@@ -271,24 +305,29 @@ function ChapterDetail() {
   const hasPrevChapter = currentChapterIndex > 0
   const hasNextChapter = currentChapterIndex < sortedChapters.length - 1
 
+  const buildChapterUrl = (targetChapterId) => {
+    const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(selectedLanguage)}` : ''
+    return `/comic/${comicId}/chapter/${targetChapterId}${langQuery}`
+  }
+
   const handleGoToPrevChapter = () => {
     if (hasPrevChapter) {
       const prevChap = sortedChapters[currentChapterIndex - 1]
-      navigate(`/comic/${comicId}/chapter/${prevChap.id}`)
+      navigate(buildChapterUrl(prevChap.id))
     }
   }
 
   const handleGoToNextChapter = () => {
     if (hasNextChapter) {
       const nextChap = sortedChapters[currentChapterIndex + 1]
-      navigate(`/comic/${comicId}/chapter/${nextChap.id}`)
+      navigate(buildChapterUrl(nextChap.id))
     }
   }
 
   const handleSelectChapter = (e) => {
     const targetId = e.target.value
     if (targetId) {
-      navigate(`/comic/${comicId}/chapter/${targetId}`)
+      navigate(buildChapterUrl(targetId))
     }
   }
 
@@ -345,6 +384,22 @@ function ChapterDetail() {
   }
 
   const pages = currentChapter.images || []
+
+  // Only show languages that actually have data for THIS chapter — the
+  // comic-level picker (ComicDetail) may list languages that some
+  // individual chapters don't have a translation for yet.
+  const availableLanguagesForChapter = translations.map((t) => t.languageCode)
+  const activeTranslation = translations.find((t) => t.languageCode === selectedLanguage)
+  const selectedBubblesByPageNumber = activeTranslation
+    ? parseTranslationBubblesByPage(activeTranslation.pagesBubbles)
+    : {}
+  console.log("[DEBUG translations]", {
+    selectedLanguage,
+    translations,
+    availableLanguagesForChapter,
+    activeTranslation,
+    selectedBubblesByPageNumber,
+  })
   const currentChapterNumberStr = currentChapter.chapterNumber || '?'
   const currentChapterTitleStr = currentChapter.title || `Chapter ${currentChapterNumberStr}`
   const comicTitleStr = comic?.title || 'Comic Series'
@@ -427,7 +482,7 @@ function ChapterDetail() {
                           key={ch.id}
                           className={`reader-chapter-dropdown-item ${isSelected ? 'selected' : ''}`}
                           onClick={() => {
-                            navigate(`/comic/${comicId}/chapter/${ch.id}`)
+                            navigate(buildChapterUrl(ch.id))
                             setIsDropdownOpen(false)
                           }}
                         >
@@ -454,6 +509,30 @@ function ChapterDetail() {
               >
                 Next ▶
               </button>
+
+              {availableLanguagesForChapter.length > 0 && (
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value)}
+                  title="Reading language"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px',
+                    padding: '6px 12px',
+                    color: 'white',
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="" style={{ color: '#111', background: '#fff' }}>Original</option>
+                  {availableLanguagesForChapter.map((lang) => (
+                    <option key={lang} value={lang} style={{ color: '#111', background: '#fff' }}>
+                      {lang}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
         </div>
@@ -473,6 +552,7 @@ function ChapterDetail() {
                 pageIndex={index}
                 isEncrypted={false} // Toggle to true if backend is encryption-enabled
                 fallbackSrc="https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&q=80"
+                bubbles={selectedBubblesByPageNumber[index + 1]}
               />
             ))
           )}

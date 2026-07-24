@@ -4,7 +4,7 @@ import HomeLayout from '../../components/layout/HomeLayout'
 import { getAuth } from '../../utils/Auth'
 import axios from 'axios'
 import { getComicByIdApi } from '../../services/api/ComicApi'
-import { getChaptersByComicIdApi } from '../../services/api/ChapterApi'
+import { getChaptersByComicIdApi, getComicTranslationLanguagesApi } from '../../services/api/ChapterApi'
 import { checkLikeStatusApi, toggleLikeStatusApi } from '../../services/api/LikeApi'
 import { checkSaveStatusApi, toggleSaveStatusApi } from '../../services/api/SaveApi'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
@@ -52,6 +52,8 @@ function ComicDetail() {
   const [isMockData, setIsMockData] = useState(false)
   const [isLiked, setIsLiked] = useState(false)
   const [readChapterIds, setReadChapterIds] = useState([])
+  const [availableLanguages, setAvailableLanguages] = useState([])
+  const [selectedLanguage, setSelectedLanguage] = useState('') // '' = original (no overlay)
 
   // Spam prevention and state mapping refs
   const likeTimeoutRef = useRef(null)
@@ -96,16 +98,18 @@ function ComicDetail() {
         const isLoggedIn = !!(auth && auth.user)
 
         // Perform parallel async API calls to prevent sequential blocking
-        const [comicRes, chaptersRes, saveCheckRes, likeCheckRes, readHistoryRes] = await Promise.all([
+        const [comicRes, chaptersRes, saveCheckRes, likeCheckRes, readHistoryRes, languagesRes] = await Promise.all([
           getComicByIdApi(id, { signal }),
           getChaptersByComicIdApi(id, { signal }),
           isLoggedIn ? checkSaveStatusApi(id, { signal }) : Promise.resolve(null),
           isLoggedIn ? checkLikeStatusApi(id, { signal }) : Promise.resolve(null),
-          isLoggedIn ? getReadChaptersByComicIdApi(id, { signal }) : Promise.resolve(null)
+          isLoggedIn ? getReadChaptersByComicIdApi(id, { signal }) : Promise.resolve(null),
+          getComicTranslationLanguagesApi(id, { signal }).catch(() => ({ data: [] }))
         ])
 
         const comicData = comicRes?.data || comicRes
         const chaptersData = chaptersRes?.data || chaptersRes || []
+        const languagesData = languagesRes?.data || languagesRes || []
 
         // Save/Like check resolves to a boolean or object containing it
         const savedStatus = saveCheckRes?.data !== undefined ? saveCheckRes.data : !!saveCheckRes
@@ -117,6 +121,7 @@ function ComicDetail() {
         setInLibrary(savedStatus)
         setIsLiked(likedStatus)
         setReadChapterIds(readHistoryData)
+        setAvailableLanguages(Array.isArray(languagesData) ? languagesData : [])
 
         // Sync refs for debounce tracking
         serverSavedRef.current = savedStatus
@@ -131,6 +136,7 @@ function ComicDetail() {
           setInLibrary(false)
           setIsLiked(false)
           setReadChapterIds([])
+          setAvailableLanguages([])
           serverSavedRef.current = false
           serverLikedRef.current = false
           setIsMockData(false)
@@ -375,7 +381,8 @@ function ComicDetail() {
       // Find the first chapter (sorting by chapter number ascending)
       const sorted = [...chapters].sort((a, b) => Number(a.chapterNumber) - Number(b.chapterNumber))
       const firstChap = sorted[0]
-      navigate(`/comic/${id}/chapter/${firstChap.id}`)
+      const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(selectedLanguage)}` : ''
+      navigate(`/comic/${id}/chapter/${firstChap.id}${langQuery}`)
     } else {
       toast.warning('No chapters available for this comic yet.')
     }
@@ -705,17 +712,47 @@ function ComicDetail() {
 
             {/* TAB CONTENT: CHAPTERS LIST */}
             {activeTab === 'chapters' && (
-              <div
-                className="comic-detail-chapter-list"
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  maxHeight: '600px',
-                  overflowY: 'auto',
-                  paddingRight: '8px'
-                }}
-              >
+              <div>
+                {availableLanguages.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                    <label htmlFor="comic-reading-language" style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Reading Language
+                    </label>
+                    <select
+                      id="comic-reading-language"
+                      value={selectedLanguage}
+                      onChange={(e) => setSelectedLanguage(e.target.value)}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        padding: '6px 12px',
+                        color: 'white',
+                        fontSize: '13px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="" style={{ color: '#111', background: '#fff' }}>Original</option>
+                      {availableLanguages.map((lang) => (
+                        <option key={lang} value={lang} style={{ color: '#111', background: '#fff' }}>
+                          {lang}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div
+                  className="comic-detail-chapter-list"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    maxHeight: '600px',
+                    overflowY: 'auto',
+                    paddingRight: '8px'
+                  }}
+                >
                 {chapters.map((ch) => {
                   const chNumber = ch.chapterNumber || '0'
                   const chTitle = ch.title || `Chapter ${chNumber}`
@@ -739,7 +776,10 @@ function ComicDetail() {
                         cursor: 'pointer',
                         transition: 'all 0.2s'
                       }}
-                      onClick={() => navigate(`/comic/${id}/chapter/${ch.id}`)}
+                      onClick={() => {
+                        const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(selectedLanguage)}` : ''
+                        navigate(`/comic/${id}/chapter/${ch.id}${langQuery}`)
+                      }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = 'rgba(168, 85, 247, 0.08)'
                         e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.4)'
@@ -764,6 +804,7 @@ function ComicDetail() {
                     </div>
                   )
                 })}
+                </div>
               </div>
             )}
 
