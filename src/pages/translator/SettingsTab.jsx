@@ -3,6 +3,12 @@
 // =============================================================================
 
 function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorkspaceSettings }) {
+  const recruitedLimit = Number(selectedDetails.maxMembers) || 5;
+  const totalCapacity = recruitedLimit + 1; // 1 Leader + N Members
+  const currentMembersCount = members.length || selectedDetails.membersCount || 1;
+  const spotsAvailable = Math.max(0, totalCapacity - currentMembersCount);
+  const isOpen = selectedDetails.isRecruiting && spotsAvailable > 0;
+
   return (
     <div className="group-settings-tab-container fade-in">
       <div className="settings-tab-card">
@@ -50,7 +56,7 @@ function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorks
           </div>
 
           <div className="trans-form-group" style={{ marginTop: '16px' }}>
-            <label className="trans-form-label">Max Members Limit</label>
+            <label className="trans-form-label">Recruited Members Limit (Excluding Leader)</label>
             <input
               type="number"
               min="1"
@@ -59,6 +65,9 @@ function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorks
               value={selectedDetails.maxMembers || 5}
               onChange={(e) => setSelectedDetails({ ...selectedDetails, maxMembers: Math.max(1, Number(e.target.value) || 5) })}
             />
+            <span style={{ fontSize: '12px', color: '#cbd5e1', display: 'block', marginTop: '6px' }}>
+              💡 Total Capacity: <strong>{totalCapacity}</strong> (1 Leader + {recruitedLimit} Members)
+            </span>
           </div>
 
           <div className="trans-form-group" style={{ marginTop: '16px' }}>
@@ -76,28 +85,26 @@ function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorks
           </div>
 
           <div style={{ marginTop: '16px' }}>
-            {selectedDetails.isRecruiting ? (
-              (selectedDetails.maxMembers || 5) - members.length > 0 ? (
-                <div className="capacity-info-alert recruiting" style={{
-                  background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.15)',
-                  color: '#4ade80', padding: '10px 14px', borderRadius: '6px', fontSize: '13px'
-                }}>
-                  <span>🟢 Open Recruiting: <strong>{Math.max(0, (selectedDetails.maxMembers || 5) - members.length)}</strong> spots available to join</span>
-                </div>
-              ) : (
-                <div className="capacity-info-alert full" style={{
-                  background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.15)',
-                  color: '#f87171', padding: '10px 14px', borderRadius: '6px', fontSize: '13px'
-                }}>
-                  <span>🔴 Team is full (0 spots available)</span>
-                </div>
-              )
-            ) : (
-              <div className="capacity-info-alert full" style={{
-                background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)',
-                color: '#94a3b8', padding: '10px 14px', borderRadius: '6px', fontSize: '13px'
+            {isOpen ? (
+              <div className="capacity-info-alert recruiting" style={{
+                background: 'rgba(52, 211, 153, 0.12)', border: '1px solid rgba(52, 211, 153, 0.3)',
+                color: '#34d399', padding: '10px 14px', borderRadius: '8px', fontSize: '13px'
               }}>
-                <span>⚪ Recruitment Closed</span>
+                <span>🟢 Open for Recruitment: <strong>{spotsAvailable}</strong> of {recruitedLimit} member spots available ({currentMembersCount}/{totalCapacity} total capacity)</span>
+              </div>
+            ) : selectedDetails.isRecruiting && spotsAvailable === 0 ? (
+              <div className="capacity-info-alert full" style={{
+                background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)',
+                color: '#f87171', padding: '10px 14px', borderRadius: '8px', fontSize: '13px'
+              }}>
+                <span>🔴 Team is FULL ({currentMembersCount}/{totalCapacity} total capacity, 0 member spots left)</span>
+              </div>
+            ) : (
+              <div className="capacity-info-alert closed" style={{
+                background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: '#cbd5e1', padding: '10px 14px', borderRadius: '8px', fontSize: '13px'
+              }}>
+                <span>⚪ Recruitment Closed ({currentMembersCount}/{totalCapacity} total members)</span>
               </div>
             )}
           </div>
@@ -121,12 +128,12 @@ function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorks
             </div>
           </div>
           <p style={{ fontSize: '12.5px', color: 'var(--trans-text-muted)', margin: '14px 0 0' }}>
-            All other members are assigned as Member. Roles are managed automatically.
+            All approved applicants are added to the Project Members list.
           </p>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default SettingsTab
+export default SettingsTab;

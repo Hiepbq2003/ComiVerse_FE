@@ -8,10 +8,63 @@ import { toast } from 'react-toastify';
 
 const PAGE_SIZE = 20;
 
+// LocalStorage Persistence Cache Helpers (User-Isolated)
+const getCacheKey = (type, gId, userId) => {
+    return `comiverse_chat_cache_${userId || 'guest'}_${type}_${gId || 'global'}`;
+};
+
+const loadCachedMessages = (type, gId, userId) => {
+    try {
+        const key = getCacheKey(type, gId, userId);
+        const saved = localStorage.getItem(key);
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                return [...parsed].sort((a, b) => {
+                    const dateA = a.createdAt ? new Date(a.createdAt) : 0;
+                    const dateB = b.createdAt ? new Date(b.createdAt) : 0;
+                    return dateA - dateB;
+                });
+            }
+        }
+    } catch (e) {
+        console.warn('[useChat] Failed to parse cached chat messages:', e);
+    }
+    return [];
+};
+
+const saveCachedMessages = (type, gId, userId, msgList) => {
+    try {
+        if (!Array.isArray(msgList)) return;
+        const key = getCacheKey(type, gId, userId);
+        // Persist up to 100 recent messages
+        const slice = msgList.slice(-100);
+        localStorage.setItem(key, JSON.stringify(slice));
+    } catch (e) {
+        console.warn('[useChat] Failed to save chat messages to localStorage:', e);
+    }
+};
+
+const mergeUniqueMessages = (existing, incoming) => {
+    const map = new Map();
+    [...existing, ...incoming].forEach(item => {
+        if (!item) return;
+        const idKey = item.id || `text-${item.senderName || item.sender || item.username}-${item.content || item.text}-${item.createdAt || item.timestamp}`;
+        if (!map.has(idKey)) {
+            map.set(idKey, item);
+        }
+    });
+    return Array.from(map.values());
+};
+
 export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
+    const auth = getAuth();
+    const currentUser = auth?.user || null;
+    const userId = currentUser?.id || currentUser?.username || 'guest';
+
     const [chatType, setChatType] = useState(initialChatType); // 'GLOBAL' | 'GROUP'
     const [groupId, setGroupId] = useState(initialGroupId);
-    const [messages, setMessages] = useState([]);
+    const [messages, setMessages] = useState(() => loadCachedMessages(initialChatType, initialGroupId, userId));
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
     const [isLoadingInitial, setIsLoadingInitial] = useState(false);
@@ -23,21 +76,19 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
     const scrollContainerRef = useRef(null);
     const isNearBottomRef = useRef(true);
 
-    const auth = getAuth();
-    const currentUser = auth?.user || null;
-
-    // Sync state if initial props change (e.g. switching selected project team)
+    // Sync state if initial props or user account changes
     useEffect(() => {
         setChatType(initialChatType);
         setGroupId(initialGroupId);
-    }, [initialChatType, initialGroupId]);
+        setMessages(loadCachedMessages(initialChatType, initialGroupId, userId));
+    }, [initialChatType, initialGroupId, userId]);
 
     // Helper: Normalize messages array to always be chronological (oldest -> newest)
     const normalizeMessages = (msgList) => {
         if (!Array.isArray(msgList)) return [];
         return [...msgList].sort((a, b) => {
-            const dateA = a.createdAt ? new Date(a.createdAt) : 0;
-            const dateB = b.createdAt ? new Date(b.createdAt) : 0;
+            const dateA = a.createdAt ? new Date(a.createdAt) : (a.timestamp ? new Date(a.timestamp) : 0);
+            const dateB = b.createdAt ? new Date(b.createdAt) : (b.timestamp ? new Date(b.timestamp) : 0);
             return dateA - dateB;
         });
     };
@@ -48,6 +99,12 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
             setMessages([]);
             setIsLoadingInitial(false);
             return;
+        }
+
+        // Load cached messages first so UI is never blank
+        const cached = loadCachedMessages(type, gId, userId);
+        if (cached.length > 0) {
+            setMessages(cached);
         }
 
         setIsLoadingInitial(true);
@@ -61,7 +118,7 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
                     groupId: type === 'GROUP' ? gId : undefined,
                     page: 1,
                     limit: PAGE_SIZE,
-                });
+                }).catch(() => null);
 
                 if (Array.isArray(res)) {
                     items = res;
@@ -69,27 +126,32 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
                     items = res.data;
                 } else if (res?.content && Array.isArray(res.content)) {
                     items = res.content;
+                } else if (type === 'GROUP' && gId) {
+                    const teamRes = await getTeamMessagesApi(gId).catch(() => []);
+                    items = Array.isArray(teamRes) ? teamRes : (teamRes?.data || []);
                 }
             } catch (primaryErr) {
-                // Secondary fallback to Team Workspace API if group endpoint fails
-                if (type === 'GROUP' && gId) {
-                    const teamRes = await getTeamMessagesApi(gId);
-                    items = Array.isArray(teamRes) ? teamRes : (teamRes?.data || []);
-                } else {
-                    throw primaryErr;
-                }
+                console.warn('[useChat] Primary chat fetch unavailable, relying on local cache:', primaryErr);
             }
 
-            const sorted = normalizeMessages(items);
-            setMessages(sorted);
-            setHasMore(items.length >= PAGE_SIZE);
+            if (Array.isArray(items) && items.length > 0) {
+                setMessages((prev) => {
+                    const merged = mergeUniqueMessages(prev, items);
+                    const sorted = normalizeMessages(merged);
+                    saveCachedMessages(type, gId, userId, sorted);
+                    return sorted;
+                });
+                setHasMore(items.length >= PAGE_SIZE);
+            } else if (cached.length > 0) {
+                setMessages(cached);
+            }
         } catch (err) {
-            console.error('[useChat] Failed to load initial chat history:', err);
-            setMessages((prev) => (prev.length > 0 ? prev : []));
+            console.warn('[useChat] REST chat history fetch unavailable/timed out. Preserving local cached history:', err?.message || err);
+            setMessages((prev) => (prev.length > 0 ? prev : cached));
         } finally {
             setIsLoadingInitial(false);
         }
-    }, []);
+    }, [userId]);
 
     // 2. Fetch older messages (Prepend on scroll to top)
     const fetchOlderMessages = useCallback(async () => {
@@ -125,6 +187,7 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
                     const existingIds = new Set(prevMessages.map((m) => m.id));
                     const newUniqueOlder = olderItems.filter((m) => !existingIds.has(m.id));
                     const combined = normalizeMessages([...newUniqueOlder, ...prevMessages]);
+                    saveCachedMessages(chatType, groupId, userId, combined);
                     return combined;
                 });
 
@@ -140,22 +203,60 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
                 });
             }
         } catch (err) {
-            console.error('[useChat] Failed to fetch older messages:', err);
+            console.warn('[useChat] Failed to fetch older messages:', err);
         } finally {
             setIsLoadingMore(false);
         }
-    }, [chatType, groupId, page, hasMore, isLoadingMore, isLoadingInitial]);
+    }, [chatType, groupId, page, hasMore, isLoadingMore, isLoadingInitial, userId]);
 
     // 3. Real-time Incoming Message Handler from STOMP
     const handleIncomingMessage = useCallback((newMsg) => {
-        if (!newMsg || !newMsg.id) return;
+        if (!newMsg) return;
+
+        const senderName = newMsg.senderName || newMsg.sender || newMsg.username || newMsg.submittedBy || 'Member';
+        const senderId = newMsg.senderId || newMsg.userId || null;
+        const contentText = newMsg.content || newMsg.text || '';
+
+        const safeMsg = {
+            id: newMsg.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+            sender: senderName,
+            senderName: senderName,
+            senderId: senderId,
+            avatar: newMsg.avatar || newMsg.senderAvatar || newMsg.userAvatar || null,
+            time: newMsg.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            text: contentText,
+            content: contentText,
+            createdAt: newMsg.createdAt || newMsg.timestamp || new Date().toISOString(),
+            ...newMsg
+        };
 
         setMessages((prevMessages) => {
-            // Prevent duplicate message addition
-            if (prevMessages.some((m) => m.id === newMsg.id)) {
-                return prevMessages;
+            // Search if a temporary optimistic message exists with matching content
+            const tempIdx = prevMessages.findIndex(m => 
+                String(m.id).startsWith('temp-') && 
+                (m.content || m.text) === contentText
+            );
+
+            if (tempIdx !== -1) {
+                // Replace temporary optimistic message in-place with real server message!
+                const updated = [...prevMessages];
+                updated[tempIdx] = safeMsg;
+                const sorted = normalizeMessages(updated);
+                saveCachedMessages(chatType, groupId, userId, sorted);
+                return sorted;
             }
-            return [...prevMessages, newMsg];
+
+            // Check if exact ID or duplicate message exists
+            const isDup = prevMessages.some((m) => 
+                m.id === safeMsg.id || 
+                ((m.content || m.text) === contentText && 
+                 Math.abs(new Date(m.createdAt || 0) - new Date(safeMsg.createdAt || 0)) < 4000)
+            );
+            if (isDup) return prevMessages;
+
+            const updated = normalizeMessages([...prevMessages, safeMsg]);
+            saveCachedMessages(chatType, groupId, userId, updated);
+            return updated;
         });
 
         // Smooth scroll to bottom if user is already near bottom
@@ -168,7 +269,7 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
                 });
             }
         });
-    }, []);
+    }, [chatType, groupId, userId]);
 
     // 4. Manage STOMP Subscription & Tab Switching Effect
     useEffect(() => {
@@ -204,7 +305,7 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
             cleanupConnect();
             cleanupDisconnect();
         };
-    }, [chatType, groupId, currentUser?.id]);
+    }, [chatType, groupId, currentUser?.id, fetchInitialMessages, handleIncomingMessage]);
 
     // 5. Send Message Handler
     const sendMessage = useCallback(async (content) => {
@@ -221,6 +322,25 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
         }
 
         setIsSending(true);
+
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const localOptimisticMsg = {
+            id: `temp-${Date.now()}`,
+            sender: currentUser?.fullName || currentUser?.username || 'Member',
+            senderName: currentUser?.fullName || currentUser?.username || 'Member',
+            senderId: currentUser?.id || currentUser?.userId || null,
+            sender_id: currentUser?.id || currentUser?.userId || null,
+            avatar: currentUser?.avatarUrl || null,
+            time: timeStr,
+            text: trimmedContent,
+            content: trimmedContent,
+            createdAt: new Date().toISOString(),
+            chatType,
+            groupId: chatType === 'GROUP' ? groupId : undefined
+        };
+
+        // Instantly display message in local UI (Optimistic UI update)
+        handleIncomingMessage(localOptimisticMsg);
 
         const payload = {
             chatType,
@@ -239,30 +359,30 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
             }
 
             // 2. Fallback to REST API sendChatMessageApi or createTeamMessageApi
-            let sentMsg = null;
             try {
-                sentMsg = await sendChatMessageApi(payload);
-            } catch (restErr) {
+                let sentMsg = null;
                 if (chatType === 'GROUP' && groupId) {
-                    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     sentMsg = await createTeamMessageApi(groupId, {
                         sender: currentUser?.fullName || currentUser?.username || 'Member',
-                        avatar: (currentUser?.fullName || currentUser?.username || 'M').substring(0, 2).toUpperCase(),
-                        time,
+                        avatar: currentUser?.avatarUrl || null,
+                        time: timeStr,
                         text: trimmedContent,
                         content: trimmedContent,
-                    });
-                } else {
-                    throw restErr;
+                    }).catch(() => null);
                 }
-            }
 
-            if (sentMsg) {
-                handleIncomingMessage(sentMsg);
+                if (!sentMsg) {
+                    sentMsg = await sendChatMessageApi(payload).catch(() => null);
+                }
+
+                if (sentMsg) {
+                    handleIncomingMessage(sentMsg);
+                }
+            } catch (restErr) {
+                console.warn('[useChat] REST send fallback preserved message in local cache:', restErr);
             }
         } catch (err) {
             console.error('[useChat] Error sending message:', err);
-            throw err;
         } finally {
             setIsSending(false);
         }
@@ -272,7 +392,8 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
     const switchTab = useCallback((newType, newGroupId = null) => {
         setChatType(newType);
         setGroupId(newGroupId);
-    }, []);
+        setMessages(loadCachedMessages(newType, newGroupId, userId));
+    }, [userId]);
 
     return {
         chatType,

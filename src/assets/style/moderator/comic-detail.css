@@ -354,27 +354,83 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(5, 3, 10, 0.9);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: #090614 !important;
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
   z-index: 99999;
   display: flex;
   flex-direction: column;
+  color: #f8fafc !important;
+  font-family: var(--sans, system-ui, sans-serif);
+}
+
+.mod-inspector-overlay h1,
+.mod-inspector-overlay h2,
+.mod-inspector-overlay h3,
+.mod-inspector-overlay h4,
+.mod-inspector-overlay h5,
+.mod-inspector-overlay strong {
+  color: #ffffff !important;
+}
+
+.mod-inspector-overlay .mod-chapters-table {
+  color: #f8fafc !important;
+}
+
+.mod-inspector-overlay .mod-chapters-table th {
+  color: #cbd5e1 !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14) !important;
+  font-weight: 700;
+}
+
+.mod-inspector-overlay .mod-chapters-table td {
+  color: #f1f5f9 !important;
+}
+
+/* Light mode overlay styling - keeps high contrast cinema inspector deck */
+html.light .mod-inspector-overlay {
+  background: #0d091c !important;
+  color: #f8fafc !important;
+}
+
+html.light .mod-inspector-overlay h1,
+html.light .mod-inspector-overlay h2,
+html.light .mod-inspector-overlay h3,
+html.light .mod-inspector-overlay h4,
+html.light .mod-inspector-overlay h5,
+html.light .mod-inspector-overlay strong {
+  color: #ffffff !important;
+}
+
+html.light .mod-inspector-overlay .mod-chapters-table th {
+  color: #cbd5e1 !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.light .mod-inspector-overlay .mod-chapters-table td {
+  color: #f1f5f9 !important;
 }
 
 .mod-inspector-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: 0 24px;
+  height: 64px;
+  min-height: 64px;
+  max-height: 64px;
   background: rgba(15, 10, 26, 0.95);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-wrap: nowrap;
+  gap: 16px;
 }
 
 .mod-inspector-title-group {
   display: flex;
   align-items: center;
   gap: 16px;
+  min-width: 0;
 }
 
 .mod-inspector-title {
@@ -382,6 +438,9 @@
   font-weight: 700;
   color: #ffffff;
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mod-inspector-mode-tabs {
@@ -391,6 +450,8 @@
   padding: 4px;
   border-radius: 500px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  flex-wrap: nowrap !important;
+  white-space: nowrap;
 }
 
 .mod-mode-tab {
@@ -403,6 +464,8 @@
   border: none;
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .mod-mode-tab.active {

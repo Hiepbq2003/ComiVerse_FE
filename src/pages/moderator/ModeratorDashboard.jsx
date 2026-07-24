@@ -215,6 +215,30 @@ function ModeratorDashboard() {
     }
   }
 
+  const handleApproveAndCreateProject = async (item) => {
+    try {
+      await approveSubmissionApi(item.id)
+      toast.success(`Approved "${item.title}"! Opening Translation Project setup...`)
+      setSubmissions(prev => prev.filter(s => s.id !== item.id))
+      fetchComicsAndTeams()
+
+      setCreateTeamForm({
+        title: `${item.title} - Translation Team`,
+        comicName: item.title,
+        sourceLang: item.language || 'Japanese',
+        targetLang: 'English',
+        leaderName: '',
+        leaderId: ''
+      })
+      setCreateTeamStep(1)
+      setShowCreateTeamModal(true)
+      setActiveNav('project-teams')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to approve submission.')
+    }
+  }
+
   const handleConfirmReject = async (id, reason) => {
     try {
       await rejectSubmissionApi(id, reason)
@@ -964,6 +988,7 @@ function ModeratorDashboard() {
               submissions={submissions} 
               handleApprove={handleApprove} 
               handleConfirmReject={handleConfirmReject} 
+              handleApproveAndCreateProject={handleApproveAndCreateProject}
             />
           )}
 

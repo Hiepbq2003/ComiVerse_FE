@@ -217,7 +217,8 @@ function TasksTab({
   onMoveTask,
   onOpenTaskDetails,
   getAssigneeInitials,
-  members
+  members,
+  isCurrentLeader
 }) {
   return (
     <div className="board tasks-board-tab-container fade-in" style={{ padding: 0, background: 'transparent' }}>
@@ -238,9 +239,11 @@ function TasksTab({
               <span className="board__badge">Translation Team</span>
               <span className="board__date">{activeTasks.length} active · {pausedTasks.length} paused</span>
             </div>
-            <button className="trans-btn primary" style={{ height: '38px', padding: '0 16px', borderRadius: '8px', fontSize: '13px' }} onClick={onCreateTaskClick}>
-              + Create Task
-            </button>
+            {isCurrentLeader && (
+              <button className="trans-btn primary" style={{ height: '38px', padding: '0 16px', borderRadius: '8px', fontSize: '13px' }} onClick={onCreateTaskClick}>
+                + Create Task
+              </button>
+            )}
           </div>
         </div>
 
