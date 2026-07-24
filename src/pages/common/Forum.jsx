@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getForumThreadsPageApi, deleteForumThreadApi, createForumThreadApi, getAllForumThreadsApi, updateForumThreadApi, getForumThreadByIdApi } from '../../services/api/ForumThreadApi'
@@ -1192,21 +1192,59 @@ function Forum() {
                               className="forum-editor-box-stv" 
                               contentEditable
                               data-placeholder="Write a reply..."
+                              onKeyUp={updateActiveFormats}
+                              onMouseUp={updateActiveFormats}
+                              onSelect={updateActiveFormats}
                               style={{ minHeight: '80px', outline: 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
                             />
                             
                             {/* Formatting Toolbar */}
                             <div className="forum-editor-toolbar-stv">
-                              <button className="forum-toolbar-btn-stv" title="Bold" onClick={() => handleInsertFormat('bold')}>B</button>
-                              <button className="forum-toolbar-btn-stv" title="Italic" onClick={() => handleInsertFormat('italic')}>I</button>
-                              <button className="forum-toolbar-btn-stv" title="Quote" onClick={() => handleInsertFormat('quote')}>”</button>
-                              <button className="forum-toolbar-btn-stv" title="Code" onClick={() => handleInsertFormat('code')}>&lt;/&gt;</button>
-                              <button className="forum-toolbar-btn-stv" title="Link" onClick={() => handleInsertFormat('link')}>🔗</button>
+                              <button 
+                                type="button"
+                                className={`forum-toolbar-btn-stv ${activeFormats.bold ? 'active' : ''}`} 
+                                title="Bold (Ctrl+B)" 
+                                onClick={() => handleInsertFormat('bold')}
+                              >
+                                B
+                              </button>
+                              <button 
+                                type="button"
+                                className={`forum-toolbar-btn-stv ${activeFormats.italic ? 'active' : ''}`} 
+                                title="Italic (Ctrl+I)" 
+                                onClick={() => handleInsertFormat('italic')}
+                              >
+                                I
+                              </button>
+                              <button 
+                                type="button"
+                                className={`forum-toolbar-btn-stv ${activeFormats.quote ? 'active' : ''}`} 
+                                title="Quote Block" 
+                                onClick={() => handleInsertFormat('quote')}
+                              >
+                                ”
+                              </button>
+                              <button 
+                                type="button"
+                                className={`forum-toolbar-btn-stv ${activeFormats.code ? 'active' : ''}`} 
+                                title="Code Block" 
+                                onClick={() => handleInsertFormat('code')}
+                              >
+                                &lt;/&gt;
+                              </button>
+                              <button 
+                                type="button"
+                                className={`forum-toolbar-btn-stv ${activeFormats.link ? 'active' : ''}`} 
+                                title="Insert Link" 
+                                onClick={() => handleInsertFormat('link')}
+                              >
+                                🔗
+                              </button>
                               <button 
                                 className="mod-btn approve" 
                                 onClick={handlePostReply}
                                 disabled={submitting}
-                                style={{ marginLeft: 'auto', padding: '6px 12px', fontSize: '12px', height: '28px', minHeight: '28px', opacity: submitting ? 0.7 : 1 }}
+                                style={{ marginLeft: 'auto', padding: '6px 14px', fontSize: '12px', height: '28px', minHeight: '28px', opacity: submitting ? 0.7 : 1 }}
                               >
                                 {submitting ? 'Posting...' : 'Reply'}
                               </button>

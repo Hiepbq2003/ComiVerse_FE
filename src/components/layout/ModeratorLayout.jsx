@@ -179,6 +179,26 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
           <div className="moderator-topbar-left">
             <span>Workspace:</span>
             <span className="workspace-label">Moderator</span>
+            <span 
+              className="mod-lang-scope-badge"
+              style={{
+                marginLeft: '12px',
+                padding: '4px 10px',
+                borderRadius: '9999px',
+                fontSize: '12px',
+                fontWeight: '700',
+                background: 'rgba(168, 85, 247, 0.15)',
+                color: '#c084fc',
+                border: '1px solid rgba(168, 85, 247, 0.3)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+              title="Authorized moderation languages"
+            >
+              <span>🌐</span>
+              <span>Scope: {Array.isArray(user?.assignedLanguages) && user.assignedLanguages.length > 0 ? user.assignedLanguages.join(', ') : 'Japanese, Korean'}</span>
+            </span>
           </div>
 
           <div className="moderator-topbar-right">
