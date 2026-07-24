@@ -396,6 +396,7 @@ function WorkspaceDetailView({
               editTaskData={editTaskData}
               setEditTaskData={setEditTaskData}
               teamMembersForAssign={teamMembersForAssign}
+              isProjectLeader={isCurrentLeader}
               onCancel={onCancelEditTask}
               onContinue={onContinueToWorkspace}
               onReview={onContinueToReviewWorkspace}

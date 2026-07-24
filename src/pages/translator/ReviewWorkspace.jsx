@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import Swal from "sweetalert2";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -159,16 +160,26 @@ function Avatar({ initials }) {
   return <div className="rvw-avatar">{initials}</div>;
 }
 
-function Bubble({ box, index, text, changed, selected, showText, fontSizePx, bgColor, textColor, onClick }) {
+function Bubble({ box, index, text, changed, selected, showText, fontSizePx, bgColor, textColor, shape, points, onClick }) {
+  const shapeClass = shape === "ellipse" ? "rvw-bubble--ellipse" : shape === "polygon" ? "rvw-bubble--polygon" : "";
+
+  const clipPath =
+    shape === "polygon" && Array.isArray(points) && points.length > 0 && box.width > 0 && box.height > 0
+      ? `polygon(${points
+          .map((p) => `${((p.x - box.x) / box.width) * 100}% ${((p.y - box.y) / box.height) * 100}%`)
+          .join(", ")})`
+      : undefined;
+
   return (
     <div
       onClick={onClick}
-      className={`rvw-bubble ${changed ? "rvw-bubble--changed" : ""} ${selected ? "rvw-bubble--selected" : ""} ${showText ? "rvw-bubble--text-only" : "rvw-bubble--outline-only"}`}
+      className={`rvw-bubble ${shapeClass} ${changed ? "rvw-bubble--changed" : ""} ${selected ? "rvw-bubble--selected" : ""} ${showText ? "rvw-bubble--text-only" : "rvw-bubble--outline-only"}`}
       style={{
         "--x": `${box.x}%`,
         "--y": `${box.y}%`,
         "--w": `${box.width}%`,
         "--h": `${box.height}%`,
+        ...(clipPath ? { clipPath } : {}),
         ...(fontSizePx ? { fontSize: `${fontSizePx}px` } : {}),
         ...(showText && bgColor ? { "--bg-color": bgColor } : {}),
         ...(showText && textColor ? { "--text-color": textColor } : {}),
@@ -260,6 +271,9 @@ function ReviewHeader({
   onApprove,
   onRequestChanges,
 }) {
+  const actionsDisabled = deciding || !isLastPage;
+  const actionsDisabledTitle = !isLastPage ? "Only available on the last page" : undefined;
+
   return (
     <header className="rvw-header">
       <div className="rvw-header-left">
@@ -336,20 +350,20 @@ function ReviewHeader({
 
         <button
           type="button"
-          disabled={deciding || !isLastPage}
+          disabled={actionsDisabled}
           onClick={onApprove}
           className="rvw-approve-btn"
-          title={isLastPage ? undefined : "Only available on the last page"}
+          title={actionsDisabledTitle}
         >
           <CheckCircle2 size={15} /> Approve
         </button>
 
         <button
           type="button"
-          disabled={deciding || !isLastPage}
+          disabled={actionsDisabled}
           onClick={onRequestChanges}
           className="rvw-reject-btn"
-          title={isLastPage ? undefined : "Only available on the last page"}
+          title={actionsDisabledTitle}
         >
           <XCircle size={15} /> Request Changes
         </button>
@@ -415,6 +429,8 @@ function BubbleOverlayPanel({
                 fontSizePx={fontSizePx}
                 bgColor={sel.textBgColor}
                 textColor={sel.textColor}
+                shape={sel.shape}
+                points={sel.points}
                 selected={selectedBubbleId === sel.id}
                 onClick={() => onSelectBubble(selectedBubbleId === sel.id ? null : sel.id)}
               />
@@ -427,6 +443,7 @@ function BubbleOverlayPanel({
 
 function CommentsSidebar({
   comments,
+  generalComments,
   totalCommentCount,
   commentsLoading,
   onResolve,
@@ -444,6 +461,10 @@ function CommentsSidebar({
   selectedBubbleTranslation,
   onClearSelectedBubble,
   bubbleAlreadyHasComment,
+  generalComposeValue,
+  onGeneralComposeChange,
+  onPostGeneralComment,
+  alreadyHasGeneralComment,
 }) {
   return (
     <aside className="rvw-sidebar">
@@ -451,6 +472,49 @@ function CommentsSidebar({
         <MessageSquare size={16} color="#a855f7" />
         <span className="rvw-sidebar-title">Comments</span>
         <span className="rvw-sidebar-count">{totalCommentCount}</span>
+      </div>
+
+      <div className="rvw-general-comments" style={{ borderBottom: "1px solid #212129" }}>
+        <p style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "#8a8a99", margin: "10px 16px 6px" }}>
+          Page-level review
+        </p>
+
+        {generalComments && generalComments.length > 0 && (
+          <div className="rvw-sidebar-list" style={{ flex: "0 0 auto", maxHeight: "220px" }}>
+            {generalComments.map((c) => (
+              <CommentThread
+                key={c.id}
+                comment={c}
+                onResolve={onResolve}
+                onDelete={onDelete}
+                onStartEdit={onStartEdit}
+                currentUserId={currentUserId}
+                resolveBubbleLabel={resolveBubbleLabel}
+              />
+            ))}
+          </div>
+        )}
+
+        {alreadyHasGeneralComment ? (
+          <p className="rvw-sidebar-empty" style={{ padding: "0 16px 12px" }}>
+            You already left a page-level review. Edit it above instead.
+          </p>
+        ) : (
+          <div className="rvw-composer-row" style={{ padding: "0 16px 12px" }}>
+            <input
+              value={generalComposeValue}
+              onChange={(e) => onGeneralComposeChange(e.target.value)}
+              placeholder="Overall feedback for this page..."
+              className="rvw-composer-input"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onPostGeneralComment();
+              }}
+            />
+            <button type="button" onClick={onPostGeneralComment} className="rvw-composer-send-btn">
+              <Send size={14} />
+            </button>
+          </div>
+        )}
       </div>
 
       {selectedBubbleId != null && (
@@ -500,7 +564,7 @@ function CommentsSidebar({
         )}
         {!editingComment && selectedBubbleId != null && bubbleAlreadyHasComment && (
           <p className="rvw-sidebar-empty" style={{ padding: "0 0 8px" }}>
-            This bubble already has a comment. Edit it above instead.
+            You already reviewed this bubble. Edit your comment above instead.
           </p>
         )}
         <div className="rvw-composer-row">
@@ -534,9 +598,9 @@ function CommentsSidebar({
   );
 }
 
-function HelpButton() {
+function HelpButton({ style }) {
   return (
-    <div className="rvw-help-btn">
+    <div className="rvw-help-btn" style={style}>
       <HelpCircle size={16} />
     </div>
   );
@@ -703,15 +767,17 @@ export default function ReviewWorkspace() {
   const { taskId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const currentUserId = user?.id ?? null;
+  const currentUserId = user?.userId ?? null;
 
   const { chapterMeta, pages, status, error } = useReviewData(taskId);
+
   const [pageIndex, setPageIndex] = useState(0);
   const currentPage = pages[pageIndex] ?? null;
   const isLastPage = pages.length > 0 && pageIndex === pages.length - 1;
 
   const { comments, setComments, loading: commentsLoading } = usePageComments(currentPage?.pageId);
   const [composeValue, setComposeValue] = useState("");
+  const [generalComposeValue, setGeneralComposeValue] = useState("");
   const [selectedBubbleId, setSelectedBubbleId] = useState(null);
   const [editingComment, setEditingComment] = useState(null);
 
@@ -739,6 +805,7 @@ export default function ReviewWorkspace() {
     setSelectedBubbleId(null);
     setEditingComment(null);
     setComposeValue("");
+    setGeneralComposeValue("");
   }, [currentPage?.pageId]);
 
   useEffect(() => {
@@ -792,10 +859,17 @@ export default function ReviewWorkspace() {
     return comments.filter((c) => c.bubbleId === selectedBubbleId);
   }, [comments, selectedBubbleId]);
 
+  const generalComments = useMemo(() => comments.filter((c) => !c.bubbleId), [comments]);
+
+  const alreadyHasGeneralComment = useMemo(
+    () => comments.some((c) => !c.bubbleId && c.authorId === currentUserId),
+    [comments, currentUserId]
+  );
+
   const bubbleAlreadyHasComment = useMemo(() => {
     if (selectedBubbleId == null || editingComment) return false;
-    return comments.some((c) => c.bubbleId === selectedBubbleId);
-  }, [selectedBubbleId, comments, editingComment]);
+    return comments.some((c) => c.bubbleId === selectedBubbleId && c.authorId === currentUserId);
+  }, [selectedBubbleId, comments, editingComment, currentUserId]);
 
   const handlePostComment = async () => {
     if (!composeValue.trim() || !currentPage?.pageId) return;
@@ -823,6 +897,21 @@ export default function ReviewWorkspace() {
       setComposeValue("");
     } catch (err) {
       console.error("Failed to post comment:", err);
+      alert(err?.message || "Failed to post comment. Please try again.");
+    }
+  };
+
+  const handlePostGeneralComment = async () => {
+    if (!generalComposeValue.trim() || !currentPage?.pageId || alreadyHasGeneralComment) return;
+    try {
+      const created = await postComment(currentPage.pageId, {
+        bubbleId: null,
+        content: generalComposeValue.trim(),
+      });
+      setComments((prev) => [...prev, created]);
+      setGeneralComposeValue("");
+    } catch (err) {
+      console.error("Failed to post page-level comment:", err);
       alert(err?.message || "Failed to post comment. Please try again.");
     }
   };
@@ -870,13 +959,39 @@ export default function ReviewWorkspace() {
 
   const handleDecision = async (decision) => {
     if (deciding) return;
+    const isApprove = decision === "approved";
+
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: isApprove
+        ? "This will approve the chapter and publish it."
+        : "This will send the chapter back to the translator for changes.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: isApprove ? "Yes, approve it!" : "Yes, request changes!",
+    });
+    if (!result.isConfirmed) return;
+
     setDeciding(true);
     try {
       await submitDecision(taskId, decision);
+
+      await Swal.fire({
+        title: isApprove ? "Approved!" : "Changes requested",
+        text: isApprove
+          ? "The chapter has been approved and published."
+          : "The translator has been notified to make changes.",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+
       goBackToProjectTeams();
     } catch (err) {
       console.error("Failed to submit decision:", err);
-      alert("Failed to submit your decision. Please try again.");
+      Swal.fire("Error", "Failed to submit your decision. Please try again.", "error");
     } finally {
       setDeciding(false);
     }
@@ -959,6 +1074,7 @@ export default function ReviewWorkspace() {
 
       <CommentsSidebar
         comments={displayedComments}
+        generalComments={generalComments}
         totalCommentCount={comments.length}
         commentsLoading={commentsLoading}
         onResolve={handleResolve}
@@ -976,6 +1092,10 @@ export default function ReviewWorkspace() {
         selectedBubbleTranslation={selectedBubbleTranslation}
         onClearSelectedBubble={() => setSelectedBubbleId(null)}
         bubbleAlreadyHasComment={bubbleAlreadyHasComment}
+        generalComposeValue={generalComposeValue}
+        onGeneralComposeChange={setGeneralComposeValue}
+        onPostGeneralComment={handlePostGeneralComment}
+        alreadyHasGeneralComment={alreadyHasGeneralComment}
       />
 
       <HelpButton />
