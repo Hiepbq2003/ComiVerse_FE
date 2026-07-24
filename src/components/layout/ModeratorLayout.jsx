@@ -179,6 +179,13 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
           <div className="moderator-topbar-left">
             <span>Workspace:</span>
             <span className="workspace-label">Moderator</span>
+            <span 
+              className="mod-lang-scope-badge"
+              title="Authorized moderation languages"
+            >
+              <span>🌐</span>
+              <span>Scope: {Array.isArray(user?.assignedLanguages) && user.assignedLanguages.length > 0 ? user.assignedLanguages.join(', ') : 'Japanese, Korean'}</span>
+            </span>
           </div>
 
           <div className="moderator-topbar-right">

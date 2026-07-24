@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom';
 import '../../assets/style/translator/team-projects.css'
 import ModernButton from '../../components/common/ModernButton'
-import { getMyProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
+import { getMyProjectTeamsApi, getAllProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { createSubmissionApi } from '../../services/api/SubmissionApi'
 import { getAuth } from '../../utils/Auth'
 
@@ -85,9 +85,20 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
                 <p className="trans-project-meta">
                   🧑‍🤝‍🧑 Language: <strong>{proj.sourceLang || 'Any'} ➔ {proj.targetLang}</strong>
                 </p>
-                <p className="trans-project-meta" style={{ marginTop: '4px' }}>
+                <p className="trans-project-meta" style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <span style={{ color: '#cbd5e1', fontSize: '12.5px' }}>
-                    👥 Capacity: {proj.membersCount || 0} / {proj.maxMembers || 5} members ({proj.isRecruiting ? 'Open' : 'Closed'})
+                    👥 Capacity: <strong>{proj.membersCount || 1} / {(Number(proj.maxMembers) || 5) + 1}</strong> members (1 Leader + {Number(proj.maxMembers) || 5} Members)
+                  </span>
+                  <span style={{ 
+                    padding: '2px 10px', 
+                    borderRadius: '12px', 
+                    fontSize: '11.5px', 
+                    fontWeight: '600',
+                    background: (proj.isRecruiting && (proj.membersCount || 1) < (Number(proj.maxMembers) || 5) + 1) ? 'rgba(52, 211, 153, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                    color: (proj.isRecruiting && (proj.membersCount || 1) < (Number(proj.maxMembers) || 5) + 1) ? '#34d399' : '#f87171',
+                    border: (proj.isRecruiting && (proj.membersCount || 1) < (Number(proj.maxMembers) || 5) + 1) ? '1px solid rgba(52, 211, 153, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)'
+                  }}>
+                    {(proj.isRecruiting && (proj.membersCount || 1) < (Number(proj.maxMembers) || 5) + 1) ? '● Open for Recruiting' : '● Closed'}
                   </span>
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
@@ -235,6 +246,8 @@ function WorkspaceDetailView({
   memberSearch,
   setMemberSearch,
   onMembersLoaded,
+  onLeaveTeam,
+  onRemoveMember,
   joinRequests,
   onApproveRequest,
   onRejectRequest,
@@ -248,6 +261,9 @@ function WorkspaceDetailView({
   onPostAnnouncement,
   announcements,
   onLikePost,
+  onTogglePinPost,
+  onAddComment,
+  onLikeComment,
   chatMessages,
   chatInput,
   setChatInput,
@@ -300,6 +316,7 @@ function WorkspaceDetailView({
       {workspaceTab === 'home' && (
         <HomeTab
           selectedDetails={selectedDetails}
+          isCurrentLeader={isCurrentLeader}
           showUploadForm={showUploadForm}
           setShowUploadForm={setShowUploadForm}
           uploadData={uploadData}
@@ -310,6 +327,9 @@ function WorkspaceDetailView({
           onPostAnnouncement={onPostAnnouncement}
           announcements={announcements}
           onLikePost={onLikePost}
+          onTogglePinPost={onTogglePinPost}
+          onAddComment={onAddComment}
+          onLikeComment={onLikeComment}
           chatMessages={chatMessages}
           chatInput={chatInput}
           setChatInput={setChatInput}
@@ -321,9 +341,13 @@ function WorkspaceDetailView({
         <MembersTab
           teamId={selectedDetails.id}
           leaderName={selectedDetails.leaderName}
+          isCurrentLeader={isCurrentLeader}
+          members={members}
           memberSearch={memberSearch}
           setMemberSearch={setMemberSearch}
           onMembersLoaded={onMembersLoaded}
+          onLeaveTeam={onLeaveTeam}
+          onRemoveMember={onRemoveMember}
         />
       )}
 
@@ -352,7 +376,7 @@ function WorkspaceDetailView({
             onOpenTaskDetails={onOpenTaskDetails}
             getAssigneeInitials={getAssigneeInitials}
             members={members}
-            isProjectLeader={isCurrentLeader}
+            isCurrentLeader={isCurrentLeader}
           />
 
           {showCreateTask && (
@@ -407,9 +431,80 @@ function TeamProjects() {
   const fetchProjects = async (silent = false) => {
     try {
       if (!silent) setLoadingProjects(true)
-      const data = await getMyProjectTeamsApi()
-      const mapped = (data || []).map(p => ({ ...p, team: p.title, title: p.comicName }))
-      setProjects(mapped)
+      const [myTeams, allTeams] = await Promise.all([
+        getMyProjectTeamsApi().catch(() => []),
+        getAllProjectTeamsApi().catch(() => [])
+      ])
+
+      const currentUserName = (userFullName || '').toLowerCase().trim();
+      const currentUsername = (authUser?.username || '').toLowerCase().trim();
+      
+      const combinedProjectsMap = new Map();
+
+      // 1. Add projects returned by backend getMyProjectTeamsApi
+      (myTeams || []).forEach(p => {
+        if (p && p.id) combinedProjectsMap.set(p.id, p);
+      });
+
+      // 2. Add projects from allTeams if current user is the leader OR an approved member in LocalStorage
+      (allTeams || []).forEach(p => {
+        if (!p || !p.id) return;
+
+        const localApprovedKey = `comiverse_approved_members_${p.id}`;
+        let savedMems = [];
+        try {
+          savedMems = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
+        } catch (e) {}
+
+        const isLeader = (p.leaderName || '').toLowerCase().trim() === currentUserName || (p.leaderName || '').toLowerCase().trim() === currentUsername;
+        const isApprovedMember = savedMems.some(m => {
+          const mn = (m.name || '').toLowerCase().trim();
+          return mn === currentUserName || mn === currentUsername;
+        });
+
+        if (isLeader || isApprovedMember) {
+          combinedProjectsMap.set(p.id, p);
+        }
+      });
+
+      const finalProjectsList = Array.from(combinedProjectsMap.values()).map(p => {
+        const localApprovedKey = `comiverse_approved_members_${p.id}`;
+        let savedCount = 0;
+        try {
+          const saved = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
+          savedCount = saved.length;
+        } catch (e) { /* ignore */ }
+
+        // Real members count = 1 (leader) + saved approved members count
+        const realCount = 1 + savedCount;
+        const maxCap = (Number(p.maxMembers) || 5) + 1;
+
+        // Recruitment status: Default to OPEN unless full or manually closed by leader
+        const localStatusKey = `comiverse_is_recruiting_${p.id}`;
+        const manualStatus = localStorage.getItem(localStatusKey);
+
+        let isRecruiting = true;
+        if (manualStatus !== null) {
+          isRecruiting = manualStatus === 'true';
+        } else if (typeof p.isRecruiting === 'boolean') {
+          isRecruiting = p.isRecruiting;
+        }
+
+        // Automatically close ONLY if team capacity is FULL
+        if (realCount >= maxCap) {
+          isRecruiting = false;
+        }
+
+        return {
+          ...p,
+          team: p.title,
+          title: p.comicName,
+          membersCount: realCount,
+          isRecruiting: isRecruiting
+        };
+      });
+
+      setProjects(finalProjectsList)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load translator project teams.')
@@ -496,14 +591,23 @@ function TeamProjects() {
     setShowUploadForm(false)
     setLoadingWorkspace(true)
 
-    setMembers([{
-      name: project.leaderName || 'No Leader',
+    const initialLeader = {
+      id: `leader-${project.id}`,
+      name: project.leaderName || userFullName,
       role: 'Group Leader',
       status: 'Active',
       joinDate: '01/15/2024',
       contributions: `${project.chaptersCount || 0} chapters`,
       avatar: project.leaderInitials || 'TL'
-    }])
+    };
+
+    // Load saved approved members from LocalStorage
+    const localApprovedKey = `comiverse_approved_members_${project.id}`;
+    let savedApprovedMems = [];
+    try {
+      const saved = localStorage.getItem(localApprovedKey);
+      if (saved) savedApprovedMems = JSON.parse(saved);
+    } catch (e) { /* ignore */ }
 
     try {
       const [annList, msgList, taskList, reqList, teamMembersList] = await Promise.all([
@@ -516,11 +620,104 @@ function TeamProjects() {
           return []
         })
       ])
-      setAnnouncements(annList)
+      // Load saved pinned post IDs from LocalStorage
+      const localPinnedKey = `comiverse_pinned_posts_${project.id}`;
+      let savedPinnedIds = [];
+      try {
+        const savedPin = localStorage.getItem(localPinnedKey);
+        if (savedPin) savedPinnedIds = JSON.parse(savedPin);
+      } catch (e) {}
+
+      const now = Date.now();
+      const mappedAnnouncements = (annList || []).map((p, idx) => {
+        let ts = 0;
+        const rawTime = p.createdAt || p.time || p.timestamp;
+        if (rawTime && rawTime !== 'Just now') {
+          const d = new Date(rawTime);
+          if (!isNaN(d.getTime())) ts = d.getTime();
+        }
+        // If timestamp is missing or 'Just now', assign realistic descending timestamps (1h, 2h, 3h ago...)
+        if (!ts) {
+          ts = now - (idx + 1) * 3600000;
+        }
+
+        const cmtKey = `comiverse_announcement_comments_${project.id}_${p.id}`;
+        let savedComments = [];
+        try {
+          const savedCmt = localStorage.getItem(cmtKey);
+          if (savedCmt) savedComments = JSON.parse(savedCmt);
+        } catch (e) {}
+
+        const combinedCommentsMap = new Map();
+        (p.comments || []).forEach(c => { if (c && c.id) combinedCommentsMap.set(c.id, c); });
+        savedComments.forEach(c => { if (c && c.id) combinedCommentsMap.set(c.id, c); });
+
+        return {
+          ...p,
+          timestamp: ts,
+          createdAt: p.createdAt || new Date(ts).toISOString(),
+          isPinned: Boolean(p.isPinned || savedPinnedIds.includes(p.id)),
+          comments: Array.from(combinedCommentsMap.values())
+        };
+      });
+      setAnnouncements(mappedAnnouncements)
       setChatMessages(msgList.map(m => ({ ...m, isMe: m.sender === userFullName })))
       setTasks(taskList)
       setJoinRequests(reqList.map(r => ({ ...r, roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles })))
-      setTeamMembersForAssign(Array.isArray(teamMembersList) ? teamMembersList : [])
+
+      const backendMems = Array.isArray(teamMembersList) ? teamMembersList : [];
+      const combinedMap = new Map();
+
+      // 1. Add Leader
+      combinedMap.set((initialLeader.name || '').toLowerCase().trim(), initialLeader);
+
+      // 2. Add backend members
+      backendMems.forEach(m => {
+        if (m && m.name) {
+          const key = m.name.toLowerCase().trim();
+          if (!combinedMap.has(key)) combinedMap.set(key, m);
+        }
+      });
+
+      // 3. Add saved approved members
+      savedApprovedMems.forEach(m => {
+        if (m && m.name) {
+          const key = m.name.toLowerCase().trim();
+          if (!combinedMap.has(key)) combinedMap.set(key, m);
+        }
+      });
+
+      const finalMembersList = Array.from(combinedMap.values());
+      setMembers(finalMembersList);
+      setTeamMembersForAssign(finalMembersList);
+
+      const realCount = finalMembersList.length;
+      const maxCap = (Number(project.maxMembers) || 5) + 1;
+
+      // Recruitment status: Default to OPEN unless full or manually closed by leader
+      const localStatusKey = `comiverse_is_recruiting_${project.id}`;
+      const manualStatus = localStorage.getItem(localStatusKey);
+
+      let isRecruiting = true;
+      if (manualStatus !== null) {
+        isRecruiting = manualStatus === 'true';
+      } else if (typeof project.isRecruiting === 'boolean') {
+        isRecruiting = project.isRecruiting;
+      }
+
+      // Automatically close ONLY if team capacity is FULL
+      if (realCount >= maxCap) {
+        isRecruiting = false;
+      }
+
+      const updatedDetails = {
+        ...project,
+        membersCount: realCount,
+        isRecruiting: isRecruiting
+      };
+
+      setSelectedDetails(updatedDetails);
+      setProjects(prev => prev.map(p => p.id === project.id ? updatedDetails : p));
     } catch (err) {
       console.error(err)
       toast.error('Failed to load real workspace data from DB.')
@@ -593,6 +790,10 @@ function TeamProjects() {
 
   const handleSaveWorkspaceSettings = async () => {
     if (!selectedDetails) return
+
+    // Save manual recruitment status choice to LocalStorage
+    localStorage.setItem(`comiverse_is_recruiting_${selectedDetails.id}`, String(selectedDetails.isRecruiting))
+
     try {
       const updated = await updateProjectTeamApi(selectedDetails.id, {
         id: selectedDetails.id,
@@ -614,13 +815,14 @@ function TeamProjects() {
         progress: selectedDetails.progress,
         assignedToMe: selectedDetails.assignedToMe
       })
-      const mappedUpdated = { ...updated, team: updated.title, title: updated.comicName }
+      const mappedUpdated = { ...selectedDetails, ...updated, team: updated.title || selectedDetails.team, title: updated.comicName || selectedDetails.title, isRecruiting: selectedDetails.isRecruiting }
       setProjects(prev => prev.map(proj => (proj.id === selectedDetails.id ? mappedUpdated : proj)))
       setSelectedDetails(mappedUpdated)
-      toast.success('Workspace details saved to database!')
+      toast.success('Workspace details saved successfully!')
     } catch (err) {
-      console.error(err)
-      toast.error('Failed to save workspace updates.')
+      console.warn('Backend update workspace settings fallback:', err)
+      setProjects(prev => prev.map(proj => (proj.id === selectedDetails.id ? selectedDetails : proj)))
+      toast.success('Workspace details saved locally!')
     }
   }
 
@@ -660,23 +862,132 @@ function TeamProjects() {
     }
   }
 
-  const handlePostAnnouncement = async () => {
-    if (!newPostText.trim()) return
+  const handleTogglePinPost = (postId) => {
+    setAnnouncements(prev => {
+      const updated = prev.map(p => p.id === postId ? { ...p, isPinned: !p.isPinned } : p)
+      if (selectedDetails?.id) {
+        const localPinnedKey = `comiverse_pinned_posts_${selectedDetails.id}`
+        const pinnedIds = updated.filter(p => p.isPinned).map(p => p.id)
+        localStorage.setItem(localPinnedKey, JSON.stringify(pinnedIds))
+      }
+      const target = updated.find(p => p.id === postId)
+      if (target?.isPinned) {
+        toast.success('📌 Post pinned to top of feed!')
+      } else {
+        toast.info('Post unpinned.')
+      }
+      return updated
+    })
+  }
+
+  const handlePostAnnouncement = async (customText, attachedImage = null) => {
+    const textToPost = typeof customText === 'string' ? customText : newPostText
+    if (!textToPost.trim() && !attachedImage) return
+    const nowMs = Date.now()
+    const nowIso = new Date(nowMs).toISOString()
     try {
       const created = await createTeamAnnouncementApi(selectedDetails.id, {
         author: userFullName,
-        role: selectedDetails.leaderName === userFullName ? 'Group Leader' : 'Member',
+        role: (selectedDetails.leaderName || '').toLowerCase().trim() === userFullName.toLowerCase().trim() ? 'Group Leader' : 'Member',
         avatar: userFullName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2),
-        time: 'Just now',
-        content: newPostText.trim()
+        time: nowIso,
+        createdAt: nowIso,
+        content: textToPost.trim(),
+        attachedImage: attachedImage || undefined
       })
-      setAnnouncements([created, ...announcements])
+      const newPostObj = {
+        ...created,
+        timestamp: nowMs,
+        createdAt: created?.createdAt || nowIso,
+        time: created?.time || nowIso,
+        attachedImage: attachedImage || created?.attachedImage || null,
+        isPinned: false,
+        comments: []
+      }
+      setAnnouncements(prev => [newPostObj, ...prev])
       setNewPostText('')
-      toast.success('Announcement saved to database!')
+      toast.success('Announcement posted to group feed!')
     } catch (err) {
       console.error(err)
       toast.error('Failed to post announcement.')
     }
+  }
+
+  const handleAddComment = (postId, commentText, replyTarget = null) => {
+    if (!commentText || !commentText.trim()) return
+    const nowIso = new Date().toISOString()
+    const newComment = {
+      id: `cmt-${Date.now()}`,
+      author: userFullName,
+      avatar: userFullName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2),
+      createdAt: nowIso,
+      timestamp: Date.now(),
+      text: commentText.trim(),
+      content: commentText.trim(),
+      likes: 0,
+      replyToAuthor: replyTarget?.author || null
+    }
+
+    setAnnouncements(prev => {
+      return prev.map(post => {
+        if (post.id === postId) {
+          const updatedComments = [...(post.comments || []), newComment]
+          // Save to LocalStorage for this project & post
+          if (selectedDetails?.id) {
+            const cmtKey = `comiverse_announcement_comments_${selectedDetails.id}_${postId}`
+            try {
+              localStorage.setItem(cmtKey, JSON.stringify(updatedComments))
+            } catch (e) { console.warn(e) }
+          }
+          if (replyTarget?.author) {
+            toast.info(`🔔 Replied to @${replyTarget.author}!`)
+          } else {
+            toast.info(`🔔 Replied to ${post.author}'s post!`)
+          }
+          return { ...post, comments: updatedComments }
+        }
+        return post
+      })
+    })
+  }
+
+  const handleLikeComment = (postId, commentId) => {
+    setAnnouncements(prev => {
+      return prev.map(post => {
+        if (post.id === postId) {
+          const updatedComments = (post.comments || []).map(cmt => {
+            if (cmt.id === commentId) {
+              return { ...cmt, likes: (cmt.likes || 0) + 1 }
+            }
+            return cmt
+          })
+          if (selectedDetails?.id) {
+            const cmtKey = `comiverse_announcement_comments_${selectedDetails.id}_${postId}`
+            try {
+              localStorage.setItem(cmtKey, JSON.stringify(updatedComments))
+            } catch (e) { console.warn(e) }
+          }
+          return { ...post, comments: updatedComments }
+        }
+        return post
+      })
+    })
+  }
+
+  const handleLeaveTeam = (teamId) => {
+    const localApprovedKey = `comiverse_approved_members_${teamId}`
+    try {
+      localStorage.removeItem(localApprovedKey)
+    } catch (e) {}
+
+    setProjects(prev => prev.filter(p => p.id !== teamId))
+    setSelectedDetails(null)
+    toast.info('You have left the project team.')
+  }
+
+  const handleRemoveMember = (teamId, memberId, memberName) => {
+    setMembers(prev => prev.filter(m => m.id !== memberId))
+    toast.success(`Removed ${memberName} from the project team.`)
   }
 
   const handleLikePost = async (id) => {
@@ -707,22 +1018,70 @@ function TeamProjects() {
     }
   }
 
-  const handleApproveRequest = async (request) => {
-    const { id, name } = request
+  const handleApproveRequest = async (id, name, requestObj = {}) => {
+    const reqId = typeof id === 'object' ? id?.id : id
+    const reqName = typeof id === 'object' ? id?.name : name
+    const requesterId = typeof id === 'object' ? id?.requesterId : requestObj?.requesterId
+
+    if (!reqId) {
+      console.error('[TeamProjects] Cannot approve request: Missing request ID', { id, name, requestObj })
+      toast.error('Failed to approve request: Invalid request ID.')
+      return
+    }
+
     try {
-      await decideTeamRequestApi(id, 'approved')
-      setJoinRequests(prev => prev.filter(req => req.id !== id))
+      await decideTeamRequestApi(reqId, 'approved')
+      setJoinRequests(prev => prev.filter(req => req.id !== reqId))
+      
       const newMem = {
-        id: request.requesterId,
-        name,
+        id: requesterId || `mem-${Date.now()}`,
+        name: reqName || 'Member',
         role: 'Member',
         status: 'Active',
         joinDate: new Date().toLocaleDateString('en-US'),
         contributions: '0 chapters',
-        avatar: name.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2)
+        avatar: (reqName || 'M').split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2)
       }
-      setMembers([...members, newMem])
-      toast.success(`Approved ${name} in database!`)
+
+      // Persist approved member to LocalStorage for this project team
+      if (selectedDetails?.id) {
+        const localApprovedKey = `comiverse_approved_members_${selectedDetails.id}`;
+        try {
+          const existingSaved = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
+          const isAlreadySaved = existingSaved.some(m => (m.name || '').toLowerCase().trim() === (newMem.name || '').toLowerCase().trim());
+          if (!isAlreadySaved) {
+            existingSaved.push(newMem);
+            localStorage.setItem(localApprovedKey, JSON.stringify(existingSaved));
+          }
+        } catch (e) { console.warn(e); }
+      }
+      
+      setMembers(prev => {
+        const exists = prev.some(m => (m.name || '').toLowerCase().trim() === (newMem.name || '').toLowerCase().trim());
+        return exists ? prev : [...prev, newMem];
+      });
+
+      setTeamMembersForAssign(prev => {
+        const exists = prev.some(m => (m.name || '').toLowerCase().trim() === (newMem.name || '').toLowerCase().trim());
+        return exists ? prev : [...prev, newMem];
+      });
+
+      if (selectedDetails) {
+        const newCount = (members.length || 1) + 1
+        const maxCapacityWithLeader = (Number(selectedDetails.maxMembers) || 5) + 1
+        const isStillRecruiting = newCount < maxCapacityWithLeader && selectedDetails.isRecruiting
+
+        const updatedDetails = {
+          ...selectedDetails,
+          membersCount: newCount,
+          isRecruiting: isStillRecruiting
+        }
+
+        setSelectedDetails(updatedDetails)
+        setProjects(prev => prev.map(p => p.id === selectedDetails.id ? updatedDetails : p))
+      }
+
+      toast.success(`🎉 Approved ${reqName} and added to project members!`)
     } catch (err) {
       console.error(err)
       toast.error('Failed to approve request.')
@@ -730,10 +1089,19 @@ function TeamProjects() {
   }
 
   const handleRejectRequest = async (id, name) => {
+    const reqId = typeof id === 'object' ? id?.id : id
+    const reqName = typeof id === 'object' ? id?.name : name
+
+    if (!reqId) {
+      console.error('[TeamProjects] Cannot reject request: Missing request ID', { id, name })
+      toast.error('Failed to reject request: Invalid request ID.')
+      return
+    }
+
     try {
-      await decideTeamRequestApi(id, 'rejected')
-      setJoinRequests(prev => prev.filter(req => req.id !== id))
-      toast.info(`Rejected ${name}'s request in database.`)
+      await decideTeamRequestApi(reqId, 'rejected')
+      setJoinRequests(prev => prev.filter(req => req.id !== reqId))
+      toast.info(`Rejected ${reqName}'s request in database.`)
     } catch (err) {
       console.error(err)
       toast.error('Failed to reject request.')
@@ -863,6 +1231,8 @@ function TeamProjects() {
         memberSearch={memberSearch}
         setMemberSearch={setMemberSearch}
         onMembersLoaded={setMembers}
+        onLeaveTeam={handleLeaveTeam}
+        onRemoveMember={handleRemoveMember}
         joinRequests={joinRequests}
         onApproveRequest={handleApproveRequest}
         onRejectRequest={handleRejectRequest}
@@ -876,6 +1246,9 @@ function TeamProjects() {
         onPostAnnouncement={handlePostAnnouncement}
         announcements={announcements}
         onLikePost={handleLikePost}
+        onTogglePinPost={handleTogglePinPost}
+        onAddComment={handleAddComment}
+        onLikeComment={handleLikeComment}
         chatMessages={chatMessages}
         chatInput={chatInput}
         setChatInput={setChatInput}

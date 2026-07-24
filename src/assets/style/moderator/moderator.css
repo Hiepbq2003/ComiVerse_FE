@@ -13,10 +13,10 @@
   --mod-sidebar-text: #94a3b8;
   --mod-sidebar-active: #ffffff;
 
-  --mod-text-primary: #f1f5f9;
-  --mod-text-secondary: #94a3b8;
-  --mod-text-muted: #64748b;
-  --mod-border: rgba(255, 255, 255, 0.08);
+  --mod-text-primary: #f8fafc;
+  --mod-text-secondary: #cbd5e1;
+  --mod-text-muted: #94a3b8;
+  --mod-border: rgba(255, 255, 255, 0.18);
 
   --mod-purple: #a855f7;
   --mod-purple-hover: #c084fc;
@@ -44,19 +44,19 @@
   background: linear-gradient(180deg, #0e0a1f 0%, #070512 100%) !important;
   backdrop-filter: blur(20px) saturate(140%) !important;
   -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-right: 1.5px solid rgba(255, 255, 255, 0.18) !important;
   display: flex;
   flex-direction: column;
   position: fixed;
   top: 0;
   left: 0;
   z-index: 100;
-  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.35);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5), 1px 0 0 rgba(168, 85, 247, 0.25) !important;
 }
 
 .moderator-sidebar-brand {
   padding: 24px 20px 28px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.14);
 }
 
 .moderator-sidebar-brand h2 {
@@ -208,9 +208,41 @@
 }
 
 .moderator-topbar-left {
-  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--mod-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.mod-lang-scope-badge {
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+html.light .mod-lang-scope-badge {
+  background: #f3e8ff !important;
+  color: #6b21a8 !important;
+  border: 1.5px solid #c084fc !important;
+}
+
+@media (max-width: 900px) {
+  .mod-lang-scope-badge {
+    display: none;
+  }
 }
 
 .moderator-topbar-right {
@@ -2393,4 +2425,335 @@ html.light .moderator-empty-state {
   border-color: rgba(0, 0, 0, 0.08) !important;
   color: #475569 !important;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   PREMIUM REVAMP: CREATE PROJECT TEAM MODAL & FORM CONTROLS
+   ────────────────────────────────────────────────────────── */
+
+/* 1. Modal Card Glassmorphism Surface (Dark Mode) */
+.mod-modal-card {
+  background: linear-gradient(145deg, #130d24 0%, #1a1132 100%) !important;
+  border: 1.5px solid rgba(168, 85, 247, 0.35) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 40px rgba(168, 85, 247, 0.2) !important;
+  backdrop-filter: blur(25px) !important;
+}
+
+.mod-modal-header {
+  padding: 20px 28px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.mod-modal-header h3 {
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  color: #ffffff !important;
+  letter-spacing: -0.01em;
+}
+
+.mod-modal-close-btn {
+  color: #94a3b8 !important;
+  font-size: 24px !important;
+  transition: all 0.2s ease !important;
+}
+
+.mod-modal-close-btn:hover {
+  color: #ffffff !important;
+  transform: scale(1.1);
+}
+
+.mod-modal-body {
+  padding: 24px 28px !important;
+}
+
+.mod-modal-footer {
+  padding: 18px 28px !important;
+  background: rgba(10, 6, 20, 0.6) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-bottom-left-radius: 20px !important;
+  border-bottom-right-radius: 20px !important;
+}
+
+/* 2. Step Tracker Indicator */
+.mod-step-tracker {
+  margin-bottom: 24px;
+}
+
+.mod-step-text {
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  color: #c084fc !important;
+  margin-bottom: 8px !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.mod-step-bar-bg {
+  height: 6px !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 999px !important;
+  overflow: hidden !important;
+}
+
+.mod-step-bar-fill {
+  height: 100% !important;
+  background: linear-gradient(90deg, #a855f7 0%, #ec4899 100%) !important;
+  border-radius: 999px !important;
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* 3. Form Labels & Inputs (Dark Mode) */
+.mod-label {
+  display: block !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  color: #e2e8f0 !important;
+  margin-bottom: 8px !important;
+}
+
+.mod-input,
+select.mod-input,
+.mod-select-field {
+  width: 100% !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1.5px solid rgba(168, 85, 247, 0.3) !important;
+  border-radius: 10px !important;
+  padding: 12px 16px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: #ffffff !important;
+  outline: none !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-sizing: border-box !important;
+}
+
+.mod-input:focus,
+select.mod-input:focus,
+.mod-select-field:focus {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: #c084fc !important;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.25), 0 4px 14px rgba(168, 85, 247, 0.2) !important;
+}
+
+.mod-input::placeholder {
+  color: #a78bfa !important;
+  opacity: 0.75 !important;
+}
+
+/* Fix Native Select Option Popup Background (Dark Mode) */
+select.mod-input option,
+select.mod-select-field option,
+select.moderator-select option,
+.mod-input option {
+  background-color: #180e30 !important;
+  color: #ffffff !important;
+  padding: 12px 16px !important;
+  font-size: 14px !important;
+}
+
+/* 4. Leader Search Result & Selected Leader Card (Dark Mode) */
+.leader-selected-card {
+  background: rgba(168, 85, 247, 0.15) !important;
+  border: 1.5px solid #a855f7 !important;
+  border-radius: 12px !important;
+  padding: 14px 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+}
+
+.leader-result-avatar {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 50% !important;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  font-size: 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.leader-result-name {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  font-size: 14.5px !important;
+}
+
+.leader-result-email {
+  color: #cbd5e1 !important;
+  font-size: 12.5px !important;
+}
+
+.leader-search-dropdown {
+  background: #180e30 !important;
+  border: 1.5px solid rgba(168, 85, 247, 0.4) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6) !important;
+  overflow: hidden !important;
+}
+
+.leader-search-result {
+  background: transparent !important;
+  color: #ffffff !important;
+  padding: 12px 16px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  width: 100% !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.leader-search-result:hover {
+  background: rgba(168, 85, 247, 0.25) !important;
+}
+
+/* 5. Modal Buttons (Dark Mode) */
+.mod-btn.review {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  color: #f8fafc !important;
+  font-weight: 600 !important;
+  padding: 10px 20px !important;
+  border-radius: 10px !important;
+  transition: all 0.2s ease !important;
+}
+
+.mod-btn.review:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.mod-btn.approve {
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%) !important;
+  border: none !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  padding: 10px 22px !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 15px rgba(168, 85, 247, 0.35) !important;
+  transition: all 0.2s ease !important;
+}
+
+.mod-btn.approve:hover {
+  background: linear-gradient(135deg, #c084fc 0%, #9333ea 100%) !important;
+  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.5) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ──────────────────────────────────────────────────────────
+   LIGHT MODE OVERRIDES FOR CREATE PROJECT TEAM MODAL
+   ────────────────────────────────────────────────────────── */
+html.light .mod-modal-card {
+  background: #ffffff !important;
+  border: 1.5px solid #e2e8f0 !important;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(124, 58, 237, 0.08) !important;
+}
+
+html.light .mod-modal-header {
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+html.light .mod-modal-header h3 {
+  color: #0f172a !important;
+}
+
+html.light .mod-modal-close-btn {
+  color: #64748b !important;
+}
+
+html.light .mod-modal-close-btn:hover {
+  color: #0f172a !important;
+}
+
+html.light .mod-modal-footer {
+  background: #f8fafc !important;
+  border-top: 1px solid #e2e8f0 !important;
+}
+
+html.light .mod-step-text {
+  color: #7c3aed !important;
+}
+
+html.light .mod-step-bar-bg {
+  background: #e2e8f0 !important;
+}
+
+html.light .mod-label {
+  color: #1e293b !important;
+}
+
+html.light .mod-input,
+html.light select.mod-input,
+html.light .mod-select-field {
+  background: #ffffff !important;
+  border: 1.5px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .mod-input:focus,
+html.light select.mod-input:focus,
+html.light .mod-select-field:focus {
+  border-color: #7c3aed !important;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15), 0 2px 8px rgba(124, 58, 237, 0.1) !important;
+}
+
+html.light .mod-input::placeholder {
+  color: #94a3b8 !important;
+  opacity: 1 !important;
+}
+
+html.light select.mod-input option,
+html.light select.mod-select-field option,
+html.light select.moderator-select option,
+html.light .mod-input option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+html.light .leader-selected-card {
+  background: #f3e8ff !important;
+  border: 1.5px solid #7c3aed !important;
+}
+
+html.light .leader-result-name {
+  color: #0f172a !important;
+}
+
+html.light .leader-result-email {
+  color: #475569 !important;
+}
+
+html.light .leader-search-dropdown {
+  background: #ffffff !important;
+  border: 1.5px solid #cbd5e1 !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
+}
+
+html.light .leader-search-result {
+  color: #0f172a !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+html.light .leader-search-result:hover {
+  background: #f1f5f9 !important;
+}
+
+html.light .mod-btn.review {
+  background: #e2e8f0 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+html.light .mod-btn.review:hover {
+  background: #cbd5e1 !important;
+}
+
+html.light .mod-btn.approve {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3) !important;
 }

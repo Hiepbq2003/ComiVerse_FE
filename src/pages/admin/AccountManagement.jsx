@@ -94,14 +94,17 @@ function AccountManagement() {
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [confirmAction, setConfirmAction] = useState(null) // { type: 'ban'|'unban'|'reset-pw', account }
 
+  // MODERATOR SPECIALIZATION LANGUAGES
+  const MODERATOR_LANGUAGES = ['Japanese', 'Korean', 'Chinese', 'English', 'Vietnamese', 'Spanish', 'French', 'German']
+
   // Edit user states
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingAccount, setEditingAccount] = useState(null)
-  const [editForm, setEditForm] = useState({ fullName: '', role: 'READER' })
+  const [editForm, setEditForm] = useState({ fullName: '', role: 'READER', assignedLanguages: ['Japanese', 'Korean'] })
   const [editFormErrors, setEditFormErrors] = useState({})
 
   // Create staff form
-  const [staffForm, setStaffForm] = useState({ username: '', password: '', fullName: '', email: '', role: 'READER' })
+  const [staffForm, setStaffForm] = useState({ username: '', password: '', fullName: '', email: '', role: 'READER', assignedLanguages: ['Japanese', 'Korean'] })
   const [staffFormErrors, setStaffFormErrors] = useState({})
   const [modalError, setModalError] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -147,16 +150,20 @@ function AccountManagement() {
       const normalized = accountsList.map((acc) => {
         const cDate = acc.createdDate || acc.createdAt || acc.created_at
         const lActive = acc.lastActive || acc.lastActiveAt || acc.lastLogin || acc.lastLoginAt || acc.updatedDate || acc.updatedAt
+        const normalizedRole = formatRoleLabel(acc.role?.roleName || acc.role || acc.roleName || 'Reader')
         return {
           id: acc.id || acc.userId,
           userId: acc.userId || `USR-${String(acc.id).padStart(4, '0')}`,
           fullName: acc.fullName || acc.name || acc.username,
           username: acc.username,
           email: acc.email,
-          role: formatRoleLabel(acc.role?.roleName || acc.role || acc.roleName || 'Reader'),
+          role: normalizedRole,
           status: acc.status || (acc.banned ? 'Banned' : 'Active'),
           createdDate: cDate ? formatDate(cDate) : '-',
           lastActive: lActive ? formatDate(lActive) : 'Today',
+          assignedLanguages: Array.isArray(acc.assignedLanguages) && acc.assignedLanguages.length > 0 
+            ? acc.assignedLanguages 
+            : (normalizedRole.toLowerCase().includes('moderator') ? ['Japanese', 'Korean'] : [])
         }
       })
       setAccounts(normalized)
@@ -233,6 +240,26 @@ function AccountManagement() {
     }
   }
 
+  const toggleStaffLanguage = (lang) => {
+    setStaffForm(prev => {
+      const current = prev.assignedLanguages || []
+      const updated = current.includes(lang)
+        ? current.filter(l => l !== lang)
+        : [...current, lang]
+      return { ...prev, assignedLanguages: updated }
+    })
+  }
+
+  const toggleEditLanguage = (lang) => {
+    setEditForm(prev => {
+      const current = prev.assignedLanguages || []
+      const updated = current.includes(lang)
+        ? current.filter(l => l !== lang)
+        : [...current, lang]
+      return { ...prev, assignedLanguages: updated }
+    })
+  }
+
   const validateStaffForm = () => {
     const errors = {}
     if (!staffForm.username.trim()) errors.username = 'Username is required'
@@ -259,13 +286,18 @@ function AccountManagement() {
     if (!validateStaffForm()) return
     setIsSubmitting(true)
     try {
-      const result = await registerStaffApi({
+      const payload = {
         username: staffForm.username.trim(),
         password: staffForm.password.trim(),
         fullName: staffForm.fullName.trim(),
         email: staffForm.email.trim(),
-        role: staffForm.role,
-      })
+        role: staffForm.role
+      }
+      if (staffForm.role === 'MODERATOR') {
+        payload.assignedLanguages = staffForm.assignedLanguages || []
+      }
+
+      const result = await registerStaffApi(payload)
       // Add to local list
       const displayRole = formatRoleLabel(result?.role || staffForm.role)
       
@@ -279,10 +311,11 @@ function AccountManagement() {
         status: 'Active',
         createdDate: new Date().toISOString().split('T')[0],
         lastActive: 'Just now',
+        assignedLanguages: staffForm.role === 'MODERATOR' ? (staffForm.assignedLanguages || []) : []
       }
       setAccounts((prev) => [newAccount, ...prev])
       setShowCreateModal(false)
-      setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'READER' })
+      setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'READER', assignedLanguages: ['Japanese', 'Korean'] })
       setStaffFormErrors({})
       setModalError(null)
       showAlert('success', `Account "${newAccount.fullName}" created successfully!`)
@@ -304,7 +337,7 @@ function AccountManagement() {
 
   const handleCloseCreateModal = () => {
     setShowCreateModal(false)
-    setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'READER' })
+    setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'READER', assignedLanguages: ['Japanese', 'Korean'] })
     setStaffFormErrors({})
     setModalError(null)
   }
@@ -314,7 +347,10 @@ function AccountManagement() {
     setEditingAccount(account)
     setEditForm({
       fullName: account.fullName,
-      role: normalizeRoleValue(account.role || 'READER')
+      role: normalizeRoleValue(account.role || 'READER'),
+      assignedLanguages: Array.isArray(account.assignedLanguages) && account.assignedLanguages.length > 0
+        ? account.assignedLanguages
+        : ['Japanese', 'Korean']
     })
     setEditFormErrors({})
     setModalError(null)
@@ -324,7 +360,7 @@ function AccountManagement() {
   const handleCloseEditModal = () => {
     setShowEditModal(false)
     setEditingAccount(null)
-    setEditForm({ fullName: '', role: 'READER' })
+    setEditForm({ fullName: '', role: 'READER', assignedLanguages: ['Japanese', 'Korean'] })
     setEditFormErrors({})
     setModalError(null)
   }
@@ -351,10 +387,15 @@ function AccountManagement() {
     setModalError(null)
 
     try {
-      const response = await updateUserApi(editingAccount.id, {
+      const updatePayload = {
         fullName: editForm.fullName.trim(),
         role: editForm.role
-      })
+      }
+      if (editForm.role === 'MODERATOR') {
+        updatePayload.assignedLanguages = editForm.assignedLanguages || []
+      }
+
+      const response = await updateUserApi(editingAccount.id, updatePayload)
 
       const updatedUser = response?.data || {}
       setAccounts((prev) =>
@@ -363,7 +404,8 @@ function AccountManagement() {
             ? {
                 ...a,
                 fullName: updatedUser.fullName || editForm.fullName,
-                role: formatRoleLabel(updatedUser.role || editForm.role)
+                role: formatRoleLabel(updatedUser.role || editForm.role),
+                assignedLanguages: editForm.role === 'MODERATOR' ? (editForm.assignedLanguages || editForm.assignedLanguages) : []
               }
             : a
         )
@@ -560,6 +602,11 @@ function AccountManagement() {
                     <span className={`role-badge ${roleToClassName(account.role)}`}>
                       {formatRoleLabel(account.role)}
                     </span>
+                    {normalizeRoleValue(account.role) === 'MODERATOR' && (
+                      <div className="admin-lang-scope-tag" style={{ marginTop: '4px', fontSize: '11px', color: '#c084fc', fontWeight: '600' }}>
+                        🌐 {Array.isArray(account.assignedLanguages) && account.assignedLanguages.length > 0 ? account.assignedLanguages.join(', ') : 'Japanese, Korean'}
+                      </div>
+                    )}
                   </td>
                   <td>
                     <span className={`status-badge ${(account.status || '').toLowerCase()}`}>
@@ -741,6 +788,40 @@ function AccountManagement() {
                 </select>
               </div>
 
+              {normalizeRoleValue(staffForm.role) === 'MODERATOR' && (
+                <div className="admin-form-group fade-in" style={{ marginTop: '12px' }}>
+                  <label className="admin-form-label" style={{ color: '#c084fc' }}>
+                    🌐 Assigned Moderation Languages <span className="required">*</span>
+                  </label>
+                  <div className="admin-lang-checkbox-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                    {MODERATOR_LANGUAGES.map((lang) => {
+                      const isChecked = (staffForm.assignedLanguages || []).includes(lang)
+                      return (
+                        <button
+                          key={lang}
+                          type="button"
+                          className={`admin-lang-chip ${isChecked ? 'active' : ''}`}
+                          onClick={() => toggleStaffLanguage(lang)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '20px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            border: isChecked ? '1.5px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.15)',
+                            background: isChecked ? 'rgba(168, 85, 247, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                            color: isChecked ? '#ffffff' : '#cbd5e1',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {isChecked ? '✓ ' : '+ '} {lang}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="admin-form-group">
                 <label className="admin-form-label">
                   Password <span className="required">*</span>
@@ -849,6 +930,40 @@ function AccountManagement() {
                   ))}
                 </select>
               </div>
+
+              {normalizeRoleValue(editForm.role) === 'MODERATOR' && (
+                <div className="admin-form-group fade-in" style={{ marginTop: '12px' }}>
+                  <label className="admin-form-label" style={{ color: '#c084fc' }}>
+                    🌐 Assigned Moderation Languages <span className="required">*</span>
+                  </label>
+                  <div className="admin-lang-checkbox-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                    {MODERATOR_LANGUAGES.map((lang) => {
+                      const isChecked = (editForm.assignedLanguages || []).includes(lang)
+                      return (
+                        <button
+                          key={lang}
+                          type="button"
+                          className={`admin-lang-chip ${isChecked ? 'active' : ''}`}
+                          onClick={() => toggleEditLanguage(lang)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '20px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            border: isChecked ? '1.5px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.15)',
+                            background: isChecked ? 'rgba(168, 85, 247, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                            color: isChecked ? '#ffffff' : '#cbd5e1',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {isChecked ? '✓ ' : '+ '} {lang}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="admin-modal-footer" style={{ justifyContent: 'space-between' }}>

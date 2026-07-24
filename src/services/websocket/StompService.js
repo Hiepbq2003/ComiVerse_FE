@@ -8,6 +8,7 @@ class StompService {
         this.connectionState = 'DISCONNECTED'; // DISCONNECTED | CONNECTING | CONNECTED
         this.onConnectCallbacks = new Set();
         this.onDisconnectCallbacks = new Set();
+        this.currentToken = null;
     }
 
     /**
@@ -30,18 +31,28 @@ class StompService {
      * Connect to STOMP WebSocket server using pure Native WebSockets
      */
     connect() {
-        if (this.client && (this.connectionState === 'CONNECTED' || this.connectionState === 'CONNECTING')) {
-            return;
-        }
-
         const auth = getAuth();
         const token = auth?.token;
 
         if (!token) {
+            if (this.client) {
+                this.disconnect();
+            }
             console.warn('[StompService] Cannot connect to WebSocket: No auth token found.');
             return;
         }
 
+        // If client exists and is connected/connecting, verify token match
+        if (this.client && (this.connectionState === 'CONNECTED' || this.connectionState === 'CONNECTING')) {
+            if (this.currentToken === token) {
+                return;
+            }
+            // User account changed! Disconnect old socket session immediately
+            console.log('[StompService] User token changed. Reconnecting WebSocket with active credentials...');
+            this.disconnect();
+        }
+
+        this.currentToken = token;
         const wsUrl = this.getWsUrl();
         this.connectionState = 'CONNECTING';
         console.log(`[StompService] Connecting via Native WebSocket to: ${wsUrl}`);
@@ -77,9 +88,13 @@ class StompService {
         };
 
         this.client.onStompError = (frame) => {
-            console.error('[StompService] STOMP Error:', frame.headers['message'], frame.body);
-            this.connectionState = 'DISCONNECTED';
-            this.onDisconnectCallbacks.forEach((cb) => cb(frame));
+            console.warn('[StompService] STOMP Channel Error (handled):', frame.headers?.['message'] || frame.body);
+            // Evict group topic subscriptions that trigger server STOMP errors to prevent infinite reconnect loops
+            this.subscriptions.forEach((subObj, topic) => {
+                if (topic && topic.includes('/topic/chat/group/')) {
+                    this.subscriptions.delete(topic);
+                }
+            });
         };
 
         this.client.onWebSocketClose = () => {
@@ -210,8 +225,11 @@ class StompService {
                 }
             });
             this.subscriptions.clear();
-            this.client.deactivate();
+            try {
+                this.client.deactivate();
+            } catch (e) { /* ignore */ }
             this.client = null;
+            this.currentToken = null;
             this.connectionState = 'DISCONNECTED';
             console.log('[StompService] Disconnected');
         }

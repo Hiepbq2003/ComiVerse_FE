@@ -1,4 +1,4 @@
-﻿/* Page Content Container */
+/* Page Content Container */
 .author-page-content {
   flex: 1;
   padding: 32px;
@@ -217,36 +217,71 @@
 
 .author-primary-btn,
 .author-secondary-btn {
-  border: 1px solid var(--author-border);
-  border-radius: 10px;
-  padding: 10px 16px;
+  border-radius: 500px;
+  padding: 10px 22px;
   font-family: var(--author-font);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 700;
   cursor: pointer;
-  transition: var(--author-transition);
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  outline: none;
 }
 
 .author-primary-btn {
-  background: #0f172a;
-  color: #fff;
-  border-color: #0f172a;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  color: #ffffff !important;
+  border: none;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.35);
 }
 
 .author-primary-btn:hover {
-  background: #020617;
-  transform: translateY(-1px);
-  box-shadow: var(--author-shadow);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.5);
+  color: #ffffff !important;
 }
 
 .author-secondary-btn {
-  background: var(--author-card-bg);
-  color: var(--author-text-primary);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  color: #ffffff !important;
+  backdrop-filter: blur(12px);
 }
 
 .author-secondary-btn:hover {
-  border-color: var(--author-accent);
-  color: var(--author-accent);
+  background: rgba(168, 85, 247, 0.18);
+  border-color: #a855f7;
+  color: #ffffff !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.25);
+}
+
+/* Light Theme High Contrast Overrides */
+html.light .author-secondary-btn {
+  background: #ffffff !important;
+  border: 1.5px solid #a855f7 !important;
+  color: #6b21a8 !important;
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.12) !important;
+}
+
+html.light .author-secondary-btn:hover {
+  background: #f3e8ff !important;
+  border-color: #7e22ce !important;
+  color: #581c87 !important;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.25) !important;
+}
+
+html.light .author-primary-btn {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35) !important;
+}
+
+html.light .author-primary-btn:hover {
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.5) !important;
 }
 
 .author-analytics-grid {
