@@ -1,5 +1,6 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { getAuth, setAuth, clearAuth } from '../utils/Auth'
+import stompService from '../services/websocket/StompService'
 
 const AuthContext = createContext()
 
@@ -39,6 +40,12 @@ export function AuthProvider({ children }) {
       user: updatedUser
     }))
   }
+
+  useEffect(() => {
+    if (authState.isLoggedIn && authState.token) {
+      stompService.connect()
+    }
+  }, [authState.isLoggedIn, authState.token])
 
   return (
     <AuthContext.Provider value={{

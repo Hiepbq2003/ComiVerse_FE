@@ -5,18 +5,41 @@ import { getAuth } from '../../utils/Auth'
 import { toast } from 'react-toastify'
 import ModernPagination from '../../components/common/ModernPagination'
 
-function mapTeamMember(m, leaderName) {
+export function mapTeamMember(m, leaderName) {
   const name = m.name || 'Unknown'
   const isLeader = m.role === 'Group Leader' || (!!leaderName && name.toLowerCase().trim() === leaderName.toLowerCase().trim())
+  const online = m.online === true
   return {
     id: m.id || `mem-${Math.random()}`,
     name,
     role: isLeader ? 'Group Leader' : (m.role || 'Member'),
-    status: m.status || 'Active',
+    status: online ? 'Active' : 'Offline',
+    online,
+    lastSeenAt: m.lastSeenAt || null,
     joinDate: m.joinDate || '—',
     contributions: m.contributions || '0 chapters',
     avatar: m.avatar || name.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2)
   }
+}
+
+export function formatMemberPresence(member, now = Date.now()) {
+  if (member?.online) return 'Active now'
+  if (!member?.lastSeenAt) return 'Offline'
+
+  const lastSeen = new Date(member.lastSeenAt).getTime()
+  if (!Number.isFinite(lastSeen)) return 'Offline'
+
+  const elapsedSeconds = Math.max(0, Math.floor((now - lastSeen) / 1000))
+  if (elapsedSeconds < 60) return 'Offline · just now'
+
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60)
+  if (elapsedMinutes < 60) return `Offline · ${elapsedMinutes}m ago`
+
+  const elapsedHours = Math.floor(elapsedMinutes / 60)
+  if (elapsedHours < 24) return `Offline · ${elapsedHours}h ago`
+
+  const elapsedDays = Math.floor(elapsedHours / 24)
+  return `Offline · ${elapsedDays}d ago`
 }
 
 function MembersTab({
@@ -36,6 +59,7 @@ function MembersTab({
   const [activeDropdownMemberId, setActiveDropdownMemberId] = useState(null)
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 })
   const dotsBtnRefs = useRef({})
+  const onMembersLoadedRef = useRef(onMembersLoaded)
 
   // Filters & Sorting state
   const [joinDateSort, setJoinDateSort] = useState('newest')
@@ -46,6 +70,17 @@ function MembersTab({
   const authUser = getAuth()?.user
   const currentUserName = (authUser?.fullName || authUser?.username || '').toLowerCase().trim()
 
+  useEffect(() => {
+    onMembersLoadedRef.current = onMembersLoaded
+  }, [onMembersLoaded])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setMembers(current => [...current])
+    }, 60000)
+    return () => window.clearInterval(intervalId)
+  }, [])
+
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1)
@@ -55,38 +90,61 @@ function MembersTab({
   useEffect(() => {
     if (parentMembers && parentMembers.length > 0) {
       const mapped = parentMembers.map(m => mapTeamMember(m, leaderName))
-      setMembers(mapped)
+      setMembers(current => {
+        const currentById = new Map(current.map(member => [String(member.id), member]))
+        return mapped.map(member => {
+          const existing = currentById.get(String(member.id))
+          if (!existing || typeof parentMembers.find(item => String(item.id) === String(member.id))?.online === 'boolean') {
+            return member
+          }
+          return {
+            ...member,
+            online: existing.online,
+            status: existing.status,
+            lastSeenAt: existing.lastSeenAt,
+          }
+        })
+      })
       setLoading(false)
     }
   }, [parentMembers, leaderName])
 
-  // Fetch initial API members if parent members empty
+  // Presence is refreshed while this tab is open; relative time updates separately above.
   useEffect(() => {
     if (!teamId) return
     let cancelled = false
-    if (parentMembers.length > 0) return
-
-    setLoading(true)
+    const showInitialLoader = parentMembers.length === 0
+    if (showInitialLoader) setLoading(true)
     setError(null)
 
-    getTeamMembersApi(teamId)
-      .then((list) => {
+    const loadMembers = () => getTeamMembersApi(teamId)
+      .then(list => {
         if (cancelled) return
         const raw = Array.isArray(list) ? list : []
         const mapped = raw.map((m) => mapTeamMember(m, leaderName))
         setMembers(mapped)
-        onMembersLoaded?.(mapped)
+        onMembersLoadedRef.current?.(mapped)
+        setError(null)
       })
       .catch((err) => {
         if (cancelled) return
         console.error('Could not load team members:', err)
-        setError('Failed to load members.')
+        if (showInitialLoader) setError('Failed to load members.')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
 
-    return () => { cancelled = true }
+    loadMembers()
+    const pollInterval = window.setInterval(loadMembers, 15000)
+    const handleFocus = () => loadMembers()
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(pollInterval)
+      window.removeEventListener('focus', handleFocus)
+    }
   }, [teamId, leaderName, parentMembers.length])
 
   // Close dropdown on scroll or outside click
@@ -268,7 +326,7 @@ function MembersTab({
                             </span>
                             <div className="member-status-row">
                               <span className={`status-dot ${member.status.toLowerCase()}`}></span>
-                              <span>{member.status}</span>
+                              <span>{formatMemberPresence(member)}</span>
                             </div>
                           </div>
                         </div>
