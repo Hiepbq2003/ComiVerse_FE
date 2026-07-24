@@ -17,6 +17,7 @@ import { getAllChatFlagsApi } from '../../services/api/ChatFlagApi'
 import { toast } from 'react-toastify'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import ModernButton from '../../components/common/ModernButton'
+import { getAuth } from '../../utils/Auth'
 
 
 const formatSubmitterName = (submittedBy) => {
@@ -156,7 +157,7 @@ function ModeratorDashboard() {
   const fetchAllData = async () => {
     try {
       setLoading(true)
-      const [comicsData, teamsData, submissionsData, genresData, forumData, chatData] = await Promise.all([
+      const results = await Promise.allSettled([
         getAllComicsApi(),
         getAllProjectTeamsApi(),
         getAllSubmissionsApi(),
@@ -164,6 +165,14 @@ function ModeratorDashboard() {
         getAllForumThreadsApi(),
         getAllChatFlagsApi()
       ])
+
+      const comicsData = results[0].status === 'fulfilled' ? results[0].value : []
+      const teamsData = results[1].status === 'fulfilled' ? results[1].value : []
+      const submissionsData = results[2].status === 'fulfilled' ? results[2].value : []
+      const genresData = results[3].status === 'fulfilled' ? results[3].value : []
+      const forumData = results[4].status === 'fulfilled' ? results[4].value : []
+      const chatData = results[5].status === 'fulfilled' ? results[5].value : []
+
       const mappedComics = (comicsData || []).map(c => {
         const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === c.title.toLowerCase())
         return {
@@ -174,7 +183,7 @@ function ModeratorDashboard() {
       setComics(mappedComics)
       setProjectTeams(teamsData || [])
       setSubmissions(submissionsData || [])
-      setGenres(genresData?.data || genresData || [])
+      setGenres(genresData?.data || (Array.isArray(genresData) ? genresData : []))
       setForumThreads(forumData || [])
       setChatFlags(chatData || [])
     } catch (err) {
@@ -200,6 +209,30 @@ function ModeratorDashboard() {
       toast.success('Submission approved!')
       setSubmissions(prev => prev.filter(item => item.id !== id))
       fetchComicsAndTeams()
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to approve submission.')
+    }
+  }
+
+  const handleApproveAndCreateProject = async (item) => {
+    try {
+      await approveSubmissionApi(item.id)
+      toast.success(`Approved "${item.title}"! Opening Translation Project setup...`)
+      setSubmissions(prev => prev.filter(s => s.id !== item.id))
+      fetchComicsAndTeams()
+
+      setCreateTeamForm({
+        title: `${item.title} - Translation Team`,
+        comicName: item.title,
+        sourceLang: item.language || 'Japanese',
+        targetLang: 'English',
+        leaderName: '',
+        leaderId: ''
+      })
+      setCreateTeamStep(1)
+      setShowCreateTeamModal(true)
+      setActiveNav('project-teams')
     } catch (err) {
       console.error(err)
       toast.error('Failed to approve submission.')
@@ -955,6 +988,7 @@ function ModeratorDashboard() {
               submissions={submissions} 
               handleApprove={handleApprove} 
               handleConfirmReject={handleConfirmReject} 
+              handleApproveAndCreateProject={handleApproveAndCreateProject}
             />
           )}
 
@@ -984,6 +1018,13 @@ function ModeratorDashboard() {
               comics={comics
                 .filter(c => !submissions.some(s => s.queueType === 'author' && s.status === 'pending' && s.title === c.title))
                 .filter((value, index, self) => self.findIndex(t => t.title === value.title) === index)
+                .filter(c => {
+                  const currentUser = getAuth()?.user;
+                  const modLangs = Array.isArray(currentUser?.assignedLanguages) && currentUser.assignedLanguages.length > 0
+                    ? currentUser.assignedLanguages
+                    : ['Japanese', 'Korean'];
+                  return modLangs.includes('All') || modLangs.some(l => l.toLowerCase() === (c.language || 'Japanese').toLowerCase());
+                })
               }
               showCreateTeamModal={showCreateTeamModal}
               setShowCreateTeamModal={setShowCreateTeamModal}

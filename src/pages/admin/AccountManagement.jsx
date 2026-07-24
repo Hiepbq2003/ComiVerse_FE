@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { toast } from 'react-toastify'
 import AdminLayout from '../../components/layout/AdminLayout'
 import { getAllAccountsApi, registerStaffApi, banUserApi, unbanUserApi, resetUserPasswordApi, updateUserApi } from '../../services/api/AccountApi'
 import ModernButton from '../../components/common/ModernButton'
@@ -6,6 +7,7 @@ import AnimatedButton from '../../components/common/AnimatedButton'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import { AIPopover } from '../../components/common/AIPopover'
 import { ModernPagination } from '../../components/common/ModernPagination'
+import { exportToCsv } from '../../utils/exportToCsv'
 import { useTheme } from '../../context/ThemeContext'
 import '../../assets/style/common/ai-popover.css'
 import '../../assets/style/common/modern-pagination.css'
@@ -29,7 +31,7 @@ const MOCK_ACCOUNTS = [
   { id: 12, userId: 'USR-0012', fullName: 'SuperAdmin', username: 'superadmin', email: 'admin@comiverse.com', role: 'Admin', status: 'Active', createdDate: '2023-01-01', lastActive: 'Today' },
 ]
 
-const ITEMS_PER_PAGE = 8
+const ITEMS_PER_PAGE = 10
 const ROLE_OPTIONS = [
   { value: 'ADMIN', label: 'Admin' },
   { value: 'MODERATOR', label: 'Moderator' },
@@ -52,6 +54,17 @@ const formatRoleLabel = (role) => {
 }
 const roleToClassName = (role) => normalizeRoleValue(role).toLowerCase().replace(/_/g, '-')
 
+const formatDate = (dateVal) => {
+  if (!dateVal || dateVal === '-') return '-'
+  try {
+    const d = new Date(dateVal)
+    if (isNaN(d.getTime())) return String(dateVal)
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  } catch {
+    return String(dateVal)
+  }
+}
+
 function AccountManagement() {
   const { theme } = useTheme()
   // Data states
@@ -61,39 +74,55 @@ function AccountManagement() {
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('All Roles')
   const [statusFilter, setStatusFilter] = useState('All Status')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalElements, setTotalElements] = useState(0)
 
+  // Debounce search input for high performance queries
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [confirmAction, setConfirmAction] = useState(null) // { type: 'ban'|'unban'|'reset-pw', account }
 
+  // MODERATOR SPECIALIZATION LANGUAGES
+  const MODERATOR_LANGUAGES = ['Japanese', 'Korean', 'Chinese', 'English', 'Vietnamese', 'Spanish', 'French', 'German']
+
   // Edit user states
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingAccount, setEditingAccount] = useState(null)
-  const [editForm, setEditForm] = useState({ fullName: '', role: 'READER' })
+  const [editForm, setEditForm] = useState({ fullName: '', role: 'READER', assignedLanguages: ['Japanese', 'Korean'] })
   const [editFormErrors, setEditFormErrors] = useState({})
 
   // Create staff form
-  const [staffForm, setStaffForm] = useState({ username: '', password: '', fullName: '', email: '', role: 'READER' })
+  const [staffForm, setStaffForm] = useState({ username: '', password: '', fullName: '', email: '', role: 'READER', assignedLanguages: ['Japanese', 'Korean'] })
   const [staffFormErrors, setStaffFormErrors] = useState({})
   const [modalError, setModalError] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Inline alert
-  const [alert, setAlert] = useState(null) // { type: 'success'|'error', message }
-
   // Action loading (track which row is being acted upon)
   const [actionLoadingId, setActionLoadingId] = useState(null)
 
-  // Show alert with auto-dismiss
+  // Show toast notification
   const showAlert = useCallback((type, message) => {
-    setAlert({ type, message })
-    setTimeout(() => setAlert(null), 4000)
+    if (type === 'success') {
+      toast.success(message)
+    } else if (type === 'error') {
+      toast.error(message)
+    } else if (type === 'warning') {
+      toast.warning(message)
+    } else {
+      toast.info(message)
+    }
   }, [])
 
   // Fetch accounts from API with paginated backend integration
@@ -104,8 +133,8 @@ function AccountManagement() {
         page: currentPage,
         size: ITEMS_PER_PAGE,
       }
-      if (searchTerm.trim()) {
-        params.search = searchTerm.trim()
+      if (debouncedSearchTerm.trim()) {
+        params.search = debouncedSearchTerm.trim()
       }
       if (roleFilter !== 'All Roles') {
         params.role = roleFilter
@@ -115,20 +144,28 @@ function AccountManagement() {
       }
 
       const response = await getAllAccountsApi(params)
-      const accountsList = response?.data || []
+      const accountsList = Array.isArray(response) ? response : (Array.isArray(response?.data) ? response.data : [])
       const metadata = response?.metadata || {}
 
-      const normalized = accountsList.map((acc) => ({
-        id: acc.id || acc.userId,
-        userId: acc.userId || `USR-${String(acc.id).padStart(4, '0')}`,
-        fullName: acc.fullName || acc.name || acc.username,
-        username: acc.username,
-        email: acc.email,
-        role: formatRoleLabel(acc.role?.roleName || acc.role || acc.roleName || 'Reader'),
-        status: acc.status || (acc.banned ? 'Banned' : 'Active'),
-        createdDate: acc.createdDate || acc.createdAt || '-',
-        lastActive: acc.lastActive || acc.lastLogin || '-',
-      }))
+      const normalized = accountsList.map((acc) => {
+        const cDate = acc.createdDate || acc.createdAt || acc.created_at
+        const lActive = acc.lastActive || acc.lastActiveAt || acc.lastLogin || acc.lastLoginAt || acc.updatedDate || acc.updatedAt
+        const normalizedRole = formatRoleLabel(acc.role?.roleName || acc.role || acc.roleName || 'Reader')
+        return {
+          id: acc.id || acc.userId,
+          userId: acc.userId || `USR-${String(acc.id).padStart(4, '0')}`,
+          fullName: acc.fullName || acc.name || acc.username,
+          username: acc.username,
+          email: acc.email,
+          role: normalizedRole,
+          status: acc.status || (acc.banned ? 'Banned' : 'Active'),
+          createdDate: cDate ? formatDate(cDate) : '-',
+          lastActive: lActive ? formatDate(lActive) : 'Today',
+          assignedLanguages: Array.isArray(acc.assignedLanguages) && acc.assignedLanguages.length > 0 
+            ? acc.assignedLanguages 
+            : (normalizedRole.toLowerCase().includes('moderator') ? ['Japanese', 'Korean'] : [])
+        }
+      })
       setAccounts(normalized)
       setTotalPages(metadata.totalPages || 1)
       setTotalElements(metadata.totalElements || normalized.length)
@@ -141,10 +178,10 @@ function AccountManagement() {
         const email = (account.email || '').toLowerCase()
         const uid = (account.userId || '').toLowerCase()
         const uname = (account.username || '').toLowerCase()
-        const search = searchTerm.toLowerCase()
+        const search = debouncedSearchTerm.toLowerCase()
 
         const matchesSearch =
-          searchTerm === '' || name.includes(search) || email.includes(search) || uid.includes(search) || uname.includes(search)
+          debouncedSearchTerm === '' || name.includes(search) || email.includes(search) || uid.includes(search) || uname.includes(search)
 
         const matchesRole =
           roleFilter === 'All Roles' ||
@@ -170,7 +207,7 @@ function AccountManagement() {
     } finally {
       setIsLoading(false)
     }
-  }, [currentPage, searchTerm, roleFilter, statusFilter])
+  }, [currentPage, debouncedSearchTerm, roleFilter, statusFilter])
 
   useEffect(() => {
     fetchAccounts()
@@ -195,24 +232,32 @@ function AccountManagement() {
     setCurrentPage(1)
   }
 
-  // Format date for display
-  const formatDate = (dateStr) => {
-    if (!dateStr || dateStr === '-') return '-'
-    try {
-      const date = new Date(dateStr)
-      if (isNaN(date.getTime())) return dateStr
-      return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
-    } catch {
-      return dateStr
-    }
-  }
-
   // ── CREATE STAFF ──────────────────────────────────
   const handleInputChange = (field, value) => {
     setStaffForm((prev) => ({ ...prev, [field]: value }))
     if (staffFormErrors[field]) {
       setStaffFormErrors((prev) => ({ ...prev, [field]: null }))
     }
+  }
+
+  const toggleStaffLanguage = (lang) => {
+    setStaffForm(prev => {
+      const current = prev.assignedLanguages || []
+      const updated = current.includes(lang)
+        ? current.filter(l => l !== lang)
+        : [...current, lang]
+      return { ...prev, assignedLanguages: updated }
+    })
+  }
+
+  const toggleEditLanguage = (lang) => {
+    setEditForm(prev => {
+      const current = prev.assignedLanguages || []
+      const updated = current.includes(lang)
+        ? current.filter(l => l !== lang)
+        : [...current, lang]
+      return { ...prev, assignedLanguages: updated }
+    })
   }
 
   const validateStaffForm = () => {
@@ -241,13 +286,18 @@ function AccountManagement() {
     if (!validateStaffForm()) return
     setIsSubmitting(true)
     try {
-      const result = await registerStaffApi({
+      const payload = {
         username: staffForm.username.trim(),
         password: staffForm.password.trim(),
         fullName: staffForm.fullName.trim(),
         email: staffForm.email.trim(),
-        role: staffForm.role,
-      })
+        role: staffForm.role
+      }
+      if (staffForm.role === 'MODERATOR') {
+        payload.assignedLanguages = staffForm.assignedLanguages || []
+      }
+
+      const result = await registerStaffApi(payload)
       // Add to local list
       const displayRole = formatRoleLabel(result?.role || staffForm.role)
       
@@ -261,10 +311,11 @@ function AccountManagement() {
         status: 'Active',
         createdDate: new Date().toISOString().split('T')[0],
         lastActive: 'Just now',
+        assignedLanguages: staffForm.role === 'MODERATOR' ? (staffForm.assignedLanguages || []) : []
       }
       setAccounts((prev) => [newAccount, ...prev])
       setShowCreateModal(false)
-      setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'READER' })
+      setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'READER', assignedLanguages: ['Japanese', 'Korean'] })
       setStaffFormErrors({})
       setModalError(null)
       showAlert('success', `Account "${newAccount.fullName}" created successfully!`)
@@ -286,7 +337,7 @@ function AccountManagement() {
 
   const handleCloseCreateModal = () => {
     setShowCreateModal(false)
-    setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'READER' })
+    setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'READER', assignedLanguages: ['Japanese', 'Korean'] })
     setStaffFormErrors({})
     setModalError(null)
   }
@@ -296,7 +347,10 @@ function AccountManagement() {
     setEditingAccount(account)
     setEditForm({
       fullName: account.fullName,
-      role: normalizeRoleValue(account.role || 'READER')
+      role: normalizeRoleValue(account.role || 'READER'),
+      assignedLanguages: Array.isArray(account.assignedLanguages) && account.assignedLanguages.length > 0
+        ? account.assignedLanguages
+        : ['Japanese', 'Korean']
     })
     setEditFormErrors({})
     setModalError(null)
@@ -306,7 +360,7 @@ function AccountManagement() {
   const handleCloseEditModal = () => {
     setShowEditModal(false)
     setEditingAccount(null)
-    setEditForm({ fullName: '', role: 'READER' })
+    setEditForm({ fullName: '', role: 'READER', assignedLanguages: ['Japanese', 'Korean'] })
     setEditFormErrors({})
     setModalError(null)
   }
@@ -333,10 +387,15 @@ function AccountManagement() {
     setModalError(null)
 
     try {
-      const response = await updateUserApi(editingAccount.id, {
+      const updatePayload = {
         fullName: editForm.fullName.trim(),
         role: editForm.role
-      })
+      }
+      if (editForm.role === 'MODERATOR') {
+        updatePayload.assignedLanguages = editForm.assignedLanguages || []
+      }
+
+      const response = await updateUserApi(editingAccount.id, updatePayload)
 
       const updatedUser = response?.data || {}
       setAccounts((prev) =>
@@ -345,7 +404,8 @@ function AccountManagement() {
             ? {
                 ...a,
                 fullName: updatedUser.fullName || editForm.fullName,
-                role: formatRoleLabel(updatedUser.role || editForm.role)
+                role: formatRoleLabel(updatedUser.role || editForm.role),
+                assignedLanguages: editForm.role === 'MODERATOR' ? (editForm.assignedLanguages || editForm.assignedLanguages) : []
               }
             : a
         )
@@ -398,7 +458,7 @@ function AccountManagement() {
       } else if (type === 'reset-pw') {
         await resetUserPasswordApi(account.id)
         setShowEditModal(false)
-        showAlert('success', `Password for "${account.fullName}" has been reset to abcd1234.`)
+        showAlert('success', `Password for "${account.fullName}" has been reset to 123456.`)
       }
     } catch (err) {
       const errorMsg = err.response?.data?.message || `Failed to ${type} user. Please try again.`
@@ -425,16 +485,24 @@ function AccountManagement() {
     ))
   )
 
+  const handleExportAccounts = () => {
+    const headers = ['User ID', 'Full Name', 'Username', 'Email', 'Role', 'Status', 'Created Date', 'Last Active']
+    const rows = accounts.map(a => [
+      a.userId || a.id,
+      a.fullName || '',
+      a.username || '',
+      a.email || '',
+      a.role || '',
+      a.status || '',
+      a.createdDate || '',
+      a.lastActive || ''
+    ])
+    exportToCsv('ComiVerse_User_Accounts_Export', headers, rows)
+  }
+
   return (
     <AdminLayout activeNav="account-management">
       <div className="admin-account-management-screen">
-      {/* Inline Alert */}
-      {alert && (
-        <div className={`admin-inline-alert admin-inline-alert--${alert.type}`}>
-          {alert.type === 'success' ? '✓' : '✕'} {alert.message}
-        </div>
-      )}
-
       {/* Mock data indicator */}
       {isMockData && !isLoading && (
         <div className="admin-inline-alert admin-inline-alert--info">
@@ -448,12 +516,22 @@ function AccountManagement() {
           <h1>Account Management</h1>
           <p>{totalElements} account{totalElements !== 1 ? 's' : ''} found</p>
         </div>
-        <AnimatedButton
-          variant={3}
-          label="+ Create User Account"
-          tooltip=""
-          onClick={() => setShowCreateModal(true)}
-        />
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <AnimatedButton
+            variant={3}
+            label="+ Create User Account"
+            tooltip=""
+            onClick={() => setShowCreateModal(true)}
+          />
+          <AnimatedButton
+            variant={3}
+            label="📥 Export Accounts"
+            tooltip="Export CSV"
+            className="btn-excel"
+            onClick={handleExportAccounts}
+            disabled={isLoading || accounts.length === 0}
+          />
+        </div>
       </div>
 
       {/* Filters Bar */}
@@ -524,6 +602,11 @@ function AccountManagement() {
                     <span className={`role-badge ${roleToClassName(account.role)}`}>
                       {formatRoleLabel(account.role)}
                     </span>
+                    {normalizeRoleValue(account.role) === 'MODERATOR' && (
+                      <div className="admin-lang-scope-tag" style={{ marginTop: '4px', fontSize: '11px', color: '#c084fc', fontWeight: '600' }}>
+                        🌐 {Array.isArray(account.assignedLanguages) && account.assignedLanguages.length > 0 ? account.assignedLanguages.join(', ') : 'Japanese, Korean'}
+                      </div>
+                    )}
                   </td>
                   <td>
                     <span className={`status-badge ${(account.status || '').toLowerCase()}`}>
@@ -538,26 +621,42 @@ function AccountManagement() {
                         <span className="admin-spinner-sm" />
                       ) : (
                         <>
-                          <ModernButton
-                            variant={2}
-                            label="Edit"
+                          <button
+                            type="button"
+                            className="btn-action-sm btn-action-sm--edit"
                             onClick={() => handleOpenEditModal(account)}
-                            className="btn-edit"
-                          />
+                          >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                            <span>Edit</span>
+                          </button>
+
                           {(account.status || '').toLowerCase() === 'banned' ? (
-                            <ModernButton
-                              variant={2}
-                              label="Unban"
+                            <button
+                              type="button"
+                              className="btn-action-sm btn-action-sm--unban"
                               onClick={() => openConfirm('unban', account)}
-                              className="btn-unban"
-                            />
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                <polyline points="22 4 12 14.01 9 11.01" />
+                              </svg>
+                              <span>Unban</span>
+                            </button>
                           ) : (
-                            <ModernButton
-                              variant={2}
-                              label="Ban"
+                            <button
+                              type="button"
+                              className="btn-action-sm btn-action-sm--ban"
                               onClick={() => openConfirm('ban', account)}
-                              className="btn-ban"
-                            />
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                              </svg>
+                              <span>Ban</span>
+                            </button>
                           )}
                         </>
                       )}
@@ -689,6 +788,40 @@ function AccountManagement() {
                 </select>
               </div>
 
+              {normalizeRoleValue(staffForm.role) === 'MODERATOR' && (
+                <div className="admin-form-group fade-in" style={{ marginTop: '12px' }}>
+                  <label className="admin-form-label" style={{ color: '#c084fc' }}>
+                    🌐 Assigned Moderation Languages <span className="required">*</span>
+                  </label>
+                  <div className="admin-lang-checkbox-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                    {MODERATOR_LANGUAGES.map((lang) => {
+                      const isChecked = (staffForm.assignedLanguages || []).includes(lang)
+                      return (
+                        <button
+                          key={lang}
+                          type="button"
+                          className={`admin-lang-chip ${isChecked ? 'active' : ''}`}
+                          onClick={() => toggleStaffLanguage(lang)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '20px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            border: isChecked ? '1.5px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.15)',
+                            background: isChecked ? 'rgba(168, 85, 247, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                            color: isChecked ? '#ffffff' : '#cbd5e1',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {isChecked ? '✓ ' : '+ '} {lang}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="admin-form-group">
                 <label className="admin-form-label">
                   Password <span className="required">*</span>
@@ -797,6 +930,40 @@ function AccountManagement() {
                   ))}
                 </select>
               </div>
+
+              {normalizeRoleValue(editForm.role) === 'MODERATOR' && (
+                <div className="admin-form-group fade-in" style={{ marginTop: '12px' }}>
+                  <label className="admin-form-label" style={{ color: '#c084fc' }}>
+                    🌐 Assigned Moderation Languages <span className="required">*</span>
+                  </label>
+                  <div className="admin-lang-checkbox-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                    {MODERATOR_LANGUAGES.map((lang) => {
+                      const isChecked = (editForm.assignedLanguages || []).includes(lang)
+                      return (
+                        <button
+                          key={lang}
+                          type="button"
+                          className={`admin-lang-chip ${isChecked ? 'active' : ''}`}
+                          onClick={() => toggleEditLanguage(lang)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '20px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            border: isChecked ? '1.5px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.15)',
+                            background: isChecked ? 'rgba(168, 85, 247, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                            color: isChecked ? '#ffffff' : '#cbd5e1',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {isChecked ? '✓ ' : '+ '} {lang}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="admin-modal-footer" style={{ justifyContent: 'space-between' }}>
@@ -856,7 +1023,7 @@ function AccountManagement() {
                   {confirmAction.type === 'unban' &&
                     `"${confirmAction.account.fullName}" will regain access to the platform.`}
                   {confirmAction.type === 'reset-pw' &&
-                    `The password for "${confirmAction.account.fullName}" will be reset to the default: abcd1234.`}
+                    `The password for "${confirmAction.account.fullName}" will be reset to the default: 123456.`}
                 </p>
               </div>
 

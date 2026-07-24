@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getForumThreadsPageApi, deleteForumThreadApi, createForumThreadApi, getAllForumThreadsApi, updateForumThreadApi, getForumThreadByIdApi } from '../../services/api/ForumThreadApi'
@@ -115,6 +115,20 @@ const renderFormattedContent = (content) => {
   const lines = content.split('\n')
   return lines.map((line, lineIndex) => {
     const trimmedLine = line.trim()
+    if (trimmedLine.startsWith('![') && trimmedLine.includes('](')) {
+      const match = trimmedLine.match(/!\[(.*?)\]\((.*?)\)/)
+      if (match && match[2]) {
+        return (
+          <div key={lineIndex} style={{ margin: '12px 0' }}>
+            <img
+              src={match[2]}
+              alt={match[1] || 'Attached Image'}
+              style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.1)' }}
+            />
+          </div>
+        )
+      }
+    }
     if (trimmedLine.startsWith('>')) {
       const quoteText = line.substring(line.indexOf('>') + 1).trim()
       return (
@@ -214,6 +228,8 @@ function Forum() {
     category: 'General',
     content: ''
   })
+  const [forumNewPostImage, setForumNewPostImage] = useState(null)
+  const forumNewPostFileInputRef = useRef(null)
 
   // Selected Thread Detail Modal State
   const [selectedThread, setSelectedThread] = useState(null)
@@ -222,6 +238,100 @@ function Forum() {
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [replyingToComment, setReplyingToComment] = useState(null)
   const [highlightedCommentId, setHighlightedCommentId] = useState(null)
+  const [forumReplyImage, setForumReplyImage] = useState(null)
+  const forumReplyFileInputRef = useRef(null)
+
+  const handleForumNewPostImageSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select a valid image file.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => setForumNewPostImage(reader.result)
+    reader.readAsDataURL(file)
+  }
+
+  const handleForumReplyImageSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select a valid image file.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => setForumReplyImage(reader.result)
+    reader.readAsDataURL(file)
+  }
+
+  // Active Rich Text formatting states for editor (Bold, Italic, Quote, Code, Link)
+  const [activeFormats, setActiveFormats] = useState({
+    bold: false,
+    italic: false,
+    quote: false,
+    code: false,
+    link: false
+  })
+
+  const updateActiveFormats = useCallback(() => {
+    try {
+      const isBold = document.queryCommandState('bold')
+      const isItalic = document.queryCommandState('italic')
+      setActiveFormats(prev => ({
+        ...prev,
+        bold: !!isBold,
+        italic: !!isItalic
+      }))
+    } catch {
+      // fallback
+    }
+  }, [])
+
+  const handleInsertFormat = (formatType) => {
+    const editor = replyInputRef.current
+    if (!editor) return
+
+    editor.focus()
+
+    if (formatType === 'bold') {
+      document.execCommand('bold', false, null)
+      setActiveFormats(prev => ({ ...prev, bold: !prev.bold }))
+    } else if (formatType === 'italic') {
+      document.execCommand('italic', false, null)
+      setActiveFormats(prev => ({ ...prev, italic: !prev.italic }))
+    } else if (formatType === 'quote') {
+      const selection = window.getSelection()
+      if (selection && selection.toString()) {
+        document.execCommand('formatBlock', false, 'blockquote')
+        setActiveFormats(prev => ({ ...prev, quote: true }))
+      } else {
+        document.execCommand('insertHTML', false, '<blockquote>Quote</blockquote>')
+        setActiveFormats(prev => ({ ...prev, quote: !prev.quote }))
+      }
+    } else if (formatType === 'code') {
+      const selection = window.getSelection()
+      if (selection && selection.toString()) {
+        const range = selection.getRangeAt(0)
+        const codeNode = document.createElement('code')
+        codeNode.textContent = selection.toString()
+        range.deleteContents()
+        range.insertNode(codeNode)
+        setActiveFormats(prev => ({ ...prev, code: true }))
+      } else {
+        document.execCommand('insertHTML', false, '<code>code</code>')
+        setActiveFormats(prev => ({ ...prev, code: !prev.code }))
+      }
+    } else if (formatType === 'link') {
+      const url = prompt('Enter link URL (e.g. https://example.com):', 'https://')
+      if (url && url !== 'https://') {
+        document.execCommand('createLink', false, url)
+        setActiveFormats(prev => ({ ...prev, link: true }))
+      }
+    }
+
+    updateActiveFormats()
+  }
 
   // Report Modal State
   const [showReportModal, setShowReportModal] = useState(false)
@@ -477,14 +587,20 @@ function Forum() {
       const auth = getAuth()
       const authorName = auth?.user?.fullName || auth?.user?.username || 'Guest User'
 
+      let finalContent = newPostForm.content.trim()
+      if (forumNewPostImage) {
+        finalContent += `\n\n![Attached Image](${forumNewPostImage})`
+      }
+
       await createForumThreadApi({
         title: newPostForm.title.trim(),
         category: newPostForm.category,
-        content: newPostForm.content.trim(),
+        content: finalContent,
         author: authorName
       })
       toast.success('Thread published successfully!')
       setShowNewPostModal(false)
+      setForumNewPostImage(null)
       setNewPostForm({
         title: '',
         category: 'General',
@@ -608,16 +724,20 @@ function Forum() {
     if (submitting) return
     const editor = replyInputRef.current
     const htmlContent = editor ? editor.innerHTML : ''
-    const textContent = editor ? editor.textContent.trim() : ''
-    if (!textContent) {
-      toast.warn('Please enter your reply.')
+    if (!textContent && !forumReplyImage) {
+      toast.warn('Please enter your reply or attach an image.')
       return
     }
     try {
       setSubmitting(true)
       const nextRepliesCount = (selectedThread.replies || 0) + 1
+      let finalCommentHtml = sanitizeHtml(htmlContent)
+      if (forumReplyImage) {
+        finalCommentHtml += `<br/><br/><img src="${forumReplyImage}" alt="Attached Image" style="max-width:100%; max-height:350px; border-radius:10px; border:1px solid rgba(255,255,255,0.1);" />`
+      }
+
       const created = await createForumCommentApi(selectedThread.id, {
-        content: sanitizeHtml(htmlContent),
+        content: finalCommentHtml,
         parentId: replyingToComment?.id || null
       })
       const newReply = normalizeForumComment(created)
@@ -625,6 +745,8 @@ function Forum() {
       setThreadComments(prev => [...prev, newReply])
       if (editor) editor.innerHTML = ''
       setReplyingToComment(null)
+      setForumReplyImage(null)
+      if (forumReplyFileInputRef.current) forumReplyFileInputRef.current.value = ''
 
       setThreads(prev => prev.map(t => t.id === selectedThread.id ? { ...t, replies: nextRepliesCount } : t))
       setSelectedThread(prev => ({ ...prev, replies: nextRepliesCount }))
@@ -741,44 +863,6 @@ function Forum() {
       } finally {
         setSubmitting(false)
       }
-    }
-  }
-
-  // WYSIWYG formatting — uses execCommand for visual rich text editing
-  const handleInsertFormat = (formatType) => {
-    const editor = replyInputRef.current
-    if (!editor) return
-    editor.focus()
-    switch (formatType) {
-      case 'bold':
-        document.execCommand('bold', false, null)
-        break
-      case 'italic':
-        document.execCommand('italic', false, null)
-        break
-      case 'quote': {
-        const sel = window.getSelection()
-        const selectedText = sel.toString() || 'quoted text'
-        document.execCommand('insertHTML', false, `<blockquote class="forum-blockquote">${selectedText}</blockquote>`)
-        break
-      }
-      case 'code': {
-        const sel2 = window.getSelection()
-        const codeText = sel2.toString() || 'code'
-        document.execCommand('insertHTML', false, `<code class="forum-inline-code">${codeText}</code>`)
-        break
-      }
-      case 'link': {
-        const url = prompt('Enter URL:', 'https://')
-        if (url) {
-          const sel3 = window.getSelection()
-          const linkLabel = sel3.toString() || url
-          document.execCommand('insertHTML', false, `<a href="${url}" target="_blank" rel="noopener noreferrer" class="forum-inline-link">${linkLabel}</a>`)
-        }
-        break
-      }
-      default:
-        return
     }
   }
 
@@ -1162,21 +1246,107 @@ function Forum() {
                               className="forum-editor-box-stv" 
                               contentEditable
                               data-placeholder="Write a reply..."
+                              onKeyUp={updateActiveFormats}
+                              onMouseUp={updateActiveFormats}
+                              onSelect={updateActiveFormats}
                               style={{ minHeight: '80px', outline: 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                            />
+                            {/* Reply Attached Image Preview */}
+                            {forumReplyImage && (
+                              <div style={{ position: 'relative', margin: '10px 12px 4px', display: 'inline-block' }}>
+                                <img
+                                  src={forumReplyImage}
+                                  alt="Reply Attachment Preview"
+                                  style={{ maxHeight: '120px', borderRadius: '8px', border: '1px solid rgba(168, 85, 247, 0.3)' }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setForumReplyImage(null)
+                                    if (forumReplyFileInputRef.current) forumReplyFileInputRef.current.value = ''
+                                  }}
+                                  style={{
+                                    position: 'absolute',
+                                    top: '4px',
+                                    right: '4px',
+                                    background: 'rgba(0, 0, 0, 0.75)',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '50%',
+                                    width: '20px',
+                                    height: '20px',
+                                    cursor: 'pointer',
+                                    fontSize: '10px',
+                                  }}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            )}
+
+                            <input
+                              type="file"
+                              ref={forumReplyFileInputRef}
+                              accept="image/*"
+                              style={{ display: 'none' }}
+                              onChange={handleForumReplyImageSelect}
                             />
                             
                             {/* Formatting Toolbar */}
                             <div className="forum-editor-toolbar-stv">
-                              <button className="forum-toolbar-btn-stv" title="Bold" onClick={() => handleInsertFormat('bold')}>B</button>
-                              <button className="forum-toolbar-btn-stv" title="Italic" onClick={() => handleInsertFormat('italic')}>I</button>
-                              <button className="forum-toolbar-btn-stv" title="Quote" onClick={() => handleInsertFormat('quote')}>”</button>
-                              <button className="forum-toolbar-btn-stv" title="Code" onClick={() => handleInsertFormat('code')}>&lt;/&gt;</button>
-                              <button className="forum-toolbar-btn-stv" title="Link" onClick={() => handleInsertFormat('link')}>🔗</button>
+                              <button 
+                                type="button"
+                                className={`forum-toolbar-btn-stv ${activeFormats.bold ? 'active' : ''}`} 
+                                title="Bold (Ctrl+B)" 
+                                onClick={() => handleInsertFormat('bold')}
+                              >
+                                B
+                              </button>
+                              <button 
+                                type="button"
+                                className={`forum-toolbar-btn-stv ${activeFormats.italic ? 'active' : ''}`} 
+                                title="Italic (Ctrl+I)" 
+                                onClick={() => handleInsertFormat('italic')}
+                              >
+                                I
+                              </button>
+                              <button 
+                                type="button"
+                                className={`forum-toolbar-btn-stv ${activeFormats.quote ? 'active' : ''}`} 
+                                title="Quote Block" 
+                                onClick={() => handleInsertFormat('quote')}
+                              >
+                                ”
+                              </button>
+                              <button 
+                                type="button"
+                                className={`forum-toolbar-btn-stv ${activeFormats.code ? 'active' : ''}`} 
+                                title="Code Block" 
+                                onClick={() => handleInsertFormat('code')}
+                              >
+                                &lt;/&gt;
+                              </button>
+                              <button 
+                                type="button"
+                                className={`forum-toolbar-btn-stv ${activeFormats.link ? 'active' : ''}`} 
+                                title="Insert Link" 
+                                onClick={() => handleInsertFormat('link')}
+                              >
+                                🔗
+                              </button>
+                              <button
+                                type="button"
+                                className="forum-toolbar-btn-stv"
+                                title="Attach Image"
+                                onClick={() => forumReplyFileInputRef.current?.click()}
+                              >
+                                📷
+                              </button>
                               <button 
                                 className="mod-btn approve" 
                                 onClick={handlePostReply}
                                 disabled={submitting}
-                                style={{ marginLeft: 'auto', padding: '6px 12px', fontSize: '12px', height: '28px', minHeight: '28px', opacity: submitting ? 0.7 : 1 }}
+                                style={{ marginLeft: 'auto', padding: '6px 14px', fontSize: '12px', height: '28px', minHeight: '28px', opacity: submitting ? 0.7 : 1 }}
                               >
                                 {submitting ? 'Posting...' : 'Reply'}
                               </button>
@@ -1297,18 +1467,24 @@ function Forum() {
                         </div>
                       )}
 
-                      {/* progression tracker */}
+                      {/* Discussion Status & Activity */}
                       <div className="forum-progress-tracker">
-                        <div className="forum-progress-title">Post Count</div>
-                        <div className="forum-progress-bar-stv">
-                          <div 
-                            className="forum-progress-bar-fill" 
-                            style={{ width: `${Math.min(100, (threadComments.length / 10) * 100)}%` }} 
-                          />
+                        <div className="forum-progress-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>Discussion Activity</span>
+                          <span style={{ 
+                            fontSize: '11px', 
+                            padding: '3px 9px', 
+                            borderRadius: '12px', 
+                            background: threadComments.length >= 10 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(168, 85, 247, 0.15)', 
+                            color: threadComments.length >= 10 ? '#f87171' : '#c084fc', 
+                            fontWeight: '700' 
+                          }}>
+                            {threadComments.length >= 10 ? '🔥 Hot Topic' : threadComments.length >= 5 ? '💬 Active' : '🌱 New'}
+                          </span>
                         </div>
-                        <div className="forum-progress-label-stv">
-                          <span>{threadComments.length + 1} posts</span>
-                          <span>{threadComments.length >= 10 ? 'Hot' : 'Quiet'}</span>
+                        <div className="forum-progress-label-stv" style={{ marginTop: '8px', fontSize: '13px' }}>
+                          <span>Total Posts: <strong>{threadComments.length + 1}</strong></span>
+                          <span style={{ fontSize: '11px', color: '#64748b' }}>No Limit</span>
                         </div>
                       </div>
                     </div>
@@ -1701,6 +1877,59 @@ function Forum() {
                   onChange={(e) => setNewPostForm({ ...newPostForm, content: e.target.value })}
                 />
               </div>
+
+              {/* Image Attachment Picker & Preview */}
+              <input
+                type="file"
+                ref={forumNewPostFileInputRef}
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleForumNewPostImageSelect}
+              />
+
+              {forumNewPostImage && (
+                <div style={{ position: 'relative', marginTop: '10px', display: 'inline-block' }}>
+                  <img
+                    src={forumNewPostImage}
+                    alt="Forum Attachment Preview"
+                    style={{ maxHeight: '140px', borderRadius: '8px', border: '1px solid rgba(168, 85, 247, 0.3)' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForumNewPostImage(null)
+                      if (forumNewPostFileInputRef.current) forumNewPostFileInputRef.current.value = ''
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: '4px',
+                      right: '4px',
+                      background: 'rgba(0, 0, 0, 0.75)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '22px',
+                      height: '22px',
+                      cursor: 'pointer',
+                      fontSize: '11px',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              <div style={{ marginTop: '10px' }}>
+                <button
+                  type="button"
+                  className="mod-btn"
+                  onClick={() => forumNewPostFileInputRef.current?.click()}
+                  style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '6px 12px', fontSize: '12px' }}
+                >
+                  📷 Attach Image
+                </button>
+              </div>
+
               {/* Buttons */}
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
                 <button 

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import AdminLayout from '../../components/layout/AdminLayout'
 import { sendBroadcastApi, getBroadcastHistoryApi, revokeBroadcastApi } from '../../services/api/BroadcastApi'
+import { AnimatedButton } from '../../components/common/AnimatedButton'
+import { exportToCsv } from '../../utils/exportToCsv'
 import '../../assets/style/admin/broadcast.css'
 
 // Fallback mock data when API is not available
@@ -205,8 +207,23 @@ function BroadcastManagement() {
     return `broadcast-type-badge ${(type || '').toLowerCase()}`
   }
 
+  const handleExportHistory = () => {
+    const headers = ['Broadcast ID', 'Type', 'Title', 'Message', 'Target Roles', 'Recipient Count', 'Sent At']
+    const rows = history.map(h => [
+      h.id,
+      h.type,
+      h.title,
+      h.message,
+      h.targetRoles,
+      h.recipientCount,
+      h.sentAt
+    ])
+    exportToCsv('ComiVerse_Broadcast_History', headers, rows)
+  }
+
   return (
-    <AdminLayout activeNav="broadcast">
+    <AdminLayout activeNav="broadcast-management">
+      <div className="broadcast-management-screen">
       {/* Inline Alert */}
       {alert && (
         <div className={`admin-inline-alert admin-inline-alert--${alert.type}`}>
@@ -227,6 +244,14 @@ function BroadcastManagement() {
           <h1>Broadcast Announcement</h1>
           <p>Send system-wide notifications to selected user roles.</p>
         </div>
+        <AnimatedButton
+          variant={3}
+          label="📥 Export History"
+          tooltip="Export CSV"
+          className="btn-excel"
+          onClick={handleExportHistory}
+          disabled={history.length === 0}
+        />
       </div>
 
       {/* Compose Card */}
@@ -490,6 +515,7 @@ function BroadcastManagement() {
           </div>
         </div>
       )}
+      </div>
     </AdminLayout>
   )
 }

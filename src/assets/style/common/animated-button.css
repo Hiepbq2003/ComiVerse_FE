@@ -286,6 +286,22 @@
     overflow: visible;
 }
 
+/* ── EXCEL EMERALD GREEN THEME MODIFIER ──────────────────────── */
+.animated-btn-container.excel .btn,
+.animated-btn-container .btn.btn-excel,
+.btn-excel {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3) !important;
+    color: #ffffff !important;
+}
+
+.animated-btn-container.excel .btn:hover,
+.animated-btn-container .btn.btn-excel:hover,
+.btn-excel:hover {
+    background: linear-gradient(135deg, #34d399 0%, #10b981 100%) !important;
+    box-shadow: 0 6px 24px rgba(16, 185, 129, 0.45) !important;
+}
+
 .animated-btn-container .btn--icon-swap::before {
     content: attr(data-tooltip);
     position: absolute;

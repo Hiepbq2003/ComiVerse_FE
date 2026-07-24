@@ -144,7 +144,6 @@ function AuthorDashboard() {
     { label: 'Followers', value: formatCompactNumber(summary.totalFollowers), change: 'Readers who saved your comics', trend: 'up', icon: 'users', color: 'pink' },
     { label: 'Avg. Rating', value: formatRating(summary.averageRating), change: `${formatFullNumber(summary.totalRatings)} ratings`, trend: 'neutral', icon: 'star', color: 'cyan' },
     { label: 'Pending Reviews', value: formatFullNumber(summary.pendingReviews), change: 'Comic and chapter review queue', trend: 'warning', icon: 'review', color: 'red' },
-    { label: 'Approved Rate', value: formatPercent(summary.approvedRate), change: 'Approved among decided reviews', trend: 'up', icon: 'check', color: 'green' },
   ], [summary])
 
   const lineChart = useMemo(() => {
@@ -217,8 +216,12 @@ function AuthorDashboard() {
           <p>Creative performance overview · {generatedLabel}</p>
         </div>
         <div className="author-dashboard-actions">
-          <button className="author-secondary-btn" onClick={() => navigate('/author/comics')}>My Comics</button>
-          <button className="author-primary-btn" onClick={() => navigate('/author/comics')}>+ Create Comic</button>
+          <button className="author-secondary-btn" onClick={() => navigate('/author/comics')}>
+            📖 My Comics
+          </button>
+          <button className="author-primary-btn" onClick={() => navigate('/author/comics')}>
+            ✨ + Create Comic
+          </button>
         </div>
       </div>
 

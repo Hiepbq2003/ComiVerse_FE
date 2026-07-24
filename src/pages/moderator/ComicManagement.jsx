@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import '../../assets/style/moderator/comic-management.css'
 import ModernButton from '../../components/common/ModernButton'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
@@ -9,6 +10,8 @@ import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getChaptersByComicIdApi, deleteChapterApi } from '../../services/api/ChapterApi'
 
 function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, handleArchiveComic, handleTriggerAssignTeam, fetchAllData }) {
+  const navigate = useNavigate()
+
   // Search & Filters local states
   const [comicSearch, setComicSearch] = useState('')
   const [comicStatusFilter, setComicStatusFilter] = useState('All Status')
@@ -29,6 +32,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
     title: '',
     author: '',
     publicationStatus: 'ONGOING',
+    language: '',
     genres: ''
   })
 
@@ -37,7 +41,6 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   const [showTransReqModal, setShowTransReqModal] = useState(false)
   const [transReqComic, setTransReqComic] = useState(null)
   const [transReqForm, setTransReqForm] = useState({
-    sourceLang: 'Japanese',
     targetLanguages: [],
     priority: 'Medium',
     deadline: '',
@@ -59,20 +62,8 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   const [chaptersList, setChaptersList] = useState([])
   const [chaptersLoading, setChaptersLoading] = useState(false)
 
-  const openChaptersModal = async (comic) => {
-    setChaptersComic(comic)
-    setChaptersList([])
-    setChaptersLoading(true)
-    setShowChaptersModal(true)
-    try {
-      const response = await getChaptersByComicIdApi(comic.id)
-      const data = response?.data?.data || response?.data || response || []
-      setChaptersList(Array.isArray(data) ? data : [])
-    } catch (err) {
-      toast.error('Failed to load chapters.')
-    } finally {
-      setChaptersLoading(false)
-    }
+  const openChaptersModal = (comic) => {
+    navigate(`/moderator/comic/${comic.id}`)
   }
 
   const handleDeleteChapter = async (chapterId) => {
@@ -101,7 +92,6 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   const openTranslationRequestModal = (comic) => {
     setTransReqComic(comic)
     setTransReqForm({
-      sourceLang: 'Japanese',
       targetLanguages: [],
       priority: 'Medium',
       deadline: '',
@@ -120,15 +110,17 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   }
 
   const handleSubmitTranslationRequest = async () => {
-    if (!transReqComic || transReqForm.targetLanguages.length === 0) {
+    if (!transReqComic?.language || transReqComic.language === 'Unknown') {
+      toast.warn('Configure the comic original language before requesting translation.')
+      return
+    }
+    if (transReqForm.targetLanguages.length === 0) {
       toast.warn('Please select at least one target language.')
       return
     }
     try {
       await createTranslationRequestApi({
         comicId: transReqComic.id,
-        comicTitle: transReqComic.title,
-        sourceLang: transReqForm.sourceLang,
         targetLanguages: transReqForm.targetLanguages,
         priority: transReqForm.priority,
         deadline: transReqForm.deadline || null,
@@ -163,6 +155,10 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   }
 
   const handleSubmitDirectAssignment = async () => {
+    if (!directAssignComic?.language || directAssignComic.language === 'Unknown') {
+      toast.warn('Configure the comic original language before assigning a translation team.')
+      return
+    }
     if (!directAssignForm.targetLang) {
       toast.warn('Please select a target language.')
       return
@@ -180,6 +176,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
       await updateProjectTeamApi(selectedTeamId, {
         ...selectedTeamObj,
         comicName: directAssignComic.title,
+        sourceLang: directAssignComic.language,
         targetLang: directAssignForm.targetLang,
         status: 'PENDING',
         deadline: directAssignForm.deadline || 'unspecified'
@@ -205,12 +202,17 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
       title: comic.title,
       author: comic.authorName || comic.author || '',
       publicationStatus: comic.publicationStatus || 'ONGOING',
+      language: comic.language && comic.language !== 'Unknown' ? comic.language : '',
       genres: comic.genres.map(g => typeof g === 'object' && g !== null ? g.name : g).join(', ')
     })
   }
 
   const saveEditModal = () => {
     if (!editingComic) return
+    if (!editComicForm.language.trim()) {
+      toast.warn('Comic original language is required.')
+      return
+    }
     const inputGenreNames = editComicForm.genres.split(',').map(g => g.trim().toLowerCase()).filter(Boolean)
     const matchedGenreIds = (genres || [])
       .filter(g => inputGenreNames.includes((g.name || '').toLowerCase()))
@@ -218,6 +220,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
 
     const updatedData = {
       title: editComicForm.title.trim(),
+      language: editComicForm.language.trim(),
       publicationStatus: editComicForm.publicationStatus?.toUpperCase(),
       genreIds: matchedGenreIds
     }
@@ -454,7 +457,14 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                         )}
                       </div>
                       <div className="comic-cell-details">
-                        <span className="comic-cell-title">{comic.title}</span>
+                        <span 
+                          className="comic-cell-title" 
+                          style={{ cursor: 'pointer' }} 
+                          onClick={() => navigate(`/moderator/comic/${comic.id}`)}
+                          title="Click to view comic details & chapters"
+                        >
+                          {comic.title}
+                        </span>
                         <div className="comic-cell-genres">
                           {comic.genres.map((g, idx) => (
                             <span key={idx} className="comic-genre-tag">
@@ -556,6 +566,21 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               </div>
 
               <div className="mod-form-row">
+                <div className="mod-form-group">
+                  <label className="mod-label">Original Language</label>
+                  <select
+                    className="mod-select-field"
+                    value={editComicForm.language}
+                    onChange={(e) => setEditComicForm({ ...editComicForm, language: e.target.value })}
+                    required
+                  >
+                    <option value="" disabled>Select original language</option>
+                    {AVAILABLE_LANGUAGES.map((language) => (
+                      <option key={language} value={language}>{language}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="mod-form-group">
                   <label className="mod-label">Status</label>
                   <select 
@@ -677,18 +702,10 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                 <div className="trans-req-comic-name">{transReqComic.title}</div>
               </div>
 
-              {/* Source Language */}
+              {/* Source language belongs to Comic and is read-only in this request. */}
               <div className="mod-form-group">
                 <label className="mod-label">Source Language</label>
-                <select 
-                  className="mod-select-field"
-                  value={transReqForm.sourceLang}
-                  onChange={(e) => setTransReqForm({ ...transReqForm, sourceLang: e.target.value })}
-                >
-                  {AVAILABLE_LANGUAGES.map(lang => (
-                    <option key={lang} value={lang}>{lang}</option>
-                  ))}
-                </select>
+                <div className="trans-req-comic-name">{transReqComic.language || 'Not configured'}</div>
               </div>
 
               {/* Target Languages - Checkbox Grid */}
@@ -696,7 +713,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                 <label className="mod-label">Target Languages <span style={{ fontSize: '11px', color: 'var(--mod-text-secondary)' }}>(select one or more)</span></label>
                 <div className="lang-checkbox-grid">
                   {AVAILABLE_LANGUAGES
-                    .filter(lang => lang !== transReqForm.sourceLang)
+                    .filter(lang => lang.toLowerCase() !== (transReqComic.language || '').toLowerCase())
                     .filter(lang => {
                       const existing = projectTeams
                         ? projectTeams.filter(t => t.comicName && transReqComic && t.comicName.toLowerCase() === transReqComic.title.toLowerCase())

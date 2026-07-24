@@ -6,6 +6,7 @@ import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { getComicsPageApi } from '../../services/api/ComicApi'
+import ChatWidget from '../chat/ChatWidget'
 
 function HomeLayout({ children }) {
   const navigate = useNavigate()
@@ -560,6 +561,9 @@ function HomeLayout({ children }) {
           </div>
         </div>
       )}
+
+      {/* FLOATING CHAT WIDGET */}
+      {isLoggedIn && <ChatWidget />}
 
       {/* FOOTER */}
       <footer className="home-footer">

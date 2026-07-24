@@ -1,54 +1,140 @@
-import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
-import Login from '../../../pages/common/Login'
+import React from 'react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import Login from '../../../pages/common/Login';
+import { AuthProvider } from '../../../context/AuthContext';
+import * as AuthApi from '../../../services/api/AuthApi';
 
-// Mock the AuthContext
-vi.mock('../../../context/AuthContext', () => ({
-  useAuth: () => ({
-    login: vi.fn(),
-  }),
-}))
-
-// Mock the API calls
 vi.mock('../../../services/api/AuthApi', () => ({
   loginApi: vi.fn(),
-  getMeApi: vi.fn(),
-}))
+  getMeApi: vi.fn()
+}));
 
-describe('Login Component Unit Tests', () => {
-  it('renders username and password fields and sign in button', () => {
-    render(
-      <Login 
-        onNavigate={vi.fn()}
-        onVerificationRequired={vi.fn()}
-        onLoginSuccess={vi.fn()}
-        showAlert={vi.fn()}
-        loading={false}
-        setLoading={vi.fn()}
-      />
-    )
+describe('Login Component Unit & Security Tests (Login.test.jsx)', () => {
+  const mockOnNavigate = vi.fn();
+  const mockOnVerificationRequired = vi.fn();
+  const mockOnLoginSuccess = vi.fn();
+  const mockShowAlert = vi.fn();
+  const mockSetLoading = vi.fn();
 
-    expect(screen.getByPlaceholderText('Enter username or email')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('Enter password')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Sign In/i })).toBeInTheDocument()
-  })
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
 
-  it('displays validation errors if username or password is not provided', async () => {
-    render(
-      <Login 
-        onNavigate={vi.fn()}
-        onVerificationRequired={vi.fn()}
-        onLoginSuccess={vi.fn()}
-        showAlert={vi.fn()}
-        loading={false}
-        setLoading={vi.fn()}
-      />
-    )
+  const renderLogin = () => {
+    return render(
+      <AuthProvider>
+        <Login
+          onNavigate={mockOnNavigate}
+          onVerificationRequired={mockOnVerificationRequired}
+          onLoginSuccess={mockOnLoginSuccess}
+          showAlert={mockShowAlert}
+          loading={false}
+          setLoading={mockSetLoading}
+        />
+      </AuthProvider>
+    );
+  };
 
-    const signInButton = screen.getByRole('button', { name: /Sign In/i })
-    fireEvent.click(signInButton)
+  it('should render username and password input fields and sign in button', () => {
+    renderLogin();
 
-    expect(await screen.findByText('Email or username is required.')).toBeInTheDocument()
-    expect(await screen.findByText('Password is required.')).toBeInTheDocument()
-  })
-})
+    expect(screen.getByPlaceholderText(/enter username or email/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/enter password/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
+  });
+
+  it('should display validation error messages when submitting empty form fields', async () => {
+    renderLogin();
+
+    const submitBtn = screen.getByRole('button', { name: /sign in/i });
+    fireEvent.click(submitBtn);
+
+    expect(screen.getByText('Email or username is required.')).toBeInTheDocument();
+    expect(screen.getByText('Password is required.')).toBeInTheDocument();
+    expect(AuthApi.loginApi).not.toHaveBeenCalled();
+  });
+
+  it('should execute successful login flow, save authentication tokens, fetch profile, and trigger onLoginSuccess', async () => {
+    const mockToken = 'mock-jwt-token-12345';
+    const mockRefreshToken = 'mock-refresh-token-67890';
+    const mockUserPayload = {
+      userId: 'uuid-user-123',
+      username: 'hiep_user',
+      fullName: 'Hiệp Nguyễn',
+      email: 'hiep@example.com',
+      role: 'READER',
+      avatarUrl: 'http://example.com/avatar.png'
+    };
+
+    AuthApi.loginApi.mockResolvedValueOnce({
+      data: { token: mockToken, refreshToken: mockRefreshToken }
+    });
+
+    AuthApi.getMeApi.mockResolvedValueOnce({
+      data: mockUserPayload
+    });
+
+    renderLogin();
+
+    fireEvent.change(screen.getByPlaceholderText(/enter username or email/i), {
+      target: { value: 'hiep_user' }
+    });
+    fireEvent.change(screen.getByPlaceholderText(/enter password/i), {
+      target: { value: 'Password123!' }
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(AuthApi.loginApi).toHaveBeenCalledWith('hiep_user', 'Password123!');
+      expect(AuthApi.getMeApi).toHaveBeenCalled();
+      expect(mockOnLoginSuccess).toHaveBeenCalledWith(mockUserPayload);
+      expect(mockShowAlert).toHaveBeenCalledWith('success', 'Welcome back to ComiVerse!');
+    });
+  });
+
+  it('should handle invalid login credentials (HTTP 401 error response)', async () => {
+    AuthApi.loginApi.mockRejectedValueOnce({
+      response: { status: 401, data: { message: 'Invalid username or password.' } }
+    });
+
+    renderLogin();
+
+    fireEvent.change(screen.getByPlaceholderText(/enter username or email/i), {
+      target: { value: 'wrong_user' }
+    });
+    fireEvent.change(screen.getByPlaceholderText(/enter password/i), {
+      target: { value: 'WrongPassword' }
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Invalid username/email or password.')).toBeInTheDocument();
+    });
+  });
+
+  it('should handle email verification required error (HTTP 403 error response)', async () => {
+    AuthApi.loginApi.mockRejectedValueOnce({
+      response: { status: 403, data: { message: 'Please verify your email before logging in.' } }
+    });
+
+    renderLogin();
+
+    fireEvent.change(screen.getByPlaceholderText(/enter username or email/i), {
+      target: { value: 'unverified@example.com' }
+    });
+    fireEvent.change(screen.getByPlaceholderText(/enter password/i), {
+      target: { value: 'Password123!' }
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(mockOnVerificationRequired).toHaveBeenCalledWith('unverified@example.com');
+      expect(mockShowAlert).toHaveBeenCalledWith('error', 'Please verify your email before logging in.');
+    });
+  });
+});

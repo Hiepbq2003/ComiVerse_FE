@@ -70,7 +70,24 @@ function ProjectList() {
       return isDevLeader && isDevUser;
     };
 
-    return !isLeaderMatch(p.leaderName);
+    if (isLeaderMatch(p.leaderName)) return false;
+
+    // Do not show projects where current user is ALREADY an approved member
+    const localApprovedKey = `comiverse_approved_members_${p.id}`;
+    let savedMems = [];
+    try {
+      savedMems = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
+    } catch (e) {}
+
+    const currentUserName = (userFullName || '').toLowerCase().trim();
+    const currentUsername = (authUser?.username || '').toLowerCase().trim();
+
+    const isAlreadyMember = savedMems.some(m => {
+      const mn = (m.name || '').toLowerCase().trim();
+      return mn === currentUserName || mn === currentUsername;
+    });
+
+    return !isAlreadyMember;
   });
 
   const handleApplyClick = (project) => {
@@ -84,13 +101,9 @@ function ProjectList() {
   const handleCvFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const allowedTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    ];
-    if (!allowedTypes.includes(file.type)) {
-      toast.warn('Only PDF, DOC, DOCX files are accepted.');
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      toast.warn('🚫 Invalid file format! Only PDF documents (.pdf) are accepted for CV uploads.');
       e.target.value = '';
       return;
     }
@@ -197,8 +210,16 @@ function ProjectList() {
       <div className="available-projects-grid">
         {filteredProjects.map((project) => {
           const alreadyApplied = appliedIds.includes(project.id);
-          const recruitedCount = Math.max(0, (project.membersCount || 1) - 1);
-          const limit = project.maxMembers || 5;
+          
+          const localApprovedKey = `comiverse_approved_members_${project.id}`;
+          let savedCount = 0;
+          try {
+            const saved = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
+            savedCount = saved.length;
+          } catch (e) { /* ignore */ }
+
+          const recruitedCount = savedCount;
+          const limit = Number(project.maxMembers) || 5;
           const spotsLeft = Math.max(0, limit - recruitedCount);
           const progressPercent = Math.min(100, Math.round((recruitedCount / limit) * 100));
 
@@ -364,7 +385,7 @@ function ProjectList() {
               {/* CV / Resume Upload */}
               <div className="trans-form-group">
                 <label className="trans-form-label" style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>
-                  Attach CV / Resume <span style={{ color: '#64748b', fontWeight: '400' }}>(optional — PDF, DOC, DOCX, max 5MB)</span>
+                  Attach CV / Resume <span style={{ color: '#c084fc', fontWeight: '500' }}>(PDF format strictly required — max 5MB)</span>
                 </label>
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: '12px',
@@ -401,14 +422,14 @@ function ProjectList() {
                         >✕ Remove</button>
                       </div>
                     ) : (
-                      <span style={{ color: '#64748b', fontSize: '13px' }}>Click to browse or drag a file here</span>
+                      <span style={{ color: '#64748b', fontSize: '13px' }}>Click to select a PDF file (.pdf)</span>
                     )}
                   </div>
                 </div>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".pdf,.doc,.docx"
+                  accept="application/pdf,.pdf"
                   style={{ display: 'none' }}
                   onChange={handleCvFileChange}
                 />

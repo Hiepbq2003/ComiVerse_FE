@@ -28,11 +28,17 @@ export function NotificationProvider({ children }) {
         const countRes = await getUnreadCountApi()
         setUnreadCount(Number(countRes?.data ?? countRes ?? 0))
       } catch (countError) {
-        console.error('Failed to load unread notification count:', countError)
+        const status = countError?.response?.status
+        if (status !== 401 && status !== 502 && status !== 504 && countError?.code !== 'ECONNABORTED') {
+          console.warn('Failed to load unread notification count:', countError?.message)
+        }
         setUnreadCount(nextNotifications.filter(notification => !notification.isRead).length)
       }
     } catch (err) {
-      console.error('Failed to load notifications:', err)
+      const status = err?.response?.status
+      if (status !== 401 && status !== 502 && status !== 504 && err?.code !== 'ECONNABORTED') {
+        console.warn('Failed to load notifications:', err?.message)
+      }
     } finally {
       setLoading(false)
     }
@@ -61,7 +67,7 @@ export function NotificationProvider({ children }) {
   useEffect(() => {
     if (isLoggedIn) {
       loadNotifications()
-      const pollInterval = window.setInterval(loadNotifications, 10000)
+      const pollInterval = window.setInterval(loadNotifications, 30000)
       const handleRefresh = () => loadNotifications()
       const handleVisibilityChange = () => {
         if (document.visibilityState === 'visible') loadNotifications()
