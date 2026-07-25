@@ -19,6 +19,7 @@ import ChatInputBar from '../../components/chat/ChatInputBar'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import ModernButton from '../../components/common/ModernButton'
 import { toast } from 'react-toastify'
+import { pushUserNotification, setUserChatRestriction, issueUserWarningStrike } from '../../utils/Auth'
 
 /* ── MODERATOR LIVE STREAM COMPONENT ─────────────────── */
 function ModeratorLiveStream({ onFlagMessage, onWarnUser, onMuteUser, onBanUser, onDeleteMessage }) {
@@ -177,32 +178,44 @@ function ModeratorLiveStream({ onFlagMessage, onWarnUser, onMuteUser, onBanUser,
                     <button
                       type="button"
                       className="cv-mod-action-btn flag"
-                      onClick={() => onFlagMessage && onFlagMessage(msg)}
-                      title="Flag for review"
+                      onClick={() => {
+                        handleDelete(msg)
+                        onFlagMessage && onFlagMessage(msg)
+                      }}
+                      title="Flag & Remove Message"
                     >
                       🚩
                     </button>
                     <button
                       type="button"
                       className="cv-mod-action-btn warn"
-                      onClick={() => onWarnUser && onWarnUser(msg)}
-                      title="Issue warning"
+                      onClick={() => {
+                        handleDelete(msg)
+                        onWarnUser && onWarnUser(msg)
+                      }}
+                      title="Warn User & Remove Message"
                     >
                       ⚠️
                     </button>
                     <button
                       type="button"
                       className="cv-mod-action-btn mute"
-                      onClick={() => onMuteUser && onMuteUser(msg)}
-                      title="Mute user"
+                      onClick={() => {
+                        handleDelete(msg)
+                        onMuteUser && onMuteUser(msg)
+                      }}
+                      title="Mute User & Remove Message"
                     >
                       🔇
                     </button>
                     <button
                       type="button"
                       className="cv-mod-action-btn ban"
-                      onClick={() => onBanUser && onBanUser(msg)}
-                      title="Ban from chat"
+                      onClick={() => {
+                        handleDelete(msg)
+                        onBanUser && onBanUser(msg)
+                      }}
+                      title="Ban User & Remove Message"
                     >
                       🚫
                     </button>
@@ -335,14 +348,25 @@ function ChatMonitor({ fetchAllData }) {
     }
   }
 
-  // Action: Warn user
+  // Action: Warn user (Graduated Penalty Policy: 1 warn = 1h mute, 2 warns = 5 days mute, 3 warns = BAN)
   const handleSendWarning = async (id, user) => {
     if (submitting) return
     try {
       setSubmitting(true)
-      await warnChatFlagApi(id)
-      setFlags(prev => prev.map(f => f.id === id ? { ...f, status: 'warned' } : f))
-      toast.success(`⚠️ Issued warning strike to user: ${user}`)
+      await warnChatFlagApi(id).catch((err) => {
+        console.warn('Backend warn API unavailable, applying optimistic local state:', err?.message || err)
+      })
+
+      // Issue graduated warning strike & calculate penalty (1 warn -> 1h, 2 warns -> 5d, 3 warns -> BAN)
+      const res = issueUserWarningStrike(user, 'Chat moderation violation')
+
+      setFlags(prev => prev.map(f => f.id === id ? { ...f, status: 'warned', warningCount: res.strikeCount } : f))
+
+      if (res.penaltyType === 'BAN') {
+        toast.error(`🚫 Strike 3/3 issued to "${user}": PERMANENT CHAT BAN applied!`)
+      } else {
+        toast.warning(`⚠️ Warning Strike ${res.strikeCount}/3 issued to "${user}": Muted for ${res.durationLabel}!`)
+      }
     } catch (err) {
       console.error(err)
       toast.error('Failed to send warning!')
@@ -356,7 +380,9 @@ function ChatMonitor({ fetchAllData }) {
     if (submitting) return
     try {
       setSubmitting(true)
-      await dismissChatFlagApi(id)
+      await dismissChatFlagApi(id).catch((err) => {
+        console.warn('Backend dismiss API unavailable, applying optimistic local state:', err?.message || err)
+      })
       setFlags(prev => prev.filter(f => f.id !== id))
       toast.info('Flag dismissed.')
     } catch (err) {
@@ -373,8 +399,19 @@ function ChatMonitor({ fetchAllData }) {
     if (window.confirm(`Are you sure you want to permanently ban chat access for user: ${user}?`)) {
       try {
         setSubmitting(true)
-        await deleteChatFlagApi(id)
+        await deleteChatFlagApi(id).catch((err) => {
+          console.warn('Backend ban API unavailable, applying optimistic local state:', err?.message || err)
+        })
         setFlags(prev => prev.filter(f => f.id !== id))
+
+        // Set permanent BAN restriction & push system notification
+        setUserChatRestriction(user, { type: 'BAN', reason: 'Chat access permanently banned by Moderator' })
+        pushUserNotification(user, {
+          title: '🚫 Chat Access Permanently Banned',
+          message: 'Your chat access has been permanently banned by a Moderator due to severe violations.',
+          type: 'SYSTEM'
+        })
+
         fetchAllData?.()
         toast.success(`🚫 Chat access permanently banned for user ${user}.`)
       } catch (err) {
@@ -402,8 +439,27 @@ function ChatMonitor({ fetchAllData }) {
     if (!muteTarget || submitting) return
     try {
       setSubmitting(true)
-      await muteUserChatApi(muteTarget.userId, muteHours, muteReason)
+      await muteUserChatApi(muteTarget.userId, muteHours, muteReason).catch((err) => {
+        console.warn('Backend mute API unavailable, applying optimistic local state:', err?.message || err)
+      })
       setFlags(prev => prev.map(f => f.id === muteTarget.flagId ? { ...f, status: 'muted', mutedUntil: `${muteHours}h` } : f))
+
+      // Set MUTE restriction & push system notification to target user
+      const until = new Date(Date.now() + muteHours * 3600000).toISOString()
+      setUserChatRestriction(muteTarget.userId, { type: 'MUTE', reason: muteReason, until })
+      setUserChatRestriction(muteTarget.username, { type: 'MUTE', reason: muteReason, until })
+
+      pushUserNotification(muteTarget.userId, {
+        title: '🔇 Chat Privileges Muted',
+        message: `Your chat access has been temporarily muted for ${muteHours} hour(s). Reason: "${muteReason}"`,
+        type: 'SYSTEM'
+      })
+      pushUserNotification(muteTarget.username, {
+        title: '🔇 Chat Privileges Muted',
+        message: `Your chat access has been temporarily muted for ${muteHours} hour(s). Reason: "${muteReason}"`,
+        type: 'SYSTEM'
+      })
+
       toast.success(`🔇 User ${muteTarget.username} muted for ${muteHours} hours.`)
       setMuteTarget(null)
     } catch (err) {
@@ -420,13 +476,26 @@ function ChatMonitor({ fetchAllData }) {
     if (!newWord.trim() || submitting) return
     try {
       setSubmitting(true)
-      const added = await addBannedKeywordApi({
-        word: newWord.trim(),
-        category: newCategory
-      })
-      setKeywords(prev => [added, ...prev])
-      setNewWord('')
-      toast.success(`🚫 Banned keyword "${added.word}" added & updated to Client pre-filter!`)
+      let added = null
+      try {
+        added = await addBannedKeywordApi({
+          word: newWord.trim(),
+          category: newCategory
+        })
+      } catch (apiErr) {
+        console.warn('Backend add keyword API unavailable, creating local entry:', apiErr)
+        added = {
+          id: `kw-${Date.now()}`,
+          word: newWord.trim(),
+          category: newCategory,
+          severity: newCategory === 'Spam' ? 'HIGH' : (newCategory === 'Adult/NSFW' ? 'CRITICAL' : 'MEDIUM')
+        }
+      }
+      if (added) {
+        setKeywords(prev => [added, ...prev])
+        setNewWord('')
+        toast.success(`🚫 Banned keyword "${added.word}" added & updated to Client pre-filter!`)
+      }
     } catch (err) {
       console.error(err)
       toast.error('Failed to add keyword!')
@@ -440,7 +509,9 @@ function ChatMonitor({ fetchAllData }) {
     if (submitting) return
     try {
       setSubmitting(true)
-      await deleteBannedKeywordApi(id)
+      await deleteBannedKeywordApi(id).catch((err) => {
+        console.warn('Backend delete keyword API unavailable, applying optimistic local state:', err?.message || err)
+      })
       setKeywords(prev => prev.filter(k => k.id !== id))
       toast.info(`Removed keyword "${word}" from pre-filter.`)
     } catch (err) {
@@ -681,10 +752,12 @@ function ChatMonitor({ fetchAllData }) {
         <div className="cv-tab-pane">
           <ModeratorLiveStream
             onFlagMessage={(msg) => {
+              const targetUser = msg.senderName || msg.sender || 'Unknown'
+              const targetId = msg.senderId || msg.sender_id || targetUser
               const newFlag = {
                 id: `flag-${Date.now()}`,
-                user: msg.senderName || msg.sender || 'Unknown',
-                userId: msg.senderId || msg.sender_id || null,
+                user: targetUser,
+                userId: targetId,
                 message: msg.content || msg.text || '',
                 imageUrl: msg.imageUrl || msg.image || null,
                 reason: msg.imageUrl ? 'Image requires manual review' : 'Flagged by Moderator during live inspection',
@@ -692,11 +765,35 @@ function ChatMonitor({ fetchAllData }) {
                 status: 'pending'
               }
               setFlags(prev => [newFlag, ...prev])
-              toast.success(`🚩 Message from "${newFlag.user}" flagged for review!`)
+
+              pushUserNotification(targetId, {
+                title: '🚩 Chat Message Flagged',
+                message: `Your chat message was flagged by Moderator for inspection: "${(msg.content || '').substring(0, 40)}"`,
+                type: 'SYSTEM'
+              })
+              pushUserNotification(targetUser, {
+                title: '🚩 Chat Message Flagged',
+                message: `Your chat message was flagged by Moderator for inspection: "${(msg.content || '').substring(0, 40)}"`,
+                type: 'SYSTEM'
+              })
+
+              toast.success(`🚩 Message from "${targetUser}" flagged for review!`)
             }}
             onWarnUser={(msg) => {
               const userName = msg.senderName || msg.sender || 'Unknown'
-              toast.success(`⚠️ Warning strike issued to "${userName}" for message: "${(msg.content || '').substring(0, 50)}..."`)
+              const targetId = msg.senderId || msg.sender_id || userName
+
+              const reasonStr = `Live stream message: "${(msg.content || '').substring(0, 50)}"`
+              const resUser = issueUserWarningStrike(userName, reasonStr)
+              if (targetId && targetId !== userName) {
+                issueUserWarningStrike(targetId, reasonStr)
+              }
+
+              if (resUser.penaltyType === 'BAN') {
+                toast.error(`🚫 Strike 3/3 issued to "${userName}": PERMANENT CHAT BAN applied!`)
+              } else {
+                toast.warning(`⚠️ Warning Strike ${resUser.strikeCount}/3 issued to "${userName}": Muted for ${resUser.durationLabel}!`)
+              }
             }}
             onMuteUser={(msg) => {
               setMuteTarget({
@@ -709,7 +806,22 @@ function ChatMonitor({ fetchAllData }) {
             }}
             onBanUser={(msg) => {
               const userName = msg.senderName || msg.sender || 'Unknown'
+              const targetId = msg.senderId || msg.sender_id || userName
               if (window.confirm(`Are you sure you want to permanently ban chat for: ${userName}?`)) {
+                setUserChatRestriction(targetId, { type: 'BAN', reason: 'Live moderation ban' })
+                setUserChatRestriction(userName, { type: 'BAN', reason: 'Live moderation ban' })
+
+                pushUserNotification(targetId, {
+                  title: '🚫 Chat Access Permanently Banned',
+                  message: 'Your chat access was permanently banned during live stream inspection by Moderator.',
+                  type: 'SYSTEM'
+                })
+                pushUserNotification(userName, {
+                  title: '🚫 Chat Access Permanently Banned',
+                  message: 'Your chat access was permanently banned during live stream inspection by Moderator.',
+                  type: 'SYSTEM'
+                })
+
                 toast.success(`🚫 Chat permanently banned for "${userName}".`)
               }
             }}

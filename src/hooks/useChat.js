@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import stompService from '../services/websocket/StompService';
 import { getChatMessagesApi, sendChatMessageApi } from '../services/api/ChatApi';
 import { getTeamMessagesApi, createTeamMessageApi } from '../services/api/TeamWorkspaceApi';
-import { getAuth } from '../utils/Auth';
+import { getAuth, getUserChatRestriction } from '../utils/Auth';
 import { checkBannedContent } from '../services/api/BannedKeywordApi';
 import { toast } from 'react-toastify';
 
@@ -311,6 +311,22 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
     // 5. Send Message Handler
     const sendMessage = useCallback(async (content, imageData = null) => {
         if ((!content || !content.trim()) && !imageData) return;
+
+        // Check if user has active moderation restriction (BAN or MUTE)
+        const restriction = getUserChatRestriction(currentUser);
+        if (restriction && restriction.isRestricted) {
+            if (restriction.type === 'BAN') {
+                toast.error(`🚫 Chat Access Banned: ${restriction.reason || 'Permanently banned by Moderator'}`);
+                setIsSending(false);
+                return false;
+            }
+            if (restriction.type === 'MUTE') {
+                const untilStr = new Date(restriction.until).toLocaleString();
+                toast.error(`🔇 Chat Privileges Muted until ${untilStr}: ${restriction.reason || 'Muted by Moderator'}`);
+                setIsSending(false);
+                return false;
+            }
+        }
 
         const trimmedContent = (content || '').trim();
 

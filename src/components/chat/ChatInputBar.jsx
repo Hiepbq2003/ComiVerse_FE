@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { getAuth, getUserChatRestriction } from '../../utils/Auth';
 
 const EMOJI_CATEGORIES = [
   {
@@ -95,6 +96,23 @@ function ChatInputBar({ onSendMessage, isSending, disabled }) {
 
   const canSend = (content.trim() || attachedImage) && !isSending && !disabled;
 
+  // Check active user moderation restriction (BAN or MUTE)
+  const auth = getAuth();
+  const restriction = getUserChatRestriction(auth?.user);
+  const isRestricted = !!(restriction && restriction.isRestricted);
+
+  const getPlaceholder = () => {
+    if (disabled) return 'Select group to chat...';
+    if (isRestricted) {
+      return restriction.type === 'BAN' 
+        ? '🚫 Chat access permanently banned' 
+        : `🔇 Muted until ${new Date(restriction.until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    return 'Type a message...';
+  };
+
+  const isInputDisabled = disabled || isSending || isRestricted;
+
   return (
     <div className="cv-chat-input-wrapper">
       {/* Image Preview Strip */}
@@ -123,7 +141,7 @@ function ChatInputBar({ onSendMessage, isSending, disabled }) {
             className={`cv-chat-action-btn ${showEmojiPicker ? 'active' : ''}`}
             onClick={() => setShowEmojiPicker(prev => !prev)}
             title="Emoji"
-            disabled={disabled}
+            disabled={isInputDisabled}
           >
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
@@ -174,7 +192,7 @@ function ChatInputBar({ onSendMessage, isSending, disabled }) {
           className="cv-chat-action-btn"
           onClick={() => fileInputRef.current?.click()}
           title="Attach image"
-          disabled={disabled}
+          disabled={isInputDisabled}
         >
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -196,11 +214,11 @@ function ChatInputBar({ onSendMessage, isSending, disabled }) {
           ref={inputRef}
           type="text"
           className="cv-chat-input"
-          placeholder={disabled ? 'Select group to chat...' : 'Type a message...'}
+          placeholder={getPlaceholder()}
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={disabled || isSending}
+          disabled={isInputDisabled}
         />
 
         {/* Send Button */}
