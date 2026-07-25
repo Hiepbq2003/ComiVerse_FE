@@ -218,10 +218,152 @@ function TasksTab({
   onOpenTaskDetails,
   getAssigneeInitials,
   members,
-  isCurrentLeader
+  isCurrentLeader,
+  chapterOptions = [],
+  onOpenCreateTaskWithChapter
 }) {
+  const [inspectingChapter, setInspectingChapter] = useState(null);
+
   return (
     <div className="board tasks-board-tab-container fade-in" style={{ padding: 0, background: 'transparent' }}>
+      
+      {/* ── RAW MANUSCRIPT CHAPTERS BACKLOG ──────────────── */}
+      {chapterOptions.length > 0 && (
+        <div style={{
+          padding: '16px 20px',
+          borderRadius: '12px',
+          background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(99, 102, 241, 0.08))',
+          border: '1px solid rgba(168, 85, 247, 0.25)',
+          marginBottom: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--trans-text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>📚 Approved Raw Manuscript Backlog ({chapterOptions.length} Chapters)</span>
+                <span style={{ fontSize: '11px', background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', padding: '2px 8px', borderRadius: '12px', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
+                  ✅ Approved & Ready
+                </span>
+              </h4>
+              <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--trans-text-secondary)' }}>
+                Approved raw chapter manuscripts ready for translation task creation and member assignment.
+              </p>
+            </div>
+            {isCurrentLeader && (
+              <button
+                className="trans-btn primary"
+                onClick={onCreateTaskClick}
+                style={{ padding: '8px 16px', fontSize: '12.5px' }}
+              >
+                + Create Task
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px', marginTop: '4px' }}>
+            {chapterOptions.map((ch, idx) => (
+              <div key={ch.id || idx} style={{
+                padding: '12px 14px',
+                borderRadius: '10px',
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '10px'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
+                    <strong style={{ fontSize: '13.5px', color: 'var(--trans-text-primary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {ch.title}
+                    </strong>
+                    <span style={{ fontSize: '10.5px', background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', padding: '2px 6px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
+                      {ch.pagesCount || 24} pages
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
+                    Status: Approved Raw Manuscript
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    type="button"
+                    className="trans-btn secondary"
+                    onClick={() => setInspectingChapter(ch)}
+                    style={{ flex: 1, padding: '5px 0', fontSize: '11.5px', textAlign: 'center' }}
+                  >
+                    👁️ View Chapter
+                  </button>
+                  {isCurrentLeader && (
+                    <button
+                      type="button"
+                      className="trans-btn primary"
+                      onClick={() => onOpenCreateTaskWithChapter && onOpenCreateTaskWithChapter(ch)}
+                      style={{ flex: 1, padding: '5px 0', fontSize: '11.5px', textAlign: 'center' }}
+                    >
+                      ⚡ Create Task
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Raw Chapter Manuscript Viewer Modal */}
+      {inspectingChapter && (
+        <div className="trans-modal-overlay">
+          <div className="trans-modal-card" style={{ maxWidth: '720px', width: '92%', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="trans-modal-header" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--trans-text-primary)' }}>
+                  📖 Raw Manuscript: {inspectingChapter.title}
+                </h3>
+                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+                  Inspect raw approved pages before creating translation tasks for team members.
+                </p>
+              </div>
+              <button className="trans-modal-close-btn" onClick={() => setInspectingChapter(null)}>×</button>
+            </div>
+
+            <div className="trans-modal-body" style={{ flex: 1, overflowY: 'auto', padding: '16px 0' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px' }}>
+                {Array.from({ length: inspectingChapter.pagesCount || 12 }).map((_, pIdx) => (
+                  <div key={pIdx} style={{ borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden', background: '#0f0a1d', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ width: '100%', height: '180px', background: '#1a1429', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c084fc', fontSize: '12px', fontWeight: 'bold' }}>
+                      📄 Page {pIdx + 1}
+                    </div>
+                    <div style={{ padding: '6px', textAlign: 'center', fontSize: '11px', color: '#94a3b8', background: 'rgba(255,255,255,0.02)' }}>
+                      Manuscript #{pIdx + 1}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="trans-modal-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                Total Pages: {inspectingChapter.pagesCount || 24} raw pages
+              </span>
+              <button
+                className="trans-btn primary"
+                onClick={() => {
+                  const ch = inspectingChapter;
+                  setInspectingChapter(null);
+                  if (onOpenCreateTaskWithChapter) onOpenCreateTaskWithChapter(ch);
+                }}
+              >
+                ⚡ Create Task for Chapter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="board__card">
         <div className="board__header">
           <div className="board__title">
@@ -514,7 +656,15 @@ export function CreateTaskModal({
             <select required
               className="trans-form-input"
               value={newTaskData.chapterId || ''}
-              onChange={(e) => setNewTaskData({ ...newTaskData, chapterId: e.target.value || null })}
+              onChange={(e) => {
+                const chId = e.target.value || null;
+                const foundCh = chapterOptions.find(c => String(c.id) === String(chId));
+                setNewTaskData(prev => ({
+                  ...prev,
+                  chapterId: chId,
+                  title: (!prev.title.trim() && foundCh) ? `${foundCh.title} - Translation & Proofreading` : prev.title
+                }));
+              }}
               disabled={chapterOptions.length === 0}
               style={{ color: '#111', background: '#fff', ...errorBorder('chapterId') }}
             >
@@ -523,7 +673,7 @@ export function CreateTaskModal({
               </option>
               {chapterOptions.map((ch) => (
                 <option key={ch.id} value={ch.id} style={{ color: '#111', background: '#fff' }}>
-                  {ch.title}
+                  📖 {ch.title} ({ch.pagesCount || 24} pages)
                 </option>
               ))}
             </select>

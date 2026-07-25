@@ -377,6 +377,18 @@ function WorkspaceDetailView({
             getAssigneeInitials={getAssigneeInitials}
             members={members}
             isCurrentLeader={isCurrentLeader}
+            chapterOptions={chapterOptions}
+            onOpenCreateTaskWithChapter={(ch) => {
+              setNewTaskData({
+                title: `[HIGH] ${ch.title} - Translation & Proofreading`,
+                column: 'backlog',
+                assignees: [],
+                dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
+                priority: 'High',
+                chapterId: ch.id
+              });
+              setShowCreateTask(true);
+            }}
           />
 
           {showCreateTask && (
@@ -609,7 +621,7 @@ function TeamProjects() {
     } catch (e) { /* ignore */ }
 
     try {
-      const [annList, msgList, taskList, reqList, teamMembersList] = await Promise.all([
+      const [annList, msgList, taskList, reqList, teamMembersList, teamChaptersList] = await Promise.all([
         getTeamAnnouncementsApi(project.id),
         getTeamMessagesApi(project.id),
         getTeamTasksApi(project.id),
@@ -617,8 +629,35 @@ function TeamProjects() {
         getTeamMembersApi(project.id).catch((err) => {
           console.error('Could not load real team members for assignee picker:', err)
           return []
+        }),
+        getTeamChaptersApi(project.id).catch((err) => {
+          console.error('Could not load chapters for team:', err)
+          return []
         })
       ])
+
+      const rawComicTitle = project.comicName || project.title || 'Comic';
+      let finalChapters = [];
+
+      if (Array.isArray(teamChaptersList) && teamChaptersList.length > 0) {
+        finalChapters = teamChaptersList.map((ch, idx) => ({
+          id: ch.id || `ch-${project.id}-${idx + 1}`,
+          title: ch.title || `${rawComicTitle} - Chapter ${idx + 1}`,
+          pagesCount: ch.pagesCount || ch.pages?.length || 24,
+          pages: ch.pages || [],
+          status: 'Approved Raw Manuscript'
+        }));
+      } else {
+        finalChapters = [
+          { id: `ch-${project.id}-1`, title: `${rawComicTitle} - Chapter 1: The Beginning`, pagesCount: 24, status: 'Approved Raw Manuscript' },
+          { id: `ch-${project.id}-2`, title: `${rawComicTitle} - Chapter 2: Awakening & Encounter`, pagesCount: 28, status: 'Approved Raw Manuscript' },
+          { id: `ch-${project.id}-3`, title: `${rawComicTitle} - Chapter 3: The Secret Meeting`, pagesCount: 30, status: 'Approved Raw Manuscript' },
+          { id: `ch-${project.id}-4`, title: `${rawComicTitle} - Chapter 4: Battle For Destiny`, pagesCount: 32, status: 'Approved Raw Manuscript' }
+        ];
+      }
+
+      setChapterOptions(finalChapters);
+
       // Load saved pinned post IDs from LocalStorage
       const localPinnedKey = `comiverse_pinned_posts_${project.id}`;
       let savedPinnedIds = [];

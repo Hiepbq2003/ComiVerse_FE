@@ -6,7 +6,8 @@ import { getAuth } from '../utils/Auth';
 import { checkBannedContent } from '../services/api/BannedKeywordApi';
 import { toast } from 'react-toastify';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
+const OLDER_PAGE_SIZE = 30;
 
 // LocalStorage Persistence Cache Helpers (User-Isolated)
 const getCacheKey = (type, gId, userId) => {
@@ -168,7 +169,7 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
                 chatType,
                 groupId: chatType === 'GROUP' ? groupId : undefined,
                 page: nextPage,
-                limit: PAGE_SIZE,
+                limit: OLDER_PAGE_SIZE,
             });
 
             let olderItems = [];
@@ -192,7 +193,7 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
                 });
 
                 setPage(nextPage);
-                setHasMore(olderItems.length >= PAGE_SIZE);
+                setHasMore(olderItems.length >= OLDER_PAGE_SIZE);
 
                 // Preserve scroll position so view doesn't jump
                 requestAnimationFrame(() => {
@@ -308,17 +309,19 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
     }, [chatType, groupId, currentUser?.id, fetchInitialMessages, handleIncomingMessage]);
 
     // 5. Send Message Handler
-    const sendMessage = useCallback(async (content) => {
-        if (!content || !content.trim()) return;
+    const sendMessage = useCallback(async (content, imageData = null) => {
+        if ((!content || !content.trim()) && !imageData) return;
 
-        const trimmedContent = content.trim();
+        const trimmedContent = (content || '').trim();
 
-        // 0ms Instant Client-Side Keyword Pre-filter
-        const filterCheck = checkBannedContent(trimmedContent);
-        if (filterCheck.isBanned) {
-            toast.error(`🚫 Message blocked by Client Pre-filter! Contains banned keyword: "${filterCheck.matchedWord}" (${filterCheck.category})`);
-            setIsSending(false);
-            return false;
+        // 0ms Instant Client-Side Keyword Pre-filter (text only)
+        if (trimmedContent) {
+            const filterCheck = checkBannedContent(trimmedContent);
+            if (filterCheck.isBanned) {
+                toast.error(`🚫 Message blocked by Client Pre-filter! Contains banned keyword: "${filterCheck.matchedWord}" (${filterCheck.category})`);
+                setIsSending(false);
+                return false;
+            }
         }
 
         setIsSending(true);
@@ -334,6 +337,7 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
             time: timeStr,
             text: trimmedContent,
             content: trimmedContent,
+            imageUrl: imageData || null,
             createdAt: new Date().toISOString(),
             chatType,
             groupId: chatType === 'GROUP' ? groupId : undefined
@@ -346,6 +350,7 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
             chatType,
             groupId: chatType === 'GROUP' ? groupId : undefined,
             content: trimmedContent,
+            imageUrl: imageData || undefined,
         };
 
         try {
@@ -368,6 +373,7 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
                         time: timeStr,
                         text: trimmedContent,
                         content: trimmedContent,
+                        imageUrl: imageData || undefined,
                     }).catch(() => null);
                 }
 

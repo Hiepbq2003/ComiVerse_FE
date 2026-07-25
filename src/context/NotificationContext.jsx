@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { useAuth } from './AuthContext'
+import { getAuth } from '../utils/Auth'
 import {
   getMyNotificationsApi,
   getUnreadCountApi,
@@ -21,19 +22,34 @@ export function NotificationProvider({ children }) {
     try {
       const res = await getMyNotificationsApi()
       const data = res?.data || res || []
-      const nextNotifications = Array.isArray(data) ? data : []
-      setNotifications(nextNotifications)
+      const serverNotifications = Array.isArray(data) ? data : []
 
+      // Load local notifications (e.g. Project Leader assignments)
+      const currentUser = getAuth()?.user;
+      const userKey = `comiverse_user_notifications_${currentUser?.id || currentUser?.username || 'all'}`;
+      let localNotifs = [];
       try {
-        const countRes = await getUnreadCountApi()
-        setUnreadCount(Number(countRes?.data ?? countRes ?? 0))
-      } catch (countError) {
-        const status = countError?.response?.status
-        if (status !== 401 && status !== 502 && status !== 504 && countError?.code !== 'ECONNABORTED') {
-          console.warn('Failed to load unread notification count:', countError?.message)
-        }
-        setUnreadCount(nextNotifications.filter(notification => !notification.isRead).length)
-      }
+        const rawUser = localStorage.getItem(userKey);
+        const rawAll = localStorage.getItem('comiverse_user_notifications_all');
+        const userArr = rawUser ? JSON.parse(rawUser) : [];
+        const allArr = rawAll ? JSON.parse(rawAll) : [];
+        localNotifs = [...userArr, ...allArr];
+      } catch (e) {}
+
+      // Deduplicate by ID
+      const notifMap = new Map();
+      [...localNotifs, ...serverNotifications].forEach(n => {
+        if (n && n.id && !notifMap.has(n.id)) notifMap.set(n.id, n);
+      });
+
+      const nextNotifications = Array.from(notifMap.values()).sort((a, b) => {
+        const da = new Date(a.createdAt || a.time || 0);
+        const db = new Date(b.createdAt || b.time || 0);
+        return db - da;
+      });
+
+      setNotifications(nextNotifications)
+      setUnreadCount(nextNotifications.filter(n => !n.isRead).length)
     } catch (err) {
       const status = err?.response?.status
       if (status !== 401 && status !== 502 && status !== 504 && err?.code !== 'ECONNABORTED') {
@@ -45,22 +61,28 @@ export function NotificationProvider({ children }) {
   }, [isLoggedIn])
 
   const markAsRead = async (id) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n))
+    setUnreadCount(prev => Math.max(0, prev - 1))
     try {
       await markAsReadApi(id)
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n))
-      setUnreadCount(prev => Math.max(0, prev - 1))
     } catch (err) {
-      console.error('Failed to mark notification as read:', err)
+      const status = err?.response?.status
+      if (status !== 401 && status !== 502 && status !== 504 && err?.code !== 'ECONNABORTED') {
+        console.warn('Failed to mark notification as read on server:', err?.message)
+      }
     }
   }
 
   const markAllAsRead = async () => {
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
+    setUnreadCount(0)
     try {
       await markAllAsReadApi()
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
-      setUnreadCount(0)
     } catch (err) {
-      console.error('Failed to mark all notifications as read:', err)
+      const status = err?.response?.status
+      if (status !== 401 && status !== 502 && status !== 504 && err?.code !== 'ECONNABORTED') {
+        console.warn('Failed to mark all notifications as read on server:', err?.message)
+      }
     }
   }
 

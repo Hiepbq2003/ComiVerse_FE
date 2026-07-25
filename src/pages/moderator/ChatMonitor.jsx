@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import '../../assets/style/moderator/chat-monitor.css'
 import {
   getAllChatFlagsApi,
@@ -14,9 +14,274 @@ import {
   deleteBannedKeywordApi
 } from '../../services/api/BannedKeywordApi'
 import ChatWidget from '../../components/chat/ChatWidget'
+import { useChat } from '../../hooks/useChat'
+import ChatInputBar from '../../components/chat/ChatInputBar'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import ModernButton from '../../components/common/ModernButton'
 import { toast } from 'react-toastify'
+
+/* ── MODERATOR LIVE STREAM COMPONENT ─────────────────── */
+function ModeratorLiveStream({ onFlagMessage, onWarnUser, onMuteUser, onBanUser, onDeleteMessage }) {
+  const {
+    messages,
+    isLoadingInitial,
+    isConnected,
+    hasMore,
+    isLoadingMore,
+    isSending,
+    currentUser,
+    scrollContainerRef,
+    isNearBottomRef,
+    fetchOlderMessages,
+    sendMessage,
+  } = useChat('GLOBAL', null)
+
+  const [hoveredMsgId, setHoveredMsgId] = useState(null)
+  const [deletedMsgIds, setDeletedMsgIds] = useState(new Set())
+  const [inspectImage, setInspectImage] = useState(null)
+
+  const handleScroll = () => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    if (container.scrollTop < 30 && hasMore && !isLoadingMore && !isLoadingInitial) {
+      fetchOlderMessages()
+    }
+    const dist = container.scrollHeight - container.scrollTop - container.clientHeight
+    if (isNearBottomRef) isNearBottomRef.current = dist < 80
+  }
+
+  useEffect(() => {
+    if (!isLoadingInitial && messages.length > 0) {
+      const container = scrollContainerRef.current
+      if (container) container.scrollTop = container.scrollHeight
+    }
+  }, [isLoadingInitial, messages.length, scrollContainerRef])
+
+  const visibleMessages = messages.filter(m => !deletedMsgIds.has(m.id))
+
+  const handleDelete = (msg) => {
+    setDeletedMsgIds(prev => new Set([...prev, msg.id]))
+    if (onDeleteMessage) onDeleteMessage(msg)
+  }
+
+  const formatTime = (iso) => {
+    if (!iso) return ''
+    try {
+      const d = new Date(iso)
+      if (isNaN(d.getTime())) return ''
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    } catch { return '' }
+  }
+
+  return (
+    <div className="cv-live-inspector-container">
+      <div className="cv-live-inspector-header">
+        <div>
+          <h3>📡 Realtime Global Room Stream — Moderator View</h3>
+          <p>Hover any message to reveal moderation actions. Flag, warn, mute, or ban users directly from the live stream.</p>
+        </div>
+        <div className="cv-chat-metrics-bar" style={{ marginLeft: 'auto' }}>
+          <div className="cv-metric-pill highlight">
+            <span className="cv-metric-val">{visibleMessages.length}</span>
+            <span className="cv-metric-lbl">Messages</span>
+          </div>
+          <div className="cv-metric-pill">
+            <span className="cv-metric-val" style={{ color: isConnected ? '#22c55e' : '#ef4444' }}>
+              {isConnected ? '●' : '○'}
+            </span>
+            <span className="cv-metric-lbl">{isConnected ? 'Connected' : 'Offline'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Live Message Stream */}
+      <div
+        className="cv-mod-stream-viewport"
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+      >
+        {isLoadingMore && (
+          <div className="cv-chat-top-loader" style={{ padding: '8px', textAlign: 'center', color: '#c084fc', fontSize: '12px' }}>
+            Loading older messages...
+          </div>
+        )}
+
+        {isLoadingInitial ? (
+          <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+            <SkeletonLoader type="staggered" count={4} />
+          </div>
+        ) : visibleMessages.length === 0 ? (
+          <div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>
+            <span style={{ fontSize: '32px', display: 'block', marginBottom: '8px' }}>📡</span>
+            <p style={{ margin: 0 }}>No messages in stream. Waiting for user activity...</p>
+          </div>
+        ) : (
+          visibleMessages.map((msg) => {
+            const userObj = currentUser || {}
+            const userId = userObj.id || userObj.userId
+            const isMine = (userId && msg.senderId && String(msg.senderId) === String(userId)) ||
+              (userObj.fullName && (msg.senderName === userObj.fullName || msg.sender === userObj.fullName))
+            const senderName = msg.senderName || msg.sender || 'Anonymous'
+            const initial = (senderName || 'U')[0].toUpperCase()
+            const imageUrl = msg.imageUrl || msg.image || msg.attachedImage || null
+            const isHovered = hoveredMsgId === msg.id
+
+            return (
+              <div
+                key={msg.id || `${msg.senderId}-${msg.createdAt}`}
+                className={`cv-mod-stream-row ${isMine ? 'mine' : ''} ${isHovered ? 'hovered' : ''}`}
+                onMouseEnter={() => setHoveredMsgId(msg.id)}
+                onMouseLeave={() => setHoveredMsgId(null)}
+              >
+                {/* Avatar */}
+                <div className="cv-mod-stream-avatar" title={senderName}>
+                  {msg.senderAvatar || msg.avatar ? (
+                    <img src={msg.senderAvatar || msg.avatar} alt={senderName} />
+                  ) : (
+                    <span>{initial}</span>
+                  )}
+                </div>
+
+                {/* Message Content */}
+                <div className="cv-mod-stream-body">
+                  <div className="cv-mod-stream-meta">
+                    <span className="cv-mod-stream-sender">{senderName}</span>
+                    <span className="cv-mod-stream-time">{formatTime(msg.createdAt)}</span>
+                    {isMine && <span className="cv-mod-stream-you-badge">YOU</span>}
+                  </div>
+
+                  {/* Image message */}
+                  {imageUrl && (
+                    <div
+                      className="cv-mod-stream-image"
+                      onClick={() => setInspectImage({ url: imageUrl, sender: senderName, time: formatTime(msg.createdAt), msg })}
+                    >
+                      <img src={imageUrl} alt="Shared content" />
+                      <div className="cv-mod-stream-image-overlay">
+                        <span>🔍 Inspect Image</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Text content */}
+                  {(msg.content || msg.text) && (
+                    <div className="cv-mod-stream-text">
+                      {msg.content || msg.text}
+                    </div>
+                  )}
+                </div>
+
+                {/* MODERATION ACTION BUTTONS — visible on hover */}
+                {isHovered && !isMine && (
+                  <div className="cv-mod-stream-actions">
+                    <button
+                      type="button"
+                      className="cv-mod-action-btn flag"
+                      onClick={() => onFlagMessage && onFlagMessage(msg)}
+                      title="Flag for review"
+                    >
+                      🚩
+                    </button>
+                    <button
+                      type="button"
+                      className="cv-mod-action-btn warn"
+                      onClick={() => onWarnUser && onWarnUser(msg)}
+                      title="Issue warning"
+                    >
+                      ⚠️
+                    </button>
+                    <button
+                      type="button"
+                      className="cv-mod-action-btn mute"
+                      onClick={() => onMuteUser && onMuteUser(msg)}
+                      title="Mute user"
+                    >
+                      🔇
+                    </button>
+                    <button
+                      type="button"
+                      className="cv-mod-action-btn ban"
+                      onClick={() => onBanUser && onBanUser(msg)}
+                      title="Ban from chat"
+                    >
+                      🚫
+                    </button>
+                    <button
+                      type="button"
+                      className="cv-mod-action-btn delete"
+                      onClick={() => handleDelete(msg)}
+                      title="Delete message"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* Moderator can also send messages */}
+      <ChatInputBar
+        onSendMessage={sendMessage}
+        isSending={isSending}
+      />
+
+      {/* Image Inspection Modal */}
+      {inspectImage && (
+        <div className="cv-modal-overlay fade-in" onClick={() => setInspectImage(null)}>
+          <div className="cv-modal-box" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="cv-modal-header">
+              <h3>🔍 Image Inspection — Sent by {inspectImage.sender}</h3>
+              <button className="cv-modal-close" onClick={() => setInspectImage(null)}>×</button>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0' }}>
+              <img
+                src={inspectImage.url}
+                alt="Inspecting content"
+                style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '12px', objectFit: 'contain' }}
+              />
+            </div>
+            <div style={{ fontSize: '12px', color: '#94a3b8', textAlign: 'center', marginBottom: '8px' }}>
+              Sent at {inspectImage.time} by <strong style={{ color: '#e2e8f0' }}>{inspectImage.sender}</strong>
+            </div>
+            <div className="cv-modal-footer" style={{ justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="mod-btn review"
+                onClick={() => { onFlagMessage && onFlagMessage(inspectImage.msg); setInspectImage(null) }}
+              >
+                🚩 Flag Image
+              </button>
+              <button
+                type="button"
+                className="mod-btn warning-opt"
+                onClick={() => { onWarnUser && onWarnUser(inspectImage.msg); setInspectImage(null) }}
+              >
+                ⚠️ Warn Sender
+              </button>
+              <button
+                type="button"
+                className="mod-btn reject"
+                onClick={() => { onBanUser && onBanUser(inspectImage.msg); setInspectImage(null) }}
+              >
+                🚫 Ban User
+              </button>
+              <button
+                type="button"
+                className="cv-btn-secondary"
+                onClick={() => setInspectImage(null)}
+              >
+                ✅ Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function ChatMonitor({ fetchAllData }) {
   const [activeTab, setActiveTab] = useState('flags') // 'flags' | 'keywords' | 'live'
@@ -411,21 +676,47 @@ function ChatMonitor({ fetchAllData }) {
         </div>
       )}
 
-      {/* TAB 3: LIVE STREAM & ROOM INSPECTOR */}
+      {/* TAB 3: LIVE STREAM & ROOM INSPECTOR WITH INLINE MODERATION */}
       {activeTab === 'live' && (
         <div className="cv-tab-pane">
-          <div className="cv-live-inspector-container">
-            <div className="cv-live-inspector-header">
-              <div>
-                <h3>📡 Realtime Global Room Stream</h3>
-                <p>Live stream of messages broadcasted via STOMP WebSocket endpoints.</p>
-              </div>
-            </div>
-
-            <div className="cv-embedded-chat-box">
-              <ChatWidget isEmbedded={true} />
-            </div>
-          </div>
+          <ModeratorLiveStream
+            onFlagMessage={(msg) => {
+              const newFlag = {
+                id: `flag-${Date.now()}`,
+                user: msg.senderName || msg.sender || 'Unknown',
+                userId: msg.senderId || msg.sender_id || null,
+                message: msg.content || msg.text || '',
+                imageUrl: msg.imageUrl || msg.image || null,
+                reason: msg.imageUrl ? 'Image requires manual review' : 'Flagged by Moderator during live inspection',
+                createdAt: new Date().toISOString(),
+                status: 'pending'
+              }
+              setFlags(prev => [newFlag, ...prev])
+              toast.success(`🚩 Message from "${newFlag.user}" flagged for review!`)
+            }}
+            onWarnUser={(msg) => {
+              const userName = msg.senderName || msg.sender || 'Unknown'
+              toast.success(`⚠️ Warning strike issued to "${userName}" for message: "${(msg.content || '').substring(0, 50)}..."`)
+            }}
+            onMuteUser={(msg) => {
+              setMuteTarget({
+                userId: msg.senderId || msg.sender_id || msg.id,
+                username: msg.senderName || msg.sender || 'Unknown',
+                flagId: null
+              })
+              setMuteHours(24)
+              setMuteReason(`Live moderation: "${(msg.content || msg.text || 'Image message').substring(0, 80)}"`)
+            }}
+            onBanUser={(msg) => {
+              const userName = msg.senderName || msg.sender || 'Unknown'
+              if (window.confirm(`Are you sure you want to permanently ban chat for: ${userName}?`)) {
+                toast.success(`🚫 Chat permanently banned for "${userName}".`)
+              }
+            }}
+            onDeleteMessage={(msg) => {
+              toast.info(`🗑️ Message from "${msg.senderName || msg.sender}" removed from stream.`)
+            }}
+          />
         </div>
       )}
 

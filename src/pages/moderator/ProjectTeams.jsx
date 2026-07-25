@@ -1,15 +1,18 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import '../../assets/style/moderator/project-teams.css'
 import { toast } from 'react-toastify'
 import { searchTranslatorsApi } from '../../services/api/AccountApi'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import ModernPagination from '../../components/common/ModernPagination'
+import { useTheme } from '../../context/ThemeContext'
 
 function ProjectTeams({
   projectTeams,
   setProjectTeams,
-  comics,
+  comics = [],
+  submissions = [],
+  genres = [],
   showCreateTeamModal,
   setShowCreateTeamModal,
   createTeamStep,
@@ -18,7 +21,7 @@ function ProjectTeams({
   setCreateTeamForm,
   handleCreateProjectTeam
 }) {
-
+  const { theme } = useTheme()
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 6
   const totalPages = Math.ceil(projectTeams.length / ITEMS_PER_PAGE)
@@ -27,6 +30,114 @@ function ProjectTeams({
     (activePage - 1) * ITEMS_PER_PAGE,
     activePage * ITEMS_PER_PAGE
   )
+
+  // Create Project Team Filter & Auto-Populate States
+  const [dateApprovedFilter, setDateApprovedFilter] = useState('today') // 'today' | '7days' | '30days' | 'all'
+  const [selectedGenre, setSelectedGenre] = useState('all')
+  const [comicSearchQuery, setComicSearchQuery] = useState('')
+
+  const genreOptions = useMemo(() => {
+    if (Array.isArray(genres) && genres.length > 0) {
+      return genres.map(g => (typeof g === 'string' ? g : g.name || g.title)).filter(Boolean);
+    }
+    return ['Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Horror', 'Romance', 'Sci-Fi', 'Slice of Life'];
+  }, [genres]);
+
+  const isSameDay = (d1, d2) => {
+    return d1.getFullYear() === d2.getFullYear() &&
+           d1.getMonth() === d2.getMonth() &&
+           d1.getDate() === d2.getDate();
+  };
+
+  const allApprovedItems = useMemo(() => {
+    const approvedFromSubmissions = (submissions || [])
+      .filter(s => s.status === 'approved')
+      .map(s => ({
+        id: s.id,
+        title: s.title,
+        language: s.language || s.rawLanguage || 'Japanese',
+        genre: s.genre || s.genres?.[0] || 'General',
+        genres: s.genres || [s.genre || 'General'],
+        status: 'approved',
+        approvedAt: s.approvedAt || s.timestamp || new Date().toISOString(),
+        createdAt: s.createdAt || s.timestamp || new Date().toISOString()
+      }));
+
+    const approvedFromComics = (comics || []).map(c => ({
+      ...c,
+      approvedAt: c.approvedAt || c.createdAt || c.timestamp || new Date().toISOString()
+    }));
+
+    const merged = [...approvedFromSubmissions, ...approvedFromComics];
+    const unique = [];
+    const titleMap = new Set();
+
+    merged.forEach(item => {
+      if (item.title && !titleMap.has(item.title.toLowerCase())) {
+        titleMap.add(item.title.toLowerCase());
+        unique.push(item);
+      }
+    });
+
+    return unique;
+  }, [submissions, comics]);
+
+  const filteredApprovedComics = useMemo(() => {
+    const now = new Date();
+
+    return allApprovedItems.filter(c => {
+      // 1. Filter out unapproved / pending / rejected items
+      if (c.status && ['pending', 'rejected'].includes(c.status.toLowerCase())) {
+        return false;
+      }
+
+      // 2. Date Approved Filter
+      const rawDate = c.approvedAt || c.createdAt || c.timestamp || c.date;
+      const comicDate = rawDate ? new Date(rawDate) : new Date();
+
+      if (dateApprovedFilter === 'today') {
+        if (!isSameDay(comicDate, now)) return false;
+      } else if (dateApprovedFilter === '7days') {
+        const diffDays = Math.ceil(Math.abs(now - comicDate) / (1000 * 60 * 60 * 24));
+        if (diffDays > 7) return false;
+      } else if (dateApprovedFilter === '30days') {
+        const diffDays = Math.ceil(Math.abs(now - comicDate) / (1000 * 60 * 60 * 24));
+        if (diffDays > 30) return false;
+      }
+
+      // 3. Genre Filter
+      if (selectedGenre !== 'all') {
+        const cGenres = Array.isArray(c.genres) ? c.genres.join(' ') : (c.genre || '');
+        if (!cGenres.toLowerCase().includes(selectedGenre.toLowerCase())) return false;
+      }
+
+      // 4. Title Search Filter
+      if (comicSearchQuery.trim()) {
+        if (!c.title.toLowerCase().includes(comicSearchQuery.toLowerCase().trim())) return false;
+      }
+
+      return true;
+    });
+  }, [allApprovedItems, dateApprovedFilter, selectedGenre, comicSearchQuery]);
+
+  const availableComicsDropdown = useMemo(() => {
+    if (filteredApprovedComics.length > 0) return filteredApprovedComics;
+    return allApprovedItems;
+  }, [filteredApprovedComics, allApprovedItems]);
+
+  const handleSelectApprovedComic = (selectedTitle) => {
+    const foundComic = allApprovedItems.find(c => c.title === selectedTitle);
+    const autoSourceLang = foundComic?.language || foundComic?.rawLanguage || foundComic?.originalLanguage || 'Japanese';
+    const targetLang = createTeamForm.targetLang || 'English';
+    const autoTitle = selectedTitle ? `${selectedTitle} - ${targetLang} Translation Team` : '';
+
+    setCreateTeamForm(prev => ({
+      ...prev,
+      comicName: selectedTitle,
+      sourceLang: autoSourceLang,
+      title: autoTitle
+    }));
+  };
 
   // Assign Leader Modal states
   const [showAssignModal, setShowAssignModal] = useState(false)
@@ -80,6 +191,34 @@ function ProjectTeams({
     setShowAssignModal(true)
   }
 
+  const sendLeaderNotification = (leaderId, leaderName, comicTitle, sourceLang, targetLang) => {
+    const userKey = `comiverse_user_notifications_${leaderId || 'all'}`;
+    let existing = [];
+    try {
+      const raw = localStorage.getItem(userKey);
+      if (raw) existing = JSON.parse(raw);
+    } catch (e) {}
+
+    const newNotif = {
+      id: `notif-${Date.now()}`,
+      title: '👑 Assigned as Group Leader',
+      message: `You have been assigned as Group Leader for translation project '${comicTitle}' (${sourceLang} → ${targetLang}). Raw manuscript chapters are ready in your workspace backlog!`,
+      actionUrl: '/translator/project-teams',
+      isRead: false,
+      createdAt: new Date().toISOString()
+    };
+
+    localStorage.setItem(userKey, JSON.stringify([newNotif, ...existing]));
+    try {
+      const genKey = `comiverse_user_notifications_all`;
+      const genRaw = localStorage.getItem(genKey);
+      let genArr = genRaw ? JSON.parse(genRaw) : [];
+      localStorage.setItem(genKey, JSON.stringify([newNotif, ...genArr]));
+    } catch (e) {}
+
+    window.dispatchEvent(new Event('notification:refresh'));
+  };
+
   const confirmAssignLeader = async (translator) => {
     const displayName = translator.fullName || translator.username;
     const team = projectTeams.find(t => t.id === assignTeamId)
@@ -100,6 +239,15 @@ function ProjectTeams({
         )
       )
       toast.success(`${displayName} assigned as Group Leader!`)
+
+      sendLeaderNotification(
+        translator.id,
+        displayName,
+        team.comicName || team.title,
+        team.sourceLang || 'Japanese',
+        team.targetLang || 'English'
+      );
+
       setShowAssignModal(false)
     } catch (err) {
       console.error(err)
@@ -142,10 +290,18 @@ function ProjectTeams({
   };
 
   const triggerOpenCreate = () => {
+    setDateApprovedFilter('today')
+    setSelectedGenre('all')
+    setComicSearchQuery('')
+
+    const initialComic = availableComicsDropdown[0] || null;
+    const initialTitle = initialComic ? `${initialComic.title} - English Translation Team` : '';
+    const initialSourceLang = initialComic?.language || initialComic?.rawLanguage || initialComic?.originalLanguage || 'Japanese';
+
     setCreateTeamForm({
-      title: '',
-      comicName: comics[0]?.title || '',
-      sourceLang: 'Japanese',
+      title: initialTitle,
+      comicName: initialComic?.title || '',
+      sourceLang: initialSourceLang,
       targetLang: 'English',
       leaderName: '',
       leaderId: '',
@@ -283,7 +439,7 @@ function ProjectTeams({
       {/* ── MODAL: CREATE PROJECT TEAM ──────────────── */}
       {showCreateTeamModal && createPortal(
         <div className="mod-modal-overlay">
-          <div className="mod-modal-card">
+          <div className="mod-modal-card wide" style={{ maxWidth: '720px' }}>
             <div className="mod-modal-header">
               <h3>Create Project Team</h3>
               <button className="mod-modal-close-btn" onClick={() => setShowCreateTeamModal(false)}>×</button>
@@ -302,80 +458,154 @@ function ProjectTeams({
               </div>
 
               {createTeamStep === 1 ? (
-                /* STEP 1: GENERAL INFO */
-                <div className="fade-in">
-                  <div className="mod-form-group">
-                    <label className="mod-label">Project Title *</label>
-                    <input 
-                      type="text" 
-                      className="mod-input" 
-                      placeholder="e.g. Invincible Sword God Group"
-                      value={createTeamForm.title}
-                      onChange={(e) => setCreateTeamForm({ ...createTeamForm, title: e.target.value })}
-                    />
+                /* STEP 1: APPROVED COMIC SELECTOR & LANGUAGE CONFIG */
+                <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  
+                  {/* Filter Ribbon: Date Approved [Today], Genre, Search Title */}
+                  <div style={{ padding: '12px 14px', borderRadius: '12px', background: theme === 'light' ? '#f8fafc' : 'rgba(255,255,255,0.03)', border: '1px solid rgba(148,163,184,0.15)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '11.5px', fontWeight: '700', textTransform: 'uppercase', color: '#c084fc', letterSpacing: '0.5px' }}>
+                        🔍 Filter Approved Comics Catalog
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '600' }}>
+                        Filter Mode: Approved Today
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '10px' }}>
+                      {/* 1. Date Approved Filter */}
+                      <div>
+                        <label style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--mod-text-secondary)', display: 'block', marginBottom: '3px' }}>
+                          📅 Date Approved
+                        </label>
+                        <select
+                          className="mod-input select"
+                          value={dateApprovedFilter}
+                          onChange={(e) => setDateApprovedFilter(e.target.value)}
+                          style={{ padding: '6px 10px', fontSize: '12px' }}
+                        >
+                          <option value="today">📅 Today</option>
+                          <option value="7days">🗓️ Last 7 Days</option>
+                          <option value="30days">📆 Last 30 Days</option>
+                          <option value="all">🌐 All Time</option>
+                        </select>
+                      </div>
+
+                      {/* 2. Genre Filter */}
+                      <div>
+                        <label style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--mod-text-secondary)', display: 'block', marginBottom: '3px' }}>
+                          🎭 Genre
+                        </label>
+                        <select
+                          className="mod-input select"
+                          value={selectedGenre}
+                          onChange={(e) => setSelectedGenre(e.target.value)}
+                          style={{ padding: '6px 10px', fontSize: '12px' }}
+                        >
+                          <option value="all">All Genres</option>
+                          {genreOptions.map(g => (
+                            <option key={g} value={g}>{g}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* 3. Search Title */}
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <label style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--mod-text-secondary)', display: 'block', marginBottom: '3px' }}>
+                          🔎 Search Comic Title
+                        </label>
+                        <input
+                          type="text"
+                          className="mod-input"
+                          placeholder="Type comic title..."
+                          value={comicSearchQuery}
+                          onChange={(e) => setComicSearchQuery(e.target.value)}
+                          style={{ padding: '6px 10px', fontSize: '12px' }}
+                        />
+                      </div>
+                    </div>
                   </div>
 
+                  {/* Select Approved Comic Dropdown */}
                   <div className="mod-form-group">
-                    <label className="mod-label">Source Comic *</label>
-                    <select 
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label className="mod-label" style={{ margin: 0 }}>
+                        Select Approved Comic ({availableComicsDropdown.length} matching) *
+                      </label>
+                      {filteredApprovedComics.length === 0 && dateApprovedFilter === 'today' && (
+                        <span style={{ fontSize: '11px', color: '#eab308', fontWeight: '600' }}>
+                          ⚠️ 0 approved today. Showing catalog below!
+                        </span>
+                      )}
+                    </div>
+                    
+                    <select
                       className="mod-input select"
                       value={createTeamForm.comicName}
-                      onChange={(e) => {
-                        const selectedTitle = e.target.value;
-                        const selectedComic = comics.find(c => c.title === selectedTitle);
-                        const autoLang = selectedComic?.language && selectedComic.language !== 'Unknown' ? selectedComic.language : 'Japanese';
-                        setCreateTeamForm({ 
-                          ...createTeamForm, 
-                          comicName: selectedTitle,
-                          sourceLang: autoLang
-                        });
-                      }}
+                      onChange={(e) => handleSelectApprovedComic(e.target.value)}
                     >
-                      <option value="">-- Select a Comic --</option>
-                      {comics.map((c) => (
+                      <option value="">-- Choose Approved Comic --</option>
+                      {availableComicsDropdown.map((c) => (
                         <option key={c.id} value={c.title}>
-                          {c.title} ({c.language || 'Unknown'})
+                          📚 {c.title} ({c.language || 'Raw Original'}) · {Array.isArray(c.genres) ? c.genres.join(', ') : (c.genre || 'General')}
                         </option>
                       ))}
                     </select>
                   </div>
 
+                  {/* Auto-Populated Source Language & Target Language Selector */}
                   <div className="mod-form-row">
                     <div className="mod-form-group half">
-                      <label className="mod-label">Source Language 🔒</label>
-                      <input 
+                      <label className="mod-label">Source Language 🔒 (Auto-Detected)</label>
+                      <input
                         type="text"
                         className="mod-input"
                         value={createTeamForm.sourceLang || 'Auto-detected'}
                         disabled
                         readOnly
-                        style={{ 
-                          opacity: 0.85, 
-                          cursor: 'not-allowed', 
-                          fontWeight: '600'
-                        }}
+                        style={{ opacity: 0.85, cursor: 'not-allowed', fontWeight: '700', color: '#c084fc' }}
                         title="Source language is inherited directly from the original comic specification."
                       />
                     </div>
 
                     <div className="mod-form-group half">
                       <label className="mod-label">Target Language *</label>
-                      <select 
+                      <select
                         className="mod-input select"
                         value={createTeamForm.targetLang}
-                        onChange={(e) => setCreateTeamForm({ ...createTeamForm, targetLang: e.target.value })}
+                        onChange={(e) => {
+                          const target = e.target.value;
+                          setCreateTeamForm(prev => ({
+                            ...prev,
+                            targetLang: target,
+                            title: prev.comicName ? `${prev.comicName} - ${target} Translation Team` : prev.title
+                          }));
+                        }}
                       >
-                        <option value="English">English</option>
-                        <option value="Vietnamese">Vietnamese</option>
-                        <option value="Spanish">Spanish</option>
-                        <option value="French">French</option>
-                        <option value="Japanese">Japanese</option>
-                        <option value="Korean">Korean</option>
-                        <option value="Chinese">Chinese</option>
-                        <option value="German">German</option>
+                        <option value="English">🇬🇧 English</option>
+                        <option value="Vietnamese">🇻🇳 Vietnamese</option>
+                        <option value="Japanese">🇯🇵 Japanese</option>
+                        <option value="Korean">🇰🇷 Korean</option>
+                        <option value="Chinese">🇨🇳 Chinese</option>
+                        <option value="Spanish">🇪🇸 Spanish</option>
+                        <option value="French">🇫🇷 French</option>
+                        <option value="German">🇩🇪 German</option>
                       </select>
                     </div>
                   </div>
+
+                  {/* Project Team Title */}
+                  <div className="mod-form-group">
+                    <label className="mod-label">Project Team Title *</label>
+                    <input
+                      type="text"
+                      className="mod-input"
+                      placeholder="e.g. Invincible Sword God - English Translation Team"
+                      value={createTeamForm.title}
+                      onChange={(e) => setCreateTeamForm({ ...createTeamForm, title: e.target.value })}
+                    />
+                  </div>
+
                 </div>
               ) : (
                 /* STEP 2: LEADER AND PRIORITY */

@@ -207,7 +207,8 @@ function ModeratorDashboard() {
     try {
       await approveSubmissionApi(id)
       toast.success('Submission approved!')
-      setSubmissions(prev => prev.filter(item => item.id !== id))
+      const nowIso = new Date().toISOString();
+      setSubmissions(prev => prev.map(item => item.id === id ? { ...item, status: 'approved', approvedAt: nowIso } : item))
       fetchComicsAndTeams()
     } catch (err) {
       console.error(err)
@@ -1015,6 +1016,8 @@ function ModeratorDashboard() {
             <ProjectTeams 
               projectTeams={projectTeams}
               setProjectTeams={setProjectTeams}
+              genres={genres}
+              submissions={submissions}
               comics={comics
                 .filter(c => !submissions.some(s => s.queueType === 'author' && s.status === 'pending' && s.title === c.title))
                 .filter((value, index, self) => self.findIndex(t => t.title === value.title) === index)
