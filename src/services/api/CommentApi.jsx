@@ -31,3 +31,12 @@ export const getChapterCommentsApi = (chapterId, parentId = '', page = 1, size =
 export const createChapterCommentApi = (data, config = {}) => {
   return AxiosClient.post('/comments/chapters', data, config);
 };
+
+export const getComicCommentByIdApi = (commentId, config = {}) => {
+  return AxiosClient.get(`/comments/comics/${commentId}`, config);
+};
+
+export const getChapterCommentByIdApi = (commentId, config = {}) => {
+  return AxiosClient.get(`/comments/chapters/${commentId}`, config);
+};
+
