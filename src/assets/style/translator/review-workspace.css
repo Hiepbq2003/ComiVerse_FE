@@ -588,6 +588,9 @@
   color: #d4d4de;
   font-size: 13px;
   line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .rvw-avatar {
@@ -798,6 +801,30 @@
   color: #d4d4de;
   font-size: 13px;
   line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.rvw-bubble.rvw-bubble--ellipse {
+  border-radius: 50%;
+}
+
+.rvw-bubble.rvw-bubble--polygon {
+  border-radius: 0;
+}
+
+
+.rvw-composer-row--wrap {
+  align-items: flex-end;
+}
+
+.rvw-composer-textarea {
+  resize: vertical;
+  min-height: 38px;
+  max-height: 160px;
+  line-height: 1.4;
+  font-family: inherit;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;

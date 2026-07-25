@@ -2337,11 +2337,7 @@ html.dark .board__card {
   transition: background 0.5s ease, color 0.5s ease;
 }
 
-.board__date {
-  color: var(--dim);
-  font-size: 0.8rem;
-  transition: color 0.5s ease;
-}
+
 
 /* ── Columns grid ── */
 .columns {

@@ -379,7 +379,6 @@ function TasksTab({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div className="board__meta">
               <span className="board__badge">Translation Team</span>
-              <span className="board__date">{activeTasks.length} active · {pausedTasks.length} paused</span>
             </div>
             {isCurrentLeader && (
               <button className="trans-btn primary" style={{ height: '38px', padding: '0 16px', borderRadius: '8px', fontSize: '13px' }} onClick={onCreateTaskClick}>
@@ -741,7 +740,7 @@ export function CreateTaskModal({
 }
 
 
-export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAssign, onCancel, onContinue, onReview }) {
+export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAssign, isProjectLeader, onCancel, onContinue, onReview }) {
   const [submitted, setSubmitted] = useState(false)
 
   const errors = {
@@ -751,6 +750,12 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   }
   const showError = (field) => submitted && errors[field]
   const errorBorder = (field) => showError(field) ? { borderColor: '#ef4444' } : undefined
+
+  // Review is a Project-Leader-only action, and only makes sense once the
+  // task has actually been submitted for review by the translator. Outside
+  // that state there is nothing to review yet.
+  const isUnderReview = editTaskData.status === 'under_review'
+  const canReview = isProjectLeader && isUnderReview
 
   const toggleAssignee = (memberId, isSelected) => {
     setEditTaskData({
@@ -768,6 +773,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   }
 
   const handleReviewClick = () => {
+    if (!canReview) return
     setSubmitted(true)
     if (Object.values(errors).some(Boolean)) return
     onReview()
@@ -858,10 +864,31 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
         </div>
         <div className="trans-modal-footer">
           <button className="trans-btn secondary" onClick={onCancel}>Cancel</button>
-          <button className="trans-btn secondary" onClick={handleReviewClick}><GitCompare />Review</button>
-          <button className="trans-btn primary" onClick={handleContinueClick}>
-            <StepForward />Continue
-          </button>
+
+          {/* Review: Project-Leader-only, and only once the task is actually
+              Under Review — there's nothing to review before the translator
+              has submitted it. */}
+          {isProjectLeader && (
+            <button
+              className="trans-btn secondary"
+              onClick={handleReviewClick}
+              disabled={!isUnderReview}
+              title={isUnderReview ? 'Review this submission' : 'Only available once the task is Under Review'}
+              style={!isUnderReview ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+            >
+              <GitCompare />Review
+            </button>
+          )}
+
+          {/* Continue (keep translating pages): hidden once the task is
+              Under Review, so nobody edits pages out from under an
+              in-progress review — that's exactly the "chỉ được review"
+              constraint. */}
+          {!isUnderReview && (
+            <button className="trans-btn primary" onClick={handleContinueClick}>
+              <StepForward />Continue
+            </button>
+          )}
         </div>
       </div>
     </div>

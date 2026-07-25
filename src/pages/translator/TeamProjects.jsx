@@ -408,6 +408,7 @@ function WorkspaceDetailView({
               editTaskData={editTaskData}
               setEditTaskData={setEditTaskData}
               teamMembersForAssign={teamMembersForAssign}
+              isProjectLeader={isCurrentLeader}
               onCancel={onCancelEditTask}
               onContinue={onContinueToWorkspace}
               onReview={onContinueToReviewWorkspace}
@@ -606,7 +607,8 @@ function TeamProjects() {
       id: `leader-${project.id}`,
       name: project.leaderName || userFullName,
       role: 'Group Leader',
-      status: 'Active',
+      status: 'Offline',
+      online: false,
       joinDate: '01/15/2024',
       contributions: `${project.chaptersCount || 0} chapters`,
       avatar: project.leaderInitials || 'TL'
@@ -713,7 +715,8 @@ function TeamProjects() {
       backendMems.forEach(m => {
         if (m && m.name) {
           const key = m.name.toLowerCase().trim();
-          if (!combinedMap.has(key)) combinedMap.set(key, m);
+          const existing = combinedMap.get(key);
+          combinedMap.set(key, existing ? { ...existing, ...m } : m);
         }
       });
 
@@ -1075,7 +1078,8 @@ function TeamProjects() {
         id: requesterId || `mem-${Date.now()}`,
         name: reqName || 'Member',
         role: 'Member',
-        status: 'Active',
+        status: 'Offline',
+        online: false,
         joinDate: new Date().toLocaleDateString('en-US'),
         contributions: '0 chapters',
         avatar: (reqName || 'M').split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2)
