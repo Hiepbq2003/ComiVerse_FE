@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from './AuthContext'
 import { getAuth } from '../utils/Auth'
 import {
@@ -7,14 +7,17 @@ import {
   markAsReadApi,
   markAllAsReadApi
 } from '../services/api/NotificationApi'
+import StompService from '../services/websocket/StompService'
+import { toast } from 'react-toastify'
 
 const NotificationContext = createContext()
 
 export function NotificationProvider({ children }) {
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, user } = useAuth()
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
+  const recentNotiKeysRef = useRef(new Set())
 
   const loadNotifications = useCallback(async () => {
     if (!isLoggedIn) return
@@ -98,18 +101,66 @@ export function NotificationProvider({ children }) {
       window.addEventListener('focus', handleRefresh)
       window.addEventListener('notification:refresh', handleRefresh)
       document.addEventListener('visibilitychange', handleVisibilityChange)
+
+      // Setup WebSocket STOMP for Real-time Notifications
+      const userId = user?.id || user?.userId
+      const topicsToSubscribe = ['/topic/notifications', '/user/queue/notifications']
+      if (userId) {
+        topicsToSubscribe.push(`/topic/notifications/${userId}`)
+      }
+
+      const handleWsMessage = (msg) => {
+        if (!msg) return
+        const newNoti = typeof msg === 'object' ? msg : { message: String(msg) }
+        const notiKey = newNoti.id || `${newNoti.title || ''}_${newNoti.message || ''}_${newNoti.createdAt || ''}`
+
+        if (recentNotiKeysRef.current.has(notiKey)) {
+          return
+        }
+        recentNotiKeysRef.current.add(notiKey)
+        setTimeout(() => {
+          recentNotiKeysRef.current.delete(notiKey)
+        }, 5000)
+
+        setNotifications(prev => {
+          if (newNoti.id && prev.some(item => item.id === newNoti.id)) {
+            return prev
+          }
+          return [newNoti, ...prev]
+        })
+        setUnreadCount(prev => prev + 1)
+        const toastText = newNoti.title
+          ? `${newNoti.title}: ${newNoti.message || ''}`
+          : (newNoti.message || 'You have a new notification!')
+        toast.info(toastText, {
+          toastId: `noti-${notiKey}`,
+          position: 'top-right',
+          autoClose: 4000
+        })
+      }
+
+      StompService.connect()
+      topicsToSubscribe.forEach(topic => {
+        StompService.subscribe(topic, handleWsMessage)
+      })
+
       return () => {
         window.clearInterval(pollInterval)
         window.removeEventListener('focus', handleRefresh)
         window.removeEventListener('notification:refresh', handleRefresh)
         document.removeEventListener('visibilitychange', handleVisibilityChange)
+
+        topicsToSubscribe.forEach(topic => {
+          StompService.unsubscribe(topic)
+        })
       }
     } else {
       setNotifications([])
       setUnreadCount(0)
+      StompService.disconnect()
     }
     return undefined
-  }, [isLoggedIn, loadNotifications])
+  }, [isLoggedIn, user?.id, loadNotifications])
 
   return (
     <NotificationContext.Provider value={{
