@@ -15,3 +15,11 @@ export const getChapterDetailApi = (chapterId) => {
 export const deleteChapterApi = (chapterId) => {
   return AxiosClient.delete(`/chapters/${chapterId}`);
 };
+
+export const getChapterTranslationsApi = (chapterId) => {
+  return AxiosClient.get(`/chapters/${chapterId}/translations`);
+};
+ 
+export const getComicTranslationLanguagesApi = (comicId) => {
+  return AxiosClient.get(`/comics/${comicId}/translation-languages`);
+};
