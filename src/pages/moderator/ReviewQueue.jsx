@@ -144,6 +144,28 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
     };
   };
 
+  // Helper to determine if a submission item is a real chapter submission (vs a raw comic catalog profile entry)
+  const isRealChapterSubmission = (item) => {
+    if (!item) return false;
+
+    // Explicit arrays
+    if (Array.isArray(item.pages) && item.pages.length > 0) return true;
+    if (Array.isArray(item.images) && item.images.length > 0) return true;
+    if (Array.isArray(item.chapters) && item.chapters.length > 0) return true;
+    if (Array.isArray(item.allChapters) && item.allChapters.length > 0) return true;
+
+    // Check title / chapter fields
+    const chapTitle = String(item.chapter || item.chapterTitle || '').trim().toLowerCase();
+    if (chapTitle && chapTitle !== 'raw draft' && chapTitle !== 'comic profile' && chapTitle !== 'chapter comic profile' && chapTitle !== 'none') {
+      return true;
+    }
+
+    if (item.chapterNumber && item.chapterNumber > 0) return true;
+    if (item.type === 'chapter' || item.submissionType === 'chapter') return true;
+
+    return false;
+  };
+
   // Extract real DB submitted chapter list for a raw comic submission
   const getSubmissionChapters = (item) => {
     if (!item) return [];
@@ -234,28 +256,14 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
       const key = item.comicId ? `comic-${item.comicId}` : `group-${titleClean}_${submitterClean}`;
 
       if (!groupsMap.has(key)) {
-        const itemChaps = getSubmissionChapters(item);
         groupsMap.set(key, {
           ...item,
           groupKey: key,
-          subItems: [item],
-          allChapters: [...itemChaps]
+          subItems: [item]
         });
       } else {
         const group = groupsMap.get(key);
         group.subItems.push(item);
-
-        // Merge chapters from this submission item
-        const itemChaps = getSubmissionChapters(item);
-        itemChaps.forEach(newChap => {
-          const exists = group.allChapters.some(c => 
-            (c.id && newChap.id && c.id === newChap.id) || 
-            (c.title && newChap.title && c.title.toLowerCase().trim() === newChap.title.toLowerCase().trim())
-          );
-          if (!exists) {
-            group.allChapters.push(newChap);
-          }
-        });
 
         // Use newest timestamp for display
         if ((item.timestamp || 0) > (group.timestamp || 0)) {
@@ -264,12 +272,29 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
       }
     });
 
-    // Clean up grouped chapters: if group has chapters with pages > 0, filter out 0-page dummy draft entries
+    // Populate and clean up grouped chapters
     groupsMap.forEach(group => {
-      const chaptersWithPages = group.allChapters.filter(c => Array.isArray(c.pages) && c.pages.length > 0);
-      if (chaptersWithPages.length > 0) {
-        group.allChapters = chaptersWithPages;
-      }
+      // Prioritize real chapter submissions over raw comic catalog draft profiles
+      const realChapterItems = group.subItems.filter(isRealChapterSubmission);
+      const itemsToUse = realChapterItems.length > 0 ? realChapterItems : group.subItems;
+
+      const combinedChaps = [];
+      itemsToUse.forEach(item => {
+        const itemChaps = getSubmissionChapters(item);
+        itemChaps.forEach(newChap => {
+          const exists = combinedChaps.some(c => 
+            (c.id && newChap.id && c.id === newChap.id) || 
+            (c.title && newChap.title && c.title.toLowerCase().trim() === newChap.title.toLowerCase().trim())
+          );
+          if (!exists) {
+            combinedChaps.push(newChap);
+          }
+        });
+      });
+
+      // Filter out 0-page items if items with pages exist
+      const chaptersWithPages = combinedChaps.filter(c => Array.isArray(c.pages) && c.pages.length > 0);
+      group.allChapters = chaptersWithPages.length > 0 ? chaptersWithPages : combinedChaps;
 
       // Synchronize group.chapters with group.allChapters for 100% consistent badge count
       group.chapters = group.allChapters;
