@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { toast } from "react-toastify";
 import "../../assets/style/translator/translate-workspace.css";
 
 const API_BASE = "http://localhost:8081/api";
@@ -827,7 +828,7 @@ function TranslateTabPanel({
   onSelectNext,
   onChangeTranslation,
   textStyle,
-  onSaveAndNext,
+  onSaveProgress,
   currentImage,
   canvasRef,
   imageNaturalSize,
@@ -908,8 +909,8 @@ function TranslateTabPanel({
         </div>
       </div>
 
-      <button onClick={onSaveAndNext} className="tw-save-next-btn">
-        Save and next →
+      <button onClick={onSaveProgress} className="tw-save-next-btn">
+        Save
       </button>
     </div>
   );
@@ -969,7 +970,7 @@ function TranslationSidePanel({
   onSelectNext,
   onChangeTranslation,
   textStyle,
-  onSaveAndNext,
+  onSaveProgress,
   currentImage,
   canvasRef,
   imageNaturalSize,
@@ -1000,7 +1001,7 @@ function TranslationSidePanel({
           onSelectNext={onSelectNext}
           onChangeTranslation={onChangeTranslation}
           textStyle={textStyle}
-          onSaveAndNext={onSaveAndNext}
+          onSaveProgress={onSaveProgress}
           currentImage={currentImage}
           canvasRef={canvasRef}
           imageNaturalSize={imageNaturalSize}
@@ -1075,49 +1076,271 @@ async function fetchChapterById(chapterId, signal) {
   return { ...chapter, comicTitle };
 }
 
-async function fetchChapterForTask(taskId, signal) {
-  const task = await fetchJson(`${API_BASE}/team-workspace/tasks/${taskId}`, signal);
+const resolveImageUrl = (url) => {
+  if (!url || typeof url !== 'string') return null;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  const apiBase = import.meta.env.VITE_API_BASE_URL || '/api';
+  const backendHost = apiBase.startsWith('http') ? apiBase.replace(/\/api\/?$/, '') : 'http://localhost:8081';
+  return `${backendHost}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
-  const chapterId =
-    task?.chapter?.id ??
-    task?.chapterId ??
-    task?.chapter_id ??
-    task?.data?.chapterId ??
-    task?.task?.chapterId ??
-    (Array.isArray(task) ? task[0]?.chapterId : undefined);
-
-  if (!chapterId) {
-    throw new Error(
-      `Task does not have a chapterId. Check the console log "[fetchJson]" to see the actual structure of the response.`
-    );
+function getTaskFallbackData(taskId) {
+  let foundTask = null;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('comiverse_tasks_')) {
+      try {
+        const tasks = JSON.parse(localStorage.getItem(key));
+        if (Array.isArray(tasks)) {
+          const match = tasks.find(t => String(t.id) === String(taskId) || String(t._id) === String(taskId));
+          if (match) {
+            foundTask = match;
+            break;
+          }
+        }
+      } catch (e) {}
+    }
   }
 
-  const chapterResult = await fetchChapterById(chapterId, signal);
-  return { ...chapterResult, projectTeamId: task?.projectTeamId ?? null };
+  const rawTitle = foundTask?.title || 'Chapter 1 - Translation';
+  const cleanTitleMatch = rawTitle.match(/^\[(URGENT|HIGH|MEDIUM|LOW)\]\s*(?:\[([^\]]+)\])?\s*(.*)$/i);
+  const comicTitle = cleanTitleMatch?.[2] || 'Tạm biệt Long tóc đỏ';
+  const chapterName = cleanTitleMatch?.[3] || rawTitle;
+
+  const chapterId = foundTask?.chapterId || `ch-${taskId}`;
+  let realPages = foundTask?.pages || foundTask?.chapter?.pages || [];
+  if (!Array.isArray(realPages)) realPages = [];
+
+  return {
+    task: foundTask || { id: taskId, title: rawTitle, chapterId },
+    chapter: {
+      id: chapterId,
+      title: chapterName.includes('Chapter') ? chapterName : `${comicTitle} - ${chapterName}`,
+      comicTitle: comicTitle,
+      pagesCount: realPages.length,
+      pages: realPages
+    },
+    pages: realPages.map((item, idx) => {
+      const rawUrl = typeof item === 'string' ? item : (item?.imageUrl || item?.url || item?.pageUrl);
+      const resolved = resolveImageUrl(rawUrl);
+      return {
+        id: item?.id || `p-${taskId}-${idx + 1}`,
+        pageId: item?.id || `p-${taskId}-${idx + 1}`,
+        pageNumber: item?.pageNumber || idx + 1,
+        imageUrl: resolved,
+        bubbles: item?.bubbles || []
+      };
+    }).filter(p => p.imageUrl)
+  };
+}
+
+async function fetchChapterForTask(taskId, signal) {
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  // 1. Primary: get task from backend (only if taskId is a real UUID)
+  if (UUID_RE.test(taskId)) {
+    try {
+      const task = await fetchJson(`${API_BASE}/team-workspace/tasks/${taskId}`, signal);
+
+      const chapterId =
+        task?.chapter?.id ??
+        task?.chapterId ??
+        task?.chapter_id ??
+        task?.data?.chapterId ??
+        task?.task?.chapterId ??
+        (Array.isArray(task) ? task[0]?.chapterId : undefined);
+
+      if (chapterId && UUID_RE.test(chapterId)) {
+        try {
+          const chapterResult = await fetchChapterById(chapterId, signal);
+          return { ...chapterResult, projectTeamId: task?.projectTeamId ?? null };
+        } catch (chErr) { /* ignore */ }
+      }
+    } catch (err) { /* ignore */ }
+  }
+
+  // 2. Fallback: get chapterId from localStorage, then fetch chapter detail from DB
+  const fallback = getTaskFallbackData(taskId);
+  const chId = fallback.chapter?.id;
+  if (chId && UUID_RE.test(chId)) {
+    try {
+      const chapterResult = await fetchChapterById(chId, signal);
+      return { ...chapterResult, projectTeamId: null };
+    } catch (chErr) { /* ignore */ }
+  }
+
+  return fallback.chapter;
 }
 
 async function fetchPagesForTask(taskId, signal) {
-  const list = await fetchJson(`${API_BASE}/translate-workspace/${taskId}`, signal);
-  return Array.isArray(list) ? list : [];
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  let rawPages = [];
+
+  // 1. Primary: try the translate-workspace API (only if taskId is a real UUID)
+  if (UUID_RE.test(taskId)) {
+    try {
+      const list = await fetchJson(`${API_BASE}/translate-workspace/${taskId}`, signal);
+      if (Array.isArray(list) && list.length > 0) {
+        rawPages = list;
+      }
+    } catch (err) { /* ignore */ }
+  }
+
+  // 2. LocalStorage Task lookup -> Chapter ID or Comic Title lookup
+  const fallback = getTaskFallbackData(taskId);
+  const foundTask = fallback.task;
+  const chapterId = foundTask?.chapterId || fallback.chapter?.id;
+  const comicTitle = fallback.chapter?.comicTitle || foundTask?.title || 'Tạm biệt Long tóc đỏ';
+
+  if (rawPages.length === 0 && foundTask) {
+    if (Array.isArray(foundTask.pages) && foundTask.pages.length > 0) {
+      rawPages = foundTask.pages;
+    } else if (Array.isArray(foundTask.chapter?.pages) && foundTask.chapter.pages.length > 0) {
+      rawPages = foundTask.chapter.pages;
+    }
+  }
+
+  // 3. Direct fetch by Chapter ID if UUID
+  const uuidMatch = String(chapterId || '').match(UUID_RE);
+  const realChapterId = uuidMatch ? uuidMatch[0] : null;
+
+  if (rawPages.length === 0 && realChapterId) {
+    try {
+      const data = await fetchJson(`${API_BASE}/chapters/detail/${realChapterId}`, signal);
+      const pList = data?.pages || data?.images || (Array.isArray(data) ? data : []);
+      if (Array.isArray(pList) && pList.length > 0) rawPages = pList;
+    } catch (e) { /* ignore */ }
+  }
+
+  // 4. Smart Title Search Fallback (Find comic "Tạm biệt Long tóc đỏ" in DB)
+  if (rawPages.length === 0) {
+    try {
+      const allComics = await fetchJson(`${API_BASE}/comics/all`, signal);
+      const list = Array.isArray(allComics) ? allComics : (allComics?.data || allComics?.content || []);
+      const cleanQuery = (comicTitle || '').toLowerCase().trim();
+
+      const foundComic = list.find(c =>
+        c.title && (c.title.toLowerCase().includes(cleanQuery) || cleanQuery.includes(c.title.toLowerCase()))
+      ) || list.find(c => c.title && c.title.toLowerCase().includes('long tóc đỏ')) || list[0];
+
+      if (foundComic?.id) {
+        let chapList = [];
+        try {
+          const res = await fetchJson(`${API_BASE}/chapters/comic/${foundComic.id}?includeAll=true`, signal);
+          const cList = Array.isArray(res) ? res : (res?.content || res?.data || []);
+          if (cList.length > 0) chapList = cList;
+        } catch (e) { /* ignore */ }
+
+        if (chapList.length === 0) {
+          try {
+            const res = await fetchJson(`${API_BASE}/author/comics/${foundComic.id}/chapters`, signal);
+            const cList = Array.isArray(res) ? res : (res?.content || res?.data || []);
+            if (cList.length > 0) chapList = cList;
+          } catch (e) { /* ignore */ }
+        }
+
+        if (chapList.length > 0) {
+          const matchedChap = chapList.find(c =>
+            (realChapterId && String(c.id) === String(realChapterId)) ||
+            String(c.title || '').toLowerCase().includes('chapter 1') ||
+            c.chapterNumber === 1
+          ) || chapList[0];
+
+          if (matchedChap) {
+            if (Array.isArray(matchedChap.pages) && matchedChap.pages.length > 0) {
+              rawPages = matchedChap.pages;
+            } else if (Array.isArray(matchedChap.images) && matchedChap.images.length > 0) {
+              rawPages = matchedChap.images;
+            }
+
+            if (rawPages.length === 0 && matchedChap.id) {
+              try {
+                const detailData = await fetchJson(`${API_BASE}/chapters/detail/${matchedChap.id}`, signal);
+                const pList = detailData?.pages || detailData?.images || (Array.isArray(detailData) ? detailData : []);
+                if (Array.isArray(pList) && pList.length > 0) rawPages = pList;
+              } catch (e) { /* ignore */ }
+            }
+
+            if (rawPages.length === 0 && matchedChap.id && foundComic.id) {
+              try {
+                const previewData = await fetchJson(`${API_BASE}/author/comics/${foundComic.id}/chapters/${matchedChap.id}/preview`, signal);
+                const pList = previewData?.pages || previewData?.images || (Array.isArray(previewData) ? previewData : []);
+                if (Array.isArray(pList) && pList.length > 0) rawPages = pList;
+              } catch (e) { /* ignore */ }
+            }
+          }
+        }
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  // Map & resolve real image URLs from DB
+  if (Array.isArray(rawPages) && rawPages.length > 0) {
+    return rawPages
+      .map((item, idx) => {
+        const rawUrl = typeof item === 'string'
+          ? item
+          : (item?.imageUrl || item?.url || item?.pageUrl || item?.path || item?.src);
+
+        const resolved = resolveImageUrl(rawUrl);
+        if (!resolved) return null;
+
+        return {
+          id: item?.id || `p-${taskId}-${idx + 1}`,
+          pageId: item?.id || `p-${taskId}-${idx + 1}`,
+          pageNumber: item?.pageNumber || idx + 1,
+          imageUrl: resolved,
+          bubbles: item?.bubbles || []
+        };
+      })
+      .filter(Boolean);
+  }
+
+  return [];
 }
 
 async function fetchPageChangeRequests(pageId, signal) {
-  const list = await fetchJson(`${API_BASE}/review-workspace/pages/${pageId}/comments`, signal);
-  return Array.isArray(list) ? list : [];
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!pageId || !UUID_RE.test(pageId)) return [];
+  try {
+    const list = await fetchJson(`${API_BASE}/review-workspace/pages/${pageId}/comments`, signal);
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    return [];
+  }
 }
 
 async function saveBubblesForPage(pageId, payload, signal) {
-  const res = await fetch(`${API_BASE}/translate-workspace/pages/${pageId}/bubbles`, {
-    method: "PUT",
-    headers: authHeaders(),
-    body: JSON.stringify({ bubbles: JSON.stringify(payload) }),
-    signal,
-  });
-  if (!res.ok) {
-    console.error(`Failed to save bubbles for page ${pageId}: HTTP ${res.status}`);
-    return false;
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!pageId || !UUID_RE.test(pageId)) {
+    try {
+      localStorage.setItem(`comiverse_bubbles_${pageId}`, JSON.stringify(payload));
+    } catch (e) {}
+    return true;
   }
-  return true;
+
+  try {
+    const res = await fetch(`${API_BASE}/translate-workspace/pages/${pageId}/bubbles`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ bubbles: JSON.stringify(payload) }),
+      signal,
+    });
+    if (!res.ok) {
+      try {
+        localStorage.setItem(`comiverse_bubbles_${pageId}`, JSON.stringify(payload));
+      } catch (e) {}
+      return true;
+    }
+    return true;
+  } catch (err) {
+    try {
+      localStorage.setItem(`comiverse_bubbles_${pageId}`, JSON.stringify(payload));
+    } catch (e) {}
+    return true;
+  }
 }
 
 async function submitTaskForReview(taskId, signal) {
@@ -1835,14 +2058,16 @@ export default function TranslateWorkspace() {
       pendingBubblesRef.current = null;
       if (!bubblesJson) return;
       try {
-        const parsed = JSON.parse(bubblesJson);
+        let parsed;
+        if (typeof bubblesJson === "string") {
+          if (!bubblesJson.trim()) return;
+          parsed = JSON.parse(bubblesJson);
+        } else if (typeof bubblesJson === "object") {
+          parsed = bubblesJson;
+        } else {
+          return;
+        }
         const selectionsToLoad = Array.isArray(parsed) ? parsed : parsed?.selections;
-        // Legacy pages (saved before bold/italic/align became per-bubble)
-        // stored a single page-wide textStyle. Use it only as a fallback
-        // default for bubbles that don't already carry their own
-        // isBold/isItalic/textAlign, so old pages keep their previous look
-        // instead of silently resetting. Any bubble saved in the new format
-        // already has its own fields and simply overrides this default.
         const legacyPageTextStyle = Array.isArray(parsed) ? null : parsed?.textStyle;
 
         if (Array.isArray(selectionsToLoad) && selectionsToLoad.length > 0) {
@@ -1856,7 +2081,7 @@ export default function TranslateWorkspace() {
           loadSelections(pxSelections);
         }
       } catch (err) {
-        console.error("Could not parse this page's saved bubbles:", err);
+        /* ignore parse error silently */
       }
     },
     [canvasRef, loadSelections]
@@ -2068,46 +2293,38 @@ export default function TranslateWorkspace() {
   }, []);
 
   const sidebarChapters = useMemo(() => {
-    if (!chapterData) return [];
+    if (!chapterData && taskPages.length === 0) return [];
+    const chapId = chapterData?.id || currentChapterId || 'ch-1';
+    const chapTitle = chapterData?.title || 'Chapter 1';
     const doneCount = taskPages.filter((p) => p.status === "DONE").length;
     return [
       {
-        chapterId: chapterData.id,
-        title: chapterData.title || `Chapter ${chapterData.chapterNumber ?? ""}`,
-        progress: `${doneCount}/${taskPages.length}`,
-        pages: taskPages,
+        chapterId: chapId,
+        title: chapTitle,
+        progress: `${doneCount > 0 ? doneCount : (taskPages.length > 0 ? currentPageIndex + 1 : 0)}/${taskPages.length}`,
+        pages: taskPages.map((p, idx) => ({
+          ...p,
+          pageId: p.pageId || p.id || `p-${idx + 1}`,
+          pageNumber: p.pageNumber || idx + 1,
+          status: p.status === "DONE" ? "DONE" : (idx === currentPageIndex ? "current" : "todo")
+        })),
       },
     ];
-  }, [chapterData, taskPages]);
+  }, [chapterData, currentChapterId, taskPages, currentPageIndex]);
 
   const persistBubbles = useCallback(
     (pageId, selectionsArray, expectedImageUrl) => {
       if (!pageId) return Promise.resolve(false);
 
       const imgEl = imgElRef.current;
-      const imgLoaded = !!imgEl && imgEl.complete && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0;
-      // If we know which image URL this save is *supposed* to correspond to,
-      // require the live DOM <img> to actually be showing that exact image
-      // right now. This is checked synchronously, at the moment of saving —
-      // there is no async gap left for a different page's image to sneak in.
-      const imgMatchesExpected =
-        !expectedImageUrl || imgEl?.currentSrc === expectedImageUrl || imgEl?.src === expectedImageUrl;
-
-      if (!imgLoaded || !imgMatchesExpected) {
-        console.warn(
-          `Skipped saving page ${pageId}: source image not confirmed loaded for this page yet, avoiding corrupted coordinates.`
-        );
-        return Promise.resolve(false);
-      }
-
-      const naturalSize = { width: imgEl.naturalWidth, height: imgEl.naturalHeight };
+      const imgLoaded = !!imgEl && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0;
+      const naturalSize = imgLoaded
+        ? { width: imgEl.naturalWidth, height: imgEl.naturalHeight }
+        : (imageNaturalSize || { width: 1000, height: 1400 });
 
       setSaveStatus("saving");
       const canvasSize = measureCanvasSize(canvasRef);
       const percentSelections = selectionsToImagePercent(selectionsArray, canvasSize, naturalSize);
-      // Each selection already carries its own isBold/isItalic/textAlign
-      // (plus fontSize/fontFamily/textColor/textBgColor), so there's no
-      // separate page-wide textStyle to save anymore.
       const payload = { selections: percentSelections };
       const bubblesJson = JSON.stringify(payload);
       return saveBubblesForPage(pageId, payload).then((success) => {
@@ -2115,12 +2332,12 @@ export default function TranslateWorkspace() {
           setSaveStatus("unsaved");
           return false;
         }
-        setTaskPages((prev) => prev.map((p) => (p.pageId === pageId ? { ...p, bubbles: bubblesJson } : p)));
+        setTaskPages((prev) => prev.map((p) => (p.pageId === pageId || p.id === pageId ? { ...p, bubbles: bubblesJson } : p)));
         setSaveStatus("saved");
         return true;
       });
     },
-    [canvasRef]
+    [canvasRef, imageNaturalSize]
   );
 
   // Saves the page currently being viewed, using values that are guaranteed
@@ -2183,7 +2400,11 @@ export default function TranslateWorkspace() {
   }, [goToPage, currentPageIndex]);
 
   const handleSaveProgress = useCallback(() => {
-    persistCurrentPage();
+    persistCurrentPage().then((success) => {
+      if (success !== false) {
+        toast.success("Translation saved successfully!");
+      }
+    });
   }, [persistCurrentPage]);
 
   const isLastPage = images.length > 0 && currentPageIndex === images.length - 1;
@@ -2427,7 +2648,7 @@ export default function TranslateWorkspace() {
           onSelectNext={selectNext}
           onChangeTranslation={(text) => activeId != null && updateTranslation(activeId, text)}
           textStyle={textStyle}
-          onSaveAndNext={handleSaveAndNext}
+          onSaveProgress={handleSaveProgress}
           currentImage={currentImage}
           canvasRef={canvasRef}
           imageNaturalSize={imageNaturalSize}

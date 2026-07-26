@@ -19,7 +19,7 @@ import ChatInputBar from '../../components/chat/ChatInputBar'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import ModernButton from '../../components/common/ModernButton'
 import { toast } from 'react-toastify'
-import { pushUserNotification, setUserChatRestriction, issueUserWarningStrike } from '../../utils/Auth'
+import { pushUserNotification, setUserChatRestriction, issueUserWarningStrike, getAuth } from '../../utils/Auth'
 
 /* ── MODERATOR LIVE STREAM COMPONENT ─────────────────── */
 function ModeratorLiveStream({ onFlagMessage, onWarnUser, onMuteUser, onBanUser, onDeleteMessage }) {
@@ -38,7 +38,14 @@ function ModeratorLiveStream({ onFlagMessage, onWarnUser, onMuteUser, onBanUser,
   } = useChat('GLOBAL', null)
 
   const [hoveredMsgId, setHoveredMsgId] = useState(null)
-  const [deletedMsgIds, setDeletedMsgIds] = useState(new Set())
+  const [deletedMsgIds, setDeletedMsgIds] = useState(() => {
+    try {
+      const raw = localStorage.getItem('comiverse_moderator_deleted_msgs')
+      return raw ? new Set(JSON.parse(raw)) : new Set()
+    } catch (e) {
+      return new Set()
+    }
+  })
   const [inspectImage, setInspectImage] = useState(null)
 
   const handleScroll = () => {
@@ -61,7 +68,13 @@ function ModeratorLiveStream({ onFlagMessage, onWarnUser, onMuteUser, onBanUser,
   const visibleMessages = messages.filter(m => !deletedMsgIds.has(m.id))
 
   const handleDelete = (msg) => {
-    setDeletedMsgIds(prev => new Set([...prev, msg.id]))
+    setDeletedMsgIds(prev => {
+      const next = new Set(prev).add(msg.id)
+      try {
+        localStorage.setItem('comiverse_moderator_deleted_msgs', JSON.stringify(Array.from(next)))
+      } catch (e) {}
+      return next
+    })
     if (onDeleteMessage) onDeleteMessage(msg)
   }
 
@@ -120,9 +133,18 @@ function ModeratorLiveStream({ onFlagMessage, onWarnUser, onMuteUser, onBanUser,
           visibleMessages.map((msg) => {
             const userObj = currentUser || {}
             const userId = userObj.id || userObj.userId
-            const isMine = (userId && msg.senderId && String(msg.senderId) === String(userId)) ||
-              (userObj.fullName && (msg.senderName === userObj.fullName || msg.sender === userObj.fullName))
+            const myName = (userObj.fullName || userObj.username || '').toLowerCase()
             const senderName = msg.senderName || msg.sender || 'Anonymous'
+            const senderLower = senderName.toLowerCase()
+
+            const isMine = (userId && msg.senderId && String(msg.senderId) === String(userId)) ||
+              (myName && (senderLower === myName || senderLower.includes(myName)))
+            const isAdmin = senderLower.includes('admin') ||
+              senderLower.includes('system administrator') ||
+              (msg.senderRole && msg.senderRole.toLowerCase() === 'admin') ||
+              (msg.role && msg.role.toLowerCase() === 'admin')
+
+            const isProtected = isMine || isAdmin
             const initial = (senderName || 'U')[0].toUpperCase()
             const imageUrl = msg.imageUrl || msg.image || msg.attachedImage || null
             const isHovered = hoveredMsgId === msg.id
@@ -149,6 +171,11 @@ function ModeratorLiveStream({ onFlagMessage, onWarnUser, onMuteUser, onBanUser,
                     <span className="cv-mod-stream-sender">{senderName}</span>
                     <span className="cv-mod-stream-time">{formatTime(msg.createdAt)}</span>
                     {isMine && <span className="cv-mod-stream-you-badge">YOU</span>}
+                    {isAdmin && !isMine && (
+                      <span className="cv-mod-stream-you-badge" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' }}>
+                        ADMIN
+                      </span>
+                    )}
                   </div>
 
                   {/* Image message */}
@@ -172,58 +199,62 @@ function ModeratorLiveStream({ onFlagMessage, onWarnUser, onMuteUser, onBanUser,
                   )}
                 </div>
 
-                {/* MODERATION ACTION BUTTONS — visible on hover */}
-                {isHovered && !isMine && (
+                {/* MODERATION ACTION BUTTONS — Hidden for Admin & Self */}
+                {isHovered && (
                   <div className="cv-mod-stream-actions">
-                    <button
-                      type="button"
-                      className="cv-mod-action-btn flag"
-                      onClick={() => {
-                        handleDelete(msg)
-                        onFlagMessage && onFlagMessage(msg)
-                      }}
-                      title="Flag & Remove Message"
-                    >
-                      🚩
-                    </button>
-                    <button
-                      type="button"
-                      className="cv-mod-action-btn warn"
-                      onClick={() => {
-                        handleDelete(msg)
-                        onWarnUser && onWarnUser(msg)
-                      }}
-                      title="Warn User & Remove Message"
-                    >
-                      ⚠️
-                    </button>
-                    <button
-                      type="button"
-                      className="cv-mod-action-btn mute"
-                      onClick={() => {
-                        handleDelete(msg)
-                        onMuteUser && onMuteUser(msg)
-                      }}
-                      title="Mute User & Remove Message"
-                    >
-                      🔇
-                    </button>
-                    <button
-                      type="button"
-                      className="cv-mod-action-btn ban"
-                      onClick={() => {
-                        handleDelete(msg)
-                        onBanUser && onBanUser(msg)
-                      }}
-                      title="Ban User & Remove Message"
-                    >
-                      🚫
-                    </button>
+                    {!isProtected && (
+                      <>
+                        <button
+                          type="button"
+                          className="cv-mod-action-btn flag"
+                          onClick={() => {
+                            handleDelete(msg)
+                            onFlagMessage && onFlagMessage(msg)
+                          }}
+                          data-tooltip="Flag & Remove Message"
+                        >
+                          🚩
+                        </button>
+                        <button
+                          type="button"
+                          className="cv-mod-action-btn warn"
+                          onClick={() => {
+                            handleDelete(msg)
+                            onWarnUser && onWarnUser(msg)
+                          }}
+                          data-tooltip="Warn User & Remove"
+                        >
+                          ⚠️
+                        </button>
+                        <button
+                          type="button"
+                          className="cv-mod-action-btn mute"
+                          onClick={() => {
+                            handleDelete(msg)
+                            onMuteUser && onMuteUser(msg)
+                          }}
+                          data-tooltip="Mute User & Remove"
+                        >
+                          🔇
+                        </button>
+                        <button
+                          type="button"
+                          className="cv-mod-action-btn ban"
+                          onClick={() => {
+                            handleDelete(msg)
+                            onBanUser && onBanUser(msg)
+                          }}
+                          data-tooltip="Ban User & Remove"
+                        >
+                          🚫
+                        </button>
+                      </>
+                    )}
                     <button
                       type="button"
                       className="cv-mod-action-btn delete"
                       onClick={() => handleDelete(msg)}
-                      title="Delete message"
+                      data-tooltip="Delete Message"
                     >
                       🗑️
                     </button>
@@ -242,62 +273,96 @@ function ModeratorLiveStream({ onFlagMessage, onWarnUser, onMuteUser, onBanUser,
       />
 
       {/* Image Inspection Modal */}
-      {inspectImage && (
-        <div className="cv-modal-overlay fade-in" onClick={() => setInspectImage(null)}>
-          <div className="cv-modal-box" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
-            <div className="cv-modal-header">
-              <h3>🔍 Image Inspection — Sent by {inspectImage.sender}</h3>
-              <button className="cv-modal-close" onClick={() => setInspectImage(null)}>×</button>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0' }}>
-              <img
-                src={inspectImage.url}
-                alt="Inspecting content"
-                style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '12px', objectFit: 'contain' }}
-              />
-            </div>
-            <div style={{ fontSize: '12px', color: '#94a3b8', textAlign: 'center', marginBottom: '8px' }}>
-              Sent at {inspectImage.time} by <strong style={{ color: '#e2e8f0' }}>{inspectImage.sender}</strong>
-            </div>
-            <div className="cv-modal-footer" style={{ justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                className="mod-btn review"
-                onClick={() => { onFlagMessage && onFlagMessage(inspectImage.msg); setInspectImage(null) }}
-              >
-                🚩 Flag Image
-              </button>
-              <button
-                type="button"
-                className="mod-btn warning-opt"
-                onClick={() => { onWarnUser && onWarnUser(inspectImage.msg); setInspectImage(null) }}
-              >
-                ⚠️ Warn Sender
-              </button>
-              <button
-                type="button"
-                className="mod-btn reject"
-                onClick={() => { onBanUser && onBanUser(inspectImage.msg); setInspectImage(null) }}
-              >
-                🚫 Ban User
-              </button>
-              <button
-                type="button"
-                className="cv-btn-secondary"
-                onClick={() => setInspectImage(null)}
-              >
-                ✅ Dismiss
-              </button>
+      {inspectImage && (() => {
+        const senderLower = (inspectImage.sender || '').toLowerCase()
+        const msgObj = inspectImage.msg || {}
+        const userObj = currentUser || {}
+        const myId = userObj.id || userObj.userId
+        const myName = (userObj.fullName || userObj.username || '').toLowerCase()
+
+        const isSelf = (myId && msgObj.senderId && String(msgObj.senderId) === String(myId)) ||
+          (myName && (senderLower === myName || senderLower.includes(myName)))
+        const isAdmin = senderLower.includes('admin') ||
+          senderLower.includes('system administrator') ||
+          (msgObj.senderRole && msgObj.senderRole.toLowerCase() === 'admin') ||
+          (msgObj.role && msgObj.role.toLowerCase() === 'admin')
+
+        const isProtected = isSelf || isAdmin
+
+        return (
+          <div className="cv-modal-overlay fade-in" onClick={() => setInspectImage(null)}>
+            <div className="cv-modal-box" style={{ maxWidth: '600px', padding: '16px 20px' }} onClick={(e) => e.stopPropagation()}>
+              <div className="cv-modal-header" style={{ marginBottom: '12px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800' }}>🔍 Image Inspection</h3>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#94a3b8',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    padding: '3px 10px',
+                    borderRadius: '20px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }}>
+                    {inspectImage.sender} {isSelf ? '(YOU)' : (isAdmin ? '(ADMIN)' : '')} • {inspectImage.time}
+                  </span>
+                </div>
+                <button className="cv-modal-close" onClick={() => setInspectImage(null)}>×</button>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0' }}>
+                <img
+                  src={inspectImage.url}
+                  alt="Inspecting content"
+                  style={{ maxWidth: '100%', maxHeight: '420px', borderRadius: '12px', objectFit: 'contain' }}
+                />
+              </div>
+
+              {!isProtected && (
+                <div className="cv-modal-footer" style={{ justifyContent: 'center', gap: '8px', marginTop: '14px' }}>
+                  <button
+                    type="button"
+                    className="mod-btn review"
+                    onClick={() => {
+                      onFlagMessage && onFlagMessage(inspectImage.msg)
+                      setInspectImage(null)
+                    }}
+                  >
+                    🚩 Flag Image
+                  </button>
+                  <button
+                    type="button"
+                    className="mod-btn warning-opt"
+                    onClick={() => {
+                      onWarnUser && onWarnUser(inspectImage.msg)
+                      setInspectImage(null)
+                    }}
+                  >
+                    ⚠️ Warn Sender
+                  </button>
+                  <button
+                    type="button"
+                    className="mod-btn reject"
+                    onClick={() => {
+                      onBanUser && onBanUser(inspectImage.msg)
+                      setInspectImage(null)
+                    }}
+                  >
+                    🚫 Ban User
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
 
 function ChatMonitor({ fetchAllData }) {
   const [activeTab, setActiveTab] = useState('flags') // 'flags' | 'keywords' | 'live'
+  const [flagSubTab, setFlagSubTab] = useState('active') // 'active' | 'resolved'
   
   // Data states
   const [flags, setFlags] = useState([])
@@ -316,6 +381,25 @@ function ChatMonitor({ fetchAllData }) {
   const [muteHours, setMuteHours] = useState(24)
   const [muteReason, setMuteReason] = useState('')
 
+  // LocalStorage Key for Chat Flags Persistence across F5
+  const FLAGS_STORAGE_KEY = 'comiverse_moderator_flags'
+
+  const saveFlagsToStorage = (updatedFlags) => {
+    try {
+      localStorage.setItem(FLAGS_STORAGE_KEY, JSON.stringify(updatedFlags))
+    } catch (e) {
+      console.warn('Failed to save flags to localStorage:', e)
+    }
+  }
+
+  const updateFlagsState = (updater) => {
+    setFlags(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      saveFlagsToStorage(next)
+      return next
+    })
+  }
+
   useEffect(() => {
     fetchFlags()
     fetchKeywords()
@@ -324,8 +408,29 @@ function ChatMonitor({ fetchAllData }) {
   const fetchFlags = async () => {
     try {
       setLoadingFlags(true)
-      const data = await getAllChatFlagsApi()
-      setFlags(Array.isArray(data) ? data : (data?.data || []))
+      let serverFlags = []
+      try {
+        const data = await getAllChatFlagsApi()
+        serverFlags = Array.isArray(data) ? data : (data?.data || [])
+      } catch (err) {
+        console.warn('Server flags API offline, using local storage flags:', err)
+      }
+
+      let localFlags = []
+      try {
+        const raw = localStorage.getItem(FLAGS_STORAGE_KEY)
+        localFlags = raw ? JSON.parse(raw) : []
+      } catch (e) {}
+
+      // Merge localFlags and serverFlags (local state takes priority for actioned status)
+      const flagMap = new Map()
+      serverFlags.forEach(f => flagMap.set(f.id, f))
+      localFlags.forEach(f => flagMap.set(f.id, { ...(flagMap.get(f.id) || {}), ...f }))
+
+      const merged = Array.from(flagMap.values()).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+
+      setFlags(merged)
+      saveFlagsToStorage(merged)
       fetchAllData?.()
     } catch (err) {
       console.error(err)
@@ -348,9 +453,22 @@ function ChatMonitor({ fetchAllData }) {
     }
   }
 
+  const checkProtectedUser = (userStr) => {
+    if (!userStr) return false
+    const lower = userStr.toLowerCase()
+    const auth = getAuth()
+    const userObj = auth?.user || {}
+    const myName = (userObj.fullName || userObj.username || '').toLowerCase()
+    return lower.includes('admin') || lower.includes('system administrator') || (myName && (lower === myName || lower.includes(myName)))
+  }
+
   // Action: Warn user (Graduated Penalty Policy: 1 warn = 1h mute, 2 warns = 5 days mute, 3 warns = BAN)
   const handleSendWarning = async (id, user) => {
     if (submitting) return
+    if (checkProtectedUser(user)) {
+      toast.error('🛡️ Cannot issue warning strikes against Admin or Self accounts!')
+      return
+    }
     try {
       setSubmitting(true)
       await warnChatFlagApi(id).catch((err) => {
@@ -360,12 +478,18 @@ function ChatMonitor({ fetchAllData }) {
       // Issue graduated warning strike & calculate penalty (1 warn -> 1h, 2 warns -> 5d, 3 warns -> BAN)
       const res = issueUserWarningStrike(user, 'Chat moderation violation')
 
-      setFlags(prev => prev.map(f => f.id === id ? { ...f, status: 'warned', warningCount: res.strikeCount } : f))
+      updateFlagsState(prev => prev.map(f => f.id === id ? {
+        ...f,
+        status: 'warned',
+        warningCount: res.strikeCount,
+        actionedAt: new Date().toISOString(),
+        actionedBy: 'Moderator'
+      } : f))
 
       if (res.penaltyType === 'BAN') {
-        toast.error(`🚫 Strike 3/3 issued to "${user}": PERMANENT CHAT BAN applied!`)
+        toast.error(`🚫 Strike 3/3 issued to "${user}": PERMANENT CHAT BAN applied! Moved to Audit Log.`)
       } else {
-        toast.warning(`⚠️ Warning Strike ${res.strikeCount}/3 issued to "${user}": Muted for ${res.durationLabel}!`)
+        toast.warning(`⚠️ Warning Strike ${res.strikeCount}/3 issued to "${user}": Muted for ${res.durationLabel}! Moved to Audit Log.`)
       }
     } catch (err) {
       console.error(err)
@@ -383,8 +507,15 @@ function ChatMonitor({ fetchAllData }) {
       await dismissChatFlagApi(id).catch((err) => {
         console.warn('Backend dismiss API unavailable, applying optimistic local state:', err?.message || err)
       })
-      setFlags(prev => prev.filter(f => f.id !== id))
-      toast.info('Flag dismissed.')
+
+      updateFlagsState(prev => prev.map(f => f.id === id ? {
+        ...f,
+        status: 'dismissed',
+        actionedAt: new Date().toISOString(),
+        actionedBy: 'Moderator'
+      } : f))
+
+      toast.info('Flag dismissed & archived to Audit Log.')
     } catch (err) {
       console.error(err)
       toast.error('Failed to dismiss flag.')
@@ -396,13 +527,23 @@ function ChatMonitor({ fetchAllData }) {
   // Action: Ban user permanently
   const handleBanUser = async (id, user) => {
     if (submitting) return
+    if (checkProtectedUser(user)) {
+      toast.error('🛡️ Cannot ban Admin or Self accounts!')
+      return
+    }
     if (window.confirm(`Are you sure you want to permanently ban chat access for user: ${user}?`)) {
       try {
         setSubmitting(true)
         await deleteChatFlagApi(id).catch((err) => {
           console.warn('Backend ban API unavailable, applying optimistic local state:', err?.message || err)
         })
-        setFlags(prev => prev.filter(f => f.id !== id))
+
+        updateFlagsState(prev => prev.map(f => f.id === id ? {
+          ...f,
+          status: 'banned',
+          actionedAt: new Date().toISOString(),
+          actionedBy: 'Moderator'
+        } : f))
 
         // Set permanent BAN restriction & push system notification
         setUserChatRestriction(user, { type: 'BAN', reason: 'Chat access permanently banned by Moderator' })
@@ -413,7 +554,7 @@ function ChatMonitor({ fetchAllData }) {
         })
 
         fetchAllData?.()
-        toast.success(`🚫 Chat access permanently banned for user ${user}.`)
+        toast.success(`🚫 Chat access permanently banned for user ${user}. Moved to Audit Log.`)
       } catch (err) {
         console.error(err)
         toast.error('Failed to ban user!')
@@ -425,9 +566,14 @@ function ChatMonitor({ fetchAllData }) {
 
   // Action: Open Mute Modal
   const handleOpenMuteModal = (flag) => {
+    const user = flag.user || flag.username || 'User'
+    if (checkProtectedUser(user)) {
+      toast.error('🛡️ Cannot mute Admin or Self accounts!')
+      return
+    }
     setMuteTarget({
       userId: flag.userId || flag.id,
-      username: flag.user || flag.username || 'User',
+      username: user,
       flagId: flag.id
     })
     setMuteHours(24)
@@ -442,10 +588,37 @@ function ChatMonitor({ fetchAllData }) {
       await muteUserChatApi(muteTarget.userId, muteHours, muteReason).catch((err) => {
         console.warn('Backend mute API unavailable, applying optimistic local state:', err?.message || err)
       })
-      setFlags(prev => prev.map(f => f.id === muteTarget.flagId ? { ...f, status: 'muted', mutedUntil: `${muteHours}h` } : f))
+
+      const until = new Date(Date.now() + muteHours * 3600000).toISOString()
+      const targetFlagId = muteTarget.flagId || `flag-${Date.now()}`
+
+      updateFlagsState(prev => {
+        const exists = prev.some(f => f.id === targetFlagId || (muteTarget.username && f.user === muteTarget.username && (!f.status || f.status === 'pending')))
+        if (exists) {
+          return prev.map(f => (f.id === targetFlagId || (muteTarget.username && f.user === muteTarget.username && (!f.status || f.status === 'pending'))) ? {
+            ...f,
+            status: 'muted',
+            mutedUntil: `${muteHours}h`,
+            actionedAt: new Date().toISOString(),
+            actionedBy: 'Moderator'
+          } : f)
+        } else {
+          return [{
+            id: targetFlagId,
+            user: muteTarget.username,
+            userId: muteTarget.userId,
+            message: muteTarget.msgContent || 'Live chat message',
+            reason: muteReason || 'Temporary chat mute applied',
+            createdAt: new Date().toISOString(),
+            status: 'muted',
+            mutedUntil: `${muteHours}h`,
+            actionedAt: new Date().toISOString(),
+            actionedBy: 'Moderator'
+          }, ...prev]
+        }
+      })
 
       // Set MUTE restriction & push system notification to target user
-      const until = new Date(Date.now() + muteHours * 3600000).toISOString()
       setUserChatRestriction(muteTarget.userId, { type: 'MUTE', reason: muteReason, until })
       setUserChatRestriction(muteTarget.username, { type: 'MUTE', reason: muteReason, until })
 
@@ -460,7 +633,7 @@ function ChatMonitor({ fetchAllData }) {
         type: 'SYSTEM'
       })
 
-      toast.success(`🔇 User ${muteTarget.username} muted for ${muteHours} hours.`)
+      toast.success(`🔇 User "${muteTarget.username}" muted for ${muteHours} hours. Moved to Audit Log.`)
       setMuteTarget(null)
     } catch (err) {
       console.error(err)
@@ -468,6 +641,17 @@ function ChatMonitor({ fetchAllData }) {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // Action: Restore Flag back to Active Queue
+  const handleReopenFlag = (id) => {
+    updateFlagsState(prev => prev.map(f => f.id === id ? {
+      ...f,
+      status: 'pending',
+      actionedAt: null,
+      actionedBy: null
+    } : f))
+    toast.info('🔄 Flag restored and moved back to Active Flags queue.')
   }
 
   // Action: Add Banned Keyword
@@ -522,6 +706,9 @@ function ChatMonitor({ fetchAllData }) {
     }
   }
 
+  const pendingFlags = flags.filter(f => !f.status || f.status === 'pending')
+  const resolvedFlags = flags.filter(f => f.status && f.status !== 'pending')
+
   const filteredKeywords = keywords.filter(k => 
     !keywordFilter || k.word?.toLowerCase().includes(keywordFilter.toLowerCase()) || k.category?.toLowerCase().includes(keywordFilter.toLowerCase())
   )
@@ -536,9 +723,13 @@ function ChatMonitor({ fetchAllData }) {
         </div>
 
         <div className="cv-chat-metrics-bar">
-          <div className="cv-metric-pill">
-            <span className="cv-metric-val">{flags.length}</span>
+          <div className="cv-metric-pill highlight">
+            <span className="cv-metric-val">{pendingFlags.length}</span>
             <span className="cv-metric-lbl">Active Flags</span>
+          </div>
+          <div className="cv-metric-pill">
+            <span className="cv-metric-val">{resolvedFlags.length}</span>
+            <span className="cv-metric-lbl">Audit Log</span>
           </div>
           <div className="cv-metric-pill">
             <span className="cv-metric-val">{keywords.length}</span>
@@ -553,7 +744,7 @@ function ChatMonitor({ fetchAllData }) {
           className={`cv-chat-tab-btn ${activeTab === 'flags' ? 'active' : ''}`}
           onClick={() => setActiveTab('flags')}
         >
-          🚩 Flagged Accounts & Violations ({flags.length})
+          🚩 Flagged Accounts & Violations ({pendingFlags.length})
         </button>
         <button
           className={`cv-chat-tab-btn ${activeTab === 'keywords' ? 'active' : ''}`}
@@ -572,46 +763,60 @@ function ChatMonitor({ fetchAllData }) {
       {/* TAB 1: VIOLATING ACCOUNTS & FLAGGED MESSAGES */}
       {activeTab === 'flags' && (
         <div className="cv-tab-pane">
-          {loadingFlags ? (
-            <div style={{ padding: '24px 0' }}>
-              <SkeletonLoader type="staggered" count={3} />
-            </div>
-          ) : flags.length === 0 ? (
-            <div className="moderator-empty-state">
-              <h3>🎉 Zero Pending Violations</h3>
-              <p>All chatrooms are clear. No flagged messages or accounts pending review.</p>
-            </div>
-          ) : (
-            <div className="cv-flags-list">
-              {flags.map(f => (
-                <div className="cv-flag-card" key={f.id}>
-                  <div className="cv-flag-user-info">
-                    <div className="cv-user-avatar">
-                      {(f.user || 'U').substring(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <h3 className="cv-user-name">User: {f.user}</h3>
-                      <span className="cv-flag-meta">
-                        Flagged in Chapter Chat • {f.createdAt ? new Date(f.createdAt).toLocaleTimeString() : 'Recent'}
-                      </span>
-                    </div>
-                  </div>
+          {/* Sub-tab Bar: Active Queue vs Resolved Audit Log */}
+          <div className="cv-subtabs-header">
+            <button
+              type="button"
+              className={`cv-subtab-btn ${flagSubTab === 'active' ? 'active' : ''}`}
+              onClick={() => setFlagSubTab('active')}
+            >
+              🚩 Active / Pending Flags ({pendingFlags.length})
+            </button>
+            <button
+              type="button"
+              className={`cv-subtab-btn ${flagSubTab === 'resolved' ? 'active' : ''}`}
+              onClick={() => setFlagSubTab('resolved')}
+            >
+              📁 Actioned Audit Log ({resolvedFlags.length})
+            </button>
+          </div>
 
-                  <div className="cv-flag-body">
-                    <div className="cv-flag-msg-box">
-                      <strong>Flagged Message:</strong> <em>"{f.message}"</em>
+          {flagSubTab === 'active' ? (
+            loadingFlags ? (
+              <div style={{ padding: '24px 0' }}>
+                <SkeletonLoader type="staggered" count={3} />
+              </div>
+            ) : pendingFlags.length === 0 ? (
+              <div className="moderator-empty-state">
+                <h3>🎉 Zero Pending Violations</h3>
+                <p>All chatrooms are clear. Switch to "Actioned Audit Log" to view previously processed items.</p>
+              </div>
+            ) : (
+              <div className="cv-flags-list">
+                {pendingFlags.map(f => (
+                  <div className="cv-flag-card" key={f.id}>
+                    <div className="cv-flag-user-info">
+                      <div className="cv-user-avatar">
+                        {(f.user || 'U').substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <h3 className="cv-user-name">User: {f.user}</h3>
+                        <span className="cv-flag-meta">
+                          Flagged in Chapter Chat • {f.createdAt ? new Date(f.createdAt).toLocaleTimeString() : 'Recent'}
+                        </span>
+                      </div>
                     </div>
-                    <div className="cv-flag-reason-tag">
-                      ⚠️ <strong>Automated Filter Match:</strong> {f.reason || 'Profanity / Toxic Content'}
-                    </div>
-                  </div>
 
-                  <div className="cv-flag-actions">
-                    {f.status === 'warned' ? (
-                      <span className="cv-status-badge warned">⚠️ Warning Issued</span>
-                    ) : f.status === 'muted' ? (
-                      <span className="cv-status-badge muted">🔇 Muted ({f.mutedUntil || 'Temp'})</span>
-                    ) : (
+                    <div className="cv-flag-body">
+                      <div className="cv-flag-msg-box">
+                        <strong>Flagged Message:</strong> <em>"{f.message}"</em>
+                      </div>
+                      <div className="cv-flag-reason-tag">
+                        ⚠️ <strong>Automated Filter Match:</strong> {f.reason || 'Profanity / Toxic Content'}
+                      </div>
+                    </div>
+
+                    <div className="cv-flag-actions">
                       <button
                         className="mod-btn review"
                         onClick={() => handleSendWarning(f.id, f.user)}
@@ -619,35 +824,102 @@ function ChatMonitor({ fetchAllData }) {
                       >
                         ⚠️ Warn User
                       </button>
-                    )}
 
-                    <button
-                      className="mod-btn warning-opt"
-                      onClick={() => handleOpenMuteModal(f)}
-                      disabled={submitting}
-                    >
-                      🔇 Mute Account
-                    </button>
+                      <button
+                        className="mod-btn warning-opt"
+                        onClick={() => handleOpenMuteModal(f)}
+                        disabled={submitting}
+                      >
+                        🔇 Mute Account
+                      </button>
 
-                    <button
-                      className="mod-btn reject"
-                      onClick={() => handleBanUser(f.id, f.user)}
-                      disabled={submitting}
-                    >
-                      🚫 Ban Chat
-                    </button>
+                      <button
+                        className="mod-btn reject"
+                        onClick={() => handleBanUser(f.id, f.user)}
+                        disabled={submitting}
+                      >
+                        🚫 Ban Chat
+                      </button>
 
-                    <button
-                      className="mod-btn dismiss"
-                      onClick={() => handleDismissFlag(f.id)}
-                      disabled={submitting}
-                    >
-                      ✅ Dismiss
-                    </button>
+                      <button
+                        className="mod-btn dismiss"
+                        onClick={() => handleDismissFlag(f.id)}
+                        disabled={submitting}
+                      >
+                        ✅ Dismiss
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )
+          ) : (
+            /* RESOLVED / ACTIONED AUDIT LOG TAB */
+            resolvedFlags.length === 0 ? (
+              <div className="moderator-empty-state">
+                <h3>📁 Audit Log Empty</h3>
+                <p>No moderation actions have been recorded yet.</p>
+              </div>
+            ) : (
+              <div className="cv-flags-list">
+                {resolvedFlags.map(f => (
+                  <div className="cv-flag-card resolved" key={f.id} style={{ opacity: 0.95, borderLeft: '4px solid #a855f7' }}>
+                    <div className="cv-flag-user-info">
+                      <div className="cv-user-avatar" style={{ background: 'linear-gradient(135deg, #64748b 0%, #475569 100%)' }}>
+                        {(f.user || 'U').substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <h3 className="cv-user-name">User: {f.user}</h3>
+                        <span className="cv-flag-meta">
+                          Actioned: {f.actionedAt ? new Date(f.actionedAt).toLocaleTimeString() : 'Recently'} • Processed by {f.actionedBy || 'Moderator'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="cv-flag-body" style={{ background: 'rgba(255, 255, 255, 0.02)' }}>
+                      <div className="cv-flag-msg-box">
+                        <strong>Flagged Message:</strong> <em>"{f.message}"</em>
+                      </div>
+                      <div className="cv-flag-reason-tag">
+                        ⚠️ <strong>Original Reason:</strong> {f.reason || 'Chat violation'}
+                      </div>
+                    </div>
+
+                    <div className="cv-flag-actions" style={{ alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                      {f.status === 'warned' && (
+                        <span className="cv-status-badge warned" style={{ padding: '6px 14px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.3)', fontWeight: '700', fontSize: '12.5px' }}>
+                          ⚠️ Warning Strike Issued (Strike {f.warningCount || 1}/3)
+                        </span>
+                      )}
+                      {f.status === 'muted' && (
+                        <span className="cv-status-badge muted" style={{ padding: '6px 14px', borderRadius: '8px', background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', fontWeight: '700', fontSize: '12.5px' }}>
+                          🔇 Account Muted ({f.mutedUntil || 'Temp'})
+                        </span>
+                      )}
+                      {f.status === 'banned' && (
+                        <span className="cv-status-badge banned" style={{ padding: '6px 14px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', fontWeight: '700', fontSize: '12.5px' }}>
+                          🚫 Account Permanently Banned
+                        </span>
+                      )}
+                      {f.status === 'dismissed' && (
+                        <span className="cv-status-badge dismissed" style={{ padding: '6px 14px', borderRadius: '8px', background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)', fontWeight: '700', fontSize: '12.5px' }}>
+                          ✅ Flag Dismissed
+                        </span>
+                      )}
+
+                      <button
+                        type="button"
+                        className="cv-btn-secondary"
+                        onClick={() => handleReopenFlag(f.id)}
+                        style={{ marginLeft: 'auto', fontSize: '12px', padding: '6px 12px' }}
+                      >
+                        🔄 Restore to Queue
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           )}
         </div>
       )}
@@ -760,11 +1032,11 @@ function ChatMonitor({ fetchAllData }) {
                 userId: targetId,
                 message: msg.content || msg.text || '',
                 imageUrl: msg.imageUrl || msg.image || null,
-                reason: msg.imageUrl ? 'Image requires manual review' : 'Flagged by Moderator during live inspection',
+                reason: msg.imageUrl ? 'Image content flagged for inspection' : 'Flagged by Moderator during live stream inspection',
                 createdAt: new Date().toISOString(),
                 status: 'pending'
               }
-              setFlags(prev => [newFlag, ...prev])
+              updateFlagsState(prev => [newFlag, ...prev])
 
               pushUserNotification(targetId, {
                 title: '🚩 Chat Message Flagged',
@@ -783,23 +1055,49 @@ function ChatMonitor({ fetchAllData }) {
               const userName = msg.senderName || msg.sender || 'Unknown'
               const targetId = msg.senderId || msg.sender_id || userName
 
+              if (checkProtectedUser(userName)) {
+                toast.error('🛡️ Cannot issue warning strikes against Admin or Self accounts!')
+                return
+              }
+
               const reasonStr = `Live stream message: "${(msg.content || '').substring(0, 50)}"`
               const resUser = issueUserWarningStrike(userName, reasonStr)
               if (targetId && targetId !== userName) {
                 issueUserWarningStrike(targetId, reasonStr)
               }
 
+              const newFlag = {
+                id: `flag-${Date.now()}`,
+                user: userName,
+                userId: targetId,
+                message: msg.content || msg.text || (msg.imageUrl ? 'Image message' : ''),
+                imageUrl: msg.imageUrl || msg.image || null,
+                reason: 'Violating live chat guidelines',
+                createdAt: new Date().toISOString(),
+                status: 'warned',
+                warningCount: resUser.strikeCount,
+                actionedAt: new Date().toISOString(),
+                actionedBy: 'Moderator'
+              }
+              updateFlagsState(prev => [newFlag, ...prev])
+
               if (resUser.penaltyType === 'BAN') {
-                toast.error(`🚫 Strike 3/3 issued to "${userName}": PERMANENT CHAT BAN applied!`)
+                toast.error(`🚫 Strike 3/3 issued to "${userName}": PERMANENT CHAT BAN applied! Moved to Audit Log.`)
               } else {
-                toast.warning(`⚠️ Warning Strike ${resUser.strikeCount}/3 issued to "${userName}": Muted for ${resUser.durationLabel}!`)
+                toast.warning(`⚠️ Warning Strike ${resUser.strikeCount}/3 issued to "${userName}": Muted for ${resUser.durationLabel}! Moved to Audit Log.`)
               }
             }}
             onMuteUser={(msg) => {
+              const user = msg.senderName || msg.sender || 'Unknown'
+              if (checkProtectedUser(user)) {
+                toast.error('🛡️ Cannot mute Admin or Self accounts!')
+                return
+              }
               setMuteTarget({
                 userId: msg.senderId || msg.sender_id || msg.id,
-                username: msg.senderName || msg.sender || 'Unknown',
-                flagId: null
+                username: user,
+                flagId: null,
+                msgContent: msg.content || msg.text || 'Image message'
               })
               setMuteHours(24)
               setMuteReason(`Live moderation: "${(msg.content || msg.text || 'Image message').substring(0, 80)}"`)
@@ -807,9 +1105,29 @@ function ChatMonitor({ fetchAllData }) {
             onBanUser={(msg) => {
               const userName = msg.senderName || msg.sender || 'Unknown'
               const targetId = msg.senderId || msg.sender_id || userName
+
+              if (checkProtectedUser(userName)) {
+                toast.error('🛡️ Cannot ban Admin or Self accounts!')
+                return
+              }
+
               if (window.confirm(`Are you sure you want to permanently ban chat for: ${userName}?`)) {
                 setUserChatRestriction(targetId, { type: 'BAN', reason: 'Live moderation ban' })
                 setUserChatRestriction(userName, { type: 'BAN', reason: 'Live moderation ban' })
+
+                const newFlag = {
+                  id: `flag-${Date.now()}`,
+                  user: userName,
+                  userId: targetId,
+                  message: msg.content || msg.text || (msg.imageUrl ? 'Image message' : ''),
+                  imageUrl: msg.imageUrl || msg.image || null,
+                  reason: 'Severe violation in live stream',
+                  createdAt: new Date().toISOString(),
+                  status: 'banned',
+                  actionedAt: new Date().toISOString(),
+                  actionedBy: 'Moderator'
+                }
+                updateFlagsState(prev => [newFlag, ...prev])
 
                 pushUserNotification(targetId, {
                   title: '🚫 Chat Access Permanently Banned',
@@ -822,7 +1140,7 @@ function ChatMonitor({ fetchAllData }) {
                   type: 'SYSTEM'
                 })
 
-                toast.success(`🚫 Chat permanently banned for "${userName}".`)
+                toast.success(`🚫 Chat permanently banned for "${userName}". Moved to Audit Log.`)
               }
             }}
             onDeleteMessage={(msg) => {

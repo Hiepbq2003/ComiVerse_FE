@@ -72,9 +72,12 @@ AxiosClient.interceptors.response.use(
         }
         else if (status === 500) {
             // 500: Internal Server Error
-            toast.error("System error (Server Error). Please try again later!", {
-                toastId: "server-error-500"
-            });
+            const isBackgroundEndpoint = requestUrl.includes('/chat/') || requestUrl.includes('/chat-flags/') || requestUrl.includes('/team-workspace/');
+            if (!isBackgroundEndpoint) {
+                toast.error("System error (Server Error). Please try again later!", {
+                    toastId: "server-error-500"
+                });
+            }
         }
 
         return Promise.reject(error);

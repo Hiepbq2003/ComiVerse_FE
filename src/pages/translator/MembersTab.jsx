@@ -121,7 +121,66 @@ function MembersTab({
       .then(list => {
         if (cancelled) return
         const raw = Array.isArray(list) ? list : []
-        const mapped = raw.map((m) => mapTeamMember(m, leaderName))
+
+        // Get active auth user for leader fallback name
+        const authUser = getAuth()?.user;
+        const actualLeaderName = leaderName || authUser?.fullName || authUser?.username || 'Group Leader';
+        const leaderInitials = (actualLeaderName || 'TL').split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2);
+
+        const initialLeader = {
+          id: `leader-${teamId}`,
+          name: actualLeaderName,
+          role: 'Group Leader',
+          status: 'Offline',
+          online: false,
+          joinDate: '01/15/2024',
+          contributions: '0 chapters',
+          avatar: leaderInitials
+        };
+
+        // Load saved approved members from LocalStorage for this team
+        let savedApproved = [];
+        try {
+          const rawSaved = localStorage.getItem(`comiverse_approved_members_${teamId}`);
+          if (rawSaved) savedApproved = JSON.parse(rawSaved);
+        } catch (e) {}
+
+        const memberMap = new Map();
+
+        // 1. Always put Leader first
+        memberMap.set(actualLeaderName.toLowerCase().trim(), initialLeader);
+
+        // 2. Put raw backend members
+        raw.forEach(m => {
+          if (m && (m.name || m.fullName || m.username)) {
+            const mName = m.name || m.fullName || m.username;
+            const key = mName.toLowerCase().trim();
+            const existing = memberMap.get(key);
+            memberMap.set(key, existing ? { ...existing, ...m, name: mName } : { ...m, name: mName });
+          }
+        });
+
+        // 3. Put saved approved members
+        savedApproved.forEach(m => {
+          if (m && (m.name || m.fullName || m.username)) {
+            const mName = m.name || m.fullName || m.username;
+            const key = mName.toLowerCase().trim();
+            const existing = memberMap.get(key);
+            memberMap.set(key, existing ? { ...existing, ...m, name: mName } : { ...m, name: mName });
+          }
+        });
+
+        // 4. Put parentMembers
+        (parentMembers || []).forEach(m => {
+          if (m && (m.name || m.fullName || m.username)) {
+            const mName = m.name || m.fullName || m.username;
+            const key = mName.toLowerCase().trim();
+            const existing = memberMap.get(key);
+            memberMap.set(key, existing ? { ...existing, ...m, name: mName } : { ...m, name: mName });
+          }
+        });
+
+        const mapped = Array.from(memberMap.values()).map((m) => mapTeamMember(m, actualLeaderName));
         setMembers(mapped)
         onMembersLoadedRef.current?.(mapped)
         setError(null)

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import '../../assets/style/moderator/project-teams.css'
 import { toast } from 'react-toastify'
@@ -6,6 +6,16 @@ import { searchTranslatorsApi } from '../../services/api/AccountApi'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import ModernPagination from '../../components/common/ModernPagination'
 import { useTheme } from '../../context/ThemeContext'
+
+const ALL_TARGET_LANGUAGES = [
+  { code: 'English', label: '🇬🇧 English' },
+  { code: 'Vietnamese', label: '🇻🇳 Vietnamese' },
+  { code: 'Japanese', label: '🇯🇵 Japanese' },
+  { code: 'Chinese', label: '🇨🇳 Chinese' },
+  { code: 'Korean', label: '🇰🇷 Korean' },
+  { code: 'French', label: '🇫🇷 French' },
+  { code: 'Spanish', label: '🇪🇸 Spanish' }
+]
 
 function ProjectTeams({
   projectTeams,
@@ -35,6 +45,29 @@ function ProjectTeams({
   const [dateApprovedFilter, setDateApprovedFilter] = useState('today') // 'today' | '7days' | '30days' | 'all'
   const [selectedGenre, setSelectedGenre] = useState('all')
   const [comicSearchQuery, setComicSearchQuery] = useState('')
+
+  const existingTargetLangsForSelectedComic = useMemo(() => {
+    if (!createTeamForm.comicName) return new Set();
+    const selNameLower = createTeamForm.comicName.toLowerCase().trim();
+
+    const set = new Set();
+    (projectTeams || []).forEach(team => {
+      const teamComicLower = (team.comicName || team.comicTitle || team.linkedComic || '').toLowerCase().trim();
+      if (teamComicLower && selNameLower && (teamComicLower === selNameLower || teamComicLower.includes(selNameLower) || selNameLower.includes(teamComicLower))) {
+        const lang = team.targetLang || team.language;
+        if (lang) {
+          set.add(lang.toLowerCase().trim());
+        }
+      }
+    });
+    return set;
+  }, [createTeamForm.comicName, projectTeams]);
+
+  const availableTargetLanguages = useMemo(() => {
+    return ALL_TARGET_LANGUAGES.filter(langObj => {
+      return !existingTargetLangsForSelectedComic.has(langObj.code.toLowerCase().trim());
+    });
+  }, [existingTargetLangsForSelectedComic]);
 
   const genreOptions = useMemo(() => {
     if (Array.isArray(genres) && genres.length > 0) {
@@ -128,16 +161,49 @@ function ProjectTeams({
   const handleSelectApprovedComic = (selectedTitle) => {
     const foundComic = allApprovedItems.find(c => c.title === selectedTitle);
     const autoSourceLang = foundComic?.language || foundComic?.rawLanguage || foundComic?.originalLanguage || 'Japanese';
-    const targetLang = createTeamForm.targetLang || 'English';
-    const autoTitle = selectedTitle ? `${selectedTitle} - ${targetLang} Translation Team` : '';
+    
+    // Find remaining available target languages for this comic
+    const takenLangs = new Set();
+    const selNameLower = (selectedTitle || '').toLowerCase().trim();
+    (projectTeams || []).forEach(team => {
+      const teamComicLower = (team.comicName || team.comicTitle || team.linkedComic || '').toLowerCase().trim();
+      if (teamComicLower && selNameLower && (teamComicLower === selNameLower || teamComicLower.includes(selNameLower) || selNameLower.includes(teamComicLower))) {
+        const lang = team.targetLang || team.language;
+        if (lang) takenLangs.add(lang.toLowerCase().trim());
+      }
+    });
+
+    const remaining = ALL_TARGET_LANGUAGES.filter(l => !takenLangs.has(l.code.toLowerCase().trim()));
+    const firstAvailable = remaining.length > 0 ? remaining[0].code : '';
+
+    const autoTitle = selectedTitle && firstAvailable ? `${selectedTitle} - ${firstAvailable} Translation Team` : '';
 
     setCreateTeamForm(prev => ({
       ...prev,
       comicName: selectedTitle,
       sourceLang: autoSourceLang,
+      targetLang: firstAvailable,
       title: autoTitle
     }));
   };
+
+  // Auto-sync targetLang and Title if currently selected targetLang is unavailable or out of sync
+  useEffect(() => {
+    if (!createTeamForm.comicName || availableTargetLanguages.length === 0) return;
+
+    const currentLangLower = (createTeamForm.targetLang || '').toLowerCase().trim();
+    const isAvailable = availableTargetLanguages.some(l => l.code.toLowerCase().trim() === currentLangLower);
+
+    if (!isAvailable) {
+      const firstAvailable = availableTargetLanguages[0].code;
+      const newTitle = `${createTeamForm.comicName} - ${firstAvailable} Translation Team`;
+      setCreateTeamForm(prev => ({
+        ...prev,
+        targetLang: firstAvailable,
+        title: newTitle
+      }));
+    }
+  }, [createTeamForm.comicName, availableTargetLanguages, createTeamForm.targetLang, setCreateTeamForm]);
 
   // Assign Leader Modal states
   const [showAssignModal, setShowAssignModal] = useState(false)
@@ -192,7 +258,10 @@ function ProjectTeams({
   }
 
   const sendLeaderNotification = (leaderId, leaderName, comicTitle, sourceLang, targetLang) => {
-    const userKey = `comiverse_user_notifications_${leaderId || 'all'}`;
+    const targetKey = leaderId || leaderName;
+    if (!targetKey) return;
+
+    const userKey = `comiverse_user_notifications_${targetKey}`;
     let existing = [];
     try {
       const raw = localStorage.getItem(userKey);
@@ -204,18 +273,12 @@ function ProjectTeams({
       title: '👑 Assigned as Group Leader',
       message: `You have been assigned as Group Leader for translation project '${comicTitle}' (${sourceLang} → ${targetLang}). Raw manuscript chapters are ready in your workspace backlog!`,
       actionUrl: '/translator/project-teams',
+      targetUserId: String(targetKey),
       isRead: false,
       createdAt: new Date().toISOString()
     };
 
     localStorage.setItem(userKey, JSON.stringify([newNotif, ...existing]));
-    try {
-      const genKey = `comiverse_user_notifications_all`;
-      const genRaw = localStorage.getItem(genKey);
-      let genArr = genRaw ? JSON.parse(genRaw) : [];
-      localStorage.setItem(genKey, JSON.stringify([newNotif, ...genArr]));
-    } catch (e) {}
-
     window.dispatchEvent(new Event('notification:refresh'));
   };
 
@@ -439,40 +502,24 @@ function ProjectTeams({
       {/* ── MODAL: CREATE PROJECT TEAM ──────────────── */}
       {showCreateTeamModal && createPortal(
         <div className="mod-modal-overlay">
-          <div className="mod-modal-card wide" style={{ maxWidth: '720px' }}>
-            <div className="mod-modal-header">
-              <h3>Create Project Team</h3>
+          <div className="mod-modal-card wide" style={{ maxWidth: '840px', width: '92%' }}>
+            <div className="mod-modal-header" style={{ padding: '16px 24px', borderBottom: '1px solid rgba(148,163,184,0.15)' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Create Project Team</h3>
               <button className="mod-modal-close-btn" onClick={() => setShowCreateTeamModal(false)}>×</button>
             </div>
 
-            <div className="mod-modal-body">
-              {/* Step indicator */}
-              <div className="mod-step-tracker">
-                <div className="mod-step-text">Step {createTeamStep} of 2</div>
-                <div className="mod-step-bar-bg">
-                  <div 
-                    className="mod-step-bar-fill" 
-                    style={{ width: createTeamStep === 1 ? '50%' : '100%' }}
-                  />
-                </div>
-              </div>
-
+            <div className="mod-modal-body" style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {createTeamStep === 1 ? (
                 /* STEP 1: APPROVED COMIC SELECTOR & LANGUAGE CONFIG */
-                <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   
-                  {/* Filter Ribbon: Date Approved [Today], Genre, Search Title */}
-                  <div style={{ padding: '12px 14px', borderRadius: '12px', background: theme === 'light' ? '#f8fafc' : 'rgba(255,255,255,0.03)', border: '1px solid rgba(148,163,184,0.15)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '11.5px', fontWeight: '700', textTransform: 'uppercase', color: '#c084fc', letterSpacing: '0.5px' }}>
-                        🔍 Filter Approved Comics Catalog
-                      </span>
-                      <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '600' }}>
-                        Filter Mode: Approved Today
-                      </span>
-                    </div>
+                  {/* Filter Ribbon: 3 Filters in 1 Single Row */}
+                  <div style={{ padding: '10px 14px', borderRadius: '12px', background: theme === 'light' ? '#f8fafc' : 'rgba(255,255,255,0.03)', border: '1px solid rgba(148,163,184,0.15)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', color: '#c084fc', letterSpacing: '0.5px' }}>
+                      🔍 Filter Approved Comics Catalog
+                    </span>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 2fr', gap: '10px', alignItems: 'center' }}>
                       {/* 1. Date Approved Filter */}
                       <div>
                         <label style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--mod-text-secondary)', display: 'block', marginBottom: '3px' }}>
@@ -510,7 +557,7 @@ function ProjectTeams({
                       </div>
 
                       {/* 3. Search Title */}
-                      <div style={{ gridColumn: 'span 2' }}>
+                      <div>
                         <label style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--mod-text-secondary)', display: 'block', marginBottom: '3px' }}>
                           🔎 Search Comic Title
                         </label>
@@ -528,16 +575,9 @@ function ProjectTeams({
 
                   {/* Select Approved Comic Dropdown */}
                   <div className="mod-form-group">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                      <label className="mod-label" style={{ margin: 0 }}>
-                        Select Approved Comic ({availableComicsDropdown.length} matching) *
-                      </label>
-                      {filteredApprovedComics.length === 0 && dateApprovedFilter === 'today' && (
-                        <span style={{ fontSize: '11px', color: '#eab308', fontWeight: '600' }}>
-                          ⚠️ 0 approved today. Showing catalog below!
-                        </span>
-                      )}
-                    </div>
+                    <label className="mod-label" style={{ marginBottom: '4px' }}>
+                      Select Approved Comic *
+                    </label>
                     
                     <select
                       className="mod-input select"
@@ -547,50 +587,63 @@ function ProjectTeams({
                       <option value="">-- Choose Approved Comic --</option>
                       {availableComicsDropdown.map((c) => (
                         <option key={c.id} value={c.title}>
-                          📚 {c.title} ({c.language || 'Raw Original'}) · {Array.isArray(c.genres) ? c.genres.join(', ') : (c.genre || 'General')}
+                          📚 {c.title} · {c.language || 'Japanese'}
                         </option>
                       ))}
                     </select>
                   </div>
 
-                  {/* Auto-Populated Source Language & Target Language Selector */}
+                  {/* Source Language & Target Language Selector */}
                   <div className="mod-form-row">
                     <div className="mod-form-group half">
-                      <label className="mod-label">Source Language 🔒 (Auto-Detected)</label>
+                      <label className="mod-label">Source Language 🔒</label>
                       <input
                         type="text"
                         className="mod-input"
-                        value={createTeamForm.sourceLang || 'Auto-detected'}
+                        value={createTeamForm.sourceLang || 'Japanese'}
                         disabled
                         readOnly
                         style={{ opacity: 0.85, cursor: 'not-allowed', fontWeight: '700', color: '#c084fc' }}
-                        title="Source language is inherited directly from the original comic specification."
                       />
                     </div>
 
                     <div className="mod-form-group half">
                       <label className="mod-label">Target Language *</label>
-                      <select
-                        className="mod-input select"
-                        value={createTeamForm.targetLang}
-                        onChange={(e) => {
-                          const target = e.target.value;
-                          setCreateTeamForm(prev => ({
-                            ...prev,
-                            targetLang: target,
-                            title: prev.comicName ? `${prev.comicName} - ${target} Translation Team` : prev.title
-                          }));
-                        }}
-                      >
-                        <option value="English">🇬🇧 English</option>
-                        <option value="Vietnamese">🇻🇳 Vietnamese</option>
-                        <option value="Japanese">🇯🇵 Japanese</option>
-                        <option value="Korean">🇰🇷 Korean</option>
-                        <option value="Chinese">🇨🇳 Chinese</option>
-                        <option value="Spanish">🇪🇸 Spanish</option>
-                        <option value="French">🇫🇷 French</option>
-                        <option value="German">🇩🇪 German</option>
-                      </select>
+                      {availableTargetLanguages.length > 0 ? (
+                        <select
+                          className="mod-input select"
+                          value={createTeamForm.targetLang}
+                          onChange={(e) => {
+                            const target = e.target.value;
+                            setCreateTeamForm(prev => ({
+                              ...prev,
+                              targetLang: target,
+                              title: prev.comicName ? `${prev.comicName} - ${target} Translation Team` : prev.title
+                            }));
+                          }}
+                        >
+                          {availableTargetLanguages.map(l => (
+                            <option key={l.code} value={l.code}>{l.label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div style={{
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          background: 'rgba(239, 68, 68, 0.12)',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          color: '#f87171',
+                          fontSize: '12px',
+                          fontWeight: '700'
+                        }}>
+                          🚫 All 7 target languages already assigned to teams for this comic!
+                        </div>
+                      )}
+                      {existingTargetLangsForSelectedComic.size > 0 && (
+                        <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px', fontWeight: '500' }}>
+                          🔒 Assigned Languages for this comic: <span style={{ color: '#c084fc', fontWeight: '700' }}>{Array.from(existingTargetLangsForSelectedComic).map(l => l.toUpperCase()).join(', ')}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -675,40 +728,61 @@ function ProjectTeams({
               )}
             </div>
 
-            <div className="mod-modal-footer">
-              <button 
-                className="mod-btn review"
-                onClick={() => {
-                  if (createTeamStep === 2) {
-                    setCreateTeamStep(1);
-                  } else {
-                    setShowCreateTeamModal(false);
-                  }
-                }}
-              >
-                {createTeamStep === 2 ? '← Back' : 'Cancel'}
-              </button>
-              <button 
-                className="mod-btn approve"
-                onClick={() => {
-                  if (createTeamStep === 1) {
-                    const exists = projectTeams.some(
-                      t => t.comicName && t.comicName.toLowerCase() === createTeamForm.comicName.toLowerCase() &&
-                           t.targetLang && t.targetLang.toLowerCase() === createTeamForm.targetLang.toLowerCase()
-                    );
-                    if (exists) {
-                      toast.error(`A translation team for "${createTeamForm.comicName}" in "${createTeamForm.targetLang}" already exists!`);
-                      return;
+            <div className="mod-modal-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 24px' }}>
+              {/* Step indicator in footer */}
+              <div className="mod-step-tracker-footer" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', color: '#c084fc', letterSpacing: '0.5px' }}>
+                  STEP {createTeamStep} OF 2
+                </span>
+                <div style={{ width: '90px', height: '6px', borderRadius: '4px', background: theme === 'light' ? '#e2e8f0' : 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                  <div 
+                    style={{ 
+                      width: createTeamStep === 1 ? '50%' : '100%', 
+                      height: '100%', 
+                      background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+                      borderRadius: '4px',
+                      transition: 'width 0.3s ease'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button 
+                  className="mod-btn review"
+                  onClick={() => {
+                    if (createTeamStep === 2) {
+                      setCreateTeamStep(1);
+                    } else {
+                      setShowCreateTeamModal(false);
                     }
-                    setCreateTeamStep(2);
-                  } else {
-                    handleCreateProjectTeam();
-                  }
-                }}
-                disabled={createTeamStep === 1 && (!createTeamForm.comicName || !createTeamForm.title.trim())}
-              >
-                {createTeamStep === 1 ? 'Next →' : 'Create Team'}
-              </button>
+                  }}
+                >
+                  {createTeamStep === 2 ? '← Back' : 'Cancel'}
+                </button>
+                <button 
+                  className="mod-btn approve"
+                  onClick={() => {
+                    if (createTeamStep === 1) {
+                      const exists = projectTeams.some(
+                        t => t.comicName && t.comicName.toLowerCase() === createTeamForm.comicName.toLowerCase() &&
+                             t.targetLang && t.targetLang.toLowerCase() === createTeamForm.targetLang.toLowerCase()
+                      );
+                      if (exists) {
+                        toast.error(`A translation team for "${createTeamForm.comicName}" in "${createTeamForm.targetLang}" already exists!`);
+                        return;
+                      }
+                      setCreateTeamStep(2);
+                    } else {
+                      handleCreateProjectTeam();
+                    }
+                  }}
+                  disabled={createTeamStep === 1 && (!createTeamForm.comicName || !createTeamForm.title.trim() || availableTargetLanguages.length === 0)}
+                >
+                  {createTeamStep === 1 ? 'Next →' : 'Create Team'}
+                </button>
+              </div>
             </div>
           </div>
         </div>,

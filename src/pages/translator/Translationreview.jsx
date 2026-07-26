@@ -46,25 +46,98 @@ async function fetchJson(url, options = {}) {
 }
 
 async function fetchPagesForTask(taskId, signal) {
-  const list = await fetchJson(`${API_BASE}/translate-workspace/${taskId}`, { signal });
-  return Array.isArray(list) ? list : [];
+  try {
+    const list = await fetchJson(`${API_BASE}/translate-workspace/${taskId}`, { signal });
+    if (Array.isArray(list) && list.length > 0) return list;
+  } catch { /* fall through */ }
+
+  // Fallback: get chapterId from localStorage, fetch chapter pages from DB
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const chapterId = getLocalTaskChapterId(taskId);
+  if (chapterId && UUID_RE.test(chapterId)) {
+    try {
+      const chapter = await fetchJson(`${API_BASE}/chapters/detail/${chapterId}`, { signal });
+      const rawPages = chapter?.pages || chapter?.images || [];
+      if (Array.isArray(rawPages) && rawPages.length > 0) {
+        return rawPages.map((item, idx) => ({
+          id: item?.id || `p-${idx + 1}`,
+          pageId: item?.id || `p-${idx + 1}`,
+          pageNumber: item?.pageNumber || idx + 1,
+          imageUrl: typeof item === 'string' ? item : (item?.imageUrl || item?.url || item?.pageUrl),
+          bubbles: item?.bubbles || []
+        }));
+      }
+    } catch { /* fall through */ }
+  }
+  return [];
+}
+
+function getLocalTaskChapterId(taskId) {
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('comiverse_tasks_')) {
+      try {
+        const tasks = JSON.parse(localStorage.getItem(key));
+        if (Array.isArray(tasks)) {
+          const match = tasks.find(t => String(t.id) === String(taskId));
+          if (match?.chapterId) return match.chapterId;
+        }
+      } catch { /* ignore */ }
+    }
+  }
+  return null;
 }
 
 async function fetchChapterForTask(taskId, signal) {
-  const task = await fetchJson(`${API_BASE}/team-workspace/tasks/${taskId}`, { signal });
-  const chapterId = task?.chapterId ?? task?.chapter_id ?? task?.data?.chapterId;
-  if (!chapterId) throw new Error("Task does not have a chapterId.");
-  const chapter = await fetchJson(`${API_BASE}/chapters/detail/${chapterId}`, { signal });
-  let comicTitle = null;
-  if (chapter?.comicId) {
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  // 1. Primary: get task from backend
+  try {
+    const task = await fetchJson(`${API_BASE}/team-workspace/tasks/${taskId}`, { signal });
+    const chapterId = task?.chapterId ?? task?.chapter_id ?? task?.data?.chapterId;
+    if (chapterId) {
+      const chapter = await fetchJson(`${API_BASE}/chapters/detail/${chapterId}`, { signal });
+      let comicTitle = null;
+      if (chapter?.comicId) {
+        try {
+          const comic = await fetchJson(`${API_BASE}/comics/${chapter.comicId}`, { signal });
+          comicTitle = comic?.title ?? comic?.name ?? null;
+        } catch {
+          /* non-fatal */
+        }
+      }
+      return { ...chapter, comicTitle };
+    }
+  } catch (err) {
+    console.warn(`[Translationreview] Task API failed for ${taskId}:`, err?.message);
+  }
+
+  // 2. Fallback: get chapterId from localStorage, fetch chapter detail from DB
+  const chapterId = getLocalTaskChapterId(taskId);
+  if (chapterId && UUID_RE.test(chapterId)) {
     try {
-      const comic = await fetchJson(`${API_BASE}/comics/${chapter.comicId}`, { signal });
-      comicTitle = comic?.title ?? comic?.name ?? null;
-    } catch {
-      /* non-fatal */
+      const chapter = await fetchJson(`${API_BASE}/chapters/detail/${chapterId}`, { signal });
+      let comicTitle = null;
+      if (chapter?.comicId) {
+        try {
+          const comic = await fetchJson(`${API_BASE}/comics/${chapter.comicId}`, { signal });
+          comicTitle = comic?.title ?? comic?.name ?? null;
+        } catch { /* non-fatal */ }
+      }
+      return { ...chapter, comicTitle };
+    } catch (chErr) {
+      console.warn('[Translationreview] Fallback chapter detail fetch failed:', chErr?.message);
     }
   }
-  return { ...chapter, comicTitle };
+
+  // 3. Last resort
+  return {
+    id: `ch-${taskId}`,
+    title: 'Chapter 1 - Translation',
+    comicTitle: 'Unknown Comic',
+    pagesCount: 0,
+    pages: []
+  };
 }
 
 async function fetchChapterReviewStatus(chapterId, signal) {

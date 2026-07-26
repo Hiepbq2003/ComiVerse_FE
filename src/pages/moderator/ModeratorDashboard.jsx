@@ -195,9 +195,22 @@ function ModeratorDashboard() {
   }
 
   const getNavBadges = () => {
+    let localFlags = []
+    try {
+      const raw = localStorage.getItem('comiverse_moderator_flags')
+      localFlags = raw ? JSON.parse(raw) : []
+    } catch (e) {}
+
+    const flagMap = new Map()
+    ;(chatFlags || []).forEach(f => flagMap.set(f.id, f))
+    localFlags.forEach(f => flagMap.set(f.id, { ...(flagMap.get(f.id) || {}), ...f }))
+    const allFlags = Array.from(flagMap.values())
+
+    const pendingChatFlags = allFlags.filter(item => !item.status || item.status === 'pending').length
+
     return {
       'review-queue': submissions.filter(item => item.status === 'pending').length,
-      'chat-monitor': chatFlags.length,
+      'chat-monitor': pendingChatFlags,
       'forum': forumThreads.filter(item => item.isReported).length,
     }
   }

@@ -54,30 +54,30 @@ export const setAuth = (token, user, refreshToken) => {
  */
 export const pushUserNotification = (targetIdOrName, notifData) => {
   if (!targetIdOrName) return;
-  const keys = [
-    `comiverse_user_notifications_${targetIdOrName}`,
-    `comiverse_user_notifications_all`
-  ];
 
   const notifObj = {
     id: notifData.id || `notif-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
     title: notifData.title || 'System Notification',
     message: notifData.message || '',
     type: notifData.type || 'SYSTEM',
+    targetUserId: String(targetIdOrName),
     isRead: false,
     createdAt: notifData.createdAt || new Date().toISOString()
   };
 
-  keys.forEach(k => {
-    try {
-      const raw = localStorage.getItem(k);
-      const existing = raw ? JSON.parse(raw) : [];
-      const updated = [notifObj, ...existing].slice(0, 50);
-      localStorage.setItem(k, JSON.stringify(updated));
-    } catch (e) {
-      console.warn('Failed to persist user notification:', e);
-    }
-  });
+  const userKey = `comiverse_user_notifications_${targetIdOrName}`;
+  try {
+    const raw = localStorage.getItem(userKey);
+    const existing = raw ? JSON.parse(raw) : [];
+    const updated = [notifObj, ...existing].slice(0, 50);
+    localStorage.setItem(userKey, JSON.stringify(updated));
+  } catch (e) {
+    console.warn('Failed to persist user notification:', e);
+  }
+
+  try {
+    window.dispatchEvent(new CustomEvent('notification:refresh'));
+  } catch (e) {}
 };
 
 /**

@@ -9,6 +9,7 @@ class StompService {
         this.onConnectCallbacks = new Set();
         this.onDisconnectCallbacks = new Set();
         this.currentToken = null;
+        this.failedTopics = new Set();
     }
 
     /**
@@ -52,10 +53,10 @@ class StompService {
             this.disconnect();
         }
 
-        this.currentToken = token;
         const wsUrl = this.getWsUrl();
-        this.connectionState = 'CONNECTING';
         console.log(`[StompService] Connecting via Native WebSocket to: ${wsUrl}`);
+        this.connectionState = 'CONNECTING';
+        this.currentToken = token;
 
         this.client = new Client({
             brokerURL: wsUrl,
@@ -64,11 +65,11 @@ class StompService {
                 token: token, // Fallback header
             },
             debug: (str) => {
-                if (import.meta.env.DEV) {
+                if (import.meta.env.DEV && !str.includes('ping') && !str.includes('pong')) {
                     console.log('[STOMP Debug]', str);
                 }
             },
-            reconnectDelay: 3000,
+            reconnectDelay: 5000,
             heartbeatIncoming: 10000,
             heartbeatOutgoing: 10000,
         });
@@ -80,18 +81,24 @@ class StompService {
             // Notify connect listeners
             this.onConnectCallbacks.forEach((cb) => cb(frame));
 
-            // Resubscribe active topics after reconnection
+            // Resubscribe active topics after reconnection (filtering failed topics)
             this.subscriptions.forEach((subObj, topic) => {
+                if (this.failedTopics.has(topic)) return;
                 const sub = this._doSubscribe(topic, subObj.callback);
                 subObj.subscription = sub;
             });
         };
 
         this.client.onStompError = (frame) => {
-            console.warn('[StompService] STOMP Channel Error (handled):', frame.headers?.['message'] || frame.body);
+            const errorMsg = frame.headers?.['message'] || frame.body || '';
+            console.warn('[StompService] STOMP Channel Error (handled):', errorMsg);
             // Evict group topic subscriptions that trigger server STOMP errors to prevent infinite reconnect loops
             this.subscriptions.forEach((subObj, topic) => {
-                if (topic && topic.includes('/topic/chat/group/')) {
+                if (topic && (topic.includes('/topic/chat/group/') || topic.includes('/topic/chat/'))) {
+                    this.failedTopics.add(topic);
+                    try {
+                        if (subObj.subscription) subObj.subscription.unsubscribe();
+                    } catch (e) {}
                     this.subscriptions.delete(topic);
                 }
             });
@@ -111,20 +118,29 @@ class StompService {
      */
     _doSubscribe(topic, callback) {
         if (!this.client || !this.client.connected) return null;
+        if (this.failedTopics && this.failedTopics.has(topic)) {
+            console.warn(`[StompService] Skipping resubscribe to rejected topic: ${topic}`);
+            return null;
+        }
 
         console.log(`[StompService] Subscribing to STOMP topic: ${topic}`);
-        const stompSubscription = this.client.subscribe(topic, (message) => {
-            try {
-                const parsedBody = JSON.parse(message.body);
-                console.log(`[StompService] Received STOMP message on ${topic}:`, parsedBody);
-                callback(parsedBody, message);
-            } catch (err) {
-                console.error(`[StompService] Failed to parse message on topic ${topic}:`, err);
-                callback(message.body, message);
-            }
-        });
+        try {
+            const stompSubscription = this.client.subscribe(topic, (message) => {
+                try {
+                    const parsedBody = JSON.parse(message.body);
+                    console.log(`[StompService] Received STOMP message on ${topic}:`, parsedBody);
+                    callback(parsedBody, message);
+                } catch (err) {
+                    console.error(`[StompService] Failed to parse message on topic ${topic}:`, err);
+                    callback(message.body, message);
+                }
+            });
 
-        return stompSubscription;
+            return stompSubscription;
+        } catch (err) {
+            console.warn(`[StompService] Failed to subscribe to topic ${topic}:`, err);
+            return null;
+        }
     }
 
     /**
@@ -134,6 +150,10 @@ class StompService {
      * @returns {string} subscription topic key
      */
     subscribe(topic, callback) {
+        if (this.failedTopics) {
+            this.failedTopics.delete(topic);
+        }
+
         if (this.subscriptions.has(topic)) {
             this.unsubscribe(topic);
         }

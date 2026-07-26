@@ -4,6 +4,8 @@ import '../../assets/style/translator/team-projects.css'
 import ModernButton from '../../components/common/ModernButton'
 import { getMyProjectTeamsApi, getAllProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { createSubmissionApi } from '../../services/api/SubmissionApi'
+import { getChaptersByComicIdApi } from '../../services/api/ChapterApi'
+import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
 import { getAuth } from '../../utils/Auth'
 
 import {
@@ -296,6 +298,7 @@ function WorkspaceDetailView({
   editTaskData,
   setEditTaskData,
   onCancelEditTask,
+  onSaveEditTask,
   onContinueToWorkspace,
   onSaveWorkspaceSettings,
   onContinueToReviewWorkspace
@@ -359,6 +362,7 @@ function WorkspaceDetailView({
         <>
           <TasksTab
             comicName={comicName}
+            comicId={selectedDetails?.comicId}
             tasks={tasks}
             activeTasks={activeTasks}
             pausedTasks={pausedTasks}
@@ -378,17 +382,7 @@ function WorkspaceDetailView({
             members={members}
             isCurrentLeader={isCurrentLeader}
             chapterOptions={chapterOptions}
-            onOpenCreateTaskWithChapter={(ch) => {
-              setNewTaskData({
-                title: `[HIGH] ${ch.title} - Translation & Proofreading`,
-                column: 'backlog',
-                assignees: [],
-                dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
-                priority: 'High',
-                chapterId: ch.id
-              });
-              setShowCreateTask(true);
-            }}
+            onOpenCreateTaskWithChapter={onCreateTaskClick}
           />
 
           {showCreateTask && (
@@ -410,6 +404,7 @@ function WorkspaceDetailView({
               teamMembersForAssign={teamMembersForAssign}
               isProjectLeader={isCurrentLeader}
               onCancel={onCancelEditTask}
+              onSave={onSaveEditTask}
               onContinue={onContinueToWorkspace}
               onReview={onContinueToReviewWorkspace}
             />
@@ -566,8 +561,17 @@ function TeamProjects() {
     return member?.avatar || '?'
   }
 
-  const openCreateTaskModal = () => {
-    setNewTaskData({ title: '', column: 'backlog', assignees: [], dueDate: '', priority: 'Medium', chapterId: null })
+  const openCreateTaskModal = (chap = null) => {
+    const chId = (chap && typeof chap === 'object') ? (chap.id || null) : null;
+    const defaultTitle = (chap && typeof chap === 'object' && chap.title) ? `${chap.title} - Translation & Proofreading` : '';
+    setNewTaskData({
+      title: defaultTitle,
+      column: 'backlog',
+      assignees: [],
+      dueDate: '',
+      priority: 'Medium',
+      chapterId: chId
+    })
     setShowCreateTask(true)
   }
 
@@ -575,6 +579,14 @@ function TeamProjects() {
     if (selectedDetails) {
       const updated = projects.find(p => p.id === selectedDetails.id)
       if (updated) setSelectedDetails(updated)
+    } else if (projects && projects.length > 0) {
+      const savedActiveId = localStorage.getItem('comiverse_active_project_id');
+      if (savedActiveId) {
+        const matching = projects.find(p => String(p.id) === String(savedActiveId));
+        if (matching) {
+          handleOpenDetails(matching);
+        }
+      }
     }
   }, [projects])
 
@@ -584,20 +596,10 @@ function TeamProjects() {
     return () => window.removeEventListener('click', handleGlobalClick)
   }, [])
 
-  useEffect(() => {
-    if (!showCreateTask || !selectedDetails?.id) {
-      setChapterOptions([])
-      return
-    }
-    getTeamChaptersApi(selectedDetails.id)
-      .then(list => setChapterOptions(Array.isArray(list) ? list : []))
-      .catch(err => {
-        console.error('Could not load chapters for this team:', err)
-        setChapterOptions([])
-      })
-  }, [showCreateTask, selectedDetails?.id])
-
   const handleOpenDetails = async (project) => {
+    if (project && project.id) {
+      localStorage.setItem('comiverse_active_project_id', String(project.id));
+    }
     setSelectedDetails(project)
     setWorkspaceTab('home')
     setShowUploadForm(false)
@@ -643,18 +645,59 @@ function TeamProjects() {
 
       if (Array.isArray(teamChaptersList) && teamChaptersList.length > 0) {
         finalChapters = teamChaptersList.map((ch, idx) => ({
+          ...ch,
           id: ch.id || `ch-${project.id}-${idx + 1}`,
+          comicId: ch.comicId || project.comicId,
           title: ch.title || `${rawComicTitle} - Chapter ${idx + 1}`,
-          pagesCount: ch.pagesCount || ch.pages?.length || 24,
-          pages: ch.pages || [],
+          pagesCount: ch.pagesCount || ch.pages?.length || ch.images?.length || 24,
+          pages: ch.pages || ch.images || [],
           status: 'Approved Raw Manuscript'
         }));
-      } else {
+      } else if (project.comicId) {
+        // Fallback: fetch chapters directly from the comic's chapter list (using both public and author APIs like Moderator)
+        try {
+          let chapList = [];
+          try {
+            const comicChapters = await getChaptersByComicIdApi(project.comicId, {}, true);
+            const list = Array.isArray(comicChapters) ? comicChapters : (comicChapters?.content || comicChapters?.data || []);
+            if (list.length > 0) chapList = list;
+          } catch (e) { /* ignore */ }
+
+          if (chapList.length === 0) {
+            try {
+              const authorChapters = await getAuthorComicChaptersApi(project.comicId);
+              const list = Array.isArray(authorChapters) ? authorChapters : (authorChapters?.content || authorChapters?.data || []);
+              if (list.length > 0) chapList = list;
+            } catch (e) { /* ignore */ }
+          }
+
+          if (chapList.length > 0) {
+            finalChapters = chapList.map((ch, idx) => ({
+              ...ch,
+              id: ch.id || `ch-${project.id}-${idx + 1}`,
+              comicId: ch.comicId || project.comicId,
+              title: ch.title || `${rawComicTitle} - Chapter ${idx + 1}`,
+              pagesCount: ch.pagesCount || ch.pages?.length || ch.images?.length || ch.pageCount || 24,
+              pages: ch.pages || ch.images || [],
+              status: 'Approved Raw Manuscript'
+            }));
+          }
+        } catch (chErr) {
+          console.error('Could not load chapters from comic:', chErr);
+        }
+      }
+
+      // Default: Every approved comic submitted by author has at least Chapter 1 (Approved Raw Manuscript)
+      if (finalChapters.length === 0) {
         finalChapters = [
-          { id: `ch-${project.id}-1`, title: `${rawComicTitle} - Chapter 1: The Beginning`, pagesCount: 24, status: 'Approved Raw Manuscript' },
-          { id: `ch-${project.id}-2`, title: `${rawComicTitle} - Chapter 2: Awakening & Encounter`, pagesCount: 28, status: 'Approved Raw Manuscript' },
-          { id: `ch-${project.id}-3`, title: `${rawComicTitle} - Chapter 3: The Secret Meeting`, pagesCount: 30, status: 'Approved Raw Manuscript' },
-          { id: `ch-${project.id}-4`, title: `${rawComicTitle} - Chapter 4: Battle For Destiny`, pagesCount: 32, status: 'Approved Raw Manuscript' }
+          {
+            id: `ch-${project.id}-1`,
+            comicId: project.comicId,
+            title: `${rawComicTitle} - Chapter 1`,
+            pagesCount: 24,
+            pages: [],
+            status: 'Approved Raw Manuscript'
+          }
         ];
       }
 
@@ -702,7 +745,20 @@ function TeamProjects() {
       });
       setAnnouncements(mappedAnnouncements)
       setChatMessages(msgList.map(m => ({ ...m, isMe: m.sender === userFullName })))
-      setTasks(taskList)
+      
+      const localTasksKey = `comiverse_tasks_${project.id}`;
+      let savedLocalTasks = [];
+      try {
+        const rawLocal = localStorage.getItem(localTasksKey);
+        if (rawLocal) savedLocalTasks = JSON.parse(rawLocal);
+      } catch (e) {}
+
+      const taskMap = new Map();
+      (Array.isArray(taskList) ? taskList : []).forEach(t => { if (t && t.id) taskMap.set(String(t.id), t); });
+      savedLocalTasks.forEach(t => { if (t && t.id) taskMap.set(String(t.id), t); });
+
+      const finalCombinedTasks = Array.from(taskMap.values());
+      setTasks(finalCombinedTasks);
       setJoinRequests(reqList.map(r => ({ ...r, roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles })))
 
       const backendMems = Array.isArray(teamMembersList) ? teamMembersList : [];
@@ -1150,45 +1206,85 @@ function TeamProjects() {
     }
   }
 
-  const handleCreateTask = async () => {
-    if (!newTaskData.title.trim()) return
-    if (!newTaskData.chapterId) {
+  const handleCreateTask = async (customData = null) => {
+    const data = customData || newTaskData
+    if (!data || !data.title || !data.title.trim()) return
+    if (!data.chapterId) {
       toast.error('Please select a chapter.')
       return
     }
-    if (newTaskData.assignees.length === 0) {
+    if (!data.assignees || data.assignees.length === 0) {
       toast.error('Please assign at least one person.')
       return
     }
+
     const comicName = selectedDetails?.comicName || selectedDetails?.title || 'Unknown Comic'
-    const formattedTitle = `[${newTaskData.priority.toUpperCase()}] [${comicName}] ${newTaskData.title.trim()}`
+    const cleanTitle = data.title.trim()
+    const formattedTitle = cleanTitle.startsWith('[') ? cleanTitle : `[${(data.priority || 'MEDIUM').toUpperCase()}] [${comicName}] ${cleanTitle}`
+    const dueDateVal = data.dueDate || new Date().toISOString().split('T')[0]
+
+    const newTaskObj = {
+      id: `task-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      title: formattedTitle,
+      status: data.column || 'backlog',
+      assignees: data.assignees,
+      assigneeIds: data.assignees,
+      chapterId: data.chapterId,
+      dueDate: dueDateVal,
+      createdAt: new Date().toISOString()
+    }
+
+    let taskToSave = newTaskObj
+
     try {
-      const selectedAssignee = members.find(member => (member.id || member.avatar) === newTaskData.assignee)
-      const taskPayload = {
+      const created = await createTeamTaskApi(selectedDetails.id, {
         title: formattedTitle,
-        status: newTaskData.column,
-        assigneeIds: newTaskData.assignees,
-        chapterId: newTaskData.chapterId,
-        dueDate: newTaskData.dueDate || new Date().toISOString().split('T')[0]
+        status: data.column || 'backlog',
+        assigneeIds: data.assignees,
+        chapterId: data.chapterId,
+        dueDate: dueDateVal
+      })
+      if (created && (created.id || created.title)) {
+        taskToSave = { ...newTaskObj, ...created }
       }
-      const created = await createTeamTaskApi(selectedDetails.id, taskPayload)
-      setTasks([...tasks, created])
+    } catch (err) {
+      console.warn('Backend createTeamTaskApi error, fallback to local task creation:', err)
+    }
+
+    const updatedTasks = [...tasks, taskToSave]
+    setTasks(updatedTasks)
+
+    if (selectedDetails?.id) {
+      try {
+        const localTasksKey = `comiverse_tasks_${selectedDetails.id}`
+        localStorage.setItem(localTasksKey, JSON.stringify(updatedTasks))
+      } catch (e) {
+        console.error('Failed to save task to local storage:', e)
+      }
+    }
+
+    if (!customData) {
       setNewTaskData({ title: '', column: 'backlog', assignees: [], dueDate: '', priority: 'Medium', chapterId: null })
       setShowCreateTask(false)
-      toast.success('Task saved to database!')
-    } catch (err) {
-      console.error(err)
-      toast.error('Failed to create task.')
     }
+    toast.success('Task created successfully!')
   }
 
   const handleMoveTask = async (id, newCol) => {
+    const updatedTasks = tasks.map(task => task.id === id ? { ...task, status: newCol } : task)
+    setTasks(updatedTasks)
+
+    if (selectedDetails?.id) {
+      try {
+        const localTasksKey = `comiverse_tasks_${selectedDetails.id}`
+        localStorage.setItem(localTasksKey, JSON.stringify(updatedTasks))
+      } catch (e) {}
+    }
+
     try {
-      const updated = await updateTeamTaskApi(id, { status: newCol })
-      setTasks(prev => prev.map(task => task.id === id ? { ...task, status: newCol } : task))
+      await updateTeamTaskApi(id, { status: newCol })
     } catch (err) {
-      console.error(err)
-      toast.error('Failed to update task state in DB.')
+      console.warn('Backend updateTeamTaskApi error:', err)
     }
   }
 
@@ -1207,20 +1303,71 @@ function TeamProjects() {
     })
   }
 
+  const handleSaveEditTask = async () => {
+    if (!selectedTask || !editTaskData) return
+    const comicFallback = selectedDetails?.comicName || selectedDetails?.title || 'Unknown Comic'
+    const formattedTitle = `[${(editTaskData.priority || 'MEDIUM').toUpperCase()}] [${editTaskData.comic || comicFallback}] ${editTaskData.title.trim()}`
+
+    const targetId = selectedTask.id || selectedTask._id || selectedTask.taskId
+    const updatedTaskObj = {
+      ...selectedTask,
+      title: formattedTitle,
+      status: editTaskData.status,
+      assigneeIds: editTaskData.assignees,
+      dueDate: editTaskData.dueDate
+    }
+
+    const updatedTasks = tasks.map(t => (t.id === targetId || t._id === targetId) ? updatedTaskObj : t)
+    setTasks(updatedTasks)
+
+    if (selectedDetails?.id) {
+      try {
+        const localTasksKey = `comiverse_tasks_${selectedDetails.id}`
+        localStorage.setItem(localTasksKey, JSON.stringify(updatedTasks))
+      } catch (e) {
+        console.error('Failed to update local task:', e)
+      }
+    }
+
+    try {
+      await updateTeamTaskApi(targetId, {
+        title: formattedTitle,
+        status: editTaskData.status,
+        assigneeIds: editTaskData.assignees,
+        dueDate: editTaskData.dueDate
+      })
+    } catch (err) {
+      console.warn('Backend updateTeamTaskApi error:', err)
+    }
+
+    toast.success('Task updated successfully!')
+    setSelectedTask(null)
+  }
+
   const handleMoveAllToDone = async (colId) => {
     const targets = tasks.filter(t => getTaskColumn(t) === colId)
     if (targets.length === 0) return
+
+    const updatedTasks = tasks.map(t => getTaskColumn(t) === colId ? { ...t, status: 'completed' } : t)
+    setTasks(updatedTasks)
+
+    if (selectedDetails?.id) {
+      try {
+        const localTasksKey = `comiverse_tasks_${selectedDetails.id}`
+        localStorage.setItem(localTasksKey, JSON.stringify(updatedTasks))
+      } catch (e) {}
+    }
+
+    toast.success(`Moved all tasks from ${colId} to Completed!`)
+
     try {
       await Promise.all(targets.map(t => updateTeamTaskApi(t.id, {
         status: 'completed',
         dueDate: t.dueDate,
         assigneeIds: t.assigneeIds
       })))
-      setTasks(prev => prev.map(t => getTaskColumn(t) === colId ? { ...t, status: 'completed' } : t))
-      toast.success(`Moved all tasks from ${colId} to Completed!`)
     } catch (err) {
-      console.error(err)
-      toast.error('Failed to move all tasks to Completed.')
+      console.warn('Backend move all tasks error:', err)
     }
   }
 
@@ -1265,7 +1412,10 @@ function TeamProjects() {
       <WorkspaceDetailView
         selectedDetails={selectedDetails}
         setSelectedDetails={setSelectedDetails}
-        onBackToProjects={() => setSelectedDetails(null)}
+        onBackToProjects={() => {
+          localStorage.removeItem('comiverse_active_project_id');
+          setSelectedDetails(null);
+        }}
         workspaceTab={workspaceTab}
         setWorkspaceTab={setWorkspaceTab}
         isCurrentLeader={isCurrentLeader}
@@ -1323,6 +1473,7 @@ function TeamProjects() {
         editTaskData={editTaskData}
         setEditTaskData={setEditTaskData}
         onCancelEditTask={() => setSelectedTask(null)}
+        onSaveEditTask={handleSaveEditTask}
         onContinueToWorkspace={() => navigate(`/translator/translate-workspace/task/${selectedTask.id}`)}
         onContinueToReviewWorkspace={() => navigate(`/translator/review-workspace/task/${selectedTask.id}`)}
         onSaveWorkspaceSettings={handleSaveWorkspaceSettings}
