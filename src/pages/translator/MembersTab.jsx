@@ -6,19 +6,19 @@ import { toast } from 'react-toastify'
 import ModernPagination from '../../components/common/ModernPagination'
 
 export function mapTeamMember(m, leaderName) {
-  const name = m.name || 'Unknown'
-  const isLeader = m.role === 'Group Leader' || (!!leaderName && name.toLowerCase().trim() === leaderName.toLowerCase().trim())
-  const online = m.online === true
+  const name = m?.name || m?.fullName || m?.username || 'Member'
+  const isLeader = m?.role === 'Group Leader' || (!!leaderName && String(name).toLowerCase().trim() === String(leaderName).toLowerCase().trim())
+  const online = m?.online === true
   return {
-    id: m.id || `mem-${Math.random()}`,
+    id: m?.id || `mem-${Math.random()}`,
     name,
-    role: isLeader ? 'Group Leader' : (m.role || 'Member'),
-    status: online ? 'Active' : 'Offline',
+    role: isLeader ? 'Group Leader' : (m?.role || 'Member'),
+    status: m?.status || (online ? 'Active' : 'Offline'),
     online,
-    lastSeenAt: m.lastSeenAt || null,
-    joinDate: m.joinDate || '—',
-    contributions: m.contributions || '0 chapters',
-    avatar: m.avatar || name.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2)
+    lastSeenAt: m?.lastSeenAt || null,
+    joinDate: m?.joinDate || '—',
+    contributions: m?.contributions || '0 chapters',
+    avatar: m?.avatar || String(name).split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2)
   }
 }
 
@@ -367,24 +367,26 @@ function MembersTab({
               </thead>
               <tbody>
                 {displayedMembers.map((member, idx) => {
-                  const memberId = member.id ?? idx
-                  const isMe = member.name.toLowerCase().trim() === currentUserName
-                  const canLeave = isMe && member.role !== 'Group Leader'
-                  const canRemove = isCurrentLeader && !isMe && member.role !== 'Group Leader'
+                  const memberId = member?.id ?? idx
+                  const memName = String(member?.name || member?.fullName || member?.username || 'Member')
+                  const isMe = memName.toLowerCase().trim() === currentUserName
+                  const canLeave = isMe && member?.role !== 'Group Leader'
+                  const canRemove = isCurrentLeader && !isMe && member?.role !== 'Group Leader'
+                  const statusClass = String(member?.status || (member?.online ? 'active' : 'offline')).toLowerCase()
 
                   return (
                     <tr key={memberId}>
                       <td>
                         <div className="member-cell-info">
-                          <div className={`chat-avatar ${member.role === 'Group Leader' ? 'avatar-leader' : 'avatar-member'}`}>
-                            {member.avatar}
+                          <div className={`chat-avatar ${member?.role === 'Group Leader' ? 'avatar-leader' : 'avatar-member'}`}>
+                            {member?.avatar || memName.substring(0, 2).toUpperCase()}
                           </div>
                           <div className="member-status-details">
                             <span className="member-name-text">
-                              {member.name} {isMe && <small className="member-you-tag">(You)</small>}
+                              {memName} {isMe && <small className="member-you-tag">(You)</small>}
                             </span>
                             <div className="member-status-row">
-                              <span className={`status-dot ${member.status.toLowerCase()}`}></span>
+                              <span className={`status-dot ${statusClass}`}></span>
                               <span>{formatMemberPresence(member)}</span>
                             </div>
                           </div>

@@ -16,6 +16,8 @@ import {
 import { getChapterDetailApi, getChaptersByComicIdApi } from "../../services/api/ChapterApi";
 import { getAuthorComicByIdApi, getAuthorComicChaptersApi, getAuthorChapterPreviewApi } from "../../services/api/AuthorComicApi";
 import { getComicByIdApi, searchComicsApi, getAllComicsApi } from "../../services/api/ComicApi";
+import { getAuth } from "../../utils/Auth";
+import CustomDatePicker from '../../components/common/CustomDatePicker';
 import "../../assets/style/moderator/comic-detail.css";
 
 const resolveImageUrl = (url) => {
@@ -94,6 +96,38 @@ export function getAllowedStatusOptions(currentStatusStr) {
 
 export function getTaskColumn(task) {
   return getNormalizedStatusKey(task?.status)
+}
+
+export function isUserAssignedToTask(t, teamMembers = [], authUser) {
+  if (!t || !authUser) return false;
+
+  const currentUserName = (authUser.fullName || authUser.username || '').toLowerCase().trim();
+  const currentUserId = authUser.id ? String(authUser.id) : null;
+
+  const assignees = t.assignees || t.assigneeIds || t.assignedMembers || [];
+  if (!Array.isArray(assignees) || assignees.length === 0) return false;
+
+  return assignees.some(mId => {
+    if (!mId) return false;
+
+    // 1. Direct ID match
+    if (currentUserId && String(mId) === currentUserId) return true;
+
+    // 2. Direct string name match
+    if (typeof mId === 'string') {
+      const s = mId.toLowerCase().trim();
+      if (s === currentUserName || (currentUserId && s === currentUserId)) return true;
+    }
+
+    // 3. Candidate lookup in team members list
+    const mem = teamMembers.find(m => String(m?.id) === String(mId));
+    if (mem) {
+      const mName = (mem.name || mem.fullName || mem.username || '').toLowerCase().trim();
+      if (mName === currentUserName || (currentUserId && String(mem.id) === currentUserId)) return true;
+    }
+
+    return false;
+  });
 }
 
 const COLUMN_LIST = [
@@ -331,6 +365,15 @@ function TasksTab({
     return !isTaskCreated;
   });
 
+  const auth = getAuth();
+  const authUser = auth?.user;
+
+  // Leader sees ALL tasks in project. Members ONLY see tasks they are assigned to.
+  const visibleTasks = (tasks || []).filter(t => {
+    if (isCurrentLeader) return true;
+    return isUserAssignedToTask(t, members, authUser);
+  });
+
   return (
     <div className="board tasks-board-tab-container fade-in" style={{ padding: 0, background: 'transparent' }}>
       
@@ -347,22 +390,29 @@ function TasksTab({
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => setIsBacklogCollapsed(prev => !prev)}>
               <svg
                 xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                style={{
-                  color: '#c084fc',
-                  transition: 'transform 0.25s ease',
-                  transform: isBacklogCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)'
-                }}
+                fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                style={{ color: '#c084fc', transform: isBacklogCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
               >
-                <path d="m6 9 6 6 6-6" />
+                <polyline points="6 9 12 15 18 9"></polyline>
               </svg>
-              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'var(--trans-text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>📚 Raw Manuscript Backlog</span>
-                <span style={{ fontSize: '11px', background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', padding: '2px 8px', borderRadius: '12px', fontWeight: '800' }}>
-                  {unassignedChapterOptions.length}
-                </span>
+              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'var(--trans-text-primary)' }}>
+                📖 Raw Manuscript Chapters Available ({unassignedChapterOptions.length})
               </h4>
+              <span style={{ fontSize: '11px', color: '#c084fc', background: 'rgba(168, 85, 247, 0.15)', padding: '2px 8px', borderRadius: '6px' }}>
+                Ready to Translate
+              </span>
             </div>
+
+            {isCurrentLeader && (
+              <button
+                type="button"
+                className="trans-btn primary"
+                onClick={() => onCreateTaskClick()}
+                style={{ fontSize: '11.5px', padding: '4px 10px', borderRadius: '6px' }}
+              >
+                <Plus size={13} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Create Task
+              </button>
+            )}
           </div>
 
           {!isBacklogCollapsed && (
@@ -458,7 +508,7 @@ function TasksTab({
               </span>
 
               <span style={{ fontSize: '12px', color: 'var(--trans-text-secondary)', background: 'rgba(255,255,255,0.04)', padding: '3px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <strong>{tasks.length}</strong> tasks total
+                <strong>{visibleTasks.length}</strong> tasks total
               </span>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '4px' }}>
@@ -528,7 +578,7 @@ function TasksTab({
             const isLocked = lockedColumns.includes(col.id)
             const isHighlighted = highlightedColumns.includes(col.id)
 
-            let colTasks = tasks.filter(t => getTaskColumn(t) === col.id)
+            let colTasks = visibleTasks.filter(t => getTaskColumn(t) === col.id)
             if (sortedColumns.includes(col.id)) {
               const priorityOrder = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 }
               colTasks = [...colTasks].sort((a, b) => {
@@ -663,7 +713,22 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
   useEffect(() => {
     let isMounted = true;
     const loadChapterPages = async () => {
-      setLoading(true);
+      const cacheKey = `comiverse_chapter_pages_${chapter.id}`;
+
+      // 0a. Instant cache load from sessionStorage (<3ms)
+      try {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0 && isMounted) {
+            setPages(parsed);
+            setLoading(false);
+            // Continue fetching in background to revalidate
+          }
+        }
+      } catch (e) {}
+
+      setLoading(prev => prev);
 
       const isSyntheticId = String(chapter.id || '').startsWith('ch-') || String(chapter.id || '').startsWith('task-');
       const uuidMatch = String(chapter.id || '').match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}/i);
@@ -679,71 +744,66 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
         fetchedPages = chapter.images;
       }
 
-      // 1. Direct getChapterDetailApi
+      // 1+2. Parallel: Direct getChapterDetailApi + getAuthorChapterPreviewApi
       if (fetchedPages.length === 0 && realChapterId && realChapterId !== activeComicId) {
-        try {
-          const response = await getChapterDetailApi(realChapterId);
+        const extractPages = (response) => {
           const data = response?.data?.data || response?.data || response;
-          const rawPages = data?.pages || data?.images || (Array.isArray(data) ? data : []);
-          if (Array.isArray(rawPages) && rawPages.length > 0) fetchedPages = rawPages;
-        } catch (err) {
-          // Ignore silently
+          return data?.pages || data?.images || (Array.isArray(data) ? data : []);
+        };
+
+        const results = await Promise.allSettled([
+          getChapterDetailApi(realChapterId),
+          activeComicId ? getAuthorChapterPreviewApi(activeComicId, realChapterId) : Promise.reject('no comicId')
+        ]);
+
+        for (const r of results) {
+          if (r.status === 'fulfilled') {
+            const rawPages = extractPages(r.value);
+            if (Array.isArray(rawPages) && rawPages.length > 0) {
+              fetchedPages = rawPages;
+              break;
+            }
+          }
         }
       }
 
-      // 2. Direct getAuthorChapterPreviewApi
-      if (fetchedPages.length === 0 && activeComicId && realChapterId && realChapterId !== activeComicId) {
-        try {
-          const response = await getAuthorChapterPreviewApi(activeComicId, realChapterId);
-          const data = response?.data?.data || response?.data || response;
-          const rawPages = data?.pages || data?.images || (Array.isArray(data) ? data : []);
-          if (Array.isArray(rawPages) && rawPages.length > 0) fetchedPages = rawPages;
-        } catch (err) {
-          // Ignore silently
-        }
-      }
-
-      // 3. Full Moderator-Style Chapter Discovery Pipeline by comicId
+      // 3. Parallel Chapter Discovery Pipeline by comicId
       if (fetchedPages.length === 0 && activeComicId) {
         let chapList = [];
 
-        // 3a. getChaptersByComicIdApi
-        try {
-          const res = await getChaptersByComicIdApi(activeComicId, {}, true);
-          const list = Array.isArray(res) ? res : (res?.content || res?.data || []);
-          if (list.length > 0) chapList = list;
-        } catch (e) { /* ignore */ }
+        // 3a+3b. Parallel: getChaptersByComicIdApi + getAuthorComicChaptersApi
+        const chapResults = await Promise.allSettled([
+          getChaptersByComicIdApi(activeComicId, {}, true),
+          getAuthorComicChaptersApi(activeComicId)
+        ]);
 
-        // 3b. getAuthorComicChaptersApi
-        if (chapList.length === 0) {
-          try {
-            const res = await getAuthorComicChaptersApi(activeComicId);
-            const list = Array.isArray(res) ? res : (res?.content || res?.data || []);
-            if (list.length > 0) chapList = list;
-          } catch (e) { /* ignore */ }
+        for (const r of chapResults) {
+          if (r.status === 'fulfilled') {
+            const list = Array.isArray(r.value) ? r.value : (r.value?.content || r.value?.data || []);
+            if (list.length > 0) { chapList = list; break; }
+          }
         }
 
-        // 3c. getComicByIdApi
-        if (chapList.length === 0) {
-          try {
-            const res = await getComicByIdApi(activeComicId);
-            const data = res?.data?.data || res?.data || res;
-            if (data?.chapters && Array.isArray(data.chapters)) chapList = data.chapters;
-            else if (data?.pages || data?.images) fetchedPages = data.pages || data.images;
-          } catch (e) { /* ignore */ }
-        }
-
-        // 3d. getAuthorComicByIdApi
+        // 3c+3d. Parallel fallback: getComicByIdApi + getAuthorComicByIdApi
         if (chapList.length === 0 && fetchedPages.length === 0) {
-          try {
-            const res = await getAuthorComicByIdApi(activeComicId);
-            const data = res?.data?.data || res?.data || res;
-            if (data?.chapters && Array.isArray(data.chapters)) chapList = data.chapters;
-            else if (data?.pages || data?.images) fetchedPages = data.pages || data.images;
-          } catch (e) { /* ignore */ }
+          const comicResults = await Promise.allSettled([
+            getComicByIdApi(activeComicId),
+            getAuthorComicByIdApi(activeComicId)
+          ]);
+
+          for (const r of comicResults) {
+            if (r.status === 'fulfilled') {
+              const data = r.value?.data?.data || r.value?.data || r.value;
+              if (data?.chapters && Array.isArray(data.chapters) && data.chapters.length > 0) {
+                chapList = data.chapters; break;
+              } else if (data?.pages || data?.images) {
+                fetchedPages = data.pages || data.images; break;
+              }
+            }
+          }
         }
 
-        if (chapList.length > 0) {
+        if (chapList.length > 0 && fetchedPages.length === 0) {
           const matchedChap = chapList.find(c =>
             (realChapterId && String(c.id) === String(realChapterId)) ||
             c.chapterNumber === chapter.number ||
@@ -757,22 +817,20 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
               fetchedPages = matchedChap.images;
             }
 
+            // Parallel: detail + preview for matched chapter
             if (fetchedPages.length === 0 && matchedChap.id) {
-              try {
-                const detailRes = await getChapterDetailApi(matchedChap.id);
-                const data = detailRes?.data?.data || detailRes?.data || detailRes;
-                const pages = data?.pages || data?.images || (Array.isArray(data) ? data : []);
-                if (Array.isArray(pages) && pages.length > 0) fetchedPages = pages;
-              } catch (e) { /* ignore */ }
-            }
+              const detailResults = await Promise.allSettled([
+                getChapterDetailApi(matchedChap.id),
+                activeComicId ? getAuthorChapterPreviewApi(activeComicId, matchedChap.id) : Promise.reject('skip')
+              ]);
 
-            if (fetchedPages.length === 0 && matchedChap.id && activeComicId) {
-              try {
-                const previewRes = await getAuthorChapterPreviewApi(activeComicId, matchedChap.id);
-                const data = previewRes?.data?.data || previewRes?.data || previewRes;
-                const pages = data?.pages || data?.images || (Array.isArray(data) ? data : []);
-                if (Array.isArray(pages) && pages.length > 0) fetchedPages = pages;
-              } catch (e) { /* ignore */ }
+              for (const r of detailResults) {
+                if (r.status === 'fulfilled') {
+                  const data = r.value?.data?.data || r.value?.data || r.value;
+                  const pages = data?.pages || data?.images || (Array.isArray(data) ? data : []);
+                  if (Array.isArray(pages) && pages.length > 0) { fetchedPages = pages; break; }
+                }
+              }
             }
           }
         }
@@ -834,6 +892,8 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
         if (mapped.length > 0 && isMounted) {
           setPages(mapped);
           setLoading(false);
+          // Cache to sessionStorage for instant future opens
+          try { sessionStorage.setItem(cacheKey, JSON.stringify(mapped)); } catch (e) {}
           return;
         }
       }
@@ -1026,6 +1086,8 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
                     <img
                       src={page.imageUrl}
                       alt={`Page ${pIdx + 1}`}
+                      loading={pIdx > 3 ? 'lazy' : 'eager'}
+                      decoding="async"
                       style={{
                         width: '100%',
                         height: '100%',
@@ -1303,7 +1365,7 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
   );
 }
 
-function AssigneeChipPicker({ candidates, selectedIds, onToggle, emptyLabel }) {
+function AssigneeChipPicker({ candidates, selectedIds, onToggle, emptyLabel, readOnly = false }) {
   if (!Array.isArray(candidates) || candidates.length === 0) {
     return <p style={{ fontSize: '12px', color: 'var(--trans-text-muted)', margin: 0 }}>{emptyLabel || 'No assignees available'}</p>
   }
@@ -1321,7 +1383,7 @@ function AssigneeChipPicker({ candidates, selectedIds, onToggle, emptyLabel }) {
             key={memberId}
             type="button"
             className={`trans-assignee-chip${isSelected ? ' selected' : ''}`}
-            onClick={() => onToggle(memberId, isSelected)}
+            onClick={() => !readOnly && onToggle && onToggle(memberId, isSelected)}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -1330,7 +1392,7 @@ function AssigneeChipPicker({ candidates, selectedIds, onToggle, emptyLabel }) {
               borderRadius: '9999px',
               fontSize: '13px',
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: readOnly ? 'default' : 'pointer',
               border: isSelected
                 ? '1.5px solid #a855f7'
                 : '1px solid rgba(255, 255, 255, 0.12)',
@@ -1471,13 +1533,13 @@ export function CreateTaskModal({
                 }));
               }}
               disabled={chapterOptions.length === 0}
-              style={{ color: '#111', background: '#fff', ...errorBorder('chapterId') }}
+              style={{ ...errorBorder('chapterId') }}
             >
-              <option value="" style={{ color: '#111', background: '#fff' }}>
+              <option value="">
                 {chapterOptions.length === 0 ? 'No chapters found for this project' : 'Select a chapter…'}
               </option>
               {chapterOptions.map((ch) => (
-                <option key={ch.id} value={ch.id} style={{ color: '#111', background: '#fff' }}>
+                <option key={ch.id} value={ch.id}>
                   📖 {ch.title}{ch.pagesCount > 0 ? ` (${ch.pagesCount} pages)` : ''}
                 </option>
               ))}
@@ -1510,29 +1572,13 @@ export function CreateTaskModal({
               <label className="trans-form-label" style={{ margin: 0 }}>
                 Due Date *
               </label>
-              {newTaskData.dueDate && (
-                <span style={{ fontSize: '11px', color: '#c084fc', fontWeight: '700' }}>
-                  📅 {new Date(newTaskData.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </span>
-              )}
             </div>
 
-            <input required
-              type="date"
-              className="trans-form-input"
-              min={new Date().toISOString().split('T')[0]}
-              style={{
-                cursor: 'pointer',
-                color: '#111',
-                background: '#fff',
-                fontWeight: '700',
-                fontSize: '13px',
-                padding: '8px 12px',
-                ...errorBorder('dueDate')
-              }}
+            <CustomDatePicker
               value={newTaskData.dueDate}
-              onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
-              onChange={(e) => setNewTaskData({ ...newTaskData, dueDate: e.target.value })}
+              onChange={(val) => setNewTaskData({ ...newTaskData, dueDate: val })}
+              placeholder="Select due date"
+              style={errorBorder('dueDate')}
             />
 
             {showError('dueDate') && (
@@ -1592,6 +1638,23 @@ export function CreateTaskModal({
 export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAssign, isProjectLeader, onCancel, onSave, onContinue, onReview }) {
   const [submitted, setSubmitted] = useState(false)
 
+  const auth = getAuth();
+  const currentUserName = (auth?.user?.fullName || auth?.user?.username || '').toLowerCase().trim();
+  const currentUserId = auth?.user?.id || auth?.user?.userId;
+
+  const isAssigned = (editTaskData.assignees || []).some(id => {
+    if (currentUserId && String(id) === String(currentUserId)) return true;
+    if (typeof id === 'string' && id.toLowerCase().trim() === currentUserName) return true;
+    const matchedMem = (teamMembersForAssign || []).find(m => String(m.id || m.userId) === String(id));
+    if (matchedMem) {
+      const memName = (matchedMem.fullName || matchedMem.name || matchedMem.username || '').toLowerCase().trim();
+      if (memName === currentUserName) return true;
+    }
+    return false;
+  });
+
+  const canAccessWorkspace = isProjectLeader || isAssigned;
+
   const errors = {
     title: !editTaskData.title.trim(),
     assignees: (editTaskData.assignees || []).length === 0,
@@ -1600,15 +1663,12 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   const showError = (field) => submitted && errors[field]
   const errorBorder = (field) => showError(field) ? { borderColor: '#ef4444' } : undefined
 
-  // Review is a Project-Leader-only action, and only makes sense once the
-  // task has actually been submitted for review by the translator. Outside
-  // that state there is nothing to review yet.
   const isUnderReview = editTaskData.status === 'under_review'
   const canReview = isProjectLeader && isUnderReview
-
   const isInProgress = editTaskData.status === 'in_progress'
 
   const toggleAssignee = (memberId, isSelected) => {
+    if (!isProjectLeader) return;
     setEditTaskData({
       ...editTaskData,
       assignees: isSelected
@@ -1618,14 +1678,14 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   }
 
   const handleSaveClick = () => {
+    if (!isProjectLeader) return;
     setSubmitted(true)
     if (Object.values(errors).some(Boolean)) return
     if (onSave) onSave()
   }
 
   const handleOpenWorkspaceClick = () => {
-    setSubmitted(true)
-    if (Object.values(errors).some(Boolean)) return
+    if (!canAccessWorkspace) return;
     if (onContinue) onContinue()
   }
 
@@ -1641,93 +1701,158 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
     <div className="trans-modal-overlay">
       <div className="trans-modal-card">
         <div className="trans-modal-header">
-          <h3>Edit Task Details</h3>
+          <h3>{isProjectLeader ? 'Edit Task Details' : 'Task Information'}</h3>
           <button className="trans-modal-close-btn" onClick={onCancel}>×</button>
         </div>
         <div className="trans-modal-body">
-          <div className="trans-form-group">
-            <label className="trans-form-label">Comic Project</label>
-            <input type="text" className="trans-form-input" value={editTaskData.comic} disabled />
-          </div>
+          {isProjectLeader ? (
+            /* ── FULL EDITING FORM FOR GROUP LEADER ───────────── */
+            <>
+              <div className="trans-form-group">
+                <label className="trans-form-label">Comic Project</label>
+                <input type="text" className="trans-form-input" value={editTaskData.comic} disabled />
+              </div>
 
-          <div className="trans-form-group">
-            <label className="trans-form-label">Task Name *</label>
-            <input required
-              type="text"
-              className="trans-form-input"
-              style={errorBorder('title')}
-              value={editTaskData.title}
-              onChange={(e) => setEditTaskData({ ...editTaskData, title: e.target.value })}
-            />
-            {showError('title') && (
-              <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>This field is required</p>
-            )}
-          </div>
+              <div className="trans-form-group">
+                <label className="trans-form-label">Task Name *</label>
+                <input required
+                  type="text"
+                  className="trans-form-input"
+                  style={errorBorder('title')}
+                  value={editTaskData.title}
+                  onChange={(e) => setEditTaskData({ ...editTaskData, title: e.target.value })}
+                />
+                {showError('title') && (
+                  <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>This field is required</p>
+                )}
+              </div>
 
-          <div className="trans-form-group">
-            <label className="trans-form-label">Status (Sprint Column)</label>
-            <select
-              className="trans-form-input"
-              value={getNormalizedStatusKey(editTaskData.status)}
-              onChange={(e) => setEditTaskData({ ...editTaskData, status: e.target.value })}
-            >
-              {getAllowedStatusOptions(editTaskData.status).map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
+              <div className="trans-form-group">
+                <label className="trans-form-label">Status (Sprint Column)</label>
+                <select
+                  className="trans-form-input"
+                  value={getNormalizedStatusKey(editTaskData.status)}
+                  onChange={(e) => setEditTaskData({ ...editTaskData, status: e.target.value })}
+                >
+                  {getAllowedStatusOptions(editTaskData.status).map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="trans-form-group">
-            <label className="trans-form-label">Priority</label>
-            <select
-              className="trans-form-input"
-              value={editTaskData.priority}
-              onChange={(e) => setEditTaskData({ ...editTaskData, priority: e.target.value })}
-            >
-              <option value="Urgent">🚨 Urgent</option>
-              <option value="High">🟠 High</option>
-              <option value="Medium">🟣 Medium</option>
-              <option value="Low">⚪ Low</option>
-            </select>
-          </div>
+              <div className="trans-form-group">
+                <label className="trans-form-label">Priority</label>
+                <select
+                  className="trans-form-input"
+                  value={editTaskData.priority}
+                  onChange={(e) => setEditTaskData({ ...editTaskData, priority: e.target.value })}
+                >
+                  <option value="Urgent">🚨 Urgent</option>
+                  <option value="High">🟠 High</option>
+                  <option value="Medium">🟣 Medium</option>
+                  <option value="Low">⚪ Low</option>
+                </select>
+              </div>
 
-          <div className="trans-form-group">
-            <label className="trans-form-label">Assignees *</label>
-            <div style={showError('assignees') ? { border: '1px solid #ef4444', borderRadius: '12px', padding: '8px' } : undefined}>
-              <AssigneeChipPicker
-                candidates={teamMembersForAssign}
-                selectedIds={editTaskData.assignees}
-                onToggle={toggleAssignee}
-                emptyLabel="No team members found for this project."
-              />
+              <div className="trans-form-group">
+                <label className="trans-form-label">Assignees *</label>
+                <div style={showError('assignees') ? { border: '1px solid #ef4444', borderRadius: '12px', padding: '8px' } : undefined}>
+                  <AssigneeChipPicker
+                    candidates={teamMembersForAssign}
+                    selectedIds={editTaskData.assignees}
+                    onToggle={toggleAssignee}
+                    emptyLabel="No team members found for this project."
+                  />
+                </div>
+                {showError('assignees') && (
+                  <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>At least one assignee is required</p>
+                )}
+              </div>
+
+              <div className="trans-form-group">
+                <label className="trans-form-label">Due Date *</label>
+                <CustomDatePicker
+                  value={editTaskData.dueDate}
+                  onChange={(val) => setEditTaskData({ ...editTaskData, dueDate: val })}
+                  placeholder="Select due date"
+                  style={errorBorder('dueDate')}
+                />
+                {showError('dueDate') && (
+                  <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Due date is required</p>
+                )}
+              </div>
+            </>
+          ) : (
+            /* ── CLEAN READ-ONLY INFORMATION VIEW FOR MEMBERS ──── */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="trans-form-group">
+                <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Comic Project</label>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--trans-text-primary)' }}>
+                  {editTaskData.comic || 'Unknown Project'}
+                </div>
+              </div>
+
+              <div className="trans-form-group">
+                <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Task Name</label>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--trans-text-primary)', lineHeight: '1.4' }}>
+                  {editTaskData.title}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div className="trans-form-group">
+                  <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</label>
+                  <div>
+                    <span style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', borderRadius: '8px', background: 'rgba(168, 85, 247, 0.12)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.25)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      {editTaskData.status === 'in_progress' ? '🟠 In Progress' : editTaskData.status === 'under_review' ? '🟣 Under Review' : editTaskData.status === 'completed' ? '🟢 Completed' : '⚪ Backlog'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="trans-form-group">
+                  <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Priority</label>
+                  <div>
+                    <span style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', borderRadius: '8px', background: 'rgba(168, 85, 247, 0.12)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.25)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      {editTaskData.priority === 'Urgent' ? '🚨 Urgent' : editTaskData.priority === 'High' ? '🟠 High' : editTaskData.priority === 'Medium' ? '🟣 Medium' : '⚪ Low'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="trans-form-group">
+                <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assigned Members</label>
+                <AssigneeChipPicker
+                  candidates={teamMembersForAssign}
+                  selectedIds={editTaskData.assignees}
+                  readOnly={true}
+                  emptyLabel="No assigned members."
+                />
+              </div>
+
+              <div className="trans-form-group">
+                <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Due Date</label>
+                <div style={{ fontSize: '13.5px', fontWeight: '600', color: 'var(--trans-text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  📅 {editTaskData.dueDate ? editTaskData.dueDate : 'No due date'}
+                </div>
+              </div>
+
+              {!canAccessWorkspace && (
+                <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)', color: '#ef4444', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  🔒 <strong>Restricted Access:</strong> You are not assigned to this task. Only assigned members and Group Leaders can access this translation workspace.
+                </div>
+              )}
             </div>
-            {showError('assignees') && (
-              <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>At least one assignee is required</p>
-            )}
-          </div>
-
-          <div className="trans-form-group">
-            <label className="trans-form-label">Due Date *</label>
-            <input
-              type="date"
-              className="trans-form-input"
-              style={errorBorder('dueDate')}
-              value={editTaskData.dueDate}
-              onChange={(e) => setEditTaskData({ ...editTaskData, dueDate: e.target.value })}
-            />
-            {showError('dueDate') && (
-              <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Due date is required</p>
-            )}
-          </div>
+          )}
         </div>
-        <div className="trans-modal-footer">
-          <button className="trans-btn secondary" onClick={onCancel}>Cancel</button>
 
-          {/* Review: Project-Leader-only, and only once the task is actually
-              Under Review — there's nothing to review before the translator
-              has submitted it. */}
+        <div className="trans-modal-footer">
+          <button className="trans-btn secondary" onClick={onCancel}>
+            {isProjectLeader ? 'Cancel' : 'Close'}
+          </button>
+
+          {/* Review: Project-Leader-only */}
           {isProjectLeader && (
             <button
               className="trans-btn secondary"
@@ -1740,17 +1865,19 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
             </button>
           )}
 
-          {/* Open Workspace — only for in_progress tasks */}
-          {isInProgress && !isUnderReview && (
-            <button className="trans-btn secondary" onClick={handleOpenWorkspaceClick} title="Save changes and open translate workspace">
+          {/* Open Workspace — ONLY IF ASSIGNED OR PROJECT LEADER */}
+          {canAccessWorkspace && !isUnderReview && (
+            <button className="trans-btn primary" onClick={handleOpenWorkspaceClick} title="Open translate workspace">
               <StepForward />Open Workspace
             </button>
           )}
 
-          {/* Save — always available */}
-          <button className="trans-btn primary" onClick={handleSaveClick}>
-            <Check size={16} />Save
-          </button>
+          {/* Save — ONLY FOR PROJECT LEADER */}
+          {isProjectLeader && (
+            <button className="trans-btn primary" onClick={handleSaveClick}>
+              <Check size={16} />Save
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -16,13 +16,26 @@
 
 /* Toolbar search field */
 .translator-project-list-container .trans-form-input {
-  background: rgba(255, 255, 255, 0.03) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
   border: 1px solid var(--trans-border) !important;
   color: var(--trans-text-primary) !important;
   border-radius: 10px;
   font-size: 14px;
   height: 44px;
   transition: all 0.2s ease;
+}
+
+.translator-project-list-container select.trans-form-input option,
+select.trans-form-input option {
+  background-color: #1a1528 !important;
+  color: #f8fafc !important;
+  padding: 8px 12px !important;
+}
+
+html.light .translator-project-list-container select.trans-form-input option,
+html.light select.trans-form-input option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
 }
 
 .translator-project-list-container .trans-form-input:focus {
@@ -43,6 +56,44 @@
   .available-projects-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+/* Light Mode Overrides for Project List */
+html.light .translator-project-list-container .trans-form-input {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html.light .available-project-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .available-project-card:hover {
+  border-color: rgba(168, 85, 247, 0.4) !important;
+  box-shadow: 0 10px 30px rgba(168, 85, 247, 0.08) !important;
+}
+
+html.light .project-card-title {
+  color: #0f172a !important;
+}
+
+html.light .project-card-team-label,
+html.light .project-meta-row {
+  color: #475569 !important;
+}
+
+html.light .project-meta-row svg {
+  color: #7c3aed !important;
+}
+
+html.light .trans-modal-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.12) !important;
 }
 
 @media (max-width: 768px) {

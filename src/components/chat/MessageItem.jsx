@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
 
 function MessageItem({ message, currentUserId, currentUser }) {
+    const [showLightbox, setShowLightbox] = useState(false);
+
     if (!message) return null;
 
     const userObj = currentUser || (typeof currentUserId === 'object' ? currentUserId : null);
@@ -33,9 +35,6 @@ function MessageItem({ message, currentUserId, currentUser }) {
             return formatTimeAgo(isoString);
         }
     };
-
-    // Lightbox state for image preview
-    const [showLightbox, setShowLightbox] = useState(false);
 
     // Detect if content is only emojis (for larger display)
     // Must NOT match digits, letters, or punctuation — only true pictographic emoji
