@@ -1435,10 +1435,16 @@ async function fetchPageChangeRequests(pageId, signal) {
 async function saveBubblesForPage(pageId, payload, signal) {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!pageId || !UUID_RE.test(pageId)) {
+    // This page has no real database id to save against at all — this is
+    // a genuine failure, not a "fine, saved locally" situation. Keep the
+    // localStorage stash as an emergency backup, but tell the caller the
+    // truth so saveStatus shows "unsaved" instead of silently lying that
+    // it's safe, which is what let bubbles quietly revert on the server
+    // while the UI kept claiming everything was saved.
     try {
       localStorage.setItem(`comiverse_bubbles_${pageId}`, JSON.stringify(payload));
     } catch (e) {}
-    return true;
+    return false;
   }
 
   try {
@@ -1452,14 +1458,15 @@ async function saveBubblesForPage(pageId, payload, signal) {
       try {
         localStorage.setItem(`comiverse_bubbles_${pageId}`, JSON.stringify(payload));
       } catch (e) {}
-      return true;
+      return false;
     }
     return true;
   } catch (err) {
+    if (err.name === "AbortError") throw err;
     try {
       localStorage.setItem(`comiverse_bubbles_${pageId}`, JSON.stringify(payload));
     } catch (e) {}
-    return true;
+    return false;
   }
 }
 
@@ -1478,6 +1485,27 @@ async function submitTaskForReview(taskId, signal) {
 function normalizeImages(chapterData) {
   const raw = chapterData?.images || [];
   return raw.map((item) => (typeof item === "string" ? item : item?.url)).filter(Boolean);
+}
+
+function clampSelectionToCanvas(selection, containerWidth, containerHeight) {
+  if (containerWidth <= 0 || containerHeight <= 0) return selection;
+
+  if (selection.shape === "polygon" && selection.points) {
+    return {
+      ...selection,
+      points: selection.points.map((p) => ({
+        x: Math.min(Math.max(p.x, 0), containerWidth),
+        y: Math.min(Math.max(p.y, 0), containerHeight),
+      })),
+    };
+  }
+
+  let { x, y, width, height } = selection;
+  width = Math.min(width, containerWidth);
+  height = Math.min(height, containerHeight);
+  x = Math.min(Math.max(x, 0), containerWidth - width);
+  y = Math.min(Math.max(y, 0), containerHeight - height);
+  return { ...selection, x, y, width, height };
 }
 
 function calculateRect(start, end) {
@@ -1625,6 +1653,26 @@ function measureCanvasSize(canvasRef) {
     width: canvasRef.current.offsetWidth,
     height: canvasRef.current.offsetHeight,
   };
+}
+
+function waitForValidCanvasSize(canvasRef, maxAttempts = 10) {
+  return new Promise((resolve) => {
+    let attempts = 0;
+    const check = () => {
+      const size = measureCanvasSize(canvasRef);
+      if (size.width > 0 && size.height > 0) {
+        resolve(size);
+        return;
+      }
+      attempts += 1;
+      if (attempts >= maxAttempts) {
+        resolve(size);
+        return;
+      }
+      requestAnimationFrame(check);
+    };
+    check();
+  });
 }
 
 function toPercent(value, size) {
@@ -1826,18 +1874,24 @@ function useSelectionAreas() {
     }
 
     if (drawing && drawing.width > 8 && drawing.height > 8) {
-      const newArea = {
-        id: generateId(),
-        shape: activeTool === "ellipse" ? "ellipse" : "rect",
-        textColor: "#000000",
-        textBgColor: "#ffffff",
-        fontSize: 13,
-        fontFamily: COMIC_FONT_LIBRARY[0].value,
-        isBold: false,
-        isItalic: false,
-        textAlign: "left",
-        ...drawing,
-      };
+      const containerWidth = containerRef.current?.offsetWidth ?? 0;
+      const containerHeight = containerRef.current?.offsetHeight ?? 0;
+      const newArea = clampSelectionToCanvas(
+        {
+          id: generateId(),
+          shape: activeTool === "ellipse" ? "ellipse" : "rect",
+          textColor: "#000000",
+          textBgColor: "#ffffff",
+          fontSize: 13,
+          fontFamily: COMIC_FONT_LIBRARY[0].value,
+          isBold: false,
+          isItalic: false,
+          textAlign: "left",
+          ...drawing,
+        },
+        containerWidth,
+        containerHeight
+      );
       setSelections((prev) => [...prev, newArea]);
       setActiveId(newArea.id);
       mergeOverlappingWith(newArea.id);
@@ -1979,6 +2033,8 @@ function useSelectionAreas() {
     const pos = getRelativePos(e);
     const dx = pos.x - drag.startPos.x;
     const dy = pos.y - drag.startPos.y;
+    const containerWidth = containerRef.current?.offsetWidth ?? 0;
+    const containerHeight = containerRef.current?.offsetHeight ?? 0;
 
     setSelections((prev) =>
       prev.map((s) => {
@@ -1986,9 +2042,17 @@ function useSelectionAreas() {
 
         if (drag.mode === "move") {
           if (s.shape === "polygon") {
-            return { ...s, points: drag.original.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) };
+            return clampSelectionToCanvas(
+              { ...s, points: drag.original.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) },
+              containerWidth,
+              containerHeight
+            );
           }
-          return { ...s, x: drag.original.x + dx, y: drag.original.y + dy };
+          return clampSelectionToCanvas(
+            { ...s, x: drag.original.x + dx, y: drag.original.y + dy },
+            containerWidth,
+            containerHeight
+          );
         }
 
         if (drag.mode === "resize") {
@@ -2018,15 +2082,19 @@ function useSelectionAreas() {
             if (newW < 8) newW = 8;
             if (newH < 8) newH = 8;
 
-            return {
-              ...s,
-              points: scalePointsToNewBox(drag.original.points, origBox, {
-                x: newX,
-                y: newY,
-                width: newW,
-                height: newH,
-              }),
-            };
+            return clampSelectionToCanvas(
+              {
+                ...s,
+                points: scalePointsToNewBox(drag.original.points, origBox, {
+                  x: newX,
+                  y: newY,
+                  width: newW,
+                  height: newH,
+                }),
+              },
+              containerWidth,
+              containerHeight
+            );
           }
 
           let { x, y, width, height } = drag.original;
@@ -2051,14 +2119,14 @@ function useSelectionAreas() {
           if (width < 8) width = 8;
           if (height < 8) height = 8;
 
-          return { ...s, x, y, width, height };
+          return clampSelectionToCanvas({ ...s, x, y, width, height }, containerWidth, containerHeight);
         }
 
         if (drag.mode === "vertex") {
           const newPoints = drag.original.points.map((p, i) =>
             i === drag.vertexIndex ? { x: p.x + dx, y: p.y + dy } : p
           );
-          return { ...s, points: newPoints };
+          return clampSelectionToCanvas({ ...s, points: newPoints }, containerWidth, containerHeight);
         }
 
         return s;
@@ -2204,12 +2272,15 @@ export default function TranslateWorkspace() {
 
         if (Array.isArray(selectionsToLoad) && selectionsToLoad.length > 0) {
           const canvasSize = measureCanvasSize(canvasRef);
-          const pxSelections = selectionsFromImagePercent(selectionsToLoad, canvasSize, naturalSize).map((s) => ({
-            isBold: legacyPageTextStyle?.isBold ?? false,
-            isItalic: legacyPageTextStyle?.isItalic ?? false,
-            textAlign: legacyPageTextStyle?.textAlign ?? "left",
-            ...s,
-          }));
+          const pxSelections = selectionsFromImagePercent(selectionsToLoad, canvasSize, naturalSize).map((s) => {
+            const clamped = clampSelectionToCanvas(s, canvasSize.width, canvasSize.height);
+            return {
+              isBold: legacyPageTextStyle?.isBold ?? false,
+              isItalic: legacyPageTextStyle?.isItalic ?? false,
+              textAlign: legacyPageTextStyle?.textAlign ?? "left",
+              ...clamped,
+            };
+          });
           loadSelections(pxSelections);
         }
       } catch (err) {
@@ -2407,7 +2478,26 @@ export default function TranslateWorkspace() {
         setChapterData(chapterResult);
         setTaskPages(pagesResult);
         setCurrentChapterId(chapterResult.id);
-        if (!hasCache) setCurrentPageIndex(0);
+        if (!hasCache) {
+          setCurrentPageIndex(0);
+        } else {
+          // The instant cache already put the user somewhere, and they may
+          // have navigated further while this real fetch was still in
+          // flight. Re-locate them by pageId in the FRESH array rather than
+          // trusting the old index — the fresh array's order/contents can
+          // differ from what the cache showed, so keeping the same index
+          // could silently point at a completely different page.
+          setCurrentPageIndex((prevIndex) => {
+            const currentId = currentPageIdRef.current;
+            if (currentId) {
+              const freshIndex = pagesResult.findIndex(
+                (p) => p.pageId === currentId || p.id === currentId
+              );
+              if (freshIndex !== -1) return freshIndex;
+            }
+            return prevIndex < pagesResult.length ? prevIndex : 0;
+          });
+        }
         setStatus("ready");
         setOpen({ [chapterResult.id]: true });
         // Cache for instant future opens
@@ -2533,32 +2623,71 @@ export default function TranslateWorkspace() {
     ];
   }, [chapterData, currentChapterId, taskPages, currentPageIndex]);
 
+  // Resolves the TRUE natural size of a page's image, guaranteed correct
+  // regardless of React re-render/state timing. Tries the already-loaded
+  // DOM <img> first (fast path); if that hasn't finished loading yet (e.g.
+  // the user jumped to this page and hit Send almost immediately), loads
+  // the exact same URL into a fresh, isolated Image object and waits for
+  // it — this is what used to fall back to a stale `imageNaturalSize`
+  // state (left over from whichever page loaded last) or a hardcoded
+  // {1000, 1400} guess, silently skewing every bubble's saved % position
+  // on the page whenever the image hadn't finished loading in time.
+  const resolveNaturalSize = (imgEl, expectedImageUrl) => {
+    const imgLoaded = !!imgEl && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0;
+    if (imgLoaded) {
+      return Promise.resolve({ width: imgEl.naturalWidth, height: imgEl.naturalHeight });
+    }
+    return new Promise((resolve) => {
+      if (!expectedImageUrl) {
+        resolve({ width: 1000, height: 1400 });
+        return;
+      }
+      const probe = new Image();
+      probe.onload = () => resolve({ width: probe.naturalWidth, height: probe.naturalHeight });
+      probe.onerror = () => resolve({ width: 1000, height: 1400 });
+      probe.src = expectedImageUrl;
+    });
+  };
+
   const persistBubbles = useCallback(
     (pageId, selectionsArray, expectedImageUrl) => {
       if (!pageId) return Promise.resolve(false);
 
-      const imgEl = imgElRef.current;
-      const imgLoaded = !!imgEl && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0;
-      const naturalSize = imgLoaded
-        ? { width: imgEl.naturalWidth, height: imgEl.naturalHeight }
-        : (imageNaturalSize || { width: 1000, height: 1400 });
-
       setSaveStatus("saving");
-      const canvasSize = measureCanvasSize(canvasRef);
-      const percentSelections = selectionsToImagePercent(selectionsArray, canvasSize, naturalSize);
-      const payload = { selections: percentSelections };
-      const bubblesJson = JSON.stringify(payload);
-      return saveBubblesForPage(pageId, payload).then((success) => {
-        if (!success) {
+
+      return Promise.all([
+        waitForValidCanvasSize(canvasRef),
+        resolveNaturalSize(imgElRef.current, expectedImageUrl),
+      ]).then(([canvasSize, naturalSize]) => {
+        if (canvasSize.width <= 0 || canvasSize.height <= 0) {
+          // NEVER silently save — selectionsToImagePercent would just
+          // pass raw pixel coordinates straight through as if they were
+          // percentages (e.g. x:295px saved as x:295%), and every
+          // subsequent load+resave compounds the distortion further.
+          // This is exactly what corrupted bubbles in the past.
+          console.error(
+            "[persistBubbles] Aborting save — canvas still has no valid size after waiting. Bubbles were NOT saved to avoid corrupting coordinates."
+          );
           setSaveStatus("unsaved");
           return false;
         }
-        setTaskPages((prev) => prev.map((p) => (p.pageId === pageId || p.id === pageId ? { ...p, bubbles: bubblesJson } : p)));
-        setSaveStatus("saved");
-        return true;
+        const percentSelections = selectionsToImagePercent(selectionsArray, canvasSize, naturalSize);
+        const payload = { selections: percentSelections };
+        const bubblesJson = JSON.stringify(payload);
+        return saveBubblesForPage(pageId, payload).then((success) => {
+          if (!success) {
+            setSaveStatus("unsaved");
+            return false;
+          }
+          setTaskPages((prev) =>
+            prev.map((p) => (p.pageId === pageId || p.id === pageId ? { ...p, bubbles: bubblesJson } : p))
+          );
+          setSaveStatus("saved");
+          return true;
+        });
       });
     },
-    [canvasRef, imageNaturalSize]
+    [canvasRef]
   );
 
   // Saves the page currently being viewed, using values that are guaranteed
@@ -2650,7 +2779,14 @@ export default function TranslateWorkspace() {
       // submit-for-review can reach the server and read the OLD bubbles
       // before our save finishes, silently dropping the last edit from the
       // review baseline (looks like "coordinates changed after Send").
-      await persistCurrentPage();
+      const saved = await persistCurrentPage();
+      if (saved === false) {
+        alert(
+          "Your latest changes on this page couldn't be saved to the server. " +
+            "Please check your connection and try Send again — submitting now would send the team an outdated version."
+        );
+        return;
+      }
       await submitTaskForReview(taskId);
       navigate("/translator/project-teams", {
         state: { teamId: chapterData?.projectTeamId, tab: "tasks" },

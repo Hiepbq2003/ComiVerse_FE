@@ -910,6 +910,7 @@
   text-align: var(--text-align, left);
   font-weight: var(--font-weight, 400);
   font-style: var(--font-style, normal);
+  z-index: 8; /* ➕ THÊM DÒNG NÀY — đảm bảo nằm trên SVG (z-index 6) và resize handle (z-index 7) */
 }
 .tw-x-inline-textarea.is-active { cursor: move; }
 .tw-x-inline-textarea.is-zoom-picking { cursor: zoom-in; }

@@ -438,7 +438,6 @@ function BubbleOverlayPanel({
   onScroll,
   frameRef,
   zoomScale,
-  zoomOrigin,
   isPickingZoomPoint,
   onFrameMouseDown,
   imageUrl,
@@ -452,52 +451,97 @@ function BubbleOverlayPanel({
   selectedBubbleId,
   onSelectBubble,
 }) {
+  const imgRef = useRef(null);
+  const [imgSize, setImgSize] = useState({ width: 0, height: 0 });
+
+  // Measure the ACTUAL rendered <img> box in pixels, rather than assuming
+  // it fills 100% of its parent frame. This is what guarantees bubbles
+  // stay pinned to the real artwork even if some other CSS rule in the
+  // app (outside review-workspace.css) constrains the image's width —
+  // whatever size the image really renders at, the overlay wrapper below
+  // is sized to match it exactly.
+  useEffect(() => {
+    const el = imgRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      setImgSize({ width: el.clientWidth, height: el.clientHeight });
+    };
+
+    if (el.complete) measure();
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    el.addEventListener("load", measure);
+
+    return () => {
+      observer.disconnect();
+      el.removeEventListener("load", measure);
+    };
+  }, [imageUrl]);
+
+  const hasSize = imgSize.width > 0 && imgSize.height > 0;
+
   return (
     <div ref={scrollRef} onScroll={onScroll} className="rvw-panel">
       <p className={`rvw-panel-label ${labelClassName}`}>{labelText}</p>
       <div
         ref={frameRef}
         onMouseDown={(e) => {
-          const handled = onFrameMouseDown(e, frameRef.current);
+          const handled = onFrameMouseDown(e, frameRef.current, scrollRef.current);
           if (handled) e.stopPropagation();
         }}
         className={`rvw-panel-frame ${isPickingZoomPoint ? "rvw-panel-frame--zoom-picking" : ""}`}
-        style={{
-          "--zoom-scale": zoomScale,
-          "--zoom-origin-x": `${zoomOrigin.x}%`,
-          "--zoom-origin-y": `${zoomOrigin.y}%`,
-        }}
+        style={{ "--zoom-scale": zoomScale }}
       >
         {imageUrl ? (
-          <img src={imageUrl} alt={`Page ${pageIndex + 1} ${labelText}`} className="rvw-panel-image" draggable={false} />
+          <div style={{ position: "relative" }}>
+            <img
+              ref={imgRef}
+              src={imageUrl}
+              alt={`Page ${pageIndex + 1} ${labelText}`}
+              className="rvw-panel-image"
+              draggable={false}
+              onLoad={() => {
+                const el = imgRef.current;
+                if (el) setImgSize({ width: el.clientWidth, height: el.clientHeight });
+              }}
+            />
+            {hasSize && !isPickingZoomPoint && (
+              <div
+                className="rvw-bubble-overlay"
+                style={{ position: "absolute", top: 0, left: 0, width: imgSize.width, height: imgSize.height }}
+              >
+                {selections.map((sel, i) => {
+                  const fontSizePx =
+                    showText && typeof sel.fontSize === "number" && frameHeight > 0
+                      ? (sel.fontSize / 100) * frameHeight
+                      : undefined;
+                  return (
+                    <Bubble
+                      key={sel.id}
+                      id={sel.id}
+                      box={getBoundingBox(sel)}
+                      index={i + 1}
+                      text={sel.translation || ""}
+                      changed={showText && changedFlags[i]}
+                      showText={showText}
+                      fontSizePx={fontSizePx}
+                      bgColor={sel.textBgColor}
+                      textColor={sel.textColor}
+                      shape={sel.shape}
+                      points={sel.points}
+                      selected={selectedBubbleId === sel.id}
+                      onClick={() => onSelectBubble(selectedBubbleId === sel.id ? null : sel.id)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
         ) : (
           <div className="rvw-panel-empty">No image for this page.</div>
         )}
-        {!isPickingZoomPoint &&
-          selections.map((sel, i) => {
-            const fontSizePx =
-              showText && typeof sel.fontSize === "number" && frameHeight > 0
-                ? (sel.fontSize / 100) * frameHeight
-                : undefined;
-            return (
-              <Bubble
-                key={sel.id}
-                id={sel.id}
-                box={getBoundingBox(sel)}
-                index={i + 1}
-                text={sel.translation || ""}
-                changed={showText && changedFlags[i]}
-                showText={showText}
-                fontSizePx={fontSizePx}
-                bgColor={sel.textBgColor}
-                textColor={sel.textColor}
-                shape={sel.shape}
-                points={sel.points}
-                selected={selectedBubbleId === sel.id}
-                onClick={() => onSelectBubble(selectedBubbleId === sel.id ? null : sel.id)}
-              />
-            );
-          })}
       </div>
     </div>
   );
@@ -724,8 +768,10 @@ function useReviewZoom() {
   const ZOOM_MAX = 6;
 
   const [zoomScale, setZoomScale] = useState(1);
-  const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
   const [isPickingZoomPoint, setIsPickingZoomPoint] = useState(false);
+
+  // Refs to each scroll container so we can centre on the click point after zoom
+  const panelScrollRefs = useRef([]);
 
   const toggleZoomIn = () => setIsPickingZoomPoint((v) => !v);
   const cancelZoomPick = () => setIsPickingZoomPoint(false);
@@ -733,36 +779,53 @@ function useReviewZoom() {
   const zoomOut = () => {
     setZoomScale((prev) => {
       const next = Math.max(ZOOM_MIN, prev / ZOOM_STEP);
-      if (next === ZOOM_MIN) setZoomOrigin({ x: 50, y: 50 });
       return next;
     });
   };
 
   const resetZoom = () => {
     setZoomScale(1);
-    setZoomOrigin({ x: 50, y: 50 });
     setIsPickingZoomPoint(false);
+    // Reset scroll to top-left
+    panelScrollRefs.current.forEach((el) => {
+      if (el) { el.scrollTop = 0; el.scrollLeft = 0; }
+    });
   };
 
-  const handleFrameMouseDown = (e, frameEl) => {
+  const handleFrameMouseDown = (e, frameEl, scrollEl) => {
     if (!isPickingZoomPoint || !frameEl) return false;
     const bounds = frameEl.getBoundingClientRect();
-    const percentX = ((e.clientX - bounds.left) / bounds.width) * 100;
-    const percentY = ((e.clientY - bounds.top) / bounds.height) * 100;
-    setZoomOrigin({ x: percentX, y: percentY });
-    setZoomScale((prev) => Math.min(ZOOM_MAX, prev * ZOOM_STEP));
+    // fraction of the frame where the user clicked
+    const fracX = (e.clientX - bounds.left) / bounds.width;
+    const fracY = (e.clientY - bounds.top) / bounds.height;
+
+    setZoomScale((prev) => {
+      const next = Math.min(ZOOM_MAX, prev * ZOOM_STEP);
+      // After the state update re-render widens the frame, scroll so the
+      // clicked point stays roughly centred in the viewport.
+      requestAnimationFrame(() => {
+        panelScrollRefs.current.forEach((el) => {
+          if (!el) return;
+          const newFrameW = el.scrollWidth;
+          const newFrameH = el.scrollHeight;
+          el.scrollLeft = fracX * newFrameW - el.clientWidth / 2;
+          el.scrollTop  = fracY * newFrameH - el.clientHeight / 2;
+        });
+      });
+      return next;
+    });
     return true;
   };
 
   return {
     zoomScale,
-    zoomOrigin,
     isPickingZoomPoint,
     toggleZoomIn,
     cancelZoomPick,
     zoomOut,
     resetZoom,
     handleFrameMouseDown,
+    panelScrollRefs,
   };
 }
 
@@ -852,14 +915,22 @@ export default function ReviewWorkspace() {
 
   const {
     zoomScale,
-    zoomOrigin,
     isPickingZoomPoint,
     toggleZoomIn,
     cancelZoomPick,
     zoomOut,
     resetZoom,
     handleFrameMouseDown,
+    panelScrollRefs,
   } = useReviewZoom();
+
+  // Register both scroll panels so resetZoom can scroll them back to origin
+  const setOriginalScrollRef = useCallback((el) => {
+    panelScrollRefs.current[0] = el;
+  }, [panelScrollRefs]);
+  const setTranslatedScrollRef = useCallback((el) => {
+    panelScrollRefs.current[1] = el;
+  }, [panelScrollRefs]);
 
   const originalFrameRef = useRef(null);
   const translatedFrameRef = useRef(null);
@@ -1096,11 +1167,13 @@ export default function ReviewWorkspace() {
 
       <div className="rvw-body">
         <BubbleOverlayPanel
-          scrollRef={originalRef}
+          scrollRef={(el) => {
+            originalRef.current = el;
+            setOriginalScrollRef(el);
+          }}
           onScroll={handleScroll("original")}
           frameRef={originalFrameRef}
           zoomScale={zoomScale}
-          zoomOrigin={zoomOrigin}
           isPickingZoomPoint={isPickingZoomPoint}
           onFrameMouseDown={handleFrameMouseDown}
           imageUrl={currentPage?.imageUrl}
@@ -1117,11 +1190,13 @@ export default function ReviewWorkspace() {
         <div className="rvw-divider-h" />
 
         <BubbleOverlayPanel
-          scrollRef={translatedRef}
+          scrollRef={(el) => {
+            translatedRef.current = el;
+            setTranslatedScrollRef(el);
+          }}
           onScroll={handleScroll("translated")}
           frameRef={translatedFrameRef}
           zoomScale={zoomScale}
-          zoomOrigin={zoomOrigin}
           isPickingZoomPoint={isPickingZoomPoint}
           onFrameMouseDown={handleFrameMouseDown}
           imageUrl={currentPage?.imageUrl}
