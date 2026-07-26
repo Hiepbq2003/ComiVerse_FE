@@ -56,7 +56,7 @@ const renderCommentBadge = (c, globalPinIndex = null) => {
   }
 };
 
-function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
+function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, handleApproveAndCreateProject, handleChapterApprove, handleChapterReject }) {
   const { theme } = useTheme()
   const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'approved' | 'rejected'
   
@@ -336,16 +336,22 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
     const targetSubId = chapToApprove.submissionId || chapToApprove.id || selectedReview.id;
     const targetSubItem = chapToApprove.originalSubmissionItem || (selectedReview.subItems ? selectedReview.subItems.find(s => (s.id || s) === targetSubId) : selectedReview);
 
-    await handleApprove(targetSubId, targetSubItem || chapToApprove);
+    if (handleChapterApprove) {
+      await handleChapterApprove(selectedReview.id || targetSubId, chapToApprove);
+    } else {
+      await handleApprove(targetSubId, targetSubItem || chapToApprove);
+    }
+
+    const getChapKey = c => c?.id || c?.chapterNumber || c?.number || c?.title || c;
+    const targetKey = getChapKey(chapToApprove);
 
     const remainingChapters = (selectedReview.allChapters || []).filter(c => {
-      const cSubId = c.submissionId || c.id;
-      return cSubId !== targetSubId && c !== chapToApprove;
+      return getChapKey(c) !== targetKey && c !== chapToApprove;
     });
 
     const remainingSubItems = (selectedReview.subItems || []).filter(s => {
-      const sId = s.id || s;
-      return sId !== targetSubId && s !== targetSubItem;
+      const sKey = s.id || s.chapterNumber || s.number || s.title || s;
+      return sKey !== targetKey && s !== chapToApprove && s !== targetSubItem;
     });
 
     if (remainingChapters.length === 0) {
@@ -356,7 +362,9 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
         ...selectedReview,
         allChapters: remainingChapters,
         chapters: remainingChapters,
-        subItems: remainingSubItems.length > 0 ? remainingSubItems : selectedReview.subItems
+        subItems: remainingSubItems.length > 0 ? remainingSubItems : selectedReview.subItems,
+        chapterNumber: remainingChapters.length,
+        number: remainingChapters.length
       };
       setSelectedReview(updatedReview);
 
@@ -379,7 +387,13 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
 
     const targetSubId = chapToReject.submissionId || chapToReject.id || selectedReview.id;
     const targetSubItem = chapToReject.originalSubmissionItem || (selectedReview.subItems ? selectedReview.subItems.find(s => (s.id || s) === targetSubId) : selectedReview);
-    setSelectedReject(targetSubItem || chapToReject || selectedReview);
+    const baseItem = typeof targetSubItem === 'object' && targetSubItem !== null ? targetSubItem : (typeof selectedReview === 'object' && selectedReview !== null ? selectedReview : { id: targetSubId });
+    setSelectedReject({
+      ...baseItem,
+      id: targetSubId,
+      rejectChapterObj: chapToReject,
+      parentReviewId: selectedReview.id || targetSubId
+    });
     setRejectionReason('');
   };
 
@@ -420,18 +434,23 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
       finalPayload = userOverallNote;
     }
 
-    const itemsToReject = selectedReject.subItems ? selectedReject.subItems : [selectedReject];
-    itemsToReject.forEach(i => handleConfirmReject(i.id || i, finalPayload));
+    if (selectedReject.rejectChapterObj && handleChapterReject) {
+      handleChapterReject(selectedReject.parentReviewId || selectedReject.id, selectedReject.rejectChapterObj, finalPayload);
+    } else {
+      const itemsToReject = selectedReject.subItems ? selectedReject.subItems : [selectedReject];
+      itemsToReject.forEach(i => handleConfirmReject(i.id || i, finalPayload));
+    }
 
     if (selectedReview && (selectedReview.allChapters || selectedReview.subItems)) {
-      const targetSubId = selectedReject.id || selectedReject;
+      const getChapKey = c => c?.id || c?.chapterNumber || c?.number || c?.title || c;
+      const targetKey = getChapKey(selectedReject.rejectChapterObj || selectedReject);
+
       const remainingChapters = (selectedReview.allChapters || []).filter(c => {
-        const cSubId = c.submissionId || c.id;
-        return cSubId !== targetSubId && c !== selectedChapter && c.originalSubmissionItem !== selectedReject;
+        return getChapKey(c) !== targetKey && c !== selectedReject.rejectChapterObj && c !== selectedChapter;
       });
       const remainingSubItems = (selectedReview.subItems || []).filter(s => {
-        const sId = s.id || s;
-        return sId !== targetSubId && s !== selectedReject;
+        const sKey = s.id || s.chapterNumber || s.number || s.title || s;
+        return sKey !== targetKey && s !== selectedReject.rejectChapterObj && s !== selectedReject;
       });
 
       if (remainingChapters.length === 0) {
@@ -442,7 +461,9 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
           ...selectedReview,
           allChapters: remainingChapters,
           chapters: remainingChapters,
-          subItems: remainingSubItems.length > 0 ? remainingSubItems : selectedReview.subItems
+          subItems: remainingSubItems.length > 0 ? remainingSubItems : selectedReview.subItems,
+          chapterNumber: remainingChapters.length,
+          number: remainingChapters.length
         };
         setSelectedReview(updatedReview);
 

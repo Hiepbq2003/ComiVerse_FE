@@ -167,7 +167,7 @@ function ModeratorDashboard() {
     return result;
   };
 
-  const publishComicToManagement = (sub) => {
+  const publishComicToManagement = (sub, isSingleChapter = false) => {
     if (!sub || (!sub.title && !sub.comicName && !sub.comicTitle)) return;
     const comicTitle = (sub.title || sub.comicName || sub.comicTitle).trim();
     if (!comicTitle) return;
@@ -181,7 +181,7 @@ function ModeratorDashboard() {
         const existing = updated[existingIdx];
         const finalCover = getComicCover(existing) || coverVal;
         const currentChaps = existing.chapterCount !== undefined ? existing.chapterCount : (existing.chapters || 0);
-        const newChapCount = sub.chapterNumber || sub.number || (currentChaps + 1);
+        const newChapCount = isSingleChapter ? currentChaps + 1 : Math.max(currentChaps, sub.chapterNumber || sub.number || (currentChaps + 1));
         updated[existingIdx] = {
           ...existing,
           cover: finalCover,
@@ -189,12 +189,14 @@ function ModeratorDashboard() {
           coverImageUrl: finalCover,
           publicationStatus: 'ONGOING',
           status: 'Active',
-          chapterCount: Math.max(currentChaps, newChapCount),
+          chapterCount: newChapCount,
+          chapters: newChapCount,
           lastChapterUpdatedAt: nowIso
         };
         return updated;
       } else {
         const authorNameClean = formatSubmitterName(sub.submittedBy || sub.author || 'Original Author').replace(/^Author:\s*/i, '');
+        const initialChaps = isSingleChapter ? 1 : (sub.chapterNumber || sub.number || sub.chapters || 1);
         const newComic = {
           id: sub.comicId || `comic-${Date.now()}`,
           title: comicTitle,
@@ -208,8 +210,8 @@ function ModeratorDashboard() {
           status: 'Active',
           language: sub.language || sub.rawLanguage || 'Japanese',
           description: sub.description || '',
-          chapterCount: sub.chapterNumber || sub.number || 1,
-          chapters: sub.chapterNumber || sub.number || 1,
+          chapterCount: initialChaps,
+          chapters: initialChaps,
           views: 0,
           viewCount: 0,
           rating: 5.0,
@@ -407,6 +409,103 @@ function ModeratorDashboard() {
       toast.error('Failed to reject submission.')
     }
   }
+
+  const handleChapterApprove = async (submissionId, chapterObj) => {
+    try {
+      const sub = submissions.find(item => (item.id || item) === submissionId || item.submissionId === submissionId || (item.title && chapterObj && chapterObj.title && item.title.toLowerCase().trim() === (chapterObj.originalSubmissionItem?.title || chapterObj.title || '').toLowerCase().trim()));
+      if (!sub) return;
+
+      const chapTitle = chapterObj?.title || `Chapter ${chapterObj?.number || chapterObj?.chapterNumber || ''}`.trim() || 'Chapter';
+      toast.success(`Approved "${chapTitle}" & published to Comic Management!`);
+
+      publishComicToManagement(sub, true);
+
+      const getChapKey = c => c?.id || c?.chapterNumber || c?.number || c?.title || c;
+      const targetKey = getChapKey(chapterObj);
+      const nowIso = new Date().toISOString();
+
+      setSubmissions(prev => prev.map(item => {
+        const itemId = item.id || item.submissionId || item;
+        if (itemId === sub.id || itemId === submissionId) {
+          const currentChaps = Array.isArray(item.allChapters) && item.allChapters.length > 0 
+            ? item.allChapters 
+            : (Array.isArray(item.chapters) && item.chapters.length > 0 ? item.chapters : []);
+          
+          const remainingChaps = currentChaps.filter(c => getChapKey(c) !== targetKey && c !== chapterObj);
+
+          if (remainingChaps.length === 0) {
+            return {
+              ...item,
+              status: 'approved',
+              approvedAt: nowIso,
+              allChapters: [],
+              chapters: []
+            };
+          } else {
+            return {
+              ...item,
+              allChapters: remainingChaps,
+              chapters: remainingChaps,
+              chapterNumber: remainingChaps.length,
+              number: remainingChaps.length
+            };
+          }
+        }
+        return item;
+      }));
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to approve chapter.');
+    }
+  };
+
+  const handleChapterReject = async (submissionId, chapterObj, reason) => {
+    try {
+      const sub = submissions.find(item => (item.id || item) === submissionId || item.submissionId === submissionId);
+      if (!sub) return;
+
+      const chapTitle = chapterObj?.title || `Chapter ${chapterObj?.number || chapterObj?.chapterNumber || ''}`.trim() || 'Chapter';
+      toast.success(`Rejected "${chapTitle}".`);
+
+      const getChapKey = c => c?.id || c?.chapterNumber || c?.number || c?.title || c;
+      const targetKey = getChapKey(chapterObj);
+      const nowIso = new Date().toISOString();
+
+      setSubmissions(prev => prev.map(item => {
+        const itemId = item.id || item.submissionId || item;
+        if (itemId === sub.id || itemId === submissionId) {
+          const currentChaps = Array.isArray(item.allChapters) && item.allChapters.length > 0 
+            ? item.allChapters 
+            : (Array.isArray(item.chapters) && item.chapters.length > 0 ? item.chapters : []);
+          
+          const remainingChaps = currentChaps.filter(c => getChapKey(c) !== targetKey && c !== chapterObj);
+
+          if (remainingChaps.length === 0) {
+            return {
+              ...item,
+              status: 'rejected',
+              rejectedAt: nowIso,
+              rejectionReason: reason || 'Chapter rejected',
+              allChapters: [],
+              chapters: []
+            };
+          } else {
+            return {
+              ...item,
+              allChapters: remainingChaps,
+              chapters: remainingChaps,
+              chapterNumber: remainingChaps.length,
+              number: remainingChaps.length
+            };
+          }
+        }
+        return item;
+      }));
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to reject chapter.');
+    }
+  };
 
   const handleSaveEditComic = async (id, updatedFields) => {
     try {
@@ -1147,6 +1246,8 @@ function ModeratorDashboard() {
               handleApprove={handleApprove} 
               handleConfirmReject={handleConfirmReject} 
               handleApproveAndCreateProject={handleApproveAndCreateProject}
+              handleChapterApprove={handleChapterApprove}
+              handleChapterReject={handleChapterReject}
             />
           )}
 
