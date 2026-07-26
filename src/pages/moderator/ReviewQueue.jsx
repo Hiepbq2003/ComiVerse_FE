@@ -125,14 +125,27 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
     setCurrentPage(1)
   }, [activeTab, sortFilter, searchQuery])
 
-  // 1. High-Performance Memoized Tab Counts
+  // 1. High-Performance Memoized Tab Counts (Grouped by Comic)
   const tabCounts = useMemo(() => {
     const counts = { pending: 0, approved: 0, rejected: 0 };
-    submissions.forEach(item => {
-      if (item.status && counts[item.status] !== undefined) {
-        counts[item.status]++;
-      }
+    const authUser = getAuth()?.user;
+
+    const scopedSubmissions = submissions.filter(item => 
+      isLanguageInModeratorScope(item.language || item.rawLanguage || item.targetLanguage || item.targetLang, authUser)
+    );
+
+    ['pending', 'approved', 'rejected'].forEach(tabStatus => {
+      const itemsInTab = scopedSubmissions.filter(i => i.status === tabStatus);
+      const uniqueKeys = new Set();
+      itemsInTab.forEach(item => {
+        const titleClean = (item.title || '').toLowerCase().trim();
+        const submitterClean = (item.submittedBy || '').toLowerCase().trim();
+        const key = item.comicId ? `comic-${item.comicId}` : `group-${titleClean}_${submitterClean}`;
+        uniqueKeys.add(key);
+      });
+      counts[tabStatus] = uniqueKeys.size;
     });
+
     return counts;
   }, [submissions]);
 
@@ -160,13 +173,58 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
       });
   }, [submissions, activeTab, searchQuery, sortFilter]);
 
-  const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE)
-  const paginatedItems = useMemo(() => {
-    return filteredItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-  }, [filteredItems, currentPage]);
+  // 3. Smart Comic Grouping: Consolidate multiple chapter submissions of the same comic into 1 card
+  const groupedItems = useMemo(() => {
+    const groupsMap = new Map();
 
-  const onApproveClick = (id) => {
-    handleApprove(id)
+    filteredItems.forEach(item => {
+      const titleClean = (item.title || '').toLowerCase().trim();
+      const submitterClean = (item.submittedBy || '').toLowerCase().trim();
+      const key = item.comicId ? `comic-${item.comicId}` : `group-${titleClean}_${submitterClean}`;
+
+      if (!groupsMap.has(key)) {
+        const itemChaps = getSubmissionChapters(item);
+        groupsMap.set(key, {
+          ...item,
+          groupKey: key,
+          subItems: [item],
+          allChapters: [...itemChaps]
+        });
+      } else {
+        const group = groupsMap.get(key);
+        group.subItems.push(item);
+
+        // Merge chapters without duplicates
+        const itemChaps = getSubmissionChapters(item);
+        itemChaps.forEach(newChap => {
+          const exists = group.allChapters.some(c => 
+            (c.id && newChap.id && c.id === newChap.id) || 
+            (c.number && newChap.number && c.number === newChap.number)
+          );
+          if (!exists) {
+            group.allChapters.push(newChap);
+          }
+        });
+
+        // Use newest timestamp for display
+        if ((item.timestamp || 0) > (group.timestamp || 0)) {
+          group.timestamp = item.timestamp;
+        }
+      }
+    });
+
+    return Array.from(groupsMap.values());
+  }, [filteredItems]);
+
+  const totalPages = Math.ceil(groupedItems.length / ITEMS_PER_PAGE)
+  const paginatedItems = useMemo(() => {
+    return groupedItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  }, [groupedItems, currentPage]);
+
+  const onApproveClick = (groupOrItem) => {
+    const targetId = typeof groupOrItem === 'string' ? groupOrItem : (groupOrItem.id || groupOrItem);
+    const itemsToApprove = typeof groupOrItem === 'object' && groupOrItem.subItems ? groupOrItem.subItems : [{ id: targetId }];
+    itemsToApprove.forEach(i => handleApprove(i.id || i));
     setSelectedReview(null)
     setSelectedChapter(null)
   }
@@ -208,7 +266,8 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
       finalPayload = userOverallNote;
     }
 
-    handleConfirmReject(selectedReject.id, finalPayload)
+    const itemsToReject = selectedReject.subItems || [selectedReject];
+    itemsToReject.forEach(i => handleConfirmReject(i.id || i, finalPayload));
     
     setSelectedReview(null)
     setSelectedChapter(null)
@@ -299,6 +358,10 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
   // Extract real DB submitted chapter list for a raw comic submission
   const getSubmissionChapters = (item) => {
     if (!item) return [];
+
+    if (Array.isArray(item.allChapters) && item.allChapters.length > 0) {
+      return item.allChapters;
+    }
     
     if (Array.isArray(item.chapters) && item.chapters.length > 0) {
       return item.chapters.map((c, i) => normalizeChapter(c, i));
@@ -552,9 +615,11 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
                   {item.language && <span> · <strong>Lang:</strong> {item.language}</span>}
                   {item.minAge && <span> · <strong>Age:</strong> {item.minAge}</span>}
                 </p>
-                <div className="submission-extra">
+                <div className="submission-extra" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
                   <span className="submission-extra-item">⏱️ {formatTimeAgo(item.timestamp)}</span>
-                  <span className="submission-extra-item">📄 {item.words || 'Raw Draft'}</span>
+                  <span className="submission-extra-item" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '2px 8px', borderRadius: '6px', fontWeight: '800', fontSize: '11.5px' }}>
+                    📚 {(item.allChapters?.length || (item.chapters ? item.chapters.length : 1))} {(item.allChapters?.length || 1) === 1 ? 'Chapter' : 'Chapters'}
+                  </span>
                 </div>
               </div>
 
@@ -573,7 +638,7 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
                         variant={2} 
                         label="✓ Approve" 
                         className="btn-approve"
-                        onClick={() => onApproveClick(item.id)} 
+                        onClick={() => onApproveClick(item)} 
                       />
 
                       <ModernButton 
