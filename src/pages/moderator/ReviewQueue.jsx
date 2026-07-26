@@ -56,7 +56,16 @@ const renderCommentBadge = (c, globalPinIndex = null) => {
   }
 };
 
-function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
+const isSameChapterItem = (c, target) => {
+  if (!c || !target) return false;
+  if (c === target) return true;
+  if (c.id && target.id && c.id === target.id) return true;
+  if (c.submissionId && target.submissionId && c.submissionId === target.submissionId) return true;
+  if (c.title && target.title && c.title.trim().toLowerCase() === target.title.trim().toLowerCase()) return true;
+  return false;
+};
+
+function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, handleApproveAndCreateProject, handleChapterApprove, handleChapterReject }) {
   const { theme } = useTheme()
   const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'approved' | 'rejected'
   
@@ -125,14 +134,105 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
     setCurrentPage(1)
   }, [activeTab, sortFilter, searchQuery])
 
-  // 1. High-Performance Memoized Tab Counts
+  // Normalize a chapter object from the backend: map 'images' to 'pages'
+  const normalizeChapter = (chap, idx) => {
+    const pages = Array.isArray(chap.pages) && chap.pages.length > 0
+      ? chap.pages
+      : Array.isArray(chap.images) && chap.images.length > 0
+        ? chap.images
+        : [];
+    return {
+      ...chap,
+      id: chap.id || `chap-${idx}-${Date.now()}`,
+      number: chap.chapterNumber || chap.number || idx + 1,
+      title: chap.title || chap.chapter || `Chapter ${chap.chapterNumber || chap.number || idx + 1}`,
+      pages,
+      content: chap.content || null,
+      words: chap.words || chap.wordCount || null,
+      timestamp: chap.createdAt || chap.timestamp || Date.now()
+    };
+  };
+
+  // Helper to determine if a submission item is a real chapter submission (vs a raw comic catalog profile entry)
+  const isRealChapterSubmission = (item) => {
+    if (!item) return false;
+
+    // Explicit arrays
+    if (Array.isArray(item.pages) && item.pages.length > 0) return true;
+    if (Array.isArray(item.images) && item.images.length > 0) return true;
+    if (Array.isArray(item.chapters) && item.chapters.length > 0) return true;
+    if (Array.isArray(item.allChapters) && item.allChapters.length > 0) return true;
+
+    // Check title / chapter fields
+    const chapTitle = String(item.chapter || item.chapterTitle || '').trim().toLowerCase();
+    if (chapTitle && chapTitle !== 'raw draft' && chapTitle !== 'comic profile' && chapTitle !== 'chapter comic profile' && chapTitle !== 'none') {
+      return true;
+    }
+
+    if (item.chapterNumber && item.chapterNumber > 0) return true;
+    if (item.type === 'chapter' || item.submissionType === 'chapter') return true;
+
+    return false;
+  };
+
+  // Extract real DB submitted chapter list for a raw comic submission
+  const getSubmissionChapters = (item) => {
+    if (!item) return [];
+
+    let list = [];
+
+    if (Array.isArray(item.allChapters) && item.allChapters.length > 0) {
+      list = item.allChapters;
+    } else if (Array.isArray(item.chapters) && item.chapters.length > 0) {
+      list = item.chapters.map((c, i) => normalizeChapter(c, i));
+    } else {
+      const pages = Array.isArray(item.pages) && item.pages.length > 0
+        ? item.pages
+        : Array.isArray(item.images) && item.images.length > 0
+          ? item.images
+          : [];
+
+      list = [normalizeChapter({
+        id: item.id || `chap-${Date.now()}`,
+        chapterNumber: item.chapterNumber || item.number || 1,
+        title: item.chapter || item.title || 'Chapter 1',
+        pages,
+        content: item.content || null,
+        words: item.words || null,
+        timestamp: item.timestamp || Date.now()
+      }, 0)];
+    }
+
+    const withPages = list.filter(c => Array.isArray(c.pages) && c.pages.length > 0);
+    const finalChaps = withPages.length > 0 ? withPages : list;
+    return finalChaps.map(c => ({
+      ...c,
+      submissionId: c.submissionId || item.id || c.id,
+      originalSubmissionItem: c.originalSubmissionItem || item
+    }));
+  };
+
+  // 1. High-Performance Memoized Tab Counts (Grouped by Comic)
   const tabCounts = useMemo(() => {
     const counts = { pending: 0, approved: 0, rejected: 0 };
-    submissions.forEach(item => {
-      if (item.status && counts[item.status] !== undefined) {
-        counts[item.status]++;
-      }
+    const authUser = getAuth()?.user;
+
+    const scopedSubmissions = submissions.filter(item => 
+      isLanguageInModeratorScope(item.language || item.rawLanguage || item.targetLanguage || item.targetLang, authUser)
+    );
+
+    ['pending', 'approved', 'rejected'].forEach(tabStatus => {
+      const itemsInTab = scopedSubmissions.filter(i => i.status === tabStatus);
+      const uniqueKeys = new Set();
+      itemsInTab.forEach(item => {
+        const titleClean = (item.title || '').toLowerCase().trim();
+        const submitterClean = (item.submittedBy || '').toLowerCase().trim();
+        const key = item.comicId ? `comic-${item.comicId}` : `group-${titleClean}_${submitterClean}`;
+        uniqueKeys.add(key);
+      });
+      counts[tabStatus] = uniqueKeys.size;
     });
+
     return counts;
   }, [submissions]);
 
@@ -160,16 +260,147 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
       });
   }, [submissions, activeTab, searchQuery, sortFilter]);
 
-  const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE)
-  const paginatedItems = useMemo(() => {
-    return filteredItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-  }, [filteredItems, currentPage]);
+  // 3. Smart Comic Grouping: Consolidate multiple chapter submissions of the same comic into 1 card
+  const groupedItems = useMemo(() => {
+    const groupsMap = new Map();
 
-  const onApproveClick = (id) => {
-    handleApprove(id)
+    filteredItems.forEach(item => {
+      const titleClean = (item.title || '').toLowerCase().trim();
+      const submitterClean = (item.submittedBy || '').toLowerCase().trim();
+      const key = item.comicId ? `comic-${item.comicId}` : `group-${titleClean}_${submitterClean}`;
+
+      if (!groupsMap.has(key)) {
+        groupsMap.set(key, {
+          ...item,
+          groupKey: key,
+          subItems: [item]
+        });
+      } else {
+        const group = groupsMap.get(key);
+        group.subItems.push(item);
+
+        // Use newest timestamp for display
+        if ((item.timestamp || 0) > (group.timestamp || 0)) {
+          group.timestamp = item.timestamp;
+        }
+      }
+    });
+
+    // Populate and clean up grouped chapters
+    groupsMap.forEach(group => {
+      // Prioritize real chapter submissions over raw comic catalog draft profiles
+      const realChapterItems = group.subItems.filter(isRealChapterSubmission);
+      const itemsToUse = realChapterItems.length > 0 ? realChapterItems : group.subItems;
+
+      const combinedChaps = [];
+      itemsToUse.forEach(item => {
+        const itemChaps = getSubmissionChapters(item);
+        itemChaps.forEach(newChap => {
+          const exists = combinedChaps.some(c => 
+            (c.id && newChap.id && c.id === newChap.id) || 
+            (c.title && newChap.title && c.title.toLowerCase().trim() === newChap.title.toLowerCase().trim())
+          );
+          if (!exists) {
+            combinedChaps.push(newChap);
+          }
+        });
+      });
+
+      // Filter out 0-page items if items with pages exist
+      const chaptersWithPages = combinedChaps.filter(c => Array.isArray(c.pages) && c.pages.length > 0);
+      group.allChapters = chaptersWithPages.length > 0 ? chaptersWithPages : combinedChaps;
+
+      // Synchronize group.chapters with group.allChapters for 100% consistent badge count
+      group.chapters = group.allChapters;
+      
+      // Re-index chapter numbers for clean ordering if needed
+      group.allChapters.forEach((chap, idx) => {
+        if (!chap.number || chap.number === 1) {
+          chap.number = idx + 1;
+        }
+      });
+    });
+
+    return Array.from(groupsMap.values());
+  }, [filteredItems]);
+
+  const totalPages = Math.ceil(groupedItems.length / ITEMS_PER_PAGE)
+  const paginatedItems = useMemo(() => {
+    return groupedItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  }, [groupedItems, currentPage]);
+
+  const onApproveClick = (groupOrItem) => {
+    const targetId = typeof groupOrItem === 'string' ? groupOrItem : (groupOrItem.id || groupOrItem);
+    const itemsToApprove = typeof groupOrItem === 'object' && groupOrItem.subItems ? groupOrItem.subItems : [{ id: targetId, ...groupOrItem }];
+    itemsToApprove.forEach(i => handleApprove(i.id || i, typeof i === 'object' ? i : null));
     setSelectedReview(null)
     setSelectedChapter(null)
   }
+
+  const onModalApproveClick = async (specificChap = null) => {
+    if (!selectedReview) return;
+    const chapToApprove = specificChap || selectedChapter || (selectedReview.allChapters && selectedReview.allChapters[0]);
+    if (!chapToApprove) return;
+
+    const targetSubId = chapToApprove.submissionId || chapToApprove.id || selectedReview.id;
+    const targetSubItem = chapToApprove.originalSubmissionItem || (selectedReview.subItems ? selectedReview.subItems.find(s => (s.id || s) === targetSubId) : selectedReview);
+
+    if (handleChapterApprove) {
+      await handleChapterApprove(selectedReview.id || targetSubId, chapToApprove);
+    } else {
+      await handleApprove(targetSubId, targetSubItem || chapToApprove);
+    }
+
+    const remainingChapters = (selectedReview.allChapters || []).filter(c => {
+      return !isSameChapterItem(c, chapToApprove);
+    });
+
+    const remainingSubItems = (selectedReview.subItems || []).filter(s => {
+      return !isSameChapterItem(s, targetSubItem) && !isSameChapterItem(s, chapToApprove);
+    });
+
+    if (remainingChapters.length === 0) {
+      setSelectedReview(null);
+      setSelectedChapter(null);
+    } else {
+      const updatedReview = {
+        ...selectedReview,
+        allChapters: remainingChapters,
+        chapters: remainingChapters,
+        subItems: remainingSubItems.length > 0 ? remainingSubItems : selectedReview.subItems,
+        chapterNumber: remainingChapters.length,
+        number: remainingChapters.length
+      };
+      setSelectedReview(updatedReview);
+
+      const nextChapter = remainingChapters[0];
+      setSelectedChapter(nextChapter);
+      setPageIndex(0);
+
+      if (remainingChapters.length > 1) {
+        setPreviewTab('chapters');
+      } else {
+        setPreviewTab(nextChapter && Array.isArray(nextChapter.pages) && nextChapter.pages.length > 0 ? 'reader' : 'chapters');
+      }
+    }
+  };
+
+  const onModalRejectClick = (specificChap = null) => {
+    if (!selectedReview) return;
+    const chapToReject = specificChap || selectedChapter || (selectedReview.allChapters && selectedReview.allChapters[0]);
+    if (!chapToReject) return;
+
+    const targetSubId = chapToReject.submissionId || chapToReject.id || selectedReview.id;
+    const targetSubItem = chapToReject.originalSubmissionItem || (selectedReview.subItems ? selectedReview.subItems.find(s => (s.id || s) === targetSubId) : selectedReview);
+    const baseItem = typeof targetSubItem === 'object' && targetSubItem !== null ? targetSubItem : (typeof selectedReview === 'object' && selectedReview !== null ? selectedReview : { id: targetSubId });
+    setSelectedReject({
+      ...baseItem,
+      id: targetSubId,
+      rejectChapterObj: chapToReject,
+      parentReviewId: selectedReview.id || targetSubId
+    });
+    setRejectionReason('');
+  };
 
   const onOpenReject = (item) => {
     setSelectedReject(item)
@@ -208,10 +439,52 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
       finalPayload = userOverallNote;
     }
 
-    handleConfirmReject(selectedReject.id, finalPayload)
-    
-    setSelectedReview(null)
-    setSelectedChapter(null)
+    if (selectedReject.rejectChapterObj && handleChapterReject) {
+      handleChapterReject(selectedReject.parentReviewId || selectedReject.id, selectedReject.rejectChapterObj, finalPayload);
+    } else {
+      const itemsToReject = selectedReject.subItems ? selectedReject.subItems : [selectedReject];
+      itemsToReject.forEach(i => handleConfirmReject(i.id || i, finalPayload));
+    }
+
+    if (selectedReview && (selectedReview.allChapters || selectedReview.subItems)) {
+      const targetObj = selectedReject.rejectChapterObj || selectedReject;
+
+      const remainingChapters = (selectedReview.allChapters || []).filter(c => {
+        return !isSameChapterItem(c, targetObj) && c !== selectedChapter;
+      });
+      const remainingSubItems = (selectedReview.subItems || []).filter(s => {
+        return !isSameChapterItem(s, targetObj) && s !== selectedReject;
+      });
+
+      if (remainingChapters.length === 0) {
+        setSelectedReview(null);
+        setSelectedChapter(null);
+      } else {
+        const updatedReview = {
+          ...selectedReview,
+          allChapters: remainingChapters,
+          chapters: remainingChapters,
+          subItems: remainingSubItems.length > 0 ? remainingSubItems : selectedReview.subItems,
+          chapterNumber: remainingChapters.length,
+          number: remainingChapters.length
+        };
+        setSelectedReview(updatedReview);
+
+        const nextChapter = remainingChapters[0];
+        setSelectedChapter(nextChapter);
+        setPageIndex(0);
+
+        if (remainingChapters.length > 1) {
+          setPreviewTab('chapters');
+        } else {
+          setPreviewTab(nextChapter && Array.isArray(nextChapter.pages) && nextChapter.pages.length > 0 ? 'reader' : 'chapters');
+        }
+      }
+    } else {
+      setSelectedReview(null);
+      setSelectedChapter(null);
+    }
+
     setSelectedReject(null)
     setRejectionReason('')
   }
@@ -277,53 +550,7 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
     }))
   }
 
-  // Normalize a chapter object from the backend: map 'images' to 'pages'
-  const normalizeChapter = (chap, idx) => {
-    const pages = Array.isArray(chap.pages) && chap.pages.length > 0
-      ? chap.pages
-      : Array.isArray(chap.images) && chap.images.length > 0
-        ? chap.images
-        : [];
-    return {
-      ...chap,
-      id: chap.id || `chap-${idx}-${Date.now()}`,
-      number: chap.chapterNumber || chap.number || idx + 1,
-      title: chap.title || chap.chapter || `Chapter ${chap.chapterNumber || chap.number || idx + 1}`,
-      pages,
-      content: chap.content || null,
-      words: chap.words || chap.wordCount || null,
-      timestamp: chap.createdAt || chap.timestamp || Date.now()
-    };
-  };
 
-  // Extract real DB submitted chapter list for a raw comic submission
-  const getSubmissionChapters = (item) => {
-    if (!item) return [];
-    
-    if (Array.isArray(item.chapters) && item.chapters.length > 0) {
-      return item.chapters.map((c, i) => normalizeChapter(c, i));
-    }
-
-    const pages = Array.isArray(item.pages) && item.pages.length > 0
-      ? item.pages
-      : Array.isArray(item.images) && item.images.length > 0
-        ? item.images
-        : [];
-
-    if (item.chapter || item.content || pages.length > 0) {
-      return [normalizeChapter({
-        id: item.id || `chap-${Date.now()}`,
-        chapterNumber: item.chapterNumber || 1,
-        title: item.chapter ? (item.chapter.toLowerCase().startsWith('chapter') ? item.chapter : `Chapter ${item.chapter}`) : 'Chapter 1',
-        pages,
-        content: item.content || null,
-        words: item.words || null,
-        timestamp: item.timestamp || Date.now()
-      }, 0)];
-    }
-
-    return [];
-  };
 
   // Accelerated Backend Chapter Fetching with In-Memory Cache
   const fetchChaptersFromBackend = async (comicId) => {
@@ -368,23 +595,53 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
     setPageIndex(0);
     setFetchingChapters(true);
 
-    // First try to use inline chapter data
-    let chaps = getSubmissionChapters(item);
+    // Get combined chapters from group or item
+    let chaps = (item.allChapters && item.allChapters.length > 0)
+      ? [...item.allChapters]
+      : getSubmissionChapters(item);
 
     // If no pages found and we have a comicId, fetch from backend
     const hasPages = chaps.some(c => Array.isArray(c.pages) && c.pages.length > 0);
     if (!hasPages && item.comicId) {
       const backendChaps = await fetchChaptersFromBackend(item.comicId);
       if (backendChaps.length > 0) {
-        chaps = backendChaps;
-        // Cache the fetched chapters back into the item for future access
-        item.chapters = chaps;
+        backendChaps.forEach(bChap => {
+          const exists = chaps.some(c => 
+            (c.id && bChap.id && c.id === bChap.id) || 
+            (c.title && bChap.title && c.title.toLowerCase() === bChap.title.toLowerCase())
+          );
+          if (!exists) {
+            chaps.push(bChap);
+          } else {
+            const existing = chaps.find(c => (c.id && bChap.id && c.id === bChap.id) || (c.title && bChap.title && c.title.toLowerCase() === bChap.title.toLowerCase()));
+            if (existing && (!existing.pages || existing.pages.length === 0) && bChap.pages?.length > 0) {
+              existing.pages = bChap.pages;
+            }
+          }
+        });
       }
     }
 
+    // Filter out 0-page placeholders if real chapters with pages exist
+    const chapsWithPages = chaps.filter(c => Array.isArray(c.pages) && c.pages.length > 0);
+    if (chapsWithPages.length > 0) {
+      chaps = chapsWithPages;
+    }
+
+    item.allChapters = chaps;
+    item.chapters = chaps;
+
     const firstChap = chaps[0] || null;
     setSelectedChapter(firstChap);
-    setPreviewTab(firstChap && Array.isArray(firstChap.pages) && firstChap.pages.length > 0 ? 'reader' : 'chapters');
+
+    // Dynamic Tab Selection for optimal Moderator UX:
+    // If comic has > 1 chapter, default focus to 'chapters' list; if 1 chapter, default to 'reader' image view
+    if (chaps.length > 1) {
+      setPreviewTab('chapters');
+    } else {
+      setPreviewTab(firstChap && Array.isArray(firstChap.pages) && firstChap.pages.length > 0 ? 'reader' : 'chapters');
+    }
+
     setFetchingChapters(false);
   };
 
@@ -552,9 +809,11 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
                   {item.language && <span> · <strong>Lang:</strong> {item.language}</span>}
                   {item.minAge && <span> · <strong>Age:</strong> {item.minAge}</span>}
                 </p>
-                <div className="submission-extra">
+                <div className="submission-extra" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
                   <span className="submission-extra-item">⏱️ {formatTimeAgo(item.timestamp)}</span>
-                  <span className="submission-extra-item">📄 {item.words || 'Raw Draft'}</span>
+                  <span className="submission-extra-item" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '2px 8px', borderRadius: '6px', fontWeight: '800', fontSize: '11.5px' }}>
+                    📚 {(item.allChapters?.length || (item.chapters ? item.chapters.length : 1))} {(item.allChapters?.length || 1) === 1 ? 'Chapter' : 'Chapters'}
+                  </span>
                 </div>
               </div>
 
@@ -573,7 +832,7 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
                         variant={2} 
                         label="✓ Approve" 
                         className="btn-approve"
-                        onClick={() => onApproveClick(item.id)} 
+                        onClick={() => onApproveClick(item)} 
                       />
 
                       <ModernButton 
@@ -626,7 +885,7 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
                   </div>
                 </div>
 
-                {/* Center: Mode Tabs */}
+                {/* Center: Fixed Standard Mode Tabs Order */}
                 <div className="mod-inspector-mode-tabs">
                   <button
                     type="button"
@@ -668,14 +927,14 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
                         variant={2} 
                         label="✓ Approve" 
                         className="btn-approve"
-                        onClick={() => onApproveClick(selectedReview.id)} 
+                        onClick={() => onModalApproveClick()} 
                       />
 
                       <ModernButton 
                         variant={2} 
                         label="✗ Reject" 
                         className="btn-reject"
-                        onClick={() => onOpenReject(selectedReview)} 
+                        onClick={() => onModalRejectClick()} 
                       />
                     </>
                   )}
@@ -1065,11 +1324,29 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
                                         ⏱️ {formatTimeAgo(chap.timestamp || selectedReview.timestamp)}
                                       </td>
                                       <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-                                        <ModernButton
-                                          variant={2}
-                                          label={isSelected ? '✓ Inspecting' : '👁️ View Chapter'}
-                                          onClick={() => handleSelectChapterItem(chap)}
-                                        />
+                                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                          <ModernButton
+                                            variant={2}
+                                            label={isSelected ? '✓ Inspecting' : '👁️ View'}
+                                            onClick={() => handleSelectChapterItem(chap)}
+                                          />
+                                          {selectedReview.status === 'pending' && (
+                                            <>
+                                              <ModernButton
+                                                variant={2}
+                                                label="✓ Approve"
+                                                className="btn-approve"
+                                                onClick={() => onModalApproveClick(chap)}
+                                              />
+                                              <ModernButton
+                                                variant={2}
+                                                label="✗ Reject"
+                                                className="btn-reject"
+                                                onClick={() => onModalRejectClick(chap)}
+                                              />
+                                            </>
+                                          )}
+                                        </div>
                                       </td>
                                     </tr>
                                   );
@@ -1115,59 +1392,34 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
 
                           {/* Core Input Fields */}
                           <div style={{ flex: 1, minWidth: '260px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                              <div>
-                                <span className="mod-pane-title--raw" style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '4px' }}>
-                                  Comic Title *
-                                </span>
-                                <h2 className="mod-inspector-title" style={{ margin: 0, fontSize: '22px', fontWeight: '800' }}>
-                                  {selectedReview.title}
-                                </h2>
-                              </div>
-                              <ModernButton
-                                variant={2}
-                                label="💬 Comment"
-                                onClick={() => {
-                                  setFieldCommentModalTarget({
-                                    targetType: 'field',
-                                    targetKey: 'title',
-                                    targetLabel: 'Comic Title'
-                                  });
-                                }}
-                              />
+                            <div>
+                              <span className="mod-pane-title--raw" style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '4px' }}>
+                                Comic Title *
+                              </span>
+                              <h2 className="mod-inspector-title" style={{ margin: 0, fontSize: '22px', fontWeight: '800' }}>
+                                {selectedReview.title}
+                              </h2>
                             </div>
 
                             {/* Author Input Fields Grid */}
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Original Language *</span>
-                                  <button type="button" onClick={() => setFieldCommentModalTarget({ targetType: 'field', targetKey: 'language', targetLabel: 'Original Language' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#7c3aed' }}>💬</button>
-                                </div>
+                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
+                                <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Original Language *</span>
                                 <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{selectedReview.language || 'Japanese'}</strong>
                               </div>
 
-                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Minimum Age</span>
-                                  <button type="button" onClick={() => setFieldCommentModalTarget({ targetType: 'field', targetKey: 'minAge', targetLabel: 'Minimum Age' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#7c3aed' }}>💬</button>
-                                </div>
+                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
+                                <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Minimum Age</span>
                                 <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{selectedReview.minAge || selectedReview.ageRating || '13+'}</strong>
                               </div>
 
-                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Publication Status</span>
-                                  <button type="button" onClick={() => setFieldCommentModalTarget({ targetType: 'field', targetKey: 'status', targetLabel: 'Publication Status' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#7c3aed' }}>💬</button>
-                                </div>
+                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
+                                <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Publication Status</span>
                                 <strong style={{ fontSize: '13.5px', color: '#10b981', display: 'block', marginTop: '4px' }}>{selectedReview.publicationStatus || selectedReview.comicStatus || 'Ongoing'}</strong>
                               </div>
 
-                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Author Account</span>
-                                  <button type="button" onClick={() => setFieldCommentModalTarget({ targetType: 'field', targetKey: 'submittedBy', targetLabel: 'Author Account' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#7c3aed' }}>💬</button>
-                                </div>
+                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
+                                <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Author Account</span>
                                 <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{formatSubmitterName(selectedReview.submittedBy).replace('Author: ', '')}</strong>
                               </div>
                             </div>
@@ -1175,10 +1427,7 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
                             {/* Genres Input Field Display */}
                             {selectedReview.genres && selectedReview.genres.length > 0 && (
                               <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                  <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600' }}>Genres</span>
-                                  <button type="button" onClick={() => setFieldCommentModalTarget({ targetType: 'field', targetKey: 'genres', targetLabel: 'Genres' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#7c3aed' }}>💬 Comment</button>
-                                </div>
+                                <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Genres</span>
                                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                   {selectedReview.genres.map((genre, idx) => (
                                     <span key={idx} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', background: 'rgba(124,58,237,0.15)', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)' }}>
@@ -1193,22 +1442,9 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
 
                         {/* Description Field Review */}
                         <div style={{ borderTop: '1px solid rgba(148,163,184,0.15)', paddingTop: '16px', marginTop: '12px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                            <span className="mod-pane-title--raw" style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                              Description
-                            </span>
-                            <ModernButton
-                              variant={2}
-                              label="💬 Comment"
-                              onClick={() => {
-                                setFieldCommentModalTarget({
-                                  targetType: 'field',
-                                  targetKey: 'description',
-                                  targetLabel: 'Comic Description'
-                                });
-                              }}
-                            />
-                          </div>
+                          <span className="mod-pane-title--raw" style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '6px' }}>
+                            Description
+                          </span>
                           <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
                             {selectedReview.description || selectedReview.synopsis || 'No description has been added yet.'}
                           </p>
