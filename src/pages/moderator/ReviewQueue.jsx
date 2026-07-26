@@ -148,25 +148,23 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
   const getSubmissionChapters = (item) => {
     if (!item) return [];
 
+    let list = [];
+
     if (Array.isArray(item.allChapters) && item.allChapters.length > 0) {
-      return item.allChapters;
-    }
-    
-    if (Array.isArray(item.chapters) && item.chapters.length > 0) {
-      return item.chapters.map((c, i) => normalizeChapter(c, i));
-    }
+      list = item.allChapters;
+    } else if (Array.isArray(item.chapters) && item.chapters.length > 0) {
+      list = item.chapters.map((c, i) => normalizeChapter(c, i));
+    } else {
+      const pages = Array.isArray(item.pages) && item.pages.length > 0
+        ? item.pages
+        : Array.isArray(item.images) && item.images.length > 0
+          ? item.images
+          : [];
 
-    const pages = Array.isArray(item.pages) && item.pages.length > 0
-      ? item.pages
-      : Array.isArray(item.images) && item.images.length > 0
-        ? item.images
-        : [];
-
-    if (item.chapter || item.content || pages.length > 0) {
-      return [normalizeChapter({
+      list = [normalizeChapter({
         id: item.id || `chap-${Date.now()}`,
-        chapterNumber: item.chapterNumber || 1,
-        title: item.chapter ? (item.chapter.toLowerCase().startsWith('chapter') ? item.chapter : `Chapter ${item.chapter}`) : 'Chapter 1',
+        chapterNumber: item.chapterNumber || item.number || 1,
+        title: item.chapter || item.title || 'Chapter 1',
         pages,
         content: item.content || null,
         words: item.words || null,
@@ -174,7 +172,8 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
       }, 0)];
     }
 
-    return [];
+    const withPages = list.filter(c => Array.isArray(c.pages) && c.pages.length > 0);
+    return withPages.length > 0 ? withPages : list;
   };
 
   // 1. High-Performance Memoized Tab Counts (Grouped by Comic)
@@ -271,6 +270,9 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
       if (chaptersWithPages.length > 0) {
         group.allChapters = chaptersWithPages;
       }
+
+      // Synchronize group.chapters with group.allChapters for 100% consistent badge count
+      group.chapters = group.allChapters;
       
       // Re-index chapter numbers for clean ordering if needed
       group.allChapters.forEach((chap, idx) => {
