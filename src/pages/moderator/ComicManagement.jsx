@@ -962,7 +962,9 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                     {chaptersList.map((chap) => (
                       <tr key={chap.id} style={{ borderBottom: '1px solid var(--mod-border)' }}>
                         <td style={{ padding: '12px', fontWeight: 'bold' }}>Chapter {chap.chapterNumber}</td>
-                        <td style={{ padding: '12px' }}>{chap.title || <span style={{ color: 'var(--mod-text-muted)', fontStyle: 'italic' }}>Untitled</span>}</td>
+                        <td style={{ padding: '12px' }}>
+                          {chap.title || chap.manuscriptTitle || chap.chapterTitle || chap.chapter || chap.name || `Chapter ${chap.chapterNumber || chap.number || 1}`}
+                        </td>
                         <td style={{ padding: '12px' }}>
                           <span className={`comic-status-badge ${chap.isPremium ? 'paused' : 'ongoing'}`} style={{ fontSize: '11px', padding: '2px 6px' }}>
                             {chap.isPremium ? 'Premium' : 'Free'}

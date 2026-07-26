@@ -37,6 +37,26 @@ const getAuthorRawLanguage = (comic) => {
   return 'Original Raw'
 }
 
+const getChapterDisplayTitle = (chap, idx = 0) => {
+  if (!chap) return `Chapter ${idx + 1}`;
+  const rawTitle = (
+    chap.title ||
+    chap.manuscriptTitle ||
+    chap.chapterTitle ||
+    chap.chapter ||
+    chap.name ||
+    chap.originalSubmissionItem?.title ||
+    ''
+  ).toString().trim();
+
+  if (rawTitle && rawTitle.toLowerCase() !== 'untitled' && rawTitle.toLowerCase() !== 'raw draft' && rawTitle.toLowerCase() !== 'none') {
+    return rawTitle;
+  }
+
+  const num = chap.chapterNumber || chap.number || (idx + 1);
+  return `Chapter ${num}`;
+};
+
 function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = [], projectTeams = [], initialTargetLang, onClose }) {
   const { theme } = useTheme()
   const [loading, setLoading] = useState(true)
@@ -148,7 +168,7 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
               📖 {comic?.title} — Chapter {chapter.chapterNumber}
             </h3>
             <span className="mod-inspector-subtitle">
-              {chapter.title || 'Untitled Chapter'} {assignedTeam && displayTargetLang ? `• Team: ${assignedTeam.title}` : ''}
+              {getChapterDisplayTitle(chapter, 0)} {assignedTeam && displayTargetLang ? `• Team: ${assignedTeam.title}` : ''}
             </span>
           </div>
         </div>
@@ -470,8 +490,39 @@ function ModeratorComicDetail() {
         }
       }
 
+      // Fallback: If chaptersData is empty, populate chapters from matching author submissions
+      if ((!chaptersData || chaptersData.length === 0) && Array.isArray(submissionsData) && submissionsData.length > 0) {
+        const targetIdStr = String(id).toLowerCase().trim();
+        const matchedSubs = submissionsData.filter(s => 
+          String(s.id || '').toLowerCase() === targetIdStr || 
+          String(s.comicId || '').toLowerCase() === targetIdStr || 
+          (s.title && comicData?.title && s.title.toLowerCase().trim() === comicData.title.toLowerCase().trim())
+        );
+
+        const subChaps = [];
+        matchedSubs.forEach(sub => {
+          const list = sub.allChapters || sub.chapters || (sub.pages ? [sub] : []);
+          list.forEach((c, idx) => {
+            subChaps.push({
+              ...c,
+              id: c.id || `chap-sub-${idx}-${Date.now()}`,
+              chapterNumber: c.chapterNumber || c.number || idx + 1,
+              title: getChapterDisplayTitle(c, idx),
+              pages: c.pages || c.images || [],
+              isPremium: c.isPremium || false,
+              createdAt: c.createdAt || c.timestamp || sub.timestamp || new Date().toISOString(),
+              viewCount: c.viewCount || c.views || 0
+            });
+          });
+        });
+
+        if (subChaps.length > 0) {
+          chaptersData = subChaps;
+        }
+      }
+
       setComic(comicData)
-      setChapters(Array.isArray(chaptersData) ? chaptersData : [])
+      setChapters(Array.isArray(chaptersData) ? chaptersData.map((c, idx) => ({ ...c, title: getChapterDisplayTitle(c, idx) })) : [])
       setProjectTeams(Array.isArray(teamsData) ? teamsData : [])
     } catch (err) {
       console.error('Failed to fetch comic details:', err)
@@ -707,7 +758,7 @@ function ModeratorComicDetail() {
                         <td>
                           <strong>Chapter {chap.chapterNumber}</strong>
                         </td>
-                        <td>{chap.title || <span style={{ color: '#64748b', fontStyle: 'italic' }}>Untitled</span>}</td>
+                        <td>{getChapterDisplayTitle(chap, index)}</td>
                         <td>
                           <span className={`comic-status-badge ${chap.isPremium ? 'paused' : 'ongoing'}`} style={{ fontSize: '11px', padding: '2px 8px' }}>
                             {chap.isPremium ? 'Premium' : 'Free'}
