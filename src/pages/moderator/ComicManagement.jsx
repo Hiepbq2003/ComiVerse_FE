@@ -1,13 +1,16 @@
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import '../../assets/style/moderator/comic-management.css'
 import ModernButton from '../../components/common/ModernButton'
+import ModernPagination from '../../components/common/ModernPagination'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import { createTranslationRequestApi } from '../../services/api/TranslationPoolApi'
 import { toast } from 'react-toastify'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getChaptersByComicIdApi, deleteChapterApi } from '../../services/api/ChapterApi'
+import { getAuth } from '../../utils/Auth'
+import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
 
 function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, handleArchiveComic, handleTriggerAssignTeam, fetchAllData }) {
   const navigate = useNavigate()
@@ -21,6 +24,83 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   const [viewsSort, setViewsSort] = useState('All Views')
   const [comicTimeFilter, setComicTimeFilter] = useState('All Time')
   const [chapterUpdateSort, setChapterUpdateSort] = useState('Sort by Update Time')
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [comicSearch, comicStatusFilter, comicGenreFilter, comicAuthorFilter, comicTeamFilter, viewsSort, comicTimeFilter, chapterUpdateSort]);
+
+  const filteredAndSortedComics = useMemo(() => {
+    const authUser = getAuth()?.user;
+    return (comics || [])
+      .filter(c => {
+        const matchesScope = isLanguageInModeratorScope(c.language || c.rawLanguage || c.originalLanguage, authUser);
+        if (!matchesScope) return false;
+
+        const searchLower = comicSearch.toLowerCase();
+        const matchesSearch = c.title.toLowerCase().includes(searchLower) ||
+          (c.authorName || '').toLowerCase().includes(searchLower) ||
+          (c.author || '').toLowerCase().includes(searchLower) ||
+          c.projectTeam.toLowerCase().includes(searchLower);
+        
+        const matchesStatus = comicStatusFilter === 'All Status' || c.publicationStatus?.toUpperCase() === comicStatusFilter.toUpperCase();
+        const matchesGenre = comicGenreFilter === 'All Genres' || (c.genres || []).some(g => (typeof g === 'object' && g !== null ? g.name : g) === comicGenreFilter);
+        const matchesAuthor = comicAuthorFilter === 'All Authors' || c.authorName === comicAuthorFilter || c.author === comicAuthorFilter;
+        const matchesTeam = comicTeamFilter === 'All Project Teams' || c.projectTeam === comicTeamFilter;
+
+        let matchesTime = true;
+        if (comicTimeFilter !== 'All Time') {
+          const targetTime = c.lastChapterUpdatedAt || c.createdAt || c.timestamp;
+          if (targetTime) {
+            const updateDate = new Date(targetTime);
+            const now = new Date();
+            if (comicTimeFilter === 'Updated Today') {
+              const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+              matchesTime = updateDate >= oneDayAgo;
+            } else if (comicTimeFilter === 'Updated Last 7 Days') {
+              const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+              matchesTime = updateDate >= sevenDaysAgo;
+            } else if (comicTimeFilter === 'Updated Last 30 Days') {
+              const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+              matchesTime = updateDate >= thirtyDaysAgo;
+            }
+          } else {
+            matchesTime = false;
+          }
+        }
+
+        return matchesSearch && matchesStatus && matchesGenre && matchesAuthor && matchesTeam && matchesTime;
+      })
+      .sort((a, b) => {
+        if (chapterUpdateSort === 'Newest Chapters First') {
+          const tA = new Date(a.lastChapterUpdatedAt || a.createdAt || a.timestamp || 0).getTime();
+          const tB = new Date(b.lastChapterUpdatedAt || b.createdAt || b.timestamp || 0).getTime();
+          return tB - tA;
+        } else if (chapterUpdateSort === 'Oldest Chapters First') {
+          const tA = new Date(a.lastChapterUpdatedAt || a.createdAt || a.timestamp || 0).getTime();
+          const tB = new Date(b.lastChapterUpdatedAt || b.createdAt || b.timestamp || 0).getTime();
+          return tA - tB;
+        }
+
+        const aViews = a.viewCount !== undefined ? a.viewCount : (a.views || 0);
+        const bViews = b.viewCount !== undefined ? b.viewCount : (b.views || 0);
+        if (viewsSort === 'Most Viewed') {
+          return bViews - aViews;
+        } else if (viewsSort === 'Least Viewed') {
+          return aViews - bViews;
+        }
+        return 0;
+      });
+  }, [comics, comicSearch, comicStatusFilter, comicGenreFilter, comicAuthorFilter, comicTeamFilter, comicTimeFilter, chapterUpdateSort, viewsSort]);
+
+  const totalPages = Math.ceil(filteredAndSortedComics.length / ITEMS_PER_PAGE);
+  const activePage = Math.min(currentPage, Math.max(1, totalPages));
+
+  const paginatedComics = useMemo(() => {
+    return filteredAndSortedComics.slice((activePage - 1) * ITEMS_PER_PAGE, activePage * ITEMS_PER_PAGE);
+  }, [filteredAndSortedComics, activePage]);
 
   // Archive confirmation modal states
   const [showArchiveModal, setShowArchiveModal] = useState(false)
@@ -381,62 +461,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
             </tr>
           </thead>
           <tbody>
-            {comics
-              .filter(c => {
-                const searchLower = comicSearch.toLowerCase();
-                const matchesSearch = c.title.toLowerCase().includes(searchLower) ||
-                  (c.authorName || '').toLowerCase().includes(searchLower) ||
-                  (c.author || '').toLowerCase().includes(searchLower) ||
-                  c.projectTeam.toLowerCase().includes(searchLower);
-                
-                const matchesStatus = comicStatusFilter === 'All Status' || c.publicationStatus?.toUpperCase() === comicStatusFilter.toUpperCase();
-                const matchesGenre = comicGenreFilter === 'All Genres' || c.genres.some(g => (typeof g === 'object' && g !== null ? g.name : g) === comicGenreFilter);
-                const matchesAuthor = comicAuthorFilter === 'All Authors' || c.authorName === comicAuthorFilter || c.author === comicAuthorFilter;
-                const matchesTeam = comicTeamFilter === 'All Project Teams' || c.projectTeam === comicTeamFilter;
-
-                let matchesTime = true;
-                if (comicTimeFilter !== 'All Time') {
-                  const targetTime = c.lastChapterUpdatedAt || c.createdAt || c.timestamp;
-                  if (targetTime) {
-                    const updateDate = new Date(targetTime);
-                    const now = new Date();
-                    if (comicTimeFilter === 'Updated Today') {
-                      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-                      matchesTime = updateDate >= oneDayAgo;
-                    } else if (comicTimeFilter === 'Updated Last 7 Days') {
-                      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                      matchesTime = updateDate >= sevenDaysAgo;
-                    } else if (comicTimeFilter === 'Updated Last 30 Days') {
-                      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-                      matchesTime = updateDate >= thirtyDaysAgo;
-                    }
-                  } else {
-                    matchesTime = false;
-                  }
-                }
-
-                return matchesSearch && matchesStatus && matchesGenre && matchesAuthor && matchesTeam && matchesTime;
-              })
-              .sort((a, b) => {
-                if (chapterUpdateSort === 'Newest Chapters First') {
-                  const tA = new Date(a.lastChapterUpdatedAt || a.createdAt || a.timestamp || 0).getTime();
-                  const tB = new Date(b.lastChapterUpdatedAt || b.createdAt || b.timestamp || 0).getTime();
-                  return tB - tA;
-                } else if (chapterUpdateSort === 'Oldest Chapters First') {
-                  const tA = new Date(a.lastChapterUpdatedAt || a.createdAt || a.timestamp || 0).getTime();
-                  const tB = new Date(b.lastChapterUpdatedAt || b.createdAt || b.timestamp || 0).getTime();
-                  return tA - tB;
-                }
-
-                const aViews = a.viewCount !== undefined ? a.viewCount : (a.views || 0);
-                const bViews = b.viewCount !== undefined ? b.viewCount : (b.views || 0);
-                if (viewsSort === 'Most Viewed') {
-                  return bViews - aViews;
-                } else if (viewsSort === 'Least Viewed') {
-                  return aViews - bViews;
-                }
-                return 0;
-              })
+            {paginatedComics
               .map(comic => (
                 <tr key={comic.id}>
                   <td>
@@ -475,7 +500,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                       </div>
                     </div>
                   </td>
-                  <td>{comic.authorName || comic.author || 'Original Author'}</td>
+                  <td>{comic.authorName || (typeof comic.author === 'object' ? (comic.author?.displayName || comic.author?.fullName || comic.author?.username) : comic.author) || (typeof comic.user === 'object' ? (comic.user?.fullName || comic.user?.username) : comic.user) || comic.creatorName || (typeof comic.creator === 'object' ? (comic.creator?.fullName || comic.creator?.username) : comic.creator) || comic.submittedBy || comic.createdByName || 'Original Author'}</td>
                   <td>
                     {comic.projectTeam === '-' ? (
                       <span style={{ color: 'var(--mod-text-muted)', fontSize: '13px' }}>Unassigned</span>
@@ -533,6 +558,17 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
+          <ModernPagination 
+            currentPage={activePage} 
+            totalPages={totalPages} 
+            onPageChange={setCurrentPage} 
+            variant="pills"
+          />
+        </div>
+      )}
 
       {/* ── MODAL: EDIT COMIC INFO ─────────────────── */}
       {editingComic && createPortal(

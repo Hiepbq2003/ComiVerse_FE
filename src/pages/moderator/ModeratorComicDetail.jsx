@@ -10,6 +10,8 @@ import ModernButton from '../../components/common/ModernButton'
 import { toast } from 'react-toastify'
 import { useTheme } from '../../context/ThemeContext'
 import '../../assets/style/moderator/comic-detail.css'
+import { getAuth } from '../../utils/Auth'
+import { isLanguageInModeratorScope, getModeratorScope } from '../../utils/moderatorScope'
 
 const getLanguageFlag = (lang) => {
   const n = (lang || '').toLowerCase().trim()
@@ -472,6 +474,19 @@ function ModeratorComicDetail() {
           <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
             <h3>Comic not found or failed to load.</h3>
           </div>
+        ) : !isLanguageInModeratorScope(getAuthorRawLanguage(comic), getAuth()?.user) ? (
+          <div className="mod-comic-overview-card" style={{ textAlign: 'center', padding: '80px 20px', margin: '20px 0', display: 'block' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+            <h2 style={{ fontSize: '22px', fontWeight: '700', color: 'var(--mod-text-primary)', marginBottom: '8px' }}>
+              Access Denied: Out of Moderation Scope
+            </h2>
+            <p style={{ color: 'var(--mod-text-secondary)', maxWidth: '520px', margin: '0 auto 24px', lineHeight: '1.6', fontSize: '14.5px' }}>
+              This comic's original language (<strong>{getAuthorRawLanguage(comic)}</strong>) does not fall within your assigned moderation scope (<strong>{getModeratorScope(getAuth()?.user).map(l => l.charAt(0).toUpperCase() + l.slice(1)).join(', ')}</strong>). You are only authorized to inspect and review content in your assigned languages.
+            </p>
+            <Link to="/moderator" className="mod-back-btn" style={{ display: 'inline-block', padding: '10px 20px', background: 'var(--mod-accent, #a855f7)', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontWeight: '600' }}>
+              ← Return to Moderator Dashboard
+            </Link>
+          </div>
         ) : (
           <>
             {/* Comic Overview Card */}
@@ -524,7 +539,7 @@ function ModeratorComicDetail() {
                 </div>
 
                 <div style={{ fontSize: '13px', color: 'var(--mod-text-secondary)', display: 'flex', gap: '12px' }}>
-                  <span>Author: <strong style={{ color: 'var(--mod-text-primary)' }}>{comic.authorName || comic.author || 'N/A'}</strong></span>
+                  <span>Author: <strong style={{ color: 'var(--mod-text-primary)' }}>{comic.authorName || (typeof comic.author === 'object' ? (comic.author?.displayName || comic.author?.fullName || comic.author?.username) : comic.author) || (typeof comic.user === 'object' ? (comic.user?.fullName || comic.user?.username) : comic.user) || comic.creatorName || (typeof comic.creator === 'object' ? (comic.creator?.fullName || comic.creator?.username) : comic.creator) || comic.submittedBy || comic.createdByName || 'Original Author'}</strong></span>
                 </div>
               </div>
             </div>

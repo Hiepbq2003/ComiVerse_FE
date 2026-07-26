@@ -18,6 +18,7 @@ import { toast } from 'react-toastify'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import ModernButton from '../../components/common/ModernButton'
 import { getAuth } from '../../utils/Auth'
+import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
 
 
 const formatSubmitterName = (submittedBy) => {
@@ -112,13 +113,14 @@ function ModeratorDashboard() {
         getAllProjectTeamsApi(),
         getAllGenresApi()
       ])
+      const authUser = getAuth()?.user;
       const mappedComics = (comicsData || []).map(c => {
         const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === c.title.toLowerCase())
         return {
           ...c,
           projectTeam: team ? team.title : '-'
         }
-      })
+      }).filter(c => isLanguageInModeratorScope(c.language || c.rawLanguage || c.originalLanguage, authUser));
       setComics(mappedComics)
       setProjectTeams(teamsData || [])
       setGenres(genresData?.data || genresData || [])
@@ -130,7 +132,9 @@ function ModeratorDashboard() {
   const fetchSubmissionsData = async () => {
     try {
       const data = await getAllSubmissionsApi()
-      setSubmissions(data || [])
+      const authUser = getAuth()?.user;
+      const filtered = (data || []).filter(s => isLanguageInModeratorScope(s.language || s.rawLanguage || s.targetLanguage || s.targetLang, authUser));
+      setSubmissions(filtered)
     } catch (err) {
       console.error('Failed to fetch submissions:', err)
     }
@@ -173,16 +177,18 @@ function ModeratorDashboard() {
       const forumData = results[4].status === 'fulfilled' ? results[4].value : []
       const chatData = results[5].status === 'fulfilled' ? results[5].value : []
 
+      const authUser = getAuth()?.user;
       const mappedComics = (comicsData || []).map(c => {
         const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === c.title.toLowerCase())
         return {
           ...c,
           projectTeam: team ? team.title : '-'
         }
-      })
+      }).filter(c => isLanguageInModeratorScope(c.language || c.rawLanguage || c.originalLanguage, authUser));
       setComics(mappedComics)
       setProjectTeams(teamsData || [])
-      setSubmissions(submissionsData || [])
+      const filteredSubmissions = (submissionsData || []).filter(s => isLanguageInModeratorScope(s.language || s.rawLanguage || s.targetLanguage || s.targetLang, authUser));
+      setSubmissions(filteredSubmissions)
       setGenres(genresData?.data || (Array.isArray(genresData) ? genresData : []))
       setForumThreads(forumData || [])
       setChatFlags(chatData || [])
