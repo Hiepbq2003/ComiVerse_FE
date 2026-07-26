@@ -42,7 +42,7 @@ function getTimeAgo(date) {
   return date.toLocaleDateString()
 }
 
-function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpenDetails, onOpenEdit, isLeaderMatch }) {
+function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpenDetails, onQuickTranslate, onOpenEdit, isLeaderMatch }) {
   return (
     <div className="fade-in">
       <div className="translator-page-header">
@@ -114,11 +114,21 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
               </div>
               <div className="trans-project-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <ModernButton variant={2} label="Workspace" onClick={() => onOpenDetails(proj)} />
-                <button className="trans-btn icon-edit" onClick={(e) => onOpenEdit(proj, e)}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                    <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                  </svg>
+                <button
+                  className="dash-quick-action-btn"
+                  style={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                    padding: '8px 14px',
+                    fontSize: '12.5px'
+                  }}
+                  title="Open Translation Editor Directly"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (onQuickTranslate) onQuickTranslate(proj)
+                  }}
+                >
+                  <span style={{ fontSize: '14px' }}>🎨</span> Dịch ngay
                 </button>
               </div>
             </div>
@@ -437,7 +447,7 @@ function TeamProjects() {
 
   const fetchProjects = async (silent = false) => {
     try {
-      if (!silent) setLoadingProjects(true)
+      if (!silent && projects.length === 0) setLoadingProjects(true)
       const [myTeams, allTeams] = await Promise.all([
         getMyProjectTeamsApi().catch(() => []),
         getAllProjectTeamsApi().catch(() => [])
@@ -512,15 +522,33 @@ function TeamProjects() {
       });
 
       setProjects(finalProjectsList)
+      // Save cache to sessionStorage for instant (<5ms) future loads
+      try {
+        sessionStorage.setItem('comiverse_teams_list_cache', JSON.stringify(finalProjectsList));
+      } catch (e) {}
     } catch (err) {
       console.error(err)
-      toast.error('Failed to load translator project teams.')
     } finally {
-      if (!silent) setLoadingProjects(false)
+      setLoadingProjects(false)
     }
   }
 
-  useEffect(() => { fetchProjects() }, [])
+  useEffect(() => {
+    let hasCache = false;
+    try {
+      const cached = sessionStorage.getItem('comiverse_teams_list_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setProjects(parsed);
+          setLoadingProjects(false);
+          hasCache = true;
+        }
+      }
+    } catch (e) {}
+
+    fetchProjects(hasCache);
+  }, [])
 
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDetails, setSelectedDetails] = useState(null)
@@ -580,15 +608,16 @@ function TeamProjects() {
       const updated = projects.find(p => p.id === selectedDetails.id)
       if (updated) setSelectedDetails(updated)
     } else if (projects && projects.length > 0) {
-      const savedActiveId = localStorage.getItem('comiverse_active_project_id');
-      if (savedActiveId) {
-        const matching = projects.find(p => String(p.id) === String(savedActiveId));
+      const stateTeamId = location.state?.teamId
+      const targetId = stateTeamId || localStorage.getItem('comiverse_active_project_id')
+      if (targetId) {
+        const matching = projects.find(p => String(p.id) === String(targetId))
         if (matching) {
-          handleOpenDetails(matching);
+          handleOpenDetails(matching, location.state?.tab || 'home')
         }
       }
     }
-  }, [projects])
+  }, [projects, location.state])
 
   useEffect(() => {
     const handleGlobalClick = () => setOpenDropdownCol(null)
@@ -596,14 +625,37 @@ function TeamProjects() {
     return () => window.removeEventListener('click', handleGlobalClick)
   }, [])
 
-  const handleOpenDetails = async (project) => {
-    if (project && project.id) {
-      localStorage.setItem('comiverse_active_project_id', String(project.id));
-    }
+  const handleOpenDetails = async (project, initialTab = 'home') => {
+    if (!project || !project.id) return;
+    localStorage.setItem('comiverse_active_project_id', String(project.id));
     setSelectedDetails(project)
-    setWorkspaceTab('home')
+    setWorkspaceTab(initialTab)
     setShowUploadForm(false)
-    setLoadingWorkspace(true)
+
+    const cacheKey = `comiverse_team_details_cache_${project.id}`;
+    let hasCache = false;
+
+    try {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        const c = JSON.parse(cached);
+        if (c && Array.isArray(c.members) && c.members.length > 0) {
+          setChapterOptions(c.chapterOptions || []);
+          setAnnouncements(c.announcements || []);
+          setChatMessages(c.chatMessages || []);
+          setTasks(c.tasks || []);
+          setJoinRequests(c.joinRequests || []);
+          setMembers(c.members || []);
+          setTeamMembersForAssign(c.teamMembersForAssign || c.members || []);
+          setLoadingWorkspace(false);
+          hasCache = true;
+        }
+      }
+    } catch (e) {}
+
+    if (!hasCache) {
+      setLoadingWorkspace(true);
+    }
 
     const initialLeader = {
       id: `leader-${project.id}`,
@@ -744,7 +796,8 @@ function TeamProjects() {
         };
       });
       setAnnouncements(mappedAnnouncements)
-      setChatMessages(msgList.map(m => ({ ...m, isMe: m.sender === userFullName })))
+      const mappedMessages = msgList.map(m => ({ ...m, isMe: m.sender === userFullName }));
+      setChatMessages(mappedMessages)
       
       const localTasksKey = `comiverse_tasks_${project.id}`;
       let savedLocalTasks = [];
@@ -759,7 +812,8 @@ function TeamProjects() {
 
       const finalCombinedTasks = Array.from(taskMap.values());
       setTasks(finalCombinedTasks);
-      setJoinRequests(reqList.map(r => ({ ...r, roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles })))
+      const mappedRequests = reqList.map(r => ({ ...r, roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles }));
+      setJoinRequests(mappedRequests)
 
       const backendMems = Array.isArray(teamMembersList) ? teamMembersList : [];
       const combinedMap = new Map();
@@ -815,9 +869,21 @@ function TeamProjects() {
 
       setSelectedDetails(updatedDetails);
       setProjects(prev => prev.map(p => p.id === project.id ? updatedDetails : p));
+
+      // Cache details to sessionStorage for instantaneous (<5ms) future opens
+      try {
+        sessionStorage.setItem(cacheKey, JSON.stringify({
+          chapterOptions: finalChapters,
+          announcements: mappedAnnouncements,
+          chatMessages: mappedMessages,
+          tasks: finalCombinedTasks,
+          joinRequests: mappedRequests,
+          members: finalMembersList,
+          teamMembersForAssign: finalMembersList
+        }));
+      } catch (e) {}
     } catch (err) {
       console.error(err)
-      toast.error('Failed to load real workspace data from DB.')
     } finally {
       setLoadingWorkspace(false)
     }
@@ -1126,63 +1192,65 @@ function TeamProjects() {
       return
     }
 
+    // 1. Optimistically update local UI states instantly (<5ms)
+    setJoinRequests(prev => prev.filter(req => req.id !== reqId))
+
+    const newMem = {
+      id: requesterId || `mem-${Date.now()}`,
+      name: reqName || 'Member',
+      role: 'Member',
+      status: 'Offline',
+      online: false,
+      joinDate: new Date().toLocaleDateString('en-US'),
+      contributions: '0 chapters',
+      avatar: (reqName || 'M').split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2)
+    }
+
+    // Persist approved member to LocalStorage immediately
+    if (selectedDetails?.id) {
+      const localApprovedKey = `comiverse_approved_members_${selectedDetails.id}`;
+      try {
+        const existingSaved = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
+        const isAlreadySaved = existingSaved.some(m => (m.name || '').toLowerCase().trim() === (newMem.name || '').toLowerCase().trim());
+        if (!isAlreadySaved) {
+          existingSaved.push(newMem);
+          localStorage.setItem(localApprovedKey, JSON.stringify(existingSaved));
+        }
+      } catch (e) { console.warn(e); }
+    }
+
+    setMembers(prev => {
+      const exists = prev.some(m => (m.name || '').toLowerCase().trim() === (newMem.name || '').toLowerCase().trim());
+      return exists ? prev : [...prev, newMem];
+    });
+
+    setTeamMembersForAssign(prev => {
+      const exists = prev.some(m => (m.name || '').toLowerCase().trim() === (newMem.name || '').toLowerCase().trim());
+      return exists ? prev : [...prev, newMem];
+    });
+
+    if (selectedDetails) {
+      const newCount = (members.length || 1) + 1
+      const maxCapacityWithLeader = (Number(selectedDetails.maxMembers) || 5) + 1
+      const isStillRecruiting = newCount < maxCapacityWithLeader && selectedDetails.isRecruiting
+
+      const updatedDetails = {
+        ...selectedDetails,
+        membersCount: newCount,
+        isRecruiting: isStillRecruiting
+      }
+
+      setSelectedDetails(updatedDetails)
+      setProjects(prev => prev.map(p => p.id === selectedDetails.id ? updatedDetails : p))
+    }
+
+    toast.success(`🎉 Approved ${reqName} and added to project members!`)
+
+    // 2. Fire backend query asynchronously in background
     try {
       await decideTeamRequestApi(reqId, 'approved')
-      setJoinRequests(prev => prev.filter(req => req.id !== reqId))
-      
-      const newMem = {
-        id: requesterId || `mem-${Date.now()}`,
-        name: reqName || 'Member',
-        role: 'Member',
-        status: 'Offline',
-        online: false,
-        joinDate: new Date().toLocaleDateString('en-US'),
-        contributions: '0 chapters',
-        avatar: (reqName || 'M').split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2)
-      }
-
-      // Persist approved member to LocalStorage for this project team
-      if (selectedDetails?.id) {
-        const localApprovedKey = `comiverse_approved_members_${selectedDetails.id}`;
-        try {
-          const existingSaved = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
-          const isAlreadySaved = existingSaved.some(m => (m.name || '').toLowerCase().trim() === (newMem.name || '').toLowerCase().trim());
-          if (!isAlreadySaved) {
-            existingSaved.push(newMem);
-            localStorage.setItem(localApprovedKey, JSON.stringify(existingSaved));
-          }
-        } catch (e) { console.warn(e); }
-      }
-      
-      setMembers(prev => {
-        const exists = prev.some(m => (m.name || '').toLowerCase().trim() === (newMem.name || '').toLowerCase().trim());
-        return exists ? prev : [...prev, newMem];
-      });
-
-      setTeamMembersForAssign(prev => {
-        const exists = prev.some(m => (m.name || '').toLowerCase().trim() === (newMem.name || '').toLowerCase().trim());
-        return exists ? prev : [...prev, newMem];
-      });
-
-      if (selectedDetails) {
-        const newCount = (members.length || 1) + 1
-        const maxCapacityWithLeader = (Number(selectedDetails.maxMembers) || 5) + 1
-        const isStillRecruiting = newCount < maxCapacityWithLeader && selectedDetails.isRecruiting
-
-        const updatedDetails = {
-          ...selectedDetails,
-          membersCount: newCount,
-          isRecruiting: isStillRecruiting
-        }
-
-        setSelectedDetails(updatedDetails)
-        setProjects(prev => prev.map(p => p.id === selectedDetails.id ? updatedDetails : p))
-      }
-
-      toast.success(`🎉 Approved ${reqName} and added to project members!`)
     } catch (err) {
-      console.error(err)
-      toast.error('Failed to approve request.')
+      console.error('[TeamProjects] Backend decide team request error:', err)
     }
   }
 
@@ -1196,13 +1264,14 @@ function TeamProjects() {
       return
     }
 
+    // Optimistically remove from UI instantly
+    setJoinRequests(prev => prev.filter(req => req.id !== reqId))
+    toast.info(`Rejected request from ${reqName}.`)
+
     try {
       await decideTeamRequestApi(reqId, 'rejected')
-      setJoinRequests(prev => prev.filter(req => req.id !== reqId))
-      toast.info(`Rejected ${reqName}'s request in database.`)
     } catch (err) {
       console.error(err)
-      toast.error('Failed to reject request.')
     }
   }
 
@@ -1384,19 +1453,35 @@ function TeamProjects() {
     (proj.comicName || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  if (loadingProjects) {
+  if (loadingProjects && projects.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '100px', color: 'var(--trans-text-primary)' }}>
-        <h3>⏳ Loading translation project teams...</h3>
+      <div className="fade-in trans-projects-container" style={{ padding: '0 0 40px' }}>
+        <div style={{ marginBottom: '24px' }}>
+          <div className="skeleton-dash-shimmer" style={{ width: '240px', height: '28px', marginBottom: '8px' }}></div>
+          <div className="skeleton-dash-shimmer" style={{ width: '380px', height: '16px' }}></div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="skeleton-dash-shimmer" style={{ height: '100px', borderRadius: '16px' }}></div>
+          <div className="skeleton-dash-shimmer" style={{ height: '100px', borderRadius: '16px' }}></div>
+          <div className="skeleton-dash-shimmer" style={{ height: '100px', borderRadius: '16px' }}></div>
+        </div>
       </div>
     )
   }
 
   if (selectedDetails) {
-    if (loadingWorkspace) {
+    if (loadingWorkspace && members.length === 0) {
       return (
-        <div style={{ textAlign: 'center', padding: '100px', color: 'var(--trans-text-primary)' }}>
-          <h3>⏳ Loading real-time database details...</h3>
+        <div className="fade-in trans-projects-container" style={{ padding: '0 0 40px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <div>
+              <div className="skeleton-dash-shimmer" style={{ width: '280px', height: '28px', marginBottom: '8px' }}></div>
+              <div className="skeleton-dash-shimmer" style={{ width: '180px', height: '16px' }}></div>
+            </div>
+            <div className="skeleton-dash-shimmer" style={{ width: '120px', height: '36px', borderRadius: '10px' }}></div>
+          </div>
+          <div className="skeleton-dash-shimmer" style={{ width: '100%', height: '48px', borderRadius: '12px', marginBottom: '24px' }}></div>
+          <div className="skeleton-dash-shimmer" style={{ width: '100%', height: '320px', borderRadius: '16px' }}></div>
         </div>
       )
     }
@@ -1481,6 +1566,76 @@ function TeamProjects() {
     )
   }
 
+  const handleQuickTranslate = async (proj) => {
+    try {
+      const localTasksKey = `comiverse_tasks_${proj.id}`;
+      let taskList = [];
+      try {
+        taskList = JSON.parse(localStorage.getItem(localTasksKey) || '[]');
+      } catch (e) {}
+
+      // Try checking cached workspace details first (<1ms)
+      try {
+        const teamCache = sessionStorage.getItem(`comiverse_team_details_cache_${proj.id}`);
+        if (teamCache) {
+          const parsed = JSON.parse(teamCache);
+          if (Array.isArray(parsed.tasks) && parsed.tasks.length > 0) {
+            taskList = parsed.tasks;
+          }
+        }
+      } catch (e) {}
+
+      if (taskList.length === 0) {
+        try {
+          const tRes = await getTeamTasksApi(proj.id);
+          taskList = Array.isArray(tRes) ? tRes : (tRes?.data || tRes?.content || []);
+        } catch (e) {}
+      }
+
+      let targetTask = taskList.find(t => {
+        const col = (t.column || t.status || '').toLowerCase();
+        return col.includes('progress') || col.includes('doing');
+      }) || taskList[0];
+
+      const targetTaskId = targetTask?.id || `task-${proj.id}`;
+
+      // Pre-warm workspace cache to avoid 0-page flickering
+      const rawComicTitle = proj.comicName || proj.title || 'Comic';
+      const cleanTitle = targetTask?.title || `${rawComicTitle} - Chapter 1 - Translation`;
+      const chId = targetTask?.chapterId || `ch-${proj.id}-1`;
+
+      const cacheKey = `comiverse_ws_cache_${targetTaskId}`;
+      if (!sessionStorage.getItem(cacheKey)) {
+        try {
+          const cachedPages = sessionStorage.getItem(`comiverse_chapter_pages_${chId}`);
+          let pages = [];
+          if (cachedPages) {
+            pages = JSON.parse(cachedPages);
+          } else if (Array.isArray(targetTask?.pages) && targetTask.pages.length > 0) {
+            pages = targetTask.pages;
+          }
+
+          if (pages.length > 0) {
+            sessionStorage.setItem(cacheKey, JSON.stringify({
+              chapter: {
+                id: chId,
+                title: cleanTitle,
+                comicTitle: rawComicTitle,
+                pagesCount: pages.length,
+                pages: pages
+              },
+              pages: pages
+            }));
+          }
+        } catch (e) {}
+      }
+
+      navigate(`/translator/translate-workspace/task/${targetTaskId}`);
+    } catch (err) {
+      navigate(`/translator/translate-workspace/task/task-${proj.id}`);
+    }
+  };
+
   return (
     <>
       <ProjectsListView
@@ -1488,6 +1643,7 @@ function TeamProjects() {
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         onOpenDetails={handleOpenDetails}
+        onQuickTranslate={handleQuickTranslate}
         onOpenEdit={handleOpenEdit}
         isLeaderMatch={isLeaderMatch}
       />

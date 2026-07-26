@@ -27,6 +27,56 @@
   --trans-gray: #64748b;
 }
 
+html.light {
+  --trans-bg: #f8fafc;
+  --trans-sidebar-bg: #ffffff;
+  --trans-topbar-bg: #ffffff;
+  --trans-card-bg: #ffffff;
+  --trans-sidebar-text: #475569;
+  --trans-sidebar-active: #0f172a;
+  --trans-text-primary: #0f172a;
+  --trans-text-secondary: #475569;
+  --trans-text-muted: #64748b;
+  --trans-border: #e2e8f0;
+}
+
+html.light .trans-project-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .trans-project-card:hover {
+  border-color: rgba(168, 85, 247, 0.4) !important;
+  box-shadow: 0 8px 24px rgba(168, 85, 247, 0.08) !important;
+}
+
+html.light .trans-project-title {
+  color: #0f172a !important;
+}
+
+html.light .trans-project-meta {
+  color: #475569 !important;
+}
+
+html.light .status-badge {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light .status-badge.leader {
+  background: rgba(245, 158, 11, 0.12) !important;
+  color: #d97706 !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+html.light .trans-form-input {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
 /* ── LAYOUT STRUCTURE ────────────────────────────── */
 .translator-layout {
   display: flex;
@@ -2936,6 +2986,17 @@ select.trans-form-input {
   background-color: rgba(255, 255, 255, 0.05) !important;
   border: 1px solid rgba(124, 92, 255, 0.25) !important;
   color: #ffffff !important;
+}
+
+select option {
+  background-color: #1e192c !important;
+  color: #f8fafc !important;
+  padding: 8px 12px !important;
+}
+
+html.light select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
 }
 
 .trans-form-input::placeholder {

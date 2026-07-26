@@ -29,25 +29,48 @@ function ProjectList() {
   const authUser = auth?.user;
   const userFullName = authUser?.fullName || authUser?.username || 'Translator';
 
-  useEffect(() => {
-    const fetchProjectsAndRequests = async () => {
+  const fetchProjectsAndRequests = async (silent = false) => {
+    try {
+      if (!silent && projects.length === 0) setLoading(true);
+      const [projectsData, requestsData] = await Promise.all([
+        getAllProjectTeamsApi(),
+        getRequestsByNameApi(userFullName).catch(() => [])
+      ]);
+      const projList = Array.isArray(projectsData) ? projectsData : [];
+      const appIds = Array.isArray(requestsData) ? requestsData.map(req => req.projectTeamId) : [];
+
+      setProjects(projList);
+      setAppliedIds(appIds);
+
       try {
-        const [projectsData, requestsData] = await Promise.all([
-          getAllProjectTeamsApi(),
-          getRequestsByNameApi(userFullName).catch(() => [])
-        ]);
-        setProjects(Array.isArray(projectsData) ? projectsData : []);
-        if (Array.isArray(requestsData)) {
-          setAppliedIds(requestsData.map(req => req.projectTeamId));
+        sessionStorage.setItem('comiverse_available_projects_cache', JSON.stringify({
+          projects: projList,
+          appliedIds: appIds
+        }));
+      } catch (e) {}
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let hasCache = false;
+    try {
+      const cached = sessionStorage.getItem('comiverse_available_projects_cache');
+      if (cached) {
+        const { projects: cProjects, appliedIds: cApplied } = JSON.parse(cached);
+        if (Array.isArray(cProjects) && cProjects.length > 0) {
+          setProjects(cProjects);
+          if (Array.isArray(cApplied)) setAppliedIds(cApplied);
+          setLoading(false);
+          hasCache = true;
         }
-      } catch (err) {
-        console.error(err);
-        toast.error('Failed to load available projects.');
-      } finally {
-        setLoading(false);
       }
-    };
-    fetchProjectsAndRequests();
+    } catch (e) {}
+
+    fetchProjectsAndRequests(hasCache);
   }, [userFullName]);
 
   // Optimized query filtering with useMemo
@@ -257,7 +280,7 @@ function ProjectList() {
           <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--trans-text-secondary)', whiteSpace: 'nowrap' }}>🌐 Target:</span>
           <select
             className="trans-form-input"
-            style={{ height: '42px', fontSize: '13px', color: '#111', background: '#fff', fontWeight: '600' }}
+            style={{ height: '42px', fontSize: '13px', fontWeight: '600' }}
             value={selectedTargetLang}
             onChange={(e) => setSelectedTargetLang(e.target.value)}
           >
@@ -277,7 +300,7 @@ function ProjectList() {
           <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--trans-text-secondary)', whiteSpace: 'nowrap' }}>🔥 Priority:</span>
           <select
             className="trans-form-input"
-            style={{ height: '42px', fontSize: '13px', color: '#111', background: '#fff', fontWeight: '600' }}
+            style={{ height: '42px', fontSize: '13px', fontWeight: '600' }}
             value={selectedPriority}
             onChange={(e) => setSelectedPriority(e.target.value)}
           >
