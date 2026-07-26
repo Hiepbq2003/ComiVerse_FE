@@ -96,28 +96,43 @@ function ProjectTeams({
         genre: s.genre || s.genres?.[0] || 'General',
         genres: s.genres || [s.genre || 'General'],
         status: 'approved',
-        approvedAt: s.approvedAt || s.timestamp || s.createdAt || null,
+        approvedAt: s.approvedAt || s.lastChapterUpdatedAt || s.timestamp || s.createdAt || null,
+        lastChapterUpdatedAt: s.lastChapterUpdatedAt || s.approvedAt || s.timestamp || s.createdAt || null,
         createdAt: s.createdAt || s.timestamp || null
       }));
 
     const approvedFromComics = (comics || []).map(c => ({
       ...c,
       approvedAt: c.approvedAt || c.lastChapterUpdatedAt || c.createdAt || c.timestamp || null,
+      lastChapterUpdatedAt: c.lastChapterUpdatedAt || c.approvedAt || c.createdAt || c.timestamp || null,
       createdAt: c.createdAt || c.timestamp || null
     }));
 
-    const merged = [...approvedFromSubmissions, ...approvedFromComics];
-    const unique = [];
-    const titleMap = new Set();
+    const mergedMap = new Map();
 
-    merged.forEach(item => {
-      if (item.title && !titleMap.has(item.title.toLowerCase())) {
-        titleMap.add(item.title.toLowerCase());
-        unique.push(item);
+    [...approvedFromSubmissions, ...approvedFromComics].forEach(item => {
+      if (!item.title) return;
+      const key = item.title.trim().toLowerCase();
+      if (!mergedMap.has(key)) {
+        mergedMap.set(key, item);
+      } else {
+        const existing = mergedMap.get(key);
+        const existingDate = existing.approvedAt || existing.lastChapterUpdatedAt || existing.createdAt;
+        const newDate = item.approvedAt || item.lastChapterUpdatedAt || item.createdAt;
+
+        const eTime = existingDate ? new Date(existingDate).getTime() : 0;
+        const nTime = newDate ? new Date(newDate).getTime() : 0;
+
+        mergedMap.set(key, {
+          ...existing,
+          ...item,
+          approvedAt: (nTime >= eTime && nTime > 0) ? newDate : (existingDate || newDate),
+          lastChapterUpdatedAt: (nTime >= eTime && nTime > 0) ? newDate : (existingDate || newDate)
+        });
       }
     });
 
-    return unique;
+    return Array.from(mergedMap.values());
   }, [submissions, comics]);
 
   const filteredApprovedComics = useMemo(() => {

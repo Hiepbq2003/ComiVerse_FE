@@ -191,6 +191,7 @@ function ModeratorDashboard() {
           status: 'Active',
           chapterCount: newChapCount,
           chapters: newChapCount,
+          approvedAt: existing.approvedAt || nowIso,
           lastChapterUpdatedAt: nowIso
         };
         return updated;
@@ -218,6 +219,7 @@ function ModeratorDashboard() {
           ratingAverage: sub.ratingCount ? (sub.ratingAverage || sub.rating || 0.0) : 0.0,
           ratingCount: sub.ratingCount || 0,
           projectTeam: '-',
+          approvedAt: sub.approvedAt || nowIso,
           lastChapterUpdatedAt: nowIso
         };
         return [newComic, ...prev];
