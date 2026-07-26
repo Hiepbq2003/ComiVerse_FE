@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { registerApi } from '../../services/api/AuthApi'
+import CustomDatePicker from '../../components/common/CustomDatePicker'
 
 function Register({ onNavigate, onVerificationRequired, showAlert, loading, setLoading, onOpenModal }) {
   const [form, setForm] = useState({
@@ -186,13 +187,10 @@ function Register({ onNavigate, onVerificationRequired, showAlert, loading, setL
             {/* Date of Birth */}
             <div className="glass-input-wrapper auth-margin-top-16">
               <span className="glass-input-label">Date of Birth</span>
-              <input 
-                id="signup-dob"
-                type="date" 
+              <CustomDatePicker 
                 value={form.dateOfBirth}
-                onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })}
-                className="glass-input-field"
-                required
+                onChange={(val) => setForm({ ...form, dateOfBirth: val })}
+                placeholder="Select date of birth"
               />
             </div>
             <p className="input-description-label">

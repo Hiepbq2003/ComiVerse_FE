@@ -5,6 +5,7 @@ import { toast } from 'react-toastify'
 import Swal from 'sweetalert2'
 import ModernPagination from './ModernPagination'
 import ConfirmModal from './ConfirmModal'
+import { Trash2 } from 'lucide-react'
 import {
   getComicCommentsApi,
   createComicCommentApi,
@@ -410,11 +411,11 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
                       ) && (
                         <button
                           className="comment-action-btn"
-                          style={{ color: '#ef4444' }}
+                          style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                           onClick={() => handleDeleteComment(comment.id)}
                           title="Delete this comment"
                         >
-                          🗑️ Delete
+                          <Trash2 size={13} /> Delete
                         </button>
                       )}
                     </div>
@@ -552,11 +553,11 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
                               ) && (
                                 <button
                                   className="comment-action-btn"
-                                  style={{ color: '#ef4444' }}
+                                  style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                                   onClick={() => handleDeleteComment(reply.id, comment.id)}
                                   title="Delete this comment"
                                 >
-                                  🗑️ Delete
+                                  <Trash2 size={13} /> Delete
                                 </button>
                               )}
                             </div>

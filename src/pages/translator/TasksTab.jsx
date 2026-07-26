@@ -17,6 +17,7 @@ import { getChapterDetailApi, getChaptersByComicIdApi } from "../../services/api
 import { getAuthorComicByIdApi, getAuthorComicChaptersApi, getAuthorChapterPreviewApi } from "../../services/api/AuthorComicApi";
 import { getComicByIdApi, searchComicsApi, getAllComicsApi } from "../../services/api/ComicApi";
 import { getAuth } from "../../utils/Auth";
+import CustomDatePicker from '../../components/common/CustomDatePicker';
 import "../../assets/style/moderator/comic-detail.css";
 
 const resolveImageUrl = (url) => {
@@ -1571,29 +1572,13 @@ export function CreateTaskModal({
               <label className="trans-form-label" style={{ margin: 0 }}>
                 Due Date *
               </label>
-              {newTaskData.dueDate && (
-                <span style={{ fontSize: '11px', color: '#c084fc', fontWeight: '700' }}>
-                  📅 {new Date(newTaskData.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </span>
-              )}
             </div>
 
-            <input required
-              type="date"
-              className="trans-form-input"
-              min={new Date().toISOString().split('T')[0]}
-              style={{
-                cursor: 'pointer',
-                color: '#111',
-                background: '#fff',
-                fontWeight: '700',
-                fontSize: '13px',
-                padding: '8px 12px',
-                ...errorBorder('dueDate')
-              }}
+            <CustomDatePicker
               value={newTaskData.dueDate}
-              onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
-              onChange={(e) => setNewTaskData({ ...newTaskData, dueDate: e.target.value })}
+              onChange={(val) => setNewTaskData({ ...newTaskData, dueDate: val })}
+              placeholder="Select due date"
+              style={errorBorder('dueDate')}
             />
 
             {showError('dueDate') && (

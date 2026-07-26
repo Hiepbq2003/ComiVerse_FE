@@ -1537,10 +1537,44 @@ html.light .brand-footer-text p {
   box-shadow: 0 35px 70px rgba(249, 115, 22, 0.35), 0 20px 45px rgba(0, 0, 0, 0.6) !important;
 }
 
-.comic-card.card-purple {
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(168, 85, 247, 0.15);
-}
-
 .comic-card.card-purple:hover {
   box-shadow: 0 35px 70px rgba(168, 85, 247, 0.35), 0 20px 45px rgba(0, 0, 0, 0.6) !important;
 }
+
+/* ── CUSTOM DATEPICKER INTEGRATION IN AUTH FORMS ─────────────── */
+.auth-form-card,
+.auth-form-card.register-card,
+.register-grid-container,
+.register-column {
+  overflow: visible !important;
+}
+
+.glass-input-wrapper:has(.custom-datepicker-container.open),
+.glass-input-wrapper:focus-within {
+  z-index: 100 !important;
+}
+
+.glass-input-wrapper .custom-datepicker-container {
+  width: 100%;
+}
+
+.glass-input-wrapper .custom-datepicker-input {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  height: 24px !important;
+  min-height: 24px !important;
+}
+
+.glass-input-wrapper .custom-datepicker-value {
+  color: #ffffff !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+.glass-input-wrapper .custom-datepicker-icon {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
