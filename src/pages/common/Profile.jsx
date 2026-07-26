@@ -28,7 +28,7 @@ const COMMON_NOTIFICATION_OPTIONS = [
     title: 'General Notifications',
     options: [
       { key: 'SYSTEM_BROADCASTS', label: 'System broadcasts', description: 'Platform announcements and maintenance updates sent by administrators.' },
-      { key: 'FORUM_ACTIVITY', label: 'Forum replies', description: 'Replies to your forum posts and comments, with a direct link to the discussion.' },
+      { key: 'FORUM_ACTIVITY', label: 'Discussion replies', description: 'Replies to your forum, comic, and chapter comments, with a direct link to the discussion.' },
     ],
   },
 ]

@@ -147,4 +147,44 @@ describe('Profile API integration', () => {
       }))
     })
   })
+
+  it.each([
+    ['READER', ['SYSTEM_BROADCASTS', 'FORUM_ACTIVITY'], ['System broadcasts', 'Discussion replies'], 'FORUM_ACTIVITY', 'Discussion replies'],
+    ['ADMIN', ['SYSTEM_BROADCASTS', 'FORUM_ACTIVITY'], ['System broadcasts', 'Discussion replies'], 'SYSTEM_BROADCASTS', 'System broadcasts'],
+    ['MODERATOR', ['SYSTEM_BROADCASTS', 'FORUM_ACTIVITY', 'REVIEW_QUEUE'], ['System broadcasts', 'Discussion replies', 'Review queue'], 'REVIEW_QUEUE', 'Review queue'],
+    ['AUTHOR', ['SYSTEM_BROADCASTS', 'FORUM_ACTIVITY', 'SUBMISSION_STATUS'], ['System broadcasts', 'Discussion replies', 'Submission status'], 'SUBMISSION_STATUS', 'Submission status'],
+    ['TRANSLATOR', ['SYSTEM_BROADCASTS', 'FORUM_ACTIVITY', 'PROJECT_OPPORTUNITIES', 'TEAM_UPDATES'], ['System broadcasts', 'Discussion replies', 'Project opportunities', 'Team updates'], 'TEAM_UPDATES', 'Team updates'],
+    ['PROJECT_LEADER', ['SYSTEM_BROADCASTS', 'FORUM_ACTIVITY', 'PROJECT_OPPORTUNITIES', 'TEAM_UPDATES', 'TEAM_JOIN_REQUESTS'], ['System broadcasts', 'Discussion replies', 'Project opportunities', 'Team updates', 'Team join requests'], 'TEAM_JOIN_REQUESTS', 'Team join requests'],
+  ])('persists notification toggles for %s', async (role, availableKeys, labels, targetKey, targetLabel) => {
+    const roleUser = { ...baseUser, role }
+    const preferences = Object.fromEntries(availableKeys.map(key => [key, true]))
+    const preferenceResponse = { role, availableKeys, preferences }
+    prepareApi(roleUser, preferenceResponse)
+    NotificationApi.updateNotificationPreferencesApi.mockResolvedValue({
+      ...preferenceResponse,
+      preferences: { ...preferences, [targetKey]: false },
+    })
+
+    renderProfile(roleUser)
+    fireEvent.click(screen.getByRole('button', { name: /Notification Settings/i }))
+
+    for (const label of labels) {
+      expect(await screen.findByText(label)).toBeInTheDocument()
+    }
+
+    const toggle = screen.getByText(targetLabel)
+      .closest('.profile-notif-item')
+      .querySelector('input[type="checkbox"]')
+    expect(toggle).toBeChecked()
+    fireEvent.click(toggle)
+    expect(toggle).not.toBeChecked()
+    fireEvent.click(screen.getByRole('button', { name: 'Save Notification Preferences' }))
+
+    await waitFor(() => {
+      expect(NotificationApi.updateNotificationPreferencesApi).toHaveBeenCalledWith({
+        ...preferences,
+        [targetKey]: false,
+      })
+    })
+  })
 })
