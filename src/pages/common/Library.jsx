@@ -5,9 +5,12 @@ import { getComicsPageApi } from '../../services/api/ComicApi'
 import { getMyReadingHistoryApi, deleteReadingHistoryComicApi } from '../../services/api/ReadingHistoryApi'
 import { getMySavesApi, toggleSaveStatusApi } from '../../services/api/SaveApi'
 import { getMyLikesApi, toggleLikeStatusApi } from '../../services/api/LikeApi'
+import { getUserRatingsApi, deleteComicRatingApi } from '../../services/api/RatingApi'
 import { useAuth } from '../../context/AuthContext'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { toast } from 'react-toastify'
+import ConfirmModal from '../../components/common/ConfirmModal'
+import { Trash2 } from 'lucide-react'
 import '../../assets/style/reader/library.css'
 
 // Import assets
@@ -28,6 +31,15 @@ function Library() {
   const [savedList, setSavedList] = useState([])
   const [likedList, setLikedList] = useState([])
   const [historyList, setHistoryList] = useState([])
+  const [ratedList, setRatedList] = useState([])
+
+  // Unified Delete Confirmation Modal state
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    comicId: null,
+    comicTitle: '',
+    targetTab: ''
+  })
 
   // Pagination for the library lists
   const [currentPage, setCurrentPage] = useState(1)
@@ -51,7 +63,7 @@ function Library() {
   const fetchLibraryData = async () => {
     try {
       setLoading(true)
-      const [historyData, savesData, likesData] = await Promise.all([
+      const [historyData, savesData, likesData, ratingsData] = await Promise.all([
         getMyReadingHistoryApi().catch(err => {
           console.error("Failed to fetch reading history:", err)
           return []
@@ -63,12 +75,17 @@ function Library() {
         getMyLikesApi().catch(err => {
           console.error("Failed to fetch likes:", err)
           return []
+        }),
+        getUserRatingsApi().catch(err => {
+          console.error("Failed to fetch user ratings:", err)
+          return []
         })
       ])
       
       setHistoryList(Array.isArray(historyData) ? historyData : [])
       setSavedList(Array.isArray(savesData) ? savesData : [])
       setLikedList(Array.isArray(likesData) ? likesData : [])
+      setRatedList(Array.isArray(ratingsData) ? ratingsData : (ratingsData?.data || []))
     } catch (err) {
       console.error(err)
       toast.error('Failed to load library data.')
@@ -80,7 +97,7 @@ function Library() {
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     const tab = params.get('tab')
-    if (['Saved', 'Liked', 'History'].includes(tab)) {
+    if (['Saved', 'Liked', 'History', 'Rated'].includes(tab)) {
       setActiveTab(tab)
     }
   }, [location.search])
@@ -95,7 +112,7 @@ function Library() {
     const list = getActiveList()
     setTotalPages(Math.ceil(list.length / ITEMS_PER_PAGE) || 1)
     setTotalElements(list.length)
-  }, [activeTab, savedList, likedList, historyList])
+  }, [activeTab, savedList, likedList, historyList, ratedList])
 
   // Helper to detect if cover is an emoji character
   const isEmoji = (str) => {
@@ -117,43 +134,65 @@ function Library() {
     return fallbacks[idHash % 3] || comicAction
   }
 
-  // Action: delete / remove from library list
-  const handleRemoveItem = async (id, event) => {
-    event.stopPropagation() // Prevent card click navigation
+  // Action: Open popup confirm modal before deletion
+  const requestRemoveItem = (id, title, event) => {
+    if (event) event.stopPropagation()
+    setDeleteModal({
+      isOpen: true,
+      comicId: id,
+      comicTitle: title || 'this series',
+      targetTab: activeTab
+    })
+  }
+
+  // Action: Execute actual deletion after user confirms in popup modal
+  const handleConfirmDelete = async () => {
+    const id = deleteModal.comicId
+    const tab = deleteModal.targetTab || activeTab
+
+    setDeleteModal(prev => ({ ...prev, isOpen: false }))
     
     // Save previous state for rollback
     const previousSaved = [...savedList]
     const previousLiked = [...likedList]
     const previousHistory = [...historyList]
+    const previousRated = [...ratedList]
 
     // Update state optimistically
-    if (activeTab === 'Saved') {
+    if (tab === 'Saved') {
       setSavedList(prev => prev.filter(c => (c.comic?.id || c.id) !== id))
-    } else if (activeTab === 'Liked') {
+    } else if (tab === 'Liked') {
       setLikedList(prev => prev.filter(c => (c.comic?.id || c.id) !== id))
+    } else if (tab === 'Rated') {
+      setRatedList(prev => prev.filter(c => (c.comic?.id || c.id) !== id))
     } else {
       setHistoryList(prev => prev.filter(c => (c.comic?.id || c.id) !== id))
     }
 
     try {
-      if (activeTab === 'Saved') {
+      if (tab === 'Saved') {
         await toggleSaveStatusApi(id)
-        toast.success('Removed from saved comics.')
-      } else if (activeTab === 'Liked') {
+        toast.success('Removed from Saved list.')
+      } else if (tab === 'Liked') {
         await toggleLikeStatusApi(id)
         toast.success('Unliked comic series.')
+      } else if (tab === 'Rated') {
+        await deleteComicRatingApi(id)
+        toast.success('Removed rating score.')
       } else {
         await deleteReadingHistoryComicApi(id)
-        toast.success('Cleared from reading history.')
+        toast.success('Removed from reading history.')
       }
     } catch (err) {
       console.error(err)
-      toast.error('Failed to remove item from library.')
+      toast.error('Failed to remove item. Please try again!')
       // Rollback state on failure
-      if (activeTab === 'Saved') {
+      if (tab === 'Saved') {
         setSavedList(previousSaved)
-      } else if (activeTab === 'Liked') {
+      } else if (tab === 'Liked') {
         setLikedList(previousLiked)
+      } else if (tab === 'Rated') {
+        setRatedList(previousRated)
       } else {
         setHistoryList(previousHistory)
       }
@@ -164,12 +203,23 @@ function Library() {
   const getActiveList = () => {
     if (activeTab === 'Saved') return savedList
     if (activeTab === 'Liked') return likedList
+    if (activeTab === 'Rated') return ratedList
     return historyList
   }
 
   const activeComics = getActiveList()
   // Client-side pagination
   const paginatedComics = activeComics.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+
+  // Get localized tab name for confirm message
+  const getTabLabel = (tab) => {
+    switch (tab) {
+      case 'Saved': return 'Saved list'
+      case 'Liked': return 'Liked list'
+      case 'Rated': return 'Rated list'
+      case 'History': default: return 'Reading history'
+    }
+  }
 
   return (
     <HomeLayout>
@@ -183,38 +233,57 @@ function Library() {
             </div>
           </div>
 
-          {/* ── HEADER STATS DASHBOARD ────────────────── */}
+          {/* ── HEADER STATS DASHBOARD (SAVED, LIKED, READ, RATED) ────────────────── */}
           <div className="lib-stats-grid">
-            <div className="lib-stat-card">
-              <div className="lib-stat-icon-wrapper">📖</div>
+            <div
+              className={`lib-stat-card ${activeTab === 'Saved' ? 'active-stat-card' : ''}`}
+              onClick={() => handleTabClick('Saved')}
+              style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+              <div className="lib-stat-icon-wrapper">🔖</div>
               <div className="lib-stat-info">
-                <span className="lib-stat-label">Comics Read</span>
-                <span className="lib-stat-value">{historyList.length}</span>
-                <span className="lib-stat-subtext">+3 this week</span>
+                <span className="lib-stat-label">Saved</span>
+                <span className="lib-stat-value">{savedList.length}</span>
+                <span className="lib-stat-subtext">Bookmarked titles</span>
               </div>
             </div>
-            <div className="lib-stat-card">
-              <div className="lib-stat-icon-wrapper">👁️</div>
-              <div className="lib-stat-info">
-                <span className="lib-stat-label">Chapters Read</span>
-                <span className="lib-stat-value">1,247</span>
-                <span className="lib-stat-subtext">avg 26/comic</span>
-              </div>
-            </div>
-            <div className="lib-stat-card">
+
+            <div
+              className={`lib-stat-card ${activeTab === 'Liked' ? 'active-stat-card' : ''}`}
+              onClick={() => handleTabClick('Liked')}
+              style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+            >
               <div className="lib-stat-icon-wrapper">❤️</div>
               <div className="lib-stat-info">
                 <span className="lib-stat-label">Liked</span>
                 <span className="lib-stat-value">{likedList.length}</span>
-                <span className="lib-stat-subtext">latest updates</span>
+                <span className="lib-stat-subtext">Favorites list</span>
               </div>
             </div>
-            <div className="lib-stat-card">
-              <div className="lib-stat-icon-wrapper">💬</div>
+
+            <div
+              className={`lib-stat-card ${activeTab === 'History' ? 'active-stat-card' : ''}`}
+              onClick={() => handleTabClick('History')}
+              style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+              <div className="lib-stat-icon-wrapper">📖</div>
               <div className="lib-stat-info">
-                <span className="lib-stat-label">Comments Posted</span>
-                <span className="lib-stat-value">183</span>
-                <span className="lib-stat-subtext">+12 this month</span>
+                <span className="lib-stat-label">Read</span>
+                <span className="lib-stat-value">{historyList.length}</span>
+                <span className="lib-stat-subtext">Reading history</span>
+              </div>
+            </div>
+
+            <div
+              className={`lib-stat-card ${activeTab === 'Rated' ? 'active-stat-card' : ''}`}
+              onClick={() => handleTabClick('Rated')}
+              style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+              <div className="lib-stat-icon-wrapper">⭐</div>
+              <div className="lib-stat-info">
+                <span className="lib-stat-label">Rated</span>
+                <span className="lib-stat-value">{ratedList.length}</span>
+                <span className="lib-stat-subtext">Star rated comics</span>
               </div>
             </div>
           </div>
@@ -263,6 +332,12 @@ function Library() {
                 onClick={() => handleTabClick('History')}
               >
                 Reading History
+              </div>
+              <div 
+                className={`lib-tab-item ${activeTab === 'Rated' ? 'active' : ''}`}
+                onClick={() => handleTabClick('Rated')}
+              >
+                ⭐ Rated
               </div>
             </div>
           </div>
@@ -327,6 +402,14 @@ function Library() {
                                 {lastReadTime ? `Read ${formatTimeAgo(lastReadTime)}` : 'Recently'}
                               </span>
                             </>
+                          ) : activeTab === 'Rated' ? (
+                            <>
+                              <span className="lib-comic-chapter" style={{ color: '#fbbf24', fontWeight: 'bold' }}>
+                                ⭐ {item.score || item.userScore || actualComic.ratingAverage || 5} / 5
+                              </span>
+                              <span className="lib-comic-status-dot"></span>
+                              <span className="lib-comic-status-text">Your Rating</span>
+                            </>
                           ) : (
                             <>
                               <span className="lib-comic-chapter">Ch.{comicChapter}</span>
@@ -340,10 +423,10 @@ function Library() {
                       {/* Remove action button */}
                       <button 
                         className="lib-comic-delete-btn"
-                        onClick={(e) => handleRemoveItem(comicId, e)}
-                        title="Remove from List"
+                        onClick={(e) => requestRemoveItem(comicId, comicTitle, e)}
+                        title="Xóa khỏi danh sách"
                       >
-                        🗑️
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   );
@@ -413,6 +496,18 @@ function Library() {
           )}
         </div>
       </div>
+
+      {/* Unified Popup Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteModal.isOpen}
+        title="Confirm Library Removal"
+        message={`Are you sure you want to remove "${deleteModal.comicTitle}" from your ${getTabLabel(deleteModal.targetTab)}?`}
+        confirmText="Remove Now"
+        cancelText="Cancel"
+        type="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </HomeLayout>
   )
 }

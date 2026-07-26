@@ -45,3 +45,8 @@ export const uploadAvatarApi = (file) => {
     }
   });
 };
+
+export const getUserInteractionCountsApi = () => {
+  return AxiosClient.get('/users/me/interaction-counts');
+};
+

@@ -1,5 +1,96 @@
 import { useEffect, useRef, useState } from 'react'
 
+function getBubbleBoundingBox(selection) {
+  if (selection.shape === 'polygon' && selection.points?.length) {
+    const xs = selection.points.map((p) => p.x)
+    const ys = selection.points.map((p) => p.y)
+    const minX = Math.min(...xs)
+    const minY = Math.min(...ys)
+    return { x: minX, y: minY, width: Math.max(...xs) - minX, height: Math.max(...ys) - minY }
+  }
+  return { x: selection.x, y: selection.y, width: selection.width, height: selection.height }
+}
+
+function BubbleOverlay({ bubbles, displayedHeightPx }) {
+  if (!Array.isArray(bubbles) || bubbles.length === 0) return null
+  // Avoid a flash of oversized/default-sized text before the container has
+  // actually been measured (e.g. right on first paint before ResizeObserver
+  // fires) — better to render nothing for one frame than to show text at
+  // the wrong size.
+  if (!displayedHeightPx) return null
+
+  return (
+    <div
+      className="chapter-page-bubble-overlay no-select no-pointer"
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+      }}
+    >
+      {bubbles.map((sel, i) => {
+        const box = getBubbleBoundingBox(sel)
+        const shapeStyle =
+          sel.shape === 'ellipse'
+            ? { borderRadius: '50%' }
+            : sel.shape === 'polygon' && Array.isArray(sel.points) && sel.points.length > 0 && box.width > 0 && box.height > 0
+            ? {
+                clipPath: `polygon(${sel.points
+                  .map((p) => `${((p.x - box.x) / box.width) * 100}% ${((p.y - box.y) / box.height) * 100}%`)
+                  .join(', ')})`,
+              }
+            : {}
+
+        // sel.fontSize is stored as a percentage of the displayed image
+        // height (same basis used throughout the translate/review
+        // workspaces) — convert it to real pixels using the page's actual
+        // measured height, instead of relying on CSS container-query units
+        // (cqh), which turned out to render text far too large — very
+        // likely falling back to the browser/body default font-size
+        // whenever the container-query context wasn't reliably established.
+        const fontSizePct = typeof sel.fontSize === 'number' ? sel.fontSize : 1.2
+        const fontSizePx = (fontSizePct / 100) * displayedHeightPx
+
+        return (
+          <div
+            key={sel.id || i}
+            className="chapter-page-bubble"
+            style={{
+              position: 'absolute',
+              left: `${box.x}%`,
+              top: `${box.y}%`,
+              width: `${box.width}%`,
+              height: `${box.height}%`,
+              background: sel.textBgColor || '#ffffff',
+              color: sel.textColor || '#000000',
+              fontWeight: sel.isBold ? 700 : 400,
+              fontStyle: sel.isItalic ? 'italic' : 'normal',
+              textAlign: sel.textAlign || 'center',
+              fontFamily: sel.fontFamily || undefined,
+              fontSize: `${fontSizePx}px`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '2px',
+              overflow: 'hidden',
+              whiteSpace: 'pre-wrap',
+              overflowWrap: 'anywhere',
+              lineHeight: 1.2,
+              borderRadius: sel.shape === 'ellipse' ? undefined : '4px',
+              ...shapeStyle,
+            }}
+          >
+            {sel.translation || ''}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 /**
  * Reusable, high-performance copy-protected comic page canvas.
  * Handles lazy loading, secure in-memory decryption, rendering to canvas,
@@ -12,13 +103,31 @@ import { useEffect, useRef, useState } from 'react'
  * @param {number} [props.xorKey=0x5A] The XOR decryption key to use
  * @param {string} [props.fallbackSrc] Backup URL to use if loading fails
  */
-function ComicPageCanvas({ src, pageIndex, isEncrypted = false, xorKey = 0x5A, fallbackSrc }) {
+function ComicPageCanvas({ src, pageIndex, isEncrypted = false, xorKey = 0x5A, fallbackSrc, bubbles }) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
   
   const [isVisible, setIsVisible] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [displayedHeightPx, setDisplayedHeightPx] = useState(0)
+
+  // Measure the wrapper's real rendered pixel height (matches the canvas's
+  // displayed height once the image has loaded, since the canvas is
+  // width:100%/height:auto and the wrapper has no fixed height of its own).
+  // Used to convert bubble fontSize (stored as a % of displayed height)
+  // into real pixels — far more reliable across browsers than CSS
+  // container-query units.
+  useEffect(() => {
+    if (!containerRef.current || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setDisplayedHeightPx(entry.contentRect.height)
+      }
+    })
+    observer.observe(containerRef.current)
+    return () => observer.disconnect()
+  }, [])
 
   // Intersection Observer for Lazy Loading
   useEffect(() => {
@@ -227,6 +336,8 @@ function ComicPageCanvas({ src, pageIndex, isEncrypted = false, xorKey = 0x5A, f
           }}
         />
       )}
+
+      {!loading && !error && <BubbleOverlay bubbles={bubbles} displayedHeightPx={displayedHeightPx} />}
     </div>
   )
 }

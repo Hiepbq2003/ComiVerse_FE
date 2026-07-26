@@ -27,6 +27,56 @@
   --trans-gray: #64748b;
 }
 
+html.light {
+  --trans-bg: #f8fafc;
+  --trans-sidebar-bg: #ffffff;
+  --trans-topbar-bg: #ffffff;
+  --trans-card-bg: #ffffff;
+  --trans-sidebar-text: #475569;
+  --trans-sidebar-active: #0f172a;
+  --trans-text-primary: #0f172a;
+  --trans-text-secondary: #475569;
+  --trans-text-muted: #64748b;
+  --trans-border: #e2e8f0;
+}
+
+html.light .trans-project-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .trans-project-card:hover {
+  border-color: rgba(168, 85, 247, 0.4) !important;
+  box-shadow: 0 8px 24px rgba(168, 85, 247, 0.08) !important;
+}
+
+html.light .trans-project-title {
+  color: #0f172a !important;
+}
+
+html.light .trans-project-meta {
+  color: #475569 !important;
+}
+
+html.light .status-badge {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light .status-badge.leader {
+  background: rgba(245, 158, 11, 0.12) !important;
+  color: #d97706 !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+html.light .trans-form-input {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
 /* ── LAYOUT STRUCTURE ────────────────────────────── */
 .translator-layout {
   display: flex;
@@ -515,38 +565,68 @@
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  background: #f8fafc;
-  border-bottom-left-radius: 12px;
-  border-bottom-right-radius: 12px;
+  background: var(--trans-card-bg, #0f172a);
+  border-bottom-left-radius: 14px;
+  border-bottom-right-radius: 14px;
 }
 
 /* Form Groups */
 .trans-form-group {
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .trans-form-label {
   display: block;
   font-size: 13px;
   font-weight: 600;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   color: var(--trans-text-primary);
+  letter-spacing: 0.01em;
 }
 
 .trans-form-input {
   width: 100%;
   border: 1px solid var(--trans-border);
-  border-radius: 6px;
-  padding: 8px 12px;
+  border-radius: 10px;
+  padding: 10px 14px;
   font-family: inherit;
   font-size: 14px;
   box-sizing: border-box;
   outline: none;
-  background: #ffffff;
+  background: var(--trans-bg-input, #ffffff);
+  color: var(--trans-text-primary);
+  transition: all 0.2s ease;
 }
 
 .trans-form-input:focus {
-  border-color: var(--trans-purple);
+  border-color: #a855f7;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2);
+}
+
+.trans-assignee-chip {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.trans-assignee-chip:hover {
+  transform: translateY(-1.5px);
+  border-color: #a855f7 !important;
+  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.25) !important;
+}
+
+html.light .trans-modal-footer {
+  background: #f8fafc;
+}
+
+html.light .trans-assignee-chip {
+  background: #f1f5f9 !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  color: #334155 !important;
+}
+
+html.light .trans-assignee-chip.selected {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.14) 0%, rgba(236, 72, 153, 0.1) 100%) !important;
+  border-color: #a855f7 !important;
+  color: #6b21a8 !important;
 }
 
 .trans-form-input.textarea {
@@ -1283,51 +1363,90 @@ html.light .member-dropdown-btn:hover {
 
 /* Requests Tab */
 .requests-count-header {
-  font-size: 14px;
-  color: var(--trans-text-secondary);
-  margin-bottom: 16px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--trans-text-primary, #f8fafc);
+  margin-bottom: 18px;
+  letter-spacing: 0.02em;
+}
+
+html.light .requests-count-header {
+  color: #0f172a;
 }
 
 .request-card-item {
-  background: #ffffff;
-  border: 1px solid var(--trans-border);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 16px;
+  background: linear-gradient(135deg, rgba(26, 22, 37, 0.95) 0%, rgba(17, 13, 26, 0.98) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 18px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+html.light .request-card-item {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+}
+
+.request-card-item:hover {
+  border-color: rgba(168, 85, 247, 0.3);
+}
+
+html.light .request-card-item:hover {
+  border-color: #c084fc !important;
 }
 
 .request-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
+  gap: 14px;
+  margin-bottom: 14px;
 }
 
 .request-message {
-  font-size: 13px;
-  color: var(--trans-text-primary);
-  line-height: 1.5;
-  margin-bottom: 14px;
+  font-size: 14px;
+  color: #cbd5e1;
+  line-height: 1.6;
+  margin-bottom: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 12px 16px;
+  border-radius: 10px;
+}
+
+html.light .request-message {
+  color: #334155 !important;
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
 }
 
 .request-role-tags {
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .role-tag {
-  background-color: #f1f5f9;
-  color: var(--trans-text-secondary);
-  font-size: 11px;
+  background-color: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  font-size: 12px;
   font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 4px;
+  padding: 4px 12px;
+  border-radius: 6px;
+}
+
+html.light .role-tag {
+  background-color: #f3e8ff !important;
+  color: #7e22ce !important;
+  border: 1px solid #e9d5ff !important;
 }
 
 .request-actions-row {
   display: flex;
-  gap: 8px;
+  gap: 12px;
 }
 
 /* Tasks Tab (Kanban) */
@@ -2867,6 +2986,17 @@ select.trans-form-input {
   background-color: rgba(255, 255, 255, 0.05) !important;
   border: 1px solid rgba(124, 92, 255, 0.25) !important;
   color: #ffffff !important;
+}
+
+select option {
+  background-color: #1e192c !important;
+  color: #f8fafc !important;
+  padding: 8px 12px !important;
+}
+
+html.light select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
 }
 
 .trans-form-input::placeholder {

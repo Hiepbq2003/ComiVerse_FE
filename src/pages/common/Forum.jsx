@@ -5,6 +5,7 @@ import { getForumThreadsPageApi, deleteForumThreadApi, createForumThreadApi, get
 import { createForumCommentApi, getForumCommentsApi } from '../../services/api/ForumCommentApi'
 import { getAuth } from '../../utils/Auth'
 import { toast } from 'react-toastify'
+import { Trash2 } from 'lucide-react'
 import '../../assets/style/reader/forum.css'
 
 const formatTimeAgo = (createdAtString) => {
@@ -1454,15 +1455,18 @@ function Forum() {
                             🔒 {selectedThread.isLocked ? 'Unlock Thread' : 'Lock Thread'}
                           </button>
                           <button 
-                            className="forum-panel-btn delete"
+                            className="forum-action-btn danger"
                             onClick={() => handleDeleteThreadDirect(selectedThread)}
                             style={{ 
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
                               background: 'rgba(239, 68, 68, 0.1)', 
                               color: '#f87171', 
                               border: '1px solid rgba(239, 68, 68, 0.2)' 
                             }}
                           >
-                            🗑️ Delete Thread
+                            <Trash2 size={14} /> Delete Thread
                           </button>
                         </div>
                       )}
@@ -1731,7 +1735,7 @@ function Forum() {
                                             setActiveDropdownThreadId(null);
                                           }}
                                         >
-                                          <span>🗑️</span> Delete Thread
+                                          <Trash2 size={14} style={{ marginRight: '6px' }} /> Delete Thread
                                         </button>
                                       </>
                                     )}

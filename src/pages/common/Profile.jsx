@@ -5,10 +5,23 @@ import ModeratorLayout from '../../components/layout/ModeratorLayout'
 import TranslatorLayout from '../../components/layout/TranslatorLayout'
 import AuthorLayout from '../../components/layout/AuthorLayout'
 import '../../assets/style/reader/profile.css'
-import { changePasswordApi, getMeApi, updateProfileApi, uploadAvatarApi } from '../../services/api/AuthApi'
-import { getNotificationPreferencesApi, updateNotificationPreferencesApi } from '../../services/api/NotificationApi'
+import { useNavigate } from 'react-router-dom'
+import CustomDatePicker from '../../components/common/CustomDatePicker'
+import {
+  changePasswordApi,
+  getMeApi,
+  getUserInteractionCountsApi,
+  updateProfileApi,
+  uploadAvatarApi,
+} from '../../services/api/AuthApi'
+import { getUserRatingsApi } from '../../services/api/RatingApi'
+import {
+  getNotificationPreferencesApi,
+  updateNotificationPreferencesApi,
+} from '../../services/api/NotificationApi'
 import { toast } from 'react-toastify'
 import { useAuth } from '../../context/AuthContext'
+import { getAuth } from '../../utils/Auth'
 
 const COMMON_NOTIFICATION_OPTIONS = [
   {
@@ -43,20 +56,34 @@ const ROLE_NOTIFICATION_OPTIONS = {
 
 // ── ROLE-SPECIFIC STATISTICS COMPONENTS ────────────────────────────
 
-function ReaderStats() {
+function ReaderStats({ stats, loading }) {
+  if (loading) {
+    return (
+      <div className="profile-stats-list">
+        <div style={{ color: 'var(--profile-text-muted)', fontSize: '13px', textAlign: 'center', padding: '8px 0' }}>
+          Loading stats...
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="profile-stats-list">
       <div className="profile-stats-row">
+        <span>Comics liked</span>
+        <span className="profile-stats-value">{(stats?.likedCount ?? 0).toLocaleString()}</span>
+      </div>
+      <div className="profile-stats-row">
         <span>Comics saved</span>
-        <span className="profile-stats-value">24</span>
+        <span className="profile-stats-value">{(stats?.savedCount ?? 0).toLocaleString()}</span>
       </div>
       <div className="profile-stats-row">
-        <span>Chapters read</span>
-        <span className="profile-stats-value">1,482</span>
+        <span>Comics read</span>
+        <span className="profile-stats-value">{(stats?.readCount ?? 0).toLocaleString()}</span>
       </div>
       <div className="profile-stats-row">
-        <span>Comments</span>
-        <span className="profile-stats-value">63</span>
+        <span>Comics rated</span>
+        <span className="profile-stats-value">{(stats?.ratingCount ?? 0).toLocaleString()}</span>
       </div>
     </div>
   )
@@ -171,9 +198,68 @@ function AdminStats() {
 
 // Main profile page
 
-function Profile({ user }) {
-  const { updateUser } = useAuth()
-  const [activeTab, setActiveTab] = useState('info') // 'info' | 'password'
+function Profile({ user: userProp }) {
+  const navigate = useNavigate()
+  const { user: authUser, updateUser } = useAuth()
+  
+  // Safely resolve user from prop, auth context, or localStorage fallback
+  const user = userProp || authUser || getAuth()?.user || null
+
+  const [activeTab, setActiveTab] = useState('info') // 'info' | 'password' | 'notifications' | 'ratings'
+  const [interactionCounts, setInteractionCounts] = useState({
+    likedCount: 0,
+    savedCount: 0,
+    readCount: 0,
+    ratingCount: 0
+  })
+  const [statsLoading, setStatsLoading] = useState(true)
+
+  useEffect(() => {
+    if (!user) {
+      setStatsLoading(false)
+      return
+    }
+    const fetchInteractionCounts = async () => {
+      try {
+        setStatsLoading(true)
+        const res = await getUserInteractionCountsApi()
+        if (res) {
+          setInteractionCounts({
+            likedCount: res.likedCount ?? 0,
+            savedCount: res.savedCount ?? 0,
+            readCount: res.readCount ?? 0,
+            ratingCount: res.ratingCount ?? 0
+          })
+        }
+      } catch (err) {
+        console.error('Failed to fetch user interaction counts:', err)
+      } finally {
+        setStatsLoading(false)
+      }
+    }
+    fetchInteractionCounts()
+  }, [user?.id, user?.userId])
+
+  const [userRatings, setUserRatings] = useState([])
+  const [ratingsLoading, setRatingsLoading] = useState(false)
+
+  useEffect(() => {
+    if (user && activeTab === 'ratings') {
+      const fetchRatings = async () => {
+        try {
+          setRatingsLoading(true)
+          const res = await getUserRatingsApi()
+          const list = res?.data || res || []
+          setUserRatings(Array.isArray(list) ? list : [])
+        } catch (err) {
+          console.error('Failed to fetch user ratings:', err)
+        } finally {
+          setRatingsLoading(false)
+        }
+      }
+      fetchRatings()
+    }
+  }, [activeTab, user?.id, user?.userId])
 
   const parseFullName = (fullName) => {
     if (!fullName) return { first: '', last: '' };
@@ -184,21 +270,21 @@ function Profile({ user }) {
     return { first, last };
   }
 
-  const initialName = parseFullName(user.fullName || '');
-  const roleName = user.role || 'Reader'
+  const initialName = parseFullName(user?.fullName || '');
+  const roleName = user?.role || 'Reader'
   const roleUpper = roleName.toUpperCase().replace(/[\s-]+/g, '_')
 
   // Form states for Basic Info
   const [firstName, setFirstName] = useState(initialName.first || '')
   const [lastName, setLastName] = useState(initialName.last || '')
-  const [username, setUsername] = useState(user.username || '')
-  const [email, setEmail] = useState(user.email || '')
-  const [dateOfBirth, setDateOfBirth] = useState(user.dateOfBirth || '')
-  const [bio, setBio] = useState(user.bio || '')
-  const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || '')
-  const [backgroundImageUrl, setBackgroundImageUrl] = useState(user.backgroundImageUrl || '')
+  const [username, setUsername] = useState(user?.username || '')
+  const [email, setEmail] = useState(user?.email || '')
+  const [dateOfBirth, setDateOfBirth] = useState(user?.dateOfBirth || '')
+  const [bio, setBio] = useState(user?.bio || '')
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || '')
+  const [backgroundImageUrl, setBackgroundImageUrl] = useState(user?.backgroundImageUrl || '')
   const [assignedLanguages, setAssignedLanguages] = useState(
-    Array.isArray(user.assignedLanguages) && user.assignedLanguages.length > 0
+    Array.isArray(user?.assignedLanguages) && user.assignedLanguages.length > 0
       ? user.assignedLanguages
       : ['Japanese', 'Korean']
   )
@@ -215,6 +301,7 @@ function Profile({ user }) {
   const [notifSaving, setNotifSaving] = useState(false)
 
   useEffect(() => {
+    if (!user) return
     let cancelled = false
     getMeApi()
       .then(serverProfile => {
@@ -234,9 +321,13 @@ function Profile({ user }) {
         if (!cancelled) toast.error(err.response?.data?.message || 'Failed to load the latest profile information.')
       })
     return () => { cancelled = true }
-  }, [user.userId])
+  }, [user?.id, user?.userId])
 
   useEffect(() => {
+    if (!user) {
+      setNotifLoading(false)
+      return
+    }
     let cancelled = false
     setNotifLoading(true)
     getNotificationPreferencesApi()
@@ -252,7 +343,7 @@ function Profile({ user }) {
         if (!cancelled) setNotifLoading(false)
       })
     return () => { cancelled = true }
-  }, [user.userId, roleUpper])
+  }, [user?.id, user?.userId, roleUpper])
 
   const handleToggleNotifSetting = (key) => {
     setNotifSettings(prev => ({ ...prev, [key]: !prev[key] }))
@@ -288,6 +379,21 @@ function Profile({ user }) {
     setAvatarUrl(savedProfile.avatarUrl || '')
     setBackgroundImageUrl(savedProfile.backgroundImageUrl || '')
     updateUser({ ...user, ...savedProfile, assignedLanguages })
+  }
+
+  if (!user) {
+    return (
+      <HomeLayout>
+        <div style={{ textAlign: 'center', padding: '120px 20px', color: '#64748b' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+          <h2 style={{ color: 'white', marginBottom: '8px' }}>Session Required</h2>
+          <p style={{ marginBottom: '24px' }}>Please log in to view and manage your profile.</p>
+          <button className="btn-home-primary" onClick={() => navigate('/auth?mode=signin')}>
+            Sign In
+          </button>
+        </div>
+      </HomeLayout>
+    )
   }
 
   const handleSaveInfo = async (e) => {
@@ -396,7 +502,7 @@ function Profile({ user }) {
       case 'READER':
       case 'USER':
       default:
-        return <ReaderStats />
+        return <ReaderStats stats={interactionCounts} loading={statsLoading} />
     }
   }
 
@@ -425,22 +531,8 @@ function Profile({ user }) {
   const displayUserName = `${firstName} ${lastName}`.trim() || user.fullName || 'Minh Khoa'
   const userInitials = displayUserName.substring(0, 2).toUpperCase()
 
-  let LayoutComponent = HomeLayout
-  let layoutProps = {}
-
-  if (roleUpper === 'ADMIN') {
-    LayoutComponent = AdminLayout
-    layoutProps = { activeNav: 'profile' }
-  } else if (roleUpper === 'MODERATOR' || roleUpper === 'STAFF') {
-    LayoutComponent = ModeratorLayout
-    layoutProps = { activeNav: 'profile' }
-  } else if (roleUpper === 'TRANSLATOR' || roleUpper === 'PROJECT_LEADER') {
-    LayoutComponent = TranslatorLayout
-    layoutProps = { activeNav: 'profile' }
-  } else if (roleUpper === 'AUTHOR') {
-    LayoutComponent = AuthorLayout
-    layoutProps = { activeNav: 'profile' }
-  }
+  const LayoutComponent = HomeLayout
+  const layoutProps = {}
 
   return (
     <LayoutComponent {...layoutProps}>
@@ -529,6 +621,12 @@ function Profile({ user }) {
                 onClick={() => setActiveTab('notifications')}
               >
                 🔔 Notification Settings
+              </button>
+              <button 
+                className={`profile-sidebar-nav-btn ${activeTab === 'ratings' ? 'active' : ''}`}
+                onClick={() => setActiveTab('ratings')}
+              >
+                ⭐ My Ratings
               </button>
             </div>
 
@@ -634,11 +732,9 @@ function Profile({ user }) {
                 {/* Date of Birth */}
                 <div className="profile-input-group">
                   <label>Date of Birth</label>
-                  <input 
-                    type="date" 
+                  <CustomDatePicker 
                     value={dateOfBirth} 
-                    onChange={(e) => setDateOfBirth(e.target.value)} 
-                    required 
+                    onChange={(val) => setDateOfBirth(val)} 
                   />
                 </div>
 
@@ -718,7 +814,7 @@ function Profile({ user }) {
                 </button>
               </form>
             </div>
-          ) : (
+          ) : activeTab === 'notifications' ? (
             <div className="fade-in">
               <h2 className="profile-content-title">Notification Settings</h2>
               <p className="profile-input-desc" style={{ marginBottom: '24px', fontSize: '13px' }}>
@@ -761,7 +857,71 @@ function Profile({ user }) {
                 </form>
               )}
             </div>
-          )}
+          ) : activeTab === 'ratings' ? (
+            <div className="fade-in">
+              <h2 className="profile-content-title">My Rated Comics</h2>
+              <p className="profile-input-desc" style={{ marginBottom: '24px', fontSize: '13px' }}>
+                A complete history of all comics you have rated and reviewed.
+              </p>
+
+              {ratingsLoading ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
+                  Loading your rated comics...
+                </div>
+              ) : userRatings.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b', background: 'rgba(255,255,255,0.01)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <span style={{ fontSize: '40px', display: 'block', marginBottom: '12px' }}>⭐</span>
+                  <h4 style={{ color: 'white', margin: '0 0 8px' }}>No Rated Comics Yet</h4>
+                  <p style={{ margin: 0, fontSize: '13px' }}>
+                    You haven't rated any comics yet. Explore titles and drop your star ratings!
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
+                  {userRatings.map((item) => {
+                    const comicObj = item.comic || item;
+                    const comicId = comicObj.id || item.comicId;
+                    const comicTitle = comicObj.title || 'Untitled Comic';
+                    const userScoreVal = item.score || item.userScore || 5;
+
+                    return (
+                      <div
+                        key={item.id || comicId}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          border: '1px solid rgba(255, 255, 255, 0.06)',
+                          borderRadius: '12px',
+                          padding: '14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px',
+                          cursor: 'pointer',
+                          transition: 'transform 0.2s, border-color 0.2s'
+                        }}
+                        onClick={() => navigate(`/comic/${comicId}`)}
+                      >
+                        {comicObj.cover && (
+                          <img
+                            src={comicObj.cover}
+                            alt={comicTitle}
+                            style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: '8px' }}
+                          />
+                        )}
+                        <div>
+                          <h4 style={{ margin: '0 0 4px', fontSize: '14px', color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {comicTitle}
+                          </h4>
+                          <span style={{ fontSize: '13px', color: '#fbbf24', fontWeight: 'bold' }}>
+                            ⭐ Rated: {userScoreVal} / 5
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
       </div>

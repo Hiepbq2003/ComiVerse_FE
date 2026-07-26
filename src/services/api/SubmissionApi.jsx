@@ -15,3 +15,11 @@ export const approveSubmissionApi = (id) => {
 export const rejectSubmissionApi = (id, reason) => {
   return AxiosClient.put(`/submissions/${id}/reject`, { reason });
 };
+
+export const getSubmissionCommentsApi = (id) => {
+  return AxiosClient.get(`/submissions/${id}/comments`);
+};
+
+export const saveSubmissionCommentsApi = (id, comments) => {
+  return AxiosClient.post(`/submissions/${id}/comments`, { comments });
+};
