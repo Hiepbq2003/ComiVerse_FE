@@ -738,43 +738,22 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
                   </div>
                 </div>
 
-                {/* Center: Dynamic Mode Tabs Order */}
+                {/* Center: Fixed Standard Mode Tabs Order */}
                 <div className="mod-inspector-mode-tabs">
-                  {chaptersList.length > 1 ? (
-                    <>
-                      <button
-                        type="button"
-                        className={`mod-mode-tab ${previewTab === 'chapters' ? 'active' : ''}`}
-                        onClick={() => setPreviewTab('chapters')}
-                      >
-                        📋 Chapters ({chaptersList.length})
-                      </button>
-                      <button
-                        type="button"
-                        className={`mod-mode-tab ${previewTab === 'reader' ? 'active' : ''}`}
-                        onClick={() => setPreviewTab('reader')}
-                      >
-                        🖼️ Image Reader ({pages.length})
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        className={`mod-mode-tab ${previewTab === 'reader' ? 'active' : ''}`}
-                        onClick={() => setPreviewTab('reader')}
-                      >
-                        🖼️ Image Reader ({pages.length})
-                      </button>
-                      <button
-                        type="button"
-                        className={`mod-mode-tab ${previewTab === 'chapters' ? 'active' : ''}`}
-                        onClick={() => setPreviewTab('chapters')}
-                      >
-                        📋 Chapters ({chaptersList.length})
-                      </button>
-                    </>
-                  )}
+                  <button
+                    type="button"
+                    className={`mod-mode-tab ${previewTab === 'reader' ? 'active' : ''}`}
+                    onClick={() => setPreviewTab('reader')}
+                  >
+                    🖼️ Image Reader ({pages.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`mod-mode-tab ${previewTab === 'chapters' ? 'active' : ''}`}
+                    onClick={() => setPreviewTab('chapters')}
+                  >
+                    📋 Chapters ({chaptersList.length})
+                  </button>
                   <button
                     type="button"
                     className={`mod-mode-tab ${previewTab === 'synopsis' ? 'active' : ''}`}
