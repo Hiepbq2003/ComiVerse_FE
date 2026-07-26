@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'react-toastify'
 import { loginApi, getMeApi } from '../../services/api/AuthApi'
 import { useAuth } from '../../context/AuthContext'
@@ -10,6 +10,48 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
   const [showPassword, setShowPassword] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({ username: '', password: '' })
 
+  const [failedAttempts, setFailedAttempts] = useState(() => {
+    try {
+      const stored = localStorage.getItem('comiverse_login_attempts');
+      if (stored) {
+        const data = JSON.parse(stored);
+        return data.count || 0;
+      }
+    } catch (e) {}
+    return 0;
+  });
+
+  const [lockoutTimer, setLockoutTimer] = useState(() => {
+    try {
+      const stored = localStorage.getItem('comiverse_login_attempts');
+      if (stored) {
+        const data = JSON.parse(stored);
+        if (data.lockoutUntil && Date.now() < data.lockoutUntil) {
+          return Math.ceil((data.lockoutUntil - Date.now()) / 1000);
+        }
+      }
+    } catch (e) {}
+    return 0;
+  });
+
+  useEffect(() => {
+    if (lockoutTimer <= 0) return;
+    const interval = setInterval(() => {
+      setLockoutTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          try {
+            localStorage.removeItem('comiverse_login_attempts');
+          } catch (e) {}
+          setFailedAttempts(0);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lockoutTimer]);
+
   const updateField = (field, value) => {
     setForm({ ...form, [field]: value })
     if (fieldErrors[field]) {
@@ -19,6 +61,14 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
 
   const handleSignin = async (e) => {
     e.preventDefault()
+    if (lockoutTimer > 0) {
+      const minutes = Math.floor(lockoutTimer / 60);
+      const seconds = lockoutTimer % 60;
+      const msg = `Too many failed attempts. Please wait ${minutes}m ${seconds}s before trying again to prevent spam.`;
+      toast.error(msg);
+      setFieldErrors({ username: '', password: msg });
+      return;
+    }
     const nextErrors = {
       username: form.username.trim() ? '' : 'Email or username is required.',
       password: form.password ? '' : 'Password is required.'
@@ -66,6 +116,12 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
         avatarUrl: meData.avatarUrl
       }
 
+      try {
+        localStorage.removeItem('comiverse_login_attempts');
+      } catch (e) {}
+      setFailedAttempts(0);
+      setLockoutTimer(0);
+
       login(data.token, userData)
       onLoginSuccess(userData)
       toast.success('Welcome back to ComiVerse!')
@@ -92,10 +148,34 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
       }
 
       if (isInvalidCredentials) {
-        setFieldErrors({
-          username: '',
-          password: 'Invalid username/email or password.'
-        })
+        const newCount = failedAttempts + 1;
+        setFailedAttempts(newCount);
+        if (newCount >= 5) {
+          const lockTime = Date.now() + 10 * 60 * 1000;
+          try {
+            localStorage.setItem('comiverse_login_attempts', JSON.stringify({ count: 5, lockoutUntil: lockTime }));
+          } catch (e) {}
+          setLockoutTimer(600);
+          const lockMsg = 'You have failed 5 times! Your account login is locked for 10 minutes to prevent spam.';
+          setFieldErrors({
+            username: '',
+            password: lockMsg
+          });
+          toast.error(lockMsg);
+          if (typeof showAlert === 'function') {
+            showAlert('error', lockMsg);
+          }
+        } else {
+          try {
+            localStorage.setItem('comiverse_login_attempts', JSON.stringify({ count: newCount, lockoutUntil: null }));
+          } catch (e) {}
+          const rem = 5 - newCount;
+          setFieldErrors({
+            username: '',
+            password: 'Invalid username/email or password.'
+          });
+          toast.error(`Invalid username/email or password. You have ${rem} attempt${rem === 1 ? '' : 's'} left before a 10-minute lockout.`);
+        }
         return
       }
 
@@ -223,8 +303,33 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
           </button>
         </div>
 
-        <button type="submit" className="btn-primary" disabled={loading}>
-          <span>{loading ? 'Signing In...' : 'Sign In'}</span> <span className="btn-arrow-icon">›</span>
+        {(failedAttempts > 0 || lockoutTimer > 0) && (
+          <div style={{
+            padding: '10px 14px',
+            margin: '0 0 14px 0',
+            borderRadius: '10px',
+            background: lockoutTimer > 0 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+            border: `1px solid ${lockoutTimer > 0 ? 'rgba(239, 68, 68, 0.35)' : 'rgba(245, 158, 11, 0.35)'}`,
+            color: lockoutTimer > 0 ? '#f87171' : '#fbbf24',
+            fontSize: '12.5px',
+            lineHeight: '1.4',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <span style={{ fontSize: '16px' }}>{lockoutTimer > 0 ? '🔒' : '⚠️'}</span>
+            <div>
+              {lockoutTimer > 0 ? (
+                <span><strong>Login Locked:</strong> You have failed 5 times. Please wait <strong>{Math.floor(lockoutTimer / 60)}m {lockoutTimer % 60}s</strong> before trying again to prevent spam.</span>
+              ) : (
+                <span><strong>Security Notice:</strong> You have <strong>{5 - failedAttempts} attempt{5 - failedAttempts === 1 ? '' : 's'} left</strong> before your login is locked for 10 minutes.</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        <button type="submit" className="btn-primary" disabled={loading || lockoutTimer > 0} style={lockoutTimer > 0 ? { opacity: 0.6, cursor: 'not-allowed', background: '#64748b' } : {}}>
+          <span>{lockoutTimer > 0 ? `Locked (${Math.floor(lockoutTimer / 60)}m ${lockoutTimer % 60}s)` : (loading ? 'Signing In...' : 'Sign In')}</span> <span className="btn-arrow-icon">›</span>
         </button>
       </form>
 
