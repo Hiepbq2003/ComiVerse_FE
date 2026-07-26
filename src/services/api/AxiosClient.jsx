@@ -1,9 +1,10 @@
 import axios from 'axios';
 import { getAuth, clearAuth } from '../../utils/Auth';
 import { toast } from 'react-toastify';
+import { API_BASE_URL } from '../../config/apiConfig';
 
 const AxiosClient = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+    baseURL: API_BASE_URL,
     timeout: 10000,
 });
 

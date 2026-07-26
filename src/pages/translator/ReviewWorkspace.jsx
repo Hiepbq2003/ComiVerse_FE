@@ -21,8 +21,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import "../../assets/style/translator/review-workspace.css";
+import { API_BASE_URL as API_BASE } from "../../config/apiConfig";
 
-const API_BASE = "http://localhost:8081/api";
 const TOKEN_KEY = "token";
 
 function authHeaders() {
