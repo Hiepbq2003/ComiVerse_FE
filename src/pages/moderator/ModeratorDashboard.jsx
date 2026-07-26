@@ -155,9 +155,9 @@ function ModeratorDashboard() {
             chapters: sub.chapterNumber || sub.number || 1,
             views: 0,
             viewCount: 0,
-            rating: 5.0,
-            ratingAverage: 5.0,
-            ratingCount: 1,
+            rating: sub.rating || sub.ratingAverage || 0.0,
+            ratingAverage: sub.ratingAverage || sub.rating || 0.0,
+            ratingCount: sub.ratingCount || 0,
             projectTeam: '-',
             lastChapterUpdatedAt: sub.approvedAt || sub.timestamp || new Date().toISOString()
           });
@@ -214,9 +214,9 @@ function ModeratorDashboard() {
           chapters: initialChaps,
           views: 0,
           viewCount: 0,
-          rating: 5.0,
-          ratingAverage: 5.0,
-          ratingCount: 1,
+          rating: sub.rating || sub.ratingAverage || 0.0,
+          ratingAverage: sub.ratingAverage || sub.rating || 0.0,
+          ratingCount: sub.ratingCount || 0,
           projectTeam: '-',
           lastChapterUpdatedAt: nowIso
         };
