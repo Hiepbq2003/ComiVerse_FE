@@ -250,17 +250,11 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
         const itemChaps = getSubmissionChapters(item);
         itemChaps.forEach(newChap => {
           const exists = group.allChapters.some(c => 
-            c.id === newChap.id || 
-            (c.title && newChap.title && c.title.toLowerCase() === newChap.title.toLowerCase())
+            (c.id && newChap.id && c.id === newChap.id) || 
+            (c.title && newChap.title && c.title.toLowerCase().trim() === newChap.title.toLowerCase().trim())
           );
           if (!exists) {
-            const nextNum = group.allChapters.length + 1;
-            const formattedChap = {
-              ...newChap,
-              number: newChap.number && newChap.number !== 1 ? newChap.number : nextNum,
-              title: newChap.title && newChap.title !== 'Chapter 1' ? newChap.title : `Chapter ${nextNum}`
-            };
-            group.allChapters.push(formattedChap);
+            group.allChapters.push(newChap);
           }
         });
 
@@ -269,6 +263,21 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
           group.timestamp = item.timestamp;
         }
       }
+    });
+
+    // Clean up grouped chapters: if group has chapters with pages > 0, filter out 0-page dummy draft entries
+    groupsMap.forEach(group => {
+      const chaptersWithPages = group.allChapters.filter(c => Array.isArray(c.pages) && c.pages.length > 0);
+      if (chaptersWithPages.length > 0) {
+        group.allChapters = chaptersWithPages;
+      }
+      
+      // Re-index chapter numbers for clean ordering if needed
+      group.allChapters.forEach((chap, idx) => {
+        if (!chap.number || chap.number === 1) {
+          chap.number = idx + 1;
+        }
+      });
     });
 
     return Array.from(groupsMap.values());
@@ -464,6 +473,12 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
           }
         });
       }
+    }
+
+    // Filter out 0-page placeholders if real chapters with pages exist
+    const chapsWithPages = chaps.filter(c => Array.isArray(c.pages) && c.pages.length > 0);
+    if (chapsWithPages.length > 0) {
+      chaps = chapsWithPages;
     }
 
     item.allChapters = chaps;
