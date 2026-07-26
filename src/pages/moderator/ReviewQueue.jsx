@@ -246,15 +246,21 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
         const group = groupsMap.get(key);
         group.subItems.push(item);
 
-        // Merge chapters without duplicates
+        // Merge chapters from this submission item
         const itemChaps = getSubmissionChapters(item);
         itemChaps.forEach(newChap => {
           const exists = group.allChapters.some(c => 
-            (c.id && newChap.id && c.id === newChap.id) || 
-            (c.number && newChap.number && c.number === newChap.number)
+            c.id === newChap.id || 
+            (c.title && newChap.title && c.title.toLowerCase() === newChap.title.toLowerCase())
           );
           if (!exists) {
-            group.allChapters.push(newChap);
+            const nextNum = group.allChapters.length + 1;
+            const formattedChap = {
+              ...newChap,
+              number: newChap.number && newChap.number !== 1 ? newChap.number : nextNum,
+              title: newChap.title && newChap.title !== 'Chapter 1' ? newChap.title : `Chapter ${nextNum}`
+            };
+            group.allChapters.push(formattedChap);
           }
         });
 
@@ -433,19 +439,35 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
     setPageIndex(0);
     setFetchingChapters(true);
 
-    // First try to use inline chapter data
-    let chaps = getSubmissionChapters(item);
+    // Get combined chapters from group or item
+    let chaps = (item.allChapters && item.allChapters.length > 0)
+      ? [...item.allChapters]
+      : getSubmissionChapters(item);
 
     // If no pages found and we have a comicId, fetch from backend
     const hasPages = chaps.some(c => Array.isArray(c.pages) && c.pages.length > 0);
     if (!hasPages && item.comicId) {
       const backendChaps = await fetchChaptersFromBackend(item.comicId);
       if (backendChaps.length > 0) {
-        chaps = backendChaps;
-        // Cache the fetched chapters back into the item for future access
-        item.chapters = chaps;
+        backendChaps.forEach(bChap => {
+          const exists = chaps.some(c => 
+            (c.id && bChap.id && c.id === bChap.id) || 
+            (c.title && bChap.title && c.title.toLowerCase() === bChap.title.toLowerCase())
+          );
+          if (!exists) {
+            chaps.push(bChap);
+          } else {
+            const existing = chaps.find(c => (c.id && bChap.id && c.id === bChap.id) || (c.title && bChap.title && c.title.toLowerCase() === bChap.title.toLowerCase()));
+            if (existing && (!existing.pages || existing.pages.length === 0) && bChap.pages?.length > 0) {
+              existing.pages = bChap.pages;
+            }
+          }
+        });
       }
     }
+
+    item.allChapters = chaps;
+    item.chapters = chaps;
 
     const firstChap = chaps[0] || null;
     setSelectedChapter(firstChap);
