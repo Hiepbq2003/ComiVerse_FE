@@ -483,6 +483,7 @@ function PageImage({
   currentPageIndex,
   canvasRef,
   imgRef,
+  bubbleRefs,
   drawing,
   selections,
   activeId,
@@ -592,6 +593,9 @@ function PageImage({
               return (
                 <polygon
                   key={sel.id}
+                  ref={(el) => {
+                    if (bubbleRefs) bubbleRefs.current[sel.id] = el;
+                  }}
                   points={sel.points.map((p) => `${p.x},${p.y}`).join(" ")}
                   fill={sel.textBgColor ?? "#ffffff"}
                   stroke={isActive ? "#16a34a" : "#f59e0b"}
@@ -676,6 +680,9 @@ function PageImage({
             return (
               <div
                 key={sel.id}
+                ref={(el) => {
+                  if (bubbleRefs) bubbleRefs.current[sel.id] = el;
+                }}
                 onMouseDown={(e) => {
                   if (isPickingZoomPoint) return;
                   e.stopPropagation();
@@ -924,7 +931,27 @@ function GlossaryTabPanel() {
   );
 }
 
-function ChangeRequestsTabPanel({ comments, loading, resolveBubbleLabel }) {
+function ChangeRequestCard({ comment, resolveBubbleLabel, onSelectBubble }) {
+  const isClickable = comment.bubbleId != null && typeof onSelectBubble === "function";
+  return (
+    <div
+      className="tw-x-change-request-card"
+      onClick={isClickable ? () => onSelectBubble(comment.bubbleId) : undefined}
+      style={isClickable ? { cursor: "pointer" } : undefined}
+    >
+      <div className="tw-x-change-request-header">
+        <span className="tw-x-change-request-author">{comment.authorName}</span>
+        {comment.resolved && <span className="tw-x-change-request-resolved">Resolved</span>}
+      </div>
+      {comment.bubbleId && (
+        <span className="tw-x-change-request-bubble-tag">{resolveBubbleLabel(comment.bubbleId)}</span>
+      )}
+      <p className="tw-x-change-request-text">{comment.content}</p>
+    </div>
+  );
+}
+
+function ChangeRequestsTabPanel({ comments, loading, resolveBubbleLabel, onSelectBubble }) {
   if (loading) {
     return (
       <div className="tw-placeholder">
@@ -942,20 +969,32 @@ function ChangeRequestsTabPanel({ comments, loading, resolveBubbleLabel }) {
     );
   }
 
+  const bubbleComments = comments.filter((c) => c.bubbleId);
+  const pageComments = comments.filter((c) => !c.bubbleId);
+
   return (
     <div className="tw-tabpanel">
-      {comments.map((c) => (
-        <div key={c.id} className="tw-x-change-request-card">
-          <div className="tw-x-change-request-header">
-            <span className="tw-x-change-request-author">{c.authorName}</span>
-            {c.resolved && <span className="tw-x-change-request-resolved">Resolved</span>}
-          </div>
-          {c.bubbleId && (
-            <span className="tw-x-change-request-bubble-tag">{resolveBubbleLabel(c.bubbleId)}</span>
-          )}
-          <p className="tw-x-change-request-text">{c.content}</p>
-        </div>
-      ))}
+      <p className="tw-x-change-request-section-label">
+        Bubble Reviews {bubbleComments.length > 0 ? `(${bubbleComments.length})` : ""}
+      </p>
+      {bubbleComments.length === 0 ? (
+        <p className="tw-x-change-request-empty">No bubble-specific reviews on this page.</p>
+      ) : (
+        bubbleComments.map((c) => (
+          <ChangeRequestCard key={c.id} comment={c} resolveBubbleLabel={resolveBubbleLabel} onSelectBubble={onSelectBubble} />
+        ))
+      )}
+
+      <p className="tw-x-change-request-section-label" style={{ marginTop: 16 }}>
+        Page-level Review {pageComments.length > 0 ? `(${pageComments.length})` : ""}
+      </p>
+      {pageComments.length === 0 ? (
+        <p className="tw-x-change-request-empty">No overall page review yet.</p>
+      ) : (
+        pageComments.map((c) => (
+          <ChangeRequestCard key={c.id} comment={c} resolveBubbleLabel={resolveBubbleLabel} onSelectBubble={onSelectBubble} />
+        ))
+      )}
     </div>
   );
 }
@@ -981,6 +1020,7 @@ function TranslationSidePanel({
   changeRequests,
   changeRequestsLoading,
   resolveBubbleLabel,
+  onSelectBubble,
 }) {
   return (
     <aside className="tw-rightpanel">
@@ -1017,6 +1057,7 @@ function TranslationSidePanel({
           comments={changeRequests}
           loading={changeRequestsLoading}
           resolveBubbleLabel={resolveBubbleLabel}
+          onSelectBubble={onSelectBubble}
         />
       )}
 
@@ -1182,10 +1223,13 @@ async function fetchPagesForTask(taskId, signal) {
   if (UUID_RE.test(taskId)) {
     try {
       const list = await fetchJson(`${API_BASE}/translate-workspace/${taskId}`, signal);
+      console.log('[DEBUG] /translate-workspace response:', list);
       if (Array.isArray(list) && list.length > 0) {
         rawPages = list;
       }
-    } catch (err) { /* ignore */ }
+    } catch (err) {
+      console.warn('[DEBUG] /translate-workspace fetch failed:', err);
+    }
   }
 
   // 2. LocalStorage Task lookup -> Chapter ID or Comic Title lookup
@@ -1278,7 +1322,7 @@ async function fetchPagesForTask(taskId, signal) {
 
   // Map & resolve real image URLs from DB
   if (Array.isArray(rawPages) && rawPages.length > 0) {
-    return rawPages
+    let finalPages = rawPages
       .map((item, idx) => {
         const rawUrl = typeof item === 'string'
           ? item
@@ -1288,14 +1332,39 @@ async function fetchPagesForTask(taskId, signal) {
         if (!resolved) return null;
 
         return {
-          id: item?.id || `p-${taskId}-${idx + 1}`,
-          pageId: item?.id || `p-${taskId}-${idx + 1}`,
+          id: item?.pageId || item?.id || `p-${taskId}-${idx + 1}`,
+          pageId: item?.pageId || item?.id || `p-${taskId}-${idx + 1}`,
           pageNumber: item?.pageNumber || idx + 1,
           imageUrl: resolved,
           bubbles: item?.bubbles || []
         };
       })
       .filter(Boolean);
+
+    // If any page ended up with a fabricated (non-UUID) id — e.g. the
+    // primary /translate-workspace source didn't return real
+    // PageTranslationEntity ids — backfill the real ones from
+    // /review-workspace/{taskId} (same endpoint ReviewWorkspace.jsx relies
+    // on) by matching pageNumber. Without a real UUID here, "Change
+    // Requests" can never load: the backend rejects non-UUID page ids.
+    const needsRealPageIds = finalPages.some((p) => !UUID_RE.test(p.pageId));
+    if (needsRealPageIds && UUID_RE.test(taskId)) {
+      try {
+        const realPages = await fetchJson(`${API_BASE}/review-workspace/${taskId}`, signal);
+        if (Array.isArray(realPages) && realPages.length > 0) {
+          const byPageNumber = new Map(realPages.map((rp) => [rp.pageNumber, rp]));
+          finalPages = finalPages.map((p) => {
+            const real = byPageNumber.get(p.pageNumber);
+            if (!real?.pageId) return p;
+            return { ...p, id: real.pageId, pageId: real.pageId };
+          });
+        }
+      } catch (e) {
+        console.warn('[DEBUG] Could not backfill real pageIds from /review-workspace:', e);
+      }
+    }
+
+    return finalPages;
   }
 
   return [];
@@ -1303,11 +1372,17 @@ async function fetchPagesForTask(taskId, signal) {
 
 async function fetchPageChangeRequests(pageId, signal) {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!pageId || !UUID_RE.test(pageId)) return [];
+  console.log('[DEBUG] fetchPageChangeRequests pageId:', pageId, '| isUUID:', UUID_RE.test(pageId));
+  if (!pageId || !UUID_RE.test(pageId)) {
+    console.warn('[DEBUG] pageId không phải UUID, bỏ qua fetch comments');
+    return [];
+  }
   try {
     const list = await fetchJson(`${API_BASE}/review-workspace/pages/${pageId}/comments`, signal);
+    console.log('[DEBUG] comments API response:', list);
     return Array.isArray(list) ? list : [];
   } catch (e) {
+    console.error('[DEBUG] fetchPageChangeRequests error:', e);
     return [];
   }
 }
@@ -1595,6 +1670,7 @@ function useSelectionAreas() {
 
   const startPoint = useRef({ x: 0, y: 0 });
   const containerRef = useRef(null);
+  const bubbleRefs = useRef({});
 
   const getRelativePos = (e) => {
     const bounds = containerRef.current.getBoundingClientRect();
@@ -1607,6 +1683,12 @@ function useSelectionAreas() {
 
   const toggleZoomIn = () => setIsPickingZoomPoint((v) => !v);
   const cancelZoomPick = () => setIsPickingZoomPoint(false);
+
+  useEffect(() => {
+    if (activeId == null) return;
+    const el = bubbleRefs.current[activeId];
+    el?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+  }, [activeId]);
 
   const zoomOut = () => {
     setZoomScale((prev) => {
@@ -1941,6 +2023,7 @@ function useSelectionAreas() {
 
   return {
     containerRef,
+    bubbleRefs,
     selections,
     drawing,
     activeId,
@@ -2020,6 +2103,7 @@ export default function TranslateWorkspace() {
 
   const {
     containerRef: canvasRef,
+    bubbleRefs,
     selections,
     drawing,
     activeId,
@@ -2615,6 +2699,7 @@ export default function TranslateWorkspace() {
             currentPageIndex={currentPageIndex}
             canvasRef={canvasRef}
             imgRef={imgElRef}
+            bubbleRefs={bubbleRefs}
             drawing={drawing}
             selections={selections}
             activeId={activeId}
@@ -2659,6 +2744,7 @@ export default function TranslateWorkspace() {
           changeRequests={changeRequests}
           changeRequestsLoading={changeRequestsLoading}
           resolveBubbleLabel={resolveBubbleLabel}
+          onSelectBubble={selectArea}
         />
       </div>
     </div>
