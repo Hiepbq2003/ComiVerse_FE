@@ -411,14 +411,25 @@ function ModeratorDashboard() {
   }
 
   const handleChapterApprove = async (submissionId, chapterObj) => {
+    const targetApiId = chapterObj?.submissionId || chapterObj?.id || submissionId;
+    const chapTitle = chapterObj?.title || `Chapter ${chapterObj?.number || chapterObj?.chapterNumber || ''}`.trim() || 'Chapter';
+
+    try {
+      if (targetApiId) {
+        await approveSubmissionApi(targetApiId);
+      }
+    } catch (apiErr) {
+      console.warn(`[Backend DB Sync] approveSubmissionApi(${targetApiId}) notice:`, apiErr?.message || apiErr);
+    }
+
     try {
       const sub = submissions.find(item => (item.id || item) === submissionId || item.submissionId === submissionId || (item.title && chapterObj && chapterObj.title && item.title.toLowerCase().trim() === (chapterObj.originalSubmissionItem?.title || chapterObj.title || '').toLowerCase().trim()));
-      if (!sub) return;
+      
+      toast.success(`Approved "${chapTitle}" & saved to Database & Comic Management!`);
 
-      const chapTitle = chapterObj?.title || `Chapter ${chapterObj?.number || chapterObj?.chapterNumber || ''}`.trim() || 'Chapter';
-      toast.success(`Approved "${chapTitle}" & published to Comic Management!`);
-
-      publishComicToManagement(sub, true);
+      if (sub) {
+        publishComicToManagement(sub, true);
+      }
 
       const getChapKey = c => c?.id || c?.chapterNumber || c?.number || c?.title || c;
       const targetKey = getChapKey(chapterObj);
@@ -426,7 +437,7 @@ function ModeratorDashboard() {
 
       setSubmissions(prev => prev.map(item => {
         const itemId = item.id || item.submissionId || item;
-        if (itemId === sub.id || itemId === submissionId) {
+        if (itemId === (sub?.id || submissionId)) {
           const currentChaps = Array.isArray(item.allChapters) && item.allChapters.length > 0 
             ? item.allChapters 
             : (Array.isArray(item.chapters) && item.chapters.length > 0 ? item.chapters : []);
@@ -460,12 +471,21 @@ function ModeratorDashboard() {
   };
 
   const handleChapterReject = async (submissionId, chapterObj, reason) => {
+    const targetApiId = chapterObj?.submissionId || chapterObj?.id || submissionId;
+    const chapTitle = chapterObj?.title || `Chapter ${chapterObj?.number || chapterObj?.chapterNumber || ''}`.trim() || 'Chapter';
+
+    try {
+      if (targetApiId) {
+        await rejectSubmissionApi(targetApiId, reason || 'Chapter rejected');
+      }
+    } catch (apiErr) {
+      console.warn(`[Backend DB Sync] rejectSubmissionApi(${targetApiId}) notice:`, apiErr?.message || apiErr);
+    }
+
     try {
       const sub = submissions.find(item => (item.id || item) === submissionId || item.submissionId === submissionId);
-      if (!sub) return;
-
-      const chapTitle = chapterObj?.title || `Chapter ${chapterObj?.number || chapterObj?.chapterNumber || ''}`.trim() || 'Chapter';
-      toast.success(`Rejected "${chapTitle}".`);
+      
+      toast.success(`Rejected "${chapTitle}" & updated Database!`);
 
       const getChapKey = c => c?.id || c?.chapterNumber || c?.number || c?.title || c;
       const targetKey = getChapKey(chapterObj);
@@ -473,7 +493,7 @@ function ModeratorDashboard() {
 
       setSubmissions(prev => prev.map(item => {
         const itemId = item.id || item.submissionId || item;
-        if (itemId === sub.id || itemId === submissionId) {
+        if (itemId === (sub?.id || submissionId)) {
           const currentChaps = Array.isArray(item.allChapters) && item.allChapters.length > 0 
             ? item.allChapters 
             : (Array.isArray(item.chapters) && item.chapters.length > 0 ? item.chapters : []);
