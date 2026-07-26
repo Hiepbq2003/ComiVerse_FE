@@ -195,7 +195,12 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
     }
 
     const withPages = list.filter(c => Array.isArray(c.pages) && c.pages.length > 0);
-    return withPages.length > 0 ? withPages : list;
+    const finalChaps = withPages.length > 0 ? withPages : list;
+    return finalChaps.map(c => ({
+      ...c,
+      submissionId: c.submissionId || item.id || c.id,
+      originalSubmissionItem: c.originalSubmissionItem || item
+    }));
   };
 
   // 1. High-Performance Memoized Tab Counts (Grouped by Comic)
@@ -317,11 +322,66 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
 
   const onApproveClick = (groupOrItem) => {
     const targetId = typeof groupOrItem === 'string' ? groupOrItem : (groupOrItem.id || groupOrItem);
-    const itemsToApprove = typeof groupOrItem === 'object' && groupOrItem.subItems ? groupOrItem.subItems : [{ id: targetId }];
-    itemsToApprove.forEach(i => handleApprove(i.id || i));
+    const itemsToApprove = typeof groupOrItem === 'object' && groupOrItem.subItems ? groupOrItem.subItems : [{ id: targetId, ...groupOrItem }];
+    itemsToApprove.forEach(i => handleApprove(i.id || i, typeof i === 'object' ? i : null));
     setSelectedReview(null)
     setSelectedChapter(null)
   }
+
+  const onModalApproveClick = async (specificChap = null) => {
+    if (!selectedReview) return;
+    const chapToApprove = specificChap || selectedChapter || (selectedReview.allChapters && selectedReview.allChapters[0]);
+    if (!chapToApprove) return;
+
+    const targetSubId = chapToApprove.submissionId || chapToApprove.id || selectedReview.id;
+    const targetSubItem = chapToApprove.originalSubmissionItem || (selectedReview.subItems ? selectedReview.subItems.find(s => (s.id || s) === targetSubId) : selectedReview);
+
+    await handleApprove(targetSubId, targetSubItem || chapToApprove);
+
+    const remainingChapters = (selectedReview.allChapters || []).filter(c => {
+      const cSubId = c.submissionId || c.id;
+      return cSubId !== targetSubId && c !== chapToApprove;
+    });
+
+    const remainingSubItems = (selectedReview.subItems || []).filter(s => {
+      const sId = s.id || s;
+      return sId !== targetSubId && s !== targetSubItem;
+    });
+
+    if (remainingChapters.length === 0) {
+      setSelectedReview(null);
+      setSelectedChapter(null);
+    } else {
+      const updatedReview = {
+        ...selectedReview,
+        allChapters: remainingChapters,
+        chapters: remainingChapters,
+        subItems: remainingSubItems.length > 0 ? remainingSubItems : selectedReview.subItems
+      };
+      setSelectedReview(updatedReview);
+
+      const nextChapter = remainingChapters[0];
+      setSelectedChapter(nextChapter);
+      setPageIndex(0);
+
+      if (remainingChapters.length > 1) {
+        setPreviewTab('chapters');
+      } else {
+        setPreviewTab(nextChapter && Array.isArray(nextChapter.pages) && nextChapter.pages.length > 0 ? 'reader' : 'chapters');
+      }
+    }
+  };
+
+  const onModalRejectClick = (specificChap = null) => {
+    if (!selectedReview) return;
+    const chapToReject = specificChap || selectedChapter || (selectedReview.allChapters && selectedReview.allChapters[0]);
+    if (!chapToReject) return;
+
+    const targetSubId = chapToReject.submissionId || chapToReject.id || selectedReview.id;
+    const targetSubItem = chapToReject.originalSubmissionItem || (selectedReview.subItems ? selectedReview.subItems.find(s => (s.id || s) === targetSubId) : selectedReview);
+    setSelectedReject(targetSubItem || chapToReject || selectedReview);
+    setRejectionReason('');
+  };
 
   const onOpenReject = (item) => {
     setSelectedReject(item)
@@ -360,11 +420,47 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
       finalPayload = userOverallNote;
     }
 
-    const itemsToReject = selectedReject.subItems || [selectedReject];
+    const itemsToReject = selectedReject.subItems ? selectedReject.subItems : [selectedReject];
     itemsToReject.forEach(i => handleConfirmReject(i.id || i, finalPayload));
-    
-    setSelectedReview(null)
-    setSelectedChapter(null)
+
+    if (selectedReview && (selectedReview.allChapters || selectedReview.subItems)) {
+      const targetSubId = selectedReject.id || selectedReject;
+      const remainingChapters = (selectedReview.allChapters || []).filter(c => {
+        const cSubId = c.submissionId || c.id;
+        return cSubId !== targetSubId && c !== selectedChapter && c.originalSubmissionItem !== selectedReject;
+      });
+      const remainingSubItems = (selectedReview.subItems || []).filter(s => {
+        const sId = s.id || s;
+        return sId !== targetSubId && s !== selectedReject;
+      });
+
+      if (remainingChapters.length === 0) {
+        setSelectedReview(null);
+        setSelectedChapter(null);
+      } else {
+        const updatedReview = {
+          ...selectedReview,
+          allChapters: remainingChapters,
+          chapters: remainingChapters,
+          subItems: remainingSubItems.length > 0 ? remainingSubItems : selectedReview.subItems
+        };
+        setSelectedReview(updatedReview);
+
+        const nextChapter = remainingChapters[0];
+        setSelectedChapter(nextChapter);
+        setPageIndex(0);
+
+        if (remainingChapters.length > 1) {
+          setPreviewTab('chapters');
+        } else {
+          setPreviewTab(nextChapter && Array.isArray(nextChapter.pages) && nextChapter.pages.length > 0 ? 'reader' : 'chapters');
+        }
+      }
+    } else {
+      setSelectedReview(null);
+      setSelectedChapter(null);
+    }
+
     setSelectedReject(null)
     setRejectionReason('')
   }
@@ -807,14 +903,14 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
                         variant={2} 
                         label="✓ Approve" 
                         className="btn-approve"
-                        onClick={() => onApproveClick(selectedReview.id)} 
+                        onClick={() => onModalApproveClick()} 
                       />
 
                       <ModernButton 
                         variant={2} 
                         label="✗ Reject" 
                         className="btn-reject"
-                        onClick={() => onOpenReject(selectedReview)} 
+                        onClick={() => onModalRejectClick()} 
                       />
                     </>
                   )}
@@ -1204,11 +1300,29 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
                                         ⏱️ {formatTimeAgo(chap.timestamp || selectedReview.timestamp)}
                                       </td>
                                       <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-                                        <ModernButton
-                                          variant={2}
-                                          label={isSelected ? '✓ Inspecting' : '👁️ View Chapter'}
-                                          onClick={() => handleSelectChapterItem(chap)}
-                                        />
+                                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                          <ModernButton
+                                            variant={2}
+                                            label={isSelected ? '✓ Inspecting' : '👁️ View'}
+                                            onClick={() => handleSelectChapterItem(chap)}
+                                          />
+                                          {selectedReview.status === 'pending' && (
+                                            <>
+                                              <ModernButton
+                                                variant={2}
+                                                label="✓ Approve"
+                                                className="btn-approve"
+                                                onClick={() => onModalApproveClick(chap)}
+                                              />
+                                              <ModernButton
+                                                variant={2}
+                                                label="✗ Reject"
+                                                className="btn-reject"
+                                                onClick={() => onModalRejectClick(chap)}
+                                              />
+                                            </>
+                                          )}
+                                        </div>
                                       </td>
                                     </tr>
                                   );
