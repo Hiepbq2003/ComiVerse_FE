@@ -468,9 +468,9 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                   <td>
                     <div className="comic-cell-info">
                       <div className="comic-cell-thumbnail">
-                        {(comic.cover || comic.coverImageUrl) ? (
+                        {(comic.cover || comic.coverImage || comic.coverImageUrl || comic.coverUrl || comic.cover_url || comic.imageUrl) ? (
                           <img 
-                            src={comic.cover || comic.coverImageUrl} 
+                            src={comic.cover || comic.coverImage || comic.coverImageUrl || comic.coverUrl || comic.cover_url || comic.imageUrl} 
                             alt={comic.title} 
                             onError={(e) => {
                               e.target.onerror = null;

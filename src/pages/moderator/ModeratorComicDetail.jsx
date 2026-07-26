@@ -493,7 +493,7 @@ function ModeratorComicDetail() {
             <div className="mod-comic-overview-card">
               <div className="mod-comic-cover-wrapper">
                 <img
-                  src={comic.cover || comic.coverImageUrl || 'https://via.placeholder.com/200x280?text=No+Cover'}
+                  src={comic.cover || comic.coverImage || comic.coverImageUrl || comic.coverUrl || comic.cover_url || comic.imageUrl || 'https://via.placeholder.com/200x280?text=No+Cover'}
                   alt={comic.title}
                   className="mod-comic-cover-img"
                 />

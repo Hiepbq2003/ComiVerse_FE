@@ -106,15 +106,33 @@ function ModeratorDashboard() {
     fetchAllData()
   }, [])
 
+  const getComicCover = (item) => {
+    if (!item) return '';
+    return item.cover || item.coverImage || item.coverImageUrl || item.coverUrl || item.cover_url || item.imageUrl || '';
+  };
+
   const syncApprovedComics = (comicsList, subsList) => {
-    let result = [...(comicsList || [])];
+    let result = (comicsList || []).map(c => {
+      const cCover = getComicCover(c);
+      return {
+        ...c,
+        cover: cCover,
+        coverImage: cCover,
+        coverImageUrl: cCover
+      };
+    });
     (subsList || []).forEach(sub => {
       if (sub.status === 'approved' && (sub.title || sub.comicName || sub.comicTitle)) {
         const comicTitle = (sub.title || sub.comicName || sub.comicTitle).trim();
         const existingIdx = result.findIndex(c => (c.title && c.title.trim().toLowerCase() === comicTitle.toLowerCase()) || (sub.comicId && c.id === sub.comicId));
+        const coverVal = getComicCover(sub);
         if (existingIdx !== -1) {
+          const finalCover = getComicCover(result[existingIdx]) || coverVal;
           result[existingIdx] = {
             ...result[existingIdx],
+            cover: finalCover,
+            coverImage: finalCover,
+            coverImageUrl: finalCover,
             publicationStatus: result[existingIdx].publicationStatus || 'ONGOING',
             status: 'Active'
           };
@@ -126,7 +144,9 @@ function ModeratorDashboard() {
             authorName: authorNameClean,
             author: sub.submittedBy || sub.author || 'Original Author',
             genres: Array.isArray(sub.genres) ? sub.genres : (typeof sub.genres === 'string' ? sub.genres.split(',').map(g => g.trim()) : ['Fantasy']),
-            coverImage: sub.coverImage || sub.coverUrl || '',
+            cover: coverVal,
+            coverImage: coverVal,
+            coverImageUrl: coverVal,
             publicationStatus: 'ONGOING',
             status: 'Active',
             language: sub.language || sub.rawLanguage || 'Japanese',
@@ -152,16 +172,21 @@ function ModeratorDashboard() {
     const comicTitle = (sub.title || sub.comicName || sub.comicTitle).trim();
     if (!comicTitle) return;
 
+    const coverVal = getComicCover(sub);
     const nowIso = new Date().toISOString();
     setComics(prev => {
       const existingIdx = prev.findIndex(c => (c.title && c.title.trim().toLowerCase() === comicTitle.toLowerCase()) || (sub.comicId && c.id === sub.comicId));
       if (existingIdx !== -1) {
         const updated = [...prev];
         const existing = updated[existingIdx];
+        const finalCover = getComicCover(existing) || coverVal;
         const currentChaps = existing.chapterCount !== undefined ? existing.chapterCount : (existing.chapters || 0);
         const newChapCount = sub.chapterNumber || sub.number || (currentChaps + 1);
         updated[existingIdx] = {
           ...existing,
+          cover: finalCover,
+          coverImage: finalCover,
+          coverImageUrl: finalCover,
           publicationStatus: 'ONGOING',
           status: 'Active',
           chapterCount: Math.max(currentChaps, newChapCount),
@@ -176,7 +201,9 @@ function ModeratorDashboard() {
           authorName: authorNameClean,
           author: sub.submittedBy || sub.author || 'Original Author',
           genres: Array.isArray(sub.genres) ? sub.genres : (typeof sub.genres === 'string' ? sub.genres.split(',').map(g => g.trim()) : ['Fantasy']),
-          coverImage: sub.coverImage || sub.coverUrl || '',
+          cover: coverVal,
+          coverImage: coverVal,
+          coverImageUrl: coverVal,
           publicationStatus: 'ONGOING',
           status: 'Active',
           language: sub.language || sub.rawLanguage || 'Japanese',
@@ -207,8 +234,12 @@ function ModeratorDashboard() {
       const mappedComics = syncApprovedComics(
         (comicsData || []).map(c => {
           const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === c.title.toLowerCase())
+          const cCover = getComicCover(c);
           return {
             ...c,
+            cover: cCover,
+            coverImage: cCover,
+            coverImageUrl: cCover,
             projectTeam: team ? team.title : '-'
           }
         }).filter(c => isLanguageInModeratorScope(c.language || c.rawLanguage || c.originalLanguage, authUser)),
@@ -277,8 +308,12 @@ function ModeratorDashboard() {
       const mappedComics = syncApprovedComics(
         (comicsData || []).map(c => {
           const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === c.title.toLowerCase())
+          const cCover = getComicCover(c);
           return {
             ...c,
+            cover: cCover,
+            coverImage: cCover,
+            coverImageUrl: cCover,
             projectTeam: team ? team.title : '-'
           }
         }).filter(c => isLanguageInModeratorScope(c.language || c.rawLanguage || c.originalLanguage, authUser)),
