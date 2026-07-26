@@ -33,8 +33,8 @@ import { useAuth } from "../../context/AuthContext";
 import { getAuth } from "../../utils/Auth";
 import { toast } from "react-toastify";
 import "../../assets/style/translator/translate-workspace.css";
+import { API_BASE_URL as API_BASE, resolveImageUrl } from "../../config/apiConfig";
 
-const API_BASE = "http://localhost:8081/api";
 const TOKEN_KEY = "token";
 const IS_DEV = process.env.NODE_ENV === "development";
 
@@ -1163,16 +1163,6 @@ async function fetchChapterById(chapterId, signal) {
 
   return { ...chapter, comicTitle };
 }
-
-const resolveImageUrl = (url) => {
-  if (!url || typeof url !== 'string') return null;
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
-    return url;
-  }
-  const apiBase = import.meta.env.VITE_API_BASE_URL || '/api';
-  const backendHost = apiBase.startsWith('http') ? apiBase.replace(/\/api\/?$/, '') : 'http://localhost:8081';
-  return `${backendHost}${url.startsWith('/') ? '' : '/'}${url}`;
-};
 
 function getTaskFallbackData(taskId) {
   let foundTask = null;

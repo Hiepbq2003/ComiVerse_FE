@@ -1,5 +1,6 @@
 import { Client } from '@stomp/stompjs';
 import { getAuth } from '../../utils/Auth';
+import { getWebSocketUrl } from '../../config/apiConfig';
 
 class StompService {
     constructor() {
@@ -16,16 +17,7 @@ class StompService {
      * Compute Native WebSocket URL (ws:// or wss://)
      */
     getWsUrl() {
-        const apiBase = import.meta.env.VITE_API_BASE_URL || '';
-        
-        if (apiBase.startsWith('http://') || apiBase.startsWith('https://')) {
-            const serverOrigin = apiBase.replace(/\/api\/?$/, '');
-            return serverOrigin.replace(/^http/, 'ws') + '/ws';
-        }
-        
-        // Relative path -> use window.location.host so Vite proxy handles /ws
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        return `${protocol}//${window.location.host}/ws`;
+        return getWebSocketUrl();
     }
 
     /**
