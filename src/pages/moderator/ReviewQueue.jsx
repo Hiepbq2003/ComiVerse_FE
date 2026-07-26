@@ -56,6 +56,15 @@ const renderCommentBadge = (c, globalPinIndex = null) => {
   }
 };
 
+const isSameChapterItem = (c, target) => {
+  if (!c || !target) return false;
+  if (c === target) return true;
+  if (c.id && target.id && c.id === target.id) return true;
+  if (c.submissionId && target.submissionId && c.submissionId === target.submissionId) return true;
+  if (c.title && target.title && c.title.trim().toLowerCase() === target.title.trim().toLowerCase()) return true;
+  return false;
+};
+
 function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, handleApproveAndCreateProject, handleChapterApprove, handleChapterReject }) {
   const { theme } = useTheme()
   const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'approved' | 'rejected'
@@ -342,16 +351,12 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
       await handleApprove(targetSubId, targetSubItem || chapToApprove);
     }
 
-    const getChapKey = c => c?.id || c?.chapterNumber || c?.number || c?.title || c;
-    const targetKey = getChapKey(chapToApprove);
-
     const remainingChapters = (selectedReview.allChapters || []).filter(c => {
-      return getChapKey(c) !== targetKey && c !== chapToApprove;
+      return !isSameChapterItem(c, chapToApprove);
     });
 
     const remainingSubItems = (selectedReview.subItems || []).filter(s => {
-      const sKey = s.id || s.chapterNumber || s.number || s.title || s;
-      return sKey !== targetKey && s !== chapToApprove && s !== targetSubItem;
+      return !isSameChapterItem(s, targetSubItem) && !isSameChapterItem(s, chapToApprove);
     });
 
     if (remainingChapters.length === 0) {
@@ -442,15 +447,13 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
     }
 
     if (selectedReview && (selectedReview.allChapters || selectedReview.subItems)) {
-      const getChapKey = c => c?.id || c?.chapterNumber || c?.number || c?.title || c;
-      const targetKey = getChapKey(selectedReject.rejectChapterObj || selectedReject);
+      const targetObj = selectedReject.rejectChapterObj || selectedReject;
 
       const remainingChapters = (selectedReview.allChapters || []).filter(c => {
-        return getChapKey(c) !== targetKey && c !== selectedReject.rejectChapterObj && c !== selectedChapter;
+        return !isSameChapterItem(c, targetObj) && c !== selectedChapter;
       });
       const remainingSubItems = (selectedReview.subItems || []).filter(s => {
-        const sKey = s.id || s.chapterNumber || s.number || s.title || s;
-        return sKey !== targetKey && s !== selectedReject.rejectChapterObj && s !== selectedReject;
+        return !isSameChapterItem(s, targetObj) && s !== selectedReject;
       });
 
       if (remainingChapters.length === 0) {

@@ -214,8 +214,8 @@ function ModeratorDashboard() {
           chapters: initialChaps,
           views: 0,
           viewCount: 0,
-          rating: sub.rating || sub.ratingAverage || 0.0,
-          ratingAverage: sub.ratingAverage || sub.rating || 0.0,
+          rating: sub.ratingCount ? (sub.rating || sub.ratingAverage || 0.0) : 0.0,
+          ratingAverage: sub.ratingCount ? (sub.ratingAverage || sub.rating || 0.0) : 0.0,
           ratingCount: sub.ratingCount || 0,
           projectTeam: '-',
           lastChapterUpdatedAt: nowIso
@@ -410,6 +410,15 @@ function ModeratorDashboard() {
     }
   }
 
+  const isSameChapterItem = (c, target) => {
+    if (!c || !target) return false;
+    if (c === target) return true;
+    if (c.id && target.id && c.id === target.id) return true;
+    if (c.submissionId && target.submissionId && c.submissionId === target.submissionId) return true;
+    if (c.title && target.title && c.title.trim().toLowerCase() === target.title.trim().toLowerCase()) return true;
+    return false;
+  };
+
   const handleChapterApprove = async (submissionId, chapterObj) => {
     const targetApiId = chapterObj?.submissionId || chapterObj?.id || submissionId;
     const chapTitle = chapterObj?.title || `Chapter ${chapterObj?.number || chapterObj?.chapterNumber || ''}`.trim() || 'Chapter';
@@ -431,8 +440,6 @@ function ModeratorDashboard() {
         publishComicToManagement(sub, true);
       }
 
-      const getChapKey = c => c?.id || c?.chapterNumber || c?.number || c?.title || c;
-      const targetKey = getChapKey(chapterObj);
       const nowIso = new Date().toISOString();
 
       setSubmissions(prev => prev.map(item => {
@@ -442,7 +449,7 @@ function ModeratorDashboard() {
             ? item.allChapters 
             : (Array.isArray(item.chapters) && item.chapters.length > 0 ? item.chapters : []);
           
-          const remainingChaps = currentChaps.filter(c => getChapKey(c) !== targetKey && c !== chapterObj);
+          const remainingChaps = currentChaps.filter(c => !isSameChapterItem(c, chapterObj));
 
           if (remainingChaps.length === 0) {
             return {
@@ -487,8 +494,6 @@ function ModeratorDashboard() {
       
       toast.success(`Rejected "${chapTitle}" & updated Database!`);
 
-      const getChapKey = c => c?.id || c?.chapterNumber || c?.number || c?.title || c;
-      const targetKey = getChapKey(chapterObj);
       const nowIso = new Date().toISOString();
 
       setSubmissions(prev => prev.map(item => {
@@ -498,7 +503,7 @@ function ModeratorDashboard() {
             ? item.allChapters 
             : (Array.isArray(item.chapters) && item.chapters.length > 0 ? item.chapters : []);
           
-          const remainingChaps = currentChaps.filter(c => getChapKey(c) !== targetKey && c !== chapterObj);
+          const remainingChaps = currentChaps.filter(c => !isSameChapterItem(c, chapterObj));
 
           if (remainingChaps.length === 0) {
             return {
