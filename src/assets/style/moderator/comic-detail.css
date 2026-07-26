@@ -388,28 +388,47 @@
   color: #f1f5f9 !important;
 }
 
-/* Light mode overlay styling - keeps high contrast cinema inspector deck */
-html.light .mod-inspector-overlay {
-  background: #0d091c !important;
-  color: #f8fafc !important;
+/* Light mode overlay styling */
+html.light .mod-inspector-overlay.light-theme {
+  background: #f8fafc !important;
+  color: #0f172a !important;
 }
 
-html.light .mod-inspector-overlay h1,
-html.light .mod-inspector-overlay h2,
-html.light .mod-inspector-overlay h3,
-html.light .mod-inspector-overlay h4,
-html.light .mod-inspector-overlay h5,
-html.light .mod-inspector-overlay strong {
-  color: #ffffff !important;
+html.light .mod-inspector-overlay.light-theme h1,
+html.light .mod-inspector-overlay.light-theme h2,
+html.light .mod-inspector-overlay.light-theme h3,
+html.light .mod-inspector-overlay.light-theme h4,
+html.light .mod-inspector-overlay.light-theme h5,
+html.light .mod-inspector-overlay.light-theme h6,
+html.light .mod-inspector-overlay.light-theme strong,
+html.light .mod-inspector-overlay.light-theme b,
+html.light .mod-inspector-overlay.light-theme span,
+html.light .mod-inspector-overlay.light-theme p,
+html.light .mod-inspector-overlay.light-theme td,
+html.light .mod-inspector-overlay.light-theme th {
+  color: #0f172a !important;
 }
 
-html.light .mod-inspector-overlay .mod-chapters-table th {
-  color: #cbd5e1 !important;
-  background: rgba(255, 255, 255, 0.08) !important;
+html.light .mod-inspector-overlay.light-theme .mod-chapters-table th {
+  color: #0f172a !important;
+  background: #f1f5f9 !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+  font-weight: 800 !important;
 }
 
-html.light .mod-inspector-overlay .mod-chapters-table td {
-  color: #f1f5f9 !important;
+html.light .mod-inspector-overlay.light-theme .mod-chapters-table td {
+  color: #0f172a !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  font-weight: 600 !important;
+}
+
+html.light .mod-inspector-overlay.light-theme .mod-chapters-table tr.selected {
+  background: #f3e8ff !important;
+}
+
+html.light .mod-inspector-overlay.light-theme .mod-chapters-table tr.selected td {
+  color: #581c87 !important;
+  font-weight: 800 !important;
 }
 
 .mod-inspector-topbar {
@@ -904,6 +923,7 @@ html.light .mod-webtoon-no-trans {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 /* Glassmorphism Inspector Overlay */
@@ -1044,9 +1064,24 @@ html.light .mod-webtoon-no-trans {
   align-items: center;
   justify-content: space-between;
   padding: 14px 28px;
-  background: rgba(15, 10, 26, 0.85);
+  background: rgba(15, 10, 26, 0.92);
   backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.3);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease, visibility 0.35s ease;
+  z-index: 100;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+.mod-inspector-controls.is-hidden {
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
 }
 
 .mod-nav-arrow {
@@ -1204,6 +1239,395 @@ html.light .mod-nav-arrow:hover:not(:disabled) {
   border-color: #7c3aed !important;
   color: #7c3aed !important;
 }
+
+.mod-inspector-subbanner {
+  padding: 10px 24px;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+html.light .mod-inspector-subbanner {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03) !important;
+}
+
+html.light .mod-inspector-body {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+html.light .mod-inspector-reader-area {
+  background: #f1f5f9 !important;
+}
+
+html.light .mod-inspector-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06) !important;
+  color: #0f172a !important;
+}
+
+/* Light theme text & element contrast overrides for inspector overlay */
+html.light .mod-inspector-overlay h1,
+html.light .mod-inspector-overlay h2,
+html.light .mod-inspector-overlay h3,
+html.light .mod-inspector-overlay h4,
+html.light .mod-inspector-overlay h5,
+html.light .mod-inspector-overlay h6,
+html.light .mod-inspector-overlay strong,
+html.light .mod-inspector-overlay b,
+html.light .mod-inspector-overlay span,
+html.light .mod-inspector-overlay p,
+html.light .mod-inspector-overlay td,
+html.light .mod-inspector-overlay th,
+html.light .mod-inspector-overlay label,
+html.light .mod-inspector-overlay pre {
+  color: #0f172a !important;
+}
+
+html.light .mod-inspector-card h1,
+html.light .mod-inspector-card h2,
+html.light .mod-inspector-card h3,
+html.light .mod-inspector-card h4,
+html.light .mod-inspector-card h5,
+html.light .mod-inspector-card h6,
+html.light .mod-inspector-card strong,
+html.light .mod-inspector-card b,
+html.light .mod-inspector-card span,
+html.light .mod-inspector-card p,
+html.light .mod-inspector-card td,
+html.light .mod-inspector-card th,
+html.light .mod-inspector-card label {
+  color: #0f172a !important;
+}
+
+html.light .mod-inspector-subtitle {
+  color: #475569 !important;
+}
+
+html.light .mod-pane-title--raw {
+  color: #6d28d9 !important;
+}
+
+/* Light mode table cells & headers */
+html.light .mod-chapters-table {
+  background: #ffffff !important;
+}
+
+html.light .mod-chapters-table th {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+  font-weight: 700 !important;
+}
+
+html.light .mod-chapters-table td {
+  color: #0f172a !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+html.light .mod-chapters-table tr:hover {
+  background: #f8fafc !important;
+}
+
+html.light .mod-chapters-table tr[style*="background"] {
+  background: #f3e8ff !important;
+}
+
+html.light .mod-chapters-table tr[style*="background"] td {
+  color: #4c1d95 !important;
+  font-weight: 700 !important;
+}
+
+/* Google Docs Style Contextual Comment Sidebar & Pin Markers */
+.mod-doc-comment-pin {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.6);
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 25;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+}
+
+.mod-doc-comment-pin:hover,
+.mod-doc-comment-pin.active {
+  transform: translate(-50%, -50%) scale(1.25);
+  box-shadow: 0 8px 24px rgba(236, 72, 153, 0.8);
+  border-color: #ffffff;
+  z-index: 30;
+}
+
+/* Glassmorphism Floating Tooltip Card */
+.mod-pin-hover-tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(8px) scale(0.95);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  width: 240px;
+  background: rgba(15, 11, 28, 0.95) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 100;
+  text-align: left;
+}
+
+/* Tooltip Arrow */
+.mod-pin-hover-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px;
+  border-style: solid;
+  border-color: rgba(15, 11, 28, 0.95) transparent transparent transparent;
+}
+
+.mod-doc-comment-pin:hover .mod-pin-hover-tooltip,
+.mod-doc-comment-pin.active .mod-pin-hover-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+/* Light Theme Support */
+html.light .mod-pin-hover-tooltip {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border: 1px solid rgba(124, 58, 237, 0.3) !important;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15) !important;
+}
+
+html.light .mod-pin-hover-tooltip::after {
+  border-color: rgba(255, 255, 255, 0.98) transparent transparent transparent;
+}
+
+.mod-pin-tooltip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.mod-pin-tooltip-body {
+  margin: 0 0 8px 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #f1f5f9;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+html.light .mod-pin-tooltip-body {
+  color: #0f172a !important;
+}
+
+.mod-pin-tooltip-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #a78bfa;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 6px;
+}
+
+html.light .mod-pin-tooltip-footer {
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  color: #6d28d9;
+}
+
+.mod-doc-comments-sidebar {
+  width: 380px;
+  min-width: 380px;
+  max-width: 420px;
+  height: 100%;
+  background: rgba(15, 10, 26, 0.98);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html.light .mod-doc-comments-sidebar {
+  background: #ffffff !important;
+  border-left: 1px solid #e2e8f0 !important;
+  box-shadow: -6px 0 24px rgba(15, 23, 42, 0.08) !important;
+}
+
+.mod-doc-comments-sidebar-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(0, 0, 0, 0.2);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+html.light .mod-doc-comments-sidebar-tabs {
+  background: #f8fafc !important;
+}
+
+.mod-sidebar-tab-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+html.light .mod-sidebar-tab-btn {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.mod-sidebar-tab-btn:hover {
+  background: rgba(124, 58, 237, 0.1);
+  color: #a855f7;
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+.mod-sidebar-tab-btn.active-all {
+  background: linear-gradient(135deg, #6366f1, #4f46e5) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35) !important;
+}
+
+.mod-sidebar-tab-btn.active-notes {
+  background: linear-gradient(135deg, #0ea5e9, #0284c7) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.35) !important;
+}
+
+.mod-sidebar-tab-btn.active-pins {
+  background: linear-gradient(135deg, #a855f7, #9333ea) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.35) !important;
+}
+
+.mod-doc-comment-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+html.light .mod-doc-comment-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04) !important;
+}
+
+.mod-doc-comment-card:hover {
+  border-color: #7c3aed;
+}
+
+.mod-doc-comment-target-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(124, 58, 237, 0.15);
+  color: #7c3aed;
+  border: 1px solid rgba(124, 58, 237, 0.25);
+}
+
+.mod-doc-comment-target-badge.point-pin {
+  background: rgba(168, 85, 247, 0.15) !important;
+  color: #c084fc !important;
+  border: 1px solid rgba(168, 85, 247, 0.3) !important;
+}
+
+html.light .mod-doc-comment-target-badge.point-pin {
+  background: rgba(147, 51, 234, 0.1) !important;
+  color: #7e22ce !important;
+}
+
+.mod-doc-comment-target-badge.page-note {
+  background: rgba(14, 165, 233, 0.15) !important;
+  color: #38bdf8 !important;
+  border: 1px solid rgba(14, 165, 233, 0.3) !important;
+}
+
+html.light .mod-doc-comment-target-badge.page-note {
+  background: rgba(2, 132, 199, 0.1) !important;
+  color: #0369a1 !important;
+}
+
+.mod-doc-comment-target-badge.field-note {
+  background: rgba(245, 158, 11, 0.15) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(245, 158, 11, 0.3) !important;
+}
+
+html.light .mod-doc-comment-target-badge.field-note {
+  background: rgba(217, 119, 6, 0.1) !important;
+  color: #b45309 !important;
+}
+
+/* High priority overlay to ensure rejection & field comment modals sit ON TOP of full-screen inspector (z-index: 99999) */
+.mod-reject-modal-overlay,
+.mod-modal-overlay.mod-inspector-high-priority {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 999999 !important;
+  background: rgba(15, 10, 26, 0.85) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
 
 
 

@@ -1,8 +1,12 @@
 // =============================================================================
 // Tab 3: Join Requests
 // =============================================================================
+import { useTheme } from '../../context/ThemeContext';
 
 function RequestsTab({ joinRequests = [], onApprove, onReject }) {
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
+
   const handleDownloadCv = async (e, url, rawName) => {
     e.preventDefault();
     if (!url) return;
@@ -39,12 +43,14 @@ function RequestsTab({ joinRequests = [], onApprove, onReject }) {
 
   return (
     <div className="join-requests-tab-container fade-in">
-      <h3 className="requests-count-header">{joinRequests.length} requests pending review</h3>
+      <h3 className="requests-count-header" style={{ color: isLight ? '#0f172a' : '#f8fafc' }}>
+        {joinRequests.length} requests pending review
+      </h3>
 
       {joinRequests.length === 0 ? (
         <div className="translator-empty-state">
-          <h3>No pending recruitment requests</h3>
-          <p>New request applications will appear here when users apply.</p>
+          <h3 style={{ color: isLight ? '#0f172a' : '#f8fafc' }}>No pending recruitment requests</h3>
+          <p style={{ color: isLight ? '#64748b' : '#94a3b8' }}>New request applications will appear here when users apply.</p>
         </div>
       ) : (
         joinRequests.map(req => {
@@ -57,47 +63,70 @@ function RequestsTab({ joinRequests = [], onApprove, onReject }) {
             : (typeof req.roles === 'string' ? req.roles.split(',') : ['Member']);
 
           return (
-            <div className="request-card-item" key={req.id || `req-${Math.random()}`} style={{ marginBottom: '16px' }}>
+            <div
+              className={`request-card-item ${isLight ? 'light-card' : 'dark-card'}`}
+              key={req.id || `req-${Math.random()}`}
+              style={{
+                background: isLight ? '#ffffff' : 'linear-gradient(135deg, rgba(26, 22, 37, 0.95) 0%, rgba(17, 13, 26, 0.98) 100%)',
+                border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.08)',
+                boxShadow: isLight ? '0 4px 20px rgba(0, 0, 0, 0.05)' : '0 8px 32px rgba(0, 0, 0, 0.25)',
+                borderRadius: '16px',
+                padding: '24px',
+                marginBottom: '18px'
+              }}
+            >
               <div className="request-header">
-                <div className="chat-avatar" style={{ background: '#7c3aed', color: '#ffffff', fontWeight: '700' }}>
+                <div className="chat-avatar" style={{ background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', color: '#ffffff', fontWeight: '800', width: '38px', height: '38px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 12px rgba(168, 85, 247, 0.4)' }}>
                   {req.avatar || (req.name || 'U').substring(0, 2).toUpperCase()}
                 </div>
                 <div className="post-header-info">
-                  <span className="member-name-text" style={{ fontSize: '15px', fontWeight: '700', color: '#f8fafc' }}>
+                  <span className="member-name-text" style={{ fontSize: '16px', fontWeight: '700', color: isLight ? '#0f172a' : '#ffffff', letterSpacing: '0.02em' }}>
                     {req.name || 'Applicant'}
                   </span>
-                  <span className="post-time" style={{ fontSize: '12px', color: '#94a3b8', marginLeft: '10px' }}>
+                  <span className="post-time" style={{ fontSize: '12px', color: isLight ? '#64748b' : '#a78bfa', marginLeft: '10px' }}>
                     {req.time ? new Date(req.time).toLocaleString() : 'Recently'}
                   </span>
                 </div>
               </div>
 
               {/* Cover Note / Application Message */}
-              <div className="request-message" style={{ margin: '12px 0', fontSize: '14px', color: '#e2e8f0', fontStyle: 'italic' }}>
+              <div
+                className="request-message"
+                style={{
+                  margin: '14px 0 16px',
+                  fontSize: '14px',
+                  lineHeight: '1.6',
+                  color: isLight ? '#334155' : '#cbd5e1',
+                  background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.03)',
+                  border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.06)',
+                  padding: '12px 16px',
+                  borderRadius: '10px'
+                }}
+              >
                 "{req.text || req.message || 'No introductory message provided.'}"
               </div>
 
               {/* CV / Resume Attachment Link */}
               {cvLink ? (
                 <div className="request-cv-attachment" style={{
-                  marginTop: '12px',
-                  marginBottom: '14px',
-                  padding: '12px 16px',
-                  background: 'rgba(168, 85, 247, 0.08)',
-                  border: '1px solid rgba(168, 85, 247, 0.3)',
-                  borderRadius: '10px',
+                  marginTop: '14px',
+                  marginBottom: '16px',
+                  padding: '14px 18px',
+                  background: isLight ? '#f3e8ff' : 'rgba(168, 85, 247, 0.08)',
+                  border: isLight ? '1px solid #d8b4fe' : '1px solid rgba(168, 85, 247, 0.3)',
+                  borderRadius: '12px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: '12px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  boxShadow: isLight ? '0 2px 10px rgba(126, 34, 206, 0.06)' : '0 4px 16px rgba(0,0,0,0.2)'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '8px',
-                      background: 'rgba(168, 85, 247, 0.2)',
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '10px',
+                      background: isLight ? 'rgba(168, 85, 247, 0.15)' : 'rgba(168, 85, 247, 0.2)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -106,10 +135,10 @@ function RequestsTab({ joinRequests = [], onApprove, onReject }) {
                       📄
                     </div>
                     <div>
-                      <span style={{ display: 'block', fontSize: '13.5px', fontWeight: '700', color: '#c084fc' }}>
+                      <span style={{ display: 'block', fontSize: '13.5px', fontWeight: '700', color: isLight ? '#7e22ce' : '#c084fc' }}>
                         {cvName}
                       </span>
-                      <span style={{ display: 'block', fontSize: '11.5px', color: '#cbd5e1', marginTop: '2px' }}>
+                      <span style={{ display: 'block', fontSize: '11.5px', color: isLight ? '#64748b' : '#cbd5e1', marginTop: '2px' }}>
                         Attached Portfolio / Resume CV Document (PDF Format)
                       </span>
                     </div>
@@ -146,33 +175,47 @@ function RequestsTab({ joinRequests = [], onApprove, onReject }) {
                   </a>
                 </div>
               ) : (
-                <div style={{ marginBottom: '12px', fontSize: '12px', color: '#64748b', fontStyle: 'italic' }}>
+                <div style={{ marginBottom: '14px', fontSize: '12.5px', color: isLight ? '#64748b' : '#94a3b8', fontStyle: 'italic' }}>
                   ℹ️ No CV file attached with this application.
                 </div>
               )}
 
               {/* Roles Badges */}
-              <div className="request-role-tags" style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
+              <div className="request-role-tags">
                 {roleList.map((r, i) => (
-                  <span className="role-tag" key={i} style={{
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    color: '#e2e8f0',
-                    padding: '3px 10px',
-                    borderRadius: '6px',
-                    fontSize: '11.5px',
-                    fontWeight: '600'
-                  }}>
+                  <span
+                    className="role-tag"
+                    key={i}
+                    style={{
+                      background: isLight ? '#f3e8ff' : 'rgba(168, 85, 247, 0.12)',
+                      color: isLight ? '#7e22ce' : '#c084fc',
+                      border: isLight ? '1px solid #e9d5ff' : '1px solid rgba(168, 85, 247, 0.3)',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      padding: '4px 12px',
+                      borderRadius: '6px'
+                    }}
+                  >
                     {r}
                   </span>
                 ))}
               </div>
 
               {/* Actions */}
-              <div className="request-actions-row" style={{ display: 'flex', gap: '10px' }}>
-                <button className="trans-btn primary" onClick={() => onApprove(req.id, req.name, req)}>
+              <div className="request-actions-row">
+                <button className="trans-btn primary" onClick={() => onApprove(req.id, req.name, req)} style={{ padding: '8px 20px', fontWeight: '700' }}>
                   ✓ Approve
                 </button>
-                <button className="trans-btn secondary" onClick={() => onReject(req.id, req.name, req)}>
+                <button
+                  className="trans-btn secondary"
+                  onClick={() => onReject(req.id, req.name, req)}
+                  style={{
+                    padding: '8px 20px',
+                    background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.05)',
+                    color: isLight ? '#dc2626' : '#f87171',
+                    borderColor: isLight ? '#fca5a5' : 'rgba(239, 68, 68, 0.3)'
+                  }}
+                >
                   ✕ Reject
                 </button>
               </div>

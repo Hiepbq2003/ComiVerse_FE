@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, Filter, BookOpen, Users, Calendar, User } from 'lucide-react';
 import { toast } from 'react-toastify';
 import '../../assets/style/translator/project-list.css';
@@ -11,6 +11,11 @@ function ProjectList() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTargetLang, setSelectedTargetLang] = useState('ALL');
+  const [selectedPriority, setSelectedPriority] = useState('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 6;
+
   const [appliedIds, setAppliedIds] = useState([]);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -24,71 +29,126 @@ function ProjectList() {
   const authUser = auth?.user;
   const userFullName = authUser?.fullName || authUser?.username || 'Translator';
 
-  useEffect(() => {
-    const fetchProjectsAndRequests = async () => {
-      try {
-        const [projectsData, requestsData] = await Promise.all([
-          getAllProjectTeamsApi(),
-          getRequestsByNameApi(userFullName).catch(() => [])
-        ]);
-        setProjects(Array.isArray(projectsData) ? projectsData : []);
-        if (Array.isArray(requestsData)) {
-          setAppliedIds(requestsData.map(req => req.projectTeamId));
-        }
-      } catch (err) {
-        console.error(err);
-        toast.error('Failed to load available projects.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProjectsAndRequests();
-  }, [userFullName]);
-
-  const filteredProjects = projects.filter((p) => {
-    // Only show active recruiting projects
-    if (!p.isRecruiting || p.status?.toUpperCase() !== 'ACTIVE') return false;
-
-    // Filter by search text (comic name or team title)
-    const matchesSearch =
-      (p.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.comicName || '').toLowerCase().includes(searchTerm.toLowerCase());
-    if (!matchesSearch) return false;
-
-    // Do not show projects led by the current user
-    const isLeaderMatch = (leaderName) => {
-      if (!leaderName) return false;
-      const ln = leaderName.toLowerCase().trim();
-      const username = (authUser?.username || '').toLowerCase().trim();
-      const fullName = (authUser?.fullName || '').toLowerCase().trim();
-      
-      if (ln === username || ln === fullName) return true;
-      
-      const isDevLeader = ln.includes('trans') || ln.includes('tran');
-      const isDevUser = username.includes('trans') || username.includes('tran') || fullName.includes('trans') || fullName.includes('tran');
-      
-      return isDevLeader && isDevUser;
-    };
-
-    if (isLeaderMatch(p.leaderName)) return false;
-
-    // Do not show projects where current user is ALREADY an approved member
-    const localApprovedKey = `comiverse_approved_members_${p.id}`;
-    let savedMems = [];
+  const fetchProjectsAndRequests = async (silent = false) => {
     try {
-      savedMems = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
+      if (!silent && projects.length === 0) setLoading(true);
+      const [projectsData, requestsData] = await Promise.all([
+        getAllProjectTeamsApi(),
+        getRequestsByNameApi(userFullName).catch(() => [])
+      ]);
+      const projList = Array.isArray(projectsData) ? projectsData : [];
+      const appIds = Array.isArray(requestsData) ? requestsData.map(req => req.projectTeamId) : [];
+
+      setProjects(projList);
+      setAppliedIds(appIds);
+
+      try {
+        sessionStorage.setItem('comiverse_available_projects_cache', JSON.stringify({
+          projects: projList,
+          appliedIds: appIds
+        }));
+      } catch (e) {}
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let hasCache = false;
+    try {
+      const cached = sessionStorage.getItem('comiverse_available_projects_cache');
+      if (cached) {
+        const { projects: cProjects, appliedIds: cApplied } = JSON.parse(cached);
+        if (Array.isArray(cProjects) && cProjects.length > 0) {
+          setProjects(cProjects);
+          if (Array.isArray(cApplied)) setAppliedIds(cApplied);
+          setLoading(false);
+          hasCache = true;
+        }
+      }
     } catch (e) {}
 
+    fetchProjectsAndRequests(hasCache);
+  }, [userFullName]);
+
+  // Optimized query filtering with useMemo
+  const filteredProjects = useMemo(() => {
     const currentUserName = (userFullName || '').toLowerCase().trim();
     const currentUsername = (authUser?.username || '').toLowerCase().trim();
 
-    const isAlreadyMember = savedMems.some(m => {
-      const mn = (m.name || '').toLowerCase().trim();
-      return mn === currentUserName || mn === currentUsername;
-    });
+    return projects.filter((p) => {
+      // 1. Check LocalStorage recruitment status override first
+      const localStatusKey = `comiverse_is_recruiting_${p.id}`;
+      const manualStatus = localStorage.getItem(localStatusKey);
 
-    return !isAlreadyMember;
-  });
+      let isRecruiting = true;
+      if (manualStatus !== null) {
+        isRecruiting = manualStatus === 'true';
+      } else if (typeof p.isRecruiting === 'boolean') {
+        isRecruiting = p.isRecruiting;
+      }
+
+      if (!isRecruiting) return false;
+      if (p.status && p.status.toUpperCase() !== 'ACTIVE') return false;
+
+      // 2. Target Language Filter
+      if (selectedTargetLang !== 'ALL') {
+        const pLang = (p.targetLang || '').toLowerCase().trim();
+        const selLang = selectedTargetLang.toLowerCase().trim();
+        if (!pLang.includes(selLang)) return false;
+      }
+
+      // 3. Priority / Urgency Filter
+      if (selectedPriority !== 'ALL') {
+        const pPriority = (p.priority || 'medium').toLowerCase().trim();
+        const selPriority = selectedPriority.toLowerCase().trim();
+        if (pPriority !== selPriority) return false;
+      }
+
+      // 4. Search Filter
+      if (searchTerm.trim()) {
+        const term = searchTerm.toLowerCase().trim();
+        const matchComic = (p.comicName || '').toLowerCase().includes(term);
+        const matchTeam = (p.title || '').toLowerCase().includes(term);
+        const matchLeader = (p.leaderName || '').toLowerCase().includes(term);
+        if (!matchComic && !matchTeam && !matchLeader) return false;
+      }
+
+      // 5. Exclude projects led by current user
+      if (p.leaderName) {
+        const ln = p.leaderName.toLowerCase().trim();
+        if (ln === currentUserName || ln === currentUsername) return false;
+      }
+
+      // 6. Exclude projects where current user is ALREADY an approved member
+      const localApprovedKey = `comiverse_approved_members_${p.id}`;
+      let savedMems = [];
+      try {
+        savedMems = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
+      } catch (e) {}
+
+      const isAlreadyMember = savedMems.some(m => {
+        const mn = (m.name || '').toLowerCase().trim();
+        return mn === currentUserName || mn === currentUsername;
+      });
+
+      return !isAlreadyMember;
+    });
+  }, [projects, selectedTargetLang, selectedPriority, searchTerm, userFullName, authUser]);
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedTargetLang, selectedPriority]);
+
+  const totalPages = Math.ceil(filteredProjects.length / ITEMS_PER_PAGE) || 1;
+
+  const paginatedProjects = useMemo(() => {
+    const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredProjects.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+  }, [filteredProjects, currentPage]);
 
   const handleApplyClick = (project) => {
     setSelectedProject(project);
@@ -182,9 +242,19 @@ function ProjectList() {
         </p>
       </div>
 
-      {/* Toolbar */}
-      <div className="d-flex gap-3 mb-4" style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-        <div style={{ position: 'relative', flexGrow: 1 }}>
+      {/* Toolbar & Filters (1 row) */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1.5fr 1fr 1fr',
+        gap: '12px',
+        marginBottom: '24px',
+        background: 'rgba(255, 255, 255, 0.03)',
+        padding: '16px 20px',
+        borderRadius: '12px',
+        border: '1px solid rgba(255, 255, 255, 0.08)'
+      }}>
+        {/* Search */}
+        <div style={{ position: 'relative' }}>
           <Search
             size={18}
             style={{
@@ -198,17 +268,54 @@ function ProjectList() {
           <input
             type="text"
             className="trans-form-input"
-            style={{ paddingLeft: '38px', width: '100%' }}
-            placeholder="Search available projects..."
+            style={{ paddingLeft: '38px', width: '100%', height: '42px', fontSize: '13px' }}
+            placeholder="Search projects by title, comic, or leader..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+        </div>
+
+        {/* Target Language Category Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--trans-text-secondary)', whiteSpace: 'nowrap' }}>🌐 Target:</span>
+          <select
+            className="trans-form-input"
+            style={{ height: '42px', fontSize: '13px', fontWeight: '600' }}
+            value={selectedTargetLang}
+            onChange={(e) => setSelectedTargetLang(e.target.value)}
+          >
+            <option value="ALL">All Languages</option>
+            <option value="English">English</option>
+            <option value="Vietnamese">Vietnamese</option>
+            <option value="Japanese">Japanese</option>
+            <option value="Chinese">Chinese</option>
+            <option value="Korean">Korean</option>
+            <option value="French">French</option>
+            <option value="Spanish">Spanish</option>
+          </select>
+        </div>
+
+        {/* Priority Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--trans-text-secondary)', whiteSpace: 'nowrap' }}>🔥 Priority:</span>
+          <select
+            className="trans-form-input"
+            style={{ height: '42px', fontSize: '13px', fontWeight: '600' }}
+            value={selectedPriority}
+            onChange={(e) => setSelectedPriority(e.target.value)}
+          >
+            <option value="ALL">All Priorities</option>
+            <option value="Urgent">🔥 Urgent Only</option>
+            <option value="High">🟠 High Priority</option>
+            <option value="Medium">🟣 Medium Priority</option>
+            <option value="Low">⚪ Low Priority</option>
+          </select>
         </div>
       </div>
 
       {/* Grid Projects */}
       <div className="available-projects-grid">
-        {filteredProjects.map((project) => {
+        {paginatedProjects.map((project) => {
           const alreadyApplied = appliedIds.includes(project.id);
           
           const localApprovedKey = `comiverse_approved_members_${project.id}`;
@@ -221,7 +328,6 @@ function ProjectList() {
           const recruitedCount = savedCount;
           const limit = Number(project.maxMembers) || 5;
           const spotsLeft = Math.max(0, limit - recruitedCount);
-          const progressPercent = Math.min(100, Math.round((recruitedCount / limit) * 100));
 
           return (
             <div key={project.id} className="available-project-card">
@@ -283,10 +389,76 @@ function ProjectList() {
 
         {filteredProjects.length === 0 && (
           <div style={{ gridColumn: '1 / -1', padding: '60px 0', textAlign: 'center' }}>
-            <p style={{ color: 'var(--trans-text-muted)', fontSize: '14px', margin: 0 }}>No available recruiting projects found.</p>
+            <p style={{ color: 'var(--trans-text-muted)', fontSize: '14px', margin: 0 }}>No available recruiting projects found matching your filters.</p>
           </div>
         )}
       </div>
+
+      {/* ── PAGINATION CONTROLS ──────────────────────────────────── */}
+      {filteredProjects.length > 0 && (
+        <div style={{
+          display: 'flex',
+          justify: 'space-between',
+          alignItems: 'center',
+          marginTop: '32px',
+          paddingTop: '20px',
+          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <div style={{ fontSize: '13px', color: 'var(--trans-text-secondary)' }}>
+            Showing <strong>{Math.min(filteredProjects.length, (currentPage - 1) * ITEMS_PER_PAGE + 1)}</strong> to{' '}
+            <strong>{Math.min(filteredProjects.length, currentPage * ITEMS_PER_PAGE)}</strong> of{' '}
+            <strong>{filteredProjects.length}</strong> available projects
+          </div>
+
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button
+                type="button"
+                className="trans-btn secondary"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                style={{ padding: '6px 14px', fontSize: '12px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', opacity: currentPage === 1 ? 0.5 : 1 }}
+              >
+                ‹ Prev
+              </button>
+
+              {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pageNum) => (
+                <button
+                  key={pageNum}
+                  type="button"
+                  onClick={() => setCurrentPage(pageNum)}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    border: pageNum === currentPage ? 'none' : '1px solid rgba(255,255,255,0.12)',
+                    background: pageNum === currentPage ? 'linear-gradient(135deg, #a855f7, #ec4899)' : 'rgba(255,255,255,0.05)',
+                    color: '#fff',
+                    fontWeight: pageNum === currentPage ? '800' : '600',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {pageNum}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                className="trans-btn secondary"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                style={{ padding: '6px 14px', fontSize: '12px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', opacity: currentPage === totalPages ? 0.5 : 1 }}
+              >
+                Next ›
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── MODAL: REQUEST TO JOIN TEAM ────────────────── */}
       {showJoinModal && selectedProject && (

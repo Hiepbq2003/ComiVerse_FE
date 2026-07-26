@@ -10,8 +10,6 @@ import { useEffect } from 'react'
  */
 function useReaderSecurity({ onDevToolsOpen, disableDetector = false }) {
   useEffect(() => {
-    let activeKeys = new Set()
-    let pollingInterval = null
 
     // 1. Context Menu Blocker
     const handleContextMenu = (e) => {

@@ -57,7 +57,27 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
   const isRawOnlyView = selectedLang === 'raw'
   const [viewMode, setViewMode] = useState(isRawOnlyView ? 'raw' : 'side-by-side') // 'raw' | 'translated' | 'side-by-side'
   const [renderLayout, setRenderLayout] = useState('single') // 'single' (Page by page) | 'vertical' (Continuous scroll)
+  const [isFooterVisible, setIsFooterVisible] = useState(true)
   const scrollContainerRef = useRef(null)
+  const lastScrollTopRef = useRef(0)
+
+  const handleReaderScroll = (e) => {
+    const currentScroll = e.currentTarget.scrollTop;
+    const diff = currentScroll - lastScrollTopRef.current;
+
+    if (diff > 12 && currentScroll > 50) {
+      setIsFooterVisible(false);
+    } else if (diff < -12) {
+      setIsFooterVisible(true);
+    }
+    lastScrollTopRef.current = currentScroll;
+  };
+
+  const handleMouseMoveArea = (e) => {
+    if (window.innerHeight - e.clientY < 70) {
+      setIsFooterVisible(true);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true
@@ -180,8 +200,8 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
       </div>
 
       {/* Main Inspection Area */}
-      <div className="mod-inspector-body">
-        <div className="mod-inspector-main-content">
+      <div className="mod-inspector-body" onMouseMove={handleMouseMoveArea}>
+        <div className="mod-inspector-main-content" onScroll={handleReaderScroll}>
           {loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', gap: '16px', color: '#94a3b8' }}>
               <SkeletonLoader count={1} width={300} height={400} />
@@ -247,7 +267,7 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
             </div>
           ) : (
             /* CONTINUOUS VERTICAL SCROLL MODE (WEBTOON) */
-            <div className="mod-continuous-scroll-container" ref={scrollContainerRef}>
+            <div className="mod-continuous-scroll-container" ref={scrollContainerRef} onScroll={handleReaderScroll}>
               {pages.map((page, idx) => (
                 <div key={idx} className="mod-continuous-row">
                   {/* RAW COLUMN */}
@@ -291,7 +311,7 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
       </div>
 
       {/* Bottom Control Bar */}
-      <div className="mod-inspector-controls">
+      <div className={`mod-inspector-controls ${!isFooterVisible ? 'is-hidden' : ''}`}>
         <div className="mod-page-nav-group">
           {renderLayout === 'single' ? (
             <>

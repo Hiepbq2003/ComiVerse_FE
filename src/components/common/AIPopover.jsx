@@ -387,7 +387,14 @@ export const AIPopover = ({
                   <div 
                     key={n.id} 
                     className={`pop-notif__item ${n.unread ? 'pop-notif__item--unread' : ''}`}
-                    onClick={() => { setIsOpen(false); onAction(n); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const hasNavigation = Boolean(n.actionUrl && n.actionUrl.startsWith('/') && !n.actionUrl.startsWith('//'));
+                      if (hasNavigation) {
+                        setIsOpen(false);
+                      }
+                      onAction(n);
+                    }}
                     style={{ cursor: 'pointer' }}
                   >
                     <span className="pop-notif__dot"></span>

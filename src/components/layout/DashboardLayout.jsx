@@ -54,24 +54,30 @@ function DashboardLayout({ children, user, onLogout, badgeClass, badgeLabel }) {
 
   const handleMarkAsRead = async (id, isRead) => {
     if (isRead) return
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+    )
+    setUnreadCount((prev) => Math.max(0, prev - 1))
     try {
       await markAsReadApi(id)
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-      )
-      setUnreadCount((prev) => Math.max(0, prev - 1))
     } catch (err) {
-      console.error('Failed to mark notification as read:', err.message)
+      const status = err?.response?.status
+      if (status !== 401 && status !== 502 && status !== 504 && err?.code !== 'ECONNABORTED') {
+        console.warn('Failed to mark notification as read:', err?.message)
+      }
     }
   }
 
   const handleMarkAllAsRead = async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
+    setUnreadCount(0)
     try {
       await markAllAsReadApi()
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
-      setUnreadCount(0)
     } catch (err) {
-      console.error('Failed to mark all as read:', err.message)
+      const status = err?.response?.status
+      if (status !== 401 && status !== 502 && status !== 504 && err?.code !== 'ECONNABORTED') {
+        console.warn('Failed to mark all as read:', err?.message)
+      }
     }
   }
 

@@ -195,9 +195,22 @@ function ModeratorDashboard() {
   }
 
   const getNavBadges = () => {
+    let localFlags = []
+    try {
+      const raw = localStorage.getItem('comiverse_moderator_flags')
+      localFlags = raw ? JSON.parse(raw) : []
+    } catch (e) {}
+
+    const flagMap = new Map()
+    ;(chatFlags || []).forEach(f => flagMap.set(f.id, f))
+    localFlags.forEach(f => flagMap.set(f.id, { ...(flagMap.get(f.id) || {}), ...f }))
+    const allFlags = Array.from(flagMap.values())
+
+    const pendingChatFlags = allFlags.filter(item => !item.status || item.status === 'pending').length
+
     return {
       'review-queue': submissions.filter(item => item.status === 'pending').length,
-      'chat-monitor': chatFlags.length,
+      'chat-monitor': pendingChatFlags,
       'forum': forumThreads.filter(item => item.isReported).length,
     }
   }
@@ -207,7 +220,8 @@ function ModeratorDashboard() {
     try {
       await approveSubmissionApi(id)
       toast.success('Submission approved!')
-      setSubmissions(prev => prev.filter(item => item.id !== id))
+      const nowIso = new Date().toISOString();
+      setSubmissions(prev => prev.map(item => item.id === id ? { ...item, status: 'approved', approvedAt: nowIso } : item))
       fetchComicsAndTeams()
     } catch (err) {
       console.error(err)
@@ -1015,6 +1029,8 @@ function ModeratorDashboard() {
             <ProjectTeams 
               projectTeams={projectTeams}
               setProjectTeams={setProjectTeams}
+              genres={genres}
+              submissions={submissions}
               comics={comics
                 .filter(c => !submissions.some(s => s.queueType === 'author' && s.status === 'pending' && s.title === c.title))
                 .filter((value, index, self) => self.findIndex(t => t.title === value.title) === index)

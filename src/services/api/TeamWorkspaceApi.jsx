@@ -53,6 +53,10 @@ export const createTeamTaskApi = async (teamId, task) => {
 }
 
 export const updateTeamTaskApi = async (id, updates) => {
+  const isUuid = typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+  if (!isUuid) {
+    return { success: true, message: 'Local task updated' }
+  }
   return AxiosClient.put(`/team-workspace/tasks/${id}`, updates)
 }
 
