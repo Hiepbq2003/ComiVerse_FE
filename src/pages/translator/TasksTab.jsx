@@ -18,17 +18,8 @@ import { getAuthorComicByIdApi, getAuthorComicChaptersApi, getAuthorChapterPrevi
 import { getComicByIdApi, searchComicsApi, getAllComicsApi } from "../../services/api/ComicApi";
 import { getAuth } from "../../utils/Auth";
 import CustomDatePicker from '../../components/common/CustomDatePicker';
+import { resolveImageUrl } from '../../config/apiConfig';
 import "../../assets/style/moderator/comic-detail.css";
-
-const resolveImageUrl = (url) => {
-  if (!url || typeof url !== 'string') return null;
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
-    return url;
-  }
-  const apiBase = import.meta.env.VITE_API_BASE_URL || '/api';
-  const backendHost = apiBase.startsWith('http') ? apiBase.replace(/\/api\/?$/, '') : 'http://localhost:8081';
-  return `${backendHost}${url.startsWith('/') ? '' : '/'}${url}`;
-};
 
 
 
