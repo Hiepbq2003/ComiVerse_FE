@@ -125,6 +125,58 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
     setCurrentPage(1)
   }, [activeTab, sortFilter, searchQuery])
 
+  // Normalize a chapter object from the backend: map 'images' to 'pages'
+  const normalizeChapter = (chap, idx) => {
+    const pages = Array.isArray(chap.pages) && chap.pages.length > 0
+      ? chap.pages
+      : Array.isArray(chap.images) && chap.images.length > 0
+        ? chap.images
+        : [];
+    return {
+      ...chap,
+      id: chap.id || `chap-${idx}-${Date.now()}`,
+      number: chap.chapterNumber || chap.number || idx + 1,
+      title: chap.title || chap.chapter || `Chapter ${chap.chapterNumber || chap.number || idx + 1}`,
+      pages,
+      content: chap.content || null,
+      words: chap.words || chap.wordCount || null,
+      timestamp: chap.createdAt || chap.timestamp || Date.now()
+    };
+  };
+
+  // Extract real DB submitted chapter list for a raw comic submission
+  const getSubmissionChapters = (item) => {
+    if (!item) return [];
+
+    if (Array.isArray(item.allChapters) && item.allChapters.length > 0) {
+      return item.allChapters;
+    }
+    
+    if (Array.isArray(item.chapters) && item.chapters.length > 0) {
+      return item.chapters.map((c, i) => normalizeChapter(c, i));
+    }
+
+    const pages = Array.isArray(item.pages) && item.pages.length > 0
+      ? item.pages
+      : Array.isArray(item.images) && item.images.length > 0
+        ? item.images
+        : [];
+
+    if (item.chapter || item.content || pages.length > 0) {
+      return [normalizeChapter({
+        id: item.id || `chap-${Date.now()}`,
+        chapterNumber: item.chapterNumber || 1,
+        title: item.chapter ? (item.chapter.toLowerCase().startsWith('chapter') ? item.chapter : `Chapter ${item.chapter}`) : 'Chapter 1',
+        pages,
+        content: item.content || null,
+        words: item.words || null,
+        timestamp: item.timestamp || Date.now()
+      }, 0)];
+    }
+
+    return [];
+  };
+
   // 1. High-Performance Memoized Tab Counts (Grouped by Comic)
   const tabCounts = useMemo(() => {
     const counts = { pending: 0, approved: 0, rejected: 0 };
@@ -336,57 +388,7 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
     }))
   }
 
-  // Normalize a chapter object from the backend: map 'images' to 'pages'
-  const normalizeChapter = (chap, idx) => {
-    const pages = Array.isArray(chap.pages) && chap.pages.length > 0
-      ? chap.pages
-      : Array.isArray(chap.images) && chap.images.length > 0
-        ? chap.images
-        : [];
-    return {
-      ...chap,
-      id: chap.id || `chap-${idx}-${Date.now()}`,
-      number: chap.chapterNumber || chap.number || idx + 1,
-      title: chap.title || chap.chapter || `Chapter ${chap.chapterNumber || chap.number || idx + 1}`,
-      pages,
-      content: chap.content || null,
-      words: chap.words || chap.wordCount || null,
-      timestamp: chap.createdAt || chap.timestamp || Date.now()
-    };
-  };
 
-  // Extract real DB submitted chapter list for a raw comic submission
-  const getSubmissionChapters = (item) => {
-    if (!item) return [];
-
-    if (Array.isArray(item.allChapters) && item.allChapters.length > 0) {
-      return item.allChapters;
-    }
-    
-    if (Array.isArray(item.chapters) && item.chapters.length > 0) {
-      return item.chapters.map((c, i) => normalizeChapter(c, i));
-    }
-
-    const pages = Array.isArray(item.pages) && item.pages.length > 0
-      ? item.pages
-      : Array.isArray(item.images) && item.images.length > 0
-        ? item.images
-        : [];
-
-    if (item.chapter || item.content || pages.length > 0) {
-      return [normalizeChapter({
-        id: item.id || `chap-${Date.now()}`,
-        chapterNumber: item.chapterNumber || 1,
-        title: item.chapter ? (item.chapter.toLowerCase().startsWith('chapter') ? item.chapter : `Chapter ${item.chapter}`) : 'Chapter 1',
-        pages,
-        content: item.content || null,
-        words: item.words || null,
-        timestamp: item.timestamp || Date.now()
-      }, 0)];
-    }
-
-    return [];
-  };
 
   // Accelerated Backend Chapter Fetching with In-Memory Cache
   const fetchChaptersFromBackend = async (comicId) => {
