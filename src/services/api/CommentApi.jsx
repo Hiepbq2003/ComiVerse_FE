@@ -40,3 +40,12 @@ export const getChapterCommentByIdApi = (commentId, config = {}) => {
   return AxiosClient.get(`/comments/chapters/${commentId}`, config);
 };
 
+export const deleteComicCommentApi = (id, config = {}) => {
+  return AxiosClient.delete(`/comments/comics/${id}`, config);
+};
+
+export const deleteChapterCommentApi = (id, config = {}) => {
+  return AxiosClient.delete(`/comments/chapters/${id}`, config);
+};
+
+
