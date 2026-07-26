@@ -393,6 +393,7 @@ function WorkspaceDetailView({
             isCurrentLeader={isCurrentLeader}
             chapterOptions={chapterOptions}
             onOpenCreateTaskWithChapter={onCreateTaskClick}
+            onCreateTask={onCreateTask}
           />
 
           {showCreateTask && (
@@ -594,7 +595,7 @@ function TeamProjects() {
     const defaultTitle = (chap && typeof chap === 'object' && chap.title) ? `${chap.title} - Translation & Proofreading` : '';
     setNewTaskData({
       title: defaultTitle,
-      column: 'backlog',
+      column: chId ? 'in_progress' : 'backlog',
       assignees: [],
       dueDate: '',
       priority: 'Medium',
