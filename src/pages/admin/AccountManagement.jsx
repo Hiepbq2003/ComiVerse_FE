@@ -65,6 +65,22 @@ const formatDate = (dateVal) => {
   }
 }
 
+const getDisplayLanguages = (acc) => {
+  if (Array.isArray(acc?.assignedLanguages) && acc.assignedLanguages.length > 0) {
+    return acc.assignedLanguages
+  }
+  try {
+    const scopesMap = JSON.parse(localStorage.getItem('comiverse_mod_scopes') || '{}')
+    const keys = [acc?.username, acc?.email, acc?.userId, acc?.id].filter(Boolean).map(k => String(k).toLowerCase())
+    for (const k of keys) {
+      if (Array.isArray(scopesMap[k]) && scopesMap[k].length > 0) {
+        return scopesMap[k]
+      }
+    }
+  } catch (e) {}
+  return ['Japanese', 'Korean']
+}
+
 function AccountManagement() {
   const { theme } = useTheme()
   // Data states
@@ -95,7 +111,7 @@ function AccountManagement() {
   const [confirmAction, setConfirmAction] = useState(null) // { type: 'ban'|'unban'|'reset-pw', account }
 
   // MODERATOR SPECIALIZATION LANGUAGES
-  const MODERATOR_LANGUAGES = ['Japanese', 'Korean', 'Chinese', 'English', 'Vietnamese', 'Spanish', 'French', 'German']
+  const MODERATOR_LANGUAGES = ['Japanese', 'Korean', 'Chinese', 'English', 'Vietnamese', 'Spanish', 'French']
 
   // Edit user states
   const [showEditModal, setShowEditModal] = useState(false)
@@ -163,7 +179,7 @@ function AccountManagement() {
           lastActive: lActive ? formatDate(lActive) : 'Today',
           assignedLanguages: Array.isArray(acc.assignedLanguages) && acc.assignedLanguages.length > 0 
             ? acc.assignedLanguages 
-            : (normalizedRole.toLowerCase().includes('moderator') ? ['Japanese', 'Korean'] : [])
+            : (normalizedRole.toLowerCase().includes('moderator') ? getDisplayLanguages(acc) : [])
         }
       })
       setAccounts(normalized)
@@ -248,6 +264,9 @@ function AccountManagement() {
         : [...current, lang]
       return { ...prev, assignedLanguages: updated }
     })
+    if (staffFormErrors.assignedLanguages) {
+      setStaffFormErrors(prev => ({ ...prev, assignedLanguages: null }))
+    }
   }
 
   const toggleEditLanguage = (lang) => {
@@ -258,6 +277,9 @@ function AccountManagement() {
         : [...current, lang]
       return { ...prev, assignedLanguages: updated }
     })
+    if (editFormErrors.assignedLanguages) {
+      setEditFormErrors(prev => ({ ...prev, assignedLanguages: null }))
+    }
   }
 
   const validateStaffForm = () => {
@@ -272,6 +294,10 @@ function AccountManagement() {
 
     if (!staffForm.email.trim()) errors.email = 'Email is required'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(staffForm.email)) errors.email = 'Invalid email format'
+
+    if (normalizeRoleValue(staffForm.role) === 'MODERATOR' && (!staffForm.assignedLanguages || staffForm.assignedLanguages.length === 0)) {
+      errors.assignedLanguages = 'Please select at least one moderation language.'
+    }
 
     setStaffFormErrors(errors)
     if (Object.keys(errors).length > 0) {
@@ -295,6 +321,14 @@ function AccountManagement() {
       }
       if (staffForm.role === 'MODERATOR') {
         payload.assignedLanguages = staffForm.assignedLanguages || []
+        try {
+          const scopesMap = JSON.parse(localStorage.getItem('comiverse_mod_scopes') || '{}')
+          const keys = [staffForm.username, staffForm.email].filter(Boolean).map(k => String(k).toLowerCase())
+          for (const k of keys) {
+            scopesMap[k] = staffForm.assignedLanguages || []
+          }
+          localStorage.setItem('comiverse_mod_scopes', JSON.stringify(scopesMap))
+        } catch (e) {}
       }
 
       const result = await registerStaffApi(payload)
@@ -348,9 +382,7 @@ function AccountManagement() {
     setEditForm({
       fullName: account.fullName,
       role: normalizeRoleValue(account.role || 'READER'),
-      assignedLanguages: Array.isArray(account.assignedLanguages) && account.assignedLanguages.length > 0
-        ? account.assignedLanguages
-        : ['Japanese', 'Korean']
+      assignedLanguages: getDisplayLanguages(account)
     })
     setEditFormErrors({})
     setModalError(null)
@@ -377,6 +409,9 @@ function AccountManagement() {
     if (!editForm.fullName || !editForm.fullName.trim()) {
       errors.fullName = 'Full Name is required'
     }
+    if (normalizeRoleValue(editForm.role) === 'MODERATOR' && (!editForm.assignedLanguages || editForm.assignedLanguages.length === 0)) {
+      errors.assignedLanguages = 'Please select at least one moderation language.'
+    }
     if (Object.keys(errors).length > 0) {
       setEditFormErrors(errors)
       setModalError('Validation failed. Please correct the errors below.')
@@ -391,8 +426,28 @@ function AccountManagement() {
         fullName: editForm.fullName.trim(),
         role: editForm.role
       }
-      if (editForm.role === 'MODERATOR') {
+      if (normalizeRoleValue(editForm.role) === 'MODERATOR') {
         updatePayload.assignedLanguages = editForm.assignedLanguages || []
+        try {
+          const scopesMap = JSON.parse(localStorage.getItem('comiverse_mod_scopes') || '{}')
+          const keys = [editingAccount.username, editingAccount.email, editingAccount.userId, editingAccount.id].filter(Boolean).map(k => String(k).toLowerCase())
+          for (const k of keys) {
+            scopesMap[k] = editForm.assignedLanguages || []
+          }
+          localStorage.setItem('comiverse_mod_scopes', JSON.stringify(scopesMap))
+
+          const storedUserStr = localStorage.getItem('user')
+          if (storedUserStr) {
+            const storedUser = JSON.parse(storedUserStr)
+            if (keys.includes(String(storedUser.username || storedUser.email || storedUser.userId || storedUser.id).toLowerCase())) {
+              storedUser.assignedLanguages = editForm.assignedLanguages || []
+              storedUser.role = 'Moderator'
+              localStorage.setItem('user', JSON.stringify(storedUser))
+            }
+          }
+        } catch (e) {
+          console.error('Failed to save mod scopes:', e)
+        }
       }
 
       const response = await updateUserApi(editingAccount.id, updatePayload)
@@ -405,7 +460,7 @@ function AccountManagement() {
                 ...a,
                 fullName: updatedUser.fullName || editForm.fullName,
                 role: formatRoleLabel(updatedUser.role || editForm.role),
-                assignedLanguages: editForm.role === 'MODERATOR' ? (editForm.assignedLanguages || editForm.assignedLanguages) : []
+                assignedLanguages: normalizeRoleValue(editForm.role) === 'MODERATOR' ? (editForm.assignedLanguages || []) : []
               }
             : a
         )
@@ -604,7 +659,7 @@ function AccountManagement() {
                     </span>
                     {normalizeRoleValue(account.role) === 'MODERATOR' && (
                       <div className="admin-lang-scope-tag" style={{ marginTop: '4px', fontSize: '11px', color: '#c084fc', fontWeight: '600' }}>
-                        🌐 {Array.isArray(account.assignedLanguages) && account.assignedLanguages.length > 0 ? account.assignedLanguages.join(', ') : 'Japanese, Korean'}
+                        🌐 {getDisplayLanguages(account).join(', ')}
                       </div>
                     )}
                   </td>
@@ -819,6 +874,9 @@ function AccountManagement() {
                       )
                     })}
                   </div>
+                  {staffFormErrors.assignedLanguages && (
+                    <div className="admin-form-error" style={{ marginTop: '8px' }}>{staffFormErrors.assignedLanguages}</div>
+                  )}
                 </div>
               )}
 
@@ -882,7 +940,7 @@ function AccountManagement() {
                 <input
                   className="admin-form-input"
                   type="text"
-                  value={editingAccount.username}
+                  value={editingAccount?.username || ''}
                   disabled
                   style={{ opacity: 0.7, cursor: 'not-allowed' }}
                 />
@@ -893,7 +951,7 @@ function AccountManagement() {
                 <input
                   className="admin-form-input"
                   type="email"
-                  value={editingAccount.email}
+                  value={editingAccount?.email || ''}
                   disabled
                   style={{ opacity: 0.7, cursor: 'not-allowed' }}
                 />
@@ -962,6 +1020,9 @@ function AccountManagement() {
                       )
                     })}
                   </div>
+                  {editFormErrors.assignedLanguages && (
+                    <div className="admin-form-error" style={{ marginTop: '8px' }}>{editFormErrors.assignedLanguages}</div>
+                  )}
                 </div>
               )}
             </div>

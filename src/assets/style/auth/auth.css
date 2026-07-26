@@ -52,8 +52,10 @@
    ═══════════════════════════════════════════════════════════ */
 .auth-page-container {
   display: flex;
-  min-height: 100vh;
-  width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
   background: radial-gradient(circle at center, #1a0f35 0%, #08040f 60%, #050208 100%) !important;
   font-family: var(--font-sans);
@@ -354,6 +356,21 @@ html.light .brand-footer-text p {
   position: relative;
   box-sizing: border-box;
   overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.right-form-pane::-webkit-scrollbar {
+  width: 6px;
+}
+.right-form-pane::-webkit-scrollbar-track {
+  background: transparent;
+}
+.right-form-pane::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.25);
+  border-radius: 4px;
+}
+.right-form-pane::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 85, 247, 0.5);
 }
 
 /* Subtle noise texture effect */

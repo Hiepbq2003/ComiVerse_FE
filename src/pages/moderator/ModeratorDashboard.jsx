@@ -1045,7 +1045,7 @@ function ModeratorDashboard() {
                   const modLangs = Array.isArray(currentUser?.assignedLanguages) && currentUser.assignedLanguages.length > 0
                     ? currentUser.assignedLanguages
                     : ['Japanese', 'Korean'];
-                  return modLangs.includes('All') || modLangs.some(l => l.toLowerCase() === (c.language || 'Japanese').toLowerCase());
+                  return modLangs.includes('All') || modLangs.length >= 7 || modLangs.some(l => l.toLowerCase() === (c.language || 'Japanese').toLowerCase());
                 })
               }
               showCreateTeamModal={showCreateTeamModal}

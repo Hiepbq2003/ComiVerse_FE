@@ -118,7 +118,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   })
 
   // Translation Request modal states
-  const AVAILABLE_LANGUAGES = ['English', 'Vietnamese', 'Japanese', 'Korean', 'Chinese', 'Spanish', 'French', 'Thai']
+  const AVAILABLE_LANGUAGES = ['English', 'Vietnamese', 'Japanese', 'Korean', 'Chinese', 'Spanish', 'French']
   const [showTransReqModal, setShowTransReqModal] = useState(false)
   const [transReqComic, setTransReqComic] = useState(null)
   const [transReqForm, setTransReqForm] = useState({
