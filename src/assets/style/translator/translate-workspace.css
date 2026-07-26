@@ -1,9 +1,17 @@
-/* ---------------------------------------------------------------------
-   Design tokens
-   Ink desk (dark chrome) + washi paper (light canvas, like a page on a
-   lightbox) + aizuri indigo (primary action) + shu vermillion (editorial
-   correction-mark red, used for "needs attention" / current-state signals).
---------------------------------------------------------------------- */
+.tw-x-change-request-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #8a8a99;
+  margin: 0 0 8px;
+}
+
+.tw-x-change-request-empty {
+  font-size: 13px;
+  color: #8286A0;
+  margin: 0 0 12px;
+}
 .tw-root {
   --ink-950: #12141c;
   --ink-900: #1b1e2b;

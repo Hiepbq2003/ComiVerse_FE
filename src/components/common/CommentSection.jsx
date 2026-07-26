@@ -2,14 +2,19 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { toast } from 'react-toastify'
+import Swal from 'sweetalert2'
 import ModernPagination from './ModernPagination'
+import ConfirmModal from './ConfirmModal'
+import { Trash2 } from 'lucide-react'
 import {
   getComicCommentsApi,
   createComicCommentApi,
   getComicCommentByIdApi,
+  deleteComicCommentApi,
   getChapterCommentsApi,
   createChapterCommentApi,
-  getChapterCommentByIdApi
+  getChapterCommentByIdApi,
+  deleteChapterCommentApi
 } from '../../services/api/CommentApi'
 import '../../assets/style/reader/comments.css'
 
@@ -24,6 +29,13 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
   const [commentsPage, setCommentsPage] = useState(1)
   const [commentSubmitting, setCommentSubmitting] = useState(false)
   const [totalComments, setTotalComments] = useState(0)
+
+  // Popup Confirm Modal state for comment deletion
+  const [deleteCommentModal, setDeleteCommentModal] = useState({
+    isOpen: false,
+    commentId: null,
+    parentId: null
+  })
 
   // Replies state
   const [repliesMap, setRepliesMap] = useState({})
@@ -56,6 +68,46 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
       ? getComicCommentByIdApi(commentId)
       : getChapterCommentByIdApi(commentId)
   }, [targetType])
+
+  const deleteCommentApi = useCallback((commentId) => {
+    return targetType === 'comic'
+      ? deleteComicCommentApi(commentId)
+      : deleteChapterCommentApi(commentId)
+  }, [targetType])
+
+  // Open popup confirm modal for comment deletion
+  const handleDeleteComment = (commentId, parentId = null) => {
+    setDeleteCommentModal({
+      isOpen: true,
+      commentId,
+      parentId
+    })
+  }
+
+  // Execute actual comment deletion after user confirms in popup modal
+  const handleConfirmDeleteComment = async () => {
+    const { commentId, parentId } = deleteCommentModal
+    setDeleteCommentModal(prev => ({ ...prev, isOpen: false }))
+
+    try {
+      await deleteCommentApi(commentId)
+
+      if (parentId) {
+        setRepliesMap(prev => ({
+          ...prev,
+          [parentId]: (prev[parentId] || []).filter(r => r.id !== commentId)
+        }))
+      } else {
+        setComments(prev => prev.filter(c => c.id !== commentId))
+        setTotalComments(prev => Math.max(0, prev - 1))
+      }
+
+      toast.success('Comment deleted successfully!')
+    } catch (err) {
+      console.error('Failed to delete comment:', err)
+      toast.error('Failed to delete comment. Please try again!')
+    }
+  }
 
   // Fetch top-level comments
   const fetchComments = useCallback(async (page = 1, append = false) => {
@@ -165,6 +217,12 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
         }
       } catch (err) {
         console.error('Failed to load target comment chain:', err)
+        const status = err.response?.status || err.status
+        if (status === 404) {
+          toast.warning('This comment or the original comment thread has been deleted.', {
+            toastId: 'comment-deleted-404'
+          })
+        }
       }
     }
 
@@ -347,6 +405,19 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
                       >
                         💬 {isExpanded ? 'Hide Replies' : 'Replies'}
                       </button>
+
+                      {user && (
+                        (user.id === comment.userId || user.userId === comment.userId || user.username === comment.userName || ['ADMIN', 'STAFF', 'MODERATOR'].includes((user.role || '').toUpperCase()))
+                      ) && (
+                        <button
+                          className="comment-action-btn"
+                          style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          onClick={() => handleDeleteComment(comment.id)}
+                          title="Delete this comment"
+                        >
+                          <Trash2 size={13} /> Delete
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -477,6 +548,18 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
                                   Reply
                                 </button>
                               )}
+                              {user && (
+                                (user.id === reply.userId || user.userId === reply.userId || user.username === reply.userName || ['ADMIN', 'STAFF', 'MODERATOR'].includes((user.role || '').toUpperCase()))
+                              ) && (
+                                <button
+                                  className="comment-action-btn"
+                                  style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                  onClick={() => handleDeleteComment(reply.id, comment.id)}
+                                  title="Delete this comment"
+                                >
+                                  <Trash2 size={13} /> Delete
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -588,6 +671,18 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
           </div>
         )}
       </div>
+
+      {/* Unified Popup Confirmation Modal for Comment Deletion */}
+      <ConfirmModal
+        isOpen={deleteCommentModal.isOpen}
+        title="Confirm Comment Deletion"
+        message="Are you sure you want to delete this comment? This action cannot be undone."
+        confirmText="Delete Comment"
+        cancelText="Cancel"
+        type="danger"
+        onConfirm={handleConfirmDeleteComment}
+        onCancel={() => setDeleteCommentModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   )
 }

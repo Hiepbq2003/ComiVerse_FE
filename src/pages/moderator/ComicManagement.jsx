@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import '../../assets/style/moderator/comic-management.css'
 import ModernButton from '../../components/common/ModernButton'
+import CustomDatePicker from '../../components/common/CustomDatePicker'
 import ModernPagination from '../../components/common/ModernPagination'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import { createTranslationRequestApi } from '../../services/api/TranslationPoolApi'
@@ -788,11 +789,10 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                 </div>
                 <div className="mod-form-group">
                   <label className="mod-label">Deadline</label>
-                  <input 
-                    type="date" 
-                    className="mod-input"
+                  <CustomDatePicker 
                     value={transReqForm.deadline}
-                    onChange={(e) => setTransReqForm({ ...transReqForm, deadline: e.target.value })}
+                    onChange={(val) => setTransReqForm({ ...transReqForm, deadline: val })}
+                    placeholder="Select deadline"
                   />
                 </div>
               </div>
@@ -882,11 +882,10 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               {/* Deadline */}
               <div className="mod-form-group">
                 <label className="mod-label">Deadline</label>
-                <input 
-                  type="date" 
-                  className="mod-input"
+                <CustomDatePicker 
                   value={directAssignForm.deadline}
-                  onChange={(e) => setDirectAssignForm({ ...directAssignForm, deadline: e.target.value })}
+                  onChange={(val) => setDirectAssignForm({ ...directAssignForm, deadline: val })}
+                  placeholder="Select deadline"
                 />
               </div>
 

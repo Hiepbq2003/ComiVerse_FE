@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import Swal from "sweetalert2";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -159,7 +160,7 @@ function Avatar({ initials }) {
   return <div className="rvw-avatar">{initials}</div>;
 }
 
-function Bubble({ box, index, text, changed, selected, showText, fontSizePx, bgColor, textColor, shape, points, onClick }) {
+function Bubble({ id, box, index, text, changed, selected, showText, fontSizePx, bgColor, textColor, shape, points, onClick }) {
   const shapeClass = shape === "ellipse" ? "rvw-bubble--ellipse" : shape === "polygon" ? "rvw-bubble--polygon" : "";
 
   const clipPath =
@@ -172,6 +173,7 @@ function Bubble({ box, index, text, changed, selected, showText, fontSizePx, bgC
   return (
     <div
       onClick={onClick}
+      data-bubble-id={id}
       className={`rvw-bubble ${shapeClass} ${changed ? "rvw-bubble--changed" : ""} ${selected ? "rvw-bubble--selected" : ""} ${showText ? "rvw-bubble--text-only" : "rvw-bubble--outline-only"}`}
       style={{
         "--x": `${box.x}%`,
@@ -191,8 +193,32 @@ function Bubble({ box, index, text, changed, selected, showText, fontSizePx, bgC
   );
 }
 
-function CommentThread({ comment, onResolve, onDelete, onStartEdit, currentUserId, resolveBubbleLabel }) {
+function CommentThread({ comment, onResolve, onDelete, onUpdate, currentUserId, resolveBubbleLabel }) {
   const isOwner = comment.authorId === currentUserId;
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState(comment.content ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const startEdit = () => {
+    setDraft(comment.content ?? "");
+    setIsEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setDraft(comment.content ?? "");
+    setIsEditing(false);
+  };
+
+  const handleSave = async () => {
+    if (!draft.trim() || saving) return;
+    setSaving(true);
+    try {
+      await onUpdate(comment.id, draft.trim());
+      setIsEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="rvw-comment">
@@ -202,9 +228,9 @@ function CommentThread({ comment, onResolve, onDelete, onStartEdit, currentUserI
           <span className="rvw-comment-author">{comment.authorName}</span>
           <div className="rvw-comment-header-right">
             <span className="rvw-comment-time">{formatTime(comment.createdAt)}</span>
-            {isOwner && (
+            {isOwner && !isEditing && (
               <>
-                <button type="button" onClick={() => onStartEdit(comment)} className="rvw-delete-btn" title="Edit comment">
+                <button type="button" onClick={startEdit} className="rvw-delete-btn" title="Edit comment">
                   <Pencil size={12} />
                 </button>
                 <button type="button" onClick={() => onDelete(comment.id)} className="rvw-delete-btn" title="Delete comment">
@@ -215,31 +241,67 @@ function CommentThread({ comment, onResolve, onDelete, onStartEdit, currentUserI
           </div>
         </div>
 
-        {comment.bubbleId && <span className="rvw-comment-bubble-tag">{resolveBubbleLabel(comment.bubbleId)}</span>}
-
-        <p className="rvw-comment-text">{comment.content}</p>
-
-        {!comment.resolved && (
-          <button type="button" onClick={() => onResolve(comment.id)} className="rvw-resolve-btn">
-            <CheckCircle2 size={13} /> Resolve
-          </button>
+        {isEditing ? (
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSave();
+              }
+              if (e.key === "Escape") cancelEdit();
+            }}
+            rows={2}
+            autoFocus
+            className="rvw-comment-text rvw-comment-text--editable"
+          />
+        ) : (
+          <p className="rvw-comment-text">{comment.content}</p>
         )}
 
-        {comment.resolved && (
-          <span className="rvw-resolved-tag">
-            <CheckCircle2 size={12} /> Resolved
-          </span>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          {!isEditing && !comment.resolved && (
+            <button type="button" onClick={() => onResolve(comment.id)} className="rvw-resolve-btn">
+              <CheckCircle2 size={13} /> Resolve
+            </button>
+          )}
+
+          {!isEditing && comment.resolved && (
+            <span className="rvw-resolved-tag">
+              <CheckCircle2 size={12} /> Resolved
+            </span>
+          )}
+
+          {isEditing && (
+            <>
+              <button type="button" onClick={handleSave} disabled={saving || !draft.trim()} className="rvw-resolve-btn">
+                {saving ? "Saving…" : "Save"}
+              </button>
+              <button type="button" onClick={cancelEdit} className="rvw-delete-btn" style={{ fontSize: "12px" }}>
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function SelectedBubblePreview({ index, translation, onClear }) {
+function SelectedBubblePreview({ index, translation, onClear, onPrev, onNext }) {
   return (
     <div className="rvw-selected-preview">
       <div className="rvw-selected-preview-header">
-        <span className="rvw-selected-preview-title">Bubble {index}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+          <button type="button" onClick={onPrev} className="rvw-selected-preview-close" title="Previous bubble">
+            <ChevronLeft size={14} />
+          </button>
+          <span className="rvw-selected-preview-title">Bubble {index}</span>
+          <button type="button" onClick={onNext} className="rvw-selected-preview-close" title="Next bubble">
+            <ChevronRight size={14} />
+          </button>
+        </div>
         <button type="button" onClick={onClear} className="rvw-selected-preview-close">
           <X size={13} />
         </button>
@@ -420,6 +482,7 @@ function BubbleOverlayPanel({
             return (
               <Bubble
                 key={sel.id}
+                id={sel.id}
                 box={getBoundingBox(sel)}
                 index={i + 1}
                 text={sel.translation || ""}
@@ -447,18 +510,18 @@ function CommentsSidebar({
   commentsLoading,
   onResolve,
   onDelete,
-  onStartEdit,
+  onUpdate,
   currentUserId,
   resolveBubbleLabel,
   composeValue,
   onComposeChange,
   onPostComment,
-  editingComment,
-  onCancelEdit,
   selectedBubbleId,
   selectedBubbleIndex,
   selectedBubbleTranslation,
   onClearSelectedBubble,
+  onPrevBubble,
+  onNextBubble,
   bubbleAlreadyHasComment,
   generalComposeValue,
   onGeneralComposeChange,
@@ -473,58 +536,17 @@ function CommentsSidebar({
         <span className="rvw-sidebar-count">{totalCommentCount}</span>
       </div>
 
-      <div className="rvw-general-comments" style={{ borderBottom: "1px solid #212129" }}>
-        <p style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "#8a8a99", margin: "10px 16px 6px" }}>
-          Page-level review
-        </p>
-
-        {generalComments && generalComments.length > 0 && (
-          <div className="rvw-sidebar-list" style={{ flex: "0 0 auto", maxHeight: "220px" }}>
-            {generalComments.map((c) => (
-              <CommentThread
-                key={c.id}
-                comment={c}
-                onResolve={onResolve}
-                onDelete={onDelete}
-                onStartEdit={onStartEdit}
-                currentUserId={currentUserId}
-                resolveBubbleLabel={resolveBubbleLabel}
-              />
-            ))}
-          </div>
-        )}
-
-        {alreadyHasGeneralComment ? (
-          <p className="rvw-sidebar-empty" style={{ padding: "0 16px 12px" }}>
-            You already left a page-level review. Edit it above instead.
-          </p>
-        ) : (
-          <div className="rvw-composer-row" style={{ padding: "0 16px 12px" }}>
-            <input
-              value={generalComposeValue}
-              onChange={(e) => onGeneralComposeChange(e.target.value)}
-              placeholder="Overall feedback for this page..."
-              className="rvw-composer-input"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onPostGeneralComment();
-              }}
-            />
-            <button type="button" onClick={onPostGeneralComment} className="rvw-composer-send-btn">
-              <Send size={14} />
-            </button>
-          </div>
-        )}
-      </div>
-
       {selectedBubbleId != null && (
         <SelectedBubblePreview
           index={selectedBubbleIndex}
           translation={selectedBubbleTranslation}
           onClear={onClearSelectedBubble}
+          onPrev={onPrevBubble}
+          onNext={onNextBubble}
         />
       )}
 
-      <div className="rvw-sidebar-list">
+      <div>
         {commentsLoading && selectedBubbleId != null && (
           <p className="rvw-sidebar-empty">Loading comments…</p>
         )}
@@ -540,58 +562,93 @@ function CommentsSidebar({
             comment={c}
             onResolve={onResolve}
             onDelete={onDelete}
-            onStartEdit={onStartEdit}
+            onUpdate={onUpdate}
             currentUserId={currentUserId}
             resolveBubbleLabel={resolveBubbleLabel}
           />
         ))}
       </div>
 
-      <div className="rvw-composer">
-        {editingComment && (
-          <span className="rvw-composer-tag">
-            Editing comment
-            <button type="button" onClick={onCancelEdit} className="rvw-composer-tag-close">
-              <X size={11} />
+      {/* Only for composing a BRAND NEW comment on a bubble that doesn't
+          already have one — once it does, editing happens inline on the
+          CommentThread above, so this whole block (including the
+          "select a bubble..." messaging) is hidden entirely rather than
+          showing a placeholder that no longer applies. */}
+      {!bubbleAlreadyHasComment && (
+        <div className="rvw-composer">
+          {selectedBubbleId == null && (
+            <p className="rvw-sidebar-empty" style={{ padding: "0 0 8px" }}>
+              Select a bubble on the translated image to leave a comment.
+            </p>
+          )}
+          <div className="rvw-composer-row rvw-composer-row--wrap">
+            <textarea
+              value={composeValue}
+              onChange={(e) => onComposeChange(e.target.value)}
+              placeholder={selectedBubbleId != null ? `Comment on bubble ${selectedBubbleIndex}...` : "Select a bubble first..."}
+              className="rvw-composer-input rvw-composer-textarea"
+              rows={2}
+              disabled={selectedBubbleId == null}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  onPostComment();
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={onPostComment}
+              className="rvw-composer-send-btn"
+              disabled={selectedBubbleId == null}
+            >
+              <Send size={14} />
             </button>
-          </span>
-        )}
-        {!editingComment && selectedBubbleId == null && (
-          <p className="rvw-sidebar-empty" style={{ padding: "0 0 8px" }}>
-            Select a bubble on the translated image to leave a comment.
-          </p>
-        )}
-        {!editingComment && selectedBubbleId != null && bubbleAlreadyHasComment && (
-          <p className="rvw-sidebar-empty" style={{ padding: "0 0 8px" }}>
-            You already reviewed this bubble. Edit your comment above instead.
-          </p>
-        )}
-        <div className="rvw-composer-row">
-          <input
-            value={composeValue}
-            onChange={(e) => onComposeChange(e.target.value)}
-            placeholder={
-              editingComment
-                ? "Edit comment..."
-                : selectedBubbleId != null
-                ? `Comment on bubble ${selectedBubbleIndex}...`
-                : "Select a bubble first..."
-            }
-            className="rvw-composer-input"
-            disabled={!editingComment && (selectedBubbleId == null || bubbleAlreadyHasComment)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") onPostComment();
-            }}
-          />
-          <button
-            type="button"
-            onClick={onPostComment}
-            className="rvw-composer-send-btn"
-            disabled={!editingComment && (selectedBubbleId == null || bubbleAlreadyHasComment)}
-          >
-            <Send size={14} />
-          </button>
+          </div>
         </div>
+      )}
+
+      <div className="rvw-general-comments" style={{ borderTop: "1px solid #212129" }}>
+        <p style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "#8a8a99", margin: "10px 16px 6px" }}>
+          Page-level review
+        </p>
+
+        {generalComments && generalComments.length > 0 && (
+          <div style={{ flex: "0 0 auto", maxHeight: "220px" }}>
+            {generalComments.map((c) => (
+              <CommentThread
+                key={c.id}
+                comment={c}
+                onResolve={onResolve}
+                onDelete={onDelete}
+                onUpdate={onUpdate}
+                currentUserId={currentUserId}
+                resolveBubbleLabel={resolveBubbleLabel}
+              />
+            ))}
+          </div>
+        )}
+
+        {!alreadyHasGeneralComment && (
+          <div className="rvw-composer-row rvw-composer-row--wrap" style={{ padding: "0 16px 12px" }}>
+            <textarea
+              value={generalComposeValue}
+              onChange={(e) => onGeneralComposeChange(e.target.value)}
+              placeholder="Overall feedback for this page..."
+              className="rvw-composer-input rvw-composer-textarea"
+              rows={2}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  onPostGeneralComment();
+                }
+              }}
+            />
+            <button type="button" onClick={onPostGeneralComment} className="rvw-composer-send-btn">
+              <Send size={14} />
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   );
@@ -778,7 +835,15 @@ export default function ReviewWorkspace() {
   const [composeValue, setComposeValue] = useState("");
   const [generalComposeValue, setGeneralComposeValue] = useState("");
   const [selectedBubbleId, setSelectedBubbleId] = useState(null);
-  const [editingComment, setEditingComment] = useState(null);
+
+  // Scroll the active bubble into view whenever selection changes (e.g. via
+  // Prev/Next or clicking a bubble). There are two panels (Original +
+  // Translated) both rendering the same bubble ids, so scroll both.
+  useEffect(() => {
+    if (selectedBubbleId == null) return;
+    const elements = document.querySelectorAll(`[data-bubble-id="${selectedBubbleId}"]`);
+    elements.forEach((el) => el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" }));
+  }, [selectedBubbleId]);
 
   const [syncScroll, setSyncScroll] = useState(true);
   const [deciding, setDeciding] = useState(false);
@@ -801,8 +866,6 @@ export default function ReviewWorkspace() {
   const translatedFrameHeight = useElementHeight(translatedFrameRef);
 
   useEffect(() => {
-    setSelectedBubbleId(null);
-    setEditingComment(null);
     setComposeValue("");
     setGeneralComposeValue("");
   }, [currentPage?.pageId]);
@@ -832,6 +895,37 @@ export default function ReviewWorkspace() {
   const baselineSelections = useMemo(() => parseBubblesPayload(currentPage?.reviewBaselineBubbles), [currentPage]);
   const changedFlags = useMemo(() => computeChangedFlags(currentSelections, baselineSelections), [currentSelections, baselineSelections]);
   const changeCount = changedFlags.filter(Boolean).length;
+
+  // Default to the first bubble on the page (instead of nothing selected)
+  // whenever the page changes.
+  useEffect(() => {
+    setSelectedBubbleId(currentSelections.length > 0 ? currentSelections[0].id : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage?.pageId]);
+
+  const goToBubble = (direction) => {
+    if (currentSelections.length === 0) return;
+    const currentIndex = currentSelections.findIndex((s) => s.id === selectedBubbleId);
+    let nextIndex;
+    if (currentIndex === -1) {
+      nextIndex = 0;
+    } else if (direction === "next") {
+      nextIndex = (currentIndex + 1) % currentSelections.length;
+    } else {
+      nextIndex = (currentIndex - 1 + currentSelections.length) % currentSelections.length;
+    }
+    setSelectedBubbleId(currentSelections[nextIndex].id);
+  };
+
+  useEffect(() => {
+    if (selectedBubbleId == null) return;
+    const scrollToBubble = (containerRef) => {
+      const el = containerRef.current?.querySelector(`[data-bubble-id="${selectedBubbleId}"]`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    };
+    scrollToBubble(translatedRef);
+    scrollToBubble(originalRef);
+  }, [selectedBubbleId, translatedRef, originalRef]);
 
   const resolveBubbleLabel = useCallback(
     (bubbleId) => {
@@ -866,26 +960,12 @@ export default function ReviewWorkspace() {
   );
 
   const bubbleAlreadyHasComment = useMemo(() => {
-    if (selectedBubbleId == null || editingComment) return false;
+    if (selectedBubbleId == null) return false;
     return comments.some((c) => c.bubbleId === selectedBubbleId && c.authorId === currentUserId);
-  }, [selectedBubbleId, comments, editingComment, currentUserId]);
+  }, [selectedBubbleId, comments, currentUserId]);
 
   const handlePostComment = async () => {
-    if (!composeValue.trim() || !currentPage?.pageId) return;
-    if (!editingComment && selectedBubbleId == null) return;
-
-    if (editingComment) {
-      try {
-        const updated = await updateCommentApi(editingComment.id, composeValue.trim());
-        setComments((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-        setComposeValue("");
-        setEditingComment(null);
-      } catch (err) {
-        console.error("Failed to update comment:", err);
-        alert("Failed to update comment. Please try again.");
-      }
-      return;
-    }
+    if (!composeValue.trim() || !currentPage?.pageId || selectedBubbleId == null) return;
 
     try {
       const created = await postComment(currentPage.pageId, {
@@ -915,15 +995,16 @@ export default function ReviewWorkspace() {
     }
   };
 
-  const handleStartEdit = (comment) => {
-    setEditingComment(comment);
-    setComposeValue(comment.content);
-    setSelectedBubbleId(comment.bubbleId ?? null);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingComment(null);
-    setComposeValue("");
+  // Inline edit — called directly from a CommentThread's own textarea, no
+  // separate "editing mode" on the shared composer needed anymore.
+  const handleUpdateComment = async (commentId, content) => {
+    try {
+      const updated = await updateCommentApi(commentId, content);
+      setComments((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    } catch (err) {
+      console.error("Failed to update comment:", err);
+      alert("Failed to update comment. Please try again.");
+    }
   };
 
   const handleDeleteComment = async (commentId) => {
@@ -931,10 +1012,6 @@ export default function ReviewWorkspace() {
     try {
       await deleteCommentApi(commentId);
       setComments((prev) => prev.filter((c) => c.id !== commentId));
-      if (editingComment?.id === commentId) {
-        setEditingComment(null);
-        setComposeValue("");
-      }
     } catch (err) {
       console.error("Failed to delete comment:", err);
       alert("Failed to delete comment. Please try again.");
@@ -1078,18 +1155,18 @@ export default function ReviewWorkspace() {
         commentsLoading={commentsLoading}
         onResolve={handleResolve}
         onDelete={handleDeleteComment}
-        onStartEdit={handleStartEdit}
+        onUpdate={handleUpdateComment}
         currentUserId={currentUserId}
         resolveBubbleLabel={resolveBubbleLabel}
         composeValue={composeValue}
         onComposeChange={setComposeValue}
         onPostComment={handlePostComment}
-        editingComment={editingComment}
-        onCancelEdit={handleCancelEdit}
         selectedBubbleId={selectedBubbleId}
         selectedBubbleIndex={selectedBubbleIndex}
         selectedBubbleTranslation={selectedBubbleTranslation}
         onClearSelectedBubble={() => setSelectedBubbleId(null)}
+        onPrevBubble={() => goToBubble("prev")}
+        onNextBubble={() => goToBubble("next")}
         bubbleAlreadyHasComment={bubbleAlreadyHasComment}
         generalComposeValue={generalComposeValue}
         onGeneralComposeChange={setGeneralComposeValue}
