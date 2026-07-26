@@ -11,6 +11,7 @@ import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { toast } from 'react-toastify'
 import { getReadChaptersByComicIdApi } from '../../services/api/ReadingHistoryApi'
 import CommentSection from '../../components/common/CommentSection'
+import StarRating from '../../components/common/StarRating'
 
 // Import assets
 import comicAction from '../../assets/comic_action.png'
@@ -513,6 +514,25 @@ function ComicDetail() {
               >
                 {isLiked ? '❤️ Liked' : '🤍 Like'}
               </button>
+            </div>
+
+            {/* Interactive Star Rating */}
+            <div style={{ marginTop: '20px' }}>
+              <StarRating
+                comicId={id}
+                user={user}
+                initialRatingAverage={comic.ratingAverage}
+                initialRatingCount={comic.ratingCount}
+                initialUserScore={comic.userScore}
+                onRatingChange={(updatedRating) => {
+                  setComic(prev => prev ? {
+                    ...prev,
+                    ratingAverage: updatedRating.ratingAverage,
+                    ratingCount: updatedRating.ratingCount,
+                    userScore: updatedRating.userScore
+                  } : prev)
+                }}
+              />
             </div>
 
           </div>

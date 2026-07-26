@@ -5,7 +5,9 @@ import ModeratorLayout from '../../components/layout/ModeratorLayout'
 import TranslatorLayout from '../../components/layout/TranslatorLayout'
 import AuthorLayout from '../../components/layout/AuthorLayout'
 import '../../assets/style/reader/profile.css'
+import { useNavigate } from 'react-router-dom'
 import { changePasswordApi, updateProfileApi, uploadAvatarApi } from '../../services/api/AuthApi'
+import { getUserRatingsApi } from '../../services/api/RatingApi'
 import { toast } from 'react-toastify'
 import { useAuth } from '../../context/AuthContext'
 import { setAuth } from '../../utils/Auth'
@@ -140,9 +142,34 @@ function AdminStats() {
 
 // ── MAIN PROFILE PAGE COMPONENT ────────────────────────────────────
 
-function Profile({ user }) {
-  const { updateUser } = useAuth()
-  const [activeTab, setActiveTab] = useState('info') // 'info' | 'password'
+function Profile({ user: userProp }) {
+  const navigate = useNavigate()
+  const { user: authUser, updateUser } = useAuth()
+  
+  // Safely resolve user from prop, auth context, or localStorage fallback
+  const user = userProp || authUser || getAuth()?.user || null
+
+  const [activeTab, setActiveTab] = useState('info') // 'info' | 'password' | 'notifications' | 'ratings'
+  const [userRatings, setUserRatings] = useState([])
+  const [ratingsLoading, setRatingsLoading] = useState(false)
+
+  useEffect(() => {
+    if (activeTab === 'ratings') {
+      const fetchRatings = async () => {
+        try {
+          setRatingsLoading(true)
+          const res = await getUserRatingsApi()
+          const list = res?.data || res || []
+          setUserRatings(Array.isArray(list) ? list : [])
+        } catch (err) {
+          console.error('Failed to fetch user ratings:', err)
+        } finally {
+          setRatingsLoading(false)
+        }
+      }
+      fetchRatings()
+    }
+  }, [activeTab])
 
   const parseFullName = (fullName) => {
     if (!fullName) return { first: '', last: '' };
@@ -153,19 +180,19 @@ function Profile({ user }) {
     return { first, last };
   }
 
-  const initialName = parseFullName(user.fullName || '');
+  const initialName = parseFullName(user?.fullName || '');
 
   // Form states for Basic Info
   const [firstName, setFirstName] = useState(initialName.first || '')
   const [lastName, setLastName] = useState(initialName.last || '')
-  const [username, setUsername] = useState(user.username || '')
-  const [email, setEmail] = useState(user.email || '')
+  const [username, setUsername] = useState(user?.username || '')
+  const [email, setEmail] = useState(user?.email || '')
   const [dateOfBirth, setDateOfBirth] = useState('1999-05-15')
   const [bio, setBio] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || '')
-  const [backgroundImageUrl, setBackgroundImageUrl] = useState(user.backgroundImageUrl || '')
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || '')
+  const [backgroundImageUrl, setBackgroundImageUrl] = useState(user?.backgroundImageUrl || '')
   const [assignedLanguages, setAssignedLanguages] = useState(
-    Array.isArray(user.assignedLanguages) && user.assignedLanguages.length > 0
+    Array.isArray(user?.assignedLanguages) && user.assignedLanguages.length > 0
       ? user.assignedLanguages
       : ['Japanese', 'Korean']
   )
@@ -220,7 +247,22 @@ function Profile({ user }) {
     toast.success('🔔 Notification preferences saved successfully!');
   };
 
-  const roleName = user.role || 'Reader'
+  if (!user) {
+    return (
+      <HomeLayout>
+        <div style={{ textAlign: 'center', padding: '120px 20px', color: '#64748b' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+          <h2 style={{ color: 'white', marginBottom: '8px' }}>Session Required</h2>
+          <p style={{ marginBottom: '24px' }}>Please log in to view and manage your profile.</p>
+          <button className="btn-home-primary" onClick={() => navigate('/auth?mode=signin')}>
+            Sign In
+          </button>
+        </div>
+      </HomeLayout>
+    )
+  }
+
+  const roleName = user?.role || 'Reader'
   const roleUpper = roleName.toUpperCase().replace(/[\s-]+/g, '_')
 
   const handleSaveInfo = async (e) => {
@@ -378,22 +420,8 @@ function Profile({ user }) {
   const displayUserName = `${firstName} ${lastName}`.trim() || user.fullName || 'Minh Khoa'
   const userInitials = displayUserName.substring(0, 2).toUpperCase()
 
-  let LayoutComponent = HomeLayout
-  let layoutProps = {}
-
-  if (roleUpper === 'ADMIN') {
-    LayoutComponent = AdminLayout
-    layoutProps = { activeNav: 'profile' }
-  } else if (roleUpper === 'MODERATOR' || roleUpper === 'STAFF') {
-    LayoutComponent = ModeratorLayout
-    layoutProps = { activeNav: 'profile' }
-  } else if (roleUpper === 'TRANSLATOR' || roleUpper === 'PROJECT_LEADER') {
-    LayoutComponent = TranslatorLayout
-    layoutProps = { activeNav: 'profile' }
-  } else if (roleUpper === 'AUTHOR') {
-    LayoutComponent = AuthorLayout
-    layoutProps = { activeNav: 'profile' }
-  }
+  const LayoutComponent = HomeLayout
+  const layoutProps = {}
 
   return (
     <LayoutComponent {...layoutProps}>
@@ -482,6 +510,12 @@ function Profile({ user }) {
                 onClick={() => setActiveTab('notifications')}
               >
                 🔔 Notification Settings
+              </button>
+              <button 
+                className={`profile-sidebar-nav-btn ${activeTab === 'ratings' ? 'active' : ''}`}
+                onClick={() => setActiveTab('ratings')}
+              >
+                ⭐ My Ratings
               </button>
             </div>
 
@@ -927,7 +961,72 @@ function Profile({ user }) {
                 </button>
               </form>
             </div>
-          )}
+          )
+          } : activeTab === 'ratings' ? (
+            <div className="fade-in">
+              <h2 className="profile-content-title">My Rated Comics</h2>
+              <p className="profile-input-desc" style={{ marginBottom: '24px', fontSize: '13px' }}>
+                A complete history of all comics you have rated and reviewed.
+              </p>
+
+              {ratingsLoading ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
+                  Loading your rated comics...
+                </div>
+              ) : userRatings.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b', background: 'rgba(255,255,255,0.01)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <span style={{ fontSize: '40px', display: 'block', marginBottom: '12px' }}>⭐</span>
+                  <h4 style={{ color: 'white', margin: '0 0 8px' }}>No Rated Comics Yet</h4>
+                  <p style={{ margin: 0, fontSize: '13px' }}>
+                    You haven't rated any comics yet. Explore titles and drop your star ratings!
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
+                  {userRatings.map((item) => {
+                    const comicObj = item.comic || item;
+                    const comicId = comicObj.id || item.comicId;
+                    const comicTitle = comicObj.title || 'Untitled Comic';
+                    const userScoreVal = item.score || item.userScore || 5;
+
+                    return (
+                      <div
+                        key={item.id || comicId}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          border: '1px solid rgba(255, 255, 255, 0.06)',
+                          borderRadius: '12px',
+                          padding: '14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px',
+                          cursor: 'pointer',
+                          transition: 'transform 0.2s, border-color 0.2s'
+                        }}
+                        onClick={() => navigate(`/comic/${comicId}`)}
+                      >
+                        {comicObj.cover && (
+                          <img
+                            src={comicObj.cover}
+                            alt={comicTitle}
+                            style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: '8px' }}
+                          />
+                        )}
+                        <div>
+                          <h4 style={{ margin: '0 0 4px', fontSize: '14px', color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {comicTitle}
+                          </h4>
+                          <span style={{ fontSize: '13px', color: '#fbbf24', fontWeight: 'bold' }}>
+                            ⭐ Rated: {userScoreVal} / 5
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : null
         </div>
       </div>
       </div>
