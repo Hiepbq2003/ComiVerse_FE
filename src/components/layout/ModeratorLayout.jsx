@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { AIPopover } from '../common/AIPopover'
 import '../../assets/style/moderator/moderator.css'
+import { getModeratorScope } from '../../utils/moderatorScope'
 
 function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBadges = {} }) {
   const navigate = useNavigate()
@@ -184,7 +185,7 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
               title="Authorized moderation languages"
             >
               <span>🌐</span>
-              <span>Scope: {Array.isArray(user?.assignedLanguages) && user.assignedLanguages.length > 0 ? user.assignedLanguages.join(', ') : 'Japanese, Korean'}</span>
+              <span>Scope: {getModeratorScope(user).map(l => l.charAt(0).toUpperCase() + l.slice(1)).join(', ')}</span>
             </span>
           </div>
 

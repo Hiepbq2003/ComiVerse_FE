@@ -9,6 +9,8 @@ import { getChaptersByComicIdApi, getChapterDetailApi } from '../../services/api
 import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
 import { useTheme } from '../../context/ThemeContext'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
+import { getAuth } from '../../utils/Auth'
+import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
 
 const formatSubmitterName = (submittedBy) => {
   if (!submittedBy) return 'Unknown';
@@ -137,8 +139,10 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
   // 2. High-Performance Instant Query Filter & Sort
   const filteredItems = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
+    const authUser = getAuth()?.user;
     
     return submissions
+      .filter(item => isLanguageInModeratorScope(item.language || item.rawLanguage || item.targetLanguage || item.targetLang, authUser))
       .filter(item => item.status === activeTab)
       .filter(item => {
         if (!query) return true;
