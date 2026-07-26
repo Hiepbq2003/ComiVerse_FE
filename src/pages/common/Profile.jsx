@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import HomeLayout from '../../components/layout/HomeLayout'
 import AdminLayout from '../../components/layout/AdminLayout'
 import ModeratorLayout from '../../components/layout/ModeratorLayout'
@@ -6,28 +6,43 @@ import TranslatorLayout from '../../components/layout/TranslatorLayout'
 import AuthorLayout from '../../components/layout/AuthorLayout'
 import '../../assets/style/reader/profile.css'
 import { useNavigate } from 'react-router-dom'
-import { changePasswordApi, updateProfileApi, uploadAvatarApi } from '../../services/api/AuthApi'
+import CustomDatePicker from '../../components/common/CustomDatePicker'
+import { changePasswordApi, updateProfileApi, uploadAvatarApi, getUserInteractionCountsApi } from '../../services/api/AuthApi'
 import { getUserRatingsApi } from '../../services/api/RatingApi'
 import { toast } from 'react-toastify'
 import { useAuth } from '../../context/AuthContext'
-import { setAuth } from '../../utils/Auth'
+import { setAuth, getAuth } from '../../utils/Auth'
 
 // ── ROLE-SPECIFIC STATISTICS COMPONENTS ────────────────────────────
 
-function ReaderStats() {
+function ReaderStats({ stats, loading }) {
+  if (loading) {
+    return (
+      <div className="profile-stats-list">
+        <div style={{ color: 'var(--profile-text-muted)', fontSize: '13px', textAlign: 'center', padding: '8px 0' }}>
+          Loading stats...
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="profile-stats-list">
       <div className="profile-stats-row">
+        <span>Comics liked</span>
+        <span className="profile-stats-value">{(stats?.likedCount ?? 0).toLocaleString()}</span>
+      </div>
+      <div className="profile-stats-row">
         <span>Comics saved</span>
-        <span className="profile-stats-value">24</span>
+        <span className="profile-stats-value">{(stats?.savedCount ?? 0).toLocaleString()}</span>
       </div>
       <div className="profile-stats-row">
-        <span>Chapters read</span>
-        <span className="profile-stats-value">1,482</span>
+        <span>Comics read</span>
+        <span className="profile-stats-value">{(stats?.readCount ?? 0).toLocaleString()}</span>
       </div>
       <div className="profile-stats-row">
-        <span>Comments</span>
-        <span className="profile-stats-value">63</span>
+        <span>Comics rated</span>
+        <span className="profile-stats-value">{(stats?.ratingCount ?? 0).toLocaleString()}</span>
       </div>
     </div>
   )
@@ -150,6 +165,36 @@ function Profile({ user: userProp }) {
   const user = userProp || authUser || getAuth()?.user || null
 
   const [activeTab, setActiveTab] = useState('info') // 'info' | 'password' | 'notifications' | 'ratings'
+  const [interactionCounts, setInteractionCounts] = useState({
+    likedCount: 0,
+    savedCount: 0,
+    readCount: 0,
+    ratingCount: 0
+  })
+  const [statsLoading, setStatsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchInteractionCounts = async () => {
+      try {
+        setStatsLoading(true)
+        const res = await getUserInteractionCountsApi()
+        if (res) {
+          setInteractionCounts({
+            likedCount: res.likedCount ?? 0,
+            savedCount: res.savedCount ?? 0,
+            readCount: res.readCount ?? 0,
+            ratingCount: res.ratingCount ?? 0
+          })
+        }
+      } catch (err) {
+        console.error('Failed to fetch user interaction counts:', err)
+      } finally {
+        setStatsLoading(false)
+      }
+    }
+    fetchInteractionCounts()
+  }, [])
+
   const [userRatings, setUserRatings] = useState([])
   const [ratingsLoading, setRatingsLoading] = useState(false)
 
@@ -391,7 +436,7 @@ function Profile({ user: userProp }) {
       case 'READER':
       case 'USER':
       default:
-        return <ReaderStats />
+        return <ReaderStats stats={interactionCounts} loading={statsLoading} />
     }
   }
 
@@ -621,11 +666,9 @@ function Profile({ user: userProp }) {
                 {/* Date of Birth */}
                 <div className="profile-input-group">
                   <label>Date of Birth</label>
-                  <input 
-                    type="date" 
+                  <CustomDatePicker 
                     value={dateOfBirth} 
-                    onChange={(e) => setDateOfBirth(e.target.value)} 
-                    required 
+                    onChange={(val) => setDateOfBirth(val)} 
                   />
                 </div>
 
@@ -705,7 +748,7 @@ function Profile({ user: userProp }) {
                 </button>
               </form>
             </div>
-          ) : (
+          ) : activeTab === 'notifications' ? (
             <div className="fade-in">
               <h2 className="profile-content-title">Notification Settings</h2>
               <p className="profile-input-desc" style={{ marginBottom: '24px', fontSize: '13px' }}>
@@ -961,8 +1004,7 @@ function Profile({ user: userProp }) {
                 </button>
               </form>
             </div>
-          )
-          } : activeTab === 'ratings' ? (
+          ) : activeTab === 'ratings' ? (
             <div className="fade-in">
               <h2 className="profile-content-title">My Rated Comics</h2>
               <p className="profile-input-desc" style={{ marginBottom: '24px', fontSize: '13px' }}>
@@ -1026,7 +1068,7 @@ function Profile({ user: userProp }) {
                 </div>
               )}
             </div>
-          ) : null
+          ) : null}
         </div>
       </div>
       </div>

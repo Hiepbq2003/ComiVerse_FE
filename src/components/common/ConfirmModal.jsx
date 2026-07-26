@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Trash2, AlertTriangle } from 'lucide-react';
 
 /**
  * Reusable Confirmation Modal Popup Component
@@ -87,11 +88,10 @@ function ConfirmModal({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '24px',
               flexShrink: 0
             }}
           >
-            {type === 'danger' ? '🗑️' : '⚠️'}
+            {type === 'danger' ? <Trash2 size={24} color="#ef4444" /> : <AlertTriangle size={24} color="#f59e0b" />}
           </div>
           <div>
             <h3 style={{ margin: 0, fontSize: '19px', fontWeight: '700', color: 'white', letterSpacing: '-0.2px' }}>
