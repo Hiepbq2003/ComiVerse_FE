@@ -1115,59 +1115,34 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
 
                           {/* Core Input Fields */}
                           <div style={{ flex: 1, minWidth: '260px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                              <div>
-                                <span className="mod-pane-title--raw" style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '4px' }}>
-                                  Comic Title *
-                                </span>
-                                <h2 className="mod-inspector-title" style={{ margin: 0, fontSize: '22px', fontWeight: '800' }}>
-                                  {selectedReview.title}
-                                </h2>
-                              </div>
-                              <ModernButton
-                                variant={2}
-                                label="💬 Comment"
-                                onClick={() => {
-                                  setFieldCommentModalTarget({
-                                    targetType: 'field',
-                                    targetKey: 'title',
-                                    targetLabel: 'Comic Title'
-                                  });
-                                }}
-                              />
+                            <div>
+                              <span className="mod-pane-title--raw" style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '4px' }}>
+                                Comic Title *
+                              </span>
+                              <h2 className="mod-inspector-title" style={{ margin: 0, fontSize: '22px', fontWeight: '800' }}>
+                                {selectedReview.title}
+                              </h2>
                             </div>
 
                             {/* Author Input Fields Grid */}
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Original Language *</span>
-                                  <button type="button" onClick={() => setFieldCommentModalTarget({ targetType: 'field', targetKey: 'language', targetLabel: 'Original Language' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#7c3aed' }}>💬</button>
-                                </div>
+                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
+                                <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Original Language *</span>
                                 <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{selectedReview.language || 'Japanese'}</strong>
                               </div>
 
-                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Minimum Age</span>
-                                  <button type="button" onClick={() => setFieldCommentModalTarget({ targetType: 'field', targetKey: 'minAge', targetLabel: 'Minimum Age' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#7c3aed' }}>💬</button>
-                                </div>
+                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
+                                <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Minimum Age</span>
                                 <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{selectedReview.minAge || selectedReview.ageRating || '13+'}</strong>
                               </div>
 
-                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Publication Status</span>
-                                  <button type="button" onClick={() => setFieldCommentModalTarget({ targetType: 'field', targetKey: 'status', targetLabel: 'Publication Status' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#7c3aed' }}>💬</button>
-                                </div>
+                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
+                                <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Publication Status</span>
                                 <strong style={{ fontSize: '13.5px', color: '#10b981', display: 'block', marginTop: '4px' }}>{selectedReview.publicationStatus || selectedReview.comicStatus || 'Ongoing'}</strong>
                               </div>
 
-                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Author Account</span>
-                                  <button type="button" onClick={() => setFieldCommentModalTarget({ targetType: 'field', targetKey: 'submittedBy', targetLabel: 'Author Account' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#7c3aed' }}>💬</button>
-                                </div>
+                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
+                                <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Author Account</span>
                                 <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{formatSubmitterName(selectedReview.submittedBy).replace('Author: ', '')}</strong>
                               </div>
                             </div>
@@ -1175,10 +1150,7 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
                             {/* Genres Input Field Display */}
                             {selectedReview.genres && selectedReview.genres.length > 0 && (
                               <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                  <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600' }}>Genres</span>
-                                  <button type="button" onClick={() => setFieldCommentModalTarget({ targetType: 'field', targetKey: 'genres', targetLabel: 'Genres' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#7c3aed' }}>💬 Comment</button>
-                                </div>
+                                <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Genres</span>
                                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                   {selectedReview.genres.map((genre, idx) => (
                                     <span key={idx} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', background: 'rgba(124,58,237,0.15)', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)' }}>
@@ -1193,22 +1165,9 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
 
                         {/* Description Field Review */}
                         <div style={{ borderTop: '1px solid rgba(148,163,184,0.15)', paddingTop: '16px', marginTop: '12px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                            <span className="mod-pane-title--raw" style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                              Description
-                            </span>
-                            <ModernButton
-                              variant={2}
-                              label="💬 Comment"
-                              onClick={() => {
-                                setFieldCommentModalTarget({
-                                  targetType: 'field',
-                                  targetKey: 'description',
-                                  targetLabel: 'Comic Description'
-                                });
-                              }}
-                            />
-                          </div>
+                          <span className="mod-pane-title--raw" style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '6px' }}>
+                            Description
+                          </span>
                           <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
                             {selectedReview.description || selectedReview.synopsis || 'No description has been added yet.'}
                           </p>
