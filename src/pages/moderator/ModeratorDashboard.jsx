@@ -257,12 +257,36 @@ function ModeratorDashboard() {
     }
   }
 
+  const syncSubmissionsWithLocalOverride = (rawSubmissions) => {
+    try {
+      const overrideRaw = localStorage.getItem('comiverse_moderator_submissions_override');
+      if (!overrideRaw) return rawSubmissions || [];
+      const overrides = JSON.parse(overrideRaw);
+      if (!Array.isArray(overrides) || overrides.length === 0) return rawSubmissions || [];
+
+      const overrideMap = new Map();
+      overrides.forEach(o => {
+        if (o.id) overrideMap.set(String(o.id), o);
+        if (o.submissionId) overrideMap.set(String(o.submissionId), o);
+        if (o.title) overrideMap.set(String(o.title).trim().toLowerCase(), o);
+      });
+
+      return (rawSubmissions || []).map(item => {
+        const key = item.id || item.submissionId || (item.title ? String(item.title).trim().toLowerCase() : null);
+        const match = overrideMap.get(String(key)) || overrideMap.get(String(item.id)) || overrideMap.get(String(item.submissionId));
+        return match ? { ...item, ...match } : item;
+      });
+    } catch (e) {
+      return rawSubmissions || [];
+    }
+  };
+
   const fetchSubmissionsData = async () => {
     try {
       const data = await getAllSubmissionsApi()
       const authUser = getAuth()?.user;
       const filtered = (data || []).filter(s => isLanguageInModeratorScope(s.language || s.rawLanguage || s.targetLanguage || s.targetLang, authUser));
-      setSubmissions(filtered)
+      setSubmissions(syncSubmissionsWithLocalOverride(filtered))
     } catch (err) {
       console.error('Failed to fetch submissions:', err)
     }
@@ -306,7 +330,9 @@ function ModeratorDashboard() {
       const chatData = results[5].status === 'fulfilled' ? results[5].value : []
 
       const authUser = getAuth()?.user;
-      const filteredSubmissions = (submissionsData || []).filter(s => isLanguageInModeratorScope(s.language || s.rawLanguage || s.targetLanguage || s.targetLang, authUser));
+      const filteredSubmissions = syncSubmissionsWithLocalOverride(
+        (submissionsData || []).filter(s => isLanguageInModeratorScope(s.language || s.rawLanguage || s.targetLanguage || s.targetLang, authUser))
+      );
       setSubmissions(filteredSubmissions)
 
       const mappedComics = syncApprovedComics(
@@ -426,7 +452,7 @@ function ModeratorDashboard() {
     const chapTitle = chapterObj?.title || `Chapter ${chapterObj?.number || chapterObj?.chapterNumber || ''}`.trim() || 'Chapter';
 
     try {
-      if (targetApiId) {
+      if (targetApiId && !String(targetApiId).startsWith('group-') && !String(targetApiId).startsWith('chap-')) {
         await approveSubmissionApi(targetApiId);
       }
     } catch (apiErr) {
@@ -434,7 +460,13 @@ function ModeratorDashboard() {
     }
 
     try {
-      const sub = submissions.find(item => (item.id || item) === submissionId || item.submissionId === submissionId || (item.title && chapterObj && chapterObj.title && item.title.toLowerCase().trim() === (chapterObj.originalSubmissionItem?.title || chapterObj.title || '').toLowerCase().trim()));
+      const targetSubId = chapterObj?.submissionId || chapterObj?.id;
+      const sub = submissions.find(item => 
+        (item.id && (item.id === targetSubId || item.id === submissionId)) ||
+        (item.submissionId && (item.submissionId === targetSubId || item.submissionId === submissionId)) ||
+        (item.title && chapterObj && chapterObj.title && item.title.toLowerCase().trim() === (chapterObj.originalSubmissionItem?.title || chapterObj.title || '').toLowerCase().trim()) ||
+        (item.title && chapterObj && chapterObj.comicTitle && item.title.toLowerCase().trim() === chapterObj.comicTitle.toLowerCase().trim())
+      );
       
       toast.success(`Approved "${chapTitle}" & saved to Database & Comic Management!`);
 
@@ -444,35 +476,48 @@ function ModeratorDashboard() {
 
       const nowIso = new Date().toISOString();
 
-      setSubmissions(prev => prev.map(item => {
-        const itemId = item.id || item.submissionId || item;
-        if (itemId === (sub?.id || submissionId)) {
-          const currentChaps = Array.isArray(item.allChapters) && item.allChapters.length > 0 
-            ? item.allChapters 
-            : (Array.isArray(item.chapters) && item.chapters.length > 0 ? item.chapters : []);
-          
-          const remainingChaps = currentChaps.filter(c => !isSameChapterItem(c, chapterObj));
+      setSubmissions(prev => {
+        const nextSubmissions = prev.map(item => {
+          const itemId = item.id || item.submissionId || item;
+          const isTargetItem = 
+            itemId === (sub?.id || submissionId) ||
+            (targetSubId && (item.id === targetSubId || item.submissionId === targetSubId)) ||
+            (sub?.title && item.title && item.title.toLowerCase().trim() === sub.title.toLowerCase().trim());
 
-          if (remainingChaps.length === 0) {
-            return {
-              ...item,
-              status: 'approved',
-              approvedAt: nowIso,
-              allChapters: [],
-              chapters: []
-            };
-          } else {
-            return {
-              ...item,
-              allChapters: remainingChaps,
-              chapters: remainingChaps,
-              chapterNumber: remainingChaps.length,
-              number: remainingChaps.length
-            };
+          if (isTargetItem) {
+            const currentChaps = Array.isArray(item.allChapters) && item.allChapters.length > 0 
+              ? item.allChapters 
+              : (Array.isArray(item.chapters) && item.chapters.length > 0 ? item.chapters : []);
+            
+            const remainingChaps = currentChaps.filter(c => !isSameChapterItem(c, chapterObj));
+
+            if (remainingChaps.length === 0) {
+              return {
+                ...item,
+                status: 'approved',
+                approvedAt: nowIso,
+                allChapters: [],
+                chapters: []
+              };
+            } else {
+              return {
+                ...item,
+                allChapters: remainingChaps,
+                chapters: remainingChaps,
+                chapterNumber: remainingChaps.length,
+                number: remainingChaps.length
+              };
+            }
           }
-        }
-        return item;
-      }));
+          return item;
+        });
+
+        try {
+          localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(nextSubmissions));
+        } catch (e) {}
+
+        return nextSubmissions;
+      });
     } catch (err) {
       console.error(err);
       toast.error('Failed to approve chapter.');
@@ -484,7 +529,7 @@ function ModeratorDashboard() {
     const chapTitle = chapterObj?.title || `Chapter ${chapterObj?.number || chapterObj?.chapterNumber || ''}`.trim() || 'Chapter';
 
     try {
-      if (targetApiId) {
+      if (targetApiId && !String(targetApiId).startsWith('group-') && !String(targetApiId).startsWith('chap-')) {
         await rejectSubmissionApi(targetApiId, reason || 'Chapter rejected');
       }
     } catch (apiErr) {
@@ -492,42 +537,61 @@ function ModeratorDashboard() {
     }
 
     try {
-      const sub = submissions.find(item => (item.id || item) === submissionId || item.submissionId === submissionId);
+      const targetSubId = chapterObj?.submissionId || chapterObj?.id;
+      const sub = submissions.find(item => 
+        (item.id && (item.id === targetSubId || item.id === submissionId)) ||
+        (item.submissionId && (item.submissionId === targetSubId || item.submissionId === submissionId)) ||
+        (item.title && chapterObj && chapterObj.title && item.title.toLowerCase().trim() === (chapterObj.originalSubmissionItem?.title || chapterObj.title || '').toLowerCase().trim()) ||
+        (item.title && chapterObj && chapterObj.comicTitle && item.title.toLowerCase().trim() === chapterObj.comicTitle.toLowerCase().trim())
+      );
       
       toast.success(`Rejected "${chapTitle}" & updated Database!`);
 
       const nowIso = new Date().toISOString();
 
-      setSubmissions(prev => prev.map(item => {
-        const itemId = item.id || item.submissionId || item;
-        if (itemId === (sub?.id || submissionId)) {
-          const currentChaps = Array.isArray(item.allChapters) && item.allChapters.length > 0 
-            ? item.allChapters 
-            : (Array.isArray(item.chapters) && item.chapters.length > 0 ? item.chapters : []);
-          
-          const remainingChaps = currentChaps.filter(c => !isSameChapterItem(c, chapterObj));
+      setSubmissions(prev => {
+        const nextSubmissions = prev.map(item => {
+          const itemId = item.id || item.submissionId || item;
+          const isTargetItem = 
+            itemId === (sub?.id || submissionId) ||
+            (targetSubId && (item.id === targetSubId || item.submissionId === targetSubId)) ||
+            (sub?.title && item.title && item.title.toLowerCase().trim() === sub.title.toLowerCase().trim());
 
-          if (remainingChaps.length === 0) {
-            return {
-              ...item,
-              status: 'rejected',
-              rejectedAt: nowIso,
-              rejectionReason: reason || 'Chapter rejected',
-              allChapters: [],
-              chapters: []
-            };
-          } else {
-            return {
-              ...item,
-              allChapters: remainingChaps,
-              chapters: remainingChaps,
-              chapterNumber: remainingChaps.length,
-              number: remainingChaps.length
-            };
+          if (isTargetItem) {
+            const currentChaps = Array.isArray(item.allChapters) && item.allChapters.length > 0 
+              ? item.allChapters 
+              : (Array.isArray(item.chapters) && item.chapters.length > 0 ? item.chapters : []);
+            
+            const remainingChaps = currentChaps.filter(c => !isSameChapterItem(c, chapterObj));
+
+            if (remainingChaps.length === 0) {
+              return {
+                ...item,
+                status: 'rejected',
+                rejectedAt: nowIso,
+                rejectionReason: reason || 'Chapter rejected',
+                allChapters: [],
+                chapters: []
+              };
+            } else {
+              return {
+                ...item,
+                allChapters: remainingChaps,
+                chapters: remainingChaps,
+                chapterNumber: remainingChaps.length,
+                number: remainingChaps.length
+              };
+            }
           }
-        }
-        return item;
-      }));
+          return item;
+        });
+
+        try {
+          localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(nextSubmissions));
+        } catch (e) {}
+
+        return nextSubmissions;
+      });
     } catch (err) {
       console.error(err);
       toast.error('Failed to reject chapter.');
