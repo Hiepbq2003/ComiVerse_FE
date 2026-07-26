@@ -1,14 +1,45 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import HomeLayout from '../../components/layout/HomeLayout'
 import AdminLayout from '../../components/layout/AdminLayout'
 import ModeratorLayout from '../../components/layout/ModeratorLayout'
 import TranslatorLayout from '../../components/layout/TranslatorLayout'
 import AuthorLayout from '../../components/layout/AuthorLayout'
 import '../../assets/style/reader/profile.css'
-import { changePasswordApi, updateProfileApi, uploadAvatarApi } from '../../services/api/AuthApi'
+import { changePasswordApi, getMeApi, updateProfileApi, uploadAvatarApi } from '../../services/api/AuthApi'
+import { getNotificationPreferencesApi, updateNotificationPreferencesApi } from '../../services/api/NotificationApi'
 import { toast } from 'react-toastify'
 import { useAuth } from '../../context/AuthContext'
-import { setAuth } from '../../utils/Auth'
+
+const COMMON_NOTIFICATION_OPTIONS = [
+  {
+    title: 'General Notifications',
+    options: [
+      { key: 'SYSTEM_BROADCASTS', label: 'System broadcasts', description: 'Platform announcements and maintenance updates sent by administrators.' },
+      { key: 'FORUM_ACTIVITY', label: 'Forum replies', description: 'Replies to your forum posts and comments, with a direct link to the discussion.' },
+    ],
+  },
+]
+
+const ROLE_NOTIFICATION_OPTIONS = {
+  MODERATOR: [{ title: 'Moderator Workspace', options: [
+    { key: 'REVIEW_QUEUE', label: 'Review queue', description: 'New comic and chapter submissions waiting for moderation.' },
+  ] }],
+  STAFF: [{ title: 'Moderator Workspace', options: [
+    { key: 'REVIEW_QUEUE', label: 'Review queue', description: 'New comic and chapter submissions waiting for moderation.' },
+  ] }],
+  AUTHOR: [{ title: 'Author Hub', options: [
+    { key: 'SUBMISSION_STATUS', label: 'Submission status', description: 'Approval, rejection, and change requests for your submitted work.' },
+  ] }],
+  TRANSLATOR: [{ title: 'Translator Hub', options: [
+    { key: 'PROJECT_OPPORTUNITIES', label: 'Project opportunities', description: 'New translation projects available in the project pool.' },
+    { key: 'TEAM_UPDATES', label: 'Team updates', description: 'Project claims, team decisions, and workflow updates affecting you.' },
+  ] }],
+  PROJECT_LEADER: [{ title: 'Project Leader Workspace', options: [
+    { key: 'PROJECT_OPPORTUNITIES', label: 'Project opportunities', description: 'New translation projects available in the project pool.' },
+    { key: 'TEAM_UPDATES', label: 'Team updates', description: 'Project claims, team decisions, and workflow updates affecting you.' },
+    { key: 'TEAM_JOIN_REQUESTS', label: 'Team join requests', description: 'Applications from translators who want to join your project team.' },
+  ] }],
+}
 
 // ── ROLE-SPECIFIC STATISTICS COMPONENTS ────────────────────────────
 
@@ -138,7 +169,7 @@ function AdminStats() {
   )
 }
 
-// ── MAIN PROFILE PAGE COMPONENT ────────────────────────────────────
+// Main profile page
 
 function Profile({ user }) {
   const { updateUser } = useAuth()
@@ -154,14 +185,16 @@ function Profile({ user }) {
   }
 
   const initialName = parseFullName(user.fullName || '');
+  const roleName = user.role || 'Reader'
+  const roleUpper = roleName.toUpperCase().replace(/[\s-]+/g, '_')
 
   // Form states for Basic Info
   const [firstName, setFirstName] = useState(initialName.first || '')
   const [lastName, setLastName] = useState(initialName.last || '')
   const [username, setUsername] = useState(user.username || '')
   const [email, setEmail] = useState(user.email || '')
-  const [dateOfBirth, setDateOfBirth] = useState('1999-05-15')
-  const [bio, setBio] = useState('')
+  const [dateOfBirth, setDateOfBirth] = useState(user.dateOfBirth || '')
+  const [bio, setBio] = useState(user.bio || '')
   const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || '')
   const [backgroundImageUrl, setBackgroundImageUrl] = useState(user.backgroundImageUrl || '')
   const [assignedLanguages, setAssignedLanguages] = useState(
@@ -174,72 +207,101 @@ function Profile({ user }) {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [profileSaving, setProfileSaving] = useState(false)
 
-  // Notification settings state
-  const NOTIF_SETTINGS_KEY = 'comiverse_notif_settings';
-  const defaultNotifSettings = {
-    systemBroadcasts: true,
-    emailDigest: true,
-    chatFlagAlerts: true,
-    reviewQueueReminders: true,
-    projectTeamUpdates: true,
-    submissionStatusAlerts: true,
-    earningsPayoutAlerts: true,
-    commentAlerts: true,
-    jobPoolAlerts: true,
-    taskAssignments: true,
-    milestonePayouts: true,
-    securityAuditAlerts: true,
-    revenueMilestoneAlerts: true,
-    appealAlerts: true
-  };
+  const [notifSettings, setNotifSettings] = useState({})
+  const [availableNotifKeys, setAvailableNotifKeys] = useState([])
+  const [notifLoading, setNotifLoading] = useState(true)
+  const [notifSaving, setNotifSaving] = useState(false)
 
-  const loadNotifSettings = () => {
-    try {
-      const saved = localStorage.getItem(NOTIF_SETTINGS_KEY);
-      if (saved) {
-        return { ...defaultNotifSettings, ...JSON.parse(saved) };
-      }
-    } catch (e) {}
-    return defaultNotifSettings;
-  };
+  useEffect(() => {
+    let cancelled = false
+    getMeApi()
+      .then(serverProfile => {
+        if (cancelled) return
+        const name = parseFullName(serverProfile.fullName || '')
+        setFirstName(name.first)
+        setLastName(name.last)
+        setUsername(serverProfile.username || '')
+        setEmail(serverProfile.email || '')
+        setDateOfBirth(serverProfile.dateOfBirth || '')
+        setBio(serverProfile.bio || '')
+        setAvatarUrl(serverProfile.avatarUrl || '')
+        setBackgroundImageUrl(serverProfile.backgroundImageUrl || '')
+        updateUser({ ...user, ...serverProfile })
+      })
+      .catch(err => {
+        if (!cancelled) toast.error(err.response?.data?.message || 'Failed to load the latest profile information.')
+      })
+    return () => { cancelled = true }
+  }, [user.userId])
 
-  const [notifSettings, setNotifSettings] = useState(loadNotifSettings);
+  useEffect(() => {
+    let cancelled = false
+    setNotifLoading(true)
+    getNotificationPreferencesApi()
+      .then(response => {
+        if (cancelled) return
+        setNotifSettings(response?.preferences || {})
+        setAvailableNotifKeys(response?.availableKeys || [])
+      })
+      .catch(err => {
+        if (!cancelled) toast.error(err.response?.data?.message || 'Failed to load notification preferences.')
+      })
+      .finally(() => {
+        if (!cancelled) setNotifLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [user.userId, roleUpper])
 
   const handleToggleNotifSetting = (key) => {
-    setNotifSettings(prev => {
-      const updated = { ...prev, [key]: !prev[key] };
-      localStorage.setItem(NOTIF_SETTINGS_KEY, JSON.stringify(updated));
-      return updated;
-    });
+    setNotifSettings(prev => ({ ...prev, [key]: !prev[key] }))
   };
 
-  const handleSaveNotifSettings = (e) => {
-    e.preventDefault();
-    localStorage.setItem(NOTIF_SETTINGS_KEY, JSON.stringify(notifSettings));
-    toast.success('🔔 Notification preferences saved successfully!');
+  const handleSaveNotifSettings = async (e) => {
+    e.preventDefault()
+    setNotifSaving(true)
+    try {
+      const response = await updateNotificationPreferencesApi(notifSettings)
+      setNotifSettings(response?.preferences || notifSettings)
+      setAvailableNotifKeys(response?.availableKeys || availableNotifKeys)
+      toast.success('Notification preferences saved successfully!')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save notification preferences.')
+    } finally {
+      setNotifSaving(false)
+    }
   };
 
-  const roleName = user.role || 'Reader'
-  const roleUpper = roleName.toUpperCase().replace(/[\s-]+/g, '_')
+  const buildProfilePayload = (overrides = {}) => ({
+    fullName: `${firstName.trim()} ${lastName.trim()}`.trim(),
+    avatarUrl,
+    backgroundImageUrl,
+    dateOfBirth: dateOfBirth || null,
+    bio: bio.trim() || null,
+    ...overrides,
+  })
+
+  const applySavedProfile = (savedProfile) => {
+    setDateOfBirth(savedProfile.dateOfBirth || '')
+    setBio(savedProfile.bio || '')
+    setAvatarUrl(savedProfile.avatarUrl || '')
+    setBackgroundImageUrl(savedProfile.backgroundImageUrl || '')
+    updateUser({ ...user, ...savedProfile, assignedLanguages })
+  }
 
   const handleSaveInfo = async (e) => {
     e.preventDefault()
-    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
+    setProfileSaving(true)
     try {
-      await updateProfileApi(fullName, avatarUrl, backgroundImageUrl)
-      const updatedUser = {
-        ...user,
-        fullName,
-        avatarUrl,
-        backgroundImageUrl,
-        assignedLanguages
-      }
-      updateUser(updatedUser)
+      const savedProfile = await updateProfileApi(buildProfilePayload())
+      applySavedProfile(savedProfile)
       toast.success('Basic Info changes saved successfully!')
     } catch (err) {
       const errMsg = err.response?.data?.message || 'Failed to save changes.'
       toast.error(errMsg)
+    } finally {
+      setProfileSaving(false)
     }
   }
 
@@ -259,16 +321,8 @@ function Profile({ user }) {
       
       setAvatarUrl(uploadedUrl);
       
-      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-      await updateProfileApi(fullName, uploadedUrl, backgroundImageUrl);
-      
-      const updatedUser = {
-        ...user,
-        fullName,
-        avatarUrl: uploadedUrl,
-        backgroundImageUrl
-      };
-      updateUser(updatedUser);
+      const savedProfile = await updateProfileApi(buildProfilePayload({ avatarUrl: uploadedUrl }));
+      applySavedProfile(savedProfile);
       
       toast.success('Avatar uploaded successfully!');
     } catch (err) {
@@ -293,15 +347,8 @@ function Profile({ user }) {
 
       setBackgroundImageUrl(uploadedUrl)
 
-      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
-      await updateProfileApi(fullName, avatarUrl, uploadedUrl)
-
-      updateUser({
-        ...user,
-        fullName,
-        avatarUrl,
-        backgroundImageUrl: uploadedUrl
-      })
+      const savedProfile = await updateProfileApi(buildProfilePayload({ backgroundImageUrl: uploadedUrl }))
+      applySavedProfile(savedProfile)
 
       toast.success('Profile background uploaded successfully!')
     } catch (err) {
@@ -623,8 +670,8 @@ function Profile({ user }) {
                   </div>
                 )}
 
-                <button type="submit" className="profile-save-btn">
-                  Save Changes
+                <button type="submit" className="profile-save-btn" disabled={profileSaving}>
+                  {profileSaving ? 'Saving...' : 'Save Changes'}
                 </button>
               </form>
             </div>
@@ -675,257 +722,44 @@ function Profile({ user }) {
             <div className="fade-in">
               <h2 className="profile-content-title">Notification Settings</h2>
               <p className="profile-input-desc" style={{ marginBottom: '24px', fontSize: '13px' }}>
-                Customize which workspace alerts, email digests, and role notifications you receive.
+                Choose which in-app workflow notifications you receive for your current role.
               </p>
 
-              <form onSubmit={handleSaveNotifSettings}>
-                {/* 1. MODERATOR / STAFF */}
-                {(roleUpper === 'MODERATOR' || roleUpper === 'STAFF') && (
-                  <div className="profile-notif-group">
-                    <h3 className="profile-notif-group-title">🛡️ Moderator Workspace Alerts</h3>
-                    
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>🚨 High-Priority Chat Flag Alerts</strong>
-                        <p>Receive instant notifications when severe profanity or spam links are detected in live chat.</p>
+              {notifLoading ? (
+                <p className="profile-input-desc">Loading notification preferences...</p>
+              ) : (
+                <form onSubmit={handleSaveNotifSettings}>
+                  {[...(ROLE_NOTIFICATION_OPTIONS[roleUpper] || []), ...COMMON_NOTIFICATION_OPTIONS].map(section => {
+                    const options = section.options.filter(option => availableNotifKeys.includes(option.key))
+                    if (options.length === 0) return null
+                    return (
+                      <div className="profile-notif-group" key={section.title}>
+                        <h3 className="profile-notif-group-title">{section.title}</h3>
+                        {options.map(option => (
+                          <div className="profile-notif-item" key={option.key}>
+                            <div>
+                              <strong>{option.label}</strong>
+                              <p>{option.description}</p>
+                            </div>
+                            <label className="profile-switch">
+                              <input
+                                type="checkbox"
+                                checked={notifSettings[option.key] !== false}
+                                onChange={() => handleToggleNotifSetting(option.key)}
+                              />
+                              <span className="profile-slider" />
+                            </label>
+                          </div>
+                        ))}
                       </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.chatFlagAlerts}
-                          onChange={() => handleToggleNotifSetting('chatFlagAlerts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
+                    )
+                  })}
 
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>📋 Comic Review Queue Reminders</strong>
-                        <p>Alert when pending comic or chapter submissions exceed queue threshold.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.reviewQueueReminders}
-                          onChange={() => handleToggleNotifSetting('reviewQueueReminders')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>💬 Project Team & Group Updates</strong>
-                        <p>Notifications when translation teams submit chapters or request project reviews.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.projectTeamUpdates}
-                          onChange={() => handleToggleNotifSetting('projectTeamUpdates')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-                  </div>
-                )}
-
-                {/* 2. AUTHOR */}
-                {roleUpper === 'AUTHOR' && (
-                  <div className="profile-notif-group">
-                    <h3 className="profile-notif-group-title">✍️ Author Hub Alerts</h3>
-                    
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>📚 Submission Approval & Rejection Status</strong>
-                        <p>Get notified immediately when your submitted comics or chapters are reviewed by Moderators.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.submissionStatusAlerts}
-                          onChange={() => handleToggleNotifSetting('submissionStatusAlerts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>💰 Royalty Earnings & Coin Payout Confirmations</strong>
-                        <p>Receive alerts for monthly comic revenue payouts and coin tips from readers.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.earningsPayoutAlerts}
-                          onChange={() => handleToggleNotifSetting('earningsPayoutAlerts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>💬 New Reader Comments on Comics</strong>
-                        <p>Notify when readers post new comments or reviews on your published comics.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.commentAlerts}
-                          onChange={() => handleToggleNotifSetting('commentAlerts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. TRANSLATOR / PROJECT LEADER */}
-                {(roleUpper === 'TRANSLATOR' || roleUpper === 'PROJECT_LEADER') && (
-                  <div className="profile-notif-group">
-                    <h3 className="profile-notif-group-title">🌐 Translation Workspace Alerts</h3>
-                    
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>🎯 Job Pool & New Project Openings</strong>
-                        <p>Alert when new unclaimed translation projects matching your language scope become available.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.jobPoolAlerts}
-                          onChange={() => handleToggleNotifSetting('jobPoolAlerts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>👥 Team Task Assignments & Mentions</strong>
-                        <p>Notifications for new chapter assignments and team workspace chat mentions.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.taskAssignments}
-                          onChange={() => handleToggleNotifSetting('taskAssignments')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>💰 Milestone Payout Confirmations</strong>
-                        <p>Alert when completed translation milestones are approved and paid out.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.milestonePayouts}
-                          onChange={() => handleToggleNotifSetting('milestonePayouts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-                  </div>
-                )}
-
-                {/* 4. ADMIN */}
-                {roleUpper === 'ADMIN' && (
-                  <div className="profile-notif-group">
-                    <h3 className="profile-notif-group-title">🛡️ System Administration Alerts</h3>
-                    
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>🔒 Security Audit & Access Alerts</strong>
-                        <p>Instant notifications for critical system log events, admin role grants, and security alerts.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.securityAuditAlerts}
-                          onChange={() => handleToggleNotifSetting('securityAuditAlerts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>📊 Revenue Milestones & Payout Requests</strong>
-                        <p>Alert when platform revenue milestones are reached or large payouts require approval.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.revenueMilestoneAlerts}
-                          onChange={() => handleToggleNotifSetting('revenueMilestoneAlerts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>👤 Account Appeals & Escalations</strong>
-                        <p>Notifications when banned users submit account unban appeals.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.appealAlerts}
-                          onChange={() => handleToggleNotifSetting('appealAlerts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-                  </div>
-                )}
-
-                {/* 5. GENERAL & EMAIL PREFERENCES */}
-                <div className="profile-notif-group">
-                  <h3 className="profile-notif-group-title">📢 General Platform & Email Preferences</h3>
-                  
-                  <div className="profile-notif-item">
-                    <div>
-                      <strong>📢 System Broadcasts & Platform News</strong>
-                      <p>Receive global platform updates, feature announcements, and maintenance news.</p>
-                    </div>
-                    <label className="profile-switch">
-                      <input
-                        type="checkbox"
-                        checked={!!notifSettings.systemBroadcasts}
-                        onChange={() => handleToggleNotifSetting('systemBroadcasts')}
-                      />
-                      <span className="profile-slider" />
-                    </label>
-                  </div>
-
-                  <div className="profile-notif-item">
-                    <div>
-                      <strong>📧 Daily / Weekly Activity Email Digest</strong>
-                      <p>Send a summary digest of activity and notifications directly to your email address.</p>
-                    </div>
-                    <label className="profile-switch">
-                      <input
-                        type="checkbox"
-                        checked={!!notifSettings.emailDigest}
-                        onChange={() => handleToggleNotifSetting('emailDigest')}
-                      />
-                      <span className="profile-slider" />
-                    </label>
-                  </div>
-                </div>
-
-                <button type="submit" className="profile-save-btn">
-                  Save Notification Preferences
-                </button>
-              </form>
+                  <button type="submit" className="profile-save-btn" disabled={notifSaving}>
+                    {notifSaving ? 'Saving...' : 'Save Notification Preferences'}
+                  </button>
+                </form>
+              )}
             </div>
           )}
         </div>
