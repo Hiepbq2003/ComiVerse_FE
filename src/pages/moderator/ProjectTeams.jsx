@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import '../../assets/style/moderator/project-teams.css'
 import { toast } from 'react-toastify'
-import { searchTranslatorsApi } from '../../services/api/AccountApi'
+import { searchTranslatorsApi, searchProjectLeadersApi } from '../../services/api/AccountApi'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import ModernPagination from '../../components/common/ModernPagination'
 import { useTheme } from '../../context/ThemeContext'
@@ -64,10 +64,14 @@ function ProjectTeams({
   }, [createTeamForm.comicName, projectTeams]);
 
   const availableTargetLanguages = useMemo(() => {
+    const sourceLower = String(createTeamForm.sourceLang || 'Japanese').toLowerCase().trim();
     return ALL_TARGET_LANGUAGES.filter(langObj => {
-      return !existingTargetLangsForSelectedComic.has(langObj.code.toLowerCase().trim());
+      const codeLower = langObj.code.toLowerCase().trim();
+      const isAlreadyAssigned = existingTargetLangsForSelectedComic.has(codeLower);
+      const isSourceLang = codeLower === sourceLower || langObj.label.toLowerCase().trim() === sourceLower || langObj.label.toLowerCase().includes(sourceLower);
+      return !isAlreadyAssigned && !isSourceLang;
     });
-  }, [existingTargetLangsForSelectedComic]);
+  }, [existingTargetLangsForSelectedComic, createTeamForm.sourceLang]);
 
   const genreOptions = useMemo(() => {
     if (Array.isArray(genres) && genres.length > 0) {
@@ -173,7 +177,11 @@ function ProjectTeams({
       }
     });
 
-    const remaining = ALL_TARGET_LANGUAGES.filter(l => !takenLangs.has(l.code.toLowerCase().trim()));
+    const sourceLower = String(autoSourceLang || 'Japanese').toLowerCase().trim();
+    const remaining = ALL_TARGET_LANGUAGES.filter(l => {
+      const codeLower = l.code.toLowerCase().trim();
+      return !takenLangs.has(codeLower) && codeLower !== sourceLower && l.label.toLowerCase().trim() !== sourceLower && !l.label.toLowerCase().includes(sourceLower);
+    });
     const firstAvailable = remaining.length > 0 ? remaining[0].code : '';
 
     const autoTitle = selectedTitle && firstAvailable ? `${selectedTitle} - ${firstAvailable} Translation Team` : '';
@@ -219,41 +227,44 @@ function ProjectTeams({
 
   const handleLeaderSearch = async (query) => {
     setLeaderSearch(query)
-    if (query.trim().length >= 2) {
-      setSearching(true)
-      try {
-        const data = await searchTranslatorsApi(query)
-        setLeaderSearchResults(data || [])
-      } catch (err) {
-        console.error(err)
-        setLeaderSearchResults([])
-      } finally {
-        setSearching(false)
-      }
-    } else {
+    setSearching(true)
+    try {
+      const data = await searchProjectLeadersApi(query)
+      setLeaderSearchResults(data || [])
+    } catch (err) {
+      console.error(err)
       setLeaderSearchResults([])
+    } finally {
+      setSearching(false)
     }
   }
 
   const handleCreateLeaderSearch = async (query) => {
     setCreateLeaderSearch(query)
-    if (query.trim().length >= 2) {
-      try {
-        const data = await searchTranslatorsApi(query)
-        setCreateLeaderResults(data || [])
-      } catch (err) {
-        console.error(err)
-        setCreateLeaderResults([])
-      }
-    } else {
+    try {
+      const data = await searchProjectLeadersApi(query)
+      setCreateLeaderResults(data || [])
+    } catch (err) {
+      console.error(err)
       setCreateLeaderResults([])
     }
   }
 
+  useEffect(() => {
+    if (showCreateTeamModal && createTeamStep === 2 && !selectedLeader) {
+      handleCreateLeaderSearch(createLeaderSearch || '')
+    }
+  }, [showCreateTeamModal, createTeamStep])
+
+  useEffect(() => {
+    if (showAssignModal) {
+      handleLeaderSearch(leaderSearch || '')
+    }
+  }, [showAssignModal])
+
   const openAssignLeaderModal = (teamId) => {
     setAssignTeamId(teamId)
     setLeaderSearch('')
-    setLeaderSearchResults([])
     setShowAssignModal(true)
   }
 
@@ -375,6 +386,7 @@ function ProjectTeams({
     setSelectedLeader(null)
     setCreateTeamStep(1)
     setShowCreateTeamModal(true)
+    handleCreateLeaderSearch('')
   }
 
   return (
@@ -508,7 +520,7 @@ function ProjectTeams({
               <button className="mod-modal-close-btn" onClick={() => setShowCreateTeamModal(false)}>×</button>
             </div>
 
-            <div className="mod-modal-body" style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="mod-modal-body" style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '12px', minHeight: '420px', maxHeight: '75vh' }}>
               {createTeamStep === 1 ? (
                 /* STEP 1: APPROVED COMIC SELECTOR & LANGUAGE CONFIG */
                 <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -671,8 +683,10 @@ function ProjectTeams({
                       <div className="leader-selected-card">
                         <span className="leader-result-avatar">{selectedLeader.initials}</span>
                         <div className="leader-result-info">
-                          <span className="leader-result-name">{selectedLeader.fullName || selectedLeader.username}</span>
-                          <span className="leader-result-email">{selectedLeader.email || 'Translator'}</span>
+                          <span className="leader-result-name">
+                            {selectedLeader.fullName || selectedLeader.username}
+                          </span>
+                          <span className="leader-result-email">{selectedLeader.email || 'Project Leader'}</span>
                         </div>
                         <button
                           type="button"
@@ -688,37 +702,35 @@ function ProjectTeams({
                         <input 
                           type="text" 
                           className="mod-input"
-                          placeholder="Search by name, username, or email..."
+                          placeholder="Search Project Leader by name, username, or email..."
                           value={createLeaderSearch}
                           onChange={(e) => handleCreateLeaderSearch(e.target.value)}
                           autoFocus
                         />
                         {createLeaderResults.length > 0 && (
-                          <div className="leader-search-dropdown">
+                          <div className="leader-search-results-list" style={{ marginTop: '12px', maxHeight: '330px', overflowY: 'auto' }}>
                             {createLeaderResults.map((t, idx) => (
                               <button
                                 key={t.id || idx}
                                 type="button"
-                                className="leader-search-result"
+                                className="leader-search-result-card"
                                 onClick={() => selectCreateLeader(t)}
                               >
                                 <span className="leader-result-avatar">{t.initials}</span>
                                 <div className="leader-result-info">
-                                  <span className="leader-result-name">{t.fullName || t.username}</span>
-                                  <span className="leader-result-email">{t.email || 'Translator'}</span>
+                                  <span className="leader-result-name">
+                                    {t.fullName || t.username}
+                                  </span>
+                                  <span className="leader-result-email">{t.email || 'Project Leader'}</span>
                                 </div>
+                                <span className="leader-result-assign-hint">Click to assign</span>
                               </button>
                             ))}
                           </div>
                         )}
-                        {createLeaderSearch.trim().length >= 2 && createLeaderResults.length === 0 && (
-                          <div className="leader-search-dropdown">
-                            <div className="leader-search-empty">No translators found matching "{createLeaderSearch}"</div>
-                          </div>
-                        )}
-                        {createLeaderSearch.trim().length < 2 && (
-                          <div className="leader-search-hint-inline">
-                            🔍 Type at least 2 characters to search translators
+                        {createLeaderResults.length === 0 && (
+                          <div className="leader-search-results-list" style={{ marginTop: '12px' }}>
+                            <div className="leader-search-empty">No Project Leaders found matching "{createLeaderSearch}".</div>
                           </div>
                         )}
                       </div>
@@ -792,31 +804,31 @@ function ProjectTeams({
       {/* ── MODAL: ASSIGN LEADER ─────────────────────── */}
       {showAssignModal && createPortal(
         <div className="mod-modal-overlay">
-          <div className="mod-modal-card" style={{ maxWidth: '480px' }}>
+          <div className="mod-modal-card wide" style={{ maxWidth: '640px', width: '90%' }}>
             <div className="mod-modal-header">
               <h3>👑 Assign Group Leader</h3>
               <button className="mod-modal-close-btn" onClick={() => setShowAssignModal(false)}>×</button>
             </div>
 
-            <div className="mod-modal-body">
+            <div className="mod-modal-body" style={{ minHeight: '380px', maxHeight: '75vh', overflowY: 'auto' }}>
               <div className="mod-form-group">
-                <label className="mod-label">Search Translator</label>
+                <label className="mod-label">Assign Group Leader *</label>
                 <input 
                   type="text" 
                   className="mod-input"
-                  placeholder="Type username or email to search..."
+                  placeholder="Type Project Leader username or email to search..."
                   value={leaderSearch}
                   onChange={(e) => handleLeaderSearch(e.target.value)}
                   autoFocus
                 />
               </div>
 
-              <div className="leader-search-results-list">
+              <div className="leader-search-results-list" style={{ maxHeight: '290px', overflowY: 'auto' }}>
                 {searching && (
-                  <div className="leader-search-empty">Searching...</div>
+                  <div className="leader-search-empty">Searching Project Leaders...</div>
                 )}
-                {!searching && leaderSearch.trim().length >= 2 && leaderSearchResults.length === 0 && (
-                  <div className="leader-search-empty">No translators found matching "{leaderSearch}"</div>
+                {!searching && leaderSearchResults.length === 0 && (
+                  <div className="leader-search-empty">No Project Leaders found matching "{leaderSearch}".</div>
                 )}
                 {!searching && leaderSearchResults.map((t, idx) => {
                   const displayName = t.fullName || t.username;
@@ -829,19 +841,15 @@ function ProjectTeams({
                     >
                       <span className="leader-result-avatar">{t.initials}</span>
                       <div className="leader-result-info">
-                        <span className="leader-result-name">{displayName}</span>
-                        <span className="leader-result-email">{t.email}</span>
+                        <span className="leader-result-name">
+                          {displayName}
+                        </span>
+                        <span className="leader-result-email">{t.email || 'Project Leader'}</span>
                       </div>
                       <span className="leader-result-assign-hint">Click to assign</span>
                     </button>
                   );
                 })}
-                {leaderSearch.trim().length < 2 && (
-                  <div className="leader-search-hint">
-                    <span>🔍</span>
-                    <p>Type at least 2 characters to search for translators in the system.</p>
-                  </div>
-                )}
               </div>
             </div>
 
