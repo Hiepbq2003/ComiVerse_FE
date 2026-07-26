@@ -1773,12 +1773,11 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
 
               <div className="trans-form-group">
                 <label className="trans-form-label">Due Date *</label>
-                <input
-                  type="date"
-                  className="trans-form-input"
-                  style={errorBorder('dueDate')}
+                <CustomDatePicker
                   value={editTaskData.dueDate}
-                  onChange={(e) => setEditTaskData({ ...editTaskData, dueDate: e.target.value })}
+                  onChange={(val) => setEditTaskData({ ...editTaskData, dueDate: val })}
+                  placeholder="Select due date"
+                  style={errorBorder('dueDate')}
                 />
                 {showError('dueDate') && (
                   <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Due date is required</p>

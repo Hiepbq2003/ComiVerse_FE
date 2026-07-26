@@ -8,7 +8,14 @@ const MONTH_NAMES = [
 
 const WEEKDAY_NAMES = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-export default function CustomDatePicker({ value, onChange, placeholder = 'Select date of birth' }) {
+export default function CustomDatePicker({ 
+  value, 
+  onChange, 
+  placeholder = 'Select date of birth',
+  style,
+  className = '',
+  disabled = false
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
 
@@ -118,11 +125,12 @@ export default function CustomDatePicker({ value, onChange, placeholder = 'Selec
   };
 
   return (
-    <div className={`custom-datepicker-container ${isOpen ? 'open' : ''}`} ref={containerRef}>
+    <div className={`custom-datepicker-container ${isOpen ? 'open' : ''} ${className}`} ref={containerRef}>
       {/* Input box displaying selected date */}
       <div 
         className={`custom-datepicker-input ${isOpen ? 'active' : ''}`}
-        onClick={() => setIsOpen(!isOpen)}
+        style={style}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
       >
         <span className="custom-datepicker-value">{getFormattedDisplay()}</span>
         <Calendar className="custom-datepicker-icon" size={18} />
