@@ -1925,8 +1925,42 @@ body {
 
 .custom-datepicker-value {
   font-family: inherit;
-  font-weight: 500;
-  color: #f8fafc;
+  font-weight: 600;
+  font-size: 14px;
+  color: #ffffff;
+}
+
+.custom-datepicker-value.is-placeholder {
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 400;
+}
+
+.custom-datepicker-value.is-selected {
+  color: #ffffff !important;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+html.light .custom-datepicker-input,
+.light .custom-datepicker-input {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html.light .custom-datepicker-value.is-placeholder,
+.light .custom-datepicker-value.is-placeholder {
+  color: #94a3b8 !important;
+}
+
+html.light .custom-datepicker-value.is-selected,
+.light .custom-datepicker-value.is-selected {
+  color: #0f172a !important;
+}
+
+html.light .custom-datepicker-icon,
+.light .custom-datepicker-icon {
+  color: #7e22ce !important;
 }
 
 .custom-datepicker-icon {

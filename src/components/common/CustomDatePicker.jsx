@@ -68,14 +68,27 @@ export default function CustomDatePicker({
   const updateCoords = () => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
+    const actualHeight = popoverRef.current ? popoverRef.current.offsetHeight : 345;
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
-    const popoverHeight = 330;
-    const dropUp = spaceBelow < popoverHeight && spaceAbove > spaceBelow;
+
+    let top;
+    let dropUp = false;
+
+    if (spaceBelow >= actualHeight + 8) {
+      top = rect.bottom + 6;
+      dropUp = false;
+    } else if (spaceAbove >= actualHeight + 8) {
+      top = rect.top - actualHeight - 6;
+      dropUp = true;
+    } else {
+      top = Math.max(10, window.innerHeight - actualHeight - 10);
+      dropUp = rect.top > window.innerHeight / 2;
+    }
 
     setCoords({
-      top: dropUp ? rect.top - popoverHeight - 6 : rect.bottom + 6,
-      left: Math.min(Math.max(10, rect.left), window.innerWidth - 320),
+      top,
+      left: Math.min(Math.max(10, rect.left), window.innerWidth - 330),
       width: Math.max(rect.width, 310),
       dropUp
     });
@@ -84,10 +97,14 @@ export default function CustomDatePicker({
   useEffect(() => {
     if (isOpen) {
       updateCoords();
+      const frameId = requestAnimationFrame(() => {
+        updateCoords();
+      });
       const handleScrollOrResize = () => updateCoords();
       window.addEventListener('scroll', handleScrollOrResize, true);
       window.addEventListener('resize', handleScrollOrResize);
       return () => {
+        cancelAnimationFrame(frameId);
         window.removeEventListener('scroll', handleScrollOrResize, true);
         window.removeEventListener('resize', handleScrollOrResize);
       };
@@ -162,11 +179,13 @@ export default function CustomDatePicker({
     <div className={`custom-datepicker-container ${isOpen ? 'open' : ''} ${className}`} ref={containerRef}>
       {/* Input box displaying selected date */}
       <div 
-        className={`custom-datepicker-input ${isOpen ? 'active' : ''}`}
+        className={`custom-datepicker-input ${isOpen ? 'active' : ''} ${!parsed ? 'is-placeholder-state' : 'has-value-state'}`}
         style={style}
         onClick={() => !disabled && setIsOpen(!isOpen)}
       >
-        <span className="custom-datepicker-value">{getFormattedDisplay()}</span>
+        <span className={`custom-datepicker-value ${!parsed ? 'is-placeholder' : 'is-selected'}`}>
+          {getFormattedDisplay()}
+        </span>
         <Calendar className="custom-datepicker-icon" size={18} />
       </div>
 

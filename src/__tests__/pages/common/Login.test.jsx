@@ -137,4 +137,36 @@ describe('Login Component Unit & Security Tests (Login.test.jsx)', () => {
       expect(mockShowAlert).toHaveBeenCalledWith('error', 'Please verify your email before logging in.');
     });
   });
+
+  it('should enforce 5 failed login attempts limit and lock account for 10 minutes to prevent spam', async () => {
+    AuthApi.loginApi.mockRejectedValue({
+      response: { status: 401, data: { message: 'Invalid username or password.' } }
+    });
+
+    renderLogin();
+
+    const usernameInput = screen.getByPlaceholderText(/enter username or email/i);
+    const passwordInput = screen.getByPlaceholderText(/enter password/i);
+    const submitBtn = screen.getByRole('button', { name: /sign in/i });
+
+    // Try 5 failed attempts sequentially with proper async state waiting
+    for (let i = 1; i <= 5; i++) {
+      fireEvent.change(usernameInput, { target: { value: 'attacker_user' } });
+      fireEvent.change(passwordInput, { target: { value: `WrongPass${i}` } });
+      fireEvent.click(submitBtn);
+
+      if (i < 5) {
+        await waitFor(() => {
+          expect(screen.getByText(new RegExp(`${5 - i} attempt`, 'i'))).toBeInTheDocument();
+        });
+      }
+    }
+
+    await waitFor(() => {
+      expect(screen.getByText('You have failed 5 times! Your account login is locked for 10 minutes to prevent spam.')).toBeInTheDocument();
+      expect(screen.getByText(/Login Locked:/i)).toBeInTheDocument();
+      expect(submitBtn).toBeDisabled();
+    });
+  });
 });
+
