@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import Swal from "sweetalert2";
+import { toast } from "react-toastify";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -1037,37 +1037,26 @@ export default function ReviewWorkspace() {
     if (deciding) return;
     const isApprove = decision === "approved";
 
-    const result = await Swal.fire({
-      title: "Are you sure?",
-      text: isApprove
-        ? "This will approve the chapter and publish it."
-        : "This will send the chapter back to the translator for changes.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#3085d6",
-      cancelButtonColor: "#d33",
-      confirmButtonText: isApprove ? "Yes, approve it!" : "Yes, request changes!",
-    });
-    if (!result.isConfirmed) return;
+    const confirmMessage = isApprove
+      ? "Are you sure you want to approve this chapter and publish it?"
+      : "Are you sure you want to request changes and send this chapter back to the translator?";
+    
+    if (!window.confirm(confirmMessage)) return;
 
     setDeciding(true);
     try {
       await submitDecision(taskId, decision);
 
-      await Swal.fire({
-        title: isApprove ? "Approved!" : "Changes requested",
-        text: isApprove
-          ? "The chapter has been approved and published."
-          : "The translator has been notified to make changes.",
-        icon: "success",
-        timer: 1500,
-        showConfirmButton: false,
-      });
+      if (isApprove) {
+        toast.success("The chapter has been approved and published!");
+      } else {
+        toast.info("Changes requested. The translator has been notified.");
+      }
 
       goBackToProjectTeams();
     } catch (err) {
       console.error("Failed to submit decision:", err);
-      Swal.fire("Error", "Failed to submit your decision. Please try again.", "error");
+      toast.error("Failed to submit your decision. Please try again.");
     } finally {
       setDeciding(false);
     }
