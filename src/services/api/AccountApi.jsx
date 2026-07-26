@@ -34,3 +34,8 @@ export const updateUserApi = (userId, data) => {
 export const searchTranslatorsApi = (query) => {
   return AxiosClient.get('/users/translators', { params: { query } });
 };
+
+// Search active project leaders (strictly from real backend data)
+export const searchProjectLeadersApi = (query) => {
+  return AxiosClient.get('/users/project-leaders', { params: { query } });
+};
