@@ -1,5 +1,6 @@
 import React from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Profile from '../../../pages/common/Profile'
 import * as AuthApi from '../../../services/api/AuthApi'
@@ -14,8 +15,13 @@ vi.mock('../../../context/AuthContext', () => ({
 vi.mock('../../../services/api/AuthApi', () => ({
   changePasswordApi: vi.fn(),
   getMeApi: vi.fn(),
+  getUserInteractionCountsApi: vi.fn().mockResolvedValue({}),
   updateProfileApi: vi.fn(),
   uploadAvatarApi: vi.fn(),
+}))
+
+vi.mock('../../../services/api/RatingApi', () => ({
+  getUserRatingsApi: vi.fn(),
 }))
 
 vi.mock('../../../services/api/NotificationApi', () => ({
@@ -28,6 +34,11 @@ vi.mock('../../../components/layout/AdminLayout', () => ({ default: ({ children 
 vi.mock('../../../components/layout/ModeratorLayout', () => ({ default: ({ children }) => <>{children}</> }))
 vi.mock('../../../components/layout/TranslatorLayout', () => ({ default: ({ children }) => <>{children}</> }))
 vi.mock('../../../components/layout/AuthorLayout', () => ({ default: ({ children }) => <>{children}</> }))
+vi.mock('../../../components/common/CustomDatePicker', () => ({
+  default: ({ value, onChange }) => (
+    <input type="date" value={value || ''} onChange={event => onChange(event.target.value)} />
+  ),
+}))
 
 vi.mock('react-toastify', () => ({
   toast: {
@@ -45,6 +56,12 @@ const baseUser = {
   email: 'reader@example.com',
   role: 'READER',
 }
+
+const renderProfile = user => render(
+  <MemoryRouter>
+    <Profile user={user} />
+  </MemoryRouter>,
+)
 
 function prepareApi(user = baseUser, preferences = {
   role: user.role,
@@ -75,7 +92,7 @@ describe('Profile API integration', () => {
       bio: 'Updated bio',
     })
 
-    const { container } = render(<Profile user={baseUser} />)
+    const { container } = renderProfile(baseUser)
 
     await waitFor(() => expect(AuthApi.getMeApi).toHaveBeenCalled())
     const dateInput = container.querySelector('input[type="date"]')
@@ -110,7 +127,7 @@ describe('Profile API integration', () => {
       preferences: { ...preferenceResponse.preferences, SUBMISSION_STATUS: false },
     })
 
-    render(<Profile user={author} />)
+    renderProfile(author)
     fireEvent.click(screen.getByRole('button', { name: /Notification Settings/i }))
 
     expect(await screen.findByText('Submission status')).toBeInTheDocument()

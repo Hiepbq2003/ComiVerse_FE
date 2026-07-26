@@ -107,10 +107,9 @@ describe('User Registration Component Unit & Security Tests (Register.jsx)', () 
     fireEvent.change(screen.getByPlaceholderText(/create password/i), { target: { value: 'ValidPass123!' } });
     fireEvent.change(screen.getByPlaceholderText(/confirm password/i), { target: { value: 'ValidPass123!' } });
 
-    // Under 13 Date of birth (recent year)
-    const recentYear = new Date().getFullYear() - 10;
-    const dobInput = document.getElementById('signup-dob');
-    fireEvent.change(dobInput, { target: { value: `${recentYear}-01-01` } });
+    // Choosing today always represents a user under 13.
+    fireEvent.click(screen.getByText('Select date of birth'));
+    fireEvent.click(screen.getByRole('button', { name: 'Today' }));
 
     const formElement = screen.getByRole('button', { name: /create account/i }).closest('form');
     fireEvent.submit(formElement);
