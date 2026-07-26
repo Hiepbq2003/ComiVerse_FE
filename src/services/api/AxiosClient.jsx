@@ -63,9 +63,16 @@ AxiosClient.interceptors.response.use(
         } 
         else if (status === 403 && !isLoginRequest) {
             // 403: Forbidden / Access Denied
-            // Suppress global toast for background chat & workspace endpoints to prevent intrusive popups
-            const isBackgroundEndpoint = requestUrl.includes('/chat/') || requestUrl.includes('/team-workspace/');
-            if (!isBackgroundEndpoint) {
+            // Suppress global toast for background chat, workspace endpoints, and GET queries to prevent intrusive popups
+            const isBackgroundOrFallbackEndpoint = 
+                error.config?.suppressToast || 
+                error.config?.headers?.['X-Suppress-Toast'] ||
+                requestUrl.includes('/chat/') || 
+                requestUrl.includes('/team-workspace/') ||
+                requestUrl.includes('/notifications') ||
+                error.config?.method === 'get';
+
+            if (!isBackgroundOrFallbackEndpoint) {
                 toast.error("Access denied! There is an issue with your account permissions.", {
                     toastId: "forbidden-403"
                 });
@@ -73,8 +80,24 @@ AxiosClient.interceptors.response.use(
         }
         else if (status === 500) {
             // 500: Internal Server Error
-            const isBackgroundEndpoint = requestUrl.includes('/chat/') || requestUrl.includes('/chat-flags/') || requestUrl.includes('/team-workspace/');
-            if (!isBackgroundEndpoint) {
+            // Suppress global toast for background endpoints and GET data queries that have frontend fallback pipelines
+            const isBackgroundOrFallbackEndpoint = 
+                error.config?.suppressToast || 
+                error.config?.headers?.['X-Suppress-Toast'] ||
+                requestUrl.includes('/chat/') || 
+                requestUrl.includes('/chat-flags/') || 
+                requestUrl.includes('/team-workspace/') ||
+                requestUrl.includes('/notifications') ||
+                requestUrl.includes('/comics') || 
+                requestUrl.includes('/chapters') || 
+                requestUrl.includes('/submissions') || 
+                requestUrl.includes('/project-teams') ||
+                requestUrl.includes('/translation-pool') ||
+                requestUrl.includes('/genres') ||
+                requestUrl.includes('/broadcasts') ||
+                error.config?.method === 'get';
+
+            if (!isBackgroundOrFallbackEndpoint) {
                 toast.error("System error (Server Error). Please try again later!", {
                     toastId: "server-error-500"
                 });

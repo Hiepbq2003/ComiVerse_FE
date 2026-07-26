@@ -218,6 +218,9 @@ html.light .admin-nav-item.active {
 .admin-main {
   flex: 1;
   margin-left: var(--admin-sidebar-w);
+  width: calc(100% - var(--admin-sidebar-w));
+  max-width: calc(100% - var(--admin-sidebar-w));
+  min-width: 0;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -353,7 +356,10 @@ html.light .admin-notification-btn:hover svg {
 /* ── PAGE CONTENT ────────────────────────────────── */
 .admin-page-content {
   flex: 1;
+  width: 100%;
+  min-width: 0;
   padding: 32px;
+  box-sizing: border-box;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -499,7 +505,11 @@ html.light .admin-notification-btn:hover svg {
   background: var(--admin-card-bg);
   border: 1px solid var(--admin-border);
   border-radius: var(--admin-radius-lg);
-  overflow: hidden;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .admin-data-table {
@@ -1771,6 +1781,8 @@ html.light .btn-action-sm--reset:hover {
   }
   .admin-main {
     margin-left: 0;
+    width: 100%;
+    max-width: 100%;
   }
   .admin-page-header {
     flex-direction: column;

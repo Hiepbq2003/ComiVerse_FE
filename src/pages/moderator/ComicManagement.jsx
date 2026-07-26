@@ -468,9 +468,9 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                   <td>
                     <div className="comic-cell-info">
                       <div className="comic-cell-thumbnail">
-                        {(comic.cover || comic.coverImageUrl) ? (
+                        {(comic.cover || comic.coverImage || comic.coverImageUrl || comic.coverUrl || comic.cover_url || comic.imageUrl) ? (
                           <img 
-                            src={comic.cover || comic.coverImageUrl} 
+                            src={comic.cover || comic.coverImage || comic.coverImageUrl || comic.coverUrl || comic.cover_url || comic.imageUrl} 
                             alt={comic.title} 
                             onError={(e) => {
                               e.target.onerror = null;
@@ -962,7 +962,9 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                     {chaptersList.map((chap) => (
                       <tr key={chap.id} style={{ borderBottom: '1px solid var(--mod-border)' }}>
                         <td style={{ padding: '12px', fontWeight: 'bold' }}>Chapter {chap.chapterNumber}</td>
-                        <td style={{ padding: '12px' }}>{chap.title || <span style={{ color: 'var(--mod-text-muted)', fontStyle: 'italic' }}>Untitled</span>}</td>
+                        <td style={{ padding: '12px' }}>
+                          {chap.title || chap.manuscriptTitle || chap.chapterTitle || chap.chapter || chap.name || `Chapter ${chap.chapterNumber || chap.number || 1}`}
+                        </td>
                         <td style={{ padding: '12px' }}>
                           <span className={`comic-status-badge ${chap.isPremium ? 'paused' : 'ongoing'}`} style={{ fontSize: '11px', padding: '2px 6px' }}>
                             {chap.isPremium ? 'Premium' : 'Free'}
