@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const MONTH_NAMES = [
@@ -18,6 +19,8 @@ export default function CustomDatePicker({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
+  const popoverRef = useRef(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 310, dropUp: false });
 
   // Parse YYYY-MM-DD string into date values
   const parseValue = (val) => {
@@ -52,13 +55,44 @@ export default function CustomDatePicker({
   // Click outside listener
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+      const clickedContainer = containerRef.current && containerRef.current.contains(event.target);
+      const clickedPopover = popoverRef.current && popoverRef.current.contains(event.target);
+      if (!clickedContainer && !clickedPopover) {
         setIsOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const updateCoords = () => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const popoverHeight = 330;
+    const dropUp = spaceBelow < popoverHeight && spaceAbove > spaceBelow;
+
+    setCoords({
+      top: dropUp ? rect.top - popoverHeight - 6 : rect.bottom + 6,
+      left: Math.min(Math.max(10, rect.left), window.innerWidth - 320),
+      width: Math.max(rect.width, 310),
+      dropUp
+    });
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      updateCoords();
+      const handleScrollOrResize = () => updateCoords();
+      window.addEventListener('scroll', handleScrollOrResize, true);
+      window.addEventListener('resize', handleScrollOrResize);
+      return () => {
+        window.removeEventListener('scroll', handleScrollOrResize, true);
+        window.removeEventListener('resize', handleScrollOrResize);
+      };
+    }
+  }, [isOpen]);
 
   const handlePrevMonth = () => {
     if (viewMonth === 0) {
@@ -136,9 +170,17 @@ export default function CustomDatePicker({
         <Calendar className="custom-datepicker-icon" size={18} />
       </div>
 
-      {/* Popover Calendar Modal */}
-      {isOpen && (
-        <div className="custom-datepicker-popover fade-in">
+      {/* Popover Calendar Modal Rendered via Portal to avoid any clipping from overflow-y modals/containers */}
+      {isOpen && createPortal(
+        <div 
+          ref={popoverRef}
+          className={`custom-datepicker-popover fade-in ${coords.dropUp ? 'drop-up' : ''}`}
+          style={{
+            top: `${coords.top}px`,
+            left: `${coords.left}px`,
+            width: `${coords.width}px`
+          }}
+        >
           {/* Header Controls */}
           <div className="custom-datepicker-header">
             <div className="custom-datepicker-header-selects">
@@ -244,7 +286,8 @@ export default function CustomDatePicker({
               Today
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

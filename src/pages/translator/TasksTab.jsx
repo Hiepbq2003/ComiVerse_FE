@@ -215,7 +215,11 @@ function KanbanColumn({
   onToggleHighlight,
   onMoveAllToDone,
   onOpenTaskDetails,
-  getAssigneeInitials
+  getAssigneeInitials,
+  unassignedChapterOptions,
+  isCurrentLeader,
+  onCreateTaskClick,
+  onViewChapterClick
 }) {
   return (
     <div
@@ -226,7 +230,9 @@ function KanbanColumn({
         <div className="column__label">
           <div className={`column__dot ${col.dotClass}`}></div>
           <h2>{col.title}</h2>
-          <span className="column__count">{colTasks.length}</span>
+          <span className="column__count">
+            {colTasks.length + (col.id === 'backlog' && unassignedChapterOptions ? unassignedChapterOptions.length : 0)}
+          </span>
         </div>
         <div className={`column__add-wrap ${isDropdownOpen ? 'open' : ''}`}>
           <button
@@ -264,6 +270,70 @@ function KanbanColumn({
       </div>
 
       <div className="task-list" style={{ opacity: isLocked ? 0.6 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>
+        {col.id === 'backlog' && unassignedChapterOptions && unassignedChapterOptions.map((ch, idx) => (
+          <div
+            key={`raw-ch-${ch.id || idx}`}
+            className="task-card task-card-item"
+            style={{
+              background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(99, 102, 241, 0.08))',
+              border: '1.5px dashed rgba(168, 85, 247, 0.4)',
+              padding: '14px',
+              borderRadius: '12px',
+              marginBottom: '12px',
+              transition: 'all 0.2s ease',
+              cursor: 'pointer',
+              position: 'relative'
+            }}
+            onClick={() => onViewChapterClick && onViewChapterClick(ch)}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '11px', background: 'rgba(168, 85, 247, 0.25)', color: '#c084fc', padding: '3px 8px', borderRadius: '6px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                📖 Raw Chapter
+              </span>
+              {ch.pagesCount > 0 && (
+                <span style={{ fontSize: '11px', color: 'var(--trans-text-secondary)', fontWeight: '600', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
+                  {ch.pagesCount} pages
+                </span>
+              )}
+            </div>
+
+            <h4 style={{ margin: '6px 0 8px', fontSize: '14px', fontWeight: '700', color: 'var(--trans-text-primary)', lineHeight: '1.4' }}>
+              {ch.title}
+            </h4>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <span style={{ fontSize: '11.5px', color: '#34d399', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                ● Ready to Translate
+              </span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  className="trans-btn secondary"
+                  style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewChapterClick && onViewChapterClick(ch);
+                  }}
+                >
+                  👁️ View
+                </button>
+                {isCurrentLeader && (
+                  <button
+                    type="button"
+                    className="trans-btn primary"
+                    style={{ fontSize: '11px', padding: '4px 10px', background: 'linear-gradient(110deg, #a855f7 0%, #ec4899 100%)', border: 'none', color: '#fff', borderRadius: '6px', fontWeight: '700', boxShadow: '0 2px 8px rgba(168,85,247,0.3)' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCreateTaskClick && onCreateTaskClick({ chapterId: ch.id, title: ch.title });
+                    }}
+                  >
+                    + Task
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
         {colTasks.map(task => (
           <TaskCard
             key={task.id}
@@ -319,7 +389,8 @@ function TasksTab({
   members,
   isCurrentLeader,
   chapterOptions = [],
-  onOpenCreateTaskWithChapter
+  onOpenCreateTaskWithChapter,
+  onCreateTask
 }) {
   const [inspectingChapter, setInspectingChapter] = useState(null);
   const [isBacklogCollapsed, setIsBacklogCollapsed] = useState(false);
@@ -368,104 +439,6 @@ function TasksTab({
   return (
     <div className="board tasks-board-tab-container fade-in" style={{ padding: 0, background: 'transparent' }}>
       
-      {/* ── RAW MANUSCRIPT CHAPTERS BACKLOG ──────────────── */}
-      {unassignedChapterOptions.length > 0 && (
-        <div style={{
-          padding: '14px 20px',
-          borderRadius: '12px',
-          background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(99, 102, 241, 0.08))',
-          border: '1px solid rgba(168, 85, 247, 0.25)',
-          marginBottom: '20px'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => setIsBacklogCollapsed(prev => !prev)}>
-              <svg
-                xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                style={{ color: '#c084fc', transform: isBacklogCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
-              >
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'var(--trans-text-primary)' }}>
-                📖 Raw Manuscript Chapters Available ({unassignedChapterOptions.length})
-              </h4>
-              <span style={{ fontSize: '11px', color: '#c084fc', background: 'rgba(168, 85, 247, 0.15)', padding: '2px 8px', borderRadius: '6px' }}>
-                Ready to Translate
-              </span>
-            </div>
-
-            {isCurrentLeader && (
-              <button
-                type="button"
-                className="trans-btn primary"
-                onClick={() => onCreateTaskClick()}
-                style={{ fontSize: '11.5px', padding: '4px 10px', borderRadius: '6px' }}
-              >
-                <Plus size={13} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Create Task
-              </button>
-            )}
-          </div>
-
-          {!isBacklogCollapsed && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px', marginTop: '12px' }}>
-              {unassignedChapterOptions.map((ch, idx) => (
-                <div key={ch.id || idx} style={{
-                  padding: '12px 14px',
-                  borderRadius: '10px',
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  gap: '10px'
-                }}>
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
-                      <strong style={{ fontSize: '13px', color: 'var(--trans-text-primary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                        {ch.title}
-                      </strong>
-                      {ch.pagesCount > 0 && (
-                        <span style={{ fontSize: '10.5px', background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', padding: '2px 6px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
-                          {ch.pagesCount} pages
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="trans-btn secondary"
-                    onClick={() => setInspectingChapter(ch)}
-                    style={{ width: '100%', padding: '5px 0', fontSize: '11.5px', textAlign: 'center' }}
-                  >
-                    👁️ View Chapter
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Raw Chapter Manuscript Viewer & Review Mode Full-Screen Workspace */}
-      {inspectingChapter && (
-        <ChapterInspectModal
-          chapter={inspectingChapter}
-          onClose={() => setInspectingChapter(null)}
-          comicName={comicName}
-          comicId={comicId}
-          chapterOptions={chapterOptions}
-          teamMembersForAssign={members}
-          onCreateTask={(taskData) => {
-            if (onOpenCreateTaskWithChapter) {
-              onOpenCreateTaskWithChapter(taskData);
-            } else if (onCreateTaskClick) {
-              onCreateTaskClick(taskData);
-            }
-          }}
-        />
-      )}
-
       {/* ── KANBAN BOARD CARD ────────────────────────────── */}
       <div className="board__card">
         <div className="board__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--trans-border)' }}>
@@ -608,6 +581,10 @@ function TasksTab({
                 }}
                 onOpenTaskDetails={onOpenTaskDetails}
                 getAssigneeInitials={getAssigneeInitials}
+                unassignedChapterOptions={unassignedChapterOptions}
+                isCurrentLeader={isCurrentLeader}
+                onCreateTaskClick={onOpenCreateTaskWithChapter || onCreateTaskClick}
+                onViewChapterClick={(ch) => setInspectingChapter(ch)}
               />
             )
           })}
@@ -631,6 +608,30 @@ function TasksTab({
           )}
         </div>
       </div>
+
+      {/* Raw Chapter Manuscript Viewer & Review Mode Full-Screen Workspace */}
+      {inspectingChapter && (
+        <ChapterInspectModal
+          chapter={inspectingChapter}
+          onClose={() => setInspectingChapter(null)}
+          comicName={comicName}
+          comicId={comicId}
+          chapterOptions={chapterOptions}
+          teamMembersForAssign={members}
+          onCreateTask={async (taskData) => {
+            if (onCreateTask) {
+              await onCreateTask(taskData);
+              setInspectingChapter(null);
+            } else if (onOpenCreateTaskWithChapter) {
+              onOpenCreateTaskWithChapter(taskData);
+              setInspectingChapter(null);
+            } else if (onCreateTaskClick) {
+              onCreateTaskClick(taskData);
+              setInspectingChapter(null);
+            }
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -680,7 +681,7 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [inspectTaskData, setInspectTaskData] = useState({
     title: '',
-    column: 'backlog',
+    column: 'in_progress',
     assignees: [],
     dueDate: '',
     priority: 'High',
@@ -692,7 +693,7 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
     const defaultTitle = `${chapter?.title || `Chapter ${chapter?.number || chapter?.chapterNumber || ''}`} - Translation & Proofreading`;
     setInspectTaskData({
       title: defaultTitle,
-      column: 'backlog',
+      column: 'in_progress',
       assignees: [],
       dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
       priority: 'High',
@@ -1357,12 +1358,18 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
 }
 
 function AssigneeChipPicker({ candidates, selectedIds, onToggle, emptyLabel, readOnly = false }) {
-  if (!Array.isArray(candidates) || candidates.length === 0) {
+  const assignableCandidates = (candidates || []).filter(m => {
+    const roleStr = String(m.role || '').toLowerCase().trim();
+    const isLeaderRole = m.isLeader || roleStr.includes('leader') || roleStr === 'group leader' || roleStr === 'project leader' || roleStr === 'team leader' || roleStr === 'project_leader' || roleStr === 'team_leader';
+    return !isLeaderRole;
+  });
+
+  if (!Array.isArray(assignableCandidates) || assignableCandidates.length === 0) {
     return <p style={{ fontSize: '12px', color: 'var(--trans-text-muted)', margin: 0 }}>{emptyLabel || 'No assignees available'}</p>
   }
   return (
     <div className="trans-assignees-picker" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '4px 0' }}>
-      {candidates.map((m) => {
+      {assignableCandidates.map((m) => {
         const memberId = m.id || m.userId;
         const isSelected = (selectedIds || []).includes(memberId);
         const displayName = m.fullName || m.name || m.username || 'User';
