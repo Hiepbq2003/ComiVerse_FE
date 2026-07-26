@@ -571,7 +571,7 @@ function AccountManagement() {
           <h1>Account Management</h1>
           <p>{totalElements} account{totalElements !== 1 ? 's' : ''} found</p>
         </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div className="admin-account-management-actions">
           <AnimatedButton
             variant={3}
             label="+ Create User Account"
