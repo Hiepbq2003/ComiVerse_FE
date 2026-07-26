@@ -753,7 +753,7 @@ function ModeratorComicDetail() {
                     </tr>
                   </thead>
                   <tbody>
-                    {chapters.map(chap => (
+                    {chapters.map((chap, index) => (
                       <tr key={chap.id}>
                         <td>
                           <strong>Chapter {chap.chapterNumber}</strong>
