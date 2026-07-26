@@ -96,13 +96,14 @@ function ProjectTeams({
         genre: s.genre || s.genres?.[0] || 'General',
         genres: s.genres || [s.genre || 'General'],
         status: 'approved',
-        approvedAt: s.approvedAt || s.timestamp || new Date().toISOString(),
-        createdAt: s.createdAt || s.timestamp || new Date().toISOString()
+        approvedAt: s.approvedAt || s.timestamp || s.createdAt || null,
+        createdAt: s.createdAt || s.timestamp || null
       }));
 
     const approvedFromComics = (comics || []).map(c => ({
       ...c,
-      approvedAt: c.approvedAt || c.createdAt || c.timestamp || new Date().toISOString()
+      approvedAt: c.approvedAt || c.lastChapterUpdatedAt || c.createdAt || c.timestamp || null,
+      createdAt: c.createdAt || c.timestamp || null
     }));
 
     const merged = [...approvedFromSubmissions, ...approvedFromComics];
@@ -129,15 +130,17 @@ function ProjectTeams({
       }
 
       // 2. Date Approved Filter
-      const rawDate = c.approvedAt || c.createdAt || c.timestamp || c.date;
-      const comicDate = rawDate ? new Date(rawDate) : new Date();
+      const rawDate = c.approvedAt || c.lastChapterUpdatedAt || c.createdAt || c.timestamp || c.date;
+      const comicDate = rawDate ? new Date(rawDate) : null;
 
       if (dateApprovedFilter === 'today') {
-        if (!isSameDay(comicDate, now)) return false;
+        if (!comicDate || isNaN(comicDate.getTime()) || !isSameDay(comicDate, now)) return false;
       } else if (dateApprovedFilter === '7days') {
+        if (!comicDate || isNaN(comicDate.getTime())) return false;
         const diffDays = Math.ceil(Math.abs(now - comicDate) / (1000 * 60 * 60 * 24));
         if (diffDays > 7) return false;
       } else if (dateApprovedFilter === '30days') {
+        if (!comicDate || isNaN(comicDate.getTime())) return false;
         const diffDays = Math.ceil(Math.abs(now - comicDate) / (1000 * 60 * 60 * 24));
         if (diffDays > 30) return false;
       }
@@ -158,9 +161,8 @@ function ProjectTeams({
   }, [allApprovedItems, dateApprovedFilter, selectedGenre, comicSearchQuery]);
 
   const availableComicsDropdown = useMemo(() => {
-    if (filteredApprovedComics.length > 0) return filteredApprovedComics;
-    return allApprovedItems;
-  }, [filteredApprovedComics, allApprovedItems]);
+    return filteredApprovedComics;
+  }, [filteredApprovedComics]);
 
   const handleSelectApprovedComic = (selectedTitle) => {
     const foundComic = allApprovedItems.find(c => c.title === selectedTitle);
@@ -596,12 +598,18 @@ function ProjectTeams({
                       value={createTeamForm.comicName}
                       onChange={(e) => handleSelectApprovedComic(e.target.value)}
                     >
-                      <option value="">-- Choose Approved Comic --</option>
-                      {availableComicsDropdown.map((c) => (
-                        <option key={c.id} value={c.title}>
-                          📚 {c.title} · {c.language || 'Japanese'}
-                        </option>
-                      ))}
+                      {availableComicsDropdown.length === 0 ? (
+                        <option value="">-- No Approved Comics Found for Selected Filters --</option>
+                      ) : (
+                        <>
+                          <option value="">-- Choose Approved Comic ({availableComicsDropdown.length} Available) --</option>
+                          {availableComicsDropdown.map((c) => (
+                            <option key={c.id} value={c.title}>
+                              📚 {c.title} · {c.language || 'Japanese'}
+                            </option>
+                          ))}
+                        </>
+                      )}
                     </select>
                   </div>
 
