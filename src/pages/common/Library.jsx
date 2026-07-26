@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { toast } from 'react-toastify'
 import ConfirmModal from '../../components/common/ConfirmModal'
+import { Trash2 } from 'lucide-react'
 import '../../assets/style/reader/library.css'
 
 // Import assets
@@ -425,7 +426,7 @@ function Library() {
                         onClick={(e) => requestRemoveItem(comicId, comicTitle, e)}
                         title="Xóa khỏi danh sách"
                       >
-                        🗑️
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   );

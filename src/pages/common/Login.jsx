@@ -57,6 +57,7 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
       }
 
       const userData = {
+        ...meData,
         userId: meData.userId,
         username: meData.username,
         fullName: meData.fullName,
