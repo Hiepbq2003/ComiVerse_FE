@@ -15,8 +15,8 @@ import {
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import "../../assets/style/translator/TranslateWorkspace.css";
+import { API_BASE_URL as API_BASE } from "../../config/apiConfig";
 
-const API_BASE = "http://localhost:8081/api";
 const TOKEN_KEY = "token";
 
 // =============================================================================
