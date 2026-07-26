@@ -486,7 +486,15 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
 
     const firstChap = chaps[0] || null;
     setSelectedChapter(firstChap);
-    setPreviewTab(firstChap && Array.isArray(firstChap.pages) && firstChap.pages.length > 0 ? 'reader' : 'chapters');
+
+    // Dynamic Tab Selection for optimal Moderator UX:
+    // If comic has > 1 chapter, default focus to 'chapters' list; if 1 chapter, default to 'reader' image view
+    if (chaps.length > 1) {
+      setPreviewTab('chapters');
+    } else {
+      setPreviewTab(firstChap && Array.isArray(firstChap.pages) && firstChap.pages.length > 0 ? 'reader' : 'chapters');
+    }
+
     setFetchingChapters(false);
   };
 
@@ -730,22 +738,43 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
                   </div>
                 </div>
 
-                {/* Center: Mode Tabs */}
+                {/* Center: Dynamic Mode Tabs Order */}
                 <div className="mod-inspector-mode-tabs">
-                  <button
-                    type="button"
-                    className={`mod-mode-tab ${previewTab === 'reader' ? 'active' : ''}`}
-                    onClick={() => setPreviewTab('reader')}
-                  >
-                    🖼️ Image Reader ({pages.length})
-                  </button>
-                  <button
-                    type="button"
-                    className={`mod-mode-tab ${previewTab === 'chapters' ? 'active' : ''}`}
-                    onClick={() => setPreviewTab('chapters')}
-                  >
-                    📋 Chapters ({chaptersList.length})
-                  </button>
+                  {chaptersList.length > 1 ? (
+                    <>
+                      <button
+                        type="button"
+                        className={`mod-mode-tab ${previewTab === 'chapters' ? 'active' : ''}`}
+                        onClick={() => setPreviewTab('chapters')}
+                      >
+                        📋 Chapters ({chaptersList.length})
+                      </button>
+                      <button
+                        type="button"
+                        className={`mod-mode-tab ${previewTab === 'reader' ? 'active' : ''}`}
+                        onClick={() => setPreviewTab('reader')}
+                      >
+                        🖼️ Image Reader ({pages.length})
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className={`mod-mode-tab ${previewTab === 'reader' ? 'active' : ''}`}
+                        onClick={() => setPreviewTab('reader')}
+                      >
+                        🖼️ Image Reader ({pages.length})
+                      </button>
+                      <button
+                        type="button"
+                        className={`mod-mode-tab ${previewTab === 'chapters' ? 'active' : ''}`}
+                        onClick={() => setPreviewTab('chapters')}
+                      >
+                        📋 Chapters ({chaptersList.length})
+                      </button>
+                    </>
+                  )}
                   <button
                     type="button"
                     className={`mod-mode-tab ${previewTab === 'synopsis' ? 'active' : ''}`}
