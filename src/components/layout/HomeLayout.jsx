@@ -54,11 +54,12 @@ function HomeLayout({ children }) {
 
   const handleNotificationClick = async (notification) => {
     const actionUrl = notification.actionUrl
+    const hasNavigation = typeof actionUrl === 'string' && actionUrl.startsWith('/') && !actionUrl.startsWith('//')
     try {
       await handleMarkAsRead(notification.id, notification.isRead)
     } finally {
-      setShowNotificationDropdown(false)
-      if (typeof actionUrl === 'string' && actionUrl.startsWith('/') && !actionUrl.startsWith('//')) {
+      if (hasNavigation) {
+        setShowNotificationDropdown(false)
         navigate(actionUrl)
       }
     }

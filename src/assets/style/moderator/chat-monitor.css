@@ -84,6 +84,42 @@
   gap: 16px;
 }
 
+/* Sub-tabs Capsule Header Bar */
+.cv-subtabs-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 5px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 8px;
+  align-self: flex-start;
+}
+
+.cv-subtab-btn {
+  padding: 8px 18px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #94a3b8;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cv-subtab-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.cv-subtab-btn.active {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.35);
+}
+
 /* Flag Cards (Tab 1) */
 .cv-flags-list {
   display: flex;
@@ -414,18 +450,398 @@
 
 /* Embedded Live Chat Inspector (Tab 3) */
 .cv-live-inspector-container {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  background: #0f0a1a !important;
+  border: 1px solid rgba(168, 85, 247, 0.25) !important;
+  border-radius: 20px !important;
+  padding: 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(168, 85, 247, 0.15) !important;
+}
+
+.cv-live-inspector-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff !important;
+}
+
+.cv-live-inspector-header p {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: #94a3b8 !important;
 }
 
 .cv-embedded-chat-box {
   height: 520px;
   width: 100%;
+}
+
+/* ── MODERATOR LIVE STREAM STYLES ──────────────── */
+
+.cv-mod-stream-viewport {
+  height: 520px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  scroll-behavior: auto;
+  background: #160e2a !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.cv-mod-stream-viewport::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cv-mod-stream-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cv-mod-stream-viewport::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.35);
+  border-radius: 4px;
+}
+
+.cv-mod-stream-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 85, 247, 0.6);
+}
+
+/* Message Row */
+.cv-mod-stream-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  position: relative;
+  transition: all 0.15s ease;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+}
+
+.cv-mod-stream-row:hover,
+.cv-mod-stream-row.hovered {
+  background: rgba(168, 85, 247, 0.1) !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
+}
+
+.cv-mod-stream-row.mine {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.22) 0%, rgba(124, 58, 237, 0.15) 100%) !important;
+  border: 1px solid rgba(168, 85, 247, 0.35) !important;
+}
+
+.cv-mod-stream-row.mine:hover {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(124, 58, 237, 0.22) 100%) !important;
+  border-color: rgba(168, 85, 247, 0.5) !important;
+}
+
+/* Avatar */
+.cv-mod-stream-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(168, 85, 247, 0.35);
+}
+
+.cv-mod-stream-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Body */
+.cv-mod-stream-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cv-mod-stream-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cv-mod-stream-sender {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #ffffff !important;
+}
+
+.cv-mod-stream-time {
+  font-size: 11px;
+  color: #94a3b8 !important;
+  font-weight: 500;
+}
+
+.cv-mod-stream-you-badge {
+  font-size: 9.5px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%) !important;
+  color: #ffffff !important;
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 6px rgba(168, 85, 247, 0.3);
+}
+
+.cv-mod-stream-text {
+  font-size: 14px;
+  color: #f1f5f9 !important;
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
+  font-weight: 500;
+}
+
+/* Image in stream */
+.cv-mod-stream-image {
+  position: relative;
+  max-width: 220px;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid rgba(168, 85, 247, 0.35);
+  margin-top: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.cv-mod-stream-image img {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  display: block;
+}
+
+.cv-mod-stream-image-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.cv-mod-stream-image:hover .cv-mod-stream-image-overlay {
+  opacity: 1;
+}
+
+.cv-mod-stream-image-overlay span {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+}
+
+/* Moderation Action Buttons */
+.cv-mod-stream-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  animation: cv-mod-actions-fade 0.15s ease;
+  padding: 4px 6px;
+  background: #0f0a1a !important;
+  border: 1px solid rgba(168, 85, 247, 0.35) !important;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6) !important;
+}
+
+@keyframes cv-mod-actions-fade {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.cv-mod-action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  transition: all 0.15s ease;
+}
+
+.cv-mod-action-btn:hover {
+  transform: scale(1.18);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.cv-mod-action-btn.flag:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.cv-mod-action-btn.warn:hover {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.cv-mod-action-btn.mute:hover {
+  background: rgba(168, 85, 247, 0.25);
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+.cv-mod-action-btn.ban:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+.cv-mod-action-btn.delete:hover {
+  background: rgba(100, 116, 139, 0.25);
+  border-color: rgba(100, 116, 139, 0.5);
+}
+
+/* Custom Glassmorphism Tooltip for Action Buttons */
+.cv-mod-action-btn {
+  position: relative;
+}
+
+.cv-mod-action-btn[data-tooltip]::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px) scale(0.92);
+  background: rgba(15, 10, 26, 0.95);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5), 0 0 12px rgba(168, 85, 247, 0.25);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.18s cubic-bezier(0.4, 0, 0.2, 1), transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.18s;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+}
+
+.cv-mod-action-btn[data-tooltip]::after {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  border-width: 5px 5px 0 5px;
+  border-style: solid;
+  border-color: rgba(15, 10, 26, 0.95) transparent transparent transparent;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+  z-index: 100;
+}
+
+.cv-mod-action-btn[data-tooltip]:hover::before,
+.cv-mod-action-btn[data-tooltip]:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+
+/* Light Mode Overrides for Tooltip */
+html.light .cv-mod-action-btn[data-tooltip]::before {
+  background: #0f172a !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.25) !important;
+}
+
+html.light .cv-mod-action-btn[data-tooltip]::after {
+  border-color: #0f172a transparent transparent transparent !important;
+}
+
+/* Chat Input Bar inside Moderator Inspector Container */
+.cv-live-inspector-container .cv-chat-input-wrapper {
+  background: #0d0817 !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 0 0 16px 16px;
+  overflow: hidden;
+}
+
+.cv-live-inspector-container .cv-chat-input-bar {
+  background: #0d0817 !important;
+  padding: 12px 14px;
+}
+
+.cv-live-inspector-container .cv-chat-input {
+  background: #1a1230 !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  color: #ffffff !important;
+  font-size: 13.5px !important;
+}
+
+.cv-live-inspector-container .cv-chat-input::placeholder {
+  color: #94a3b8 !important;
+}
+
+.cv-live-inspector-container .cv-chat-input:focus {
+  border-color: #a855f7 !important;
+  background: #231842 !important;
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.3) !important;
+}
+
+.cv-live-inspector-container .cv-chat-action-btn {
+  color: #94a3b8 !important;
+}
+
+.cv-live-inspector-container .cv-chat-action-btn:hover {
+  color: #c084fc !important;
+  background: rgba(168, 85, 247, 0.15) !important;
+}
+
+.cv-live-inspector-container .cv-chat-send-btn {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.4) !important;
+}
+
+.cv-live-inspector-container .cv-metric-pill {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: none !important;
+}
+
+.cv-live-inspector-container .cv-metric-val {
+  color: #c084fc !important;
+}
+
+.cv-live-inspector-container .cv-metric-lbl {
+  color: #94a3b8 !important;
+}
+
+.cv-live-inspector-container .cv-metric-pill.highlight {
+  background: rgba(168, 85, 247, 0.15) !important;
+  border-color: rgba(168, 85, 247, 0.35) !important;
 }
 
 /* Modal Dialog */
@@ -531,32 +947,78 @@
   cursor: pointer;
 }
 
-/* ── LIGHT THEME COMPLETE HIGH-CONTRAST OVERRIDES ─────────── */
+/* ── DUAL THEME SYSTEM: LIGHT MODE OVERRIDES ─────────── */
+html.light .cv-chat-monitor-container {
+  color: #0f172a !important;
+}
+
+html.light .moderator-page-header h1 {
+  color: #0f172a !important;
+  background: none !important;
+  -webkit-text-fill-color: initial !important;
+}
+
+html.light .moderator-page-header p {
+  color: #64748b !important;
+}
+
 html.light .cv-metric-pill {
   background: #ffffff !important;
   border: 1.5px solid #e2e8f0 !important;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+  backdrop-filter: none !important;
 }
 
 html.light .cv-metric-val {
   color: #7c3aed !important;
+  text-shadow: none !important;
 }
 
 html.light .cv-metric-lbl {
-  color: #475569 !important;
+  color: #64748b !important;
 }
 
 html.light .cv-chat-tabs-header {
   background: #f1f5f9 !important;
   border: 1.5px solid #cbd5e1 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
 }
 
 html.light .cv-chat-tab-btn {
   color: #475569 !important;
+  background: transparent !important;
+}
+
+html.light .cv-chat-tab-btn:hover {
+  color: #0f172a !important;
+  background: rgba(0, 0, 0, 0.04) !important;
 }
 
 html.light .cv-chat-tab-btn.active {
-  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%) !important;
+  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.3) !important;
+}
+
+html.light .cv-subtabs-header {
+  background: #f1f5f9 !important;
+  border: 1.5px solid #cbd5e1 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light .cv-subtab-btn {
+  color: #475569 !important;
+  background: transparent !important;
+}
+
+html.light .cv-subtab-btn:hover {
+  color: #0f172a !important;
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .cv-subtab-btn.active {
+  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%) !important;
   color: #ffffff !important;
   box-shadow: 0 4px 14px rgba(124, 58, 237, 0.3) !important;
 }
@@ -564,21 +1026,21 @@ html.light .cv-chat-tab-btn.active {
 html.light .cv-flag-card,
 html.light .cv-add-keyword-card,
 html.light .cv-keyword-chip,
-html.light .cv-live-inspector-container,
 html.light .cv-modal-box {
   background: #ffffff !important;
   border: 1.5px solid #e2e8f0 !important;
   box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06) !important;
+  backdrop-filter: none !important;
 }
 
 html.light .cv-flag-card:hover {
   border-color: #a855f7 !important;
-  box-shadow: 0 6px 24px rgba(168, 85, 247, 0.15) !important;
+  box-shadow: 0 6px 24px rgba(168, 85, 247, 0.18) !important;
 }
 
 html.light .cv-flag-body {
   background: #f8fafc !important;
-  border-left: 4px solid #f43f5e !important;
+  border-left: 4px solid #a855f7 !important;
   border-top: 1px solid #e2e8f0 !important;
   border-right: 1px solid #e2e8f0 !important;
   border-bottom: 1px solid #e2e8f0 !important;
@@ -586,22 +1048,18 @@ html.light .cv-flag-body {
 
 html.light .cv-flag-msg-box {
   color: #0f172a !important;
-  font-weight: 500 !important;
 }
 
 html.light .cv-flag-msg-box strong {
-  color: #334155 !important;
-  font-weight: 700 !important;
+  color: #6b21a8 !important;
 }
 
 html.light .cv-flag-msg-box em {
   color: #0f172a !important;
-  font-style: italic !important;
 }
 
 html.light .cv-flag-reason-tag {
   color: #e11d48 !important;
-  font-weight: 700 !important;
 }
 
 html.light .cv-user-name,
@@ -621,7 +1079,7 @@ html.light .cv-input,
 html.light .cv-select,
 html.light .cv-textarea {
   background: #ffffff !important;
-  border-color: #cbd5e1 !important;
+  border: 1.5px solid #cbd5e1 !important;
   color: #0f172a !important;
 }
 
@@ -639,24 +1097,48 @@ html.light .mod-btn.review {
   background: #fef3c7 !important;
   border: 1.5px solid #fcd34d !important;
   color: #b45309 !important;
+  box-shadow: none !important;
+}
+
+html.light .mod-btn.review:hover {
+  background: #fde68a !important;
+  border-color: #f59e0b !important;
 }
 
 html.light .mod-btn.warning-opt {
-  background: #fef9c3 !important;
-  border: 1.5px solid #fef08a !important;
-  color: #a16207 !important;
+  background: #f3e8ff !important;
+  border: 1.5px solid #d8b4fe !important;
+  color: #7e22ce !important;
+  box-shadow: none !important;
+}
+
+html.light .mod-btn.warning-opt:hover {
+  background: #e9d5ff !important;
+  border-color: #a855f7 !important;
 }
 
 html.light .mod-btn.reject {
   background: #fee2e2 !important;
   border: 1.5px solid #fca5a5 !important;
   color: #b91c1c !important;
+  box-shadow: none !important;
+}
+
+html.light .mod-btn.reject:hover {
+  background: #fecaca !important;
+  border-color: #ef4444 !important;
 }
 
 html.light .mod-btn.dismiss {
   background: #d1fae5 !important;
   border: 1.5px solid #6ee7b7 !important;
   color: #047857 !important;
+  box-shadow: none !important;
+}
+
+html.light .mod-btn.dismiss:hover {
+  background: #a7f3d0 !important;
+  border-color: #10b981 !important;
 }
 
 html.light .cv-dur-btn {
@@ -676,5 +1158,179 @@ html.light .cv-btn-secondary {
   background: #f1f5f9 !important;
   border: 1.5px solid #cbd5e1 !important;
   color: #334155 !important;
+}
+
+html.light .cv-btn-secondary:hover {
+  background: #e2e8f0 !important;
+  border-color: #94a3b8 !important;
+}
+
+/* ── GUARANTEED SOLID DARK CHAT MONITOR CONTAINER & STREAM ─── */
+.cv-live-inspector-container,
+html.light .cv-live-inspector-container {
+  background: #0f0a1a !important;
+  border: 1px solid rgba(168, 85, 247, 0.3) !important;
+  border-radius: 20px !important;
+  padding: 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(168, 85, 247, 0.18) !important;
+}
+
+.cv-live-inspector-header h3,
+html.light .cv-live-inspector-header h3 {
+  margin: 0 !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  color: #ffffff !important;
+}
+
+.cv-live-inspector-header p,
+html.light .cv-live-inspector-header p {
+  margin: 4px 0 0 !important;
+  font-size: 12.5px !important;
+  color: #94a3b8 !important;
+}
+
+.cv-mod-stream-viewport,
+html.light .cv-mod-stream-viewport {
+  height: 520px !important;
+  overflow-y: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  padding: 14px !important;
+  scroll-behavior: auto !important;
+  background: #160e2a !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.cv-mod-stream-row,
+html.light .cv-mod-stream-row {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  padding: 12px 16px !important;
+  border-radius: 14px !important;
+  position: relative !important;
+  transition: all 0.15s ease !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+}
+
+.cv-mod-stream-row:hover,
+.cv-mod-stream-row.hovered,
+html.light .cv-mod-stream-row:hover,
+html.light .cv-mod-stream-row.hovered {
+  background: rgba(168, 85, 247, 0.1) !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
+}
+
+.cv-mod-stream-row.mine,
+html.light .cv-mod-stream-row.mine {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.22) 0%, rgba(124, 58, 237, 0.15) 100%) !important;
+  border: 1px solid rgba(168, 85, 247, 0.35) !important;
+}
+
+.cv-mod-stream-sender,
+html.light .cv-mod-stream-sender {
+  font-size: 13.5px !important;
+  font-weight: 800 !important;
+  color: #ffffff !important;
+}
+
+.cv-mod-stream-time,
+html.light .cv-mod-stream-time {
+  font-size: 11px !important;
+  color: #94a3b8 !important;
+  font-weight: 500 !important;
+}
+
+.cv-mod-stream-text,
+html.light .cv-mod-stream-text {
+  font-size: 14px !important;
+  color: #f1f5f9 !important;
+  line-height: 1.5 !important;
+  word-break: break-word !important;
+  white-space: pre-wrap !important;
+  font-weight: 500 !important;
+}
+
+/* Chat Input Bar inside Stream */
+.cv-live-inspector-container .cv-chat-input-wrapper,
+html.light .cv-live-inspector-container .cv-chat-input-wrapper {
+  background: #0d0817 !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 0 0 16px 16px !important;
+  overflow: hidden !important;
+}
+
+.cv-live-inspector-container .cv-chat-input-bar,
+html.light .cv-live-inspector-container .cv-chat-input-bar {
+  background: #0d0817 !important;
+  padding: 12px 14px !important;
+}
+
+.cv-live-inspector-container .cv-chat-input,
+html.light .cv-live-inspector-container .cv-chat-input {
+  background: #1a1230 !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  color: #ffffff !important;
+  font-size: 13.5px !important;
+}
+
+.cv-live-inspector-container .cv-chat-input::placeholder,
+html.light .cv-live-inspector-container .cv-chat-input::placeholder {
+  color: #94a3b8 !important;
+}
+
+.cv-live-inspector-container .cv-chat-input:focus,
+html.light .cv-live-inspector-container .cv-chat-input:focus {
+  border-color: #a855f7 !important;
+  background: #231842 !important;
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.3) !important;
+}
+
+.cv-live-inspector-container .cv-chat-action-btn,
+html.light .cv-live-inspector-container .cv-chat-action-btn {
+  color: #94a3b8 !important;
+}
+
+.cv-live-inspector-container .cv-chat-action-btn:hover,
+html.light .cv-live-inspector-container .cv-chat-action-btn:hover {
+  color: #c084fc !important;
+  background: rgba(168, 85, 247, 0.15) !important;
+}
+
+.cv-live-inspector-container .cv-chat-send-btn,
+html.light .cv-live-inspector-container .cv-chat-send-btn {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.4) !important;
+}
+
+.cv-live-inspector-container .cv-metric-pill,
+html.light .cv-live-inspector-container .cv-metric-pill {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: none !important;
+}
+
+.cv-live-inspector-container .cv-metric-val,
+html.light .cv-live-inspector-container .cv-metric-val {
+  color: #c084fc !important;
+}
+
+.cv-live-inspector-container .cv-metric-lbl,
+html.light .cv-live-inspector-container .cv-metric-lbl {
+  color: #94a3b8 !important;
+}
+
+.cv-live-inspector-container .cv-metric-pill.highlight,
+html.light .cv-live-inspector-container .cv-metric-pill.highlight {
+  background: rgba(168, 85, 247, 0.15) !important;
+  border-color: rgba(168, 85, 247, 0.35) !important;
 }
 

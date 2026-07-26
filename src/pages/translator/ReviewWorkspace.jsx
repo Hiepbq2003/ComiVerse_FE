@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import Swal from "sweetalert2";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
