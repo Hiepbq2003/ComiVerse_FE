@@ -8,7 +8,7 @@ import { Languages, Sparkles, Phone, Link2, CheckCircle2, ArrowLeft, AlertCircle
 
 const SUGGESTED_LANGUAGES = [
   'English', 'Japanese', 'Korean', 'Chinese', 'Vietnamese',
-  'French', 'German', 'Spanish', 'Thai', 'Indonesian'
+  'French', 'Spanish'
 ]
 
 const cardStyle = {

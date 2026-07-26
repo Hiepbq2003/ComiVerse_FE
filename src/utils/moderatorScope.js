@@ -14,6 +14,19 @@ export function getModeratorScope(user) {
   if (Array.isArray(user.assignedLanguages) && user.assignedLanguages.length > 0) {
     return user.assignedLanguages.map(l => String(l).toLowerCase().trim());
   }
+
+  try {
+    const scopesMap = JSON.parse(localStorage.getItem('comiverse_mod_scopes') || '{}');
+    const keys = [user.username, user.email, user.userId, user.id].filter(Boolean).map(k => String(k).toLowerCase());
+    for (const key of keys) {
+      if (Array.isArray(scopesMap[key]) && scopesMap[key].length > 0) {
+        return scopesMap[key].map(l => String(l).toLowerCase().trim());
+      }
+    }
+  } catch (e) {
+    console.error("Error reading mod scopes from localStorage:", e);
+  }
+
   return ['japanese', 'korean'];
 }
 
@@ -24,7 +37,7 @@ export function getModeratorScope(user) {
  */
 export function isLanguageInModeratorScope(langStr, user) {
   const scope = getModeratorScope(user);
-  if (!scope || scope.length === 0 || scope.includes('global') || scope.includes('all') || scope.includes('any') || scope.includes('*')) {
+  if (!scope || scope.length === 0 || scope.length >= 7 || scope.includes('global') || scope.includes('all') || scope.includes('any') || scope.includes('*')) {
     return true;
   }
   if (!langStr) return false;
