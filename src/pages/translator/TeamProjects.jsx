@@ -736,7 +736,9 @@ function TeamProjects() {
           setChapterOptions(c.chapterOptions || []);
           setAnnouncements(c.announcements || []);
           setChatMessages(c.chatMessages || []);
-          setTasks(c.tasks || []);
+          // NOTE: tasks are intentionally NOT restored from cache here.
+          // Tasks must always reflect the live database via the API call below,
+          // otherwise stale/failed-to-save tasks can "reappear" forever.
           setJoinRequests(c.joinRequests || []);
           setMembers(c.members || []);
           setTeamMembersForAssign(c.teamMembersForAssign || c.members || []);
@@ -892,19 +894,13 @@ function TeamProjects() {
       const mappedMessages = msgList.map(m => ({ ...m, isMe: m.sender === userFullName }));
       setChatMessages(mappedMessages)
       
-      const localTasksKey = `comiverse_tasks_${project.id}`;
-      let savedLocalTasks = [];
-      try {
-        const rawLocal = localStorage.getItem(localTasksKey);
-        if (rawLocal) savedLocalTasks = JSON.parse(rawLocal);
-      } catch (e) {}
-
-      const taskMap = new Map();
-      (Array.isArray(taskList) ? taskList : []).forEach(t => { if (t && t.id) taskMap.set(String(t.id), t); });
-      savedLocalTasks.forEach(t => { if (t && t.id) taskMap.set(String(t.id), t); });
-
-      const finalCombinedTasks = Array.from(taskMap.values());
+      // Tasks always come straight from the API — no localStorage merge.
+      // Merging in a locally-cached copy caused tasks that failed to save to the
+      // backend (or were left over from earlier tests) to keep reappearing in the
+      // UI even after they were deleted/changed directly in the database.
+      const finalCombinedTasks = Array.isArray(taskList) ? taskList : [];
       setTasks(finalCombinedTasks);
+
       const mappedRequests = reqList.map(r => ({ ...r, roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles }));
       setJoinRequests(mappedRequests)
 
@@ -969,7 +965,6 @@ function TeamProjects() {
           chapterOptions: finalChapters,
           announcements: mappedAnnouncements,
           chatMessages: mappedMessages,
-          tasks: finalCombinedTasks,
           joinRequests: mappedRequests,
           members: finalMembersList,
           teamMembersForAssign: finalMembersList
@@ -1396,7 +1391,7 @@ function TeamProjects() {
       createdAt: new Date().toISOString()
     }
 
-    let taskToSave = newTaskObj
+    let taskToSave = null
 
     try {
       const created = await createTeamTaskApi(selectedDetails.id, {
@@ -1406,24 +1401,15 @@ function TeamProjects() {
         chapterId: data.chapterId,
         dueDate: dueDateVal
       })
-      if (created && (created.id || created.title)) {
-        taskToSave = { ...newTaskObj, ...created }
-      }
+      taskToSave = (created && (created.id || created.title)) ? { ...newTaskObj, ...created } : newTaskObj
     } catch (err) {
-      console.warn('Backend createTeamTaskApi error, fallback to local task creation:', err)
+      console.error('Backend createTeamTaskApi error, task was NOT created:', err)
+      toast.error('Failed to create task. Please try again.')
+      return
     }
 
     const updatedTasks = [...tasks, taskToSave]
     setTasks(updatedTasks)
-
-    if (selectedDetails?.id) {
-      try {
-        const localTasksKey = `comiverse_tasks_${selectedDetails.id}`
-        localStorage.setItem(localTasksKey, JSON.stringify(updatedTasks))
-      } catch (e) {
-        console.error('Failed to save task to local storage:', e)
-      }
-    }
 
     if (!customData) {
       setNewTaskData({ title: '', column: 'backlog', assignees: [], dueDate: '', priority: 'Medium', chapterId: null })
@@ -1433,20 +1419,16 @@ function TeamProjects() {
   }
 
   const handleMoveTask = async (id, newCol) => {
+    const previousTasks = tasks
     const updatedTasks = tasks.map(task => task.id === id ? { ...task, status: newCol } : task)
     setTasks(updatedTasks)
-
-    if (selectedDetails?.id) {
-      try {
-        const localTasksKey = `comiverse_tasks_${selectedDetails.id}`
-        localStorage.setItem(localTasksKey, JSON.stringify(updatedTasks))
-      } catch (e) {}
-    }
 
     try {
       await updateTeamTaskApi(id, { status: newCol })
     } catch (err) {
-      console.warn('Backend updateTeamTaskApi error:', err)
+      console.error('Backend updateTeamTaskApi error, reverting move:', err)
+      toast.error('Failed to move task. Please try again.')
+      setTasks(previousTasks)
     }
   }
 
@@ -1479,17 +1461,9 @@ function TeamProjects() {
       dueDate: editTaskData.dueDate
     }
 
+    const previousTasks = tasks
     const updatedTasks = tasks.map(t => (t.id === targetId || t._id === targetId) ? updatedTaskObj : t)
     setTasks(updatedTasks)
-
-    if (selectedDetails?.id) {
-      try {
-        const localTasksKey = `comiverse_tasks_${selectedDetails.id}`
-        localStorage.setItem(localTasksKey, JSON.stringify(updatedTasks))
-      } catch (e) {
-        console.error('Failed to update local task:', e)
-      }
-    }
 
     try {
       await updateTeamTaskApi(targetId, {
@@ -1499,7 +1473,10 @@ function TeamProjects() {
         dueDate: editTaskData.dueDate
       })
     } catch (err) {
-      console.warn('Backend updateTeamTaskApi error:', err)
+      console.error('Backend updateTeamTaskApi error, reverting edit:', err)
+      toast.error('Failed to save task changes. Please try again.')
+      setTasks(previousTasks)
+      return
     }
 
     toast.success('Task updated successfully!')
@@ -1510,15 +1487,9 @@ function TeamProjects() {
     const targets = tasks.filter(t => getTaskColumn(t) === colId)
     if (targets.length === 0) return
 
+    const previousTasks = tasks
     const updatedTasks = tasks.map(t => getTaskColumn(t) === colId ? { ...t, status: 'completed' } : t)
     setTasks(updatedTasks)
-
-    if (selectedDetails?.id) {
-      try {
-        const localTasksKey = `comiverse_tasks_${selectedDetails.id}`
-        localStorage.setItem(localTasksKey, JSON.stringify(updatedTasks))
-      } catch (e) {}
-    }
 
     toast.success(`Moved all tasks from ${colId} to Completed!`)
 
@@ -1529,7 +1500,9 @@ function TeamProjects() {
         assigneeIds: t.assigneeIds
       })))
     } catch (err) {
-      console.warn('Backend move all tasks error:', err)
+      console.error('Backend move all tasks error, reverting:', err)
+      toast.error('Failed to move some tasks. Please try again.')
+      setTasks(previousTasks)
     }
   }
 
@@ -1661,29 +1634,14 @@ function TeamProjects() {
 
   const handleQuickTranslate = async (proj) => {
     try {
-      const localTasksKey = `comiverse_tasks_${proj.id}`;
+      // Always fetch the live task list from the API — tasks are no longer
+      // cached in localStorage/sessionStorage, so this always reflects the
+      // current database state.
       let taskList = [];
       try {
-        taskList = JSON.parse(localStorage.getItem(localTasksKey) || '[]');
+        const tRes = await getTeamTasksApi(proj.id);
+        taskList = Array.isArray(tRes) ? tRes : (tRes?.data || tRes?.content || []);
       } catch (e) {}
-
-      // Try checking cached workspace details first (<1ms)
-      try {
-        const teamCache = sessionStorage.getItem(`comiverse_team_details_cache_${proj.id}`);
-        if (teamCache) {
-          const parsed = JSON.parse(teamCache);
-          if (Array.isArray(parsed.tasks) && parsed.tasks.length > 0) {
-            taskList = parsed.tasks;
-          }
-        }
-      } catch (e) {}
-
-      if (taskList.length === 0) {
-        try {
-          const tRes = await getTeamTasksApi(proj.id);
-          taskList = Array.isArray(tRes) ? tRes : (tRes?.data || tRes?.content || []);
-        } catch (e) {}
-      }
 
       let targetTask = taskList.find(t => {
         const col = (t.column || t.status || '').toLowerCase();
