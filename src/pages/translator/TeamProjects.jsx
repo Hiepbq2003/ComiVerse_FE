@@ -3,7 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import '../../assets/style/translator/team-projects.css'
 import ModernButton from '../../components/common/ModernButton'
 import { getMyProjectTeamsApi, getAllProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
-import { createSubmissionApi } from '../../services/api/SubmissionApi'
+import { createSubmissionApi, getAllSubmissionsApi } from '../../services/api/SubmissionApi'
+import { getAllComicsApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi } from '../../services/api/ChapterApi'
 import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
 import { getAuth } from '../../utils/Auth'
@@ -11,34 +12,54 @@ import comicAction from '../../assets/comic_action.png'
 import comicAdventure from '../../assets/comic_adventure.png'
 import comicScifi from '../../assets/comic_scifi.png'
 
-const getProjectCover = (proj) => {
-  if (!proj) return comicAdventure;
+const getProjectCover = (proj, dbComics = [], dbSubs = []) => {
+  if (!proj) return '';
   const rawCover = proj.cover || proj.coverImage || proj.coverImageUrl || proj.coverUrl || proj.imageUrl || '';
   
   if (rawCover && typeof rawCover === 'string' && (
     rawCover.startsWith('http://') ||
     rawCover.startsWith('https://') ||
     rawCover.startsWith('data:') ||
-    rawCover.startsWith('/src/') ||
-    rawCover.startsWith('/assets/') ||
-    rawCover.endsWith('.png') ||
-    rawCover.endsWith('.jpg') ||
-    rawCover.endsWith('.jpeg') ||
-    rawCover.endsWith('.webp') ||
-    rawCover.endsWith('.svg')
-  )) {
+    rawCover.startsWith('/') ||
+    rawCover.includes('.')
+  ) && !rawCover.includes('🔮') && !rawCover.includes('📚')) {
     return rawCover;
   }
 
-  const title = (proj.title || proj.comicName || proj.comicTitle || proj.name || '').toLowerCase().trim();
+  const targetId = String(proj.comicId || proj.id || '').toLowerCase().trim();
+  const targetTitle = String(proj.title || proj.comicName || proj.comicTitle || '').toLowerCase().trim();
 
-  if (title.includes('tạm biệt') || title.includes('long') || title.includes('tóc đỏ') || title.includes('adventure') || title.includes('dragon') || title.includes('rồng')) return comicAdventure;
-  if (title.includes('scifi') || title.includes('cyber') || title.includes('neon') || title.includes('helsinki') || title.includes('orphan')) return comicScifi;
-  if (title.includes('action') || title.includes('battle') || title.includes('solo') || title.includes('sword') || title.includes('god')) return comicAction;
+  // 1. Search in DB Comics list
+  if (Array.isArray(dbComics) && dbComics.length > 0) {
+    const matchComic = dbComics.find(c => {
+      const cId = String(c.id || c.comicId || '').toLowerCase().trim();
+      const cTitle = String(c.title || '').toLowerCase().trim();
+      return (cId && cId === targetId) || (cTitle && targetTitle && (cTitle === targetTitle || cTitle.includes(targetTitle) || targetTitle.includes(cTitle)));
+    });
+    if (matchComic) {
+      const cCover = matchComic.cover || matchComic.coverImage || matchComic.coverImageUrl || matchComic.coverUrl;
+      if (cCover && typeof cCover === 'string' && (cCover.startsWith('http') || cCover.startsWith('data:') || cCover.startsWith('/'))) {
+        return cCover;
+      }
+    }
+  }
 
-  const fallbacks = [comicAction, comicAdventure, comicScifi];
-  const charCodeSum = title.split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-  return fallbacks[charCodeSum % fallbacks.length];
+  // 2. Search in DB Submissions list
+  if (Array.isArray(dbSubs) && dbSubs.length > 0) {
+    const matchSub = dbSubs.find(s => {
+      const sId = String(s.id || s.comicId || '').toLowerCase().trim();
+      const sTitle = String(s.title || s.comicName || '').toLowerCase().trim();
+      return (sId && sId === targetId) || (sTitle && targetTitle && (sTitle === targetTitle || sTitle.includes(targetTitle) || targetTitle.includes(sTitle)));
+    });
+    if (matchSub) {
+      const sCover = matchSub.cover || matchSub.coverImage || matchSub.coverImageUrl || matchSub.coverUrl;
+      if (sCover && typeof sCover === 'string' && (sCover.startsWith('http') || sCover.startsWith('data:') || sCover.startsWith('/'))) {
+        return sCover;
+      }
+    }
+  }
+
+  return (rawCover && !rawCover.includes('🔮') && !rawCover.includes('📚')) ? rawCover : '';
 };
 
 import {
@@ -105,14 +126,17 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
           teamProjectsList.map(proj => (
             <div className="trans-project-card" key={proj.id}>
               <div className="trans-project-cover">
-                <img
-                  src={getProjectCover(proj)}
-                  alt={proj.title || 'Comic Cover'}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }}
-                  onError={(e) => {
-                    e.target.src = comicAdventure;
-                  }}
-                />
+                {getProjectCover(proj) ? (
+                  <img
+                    src={getProjectCover(proj)}
+                    alt={proj.title || 'Comic Cover'}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }}
+                  />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: 'inherit', fontSize: '28px' }}>
+                    📖
+                  </div>
+                )}
               </div>
               <div className="trans-project-info">
                 <h3 className="trans-project-title">{proj.title}</h3>
@@ -481,10 +505,15 @@ function TeamProjects() {
   const fetchProjects = async (silent = false) => {
     try {
       if (!silent && projects.length === 0) setLoadingProjects(true)
-      const [myTeams, allTeams] = await Promise.all([
+      const [myTeams, allTeams, allComicsRes, submissionsRes] = await Promise.all([
         getMyProjectTeamsApi().catch(() => []),
-        getAllProjectTeamsApi().catch(() => [])
+        getAllProjectTeamsApi().catch(() => []),
+        getAllComicsApi().catch(() => []),
+        getAllSubmissionsApi().catch(() => [])
       ])
+
+      const dbComics = allComicsRes?.data?.data || allComicsRes?.data || (Array.isArray(allComicsRes) ? allComicsRes : []);
+      const dbSubs = submissionsRes?.data?.data || submissionsRes?.data || (Array.isArray(submissionsRes) ? submissionsRes : []);
 
       const currentUserName = (userFullName || '').toLowerCase().trim();
       const currentUsername = (authUser?.username || '').toLowerCase().trim();
@@ -549,7 +578,7 @@ function TeamProjects() {
           ...p,
           team: p.title,
           title: p.comicName,
-          cover: getProjectCover(p),
+          cover: getProjectCover(p, dbComics, dbSubs),
           membersCount: realCount,
           isRecruiting: isRecruiting
         };
