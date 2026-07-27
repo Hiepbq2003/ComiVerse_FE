@@ -345,6 +345,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
       title: editComicForm.title.trim(),
       language: editComicForm.language.trim(),
       publicationStatus: editComicForm.publicationStatus?.toUpperCase(),
+      status: editComicForm.publicationStatus?.toUpperCase(),
       genreIds: matchedGenreIds
     }
     handleSaveEditComic(editingComic.id, updatedData)
