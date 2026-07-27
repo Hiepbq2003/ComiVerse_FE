@@ -66,6 +66,7 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
   const navItems = [
     { id: 'statistics', label: 'Statistics Dashboard', icon: 'chart', path: '/admin/statistics' },
     { id: 'revenue', label: 'Revenue Management', icon: 'dollar', path: '/admin/revenue' },
+    { id: 'subscriptions', label: 'Subscriptions & Payments', icon: 'credit-card', path: '/admin/subscriptions' },
     { id: 'account-management', label: 'Account Management', icon: 'users', path: '/admin/account-management' },
     { id: 'broadcast', label: 'Broadcast', icon: 'megaphone', path: '/admin/broadcast' },
     { id: 'payout', label: 'Payout Management', icon: 'wallet', path: '/admin/payout' },
@@ -84,6 +85,12 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
         return (
           <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+        )
+      case 'credit-card':
+        return (
+          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" />
           </svg>
         )
       case 'users':
