@@ -1,8 +1,14 @@
-import { useEffect, useState } from 'react'
-import { useLocation, useNavigate, useParams, Link } from 'react-router-dom'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { createPortal } from 'react-dom'
 import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
 import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../context/ThemeContext'
+import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import '../../assets/style/author/comics.css'
+import '../../assets/style/moderator/comic-detail.css'
+
+/* ────────────────────────── helpers ────────────────────────── */
 
 const normalizeArrayResponse = (payload) => {
   if (Array.isArray(payload)) return payload
@@ -16,130 +22,132 @@ function getChapterNumber(chapter) {
   return chapter.chapterNumber || chapter.number || chapter.order || 'N/A'
 }
 
+const normalizePage = (page, idx) => {
+  const url = typeof page === 'string' ? page : (page?.imageUrl || page?.url || page?.pageUrl || '')
+  const number = (typeof page === 'object' && page?.pageNumber) ? page.pageNumber : (idx + 1)
+  return { url, number }
+}
+
+const cleanTargetLabel = (label) => (label || '').replace(/\s*\(\d+%\s*,\s*\d+%\)/g, '').trim()
+
+/* ────────────────── rejection data resolver ──────────────── */
+
 function resolveRejectionInfo(preview, comicId) {
-  let isRejected = false;
-  const statusStr = String(preview?.status || preview?.moderationStatus || '').toUpperCase();
-  if (statusStr === 'REJECTED') {
-    isRejected = true;
-  }
+  let isRejected = false
+  const statusStr = String(preview?.status || preview?.moderationStatus || '').toUpperCase()
+  if (statusStr === 'REJECTED') isRejected = true
 
-  let reason = preview?.rejectionReason || preview?.rejection_reason || preview?.rejectionNote || preview?.reason || preview?.notes || '';
-  let docComments = [];
+  let reason = preview?.rejectionReason || preview?.rejection_reason || preview?.rejectionNote || preview?.reason || preview?.notes || ''
+  let docComments = []
 
-  // Try fetching from localStorage overrides
   try {
-    const rawOverrides = localStorage.getItem('comiverse_moderator_submissions_override');
+    const rawOverrides = localStorage.getItem('comiverse_moderator_submissions_override')
     if (rawOverrides) {
-      const overrides = JSON.parse(rawOverrides);
+      const overrides = JSON.parse(rawOverrides)
       if (Array.isArray(overrides)) {
         const match = overrides.find(o => {
-          const st = String(o.status || '').toUpperCase();
-          const matchId = (preview?.id && String(o.id) === String(preview.id)) || (preview?.submissionId && String(o.submissionId) === String(preview.submissionId));
-          const matchComicId = (comicId && (String(o.comicId) === String(comicId) || String(o.id) === String(comicId)));
-          return st === 'REJECTED' && (matchId || matchComicId);
-        }) || overrides.find(o => String(o.status || '').toUpperCase() === 'REJECTED');
+          const st = String(o.status || '').toUpperCase()
+          const matchId = (preview?.id && String(o.id) === String(preview.id)) || (preview?.submissionId && String(o.submissionId) === String(preview.submissionId))
+          const matchComicId = (comicId && (String(o.comicId) === String(comicId) || String(o.id) === String(comicId)))
+          return st === 'REJECTED' && (matchId || matchComicId)
+        }) || overrides.find(o => String(o.status || '').toUpperCase() === 'REJECTED')
 
         if (match) {
-          isRejected = true;
-          if (match.rejectionReason) reason = match.rejectionReason;
+          isRejected = true
+          if (match.rejectionReason) reason = match.rejectionReason
         }
       }
     }
-  } catch (e) {}
+  } catch (e) { /* ignore */ }
 
-  // Try fetching pinned comments from localStorage
   try {
-    const rawCommentsMap = localStorage.getItem('comiverse_moderator_doc_comments');
+    const rawCommentsMap = localStorage.getItem('comiverse_moderator_doc_comments')
     if (rawCommentsMap) {
-      const commentsMap = JSON.parse(rawCommentsMap);
+      const commentsMap = JSON.parse(rawCommentsMap)
       Object.keys(commentsMap).forEach(key => {
         if (
           (preview?.id && key.includes(String(preview.id))) ||
           (preview?.submissionId && key.includes(String(preview.submissionId))) ||
           (comicId && key.includes(String(comicId)))
         ) {
-          docComments = [...docComments, ...(commentsMap[key] || [])];
+          docComments = [...docComments, ...(commentsMap[key] || [])]
         }
-      });
+      })
 
       if (docComments.length === 0) {
         Object.values(commentsMap).forEach(arr => {
-          if (Array.isArray(arr)) docComments.push(...arr);
-        });
+          if (Array.isArray(arr)) docComments.push(...arr)
+        })
       }
     }
-  } catch (e) {}
+  } catch (e) { /* ignore */ }
 
-  return { isRejected, reason, docComments };
+  return { isRejected, reason, docComments }
 }
 
-function parseRejectionPins(reason, docComments = []) {
-  let overall = (reason || '').trim();
-  const pagePins = {};
-  const otherPins = [];
-
-  if (reason && reason.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) {
-    const reportSplit = reason.split('--- DETAILED INSPECTION FEEDBACK REPORT');
-    overall = reportSplit[0].trim();
-    const details = reportSplit[1];
-
-    const regex = /\[(.*?)\]:\s*(.+)/g;
-    let match;
-    while ((match = regex.exec(details)) !== null) {
-      const label = match[1].trim();
-      const text = match[2].trim();
-
-      const pageMatch = label.match(/Page\s+(\d+)/i);
-      if (pageMatch) {
-        const pageNum = parseInt(pageMatch[1], 10);
-        if (!pagePins[pageNum]) pagePins[pageNum] = [];
-        pagePins[pageNum].push(text);
-      } else {
-        otherPins.push({ label, text });
-      }
-    }
+function parseOverallNote(reason) {
+  if (!reason) return ''
+  if (reason.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) {
+    return reason.split('--- DETAILED INSPECTION FEEDBACK REPORT')[0].trim()
   }
-
-  if (Array.isArray(docComments)) {
-    docComments.forEach(c => {
-      const label = c.targetLabel || 'Page comment';
-      const text = c.text;
-      const pageMatch = (c.targetKey || '').match(/page-(\d+)/i) || label.match(/Page\s+(\d+)/i);
-      if (pageMatch) {
-        const pageNum = parseInt(pageMatch[1], 10);
-        if (!pagePins[pageNum]) pagePins[pageNum] = [];
-        if (!pagePins[pageNum].includes(text)) {
-          pagePins[pageNum].push(text);
-        }
-      } else {
-        if (!otherPins.some(p => p.text === text)) {
-          otherPins.push({ label, text });
-        }
-      }
-    });
-  }
-
-  return { overall, pagePins, otherPins };
+  return reason.trim()
 }
 
-const normalizePage = (page, idx) => {
-  const url = typeof page === 'string' ? page : (page?.imageUrl || page?.url || page?.pageUrl || '');
-  const number = (typeof page === 'object' && page?.pageNumber) ? page.pageNumber : (idx + 1);
-  return { url, number };
-};
+/* ────────────────── badge renderer ──────────────── */
+
+function renderCommentBadge(c, globalPinIndex) {
+  const cleanLabel = cleanTargetLabel(c.targetLabel)
+  const isPointPin = c.targetType === 'point' || (c.xPercentage !== null && c.xPercentage !== undefined)
+
+  if (isPointPin) {
+    return (
+      <span className="mod-doc-comment-target-badge point-pin">
+        📍 {cleanLabel} · Pin #{globalPinIndex || 1}
+      </span>
+    )
+  } else if (c.targetType === 'page') {
+    return (
+      <span className="mod-doc-comment-target-badge page-note">
+        📄 {cleanLabel} · Page Note
+      </span>
+    )
+  } else {
+    return (
+      <span className="mod-doc-comment-target-badge field-note">
+        💬 {cleanLabel}
+      </span>
+    )
+  }
+}
+
+/* ════════════════════════════════════════════════════════════ */
+/*                   MAIN COMPONENT                            */
+/* ════════════════════════════════════════════════════════════ */
 
 export default function AuthorChapterPreview() {
   const { comicId, chapterId } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { theme } = useTheme()
 
   const [preview, setPreview] = useState(location.state?.preview || null)
-  const [viewMode, setViewMode] = useState('scroll')
   const [loading, setLoading] = useState(!preview)
 
+  // Reader state
+  const [previewTab, setPreviewTab] = useState('reader') // 'reader' | 'details'
+  const [pageIndex, setPageIndex] = useState(0)
+  const [readerLayout, setReaderLayout] = useState('single') // 'single' | 'vertical'
+  const [showCommentsSidebar, setShowCommentsSidebar] = useState(false)
+  const [sidebarCommentTab, setSidebarCommentTab] = useState('all') // 'all' | 'page' | 'point'
+  const [activePinTarget, setActivePinTarget] = useState(null)
+  const [isFooterVisible, setIsFooterVisible] = useState(true)
+
+  const readerAreaRef = useRef(null)
+  const footerTimerRef = useRef(null)
+
+  /* ── Auth guard ─────────────────── */
   useEffect(() => {
-    // Basic auth check
     if (!user || user.role?.toUpperCase() !== 'AUTHOR') {
       navigate('/', { replace: true })
       return
@@ -152,9 +160,7 @@ export default function AuthorChapterPreview() {
           if (res.status === 'fulfilled') {
             const chapters = normalizeArrayResponse(res.value)
             const found = chapters.find((c) => c.id === chapterId || c.chapterId === chapterId)
-            if (found) {
-              setPreview(found)
-            }
+            if (found) setPreview(found)
           }
         } catch (error) {
           console.error('Failed to load chapter for preview:', error)
@@ -166,6 +172,26 @@ export default function AuthorChapterPreview() {
     }
   }, [preview, comicId, chapterId, user, navigate])
 
+  /* ── Footer auto-hide on scroll ─── */
+  const handleReaderAreaScroll = useCallback(() => {
+    setIsFooterVisible(true)
+    if (footerTimerRef.current) clearTimeout(footerTimerRef.current)
+    footerTimerRef.current = setTimeout(() => setIsFooterVisible(false), 3000)
+  }, [])
+
+  const handleReaderAreaMouseMove = useCallback(() => {
+    setIsFooterVisible(true)
+    if (footerTimerRef.current) clearTimeout(footerTimerRef.current)
+    footerTimerRef.current = setTimeout(() => setIsFooterVisible(false), 3000)
+  }, [])
+
+  /* ── Scroll to page in vertical mode ─── */
+  const scrollToPageElement = useCallback((pageNum) => {
+    const el = document.getElementById(`author-page-container-${pageNum}`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
+
+  /* ── Loading / not found states ─── */
   if (loading) {
     return <div style={{ padding: '40px', color: '#fff', textAlign: 'center' }}>Loading preview...</div>
   }
@@ -181,128 +207,560 @@ export default function AuthorChapterPreview() {
     )
   }
 
+  /* ── Derive data ─── */
   const rawPages = normalizeArrayResponse(preview?.pages)
   const pages = rawPages.map((p, idx) => normalizePage(p, idx))
 
   const { isRejected, reason, docComments } = resolveRejectionInfo(preview, comicId)
-  const { overall, pagePins, otherPins } = parseRejectionPins(reason, docComments)
+  const overallNote = parseOverallNote(reason)
 
-  return (
-    <div className="author-preview-fullscreen" style={{ minHeight: '100vh', background: '#0d0919', color: '#fff' }}>
-      <header className="author-preview-header" style={{
-        position: 'sticky', top: 0, zIndex: 100, background: '#141024', 
-        padding: '16px 24px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <button 
-            className="btn-author-action" 
-            onClick={() => navigate(`/author/comics/${comicId}`)}
-            style={{ background: 'transparent', border: '1px solid rgba(255, 255, 255, 0.2)', color: '#ccc' }}
+  // Comments for current page
+  const currentPageComments = docComments.filter(c => c.targetKey === `page-${pageIndex + 1}`)
+
+  // Sidebar filtering
+  const allComments = docComments
+  const pageNotesList = allComments.filter(c => c.targetType === 'page' || (!c.coords && c.targetType !== 'field' && c.xPercentage === null && c.xPercentage === undefined))
+  const pointPinsList = allComments.filter(c => c.targetType === 'point' || (c.xPercentage !== null && c.xPercentage !== undefined))
+
+  const displayList = allComments.filter(c => {
+    if (sidebarCommentTab === 'page') return c.targetType === 'page' || (!c.coords && c.targetType !== 'field' && !c.xPercentage)
+    if (sidebarCommentTab === 'point') return c.targetType === 'point' || (c.xPercentage !== null && c.xPercentage !== undefined)
+    return true
+  })
+
+  /* ════════════════════════════ RENDER ════════════════════════════ */
+
+  return createPortal(
+    <div className={`mod-inspector-overlay fade-in ${theme === 'light' ? 'light-theme' : 'dark-theme'}`}>
+
+      {/* ══════════ TOPBAR ══════════ */}
+      <div className="mod-inspector-topbar">
+        {/* Left: Title Group */}
+        <div className="mod-inspector-title-group" style={{ maxWidth: '380px' }}>
+          <div style={{ minWidth: 0, overflow: 'hidden' }}>
+            <h3 className="mod-inspector-title" title={`Preview · Chapter ${getChapterNumber(preview)}`}>
+              {isRejected ? '⛔' : '📖'} Preview · Chapter {getChapterNumber(preview)}
+            </h3>
+            <div className="mod-inspector-subtitle">
+              {pages.length} pages · {isRejected ? 'Rejected by Moderator' : 'Chapter Preview'}
+            </div>
+          </div>
+        </div>
+
+        {/* Center: Mode Tabs */}
+        <div className="mod-inspector-mode-tabs">
+          <button
+            type="button"
+            className={`mod-mode-tab ${previewTab === 'reader' ? 'active' : ''}`}
+            onClick={() => setPreviewTab('reader')}
           >
-            ← Back to Comic
+            🖼️ Image Reader ({pages.length})
           </button>
-          <div>
-            <h1 style={{ fontSize: '18px', margin: 0 }}>Preview · Chapter {getChapterNumber(preview)}</h1>
-            <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>{pages.length} pages ready in preview reader.</p>
-          </div>
+          <button
+            type="button"
+            className={`mod-mode-tab ${previewTab === 'details' ? 'active' : ''}`}
+            onClick={() => setPreviewTab('details')}
+          >
+            ℹ️ Details & Feedback
+          </button>
         </div>
-        
-        <div className="author-view-toggle">
-          <button type="button" className={viewMode === 'grid' ? 'active' : ''} onClick={() => setViewMode('grid')}>Grid</button>
-          <button type="button" className={viewMode === 'scroll' ? 'active' : ''} onClick={() => setViewMode('scroll')}>Scroll</button>
+
+        {/* Right: Sidebar toggle + Close */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+          {docComments.length > 0 && (
+            <button
+              type="button"
+              className={`mod-mode-tab ${showCommentsSidebar ? 'active' : ''}`}
+              onClick={() => setShowCommentsSidebar(!showCommentsSidebar)}
+              title="Toggle Moderator Feedback Sidebar"
+            >
+              💬 Feedback Pins ({docComments.length})
+            </button>
+          )}
+
+          <button
+            className="mod-inspector-close-btn"
+            onClick={() => navigate(`/author/comics/${comicId}`)}
+            title="Close Preview"
+          >
+            ×
+          </button>
         </div>
-      </header>
+      </div>
 
-      <main style={{ padding: '24px', maxWidth: viewMode === 'grid' ? '1200px' : '900px', margin: '0 auto' }}>
-        {isRejected && (
-          <div className="author-rejection-card" style={{
-            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.18) 0%, rgba(153, 27, 27, 0.3) 100%)',
-            border: '1px solid rgba(239, 68, 68, 0.45)',
-            borderRadius: '12px',
-            padding: '20px 24px',
-            marginBottom: '28px',
-            boxShadow: '0 12px 36px rgba(239, 68, 68, 0.2)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-              <span style={{ fontSize: '22px' }}>⛔</span>
-              <h3 style={{ margin: 0, color: '#fca5a5', fontSize: '17px', fontWeight: '700' }}>
-                Chapter Rejected by Moderator — Action Required
-              </h3>
-            </div>
+      {/* ══════════ BODY ══════════ */}
+      <div className="mod-inspector-body">
 
-            <div style={{ fontSize: '14px', color: '#f8fafc', lineHeight: '1.6', marginBottom: '16px', background: 'rgba(0,0,0,0.35)', padding: '14px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <strong style={{ color: '#fca5a5' }}>Moderator Overall Note:</strong>
-              <p style={{ margin: '6px 0 0 0', whiteSpace: 'pre-wrap', color: '#e2e8f0', fontSize: '13.5px' }}>
-                {overall || 'No overall remarks provided. Please inspect flagged page feedback below.'}
-              </p>
-            </div>
+        {/* ── Left Content Area ── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', position: 'relative' }}>
 
-            {otherPins.length > 0 && (
-              <div style={{ marginTop: '12px' }}>
-                <strong style={{ fontSize: '12.5px', color: '#fca5a5', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Specific Section Comments ({otherPins.length}):
-                </strong>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
-                  {otherPins.map((pin, i) => (
-                    <div key={i} style={{ background: 'rgba(0,0,0,0.3)', padding: '10px 14px', borderRadius: '6px', fontSize: '13px', borderLeft: '3px solid #ef4444' }}>
-                      <span style={{ fontWeight: '700', color: '#f87171' }}>[{pin.label}]</span>: {pin.text}
-                    </div>
-                  ))}
+          {/* === TAB: IMAGE READER === */}
+          {previewTab === 'reader' && (
+            <>
+              {pages.length === 0 ? (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>🖼️</div>
+                  <h3 className="mod-inspector-title" style={{ margin: '0 0 8px' }}>No Pages Available</h3>
+                  <p className="mod-inspector-subtitle" style={{ margin: 0, fontSize: '14px', maxWidth: '480px', textAlign: 'center' }}>
+                    This chapter does not have any uploaded pages. Go back and upload a CBZ file first.
+                  </p>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {pages.length === 0 ? (
-          <div className="author-empty-state small">No page URL was returned for this chapter.</div>
-        ) : viewMode === 'grid' ? (
-          <div className="author-page-preview-grid">
-            {pages.map((page) => (
-              <figure key={page.number} style={{ position: 'relative' }}>
-                <img src={page.url} alt={`Page ${page.number}`} />
-                <figcaption>Page {page.number}</figcaption>
-                {isRejected && pagePins[page.number] && pagePins[page.number].length > 0 && (
-                  <div style={{ background: '#ef4444', color: '#fff', fontSize: '10px', fontWeight: '800', padding: '2px 6px', borderRadius: '4px', position: 'absolute', top: '8px', right: '8px' }}>
-                    📌 {pagePins[page.number].length} Feedback
+              ) : (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', position: 'relative' }}>
+                  {/* Sub-banner: Page info */}
+                  <div className="mod-inspector-subbanner">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span className="mod-pane-title--raw" style={{ fontWeight: '700' }}>
+                        🖼️ Chapter {getChapterNumber(preview)} — Page {pageIndex + 1} of {pages.length}
+                      </span>
+                      {isRejected && (
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: '#ef4444', background: 'rgba(239, 68, 68, 0.12)', padding: '3px 8px', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                          ⛔ REJECTED
+                        </span>
+                      )}
+                    </div>
                   </div>
-                )}
-              </figure>
-            ))}
-          </div>
-        ) : (
-          <div className="author-page-preview-scroll">
-            {pages.map((page) => (
-              <div key={page.number} className="author-scroll-page-container" style={{ position: 'relative', marginBottom: '28px' }}>
-                <img src={page.url} alt={`Page ${page.number}`} style={{ width: '100%', borderRadius: '8px', display: 'block' }} />
-                
-                <div style={{ position: 'absolute', top: '12px', left: '12px', background: 'rgba(0,0,0,0.75)', color: '#fff', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', backdropFilter: 'blur(4px)' }}>
-                  Page {page.number}
-                </div>
 
-                {isRejected && pagePins[page.number] && pagePins[page.number].length > 0 && (
-                  <div className="author-page-pin-overlay" style={{
-                    position: 'absolute', bottom: '16px', left: '16px', right: '16px',
-                    background: 'rgba(15, 10, 24, 0.94)', backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(239, 68, 68, 0.5)', borderRadius: '10px',
-                    padding: '12px 16px', boxShadow: '0 12px 30px rgba(0,0,0,0.6)'
-                  }}>
-                    <div style={{ color: '#fca5a5', fontWeight: '700', fontSize: '13px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>📌</span> Moderator Page {page.number} Feedback ({pagePins[page.number].length}):
-                    </div>
-                    {pagePins[page.number].map((msg, idx) => (
-                      <div key={idx} style={{ color: '#f8fafc', fontSize: '13px', lineHeight: '1.4', marginTop: idx > 0 ? '6px' : '0', paddingLeft: '8px', borderLeft: '2px solid #ef4444' }}>
-                        • {msg}
+                  {/* Central Reader Area */}
+                  <div
+                    ref={readerAreaRef}
+                    className="mod-inspector-reader-area"
+                    onClick={() => setActivePinTarget(null)}
+                    onScroll={handleReaderAreaScroll}
+                    onMouseMove={handleReaderAreaMouseMove}
+                    style={{ flex: 1, overflowY: 'auto', display: 'flex', justifyContent: 'center', alignItems: readerLayout === 'single' ? 'center' : 'flex-start', padding: '24px 24px 90px 24px' }}
+                  >
+                    {readerLayout === 'single' ? (
+                      /* ─── Single Page Mode ─── */
+                      <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', textAlign: 'center' }}>
+                        <img
+                          src={pages[pageIndex]?.url || ''}
+                          alt={`Page ${pageIndex + 1}`}
+                          decoding="async"
+                          loading="eager"
+                          style={{
+                            maxHeight: '75vh',
+                            maxWidth: '100%',
+                            objectFit: 'contain',
+                            borderRadius: '8px',
+                            boxShadow: '0 12px 40px rgba(0,0,0,0.3)',
+                            border: '1px solid rgba(148, 163, 184, 0.2)',
+                            cursor: 'default'
+                          }}
+                          title={`Page ${pageIndex + 1}`}
+                        />
+
+                        {/* Pin markers on this page */}
+                        {currentPageComments.map((c) => {
+                          const globalPinIndex = allComments.findIndex(item => item.id === c.id) + 1
+                          return (
+                            c.xPercentage !== null && c.xPercentage !== undefined && (
+                              <div
+                                key={c.id}
+                                className={`mod-doc-comment-pin ${activePinTarget === c.id ? 'active' : ''}`}
+                                style={{ left: `${c.xPercentage}%`, top: `${c.yPercentage}%` }}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setShowCommentsSidebar(true)
+                                  setActivePinTarget(prev => prev === c.id ? null : c.id)
+                                  const el = document.getElementById(`author-doc-comment-card-${c.id}`)
+                                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                                }}
+                              >
+                                📌 {globalPinIndex > 0 ? globalPinIndex : 1}
+
+                                {/* Glassmorphic Tooltip */}
+                                <div className="mod-pin-hover-tooltip">
+                                  <div className="mod-pin-tooltip-header">
+                                    {renderCommentBadge(c, globalPinIndex)}
+                                  </div>
+                                  <p className="mod-pin-tooltip-body">{c.text}</p>
+                                  <div className="mod-pin-tooltip-footer">
+                                    <span>🛡️ {c.author || 'Moderator'}</span>
+                                    <span>{formatTimeAgo(c.createdAt)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          )
+                        })}
                       </div>
-                    ))}
+                    ) : (
+                      /* ─── Continuous Vertical Scroll Mode ─── */
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', width: '100%', maxWidth: '850px' }}>
+                        {pages.map((page, pIdx) => {
+                          const pNum = pIdx + 1
+                          const pComments = docComments.filter(c => c.targetKey === `page-${pNum}`)
+
+                          return (
+                            <div key={pIdx} id={`author-page-container-${pNum}`} style={{ width: '100%', textAlign: 'center', position: 'relative' }}>
+                              <img
+                                src={page.url}
+                                alt={`Page ${pNum}`}
+                                decoding="async"
+                                loading="lazy"
+                                onClick={() => setPageIndex(pIdx)}
+                                style={{
+                                  width: '100%',
+                                  maxHeight: '90vh',
+                                  objectFit: 'contain',
+                                  borderRadius: '8px',
+                                  boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
+                                  border: pageIndex === pIdx ? '2px solid #a855f7' : '1px solid rgba(148, 163, 184, 0.2)',
+                                  cursor: 'pointer'
+                                }}
+                                title={`Page ${pNum}`}
+                              />
+
+                              {/* Pin markers */}
+                              {pComments.map((c) => {
+                                const globalPinIndex = allComments.findIndex(item => item.id === c.id) + 1
+                                return (
+                                  c.xPercentage !== null && c.xPercentage !== undefined && (
+                                    <div
+                                      key={c.id}
+                                      className={`mod-doc-comment-pin ${activePinTarget === c.id ? 'active' : ''}`}
+                                      style={{ left: `${c.xPercentage}%`, top: `${c.yPercentage}%` }}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setShowCommentsSidebar(true)
+                                        setActivePinTarget(prev => prev === c.id ? null : c.id)
+                                        const el = document.getElementById(`author-doc-comment-card-${c.id}`)
+                                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                                      }}
+                                    >
+                                      📌 {globalPinIndex > 0 ? globalPinIndex : 1}
+
+                                      <div className="mod-pin-hover-tooltip">
+                                        <div className="mod-pin-tooltip-header">
+                                          {renderCommentBadge(c, globalPinIndex)}
+                                        </div>
+                                        <p className="mod-pin-tooltip-body">{c.text}</p>
+                                        <div className="mod-pin-tooltip-footer">
+                                          <span>🛡️ {c.author || 'Moderator'}</span>
+                                          <span>{formatTimeAgo(c.createdAt)}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                )
+                              })}
+
+                              <span className="mod-inspector-subtitle" style={{ display: 'inline-block', marginTop: '6px', fontSize: '11.5px' }}>
+                                Page {pNum} of {pages.length}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Bottom Toolbar */}
+                  <div className={`mod-inspector-controls ${!isFooterVisible ? 'is-hidden' : ''}`}>
+                    <div className="mod-page-nav-group">
+                      <button
+                        type="button"
+                        className="mod-nav-arrow"
+                        onClick={() => {
+                          const targetP = Math.max(0, pageIndex - 1)
+                          setPageIndex(targetP)
+                          if (readerLayout === 'vertical') scrollToPageElement(targetP + 1)
+                        }}
+                        disabled={pageIndex === 0}
+                      >
+                        ← Previous Page
+                      </button>
+
+                      <div className="mod-inspect-select-container">
+                        <span className="mod-inspect-select-label">Page</span>
+                        <select
+                          className="mod-inspect-select"
+                          value={pageIndex}
+                          onChange={(e) => {
+                            const targetP = Number(e.target.value)
+                            setPageIndex(targetP)
+                            if (readerLayout === 'vertical') scrollToPageElement(targetP + 1)
+                          }}
+                        >
+                          {pages.map((_, pIdx) => (
+                            <option key={pIdx} value={pIdx}>{pIdx + 1} of {pages.length}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="mod-nav-arrow"
+                        onClick={() => {
+                          const targetP = Math.min(pages.length - 1, pageIndex + 1)
+                          setPageIndex(targetP)
+                          if (readerLayout === 'vertical') scrollToPageElement(targetP + 1)
+                        }}
+                        disabled={pageIndex >= pages.length - 1}
+                      >
+                        Next Page →
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div className="mod-inspect-select-container">
+                        <span className="mod-inspect-select-label">Reader Layout:</span>
+                        <select
+                          className="mod-inspect-select"
+                          value={readerLayout}
+                          onChange={(e) => setReaderLayout(e.target.value)}
+                        >
+                          <option value="single">📖 Single Page</option>
+                          <option value="vertical">📜 Continuous Vertical Scroll</option>
+                        </select>
+                      </div>
+
+                      <div className="mod-inspector-divider" />
+
+                      <button
+                        type="button"
+                        className="mod-mode-tab"
+                        onClick={() => navigate(`/author/comics/${comicId}`)}
+                        style={{ padding: '6px 14px', fontSize: '12.5px', cursor: 'pointer' }}
+                      >
+                        Close Viewer
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* === TAB: DETAILS & FEEDBACK === */}
+          {previewTab === 'details' && (
+            <div style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
+              <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+                {/* Rejection Banner */}
+                {isRejected && (
+                  <div style={{
+                    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.18) 0%, rgba(153, 27, 27, 0.3) 100%)',
+                    border: '1px solid rgba(239, 68, 68, 0.45)',
+                    borderRadius: '12px',
+                    padding: '20px 24px',
+                    boxShadow: '0 12px 36px rgba(239, 68, 68, 0.2)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                      <span style={{ fontSize: '22px' }}>⛔</span>
+                      <h3 style={{ margin: 0, color: '#fca5a5', fontSize: '17px', fontWeight: '700' }}>
+                        Chapter Rejected by Moderator — Action Required
+                      </h3>
+                    </div>
+
+                    <div style={{
+                      fontSize: '14px', color: '#f8fafc', lineHeight: '1.6', background: 'rgba(0,0,0,0.35)',
+                      padding: '14px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)'
+                    }}>
+                      <strong style={{ color: '#fca5a5' }}>Moderator Overall Note:</strong>
+                      <p style={{ margin: '6px 0 0 0', whiteSpace: 'pre-wrap', color: '#e2e8f0', fontSize: '13.5px' }}>
+                        {overallNote || 'No overall remarks provided. Please inspect page feedback in the sidebar.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Chapter Info Card */}
+                <div className="mod-inspector-card" style={{ padding: '20px', borderRadius: '12px' }}>
+                  <h4 className="mod-inspector-title" style={{ margin: '0 0 12px', fontSize: '17px', fontWeight: '700' }}>
+                    📖 Chapter {getChapterNumber(preview)} Details
+                  </h4>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
+                    <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
+                      <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Total Pages</span>
+                      <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{pages.length}</strong>
+                    </div>
+
+                    <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
+                      <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Status</span>
+                      <strong style={{
+                        fontSize: '13.5px', display: 'block', marginTop: '4px',
+                        color: isRejected ? '#ef4444' : '#10b981'
+                      }}>
+                        {isRejected ? '✕ Rejected' : (String(preview?.status || '').toUpperCase() || 'N/A')}
+                      </strong>
+                    </div>
+
+                    <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
+                      <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Feedback Count</span>
+                      <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px', color: '#c084fc' }}>{docComments.length} comments</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Feedback Summary */}
+                {docComments.length > 0 && (
+                  <div className="mod-inspector-card" style={{ padding: '20px', borderRadius: '12px' }}>
+                    <h4 className="mod-inspector-title" style={{ margin: '0 0 12px', fontSize: '15px', fontWeight: '700' }}>
+                      💬 All Moderator Feedback ({docComments.length})
+                    </h4>
+                    <p className="mod-inspector-subtitle" style={{ margin: '0 0 16px', fontSize: '12px' }}>
+                      Click "💬 Feedback Pins" in the top bar to open the detailed sidebar panel.
+                    </p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {docComments.map((c, idx) => (
+                        <div
+                          key={c.id || idx}
+                          style={{
+                            padding: '12px 14px', borderRadius: '10px',
+                            background: theme === 'light' ? '#f8fafc' : 'rgba(255,255,255,0.04)',
+                            border: `1px solid ${c.targetType === 'point' ? 'rgba(168,85,247,0.3)' : 'rgba(14,165,233,0.3)'}`,
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => {
+                            if (c.targetKey?.startsWith('page-')) {
+                              const pNum = parseInt(c.targetKey.replace('page-', ''), 10)
+                              if (!isNaN(pNum)) {
+                                setPageIndex(pNum - 1)
+                                setPreviewTab('reader')
+                                setShowCommentsSidebar(true)
+                                setActivePinTarget(c.id)
+                              }
+                            }
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                            {renderCommentBadge(c, idx + 1)}
+                            <span className="mod-inspector-subtitle" style={{ fontSize: '11px' }}>
+                              {formatTimeAgo(c.createdAt)}
+                            </span>
+                          </div>
+                          <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{c.text}</p>
+                          <span style={{ fontSize: '11px', fontWeight: '700', color: '#7c3aed', marginTop: '4px', display: 'block' }}>
+                            🛡️ {c.author || 'Moderator'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
-            ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Right Comment Sidebar ── */}
+        {showCommentsSidebar && (
+          <div className="mod-doc-comments-sidebar">
+            {/* Sidebar Header */}
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(148,163,184,0.15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h4 className="mod-inspector-title" style={{ margin: 0, fontSize: '15px', fontWeight: '700' }}>
+                  💬 Moderator Feedback ({allComments.length})
+                </h4>
+                <span className="mod-inspector-subtitle" style={{ fontSize: '11.5px' }}>
+                  Read-only — pinned comments from review
+                </span>
+              </div>
+              <button
+                type="button"
+                className="mod-modal-close-btn"
+                onClick={() => setShowCommentsSidebar(false)}
+                title="Close Sidebar"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Sub-tabs */}
+            <div className="mod-doc-comments-sidebar-tabs">
+              <button
+                type="button"
+                className={`mod-sidebar-tab-btn ${sidebarCommentTab === 'all' ? 'active-all' : ''}`}
+                onClick={() => setSidebarCommentTab('all')}
+              >
+                All ({allComments.length})
+              </button>
+              <button
+                type="button"
+                className={`mod-sidebar-tab-btn ${sidebarCommentTab === 'page' ? 'active-notes' : ''}`}
+                onClick={() => setSidebarCommentTab('page')}
+              >
+                📄 Notes ({pageNotesList.length})
+              </button>
+              <button
+                type="button"
+                className={`mod-sidebar-tab-btn ${sidebarCommentTab === 'point' ? 'active-pins' : ''}`}
+                onClick={() => setSidebarCommentTab('point')}
+              >
+                📍 Pins ({pointPinsList.length})
+              </button>
+            </div>
+
+            {/* Sidebar Body */}
+            <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Read-only banner */}
+              <div style={{
+                padding: '10px 14px', borderRadius: '8px',
+                background: isRejected ? 'rgba(239, 68, 68, 0.08)' : 'rgba(124,58,237,0.08)',
+                border: `1px solid ${isRejected ? 'rgba(239, 68, 68, 0.2)' : 'rgba(124,58,237,0.2)'}`,
+                fontSize: '12px', textAlign: 'center', lineHeight: '1.5'
+              }}>
+                🔒 Submission is <strong style={{ color: isRejected ? '#ef4444' : '#7c3aed' }}>
+                  {isRejected ? 'REJECTED' : String(preview?.status || 'SUBMITTED').toUpperCase()}
+                </strong> — Comments & Inspection Notes are frozen in read-only mode.
+              </div>
+
+              {/* Comment cards */}
+              {displayList.length === 0 ? (
+                <div style={{ padding: '30px 16px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '36px', marginBottom: '10px' }}>💬</div>
+                  <p className="mod-inspector-title" style={{ margin: '0 0 6px', fontWeight: '700', fontSize: '14px' }}>No Comments Found</p>
+                  <p className="mod-inspector-subtitle" style={{ margin: 0, fontSize: '12px', lineHeight: '1.5' }}>
+                    No comments match the selected filter category ({sidebarCommentTab}).
+                  </p>
+                </div>
+              ) : (
+                displayList.map((c, idx) => (
+                  <div
+                    key={c.id || idx}
+                    id={`author-doc-comment-card-${c.id}`}
+                    className={`mod-doc-comment-card ${activePinTarget === c.id ? 'active-highlight' : ''}`}
+                    onClick={() => {
+                      setActivePinTarget(c.id)
+                      if (c.targetKey?.startsWith('page-')) {
+                        const pNum = parseInt(c.targetKey.replace('page-', ''), 10)
+                        if (!isNaN(pNum)) {
+                          setPageIndex(pNum - 1)
+                          setPreviewTab('reader')
+                          if (readerLayout === 'vertical') scrollToPageElement(pNum)
+                        }
+                      }
+                    }}
+                    style={{
+                      cursor: c.targetKey?.startsWith('page-') ? 'pointer' : 'default',
+                      borderColor: activePinTarget === c.id ? '#7c3aed' : undefined,
+                      boxShadow: activePinTarget === c.id ? '0 0 16px rgba(124, 58, 237, 0.4)' : undefined
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      {renderCommentBadge(c, allComments.findIndex(item => item.id === c.id) + 1)}
+                    </div>
+
+                    <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+                      {c.text}
+                    </p>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', marginTop: '4px' }}>
+                      <span style={{ fontWeight: '700', color: '#7c3aed' }}>🛡️ {c.author || 'Moderator'}</span>
+                      <span className="mod-inspector-subtitle">{formatTimeAgo(c.createdAt)}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </div>,
+    document.body
   )
 }
