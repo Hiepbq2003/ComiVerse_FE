@@ -320,10 +320,81 @@ function AuthorComics() {
   const [reviewingId, setReviewingId] = useState(null)
   const comicsLoadedRef = useRef(false)
 
-  const pendingReviewCount = useMemo(() => comics.filter((comic) => {
-    const status = (comic.moderationStatus || '').toString().toUpperCase()
-    return status.includes('REVIEW') || status.includes('SUBMITTED')
-  }).length, [comics])
+  const [activeTab, setActiveTab] = useState('all') // 'all' | 'rejected' | 'pending' | 'approved'
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState('action_first') // 'action_first' | 'updated' | 'created' | 'title'
+
+  const counts = useMemo(() => {
+    let rejected = 0
+    let pending = 0
+    let approved = 0
+
+    comics.forEach((comic) => {
+      const status = (comic.moderationStatus || '').toString().toUpperCase()
+      const isRejected = status === 'REJECTED' || (comic.rejectedChapterCount > 0)
+      const isPending = status.includes('REVIEW') || status.includes('SUBMITTED') || (comic.pendingChapterCount > 0)
+      const isApproved = status === 'APPROVED' || status === 'PUBLISHED'
+
+      if (isRejected) rejected++
+      if (isPending) pending++
+      if (isApproved) approved++
+    })
+
+    return { all: comics.length, rejected, pending, approved }
+  }, [comics])
+
+  const filteredAndSortedComics = useMemo(() => {
+    let result = comics.filter((comic) => {
+      const title = (comic.title || '').toLowerCase()
+      if (searchQuery && !title.includes(searchQuery.toLowerCase().trim())) {
+        return false
+      }
+
+      const status = (comic.moderationStatus || '').toString().toUpperCase()
+      const isRejected = status === 'REJECTED' || (comic.rejectedChapterCount > 0)
+      const isPending = status.includes('REVIEW') || status.includes('SUBMITTED') || (comic.pendingChapterCount > 0)
+      const isApproved = status === 'APPROVED' || status === 'PUBLISHED'
+
+      if (activeTab === 'rejected') return isRejected
+      if (activeTab === 'pending') return isPending
+      if (activeTab === 'approved') return isApproved
+      return true
+    })
+
+    return result.sort((a, b) => {
+      if (sortBy === 'title') {
+        return (a.title || '').localeCompare(b.title || '')
+      }
+
+      if (sortBy === 'created') {
+        const dateA = new Date(a.createdAt || 0).getTime()
+        const dateB = new Date(b.createdAt || 0).getTime()
+        return dateB - dateA
+      }
+
+      if (sortBy === 'updated') {
+        const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime()
+        const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime()
+        return dateB - dateA
+      }
+
+      // Default: 'action_first' (Rejected first, then Pending, then by updatedAt)
+      const statusA = (a.moderationStatus || '').toString().toUpperCase()
+      const statusB = (b.moderationStatus || '').toString().toUpperCase()
+
+      const isRejectedA = statusA === 'REJECTED' || (a.rejectedChapterCount > 0)
+      const isRejectedB = statusB === 'REJECTED' || (b.rejectedChapterCount > 0)
+      if (isRejectedA !== isRejectedB) return isRejectedA ? -1 : 1
+
+      const isPendingA = statusA.includes('REVIEW') || statusA.includes('SUBMITTED') || (a.pendingChapterCount > 0)
+      const isPendingB = statusB.includes('REVIEW') || statusB.includes('SUBMITTED') || (b.pendingChapterCount > 0)
+      if (isPendingA !== isPendingB) return isPendingA ? -1 : 1
+
+      const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime()
+      const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime()
+      return dateB - dateA
+    })
+  }, [comics, activeTab, searchQuery, sortBy])
 
   const loadComics = async () => {
     setLoading(true)
@@ -414,7 +485,7 @@ function AuthorComics() {
       <div className="author-list-header-row">
         <div>
           <h1>My Comics</h1>
-          <p>{loading ? 'Loading comics...' : `${comics.length} comics · ${pendingReviewCount} pending review`}</p>
+          <p>{loading ? 'Loading comics...' : `${comics.length} comics · ${counts.pending} pending review`}</p>
         </div>
         <button className="btn-author-action black large" onClick={() => setShowCreateModal(true)}>+ Create Comic</button>
       </div>
@@ -432,6 +503,62 @@ function AuthorComics() {
         </div>
       )}
 
+      {/* Filter Toolbar */}
+      {!loading && !error && comics.length > 0 && (
+        <div className="author-filter-toolbar">
+          <div className="author-filter-tabs">
+            <button
+              className={`author-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
+              onClick={() => setActiveTab('all')}
+            >
+              All <span className="author-tab-count">{counts.all}</span>
+            </button>
+
+            <button
+              className={`author-tab-btn ${activeTab === 'rejected' ? 'active rejected' : ''}`}
+              onClick={() => setActiveTab('rejected')}
+            >
+              🔴 Needs Action <span className="author-tab-count">{counts.rejected}</span>
+            </button>
+
+            <button
+              className={`author-tab-btn ${activeTab === 'pending' ? 'active pending' : ''}`}
+              onClick={() => setActiveTab('pending')}
+            >
+              ⏳ Pending Review <span className="author-tab-count">{counts.pending}</span>
+            </button>
+
+            <button
+              className={`author-tab-btn ${activeTab === 'approved' ? 'active' : ''}`}
+              onClick={() => setActiveTab('approved')}
+            >
+              ✓ Approved <span className="author-tab-count">{counts.approved}</span>
+            </button>
+          </div>
+
+          <div className="author-filter-controls">
+            <input
+              type="text"
+              className="author-search-input"
+              placeholder="Search comics..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+
+            <select
+              className="author-sort-select"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              <option value="action_first">Needs Action First</option>
+              <option value="updated">Recently Updated</option>
+              <option value="created">Newest Created</option>
+              <option value="title">Title (A-Z)</option>
+            </select>
+          </div>
+        </div>
+      )}
+
       {!loading && !error && comics.length === 0 && (
         <div className="author-empty-state">
           <h2>No comics yet</h2>
@@ -440,8 +567,15 @@ function AuthorComics() {
         </div>
       )}
 
+      {!loading && !error && comics.length > 0 && filteredAndSortedComics.length === 0 && (
+        <div className="author-empty-state small" style={{ marginTop: '20px' }}>
+          <h3>No comics match your filter criteria</h3>
+          <p>Try switching filter tabs or clearing your search query.</p>
+        </div>
+      )}
+
       <div className="author-comic-list">
-        {comics.map((comic) => {
+        {filteredAndSortedComics.map((comic) => {
           const comicId = getComicId(comic)
           const moderationStatus = comic.moderationStatus
           const publicationStatus = comic.publicationStatus
@@ -457,6 +591,16 @@ function AuthorComics() {
                 <div className="author-comic-title-line">
                   <h2>{comic.title}</h2>
                   <span className={`author-status-badge ${getModerationClass(moderationStatus)}`}>{formatModerationStatus(moderationStatus)}</span>
+                  {comic.rejectedChapterCount > 0 && (
+                    <span className="author-status-badge error" title="Contains chapter(s) rejected by moderator">
+                      🔴 {comic.rejectedChapterCount} Chapter{comic.rejectedChapterCount > 1 ? 's' : ''} Rejected
+                    </span>
+                  )}
+                  {comic.pendingChapterCount > 0 && (
+                    <span className="author-status-badge warning" title="Contains chapter(s) pending moderation">
+                      ⏳ {comic.pendingChapterCount} Chapter{comic.pendingChapterCount > 1 ? 's' : ''} Pending
+                    </span>
+                  )}
                   <span className={`author-publication-badge ${getPublicationClass(publicationStatus)}`}>{formatPublicationStatus(publicationStatus)}</span>
                 </div>
                 <div className="author-comic-meta-line">

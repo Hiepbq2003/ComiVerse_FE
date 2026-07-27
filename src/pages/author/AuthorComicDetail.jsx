@@ -408,36 +408,6 @@ function EditComicModal({ comic, onClose, onSaved }) {
   )
 }
 
-function ChapterPreviewPanel({ preview, onClose }) {
-  const pages = normalizeArrayResponse(preview?.pages)
-  if (!preview) return null
-
-  return (
-    <section className="author-preview-section-card">
-      <div className="author-chapter-section-head">
-        <div>
-          <h2>Preview · Chapter {getChapterNumber(preview)}</h2>
-          <p>{pages.length} pages returned from backend upload.</p>
-        </div>
-        <button className="btn-author-action" onClick={onClose}>Close Preview</button>
-      </div>
-
-      {pages.length === 0 ? (
-        <div className="author-empty-state small">No page URL was returned for this chapter.</div>
-      ) : (
-        <div className="author-page-preview-grid">
-          {pages.map((page) => (
-            <figure key={page.id || page.pageNumber || page.imageUrl}>
-              <img src={page.imageUrl} alt={`Page ${page.pageNumber}`} />
-              <figcaption>Page {page.pageNumber}</figcaption>
-            </figure>
-          ))}
-        </div>
-      )}
-    </section>
-  )
-}
-
 function AuthorComicDetail() {
   const { id } = useParams()
   const location = useLocation()
@@ -452,7 +422,6 @@ function AuthorComicDetail() {
   const [showEditComic, setShowEditComic] = useState(false)
   const [showUploadGuide, setShowUploadGuide] = useState(false)
   const [actionMessage, setActionMessage] = useState(location.state?.message || '')
-  const [preview, setPreview] = useState(null)
   const [actionLoadingId, setActionLoadingId] = useState(null)
   const [uploadTask, setUploadTask] = useState(null)
   const [submittingComic, setSubmittingComic] = useState(false)
@@ -510,7 +479,12 @@ function AuthorComicDetail() {
       ...current,
       chapterCount: Number(getChapterCount(current)) + 1,
     }))
-    setPreview(uploadedPreview)
+    
+    // Auto-navigate to preview mode after successful upload
+    const uploadedChapterId = getChapterId(uploadedPreview)
+    if (uploadedChapterId) {
+      navigate(`/author/comics/${id}/preview/${uploadedChapterId}`, { state: { preview: uploadedPreview } })
+    }
   }
 
   const pollChapterUploadTask = (taskId) => {
@@ -557,7 +531,7 @@ function AuthorComicDetail() {
 
     try {
       const data = await getAuthorChapterPreviewApi(getComicId(comic), chapterId)
-      setPreview(data)
+      navigate(`/author/comics/${id}/preview/${chapterId}`, { state: { preview: data } })
     } catch {
       setActionMessage('Could not load chapter preview. Please check API/backend connection.')
     } finally {
@@ -753,8 +727,6 @@ function AuthorComicDetail() {
             </div>
           </div>
         )}
-
-        <ChapterPreviewPanel preview={preview} onClose={() => setPreview(null)} />
 
         <section className="author-chapter-section-card">
           <div className="author-chapter-section-head">

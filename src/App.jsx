@@ -24,6 +24,7 @@ import AuthorComicDetail from './pages/author/AuthorComicDetail'
 import AuthorEarnings from './pages/author/AuthorEarnings'
 import AuthorSettings from './pages/author/AuthorSettings'
 import AuthorProfile from './pages/author/AuthorProfile'
+import AuthorChapterPreview from './pages/author/AuthorChapterPreview'
 import ModeratorDashboard from './pages/moderator/ModeratorDashboard'
 import ModeratorComicDetail from './pages/moderator/ModeratorComicDetail'
 import TranslatorDashboard from './pages/translator/TranslatorDashboard'
@@ -123,6 +124,7 @@ function App() {
                   <Route path="earnings" element={<AuthorEarnings />} />
                   <Route path="settings" element={<AuthorSettings />} />
                 </Route>
+                <Route path="/author/comics/:comicId/preview/:chapterId" element={<AuthorChapterPreview />} />
                 {/* Translator */}
                 <Route path="/translator" element={<TranslatorLayout />}>
                   

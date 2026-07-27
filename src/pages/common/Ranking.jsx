@@ -4,11 +4,6 @@ import HomeLayout from '../../components/layout/HomeLayout'
 import { getComicLeaderboardApi } from '../../services/api/ComicApi'
 import axios from 'axios'
 
-// Import assets
-import comicAction from '../../assets/comic_action.png'
-import comicAdventure from '../../assets/comic_adventure.png'
-import comicScifi from '../../assets/comic_scifi.png'
-
 
 function Ranking() {
   const navigate = useNavigate()
@@ -89,12 +84,7 @@ function Ranking() {
   )
 
   const getCoverImage = (comic) => {
-    if (comic.cover && typeof comic.cover === 'string') {
-      return comic.cover
-    }
-    const fallbacks = [comicAction, comicAdventure, comicScifi]
-    const idHash = typeof comic.id === 'string' ? comic.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : comic.id || 0
-    return fallbacks[idHash % 3] || comicAction
+    return comic.cover || comic.coverImage || comic.coverImageUrl || '';
   }
 
   const formatViews = (count) => {
