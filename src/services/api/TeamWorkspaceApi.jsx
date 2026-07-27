@@ -49,7 +49,12 @@ export const getTeamChaptersApi = async (teamId) => {
 }
 
 export const createTeamTaskApi = async (teamId, task) => {
-  return AxiosClient.post(`/team-workspace/${teamId}/tasks`, task)
+  try {
+    return await AxiosClient.post(`/team-workspace/${teamId}/tasks`, task)
+  } catch (err) {
+    console.warn(`[TeamWorkspaceApi] createTeamTaskApi notice for team ${teamId}:`, err?.message || err)
+    return null
+  }
 }
 
 export const updateTeamTaskApi = async (id, updates) => {
