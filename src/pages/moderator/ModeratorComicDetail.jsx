@@ -516,7 +516,7 @@ function ModeratorComicDetail() {
   const [chapters, setChapters] = useState([])
   const [projectTeams, setProjectTeams] = useState([])
   const [systemGenres, setSystemGenres] = useState([])
-  const [loading, setLoading] = useState(!locationComic)
+  const [loading, setLoading] = useState(true) // ALWAYS start loading as true to wait for real data
 
   // Selected View Language (Defaults to Raw / Original language of comic)
   const [selectedViewLang, setSelectedViewLang] = useState('raw')
@@ -530,50 +530,8 @@ function ModeratorComicDetail() {
   const [isSaving, setIsSaving] = useState(false)
 
   const fetchComicAndChapters = useCallback(async () => {
-    if (!comic) setLoading(true)
+    setLoading(true) // Unconditionally show skeleton while fetching
     try {
-      // Stage 1: Fast direct API call for targeted Comic & Chapters (~30-50ms)
-      const [comicRes, chaptersRes, teamsData] = await Promise.all([
-        getComicByIdApi(id).catch(() => null),
-        getChaptersByComicIdApi(id, {}, true).catch(() => []),
-        getCachedOrFetch('teams', getAllProjectTeamsApi)
-      ]);
-
-      let comicData = comicRes ? (comicRes.data?.data || comicRes.data || comicRes) : null;
-      let chaptersData = chaptersRes ? (chaptersRes.data?.data || chaptersRes.data || chaptersRes || []) : [];
-
-      // Render Stage 1 data immediately if available
-      if (comicData && comicData.id && !comicData.message && comicData.status !== 500) {
-        let finalData = {
-          ...(locationComic || {}),
-          ...comicData,
-          authorName: formatSubmitterName(comicData.authorName || comicData.author || locationComic?.authorName || locationComic?.author),
-          genres: parseGenresList(comicData.genres || locationComic?.genres)
-        };
-        try {
-          const savedLocal = localStorage.getItem('comiverse_local_comic_' + (comicData.id || id));
-          if (savedLocal) {
-            finalData = { ...finalData, ...JSON.parse(savedLocal) };
-          }
-        } catch(e) {}
-        setComic(finalData);
-      } else if (locationComic) {
-        comicData = { ...locationComic };
-        try {
-          const savedLocal = localStorage.getItem('comiverse_local_comic_' + id);
-          if (savedLocal) {
-            comicData = { ...comicData, ...JSON.parse(savedLocal) };
-          }
-        } catch(e) {}
-        setComic(comicData);
-      }
-
-      if (Array.isArray(chaptersData) && chaptersData.length > 0) {
-        setChapters(chaptersData.map((c, idx) => ({ ...c, title: getChapterDisplayTitle(c, idx) })));
-      }
-      setProjectTeams(Array.isArray(teamsData) ? teamsData : []);
-      setLoading(false);
-
       const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
         return Promise.race([
           promise,
@@ -581,12 +539,23 @@ function ModeratorComicDetail() {
         ]).catch(() => fallbackValue);
       };
 
-      // Stage 2: Background Parallel Fallback & Deep Enrichment (Non-blocking)
-      const [allComicsData, submissionsData, genresData] = await Promise.all([
+      // Launch ALL API calls (Stage 1 & Stage 2) concurrently to eliminate waterfall delays
+      const [comicRes, chaptersRes, teamsData, allComicsData, submissionsData, genresData] = await Promise.all([
+        getComicByIdApi(id).catch(() => null),
+        getChaptersByComicIdApi(id, {}, true).catch(() => []),
+        getCachedOrFetch('teams', getAllProjectTeamsApi),
         getCachedOrFetch('allComics', () => withTimeout(getAllComicsApi({ timeout: 2000 }))),
         getCachedOrFetch('submissions', () => withTimeout(getAllSubmissionsApi({ timeout: 2000 }))),
         getCachedOrFetch('genres', () => withTimeout(getAllGenresApi({ timeout: 2000 })))
       ]);
+
+      let comicData = comicRes ? (comicRes.data?.data || comicRes.data || comicRes) : null;
+      let chaptersData = chaptersRes ? (chaptersRes.data?.data || chaptersRes.data || chaptersRes || []) : [];
+
+      if (Array.isArray(chaptersData) && chaptersData.length > 0) {
+        setChapters(chaptersData.map((c, idx) => ({ ...c, title: getChapterDisplayTitle(c, idx) })));
+      }
+      setProjectTeams(Array.isArray(teamsData) ? teamsData : []);
 
       if (genresData && (Array.isArray(genresData) || Array.isArray(genresData.data))) {
         setSystemGenres(genresData.data || genresData);
@@ -619,7 +588,6 @@ function ModeratorComicDetail() {
         }
 
         if (!found && locationComic) found = locationComic;
-        if (!found) found = (MOCK_COMICS || []).find(c => String(c.id).toLowerCase() === targetIdStr || (c.title && c.title.toLowerCase().trim() === targetIdStr));
 
         comicData = found ? { ...found } : { id };
       }
@@ -661,7 +629,7 @@ function ModeratorComicDetail() {
           }
         }
 
-        if (!resolvedAuthor) resolvedAuthor = 'Author One';
+        if (!resolvedAuthor) resolvedAuthor = authUser?.fullName || 'Unknown Author';
 
         comicData.authorName = resolvedAuthor;
         comicData.author = resolvedAuthor;
@@ -715,7 +683,15 @@ function ModeratorComicDetail() {
           }
         }
 
-        setComic(prev => ({ ...comicData, ...prev, ...comicData }));
+        // Merge localStorage overrides so Stage 2 doesn't wipe user edits
+        let finalComicData = { ...comicData };
+        try {
+          const savedLocal = localStorage.getItem('comiverse_local_comic_' + (comicData.id || id));
+          if (savedLocal) {
+            finalComicData = { ...finalComicData, ...JSON.parse(savedLocal) };
+          }
+        } catch(e) {}
+        setComic(prev => ({ ...finalComicData, ...prev, ...finalComicData }));
       }
     } catch (err) {
       console.error('Failed to fetch comic details:', err);
@@ -776,8 +752,33 @@ function ModeratorComicDetail() {
         </div>
 
         {loading ? (
-          <div style={{ padding: '40px', textAlign: 'center' }}>
-            <SkeletonLoader count={4} height={60} style={{ marginBottom: '16px' }} />
+          <div className="mod-comic-overview-card skeleton-active" style={{ pointerEvents: 'none' }}>
+            <div className="mod-comic-cover-wrapper">
+              <div className="skeleton-img skeleton-shimmer" style={{ width: '100%', height: '100%', borderRadius: '12px', minHeight: '280px' }}></div>
+            </div>
+            <div className="mod-comic-info-content" style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+              <div>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '32px', width: '60%', marginBottom: '16px' }}></div>
+                <div className="mod-comic-meta-pills" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <div className="skeleton-line skeleton-shimmer short" style={{ height: '24px', width: '140px', borderRadius: '12px', margin: 0 }}></div>
+                  <div className="skeleton-line skeleton-shimmer short" style={{ height: '24px', width: '110px', borderRadius: '12px', margin: 0 }}></div>
+                  <div className="skeleton-line skeleton-shimmer short" style={{ height: '24px', width: '90px', borderRadius: '12px', margin: 0 }}></div>
+                  <div className="skeleton-line skeleton-shimmer short" style={{ height: '24px', width: '100px', borderRadius: '12px', margin: 0 }}></div>
+                </div>
+                <div className="mod-comic-genres" style={{ marginTop: '16px', marginBottom: '16px', display: 'flex', gap: '8px' }}>
+                  <div className="skeleton-line skeleton-shimmer" style={{ height: '28px', width: '80px', borderRadius: '14px', margin: 0 }}></div>
+                  <div className="skeleton-line skeleton-shimmer" style={{ height: '28px', width: '70px', borderRadius: '14px', margin: 0 }}></div>
+                  <div className="skeleton-line skeleton-shimmer" style={{ height: '28px', width: '90px', borderRadius: '14px', margin: 0 }}></div>
+                </div>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '16px', width: '95%', marginBottom: '8px' }}></div>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '16px', width: '85%', marginBottom: '8px' }}></div>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '16px', width: '40%' }}></div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: 'auto' }}>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '16px', width: '60px', margin: 0 }}></div>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '16px', width: '120px', margin: 0 }}></div>
+              </div>
+            </div>
           </div>
         ) : !comic ? (
           <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
@@ -865,7 +866,7 @@ function ModeratorComicDetail() {
                 </div>
 
                 <div style={{ fontSize: '13px', color: 'var(--mod-text-secondary)', display: 'flex', gap: '12px' }}>
-                  <span>Author: <strong style={{ color: 'var(--mod-text-primary)' }}>{formatSubmitterName(comic.authorName || comic.author || comic.submittedBy || comic.creatorName) || comic.authorName || comic.author || 'Author One'}</strong></span>
+                  <span>Author: <strong style={{ color: 'var(--mod-text-primary)' }}>{formatSubmitterName(comic.authorName || comic.author || comic.submittedBy || comic.creatorName) || comic.authorName || comic.author || authUser?.fullName || 'Unknown Author'}</strong></span>
                 </div>
               </div>
             </div>
