@@ -1,7 +1,12 @@
 import AxiosClient from './AxiosClient';
 
-export const getAllSubmissionsApi = () => {
-  return AxiosClient.get('/submissions/all');
+export const getAllSubmissionsApi = async () => {
+  try {
+    return await AxiosClient.get('/submissions/all');
+  } catch (err) {
+    console.warn('[SubmissionApi] getAllSubmissionsApi fallback:', err?.message || err);
+    return [];
+  }
 };
 
 export const createSubmissionApi = (data) => {
