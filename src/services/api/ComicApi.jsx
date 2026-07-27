@@ -1,5 +1,9 @@
 import AxiosClient from './AxiosClient';
 
+// Strip any "comic-" prefix from IDs before hitting the API
+const cleanComicId = (id) =>
+  typeof id === 'string' ? id.replace(/^comic-/i, '') : id;
+
 export const getAllComicsApi = async (config = {}) => {
   try {
     return await AxiosClient.get('/comics/staff/all', { timeout: 2500, ...config });
@@ -13,11 +17,11 @@ export const getComicsPageApi = (page = 1, size = 10, search = '') => {
 };
 
 export const updateComicApi = (id, data) => {
-  return AxiosClient.put(`/comics/${id}`, data);
+  return AxiosClient.put(`/comics/${cleanComicId(id)}`, data);
 };
 
 export const deleteComicApi = (id) => {
-  return AxiosClient.delete(`/comics/${id}`);
+  return AxiosClient.delete(`/comics/${cleanComicId(id)}`);
 };
 
 export const searchComicsApi = (query) => {
@@ -37,7 +41,5 @@ export const getComicLeaderboardApi = (params, config = {}) => {
 };
 
 export const getComicByIdApi = (id, config = {}) => {
-  return AxiosClient.get(`/comics/${id}`, config);
+  return AxiosClient.get(`/comics/${cleanComicId(id)}`, config);
 };
-
-

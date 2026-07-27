@@ -87,7 +87,7 @@ function ComicDetail() {
           getComicTranslationLanguagesApi(id, { signal }).catch(() => ({ data: [] }))
         ])
 
-        const comicData = comicRes?.data || comicRes
+        let comicData = comicRes?.data || comicRes
         const chaptersData = chaptersRes?.data || chaptersRes || []
         const languagesData = languagesRes?.data || languagesRes || []
 
@@ -95,6 +95,24 @@ function ComicDetail() {
         const savedStatus = saveCheckRes?.data !== undefined ? saveCheckRes.data : !!saveCheckRes
         const likedStatus = likeCheckRes?.data !== undefined ? likeCheckRes.data : !!likeCheckRes
         const readHistoryData = readHistoryRes?.data || readHistoryRes || []
+
+        try {
+          // Attempt to merge from override if it's a new submission
+          const subsStr = localStorage.getItem('comiverse_moderator_submissions_override');
+          if (subsStr) {
+            const subs = JSON.parse(subsStr);
+            const override = subs.find(s => String(s.comicId || s.id) === String(id));
+            if (override) {
+              comicData = { ...comicData, ...override, genres: override.genres || override.genre || comicData?.genres || [] };
+            }
+          }
+          // Attempt to merge from Moderator/Author edits
+          const localEdit = localStorage.getItem('comiverse_local_comic_' + id);
+          if (localEdit) {
+            const parsedEdit = JSON.parse(localEdit);
+            comicData = { ...comicData, ...parsedEdit, genres: parsedEdit.genres || parsedEdit.genre || comicData?.genres || [] };
+          }
+        } catch(e) {}
 
         setComic(comicData)
         setChapters(chaptersData)
@@ -319,7 +337,13 @@ function ComicDetail() {
   );
   const displayGenres = parsedGenres.length > 0 ? parsedGenres : ['Fantasy'];
 
-  const displayAuthor = comic.authorName || (typeof comic.author === 'object' ? (comic.author?.displayName || comic.author?.fullName || comic.author?.username) : comic.author) || (typeof comic.user === 'object' ? (comic.user?.fullName || comic.user?.username) : comic.user) || comic.creatorName || comic.submittedBy || 'Author'
+  let rawDisplayAuthor = comic.authorName || (typeof comic.author === 'object' ? (comic.author?.displayName || comic.author?.fullName || comic.author?.username) : comic.author) || (typeof comic.user === 'object' ? (comic.user?.fullName || comic.user?.username) : comic.user) || comic.creatorName || comic.submittedBy || user?.fullName || 'Unknown Author';
+  
+  if (typeof rawDisplayAuthor === 'string') {
+    rawDisplayAuthor = rawDisplayAuthor.replace(/^(Author:\s*)+/gi, '').trim();
+  }
+  const displayAuthor = rawDisplayAuthor;
+
   const displayLanguage = comic.language || comic.rawLanguage || 'Unknown'
 
   const displayRating = comic.ratingAverage !== undefined
@@ -353,15 +377,6 @@ function ComicDetail() {
         <div className="hero-backdrop-overlay" />
 
         <div className="comic-detail-hero-content">
-          {/* Cover */}
-          <div className="comic-detail-cover-wrapper">
-            {isEmoji(displayCover) ? (
-              <div style={{ fontSize: '7rem', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at center, rgba(168, 85, 247, 0.2) 0%, rgba(13, 9, 25, 0.98) 100%)' }}>{displayCover}</div>
-            ) : (
-              <img src={displayCover} alt={displayTitle} />
-            )}
-          </div>
-
           {/* Details */}
           <div style={{ flex: '1', minWidth: '300px' }}>
             <button onClick={() => navigate(-1)} className="hero-back-btn">
@@ -443,6 +458,15 @@ function ComicDetail() {
                 }}
               />
             </div>
+          </div>
+
+          {/* Cover */}
+          <div className="comic-detail-cover-wrapper">
+            {isEmoji(displayCover) ? (
+              <div style={{ fontSize: '7rem', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at center, rgba(168, 85, 247, 0.2) 0%, rgba(13, 9, 25, 0.98) 100%)' }}>{displayCover}</div>
+            ) : (
+              <img src={displayCover} alt={displayTitle} />
+            )}
           </div>
         </div>
       </div>
@@ -553,8 +577,8 @@ function ComicDetail() {
           {/* Right Column: Sidebar */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div className="detail-sidebar-info-card">
-              <h3 className="detail-section-title" style={{ fontSize: '16px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '10px' }}>
-                Comic Info
+              <h3 className="detail-section-title" style={{ fontSize: '16px', borderBottom: '1px solid var(--reader-border, rgba(255, 255, 255, 0.08))', paddingBottom: '10px' }}>
+                Information
               </h3>
 
               <div>
