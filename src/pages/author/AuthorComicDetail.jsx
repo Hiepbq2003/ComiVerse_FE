@@ -437,12 +437,40 @@ function AuthorComicDetail() {
         getAuthorComicMetricsApi(id),
       ])
 
-      if (comicResponse.status !== 'fulfilled') {
-        throw comicResponse.reason
-      }
+      const rawComic = comicResponse.value;
+      const rawChapters = chaptersResponse.status === 'fulfilled' ? normalizeArrayResponse(chaptersResponse.value) : [];
 
-      setComic(comicResponse.value)
-      setChapters(chaptersResponse.status === 'fulfilled' ? normalizeArrayResponse(chaptersResponse.value) : [])
+      let hasRejectedOverride = false;
+      try {
+        const rawOverrides = localStorage.getItem('comiverse_moderator_submissions_override');
+        if (rawOverrides) {
+          const overrides = JSON.parse(rawOverrides);
+          const comicTitleClean = (rawComic.title || '').trim().toLowerCase();
+          const comicIdStr = String(rawComic.id || rawComic.comicId || id || '');
+
+          const matchingOverrides = overrides.filter(o => {
+            const matchId = (o.comicId && String(o.comicId) === comicIdStr) || (o.id && String(o.id) === comicIdStr);
+            const matchTitle = (comicTitleClean && o.title && o.title.trim().toLowerCase() === comicTitleClean);
+            return matchId || matchTitle;
+          });
+
+          hasRejectedOverride = matchingOverrides.some(o => (o.status || '').toString().toUpperCase() === 'REJECTED');
+        }
+      } catch (e) {}
+
+      const chaptersWithRejection = rawChapters.map(c => {
+        if (hasRejectedOverride) {
+          return { ...c, status: 'REJECTED' };
+        }
+        return c;
+      });
+
+      const finalModerationStatus = (hasRejectedOverride || chaptersWithRejection.some(c => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED'))
+        ? 'REJECTED'
+        : (rawComic.moderationStatus || rawComic.approvalStatus || 'DRAFT');
+
+      setComic({ ...rawComic, moderationStatus: finalModerationStatus });
+      setChapters(chaptersWithRejection);
       setMetrics(metricsResponse.status === 'fulfilled' ? metricsResponse.value : null)
     } catch {
       setComic(null)
