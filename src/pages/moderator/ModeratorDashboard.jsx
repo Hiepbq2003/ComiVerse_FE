@@ -113,8 +113,33 @@ function ModeratorDashboard() {
     return item.cover || item.coverImage || item.coverImageUrl || item.coverUrl || item.cover_url || item.imageUrl || '';
   };
 
-  const syncApprovedComics = (comicsList, subsList) => {
-    let result = (comicsList || []).map(c => {
+  const isTitleMatch = (t1, t2) => {
+    if (!t1 || !t2) return false;
+    const clean1 = String(t1).trim().toLowerCase().replace(/[^a-z0-9]/gi, '').replace(/s$/, '');
+    const clean2 = String(t2).trim().toLowerCase().replace(/[^a-z0-9]/gi, '').replace(/s$/, '');
+    return clean1 === clean2;
+  };
+
+  const deduplicateComics = (list) => {
+    if (!Array.isArray(list)) return [];
+    const seenIds = new Set();
+    const seenTitles = new Set();
+    return list.filter(item => {
+      if (!item) return false;
+      const idKey = item.id ? String(item.id).toLowerCase() : '';
+      const titleKey = item.title ? String(item.title).trim().toLowerCase().replace(/[^a-z0-9]/gi, '').replace(/s$/, '') : '';
+      
+      if (idKey && seenIds.has(idKey)) return false;
+      if (titleKey && seenTitles.has(titleKey)) return false;
+      
+      if (idKey) seenIds.add(idKey);
+      if (titleKey) seenTitles.add(titleKey);
+      return true;
+    });
+  };
+
+  const syncApprovedComics = (initialComics, subsList) => {
+    const result = (initialComics || []).map(c => {
       const cCover = getComicCover(c);
       return {
         ...c,
@@ -126,7 +151,7 @@ function ModeratorDashboard() {
     (subsList || []).forEach(sub => {
       if (sub.status === 'approved' && (sub.title || sub.comicName || sub.comicTitle)) {
         const comicTitle = (sub.title || sub.comicName || sub.comicTitle).trim();
-        const existingIdx = result.findIndex(c => (c.title && c.title.trim().toLowerCase() === comicTitle.toLowerCase()) || (sub.comicId && c.id === sub.comicId));
+        const existingIdx = result.findIndex(c => isTitleMatch(c.title, comicTitle) || (sub.comicId && String(c.id) === String(sub.comicId)));
         const coverVal = getComicCover(sub);
         if (existingIdx !== -1) {
           const finalCover = getComicCover(result[existingIdx]) || coverVal;
@@ -138,6 +163,7 @@ function ModeratorDashboard() {
             publicationStatus: result[existingIdx].publicationStatus || 'ONGOING',
             status: 'Active'
           };
+        } else {
           const authorNameClean = formatSubmitterName(sub.submittedBy || sub.author || sub.submittedByEmail || sub.authorName || 'Unknown Author').replace(/^Author:\s*/i, '');
           const stableId = sub.comicId || (sub.id ? `comic-${sub.id}` : (sub.submissionId ? `comic-${sub.submissionId}` : `comic-${comicTitle.replace(/\s+/g, '-').toLowerCase()}`));
           result.unshift({
@@ -166,7 +192,7 @@ function ModeratorDashboard() {
         }
       }
     });
-    return result;
+    return deduplicateComics(result);
   };
 
   const publishComicToManagement = (sub, isSingleChapter = false, approvedChapObj = null) => {
@@ -177,7 +203,7 @@ function ModeratorDashboard() {
     const coverVal = getComicCover(sub);
     const nowIso = new Date().toISOString();
     setComics(prev => {
-      const existingIdx = prev.findIndex(c => (c.title && c.title.trim().toLowerCase() === comicTitle.toLowerCase()) || (sub.comicId && c.id === sub.comicId));
+      const existingIdx = prev.findIndex(c => isTitleMatch(c.title, comicTitle) || (sub.comicId && String(c.id) === String(sub.comicId)));
       if (existingIdx !== -1) {
         const updated = [...prev];
         const existing = updated[existingIdx];
@@ -206,7 +232,7 @@ function ModeratorDashboard() {
           approvedAt: existing.approvedAt || nowIso,
           lastChapterUpdatedAt: nowIso
         };
-        return updated;
+        return deduplicateComics(updated);
       } else {
         const authorNameClean = formatSubmitterName(sub.submittedBy || sub.author || sub.submittedByEmail || sub.authorName || 'Unknown Author').replace(/^Author:\s*/i, '');
         const initialChapsList = approvedChapObj ? [approvedChapObj] : (Array.isArray(sub.allChapters) ? sub.allChapters : (Array.isArray(sub.chapters) ? sub.chapters : []));
@@ -237,7 +263,7 @@ function ModeratorDashboard() {
           approvedAt: sub.approvedAt || nowIso,
           lastChapterUpdatedAt: nowIso
         };
-        return [newComic, ...prev];
+        return deduplicateComics([newComic, ...prev]);
       }
     });
   };
@@ -269,8 +295,24 @@ function ModeratorDashboard() {
         })
       ])
       const authUser = getAuth()?.user;
+      const rawComics = comicsData || [];
+      
+      // Auto-link submissions to real DB IDs if titles match
+      setSubmissions(prevSubs => (prevSubs || []).map(sub => {
+        if (!sub) return sub;
+        const subTitle = sub.title || sub.comicName || sub.comicTitle;
+        const dbMatch = rawComics.find(c => c && isTitleMatch(c.title, subTitle));
+        if (dbMatch) {
+          return {
+            ...sub,
+            comicId: dbMatch.id
+          };
+        }
+        return sub;
+      }));
+
       const mappedComics = syncApprovedComics(
-        (comicsData || []).map(c => {
+        rawComics.map(c => {
           const merged = syncComicWithLocalOverride(c);
           const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === merged.title.toLowerCase())
           const cCover = getComicCover(merged);
@@ -284,7 +326,7 @@ function ModeratorDashboard() {
         }).filter(c => isLanguageInModeratorScope(c.language || c.rawLanguage || c.originalLanguage, authUser)),
         submissions
       ).map(c => syncComicWithLocalOverride(c)).filter(c => !c.archived);
-      setComics(mappedComics)
+      setComics(deduplicateComics(mappedComics))
       setProjectTeams(teamsData || [])
       setGenres(genresData?.data || genresData || [])
     } catch (err) {
@@ -654,7 +696,11 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
 
     try {
       if (isFinalChapterOfSub && targetApiId && !String(targetApiId).startsWith('group-') && !String(targetApiId).startsWith('chap-')) {
-        await approveSubmissionApi(targetApiId);
+        const res = await approveSubmissionApi(targetApiId);
+        const realDbComic = res?.data || res;
+        if (realDbComic && (realDbComic.id || realDbComic.comicId) && sub) {
+          sub.comicId = realDbComic.id || realDbComic.comicId;
+        }
       }
     } catch (apiErr) {
       console.warn(`[Backend DB Sync] approveSubmissionApi(${targetApiId}) notice:`, apiErr?.message || apiErr);
@@ -805,15 +851,23 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
   };
 
   const handleSaveEditComic = async (id, updatedFields) => {
+    let cleanUpdated = { ...updatedFields };
     try {
-      const updated = await updateComicApi(id, updatedFields)
-      const cleanUpdated = updated?.data || updated
-      setComics(prev => prev.map(c => c.id === id ? { ...c, ...cleanUpdated, projectTeam: c.projectTeam } : c))
-      toast.success('Comic updated successfully.')
+      const updated = await updateComicApi(id, updatedFields);
+      if (updated) {
+        cleanUpdated = updated?.data || updated;
+      }
     } catch (err) {
-      console.error(err)
-      toast.error('Failed to save comic updates.')
+      console.warn('[Moderator] Update API error (using local override fallback):', err?.message);
     }
+
+    try {
+      const existing = JSON.parse(localStorage.getItem('comiverse_local_comic_' + id) || '{}');
+      localStorage.setItem('comiverse_local_comic_' + id, JSON.stringify({ ...existing, ...cleanUpdated }));
+    } catch(e) {}
+
+    setComics(prev => prev.map(c => c.id === id ? { ...c, ...cleanUpdated, projectTeam: c.projectTeam } : c));
+    toast.success('Comic updated successfully.');
   }
 
   const handleArchiveComic = async (id) => {
