@@ -1061,21 +1061,21 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
           onClick={() => setActiveTab('pending')}
         >
           Pending Review
-          <span className="moderator-tab-btn-badge">{tabCounts.pending}</span>
+          <span className="moderator-tab-btn-badge pending">{tabCounts.pending}</span>
         </button>
         <button 
           className={`moderator-tab-btn ${activeTab === 'approved' ? 'active' : ''}`}
           onClick={() => setActiveTab('approved')}
         >
           Approved
-          <span className="moderator-tab-btn-badge">{tabCounts.approved}</span>
+          <span className="moderator-tab-btn-badge approved">{tabCounts.approved}</span>
         </button>
         <button 
           className={`moderator-tab-btn ${activeTab === 'rejected' ? 'active' : ''}`}
           onClick={() => setActiveTab('rejected')}
         >
           Rejected
-          <span className="moderator-tab-btn-badge">{tabCounts.rejected}</span>
+          <span className="moderator-tab-btn-badge rejected">{tabCounts.rejected}</span>
         </button>
       </div>
 
