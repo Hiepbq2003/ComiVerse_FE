@@ -1615,18 +1615,238 @@ html.light .mod-doc-comment-target-badge.field-note {
 }
 
 /* High priority overlay to ensure rejection & field comment modals sit ON TOP of full-screen inspector (z-index: 99999) */
-.mod-reject-modal-overlay,
-.mod-modal-overlay.mod-inspector-high-priority {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 999999 !important;
-  background: rgba(15, 10, 26, 0.85) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
+/* ═══════════════════════════════════════════════════════════════════
+   PREMIUM EDIT COMIC MODAL (DARK & LIGHT MODE SUPPORT)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.mod-edit-comic-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(8, 5, 18, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
 }
+
+html.light .mod-edit-comic-modal-overlay {
+  background: rgba(241, 245, 249, 0.75);
+}
+
+.mod-edit-comic-modal-card {
+  width: 100%;
+  max-width: 520px;
+  background: rgba(18, 12, 36, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: 90vh;
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+html.light .mod-edit-comic-modal-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.15), 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+.mod-edit-comic-modal-header {
+  padding: 22px 28px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
+}
+
+html.light .mod-edit-comic-modal-header {
+  border-bottom: 1px solid #f1f5f9;
+  background: linear-gradient(180deg, #f8fafc 0%, transparent 100%);
+}
+
+.mod-edit-comic-modal-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.3px;
+}
+
+html.light .mod-edit-comic-modal-title {
+  color: #0f172a;
+}
+
+.mod-edit-comic-modal-body {
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+}
+
+/* Custom Scrollbar for Modal Body */
+.mod-edit-comic-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.mod-edit-comic-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mod-edit-comic-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+}
+
+html.light .mod-edit-comic-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+/* Field Group */
+.mod-edit-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mod-edit-field-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+html.light .mod-edit-field-label {
+  color: #334155;
+}
+
+.mod-edit-field-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 12px 16px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.mod-edit-field-input:focus {
+  border-color: #a855f7;
+  background: rgba(168, 85, 247, 0.08);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2);
+}
+
+html.light .mod-edit-field-input {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+}
+
+html.light .mod-edit-field-input:focus {
+  border-color: #7c3aed;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+}
+
+/* System Genre Pill Buttons */
+.mod-edit-genre-pill {
+  cursor: pointer;
+  padding: 7px 16px;
+  border-radius: 500px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd5e1;
+}
+
+.mod-edit-genre-pill:hover {
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.mod-edit-genre-pill.active {
+  border: 1.5px solid #c084fc;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(124, 58, 237, 0.25) 100%);
+  color: #f3e8ff;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.3);
+}
+
+html.light .mod-edit-genre-pill {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+}
+
+html.light .mod-edit-genre-pill:hover {
+  border-color: #7c3aed;
+  color: #7c3aed;
+}
+
+html.light .mod-edit-genre-pill.active {
+  border: 1.5px solid #7c3aed;
+  background: #f3e8ff;
+  color: #6b21a8;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.2);
+}
+
+/* Modal Footer */
+.mod-edit-comic-modal-footer {
+  background: rgba(12, 8, 26, 0.8);
+  padding: 18px 28px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+html.light .mod-edit-comic-modal-footer {
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.mod-edit-cancel-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 500px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mod-edit-cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+html.light .mod-edit-cancel-btn {
+  background: #e2e8f0;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+
+html.light .mod-edit-cancel-btn:hover {
+  background: #cbd5e1;
+  color: #0f172a;
+}
+
 
 
 

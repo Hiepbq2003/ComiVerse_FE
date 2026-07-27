@@ -10,6 +10,7 @@ import { createTranslationRequestApi } from '../../services/api/TranslationPoolA
 import { toast } from 'react-toastify'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getChaptersByComicIdApi, deleteChapterApi } from '../../services/api/ChapterApi'
+import { getComicByIdApi } from '../../services/api/ComicApi'
 import { getAuth } from '../../utils/Auth'
 import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
 
@@ -25,6 +26,9 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   const [viewsSort, setViewsSort] = useState('All Views')
   const [comicTimeFilter, setComicTimeFilter] = useState('All Time')
   const [chapterUpdateSort, setChapterUpdateSort] = useState('Sort by Update Time')
+
+  // Supplementary stats state for when backend list API drops view/rating fields
+  const [comicStats, setComicStats] = useState({})
 
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
@@ -103,6 +107,44 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
     return filteredAndSortedComics.slice((activePage - 1) * ITEMS_PER_PAGE, activePage * ITEMS_PER_PAGE);
   }, [filteredAndSortedComics, activePage]);
 
+  // Fetch missing stats dynamically for visible items
+  useEffect(() => {
+    paginatedComics.forEach(comic => {
+      // If backend already provides real stats, no need to fetch
+      // We check > 0 because backend might return fake 0s for missing stats in list API
+      const hasRealStats = (comic.viewCount > 0 || comic.views > 0) || (comic.ratingAverage > 0 || comic.rating > 0);
+      if (hasRealStats) {
+        return; 
+      }
+
+      setComicStats(prev => {
+        // If already fetched or fetching, do nothing
+        if (prev[comic.id]) return prev;
+
+        // Fetch data silently
+        getComicByIdApi(comic.id).then(res => {
+          const data = res?.data?.data || res?.data || res || {};
+          setComicStats(current => ({
+            ...current,
+            [comic.id]: {
+              viewCount: data.viewCount || data.views || 0,
+              ratingAverage: data.ratingAverage || data.rating || 0,
+              ratingCount: data.ratingCount || data.ratings || 0,
+            }
+          }));
+        }).catch(err => {
+          setComicStats(current => ({
+            ...current,
+            [comic.id]: { viewCount: 0, ratingAverage: 0, ratingCount: 0 }
+          }));
+        });
+
+        // Mark as fetching
+        return { ...prev, [comic.id]: { fetching: true } };
+      });
+    });
+  }, [paginatedComics]);
+
   // Archive confirmation modal states
   const [showArchiveModal, setShowArchiveModal] = useState(false)
   const [comicToArchive, setComicToArchive] = useState(null)
@@ -144,7 +186,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   const [chaptersLoading, setChaptersLoading] = useState(false)
 
   const openChaptersModal = (comic) => {
-    navigate(`/moderator/comic/${comic.id}`)
+    navigate(`/moderator/comic/${comic.id}`, { state: { comic } })
   }
 
   const handleDeleteChapter = async (chapterId) => {
@@ -453,7 +495,6 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
             <tr>
               <th>Comic</th>
               <th>Author</th>
-              <th>Project Team</th>
               <th>Chapters</th>
               <th>Views</th>
               <th>Rating</th>
@@ -486,7 +527,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                         <span 
                           className="comic-cell-title" 
                           style={{ cursor: 'pointer' }} 
-                          onClick={() => navigate(`/moderator/comic/${comic.id}`)}
+                          onClick={() => navigate(`/moderator/comic/${comic.id}`, { state: { comic } })}
                           title="Click to view comic details & chapters"
                         >
                           {comic.title}
@@ -503,13 +544,6 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                   </td>
                   <td>{comic.authorName || (typeof comic.author === 'object' ? (comic.author?.displayName || comic.author?.fullName || comic.author?.username) : comic.author) || (typeof comic.user === 'object' ? (comic.user?.fullName || comic.user?.username) : comic.user) || comic.creatorName || (typeof comic.creator === 'object' ? (comic.creator?.fullName || comic.creator?.username) : comic.creator) || comic.submittedBy || comic.createdByName || 'Original Author'}</td>
                   <td>
-                    {comic.projectTeam === '-' ? (
-                      <span style={{ color: 'var(--mod-text-muted)', fontSize: '13px' }}>Unassigned</span>
-                    ) : (
-                      <span style={{ fontWeight: '500' }}>{comic.projectTeam}</span>
-                    )}
-                  </td>
-                  <td>
                     <strong>{comic.chapterCount !== undefined ? comic.chapterCount : (comic.chapters || 0)}</strong>
                     {comic.lastChapterUpdatedAt && (
                       <div style={{ fontSize: '11px', color: 'var(--mod-text-secondary)', marginTop: '4px' }}>
@@ -517,13 +551,15 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                       </div>
                     )}
                   </td>
-                  <td>{comic.viewCount !== undefined ? comic.viewCount : (comic.views || 0)}</td>
+                  <td>
+                    {comic.viewCount || comic.totalViews || comic.views || comic.view || comicStats[comic.id]?.viewCount || 0}
+                  </td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', color: '#f59e0b' }}>
                       <span style={{ fontSize: '15px' }}>★</span>
-                      <span>{comic.ratingAverage !== undefined ? comic.ratingAverage.toFixed(1) : (comic.rating !== undefined ? comic.rating.toFixed(1) : '0.0')}</span>
+                      <span>{Number(comic.ratingAverage || comic.averageRating || comic.rating || comicStats[comic.id]?.ratingAverage || 0).toFixed(1)}</span>
                       <span style={{ fontSize: '11px', color: 'var(--mod-text-secondary)', fontWeight: 'normal' }}>
-                        ({comic.ratingCount || 0})
+                        ({comic.ratingCount || comic.totalRatings || comic.ratings || comicStats[comic.id]?.ratingCount || 0})
                       </span>
                     </div>
                   </td>
@@ -536,15 +572,9 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                     <div className="comic-actions-cell">
                       <ModernButton 
                         variant={2} 
-                        label="📖 Chapters" 
+                        label="👁️ View Detail" 
                         className="btn-view"
-                        onClick={() => openChaptersModal(comic)} 
-                      />
-                      <ModernButton 
-                        variant={2} 
-                        label="📝 Edit" 
-                        className="btn-edit"
-                        onClick={() => openEditModal(comic)} 
+                        onClick={() => navigate(`/moderator/comic/${comic.id}`, { state: { comic } })} 
                       />
                       <ModernButton 
                         variant={5} 

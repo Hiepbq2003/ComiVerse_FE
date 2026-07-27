@@ -355,24 +355,26 @@ function ModeratorDashboard() {
     }
   }
 
-  const fetchAllData = async () => {
-    try {
-      setLoading(true)
-      const results = await Promise.allSettled([
-        getAllComicsApi(),
-        getAllProjectTeamsApi(),
-        getAllSubmissionsApi(),
-        getAllGenresApi(),
-        getAllForumThreadsApi(),
-        getAllChatFlagsApi()
-      ])
+const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
+  return Promise.race([
+    promise,
+    new Promise(resolve => setTimeout(() => resolve(fallbackValue), ms))
+  ]).catch(() => fallbackValue);
+};
 
-      const comicsData = results[0].status === 'fulfilled' ? results[0].value : []
-      const teamsData = results[1].status === 'fulfilled' ? results[1].value : []
-      const submissionsData = results[2].status === 'fulfilled' ? results[2].value : []
-      const genresData = results[3].status === 'fulfilled' ? results[3].value : []
-      const forumData = results[4].status === 'fulfilled' ? results[4].value : []
-      const chatData = results[5].status === 'fulfilled' ? results[5].value : []
+  const fetchAllData = async () => {
+    // If data is already present, refresh silently in background without showing full screen loader
+    if (comics.length === 0 && submissions.length === 0) {
+      setLoading(true);
+    }
+    try {
+      // Phase 1: Core Dashboard Data (Comics, Teams, Submissions, Genres) with 2s max timeout
+      const [comicsData, teamsData, submissionsData, genresData] = await Promise.all([
+        withTimeout(getAllComicsApi(), []),
+        withTimeout(getAllProjectTeamsApi(), []),
+        withTimeout(getAllSubmissionsApi(), []),
+        withTimeout(getAllGenresApi(), [])
+      ]);
 
       const authUser = getAuth()?.user;
       
@@ -408,7 +410,7 @@ function ModeratorDashboard() {
         enrichedRawSubmissions.filter(s => isLanguageInModeratorScope(s.language || s.rawLanguage || s.targetLanguage || s.targetLang || s.originalLanguage, authUser))
       );
       
-      setSubmissions(filteredSubmissions)
+      setSubmissions(filteredSubmissions);
 
       const mappedComics = syncApprovedComics(
         (comicsData || []).map(c => {
@@ -424,16 +426,26 @@ function ModeratorDashboard() {
         }).filter(c => isLanguageInModeratorScope(c.language || c.rawLanguage || c.originalLanguage, authUser)),
         filteredSubmissions
       );
-      setComics(mappedComics)
-      setProjectTeams(teamsData || [])
-      setGenres(genresData?.data || (Array.isArray(genresData) ? genresData : []))
-      setForumThreads(forumData || [])
-      setChatFlags(chatData || [])
+      setComics(mappedComics);
+      setProjectTeams(teamsData || []);
+      setGenres(genresData?.data || (Array.isArray(genresData) ? genresData : []));
+
+      // Release screen loading indicator immediately after Stage 1 (~50ms)
+      setLoading(false);
+
+      // Phase 2: Secondary Background Data (Forum threads & Chat flags) with timeout
+      const [forumData, chatData] = await Promise.all([
+        withTimeout(getAllForumThreadsApi(), []),
+        withTimeout(getAllChatFlagsApi(), [])
+      ]);
+
+      setForumThreads(forumData || []);
+      setChatFlags(chatData || []);
     } catch (err) {
-      console.error(err)
-      toast.error('Failed to retrieve control panel data from server.')
+      console.error(err);
+      toast.error('Failed to retrieve control panel data from server.');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -877,7 +889,10 @@ function ModeratorDashboard() {
       coverImage: resolvedCover || '',
       comicId: createTeamForm.comicId || null,
       description: `Official translation team for ${createTeamForm.comicName}.`,
-      assignedToMe: true
+      assignedToMe: true,
+      maxMembers: 5,
+      isRecruiting: true,
+      notes: `Official translation team for ${createTeamForm.comicName}.`
     }
 
     try {

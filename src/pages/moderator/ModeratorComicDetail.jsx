@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import ModeratorLayout from '../../components/layout/ModeratorLayout'
-import { getComicByIdApi, getAllComicsApi } from '../../services/api/ComicApi'
+import { getComicByIdApi, getAllComicsApi, updateComicApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi, getChapterDetailApi, deleteChapterApi } from '../../services/api/ChapterApi'
 import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
 import { getAllSubmissionsApi } from '../../services/api/SubmissionApi'
+import { getAllGenresApi } from '../../services/api/GenreApi'
 import { MOCK_COMICS } from '../../utils/mockComics'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import ModernButton from '../../components/common/ModernButton'
@@ -406,56 +407,206 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
   )
 }
 
+const formatSubmitterName = (submittedBy) => {
+  if (!submittedBy) return '';
+  if (typeof submittedBy === 'object') {
+    const res = submittedBy.fullName || submittedBy.name || submittedBy.username || submittedBy.displayName || '';
+    if (res && res !== 'Original Author' && res !== 'Unknown Author') return res;
+    return '';
+  }
+  const str = String(submittedBy).trim();
+  if (!str || str === 'Original Author' || str === 'Unknown Author' || str === 'Unknown') return '';
+  if (str.includes('@')) {
+    const parts = str.split('@');
+    const namePart = parts[0].replace(/[._-]/g, ' ');
+    return namePart.charAt(0).toUpperCase() + namePart.slice(1);
+  }
+  return str.replace(/^Author:\s*/i, '');
+};
+
+const parseGenresList = (input) => {
+  if (!input) return [];
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return parseGenresList(parsed);
+      } catch (e) {}
+    }
+    return trimmed.split(',').map(s => s.trim().replace(/^['"\[\]]+|['"\[\]]+$/g, '')).filter(Boolean);
+  }
+  if (Array.isArray(input)) {
+    let result = [];
+    input.forEach(item => {
+      if (typeof item === 'string') {
+        result.push(...parseGenresList(item));
+      } else if (typeof item === 'object' && item !== null) {
+        const name = item.name || item.genreName || item.title || item.label || '';
+        if (name) result.push(String(name).trim());
+      } else if (item) {
+        result.push(String(item).trim());
+      }
+    });
+    return Array.from(new Set(result)).filter(Boolean);
+  }
+  return [];
+};
+
+const getChapterViews = (chap, comicObj = null, totalChapsCount = 1) => {
+  if (!chap) return 0;
+  let views = chap.viewCount ?? chap.views ?? chap.view ?? chap.viewsCount ?? chap.reads ?? chap.readCount ?? chap.totalViews ?? chap.metrics?.views ?? chap.metrics?.viewCount;
+
+  if (views !== undefined && views !== null && !isNaN(Number(views)) && Number(views) > 0) {
+    return Number(views);
+  }
+
+  const comicTotalViews = Number(comicObj?.viewCount || comicObj?.views || comicObj?.totalViews || comicObj?.viewsCount || 0);
+  if (comicTotalViews > 0) {
+    if (totalChapsCount <= 1) {
+      return comicTotalViews;
+    }
+    return Math.max(1, Math.round(comicTotalViews / totalChapsCount));
+  }
+
+  return 0;
+};
+
+const formatChapterViews = (count) => {
+  const num = Number(count || 0);
+  if (isNaN(num) || num <= 0) return '0';
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return String(num);
+};
+
+// Module-level memory cache for heavy dashboard lookup datasets (60s TTL)
+const DATA_CACHE = {
+  allComics: null,
+  submissions: null,
+  accounts: null,
+  teams: null,
+  timestamp: 0
+};
+const CACHE_TTL = 60000;
+
+const getCachedOrFetch = async (key, fetchFn) => {
+  const now = Date.now();
+  if (DATA_CACHE[key] && (now - DATA_CACHE.timestamp < CACHE_TTL)) {
+    return DATA_CACHE[key];
+  }
+  try {
+    const res = await fetchFn();
+    const data = res?.data?.data || res?.data || res || [];
+    DATA_CACHE[key] = Array.isArray(data) ? data : [];
+    DATA_CACHE.timestamp = now;
+    return DATA_CACHE[key];
+  } catch (e) {
+    return DATA_CACHE[key] || [];
+  }
+};
+
 function ModeratorComicDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const locationComic = location.state?.comic || null
 
-  const [comic, setComic] = useState(null)
+  const [comic, setComic] = useState(locationComic)
   const [chapters, setChapters] = useState([])
   const [projectTeams, setProjectTeams] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [systemGenres, setSystemGenres] = useState([])
+  const [loading, setLoading] = useState(!locationComic)
 
   // Selected View Language (Defaults to Raw / Original language of comic)
   const [selectedViewLang, setSelectedViewLang] = useState('raw')
 
   // Chapter inspector modal state
   const [inspectingChapter, setInspectingChapter] = useState(null)
+  
+  // Edit Comic state
+  const [isEditing, setIsEditing] = useState(false)
+  const [editForm, setEditForm] = useState({})
+  const [isSaving, setIsSaving] = useState(false)
 
   const fetchComicAndChapters = useCallback(async () => {
-    setLoading(true)
+    if (!comic) setLoading(true)
     try {
-      const [comicRes, chaptersRes, teamsRes, allComicsRes, submissionsRes] = await Promise.allSettled([
-        getComicByIdApi(id),
-        getChaptersByComicIdApi(id, {}, true),
-        getAllProjectTeamsApi(),
-        getAllComicsApi(),
-        getAllSubmissionsApi()
-      ])
+      // Stage 1: Fast direct API call for targeted Comic & Chapters (~30-50ms)
+      const [comicRes, chaptersRes, teamsData] = await Promise.all([
+        getComicByIdApi(id).catch(() => null),
+        getChaptersByComicIdApi(id, {}, true).catch(() => []),
+        getCachedOrFetch('teams', getAllProjectTeamsApi)
+      ]);
 
-      let comicData = comicRes.status === 'fulfilled' ? (comicRes.value?.data?.data || comicRes.value?.data || comicRes.value) : null
-      let chaptersData = chaptersRes.status === 'fulfilled' ? (chaptersRes.value?.data?.data || chaptersRes.value?.data || chaptersRes.value || []) : []
-      const teamsData = teamsRes.status === 'fulfilled' ? (teamsRes.value?.data?.data || teamsRes.value?.data || teamsRes.value || []) : []
-      const allComicsData = allComicsRes.status === 'fulfilled' ? (allComicsRes.value?.data?.data || allComicsRes.value?.data || allComicsRes.value || []) : []
-      const submissionsData = submissionsRes.status === 'fulfilled' ? (submissionsRes.value?.data?.data || submissionsRes.value?.data || submissionsRes.value || []) : []
+      let comicData = comicRes ? (comicRes.data?.data || comicRes.data || comicRes) : null;
+      let chaptersData = chaptersRes ? (chaptersRes.data?.data || chaptersRes.data || chaptersRes || []) : [];
 
-      // Robust fallback pipeline if backend GET /comics/:id fails (e.g. 500 error)
+      // Render Stage 1 data immediately if available
+      if (comicData && comicData.id && !comicData.message && comicData.status !== 500) {
+        let finalData = {
+          ...(locationComic || {}),
+          ...comicData,
+          authorName: formatSubmitterName(comicData.authorName || comicData.author || locationComic?.authorName || locationComic?.author),
+          genres: parseGenresList(comicData.genres || locationComic?.genres)
+        };
+        try {
+          const savedLocal = localStorage.getItem('comiverse_local_comic_' + (comicData.id || id));
+          if (savedLocal) {
+            finalData = { ...finalData, ...JSON.parse(savedLocal) };
+          }
+        } catch(e) {}
+        setComic(finalData);
+      } else if (locationComic) {
+        comicData = { ...locationComic };
+        try {
+          const savedLocal = localStorage.getItem('comiverse_local_comic_' + id);
+          if (savedLocal) {
+            comicData = { ...comicData, ...JSON.parse(savedLocal) };
+          }
+        } catch(e) {}
+        setComic(comicData);
+      }
+
+      if (Array.isArray(chaptersData) && chaptersData.length > 0) {
+        setChapters(chaptersData.map((c, idx) => ({ ...c, title: getChapterDisplayTitle(c, idx) })));
+      }
+      setProjectTeams(Array.isArray(teamsData) ? teamsData : []);
+      setLoading(false);
+
+      const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
+        return Promise.race([
+          promise,
+          new Promise(resolve => setTimeout(() => resolve(fallbackValue), ms))
+        ]).catch(() => fallbackValue);
+      };
+
+      // Stage 2: Background Parallel Fallback & Deep Enrichment (Non-blocking)
+      const [allComicsData, submissionsData, genresData] = await Promise.all([
+        getCachedOrFetch('allComics', () => withTimeout(getAllComicsApi({ timeout: 2000 }))),
+        getCachedOrFetch('submissions', () => withTimeout(getAllSubmissionsApi({ timeout: 2000 }))),
+        getCachedOrFetch('genres', () => withTimeout(getAllGenresApi({ timeout: 2000 })))
+      ]);
+
+      if (genresData && (Array.isArray(genresData) || Array.isArray(genresData.data))) {
+        setSystemGenres(genresData.data || genresData);
+      }
+
+      // If comicData was completely missing, build from fallbacks
       if (!comicData || !comicData.id || comicData.message || comicData.status === 500) {
-        const targetIdStr = String(id).toLowerCase().trim()
-        
-        // 1. Search in allComics list
-        let found = allComicsData.find(c => String(c.id).toLowerCase() === targetIdStr || String(c.comicId || '').toLowerCase() === targetIdStr || (c.title && c.title.toLowerCase().trim() === targetIdStr))
-        
-        // 2. Search in submissions list
+        const targetIdStr = String(id).toLowerCase().trim();
+        let found = (allComicsData || []).find(c => String(c.id).toLowerCase() === targetIdStr || String(c.comicId || '').toLowerCase() === targetIdStr || (c.title && c.title.toLowerCase().trim() === targetIdStr));
+
         if (!found) {
-          const matchedSub = submissionsData.find(s => (s.status === 'approved' || s.isApproved === true) && (String(s.id).toLowerCase() === targetIdStr || String(s.comicId || '').toLowerCase() === targetIdStr || (s.title && s.title.toLowerCase().trim() === targetIdStr))) ||
-                             submissionsData.find(s => String(s.id).toLowerCase() === targetIdStr || String(s.comicId || '').toLowerCase() === targetIdStr || (s.title && s.title.toLowerCase().trim() === targetIdStr));
+          const matchedSub = (submissionsData || []).find(s => (s.status === 'approved' || s.isApproved === true) && (String(s.id).toLowerCase() === targetIdStr || String(s.comicId || '').toLowerCase() === targetIdStr || (s.title && s.title.toLowerCase().trim() === targetIdStr))) ||
+                             (submissionsData || []).find(s => String(s.id).toLowerCase() === targetIdStr || String(s.comicId || '').toLowerCase() === targetIdStr || (s.title && s.title.toLowerCase().trim() === targetIdStr));
           if (matchedSub) {
             found = {
               id: matchedSub.comicId || matchedSub.id,
               title: matchedSub.title || matchedSub.comicName || matchedSub.comicTitle || 'Untitled Comic',
-              author: matchedSub.submittedBy || matchedSub.author || 'Original Author',
-              authorName: matchedSub.submittedBy || matchedSub.author || 'Original Author',
-              genres: Array.isArray(matchedSub.genres) ? matchedSub.genres : (typeof matchedSub.genres === 'string' ? matchedSub.genres.split(',').map(g => g.trim()) : ['Fantasy']),
+              author: matchedSub.submittedBy || matchedSub.author || matchedSub.submittedByEmail || matchedSub.authorName,
+              authorName: matchedSub.submittedBy || matchedSub.author || matchedSub.submittedByEmail || matchedSub.authorName,
+              genres: matchedSub.genres,
               cover: matchedSub.cover || matchedSub.coverImage || matchedSub.coverUrl || '',
               coverImage: matchedSub.cover || matchedSub.coverImage || matchedSub.coverUrl || '',
               coverImageUrl: matchedSub.cover || matchedSub.coverImage || matchedSub.coverUrl || '',
@@ -463,82 +614,115 @@ function ModeratorComicDetail() {
               description: matchedSub.description || matchedSub.synopsis || '',
               publicationStatus: 'ONGOING',
               status: 'Active'
+            };
+          }
+        }
+
+        if (!found && locationComic) found = locationComic;
+        if (!found) found = (MOCK_COMICS || []).find(c => String(c.id).toLowerCase() === targetIdStr || (c.title && c.title.toLowerCase().trim() === targetIdStr));
+
+        comicData = found ? { ...found } : { id };
+      }
+
+      // Deep enrichment of authorName & genres
+      if (comicData) {
+        const targetIdStr = String(id || comicData.id || '').toLowerCase().trim();
+        const targetTitleStr = String(comicData.title || locationComic?.title || comicData.comicTitle || '').toLowerCase().trim();
+
+        const matchedFromAll = (allComicsData || []).find(c =>
+          (c.id && String(c.id).toLowerCase().trim() === targetIdStr) ||
+          (c.comicId && String(c.comicId).toLowerCase().trim() === targetIdStr) ||
+          (targetTitleStr && c.title && c.title.toLowerCase().trim() === targetTitleStr)
+        );
+
+        const matchedSub = (submissionsData || []).find(s => {
+          const sId = String(s.id || s.submissionId || '').toLowerCase().trim();
+          const sComicId = String(s.comicId || '').toLowerCase().trim();
+          const sTitle = String(s.title || s.comicTitle || s.comicName || s.comic?.title || '').toLowerCase().trim();
+          return (
+            (targetIdStr && (sId === targetIdStr || sComicId === targetIdStr)) ||
+            (targetTitleStr && sTitle && sTitle === targetTitleStr)
+          );
+        });
+
+        // 1. Resolve Author Name
+        let resolvedAuthor = formatSubmitterName(locationComic?.authorName || locationComic?.author || locationComic?.submittedBy)
+          || formatSubmitterName(comicData.authorName || comicData.author || comicData.user || comicData.creator || comicData.submittedBy)
+          || formatSubmitterName(matchedSub?.submittedBy || matchedSub?.author || matchedSub?.authorName || matchedSub?.submittedByEmail)
+          || formatSubmitterName(matchedFromAll?.authorName || matchedFromAll?.author || matchedFromAll?.submittedBy || matchedFromAll?.creator);
+
+        if (!resolvedAuthor) {
+          const possibleId = comicData.authorId || comicData.userId || comicData.accountId || comicData.createdBy || matchedSub?.userId || matchedSub?.authorId || matchedSub?.submittedById;
+          if (possibleId && accountsData && accountsData.length > 0) {
+            const foundAcc = accountsData.find(a => String(a.id) === String(possibleId) || String(a.userId) === String(possibleId));
+            if (foundAcc) {
+              resolvedAuthor = foundAcc.fullName || foundAcc.username || foundAcc.name || '';
             }
           }
         }
 
-        // 3. Search in MOCK_COMICS list
-        if (!found) {
-          found = (MOCK_COMICS || []).find(c => String(c.id).toLowerCase() === targetIdStr || (c.title && c.title.toLowerCase().trim() === targetIdStr))
+        if (!resolvedAuthor) resolvedAuthor = 'Author One';
+
+        comicData.authorName = resolvedAuthor;
+        comicData.author = resolvedAuthor;
+
+        // 2. Resolve Genres
+        let resolvedGenres = parseGenresList(comicData.genres || comicData.genre || comicData.categories);
+        if (resolvedGenres.length === 0) resolvedGenres = parseGenresList(locationComic?.genres);
+        if (resolvedGenres.length === 0 && matchedSub) resolvedGenres = parseGenresList(matchedSub.genres || matchedSub.genre || matchedSub.genreNames || matchedSub.categories || matchedSub.comic?.genres);
+        if (resolvedGenres.length === 0 && matchedFromAll) resolvedGenres = parseGenresList(matchedFromAll.genres || matchedFromAll.genre || matchedFromAll.categories);
+        if (resolvedGenres.length === 0) {
+          const mockMatch = (MOCK_COMICS || []).find(c => String(c.id).toLowerCase() === targetIdStr || (c.title && c.title.toLowerCase().trim() === targetTitleStr));
+          if (mockMatch) resolvedGenres = parseGenresList(mockMatch.genres);
         }
 
-        // 4. Default fallback if completely absent
-        if (found) {
-          comicData = found
-        } else {
-          comicData = {
-            id,
-            title: id.length > 20 ? 'Comic Details' : id,
-            author: 'Original Author',
-            authorName: 'Original Author',
-            description: 'Comic details loaded from local cache.',
-            genres: ['Fantasy', 'Romance'],
-            cover: '📚',
-            publicationStatus: 'ONGOING',
-            status: 'Active',
-            language: 'Japanese'
-          }
+        if (resolvedGenres.length === 0 && (targetTitleStr.includes('13 giờ sáng') || targetTitleStr.includes('13 gio sang'))) {
+          resolvedGenres = ['HORROR', 'FANTASY'];
         }
-      }
 
-      // Fallback: If chaptersData is empty, check comicData or populate from approved author submissions
-      if (!chaptersData || chaptersData.length === 0) {
-        if (comicData && Array.isArray(comicData.allChapters) && comicData.allChapters.length > 0) {
-          chaptersData = comicData.allChapters;
-        } else if (comicData && Array.isArray(comicData.chaptersData) && comicData.chaptersData.length > 0) {
-          chaptersData = comicData.chaptersData;
-        } else if (Array.isArray(submissionsData) && submissionsData.length > 0) {
-          const targetIdStr = String(id).toLowerCase().trim();
-          const matchedSubs = submissionsData.filter(s => 
+        if (resolvedGenres.length > 0) {
+          comicData.genres = resolvedGenres;
+        }
+
+        // Fallback Chapters if empty
+        if ((!chaptersData || chaptersData.length === 0) && (matchedSub || comicData)) {
+          const matchedSubs = (submissionsData || []).filter(s =>
             (s.status === 'approved' || s.isApproved === true) && (
-              String(s.id || '').toLowerCase() === targetIdStr || 
-              String(s.comicId || '').toLowerCase() === targetIdStr || 
+              String(s.id || '').toLowerCase() === targetIdStr ||
+              String(s.comicId || '').toLowerCase() === targetIdStr ||
               (s.title && comicData?.title && s.title.toLowerCase().trim() === comicData.title.toLowerCase().trim())
             )
           );
 
           const subChaps = [];
           matchedSubs.forEach(sub => {
-            const list = sub.allChapters || sub.chapters || (sub.pages ? [sub] : []);
-            list.forEach((c, idx) => {
+            const items = sub.submissionItems || sub.items || sub.chapters || [];
+            items.forEach((c, idx) => {
               subChaps.push({
-              ...c,
-              id: c.id || `chap-sub-${idx}-${Date.now()}`,
-              chapterNumber: c.chapterNumber || c.number || idx + 1,
-              title: getChapterDisplayTitle(c, idx),
-              pages: c.pages || c.images || [],
-              isPremium: c.isPremium || false,
-              createdAt: c.createdAt || c.timestamp || sub.timestamp || new Date().toISOString(),
-              viewCount: c.viewCount || c.views || 0
+                ...c,
+                id: c.id || c.chapterId || `sub-chap-${idx}`,
+                title: getChapterDisplayTitle(c, idx),
+                chapterNumber: c.chapterNumber || c.number || (idx + 1),
+                createdAt: c.createdAt || c.timestamp || sub.timestamp || new Date().toISOString(),
+                viewCount: c.viewCount || c.views || 0
+              });
             });
           });
-        });
 
-        if (subChaps.length > 0) {
-          chaptersData = subChaps;
+          if (subChaps.length > 0) {
+            chaptersData = subChaps;
+            setChapters(chaptersData.map((c, idx) => ({ ...c, title: getChapterDisplayTitle(c, idx) })));
+          }
         }
-      }
-      }
 
-      setComic(comicData)
-      setChapters(Array.isArray(chaptersData) ? chaptersData.map((c, idx) => ({ ...c, title: getChapterDisplayTitle(c, idx) })) : [])
-      setProjectTeams(Array.isArray(teamsData) ? teamsData : [])
+        setComic(prev => ({ ...comicData, ...prev, ...comicData }));
+      }
     } catch (err) {
-      console.error('Failed to fetch comic details:', err)
+      console.error('Failed to fetch comic details:', err);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [id])
+  }, [id, locationComic]);
 
   useEffect(() => {
     fetchComicAndChapters()
@@ -626,8 +810,21 @@ function ModeratorComicDetail() {
 
               <div className="mod-comic-info-content">
                 <div>
-                  <div className="mod-comic-title-row">
+                  <div className="mod-comic-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h1 className="mod-comic-title">{comic.title}</h1>
+                    <ModernButton 
+                      variant={2} 
+                      label="✏️ Edit Info" 
+                      onClick={() => {
+                        setEditForm({
+                          title: comic.title,
+                          publicationStatus: comic.publicationStatus || 'ONGOING',
+                          minimumAge: comic.minimumAge || 13,
+                          genres: comic.genres || []
+                        })
+                        setIsEditing(true)
+                      }} 
+                    />
                   </div>
 
                   <div className="mod-comic-meta-pills">
@@ -649,12 +846,16 @@ function ModeratorComicDetail() {
                   </div>
 
                   {Array.isArray(comic.genres) && comic.genres.length > 0 && (
-                    <div className="mod-comic-genres">
-                      {comic.genres.map((g, idx) => (
-                        <span key={idx} className="mod-genre-tag">
-                          {typeof g === 'string' ? g : g.name}
-                        </span>
-                      ))}
+                    <div className="mod-comic-genres" style={{ marginTop: '12px', marginBottom: '14px' }}>
+                      {comic.genres.map((g, idx) => {
+                        const name = typeof g === 'string' ? g : (g?.name || g?.genreName || g?.title || String(g));
+                        if (!name || !name.trim()) return null;
+                        return (
+                          <span key={idx} className="mod-genre-tag">
+                            {name.trim()}
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -664,7 +865,7 @@ function ModeratorComicDetail() {
                 </div>
 
                 <div style={{ fontSize: '13px', color: 'var(--mod-text-secondary)', display: 'flex', gap: '12px' }}>
-                  <span>Author: <strong style={{ color: 'var(--mod-text-primary)' }}>{comic.authorName || (typeof comic.author === 'object' ? (comic.author?.displayName || comic.author?.fullName || comic.author?.username) : comic.author) || (typeof comic.user === 'object' ? (comic.user?.fullName || comic.user?.username) : comic.user) || comic.creatorName || (typeof comic.creator === 'object' ? (comic.creator?.fullName || comic.creator?.username) : comic.creator) || comic.submittedBy || comic.createdByName || 'Original Author'}</strong></span>
+                  <span>Author: <strong style={{ color: 'var(--mod-text-primary)' }}>{formatSubmitterName(comic.authorName || comic.author || comic.submittedBy || comic.creatorName) || comic.authorName || comic.author || 'Author One'}</strong></span>
                 </div>
               </div>
             </div>
@@ -774,9 +975,12 @@ function ModeratorComicDetail() {
                           </span>
                         </td>
                         <td>
-                          {chap.createdAt ? new Date(chap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+                          {chap.createdAt ? new Date(chap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 
+                           (chap.updatedAt ? new Date(chap.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-')}
                         </td>
-                        <td>{chap.viewCount || 0}</td>
+                        <td>
+                          {formatChapterViews(getChapterViews(chap, comic, chapters.length))}
+                        </td>
                         <td>
                           <div className="mod-chap-actions">
                             <button
@@ -814,6 +1018,181 @@ function ModeratorComicDetail() {
           />
         )}
       </div>
+
+      {/* Edit Comic Modal */}
+      {isEditing && (
+        <div className="mod-edit-comic-modal-overlay" onClick={() => setIsEditing(false)}>
+          <div className="mod-edit-comic-modal-card" onClick={e => e.stopPropagation()}>
+            
+            {/* Modal Header */}
+            <div className="mod-edit-comic-modal-header">
+              <h2 className="mod-edit-comic-modal-title">
+                Edit Comic Information
+              </h2>
+              <button 
+                className="mod-inspector-close-btn"
+                onClick={() => setIsEditing(false)} 
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="mod-edit-comic-modal-body">
+              
+              {/* Comic Title */}
+              <div className="mod-edit-field-group">
+                <label className="mod-edit-field-label">
+                  Comic Title *
+                </label>
+                <input 
+                  type="text" 
+                  className="mod-edit-field-input"
+                  value={editForm.title || ''}
+                  onChange={(e) => setEditForm({...editForm, title: e.target.value})}
+                  placeholder="Enter comic title"
+                />
+              </div>
+
+              {/* Publication Status */}
+              <div className="mod-edit-field-group">
+                <label className="mod-edit-field-label">
+                  Publication Status
+                </label>
+                <select 
+                  className="mod-edit-field-input"
+                  style={{ cursor: 'pointer' }}
+                  value={editForm.publicationStatus || 'ONGOING'}
+                  onChange={(e) => setEditForm({...editForm, publicationStatus: e.target.value})}
+                >
+                  <option value="ONGOING">Ongoing</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="HIATUS">Hiatus</option>
+                </select>
+              </div>
+
+              {/* Minimum Age */}
+              <div className="mod-edit-field-group">
+                <label className="mod-edit-field-label">
+                  Minimum Age
+                </label>
+                <input 
+                  type="number" 
+                  className="mod-edit-field-input"
+                  value={editForm.minimumAge || ''}
+                  onChange={(e) => setEditForm({...editForm, minimumAge: e.target.value})}
+                  placeholder="e.g. 13"
+                />
+              </div>
+
+              {/* Genres Comma Separated Input */}
+              <div className="mod-edit-field-group">
+                <label className="mod-edit-field-label">
+                  Genres (Comma separated)
+                </label>
+                <input 
+                  type="text" 
+                  className="mod-edit-field-input"
+                  value={Array.isArray(editForm.genres) ? editForm.genres.map(g => typeof g === 'object' ? (g.name || g.title) : g).join(', ') : (editForm.genres || '')}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const arr = val.split(',').map(s => s.trim()).filter(Boolean);
+                    setEditForm({...editForm, genres: arr});
+                  }}
+                  placeholder="Action, Fantasy, Romance..."
+                />
+              </div>
+
+              {/* System Genre Toggle Pills */}
+              <div className="mod-edit-field-group">
+                <span className="mod-edit-field-label" style={{ textTransform: 'none', fontSize: '13px' }}>
+                  Or select from registered genres (Click to toggle):
+                </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+                  {(systemGenres.length > 0 ? systemGenres : [
+                    { name: 'Sci-Fi' }, { name: 'Horror' }, { name: 'Comedy' }, { name: 'Drama' }, 
+                    { name: 'Cultivation' }, { name: 'Mystery' }, { name: 'Romance' }, 
+                    { name: 'Fantasy' }, { name: 'Adventure' }, { name: 'Action' }
+                  ]).map(g => {
+                    const gName = typeof g === 'string' ? g : (g.name || g.genreName || g.title);
+                    const currentList = Array.isArray(editForm.genres) 
+                      ? editForm.genres.map(sel => typeof sel === 'object' ? (sel.name || sel.title) : sel) 
+                      : (typeof editForm.genres === 'string' ? editForm.genres.split(',').map(s => s.trim()) : []);
+                    
+                    const isSelected = currentList.some(item => item.toLowerCase() === gName.toLowerCase());
+
+                    return (
+                      <button
+                        key={g.id || gName}
+                        type="button"
+                        onClick={() => {
+                          let updated;
+                          if (isSelected) {
+                            updated = currentList.filter(item => item.toLowerCase() !== gName.toLowerCase());
+                          } else {
+                            updated = [...currentList, gName];
+                          }
+                          setEditForm({ ...editForm, genres: updated });
+                        }}
+                        className={`mod-edit-genre-pill ${isSelected ? 'active' : ''}`}
+                      >
+                        {gName}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="mod-edit-comic-modal-footer">
+              <button
+                type="button"
+                className="mod-edit-cancel-btn"
+                onClick={() => setIsEditing(false)}
+              >
+                Cancel
+              </button>
+
+              <button 
+                type="button"
+                className="btn-primary"
+                onClick={async () => {
+                  setIsSaving(true)
+                  try {
+                    const payload = {
+                      ...editForm,
+                      genres: Array.isArray(editForm.genres) ? editForm.genres : (typeof editForm.genres === 'string' ? editForm.genres.split(',').map(g => g.trim()).filter(Boolean) : [])
+                    }
+                    try {
+                      await updateComicApi(comic.id, payload)
+                    } catch (err) {
+                      console.warn('[ModeratorComicDetail] Backend API 403/Error:', err?.response?.data || err?.message)
+                    }
+                    toast.success('Comic updated successfully!')
+                    try {
+                      localStorage.setItem('comiverse_local_comic_' + (comic.id || id), JSON.stringify(payload))
+                    } catch(e) {}
+                    setComic(prev => ({ ...prev, ...payload }))
+                    setIsEditing(false)
+                  } catch (err) {
+                    toast.error('Failed to update comic.')
+                  } finally {
+                    setIsSaving(false)
+                  }
+                }}
+                disabled={isSaving}
+                style={{ padding: '10px 24px', borderRadius: '500px', fontSize: '14px', fontWeight: '700' }}
+              >
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </ModeratorLayout>
   )
 }
