@@ -1408,7 +1408,6 @@ async function fetchPagesForTask(taskId, signal) {
         console.warn('[DEBUG] Could not backfill real pageIds from /review-workspace:', e);
       }
     }
-
     return finalPages;
   }
 

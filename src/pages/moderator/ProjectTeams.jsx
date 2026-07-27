@@ -208,7 +208,9 @@ function ProjectTeams({
       comicName: selectedTitle,
       sourceLang: autoSourceLang,
       targetLang: firstAvailable,
-      title: autoTitle
+      title: autoTitle,
+      cover: foundComic?.cover || foundComic?.coverImage || foundComic?.coverImageUrl || foundComic?.coverUrl || prev?.cover || '',
+      comicId: foundComic?.id || foundComic?.comicId || prev?.comicId || ''
     }));
   };
 
@@ -396,7 +398,9 @@ function ProjectTeams({
       targetLang: 'English',
       leaderName: '',
       leaderId: '',
-      priority: 'High'
+      priority: 'High',
+      cover: initialComic?.cover || initialComic?.coverImage || initialComic?.coverImageUrl || initialComic?.coverUrl || '',
+      comicId: initialComic?.id || initialComic?.comicId || ''
     })
     setCreateLeaderSearch('')
     setCreateLeaderResults([])

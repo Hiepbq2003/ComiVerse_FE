@@ -8,9 +8,6 @@ import { getAllComicsApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi } from '../../services/api/ChapterApi'
 import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
 import { getAuth } from '../../utils/Auth'
-import comicAction from '../../assets/comic_action.png'
-import comicAdventure from '../../assets/comic_adventure.png'
-import comicScifi from '../../assets/comic_scifi.png'
 
 const getProjectCover = (proj, dbComics = [], dbSubs = []) => {
   if (!proj) return '';
@@ -26,40 +23,73 @@ const getProjectCover = (proj, dbComics = [], dbSubs = []) => {
     return rawCover;
   }
 
+  const cleanName = (str) => {
+    if (!str) return '';
+    return String(str)
+      .replace(/\s*(-.*)?(\s+translation\s+team|\s+team|\s+english\s+translation|\s+english)$/i, '')
+      .toLowerCase()
+      .trim();
+  };
+
   const targetId = String(proj.comicId || proj.id || '').toLowerCase().trim();
-  const targetTitle = String(proj.title || proj.comicName || proj.comicTitle || '').toLowerCase().trim();
+  const targetTitle = cleanName(proj.comicName || proj.title || proj.comicTitle || proj.team || '');
 
-  // 1. Search in DB Comics list
-  if (Array.isArray(dbComics) && dbComics.length > 0) {
-    const matchComic = dbComics.find(c => {
-      const cId = String(c.id || c.comicId || '').toLowerCase().trim();
-      const cTitle = String(c.title || '').toLowerCase().trim();
-      return (cId && cId === targetId) || (cTitle && targetTitle && (cTitle === targetTitle || cTitle.includes(targetTitle) || targetTitle.includes(cTitle)));
+  const findCoverInList = (list) => {
+    if (!Array.isArray(list) || list.length === 0) return '';
+    const match = list.find(item => {
+      if (!item) return false;
+      const itemId = String(item.id || item.comicId || '').toLowerCase().trim();
+      if (targetId && itemId && (itemId === targetId || itemId === `comic-${targetId}`)) return true;
+      const itemTitle = cleanName(item.title || item.comicName || item.comicTitle || item.name || '');
+      return targetTitle && itemTitle && (itemTitle === targetTitle || itemTitle.includes(targetTitle) || targetTitle.includes(itemTitle));
     });
-    if (matchComic) {
-      const cCover = matchComic.cover || matchComic.coverImage || matchComic.coverImageUrl || matchComic.coverUrl;
-      if (cCover && typeof cCover === 'string' && (cCover.startsWith('http') || cCover.startsWith('data:') || cCover.startsWith('/'))) {
-        return cCover;
+    if (match) {
+      const c = match.cover || match.coverImage || match.coverImageUrl || match.coverUrl || match.imageUrl;
+      if (c && typeof c === 'string' && (c.startsWith('http') || c.startsWith('data:') || c.startsWith('/') || c.includes('.')) && !c.includes('🔮') && !c.includes('📚')) {
+        return c;
       }
     }
-  }
+    return '';
+  };
 
-  // 2. Search in DB Submissions list
-  if (Array.isArray(dbSubs) && dbSubs.length > 0) {
-    const matchSub = dbSubs.find(s => {
-      const sId = String(s.id || s.comicId || '').toLowerCase().trim();
-      const sTitle = String(s.title || s.comicName || '').toLowerCase().trim();
-      return (sId && sId === targetId) || (sTitle && targetTitle && (sTitle === targetTitle || sTitle.includes(targetTitle) || targetTitle.includes(sTitle)));
-    });
-    if (matchSub) {
-      const sCover = matchSub.cover || matchSub.coverImage || matchSub.coverImageUrl || matchSub.coverUrl;
-      if (sCover && typeof sCover === 'string' && (sCover.startsWith('http') || sCover.startsWith('data:') || sCover.startsWith('/'))) {
-        return sCover;
-      }
+  let found = findCoverInList(dbComics) || findCoverInList(dbSubs);
+  if (!found) {
+    const storageKeys = [
+      'comiverse_moderator_submissions_override',
+      'comiverse_author_submissions',
+      'comiverse_comics_override',
+      'comiverse_admin_comics',
+      'comiverse_comics_list'
+    ];
+    for (const key of storageKeys) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          found = findCoverInList(parsed);
+          if (found) break;
+        }
+      } catch (e) {}
     }
   }
+  if (!found) {
+    try {
+      const sess = sessionStorage.getItem('comiverse_comics_cache');
+      if (sess) {
+        found = findCoverInList(JSON.parse(sess));
+      }
+    } catch (e) {}
+  }
+  if (!found) {
+    try {
+      const sessTeams = sessionStorage.getItem('comiverse_teams_list_cache');
+      if (sessTeams) {
+        found = findCoverInList(JSON.parse(sessTeams));
+      }
+    } catch (e) {}
+  }
 
-  return (rawCover && !rawCover.includes('🔮') && !rawCover.includes('📚')) ? rawCover : '';
+  return found || ((rawCover && !rawCover.includes('🔮') && !rawCover.includes('📚')) ? rawCover : '');
 };
 
 import {

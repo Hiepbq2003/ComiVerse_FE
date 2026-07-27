@@ -22,7 +22,6 @@ import { resolveImageUrl } from '../../config/apiConfig';
 import "../../assets/style/moderator/comic-detail.css";
 
 
-
 export function parseTaskTitle(title, fallbackComic) {
   const match = (title || '').match(/^\[(URGENT|HIGH|MEDIUM|LOW)\]\s*(?:\[([^\]]+)\])?\s*(.*)$/i)
   if (match) {

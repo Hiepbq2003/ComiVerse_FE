@@ -1,12 +1,12 @@
-import comicAction from '../assets/comic_action.png'
-import comicAdventure from '../assets/comic_adventure.png'
-import comicScifi from '../assets/comic_scifi.png'
+const demoAction = "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80";
+const demoAdventure = "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=600&q=80";
+const demoScifi = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80";
 
 export const MOCK_COMICS = [
   {
     id: '1',
     title: 'Battle Chronicles',
-    cover: comicAction,
+    cover: demoAction,
     genres: ['Action', 'Fantasy', 'Adventure'],
     author: 'Ji-Woo Park',
     artist: 'Studio ComiVerse',
@@ -21,7 +21,7 @@ export const MOCK_COMICS = [
   {
     id: '2',
     title: 'Dragon Legacy',
-    cover: comicAdventure,
+    cover: demoAdventure,
     genres: ['Adventure', 'Fantasy'],
     author: 'Sarah Jenkins',
     artist: 'Team Dragon',
@@ -36,7 +36,7 @@ export const MOCK_COMICS = [
   {
     id: '3',
     title: 'Neon Genesis',
-    cover: comicScifi,
+    cover: demoScifi,
     genres: ['Sci-Fi', 'Action'],
     author: 'Kenji Sato',
     artist: 'NeoArt Studio',
@@ -51,7 +51,7 @@ export const MOCK_COMICS = [
   {
     id: '4',
     title: 'Infinite Journey',
-    cover: comicAdventure,
+    cover: demoAdventure,
     genres: ['Adventure', 'Fantasy'],
     author: 'Marcus Aurelius',
     artist: 'Infinity Labs',
@@ -66,7 +66,7 @@ export const MOCK_COMICS = [
   {
     id: '5',
     title: 'Solo Adventure',
-    cover: comicAction,
+    cover: demoAction,
     genres: ['Action', 'Fantasy'],
     author: 'Kim Min-Jae',
     artist: 'Solo Studio',
@@ -81,7 +81,7 @@ export const MOCK_COMICS = [
   {
     id: '6',
     title: 'Cyber Odyssey',
-    cover: comicScifi,
+    cover: demoScifi,
     genres: ['Sci-Fi', 'Action'],
     author: 'Elena Rostova',
     artist: 'CyberArt',

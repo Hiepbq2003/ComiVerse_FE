@@ -12,12 +12,6 @@ import { toast } from 'react-toastify'
 import { getReadChaptersByComicIdApi } from '../../services/api/ReadingHistoryApi'
 import CommentSection from '../../components/common/CommentSection'
 import StarRating from '../../components/common/StarRating'
-
-// Import assets
-import comicAction from '../../assets/comic_action.png'
-import comicAdventure from '../../assets/comic_adventure.png'
-import comicScifi from '../../assets/comic_scifi.png'
-
 function ComicDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -273,19 +267,9 @@ function ComicDetail() {
     return !str.includes('/') && !str.includes('.') && str.trim().length <= 4
   }
 
-  // Cover image fallback picker
+  // Cover image helper
   const getCoverImage = (coverPath, titleVal, comicId) => {
-    if (coverPath && typeof coverPath === 'string') {
-      return coverPath
-    }
-    const t = (titleVal || '').toLowerCase()
-    if (t.includes('action') || t.includes('battle')) return comicAction
-    if (t.includes('adventure') || t.includes('dragon')) return comicAdventure
-    if (t.includes('sci-fi') || t.includes('neon') || t.includes('cyber')) return comicScifi
-    // Default fallback cycling
-    const fallbacks = [comicAction, comicAdventure, comicScifi]
-    const idHash = typeof comicId === 'string' ? comicId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : comicId || 0
-    return fallbacks[idHash % 3] || comicAction
+    return coverPath || '';
   }
 
   const displayCover = getCoverImage(comic.cover, comic.title, comic.id)

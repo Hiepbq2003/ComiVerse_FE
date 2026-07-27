@@ -447,7 +447,8 @@ function ModeratorComicDetail() {
         
         // 2. Search in submissions list
         if (!found) {
-          const matchedSub = submissionsData.find(s => String(s.id).toLowerCase() === targetIdStr || String(s.comicId || '').toLowerCase() === targetIdStr || (s.title && s.title.toLowerCase().trim() === targetIdStr))
+          const matchedSub = submissionsData.find(s => (s.status === 'approved' || s.isApproved === true) && (String(s.id).toLowerCase() === targetIdStr || String(s.comicId || '').toLowerCase() === targetIdStr || (s.title && s.title.toLowerCase().trim() === targetIdStr))) ||
+                             submissionsData.find(s => String(s.id).toLowerCase() === targetIdStr || String(s.comicId || '').toLowerCase() === targetIdStr || (s.title && s.title.toLowerCase().trim() === targetIdStr));
           if (matchedSub) {
             found = {
               id: matchedSub.comicId || matchedSub.id,
@@ -490,20 +491,27 @@ function ModeratorComicDetail() {
         }
       }
 
-      // Fallback: If chaptersData is empty, populate chapters from matching author submissions
-      if ((!chaptersData || chaptersData.length === 0) && Array.isArray(submissionsData) && submissionsData.length > 0) {
-        const targetIdStr = String(id).toLowerCase().trim();
-        const matchedSubs = submissionsData.filter(s => 
-          String(s.id || '').toLowerCase() === targetIdStr || 
-          String(s.comicId || '').toLowerCase() === targetIdStr || 
-          (s.title && comicData?.title && s.title.toLowerCase().trim() === comicData.title.toLowerCase().trim())
-        );
+      // Fallback: If chaptersData is empty, check comicData or populate from approved author submissions
+      if (!chaptersData || chaptersData.length === 0) {
+        if (comicData && Array.isArray(comicData.allChapters) && comicData.allChapters.length > 0) {
+          chaptersData = comicData.allChapters;
+        } else if (comicData && Array.isArray(comicData.chaptersData) && comicData.chaptersData.length > 0) {
+          chaptersData = comicData.chaptersData;
+        } else if (Array.isArray(submissionsData) && submissionsData.length > 0) {
+          const targetIdStr = String(id).toLowerCase().trim();
+          const matchedSubs = submissionsData.filter(s => 
+            (s.status === 'approved' || s.isApproved === true) && (
+              String(s.id || '').toLowerCase() === targetIdStr || 
+              String(s.comicId || '').toLowerCase() === targetIdStr || 
+              (s.title && comicData?.title && s.title.toLowerCase().trim() === comicData.title.toLowerCase().trim())
+            )
+          );
 
-        const subChaps = [];
-        matchedSubs.forEach(sub => {
-          const list = sub.allChapters || sub.chapters || (sub.pages ? [sub] : []);
-          list.forEach((c, idx) => {
-            subChaps.push({
+          const subChaps = [];
+          matchedSubs.forEach(sub => {
+            const list = sub.allChapters || sub.chapters || (sub.pages ? [sub] : []);
+            list.forEach((c, idx) => {
+              subChaps.push({
               ...c,
               id: c.id || `chap-sub-${idx}-${Date.now()}`,
               chapterNumber: c.chapterNumber || c.number || idx + 1,
@@ -519,6 +527,7 @@ function ModeratorComicDetail() {
         if (subChaps.length > 0) {
           chaptersData = subChaps;
         }
+      }
       }
 
       setComic(comicData)

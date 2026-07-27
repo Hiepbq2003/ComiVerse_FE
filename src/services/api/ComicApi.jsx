@@ -1,7 +1,7 @@
 import AxiosClient from './AxiosClient';
 
 export const getAllComicsApi = () => {
-  return AxiosClient.get('/comics/all');
+  return AxiosClient.get('/comics/staff/all');
 };
 
 export const getComicsPageApi = (page = 1, size = 10, search = '') => {

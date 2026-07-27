@@ -11,11 +11,6 @@ import {
 } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi } from '../../services/api/ChapterApi'
 
-// Import assets
-import comicAction from '../../assets/comic_action.png'
-import comicAdventure from '../../assets/comic_adventure.png'
-import comicScifi from '../../assets/comic_scifi.png'
-
 const DEFAULT_SPOTLIGHT = {
   id: '',
   title: 'Welcome to ComiVerse',

@@ -59,8 +59,14 @@ const renderCommentBadge = (c, globalPinIndex = null) => {
 const isSameChapterItem = (c, target) => {
   if (!c || !target) return false;
   if (c === target) return true;
+  
+  const cNum = Number(c.number !== undefined ? c.number : (c.chapterNumber !== undefined ? c.chapterNumber : NaN));
+  const tNum = Number(target.number !== undefined ? target.number : (target.chapterNumber !== undefined ? target.chapterNumber : NaN));
+  if (!isNaN(cNum) && !isNaN(tNum) && cNum > 0 && tNum > 0) {
+    if (cNum !== tNum) return false;
+  }
+  
   if (c.id && target.id && c.id === target.id) return true;
-  if (c.submissionId && target.submissionId && c.submissionId === target.submissionId) return true;
   if (c.title && target.title && c.title.trim().toLowerCase() === target.title.trim().toLowerCase()) return true;
   return false;
 };
@@ -212,13 +218,258 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
     }));
   };
 
+  // Extract description/synopsis/summary safely from raw submission objects
+  const getSubmissionDescription = (item) => {
+    if (!item) return '';
+
+    const check = (obj) => {
+      if (!obj || typeof obj !== 'object') return null;
+      const val = 
+        obj.description || 
+        obj.summary || 
+        obj.synopsis || 
+        obj.comicDescription || 
+        obj.comic_description || 
+        obj.overview || 
+        obj.details || 
+        obj.comic?.description || 
+        obj.comic?.summary || 
+        obj.comic?.synopsis;
+
+      return (val && String(val).trim() && String(val).trim() !== 'null' && String(val).trim() !== 'undefined') ? String(val).trim() : null;
+    };
+
+    const direct = check(item);
+    if (direct) return direct;
+
+    if (Array.isArray(item.subItems)) {
+      for (const sub of item.subItems) {
+        const subDesc = check(sub);
+        if (subDesc) return subDesc;
+      }
+    }
+
+    if (item.comic) {
+      const comicDesc = check(item.comic);
+      if (comicDesc) return comicDesc;
+    }
+
+    return '';
+  };
+
+  const getSubmissionLanguage = (item) => {
+    if (!item) return 'Not specified';
+
+    const check = (obj) => {
+      if (!obj || typeof obj !== 'object') return null;
+      const val = 
+        obj.language || 
+        obj.originalLanguage || 
+        obj.original_language || 
+        obj.rawLanguage || 
+        obj.raw_language || 
+        obj.targetLanguage || 
+        obj.target_language || 
+        obj.targetLang || 
+        obj.sourceLanguage || 
+        obj.sourceLang || 
+        obj.lang ||
+        obj.comicLanguage ||
+        obj.comic?.language ||
+        obj.comic?.originalLanguage ||
+        obj.comic?.original_language;
+
+      return (val && String(val).trim() && String(val).trim() !== 'null' && String(val).trim() !== 'undefined') ? String(val).trim() : null;
+    };
+
+    const direct = check(item);
+    if (direct) return direct;
+
+    if (Array.isArray(item.subItems)) {
+      for (const sub of item.subItems) {
+        const subLang = check(sub);
+        if (subLang) return subLang;
+      }
+    }
+
+    if (item.comic) {
+      const comicLang = check(item.comic);
+      if (comicLang) return comicLang;
+    }
+
+    return 'Not specified';
+  };
+
+  const getSubmissionMinAge = (item) => {
+    if (!item) return 'Not specified';
+
+    const check = (obj) => {
+      if (!obj || typeof obj !== 'object') return null;
+      const val = 
+        obj.minAge ?? 
+        obj.min_age ?? 
+        obj.minimumAge ?? 
+        obj.minimum_age ?? 
+        obj.ageRating ?? 
+        obj.age_rating ?? 
+        obj.age ?? 
+        obj.comic?.minAge ?? 
+        obj.comic?.min_age ?? 
+        obj.comic?.minimumAge ?? 
+        obj.comic?.ageRating;
+
+      return (val !== undefined && val !== null && String(val).trim() && String(val).trim() !== 'null' && String(val).trim() !== 'undefined') ? String(val).trim() : null;
+    };
+
+    const direct = check(item);
+    if (direct) return direct;
+
+    if (Array.isArray(item.subItems)) {
+      for (const sub of item.subItems) {
+        const subAge = check(sub);
+        if (subAge) return subAge;
+      }
+    }
+
+    if (item.comic) {
+      const comicAge = check(item.comic);
+      if (comicAge) return comicAge;
+    }
+
+    return 'Not specified';
+  };
+
+  const getSubmissionStatus = (item) => {
+    if (!item) return 'ONGOING';
+
+    const check = (obj) => {
+      if (!obj || typeof obj !== 'object') return null;
+      const val = 
+        obj.publicationStatus || 
+        obj.publication_status || 
+        obj.comicStatus || 
+        obj.comic_status || 
+        obj.comic?.publicationStatus ||
+        obj.comic?.publication_status;
+
+      return (val && String(val).trim() && String(val).trim() !== 'null' && String(val).trim() !== 'undefined') ? String(val).trim() : null;
+    };
+
+    const direct = check(item);
+    if (direct) return direct;
+
+    if (Array.isArray(item.subItems)) {
+      for (const sub of item.subItems) {
+        const subSt = check(sub);
+        if (subSt) return subSt;
+      }
+    }
+
+    if (item.comic) {
+      const comicSt = check(item.comic);
+      if (comicSt) return comicSt;
+    }
+
+    if (item.status && item.status !== 'pending' && item.status !== 'approved' && item.status !== 'rejected') {
+      return item.status;
+    }
+
+    return 'ONGOING';
+  };
+
+  const getSubmissionAuthor = (item) => {
+    if (!item) return 'Unknown Author';
+
+    const check = (obj) => {
+      if (!obj || typeof obj !== 'object') return null;
+      const val = 
+        obj.submittedBy || 
+        obj.submitted_by || 
+        obj.submittedByEmail || 
+        obj.submitted_by_email || 
+        obj.author || 
+        obj.authorName || 
+        obj.author_name || 
+        obj.authorId || 
+        obj.author_id || 
+        obj.userFullName || 
+        obj.userName || 
+        obj.creator || 
+        obj.uploader || 
+        obj.comic?.author || 
+        obj.comic?.authorName || 
+        obj.comic?.submittedBy;
+
+      if (!val) return null;
+      const str = String(val).trim();
+      if (!str || str === 'null' || str === 'undefined' || str === 'Author One' || str === 'Original Author') return null;
+      return formatSubmitterName(str).replace(/^Author:\s*/i, '');
+    };
+
+    const direct = check(item);
+    if (direct) return direct;
+
+    if (Array.isArray(item.subItems)) {
+      for (const sub of item.subItems) {
+        const subAuth = check(sub);
+        if (subAuth) return subAuth;
+      }
+    }
+
+    if (item.comic) {
+      const comicAuth = check(item.comic);
+      if (comicAuth) return comicAuth;
+    }
+
+    const fallbackId = item.authorId || item.author_id || item.userId || item.user_id || item.submittedBy || item.author;
+    if (fallbackId && String(fallbackId).trim() && String(fallbackId).trim() !== 'Author One' && String(fallbackId).trim() !== 'Original Author') {
+      return formatSubmitterName(String(fallbackId).trim()).replace(/^Author:\s*/i, '');
+    }
+
+    return 'Unknown Author';
+  };
+
+  const getSubmissionGenres = (item) => {
+    if (!item) return [];
+
+    const check = (obj) => {
+      if (!obj || typeof obj !== 'object') return null;
+      let raw = obj.genres || obj.genreList || obj.categories || obj.comic?.genres || obj.genre_names;
+      if (!raw) return null;
+      if (Array.isArray(raw) && raw.length > 0) {
+        return raw.map(g => typeof g === 'object' && g !== null ? (g.name || g.label || String(g)) : String(g)).filter(Boolean);
+      }
+      if (typeof raw === 'string' && raw.trim()) {
+        return raw.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      return null;
+    };
+
+    const direct = check(item);
+    if (direct) return direct;
+
+    if (Array.isArray(item.subItems)) {
+      for (const sub of item.subItems) {
+        const subG = check(sub);
+        if (subG) return subG;
+      }
+    }
+
+    if (item.comic) {
+      const comicG = check(item.comic);
+      if (comicG) return comicG;
+    }
+
+    return [];
+  };
+
   // 1. High-Performance Memoized Tab Counts (Grouped by Comic)
   const tabCounts = useMemo(() => {
     const counts = { pending: 0, approved: 0, rejected: 0 };
     const authUser = getAuth()?.user;
 
     const scopedSubmissions = submissions.filter(item => 
-      isLanguageInModeratorScope(item.language || item.rawLanguage || item.targetLanguage || item.targetLang, authUser)
+      isLanguageInModeratorScope(getSubmissionLanguage(item), authUser)
     );
 
     ['pending', 'approved', 'rejected'].forEach(tabStatus => {
@@ -242,7 +493,7 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
     const authUser = getAuth()?.user;
     
     return submissions
-      .filter(item => isLanguageInModeratorScope(item.language || item.rawLanguage || item.targetLanguage || item.targetLang, authUser))
+      .filter(item => isLanguageInModeratorScope(getSubmissionLanguage(item), authUser))
       .filter(item => item.status === activeTab)
       .filter(item => {
         if (!query) return true;
@@ -319,6 +570,14 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
           chap.number = idx + 1;
         }
       });
+
+      // Enrich group root metadata from its subItems
+      group.language = getSubmissionLanguage(group);
+      group.minAge = getSubmissionMinAge(group);
+      group.publicationStatus = getSubmissionStatus(group);
+      group.submittedBy = getSubmissionAuthor(group);
+      group.description = getSubmissionDescription(group);
+      group.genres = getSubmissionGenres(group);
     });
 
     return Array.from(groupsMap.values());
@@ -805,9 +1064,9 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
               <div className="submission-info">
                 <h3 className="submission-title">{item.title}</h3>
                 <p className="submission-meta">
-                  <span><strong>Author:</strong> {formatSubmitterName(item.submittedBy).replace('Author: ', '')}</span>
-                  {item.language && <span> · <strong>Lang:</strong> {item.language}</span>}
-                  {item.minAge && <span> · <strong>Age:</strong> {item.minAge}</span>}
+                  <span><strong>Author:</strong> {getSubmissionAuthor(item)}</span>
+                  {getSubmissionLanguage(item) !== 'Not specified' && <span> · <strong>Lang:</strong> {getSubmissionLanguage(item)}</span>}
+                  {getSubmissionMinAge(item) !== 'Not specified' && <span> · <strong>Age:</strong> {getSubmissionMinAge(item)}</span>}
                 </p>
                 <div className="submission-extra" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
                   <span className="submission-extra-item">⏱️ {formatTimeAgo(item.timestamp)}</span>
@@ -880,7 +1139,7 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
                       📖 {selectedReview.title} {selectedChapter ? `— ${selectedChapter.title}` : ''}
                     </h3>
                     <div className="mod-inspector-subtitle">
-                      {formatSubmitterName(selectedReview.submittedBy)} · {formatTimeAgo(selectedReview.timestamp)}
+                      {getSubmissionAuthor(selectedReview)} · {formatTimeAgo(selectedReview.timestamp)}
                     </div>
                   </div>
                 </div>
@@ -1405,38 +1664,41 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
                               <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
                                 <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Original Language *</span>
-                                <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{selectedReview.language || 'Japanese'}</strong>
+                                <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{getSubmissionLanguage(selectedReview)}</strong>
                               </div>
 
                               <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
                                 <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Minimum Age</span>
-                                <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{selectedReview.minAge || selectedReview.ageRating || '13+'}</strong>
+                                <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{getSubmissionMinAge(selectedReview)}</strong>
                               </div>
 
                               <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
                                 <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Publication Status</span>
-                                <strong style={{ fontSize: '13.5px', color: '#10b981', display: 'block', marginTop: '4px' }}>{selectedReview.publicationStatus || selectedReview.comicStatus || 'Ongoing'}</strong>
+                                <strong style={{ fontSize: '13.5px', color: '#10b981', display: 'block', marginTop: '4px' }}>{getSubmissionStatus(selectedReview)}</strong>
                               </div>
 
                               <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
                                 <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Author Account</span>
-                                <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{formatSubmitterName(selectedReview.submittedBy).replace('Author: ', '')}</strong>
+                                <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{getSubmissionAuthor(selectedReview)}</strong>
                               </div>
                             </div>
 
                             {/* Genres Input Field Display */}
-                            {selectedReview.genres && selectedReview.genres.length > 0 && (
-                              <div>
-                                <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Genres</span>
-                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                  {selectedReview.genres.map((genre, idx) => (
-                                    <span key={idx} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', background: 'rgba(124,58,237,0.15)', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)' }}>
-                                      {genre}
-                                    </span>
-                                  ))}
+                            {(() => {
+                              const genresList = getSubmissionGenres(selectedReview);
+                              return genresList && genresList.length > 0 ? (
+                                <div>
+                                  <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Genres</span>
+                                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                    {genresList.map((genre, idx) => (
+                                      <span key={idx} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', background: 'rgba(124,58,237,0.15)', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)' }}>
+                                        {genre}
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              ) : null;
+                            })()}
                           </div>
                         </div>
 
@@ -1446,7 +1708,7 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
                             Description
                           </span>
                           <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
-                            {selectedReview.description || selectedReview.synopsis || 'No description has been added yet.'}
+                            {getSubmissionDescription(selectedReview) || 'No description has been added yet.'}
                           </p>
                         </div>
                       </div>
