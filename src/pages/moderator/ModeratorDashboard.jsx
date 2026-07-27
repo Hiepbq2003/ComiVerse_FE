@@ -452,15 +452,47 @@ function ModeratorDashboard() {
   // API Call Integration Handlers
   const handleApprove = async (id, subItem) => {
     try {
-      const appSub = subItem || submissions.find(item => (item.id || item) === id || item.submissionId === id);
-      await approveSubmissionApi(id)
+      let cleanId = String(id || '').replace(/^(comic|group|chap)-/, '');
+      if (subItem && subItem.submissionId) {
+        cleanId = String(subItem.submissionId).replace(/^(comic|group|chap)-/, '');
+      } else if (subItem && subItem.id && !String(subItem.id).startsWith('comic-') && !String(subItem.id).startsWith('group-')) {
+        cleanId = String(subItem.id);
+      }
+
+      const appSub = subItem || submissions.find(item => (item.id || item) === id || item.submissionId === id || item.id === cleanId);
+      
+      if (cleanId && !cleanId.startsWith('comic-') && !cleanId.startsWith('group-')) {
+        try {
+          await approveSubmissionApi(cleanId);
+        } catch (apiErr) {
+          console.warn(`[Backend Approve API Notice] ${apiErr?.message || apiErr}`);
+        }
+      }
+
       toast.success('Submission approved and published to Comic Management!')
       const nowIso = new Date().toISOString();
+
       setSubmissions(prev => {
-        const next = prev.map(item => (item.id === id || item.submissionId === id) ? { ...item, status: 'approved', approvedAt: nowIso } : item);
+        const targetTitle = (appSub?.title || appSub?.comicName || '').toLowerCase().trim();
+        const targetSubmitter = (appSub?.submittedBy || '').toLowerCase().trim();
+
+        const next = prev.map(item => {
+          const itemTitle = (item.title || item.comicTitle || '').toLowerCase().trim();
+          const itemSubmitter = (item.submittedBy || '').toLowerCase().trim();
+
+          const isMatchById = (item.id === id || item.submissionId === id || item.id === cleanId || item.submissionId === cleanId);
+          const isMatchByTitle = (targetTitle && itemTitle === targetTitle && (!targetSubmitter || !itemSubmitter || itemSubmitter === targetSubmitter));
+
+          if (isMatchById || isMatchByTitle) {
+            return { ...item, status: 'approved', approvedAt: nowIso };
+          }
+          return item;
+        });
+
         try { localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(next)); } catch (e) {}
         return next;
       });
+
       await fetchComicsAndTeams()
       if (appSub) {
         publishComicToManagement(appSub);
@@ -503,13 +535,49 @@ function ModeratorDashboard() {
     }
   }
 
-  const handleConfirmReject = async (id, reason) => {
+  const handleConfirmReject = async (id, reason, subItem = null) => {
     try {
-      await rejectSubmissionApi(id, reason)
+      let cleanId = String(id || '').replace(/^(comic|group|chap)-/, '');
+      if (subItem && subItem.submissionId) {
+        cleanId = String(subItem.submissionId).replace(/^(comic|group|chap)-/, '');
+      } else if (subItem && subItem.id && !String(subItem.id).startsWith('comic-') && !String(subItem.id).startsWith('group-')) {
+        cleanId = String(subItem.id);
+      }
+
+      if (cleanId && !cleanId.startsWith('comic-') && !cleanId.startsWith('group-')) {
+        try {
+          await rejectSubmissionApi(cleanId, reason || 'Submission rejected');
+        } catch (apiErr) {
+          console.warn(`[Backend Reject API Notice] ${apiErr?.message || apiErr}`);
+        }
+      }
+
       toast.success('Submission rejected.')
       const nowIso = new Date().toISOString();
+
       setSubmissions(prev => {
-        const next = prev.map(item => (item.id === id || item.submissionId === id) ? { ...item, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Submission rejected' } : item);
+        const targetSub = subItem || prev.find(item => item.id === id || item.submissionId === id || item.id === cleanId || item.submissionId === cleanId);
+        const targetTitle = (targetSub?.title || targetSub?.comicName || '').toLowerCase().trim();
+        const targetSubmitter = (targetSub?.submittedBy || '').toLowerCase().trim();
+
+        const next = prev.map(item => {
+          const itemTitle = (item.title || item.comicTitle || '').toLowerCase().trim();
+          const itemSubmitter = (item.submittedBy || '').toLowerCase().trim();
+
+          const isMatchById = (item.id === id || item.submissionId === id || item.id === cleanId || item.submissionId === cleanId);
+          const isMatchByTitle = (targetTitle && itemTitle === targetTitle && (!targetSubmitter || !itemSubmitter || itemSubmitter === targetSubmitter));
+
+          if (isMatchById || isMatchByTitle) {
+            return {
+              ...item,
+              status: 'rejected',
+              rejectedAt: nowIso,
+              rejectionReason: reason || 'Submission rejected'
+            };
+          }
+          return item;
+        });
+
         try { localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(next)); } catch (e) {}
         return next;
       });
@@ -648,7 +716,7 @@ function ModeratorDashboard() {
   };
 
   const handleChapterReject = async (submissionId, chapterObj, reason) => {
-    const targetApiId = chapterObj?.submissionId || submissionId;
+    let cleanId = String(chapterObj?.submissionId || submissionId || '').replace(/^(comic|group|chap)-/, '');
     const chapTitle = chapterObj?.title || `Chapter ${chapterObj?.number || chapterObj?.chapterNumber || ''}`.trim() || 'Chapter';
 
     const targetSubId = chapterObj?.submissionId || chapterObj?.id || submissionId;
@@ -660,16 +728,12 @@ function ModeratorDashboard() {
       return false;
     }) || submissions.find(item => item.id === targetSubId || item.submissionId === targetSubId || item.id === submissionId);
 
-    const currentChapsForCheck = sub ? (Array.isArray(sub.allChapters) && sub.allChapters.length > 0 ? sub.allChapters : (Array.isArray(sub.chapters) && sub.chapters.length > 0 ? sub.chapters : [])) : [];
-    const remainingChapsForCheck = currentChapsForCheck.filter(c => !isSameChapterItem(c, chapterObj));
-    const isFinalChapterOfSub = currentChapsForCheck.length > 0 && remainingChapsForCheck.length === 0;
-
-    try {
-      if (targetApiId && !String(targetApiId).startsWith('group-') && !String(targetApiId).startsWith('chap-')) {
-        await rejectSubmissionApi(targetApiId, reason || 'Chapter rejected');
+    if (cleanId && !cleanId.startsWith('group-') && !cleanId.startsWith('comic-')) {
+      try {
+        await rejectSubmissionApi(cleanId, reason || 'Chapter rejected');
+      } catch (apiErr) {
+        console.warn(`[Backend DB Sync] rejectSubmissionApi(${cleanId}) notice:`, apiErr?.message || apiErr);
       }
-    } catch (apiErr) {
-      console.warn(`[Backend DB Sync] rejectSubmissionApi(${targetApiId}) notice:`, apiErr?.message || apiErr);
     }
 
     try {
@@ -679,60 +743,21 @@ function ModeratorDashboard() {
       const comicTitleClean = (sub?.title || sub?.comicName || sub?.comicTitle || chapterObj?.comicTitle || chapterObj?.originalSubmissionItem?.title || chapterObj?.title || '').trim().toLowerCase();
 
       setSubmissions(prev => {
-        const existingRejectedIndex = prev.findIndex(item => item.status === 'rejected' && ((comicTitleClean && item.title && item.title.trim().toLowerCase() === comicTitleClean) || (sub?.comicId && item.comicId && item.comicId === sub.comicId)));
-        
-        let nextSubmissions = [];
-        let sourceMatched = false;
+        const nextSubmissions = prev.map(item => {
+          const itemTitleClean = (item.title || item.comicTitle || '').trim().toLowerCase();
+          const isMatchById = (item.id === submissionId || item.submissionId === submissionId || item.id === cleanId || item.submissionId === cleanId || item.id === targetSubId);
+          const isMatchByTitle = (comicTitleClean && itemTitleClean && comicTitleClean === itemTitleClean);
 
-        prev.forEach(item => {
-          const isSourceItem = (sub && (item === sub || item.id === sub.id || item.submissionId === sub.id)) ||
-            (!sourceMatched && item.status !== 'approved' && item.status !== 'rejected' && ((item.allChapters || item.chapters || []).some(c => isSameChapterItem(c, chapterObj))));
-
-          if (isSourceItem) {
-            sourceMatched = true;
-            const currentChaps = Array.isArray(item.allChapters) && item.allChapters.length > 0 ? item.allChapters : (Array.isArray(item.chapters) && item.chapters.length > 0 ? item.chapters : []);
-            const remainingChaps = currentChaps.filter(c => !isSameChapterItem(c, chapterObj));
-
-            nextSubmissions.push({
+          if (isMatchById || isMatchByTitle) {
+            return {
               ...item,
               status: 'rejected',
               rejectedAt: nowIso,
-              rejectionReason: reason || 'Chapter rejected',
-              allChapters: [{ ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' }],
-              chapters: [{ ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' }],
-              chapterNumber: 1,
-              number: 1
-            });
-          } else if (existingRejectedIndex !== -1 && prev.indexOf(item) === existingRejectedIndex) {
-            const rejChaps = Array.isArray(item.allChapters) && item.allChapters.length > 0 ? item.allChapters : (Array.isArray(item.chapters) && item.chapters.length > 0 ? item.chapters : []);
-            const exists = rejChaps.some(c => isSameChapterItem(c, chapterObj));
-            const newRejChaps = exists ? rejChaps : [...rejChaps, { ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' }];
-            nextSubmissions.push({
-              ...item,
-              allChapters: newRejChaps,
-              chapters: newRejChaps,
-              chapterNumber: newRejChaps.length,
-              number: newRejChaps.length,
-              lastChapterUpdatedAt: nowIso
-            });
-          } else {
-            nextSubmissions.push(item);
+              rejectionReason: reason || 'Chapter rejected'
+            };
           }
+          return item;
         });
-
-        if (existingRejectedIndex === -1 && sub && !nextSubmissions.some(item => item.status === 'rejected' && ((comicTitleClean && item.title && item.title.trim().toLowerCase() === comicTitleClean) || (sub.comicId && item.comicId && item.comicId === sub.comicId)))) {
-          nextSubmissions.push({
-            ...sub,
-            id: `${sub.id || sub.submissionId || 'sub'}-rejected`,
-            status: 'rejected',
-            rejectedAt: nowIso,
-            rejectionReason: reason || 'Chapter rejected',
-            allChapters: [{ ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' }],
-            chapters: [{ ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' }],
-            chapterNumber: 1,
-            number: 1
-          });
-        }
 
         try {
           localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(nextSubmissions));
