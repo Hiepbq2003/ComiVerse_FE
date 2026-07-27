@@ -71,7 +71,7 @@ const isSameChapterItem = (c, target) => {
   return false;
 };
 
-function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, handleApproveAndCreateProject, handleChapterApprove, handleChapterReject }) {
+function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfirmReject, handleApproveAndCreateProject, handleChapterApprove, handleChapterReject }) {
   const { theme } = useTheme()
   const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'approved' | 'rejected'
   
@@ -139,6 +139,22 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
   useEffect(() => {
     setCurrentPage(1)
   }, [activeTab, sortFilter, searchQuery])
+
+  // Helper to find matching comic from comics list prop by ID or Title
+  const findMatchingComic = (item) => {
+    if (!item || !Array.isArray(comics) || comics.length === 0) return null;
+    const itemComicId = item.comicId || item.comic_id || item.comic?.id;
+    if (itemComicId) {
+      const match = comics.find(c => String(c.id) === String(itemComicId));
+      if (match) return match;
+    }
+    const itemTitle = (item.title || item.comicTitle || item.comicName || '').trim().toLowerCase();
+    if (itemTitle) {
+      const match = comics.find(c => (c.title || '').trim().toLowerCase() === itemTitle);
+      if (match) return match;
+    }
+    return null;
+  };
 
   // Normalize a chapter object from the backend: map 'images' to 'pages'
   const normalizeChapter = (chap, idx) => {
@@ -218,7 +234,7 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
     }));
   };
 
-  // Extract description/synopsis/summary safely from raw submission objects
+  // Extract description/synopsis/summary safely from raw submission objects or matching comic
   const getSubmissionDescription = (item) => {
     if (!item) return '';
 
@@ -236,7 +252,8 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
         obj.comic?.summary || 
         obj.comic?.synopsis;
 
-      return (val && String(val).trim() && String(val).trim() !== 'null' && String(val).trim() !== 'undefined') ? String(val).trim() : null;
+      const str = (val && String(val).trim() && String(val).trim() !== 'null' && String(val).trim() !== 'undefined') ? String(val).trim() : null;
+      return (str && str !== 'No description has been added yet.') ? str : null;
     };
 
     const direct = check(item);
@@ -251,6 +268,12 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
 
     if (item.comic) {
       const comicDesc = check(item.comic);
+      if (comicDesc) return comicDesc;
+    }
+
+    const matchComic = findMatchingComic(item);
+    if (matchComic) {
+      const comicDesc = check(matchComic);
       if (comicDesc) return comicDesc;
     }
 
@@ -279,7 +302,8 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
         obj.comic?.originalLanguage ||
         obj.comic?.original_language;
 
-      return (val && String(val).trim() && String(val).trim() !== 'null' && String(val).trim() !== 'undefined') ? String(val).trim() : null;
+      const clean = (val && String(val).trim() && String(val).trim() !== 'null' && String(val).trim() !== 'undefined' && String(val).trim() !== 'Not specified') ? String(val).trim() : null;
+      return clean;
     };
 
     const direct = check(item);
@@ -294,6 +318,12 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
 
     if (item.comic) {
       const comicLang = check(item.comic);
+      if (comicLang) return comicLang;
+    }
+
+    const matchComic = findMatchingComic(item);
+    if (matchComic) {
+      const comicLang = check(matchComic);
       if (comicLang) return comicLang;
     }
 
@@ -318,7 +348,10 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
         obj.comic?.minimumAge ?? 
         obj.comic?.ageRating;
 
-      return (val !== undefined && val !== null && String(val).trim() && String(val).trim() !== 'null' && String(val).trim() !== 'undefined') ? String(val).trim() : null;
+      if (val === undefined || val === null) return null;
+      const str = String(val).trim();
+      if (!str || str === 'null' || str === 'undefined' || str === 'Not specified') return null;
+      return str.endsWith('+') ? str : `${str}+`;
     };
 
     const direct = check(item);
@@ -333,6 +366,12 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
 
     if (item.comic) {
       const comicAge = check(item.comic);
+      if (comicAge) return comicAge;
+    }
+
+    const matchComic = findMatchingComic(item);
+    if (matchComic) {
+      const comicAge = check(matchComic);
       if (comicAge) return comicAge;
     }
 
@@ -370,6 +409,12 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
       if (comicSt) return comicSt;
     }
 
+    const matchComic = findMatchingComic(item);
+    if (matchComic) {
+      const comicSt = check(matchComic);
+      if (comicSt) return comicSt;
+    }
+
     if (item.status && item.status !== 'pending' && item.status !== 'approved' && item.status !== 'rejected') {
       return item.status;
     }
@@ -402,27 +447,33 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
 
       if (!val) return null;
       const str = String(val).trim();
-      if (!str || str === 'null' || str === 'undefined' || str === 'Author One' || str === 'Original Author') return null;
+      if (!str || str === 'null' || str === 'undefined' || str === 'Original Author') return null;
       return formatSubmitterName(str).replace(/^Author:\s*/i, '');
     };
 
     const direct = check(item);
-    if (direct) return direct;
+    if (direct && direct !== 'Unknown Author') return direct;
 
     if (Array.isArray(item.subItems)) {
       for (const sub of item.subItems) {
         const subAuth = check(sub);
-        if (subAuth) return subAuth;
+        if (subAuth && subAuth !== 'Unknown Author') return subAuth;
       }
     }
 
     if (item.comic) {
       const comicAuth = check(item.comic);
-      if (comicAuth) return comicAuth;
+      if (comicAuth && comicAuth !== 'Unknown Author') return comicAuth;
+    }
+
+    const matchComic = findMatchingComic(item);
+    if (matchComic) {
+      const comicAuth = check(matchComic);
+      if (comicAuth && comicAuth !== 'Unknown Author') return comicAuth;
     }
 
     const fallbackId = item.authorId || item.author_id || item.userId || item.user_id || item.submittedBy || item.author;
-    if (fallbackId && String(fallbackId).trim() && String(fallbackId).trim() !== 'Author One' && String(fallbackId).trim() !== 'Original Author') {
+    if (fallbackId && String(fallbackId).trim() && String(fallbackId).trim() !== 'Original Author') {
       return formatSubmitterName(String(fallbackId).trim()).replace(/^Author:\s*/i, '');
     }
 
@@ -446,18 +497,24 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
     };
 
     const direct = check(item);
-    if (direct) return direct;
+    if (direct && direct.length > 0) return direct;
 
     if (Array.isArray(item.subItems)) {
       for (const sub of item.subItems) {
         const subG = check(sub);
-        if (subG) return subG;
+        if (subG && subG.length > 0) return subG;
       }
     }
 
     if (item.comic) {
       const comicG = check(item.comic);
-      if (comicG) return comicG;
+      if (comicG && comicG.length > 0) return comicG;
+    }
+
+    const matchComic = findMatchingComic(item);
+    if (matchComic) {
+      const comicG = check(matchComic);
+      if (comicG && comicG.length > 0) return comicG;
     }
 
     return [];
@@ -1004,21 +1061,21 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject, han
           onClick={() => setActiveTab('pending')}
         >
           Pending Review
-          <span className="moderator-tab-btn-badge">{tabCounts.pending}</span>
+          <span className="moderator-tab-btn-badge pending">{tabCounts.pending}</span>
         </button>
         <button 
           className={`moderator-tab-btn ${activeTab === 'approved' ? 'active' : ''}`}
           onClick={() => setActiveTab('approved')}
         >
           Approved
-          <span className="moderator-tab-btn-badge">{tabCounts.approved}</span>
+          <span className="moderator-tab-btn-badge approved">{tabCounts.approved}</span>
         </button>
         <button 
           className={`moderator-tab-btn ${activeTab === 'rejected' ? 'active' : ''}`}
           onClick={() => setActiveTab('rejected')}
         >
           Rejected
-          <span className="moderator-tab-btn-badge">{tabCounts.rejected}</span>
+          <span className="moderator-tab-btn-badge rejected">{tabCounts.rejected}</span>
         </button>
       </div>
 
