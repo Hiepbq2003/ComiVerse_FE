@@ -399,12 +399,6 @@ function TranslatorDashboard() {
             </div>
           </div>
           <div className="val">{overallStats.totalProjects} Teams</div>
-          <div className="sub">
-            <span style={{ color: '#10b981', fontWeight: '700' }}>● {overallStats.activeProjects} Active</span>
-            {overallStats.pendingProjects > 0 && (
-              <span style={{ color: '#f59e0b', marginLeft: '8px', fontWeight: '700' }}>● {overallStats.pendingProjects} Pending</span>
-            )}
-          </div>
         </div>
 
         {/* Stat Card 2: Translated Chapters */}
