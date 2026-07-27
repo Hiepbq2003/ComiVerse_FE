@@ -4,7 +4,7 @@ import '../../assets/style/translator/team-projects.css'
 import ModernButton from '../../components/common/ModernButton'
 import { getMyProjectTeamsApi, getAllProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { createSubmissionApi, getAllSubmissionsApi } from '../../services/api/SubmissionApi'
-import { getAllComicsApi } from '../../services/api/ComicApi'
+import { getAllComicsApi, searchComicsApi, getComicsPageApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi } from '../../services/api/ChapterApi'
 import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
 import { getAuth } from '../../utils/Auth'
@@ -788,44 +788,67 @@ function TeamProjects() {
       const rawComicTitle = project.comicName || project.title || 'Comic';
       let finalChapters = [];
 
+      let effectiveComicId = project.comicId || project.comic_id || project.comic?.id;
+      if (!effectiveComicId && project.comicName) {
+        try {
+          const searchRes = await searchComicsApi(project.comicName);
+          const list = Array.isArray(searchRes) ? searchRes : (searchRes?.content || searchRes?.data?.content || searchRes?.data || []);
+          const matchC = list.find(c => c.title && c.title.toLowerCase().trim() === project.comicName.toLowerCase().trim()) || list[0];
+          if (matchC) effectiveComicId = matchC.id || matchC.comicId;
+        } catch (e) {
+          try {
+            const pageRes = await getComicsPageApi(1, 10, project.comicName);
+            const list = pageRes?.content || pageRes?.data?.content || pageRes?.data || (Array.isArray(pageRes) ? pageRes : []);
+            const matchC = list.find(c => c.title && c.title.toLowerCase().trim() === project.comicName.toLowerCase().trim()) || list[0];
+            if (matchC) effectiveComicId = matchC.id || matchC.comicId;
+          } catch (e2) {}
+        }
+      }
+
       if (Array.isArray(teamChaptersList) && teamChaptersList.length > 0) {
-        finalChapters = teamChaptersList.map((ch, idx) => ({
-          ...ch,
-          id: ch.id || `ch-${project.id}-${idx + 1}`,
-          comicId: ch.comicId || project.comicId,
-          title: ch.title || `${rawComicTitle} - Chapter ${idx + 1}`,
-          pagesCount: ch.pagesCount || ch.pages?.length || ch.images?.length || 24,
-          pages: ch.pages || ch.images || [],
-          status: 'Approved Raw Manuscript'
-        }));
-      } else if (project.comicId) {
+        finalChapters = teamChaptersList.map((ch, idx) => {
+          const realChId = ch.id || ch.chapterId || ch.chapter_id;
+          return {
+            ...ch,
+            id: realChId || `ch-${project.id}-${idx + 1}`,
+            comicId: ch.comicId || effectiveComicId,
+            title: ch.title || `${rawComicTitle} - Chapter ${idx + 1}`,
+            pagesCount: ch.pagesCount || ch.pages?.length || ch.images?.length || 24,
+            pages: ch.pages || ch.images || [],
+            status: 'Approved Raw Manuscript'
+          };
+        });
+      } else if (effectiveComicId) {
         // Fallback: fetch chapters directly from the comic's chapter list (using both public and author APIs like Moderator)
         try {
           let chapList = [];
           try {
-            const comicChapters = await getChaptersByComicIdApi(project.comicId, {}, true);
+            const comicChapters = await getChaptersByComicIdApi(effectiveComicId, {}, true);
             const list = Array.isArray(comicChapters) ? comicChapters : (comicChapters?.content || comicChapters?.data || []);
             if (list.length > 0) chapList = list;
           } catch (e) { /* ignore */ }
 
           if (chapList.length === 0) {
             try {
-              const authorChapters = await getAuthorComicChaptersApi(project.comicId);
+              const authorChapters = await getAuthorComicChaptersApi(effectiveComicId);
               const list = Array.isArray(authorChapters) ? authorChapters : (authorChapters?.content || authorChapters?.data || []);
               if (list.length > 0) chapList = list;
             } catch (e) { /* ignore */ }
           }
 
           if (chapList.length > 0) {
-            finalChapters = chapList.map((ch, idx) => ({
-              ...ch,
-              id: ch.id || `ch-${project.id}-${idx + 1}`,
-              comicId: ch.comicId || project.comicId,
-              title: ch.title || `${rawComicTitle} - Chapter ${idx + 1}`,
-              pagesCount: ch.pagesCount || ch.pages?.length || ch.images?.length || ch.pageCount || 24,
-              pages: ch.pages || ch.images || [],
-              status: 'Approved Raw Manuscript'
-            }));
+            finalChapters = chapList.map((ch, idx) => {
+              const realChId = ch.id || ch.chapterId || ch.chapter_id;
+              return {
+                ...ch,
+                id: realChId || `ch-${project.id}-${idx + 1}`,
+                comicId: ch.comicId || effectiveComicId,
+                title: ch.title || `${rawComicTitle} - Chapter ${idx + 1}`,
+                pagesCount: ch.pagesCount || ch.pages?.length || ch.images?.length || ch.pageCount || 24,
+                pages: ch.pages || ch.images || [],
+                status: 'Approved Raw Manuscript'
+              };
+            });
           }
         } catch (chErr) {
           console.error('Could not load chapters from comic:', chErr);
