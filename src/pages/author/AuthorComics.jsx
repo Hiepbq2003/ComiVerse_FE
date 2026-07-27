@@ -309,6 +309,49 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
   )
 }
 
+function getModeratorOverridesMap() {
+  try {
+    const raw = localStorage.getItem('comiverse_moderator_submissions_override');
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch (e) {
+    return [];
+  }
+}
+
+function enrichComicWithModeratorOverrides(comic) {
+  if (!comic) return comic;
+
+  const overrides = getModeratorOverridesMap();
+  const comicTitleClean = (comic.title || '').trim().toLowerCase();
+  const comicIdStr = String(comic.id || comic.comicId || '');
+
+  const matchingOverrides = overrides.filter(o => {
+    const matchId = (o.comicId && String(o.comicId) === comicIdStr) || (o.id && String(o.id) === comicIdStr);
+    const matchTitle = (comicTitleClean && o.title && o.title.trim().toLowerCase() === comicTitleClean);
+    return matchId || matchTitle;
+  });
+
+  const hasRejectedOverride = matchingOverrides.some(o => (o.status || '').toString().toUpperCase() === 'REJECTED');
+  const hasApprovedOverride = matchingOverrides.some(o => (o.status || '').toString().toUpperCase() === 'APPROVED');
+  const hasPendingOverride = matchingOverrides.some(o => (o.status || '').toString().toUpperCase() === 'PENDING');
+
+  let moderationStatus = comic.moderationStatus || comic.approvalStatus || 'DRAFT';
+
+  if (hasRejectedOverride) {
+    moderationStatus = 'REJECTED';
+  } else if (hasApprovedOverride && !hasPendingOverride) {
+    moderationStatus = 'APPROVED';
+  }
+
+  return {
+    ...comic,
+    moderationStatus,
+    hasRejectedOverride,
+    rejectedChapterCount: hasRejectedOverride ? Math.max(1, comic.rejectedChapterCount || 0) : comic.rejectedChapterCount
+  };
+}
+
 function AuthorComics() {
   const navigate = useNavigate()
   const [comics, setComics] = useState([])
@@ -331,13 +374,13 @@ function AuthorComics() {
 
     comics.forEach((comic) => {
       const status = (comic.moderationStatus || '').toString().toUpperCase()
-      const isRejected = status === 'REJECTED' || (comic.rejectedChapterCount > 0)
-      const isPending = status.includes('REVIEW') || status.includes('SUBMITTED') || (comic.pendingChapterCount > 0)
-      const isApproved = status === 'APPROVED' || status === 'PUBLISHED'
+      const isRejected = status === 'REJECTED' || (comic.rejectedChapterCount > 0) || comic.hasRejectedOverride
+      const isPending = !isRejected && (status.includes('REVIEW') || status.includes('SUBMITTED') || (comic.pendingChapterCount > 0))
+      const isApproved = !isRejected && !isPending && (status === 'APPROVED' || status === 'PUBLISHED')
 
       if (isRejected) rejected++
-      if (isPending) pending++
-      if (isApproved) approved++
+      else if (isPending) pending++
+      else if (isApproved) approved++
     })
 
     return { all: comics.length, rejected, pending, approved }
@@ -351,9 +394,9 @@ function AuthorComics() {
       }
 
       const status = (comic.moderationStatus || '').toString().toUpperCase()
-      const isRejected = status === 'REJECTED' || (comic.rejectedChapterCount > 0)
-      const isPending = status.includes('REVIEW') || status.includes('SUBMITTED') || (comic.pendingChapterCount > 0)
-      const isApproved = status === 'APPROVED' || status === 'PUBLISHED'
+      const isRejected = status === 'REJECTED' || (comic.rejectedChapterCount > 0) || comic.hasRejectedOverride
+      const isPending = !isRejected && (status.includes('REVIEW') || status.includes('SUBMITTED') || (comic.pendingChapterCount > 0))
+      const isApproved = !isRejected && !isPending && (status === 'APPROVED' || status === 'PUBLISHED')
 
       if (activeTab === 'rejected') return isRejected
       if (activeTab === 'pending') return isPending
@@ -382,12 +425,12 @@ function AuthorComics() {
       const statusA = (a.moderationStatus || '').toString().toUpperCase()
       const statusB = (b.moderationStatus || '').toString().toUpperCase()
 
-      const isRejectedA = statusA === 'REJECTED' || (a.rejectedChapterCount > 0)
-      const isRejectedB = statusB === 'REJECTED' || (b.rejectedChapterCount > 0)
+      const isRejectedA = statusA === 'REJECTED' || (a.rejectedChapterCount > 0) || a.hasRejectedOverride
+      const isRejectedB = statusB === 'REJECTED' || (b.rejectedChapterCount > 0) || b.hasRejectedOverride
       if (isRejectedA !== isRejectedB) return isRejectedA ? -1 : 1
 
-      const isPendingA = statusA.includes('REVIEW') || statusA.includes('SUBMITTED') || (a.pendingChapterCount > 0)
-      const isPendingB = statusB.includes('REVIEW') || statusB.includes('SUBMITTED') || (b.pendingChapterCount > 0)
+      const isPendingA = !isRejectedA && (statusA.includes('REVIEW') || statusA.includes('SUBMITTED') || (a.pendingChapterCount > 0))
+      const isPendingB = !isRejectedB && (statusB.includes('REVIEW') || statusB.includes('SUBMITTED') || (b.pendingChapterCount > 0))
       if (isPendingA !== isPendingB) return isPendingA ? -1 : 1
 
       const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime()
@@ -400,7 +443,8 @@ function AuthorComics() {
     setLoading(true)
     setError('')
     try {
-      setComics(normalizeArrayResponse(await getAuthorComicsApi({ page: 1, size: 100 })))
+      const rawComics = normalizeArrayResponse(await getAuthorComicsApi({ page: 1, size: 100 }))
+      setComics(rawComics.map(enrichComicWithModeratorOverrides))
     } catch (err) {
       setError(err?.response?.data?.message || 'Cannot load author comics. Please check the backend and AUTHOR token.')
     } finally {

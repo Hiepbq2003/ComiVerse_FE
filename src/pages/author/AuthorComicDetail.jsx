@@ -437,12 +437,40 @@ function AuthorComicDetail() {
         getAuthorComicMetricsApi(id),
       ])
 
-      if (comicResponse.status !== 'fulfilled') {
-        throw comicResponse.reason
-      }
+      const rawComic = comicResponse.value;
+      const rawChapters = chaptersResponse.status === 'fulfilled' ? normalizeArrayResponse(chaptersResponse.value) : [];
 
-      setComic(comicResponse.value)
-      setChapters(chaptersResponse.status === 'fulfilled' ? normalizeArrayResponse(chaptersResponse.value) : [])
+      let hasRejectedOverride = false;
+      try {
+        const rawOverrides = localStorage.getItem('comiverse_moderator_submissions_override');
+        if (rawOverrides) {
+          const overrides = JSON.parse(rawOverrides);
+          const comicTitleClean = (rawComic.title || '').trim().toLowerCase();
+          const comicIdStr = String(rawComic.id || rawComic.comicId || id || '');
+
+          const matchingOverrides = overrides.filter(o => {
+            const matchId = (o.comicId && String(o.comicId) === comicIdStr) || (o.id && String(o.id) === comicIdStr);
+            const matchTitle = (comicTitleClean && o.title && o.title.trim().toLowerCase() === comicTitleClean);
+            return matchId || matchTitle;
+          });
+
+          hasRejectedOverride = matchingOverrides.some(o => (o.status || '').toString().toUpperCase() === 'REJECTED');
+        }
+      } catch (e) {}
+
+      const chaptersWithRejection = rawChapters.map(c => {
+        if (hasRejectedOverride) {
+          return { ...c, status: 'REJECTED' };
+        }
+        return c;
+      });
+
+      const finalModerationStatus = (hasRejectedOverride || chaptersWithRejection.some(c => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED'))
+        ? 'REJECTED'
+        : (rawComic.moderationStatus || rawComic.approvalStatus || 'DRAFT');
+
+      setComic({ ...rawComic, moderationStatus: finalModerationStatus });
+      setChapters(chaptersWithRejection);
       setMetrics(metricsResponse.status === 'fulfilled' ? metricsResponse.value : null)
     } catch {
       setComic(null)
@@ -531,9 +559,15 @@ function AuthorComicDetail() {
 
     try {
       const data = await getAuthorChapterPreviewApi(getComicId(comic), chapterId)
-      navigate(`/author/comics/${id}/preview/${chapterId}`, { state: { preview: data } })
+      const mergedPreview = {
+        ...chapter,
+        ...(data || {}),
+        status: data?.status || chapter?.status || chapter?.moderationStatus,
+        rejectionReason: data?.rejectionReason || chapter?.rejectionReason || chapter?.rejection_reason || chapter?.rejectionNote
+      }
+      navigate(`/author/comics/${id}/preview/${chapterId}`, { state: { preview: mergedPreview } })
     } catch {
-      setActionMessage('Could not load chapter preview. Please check API/backend connection.')
+      navigate(`/author/comics/${id}/preview/${chapterId}`, { state: { preview: chapter } })
     } finally {
       setActionLoadingId(null)
     }
@@ -741,6 +775,14 @@ function AuthorComicDetail() {
               </button>
             </div>
           </div>
+
+          {chapters.some(c => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED') && (
+            <div className="author-alert error" style={{ margin: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', padding: '14px 18px', borderRadius: '8px' }}>
+              <div>
+                <strong>⛔ Chapter Rejected by Moderator:</strong> One or more chapters were rejected. Click <strong>Preview</strong> on the rejected chapter below to inspect full moderator feedback and page pins.
+              </div>
+            </div>
+          )}
 
           {chapters.length === 0 ? (
             <div className="author-empty-state small">
