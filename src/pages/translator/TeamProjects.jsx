@@ -7,6 +7,39 @@ import { createSubmissionApi } from '../../services/api/SubmissionApi'
 import { getChaptersByComicIdApi } from '../../services/api/ChapterApi'
 import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
 import { getAuth } from '../../utils/Auth'
+import comicAction from '../../assets/comic_action.png'
+import comicAdventure from '../../assets/comic_adventure.png'
+import comicScifi from '../../assets/comic_scifi.png'
+
+const getProjectCover = (proj) => {
+  if (!proj) return comicAdventure;
+  const rawCover = proj.cover || proj.coverImage || proj.coverImageUrl || proj.coverUrl || proj.imageUrl || '';
+  
+  if (rawCover && typeof rawCover === 'string' && (
+    rawCover.startsWith('http://') ||
+    rawCover.startsWith('https://') ||
+    rawCover.startsWith('data:') ||
+    rawCover.startsWith('/src/') ||
+    rawCover.startsWith('/assets/') ||
+    rawCover.endsWith('.png') ||
+    rawCover.endsWith('.jpg') ||
+    rawCover.endsWith('.jpeg') ||
+    rawCover.endsWith('.webp') ||
+    rawCover.endsWith('.svg')
+  )) {
+    return rawCover;
+  }
+
+  const title = (proj.title || proj.comicName || proj.comicTitle || proj.name || '').toLowerCase().trim();
+
+  if (title.includes('tạm biệt') || title.includes('long') || title.includes('tóc đỏ') || title.includes('adventure') || title.includes('dragon') || title.includes('rồng')) return comicAdventure;
+  if (title.includes('scifi') || title.includes('cyber') || title.includes('neon') || title.includes('helsinki') || title.includes('orphan')) return comicScifi;
+  if (title.includes('action') || title.includes('battle') || title.includes('solo') || title.includes('sword') || title.includes('god')) return comicAction;
+
+  const fallbacks = [comicAction, comicAdventure, comicScifi];
+  const charCodeSum = title.split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+  return fallbacks[charCodeSum % fallbacks.length];
+};
 
 import {
   getTeamAnnouncementsApi,
@@ -72,15 +105,14 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
           teamProjectsList.map(proj => (
             <div className="trans-project-card" key={proj.id}>
               <div className="trans-project-cover">
-                {proj.cover && /^(https?:)?\/\//.test(proj.cover) ? (
-                  <img
-                    src={proj.cover}
-                    alt={proj.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }}
-                  />
-                ) : (
-                  proj.cover || '📚'
-                )}
+                <img
+                  src={getProjectCover(proj)}
+                  alt={proj.title || 'Comic Cover'}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }}
+                  onError={(e) => {
+                    e.target.src = comicAdventure;
+                  }}
+                />
               </div>
               <div className="trans-project-info">
                 <h3 className="trans-project-title">{proj.title}</h3>
@@ -517,6 +549,7 @@ function TeamProjects() {
           ...p,
           team: p.title,
           title: p.comicName,
+          cover: getProjectCover(p),
           membersCount: realCount,
           isRecruiting: isRecruiting
         };
@@ -1004,7 +1037,7 @@ function TeamProjects() {
       priority: selectedDetails.priority || 'Medium',
       flags: 0,
       status: 'pending',
-      cover: selectedDetails.cover || '🔮',
+      cover: getProjectCover(selectedDetails),
       content: uploadData.chapterContent
     }
 
