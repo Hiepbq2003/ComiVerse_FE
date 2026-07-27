@@ -1,7 +1,12 @@
 import AxiosClient from './AxiosClient';
 
-export const getAllComicsApi = () => {
-  return AxiosClient.get('/comics/staff/all');
+export const getAllComicsApi = async () => {
+  try {
+    return await AxiosClient.get('/comics/staff/all');
+  } catch (err) {
+    console.warn('[ComicApi] getAllComicsApi fallback:', err?.message || err);
+    return [];
+  }
 };
 
 export const getComicsPageApi = (page = 1, size = 10, search = '') => {

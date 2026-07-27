@@ -245,9 +245,18 @@ function ModeratorDashboard() {
   const fetchComicsAndTeams = async () => {
     try {
       const [comicsData, teamsData, genresData] = await Promise.all([
-        getAllComicsApi(),
-        getAllProjectTeamsApi(),
-        getAllGenresApi()
+        getAllComicsApi().catch(err => {
+          console.warn('[ModeratorDashboard] getAllComicsApi fallback:', err?.message || err)
+          return []
+        }),
+        getAllProjectTeamsApi().catch(err => {
+          console.warn('[ModeratorDashboard] getAllProjectTeamsApi fallback:', err?.message || err)
+          return []
+        }),
+        getAllGenresApi().catch(err => {
+          console.warn('[ModeratorDashboard] getAllGenresApi fallback:', err?.message || err)
+          return []
+        })
       ])
       const authUser = getAuth()?.user;
       const mappedComics = syncApprovedComics(
@@ -845,12 +854,17 @@ function ModeratorDashboard() {
       }
     }
 
+    const targetName = (createTeamForm.comicName || '').toLowerCase().trim();
+    const matchComic = comics.find(c => (c.title && c.title.toLowerCase().trim() === targetName) || (createTeamForm.comicId && (c.id === createTeamForm.comicId || c.comicId === createTeamForm.comicId)));
+    const comicChCount = matchComic ? (matchComic.latestChapterNumber || matchComic.latest_chapter_number || matchComic.chaptersCount || matchComic.chapterCount || matchComic.totalChapters || 0) : 0;
+    const initialChapterCount = parseInt(comicChCount, 10) || 0;
+
     const newTeam = {
       title: createTeamForm.title.trim() || `${createTeamForm.comicName} Team`,
       comicName: createTeamForm.comicName,
       status: 'Active',
       membersCount: 1,
-      chaptersCount: 0,
+      chaptersCount: initialChapterCount,
       progress: 0,
       leaderName: leaderName,
       leaderId: createTeamForm.leaderId || null,
