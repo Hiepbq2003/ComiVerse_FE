@@ -22,6 +22,7 @@ import {
 import { toast } from 'react-toastify'
 import { useAuth } from '../../context/AuthContext'
 import { getAuth } from '../../utils/Auth'
+import { getMyProjectTeamsApi, getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
 
 const COMMON_NOTIFICATION_OPTIONS = [
   {
@@ -89,39 +90,67 @@ function ReaderStats({ stats, loading }) {
   )
 }
 
-function TranslatorStats() {
+function TranslatorStats({ teams = [], loading = false }) {
+  if (loading) {
+    return (
+      <div className="profile-stats-list">
+        <div className="profile-stats-row"><span>Comics translated</span><span className="profile-stats-value">...</span></div>
+        <div className="profile-stats-row"><span>Chapters translated</span><span className="profile-stats-value">...</span></div>
+        <div className="profile-stats-row"><span>Group members</span><span className="profile-stats-value">...</span></div>
+      </div>
+    )
+  }
+
+  const uniqueComics = new Set(teams.map(t => (t.comicName || t.comic_name || t.title || '').toLowerCase().trim()).filter(Boolean)).size
+  const totalChapters = teams.reduce((acc, t) => acc + (Number(t.chaptersCount || t.chapters_count) || 0), 0)
+  const totalMembers = teams.reduce((acc, t) => acc + (Number(t.membersCount || t.members_count) || 1), 0)
+
   return (
     <div className="profile-stats-list">
       <div className="profile-stats-row">
         <span>Comics translated</span>
-        <span className="profile-stats-value">12</span>
+        <span className="profile-stats-value">{uniqueComics}</span>
       </div>
       <div className="profile-stats-row">
         <span>Chapters translated</span>
-        <span className="profile-stats-value">128</span>
+        <span className="profile-stats-value">{totalChapters}</span>
       </div>
       <div className="profile-stats-row">
         <span>Group members</span>
-        <span className="profile-stats-value">6</span>
+        <span className="profile-stats-value">{totalMembers}</span>
       </div>
     </div>
   )
 }
 
-function ProjectLeaderStats() {
+function ProjectLeaderStats({ teams = [], loading = false }) {
+  if (loading) {
+    return (
+      <div className="profile-stats-list">
+        <div className="profile-stats-row"><span>Projects led</span><span className="profile-stats-value">...</span></div>
+        <div className="profile-stats-row"><span>Active teams</span><span className="profile-stats-value">...</span></div>
+        <div className="profile-stats-row"><span>Chapters delivered</span><span className="profile-stats-value">...</span></div>
+      </div>
+    )
+  }
+
+  const projectsLed = teams.length
+  const activeTeams = teams.filter(t => (t.status || 'Active').toLowerCase() === 'active').length
+  const totalChaptersDelivered = teams.reduce((acc, t) => acc + (Number(t.chaptersCount || t.chapters_count) || 0), 0)
+
   return (
     <div className="profile-stats-list">
       <div className="profile-stats-row">
         <span>Projects led</span>
-        <span className="profile-stats-value">8</span>
+        <span className="profile-stats-value">{projectsLed}</span>
       </div>
       <div className="profile-stats-row">
         <span>Active teams</span>
-        <span className="profile-stats-value">4</span>
+        <span className="profile-stats-value">{activeTeams}</span>
       </div>
       <div className="profile-stats-row">
         <span>Chapters delivered</span>
-        <span className="profile-stats-value">196</span>
+        <span className="profile-stats-value">{totalChaptersDelivered}</span>
       </div>
     </div>
   )
@@ -239,6 +268,49 @@ function Profile({ user: userProp }) {
     }
     fetchInteractionCounts()
   }, [user?.id, user?.userId])
+
+  const [projectTeams, setProjectTeams] = useState([])
+  const [projectTeamsLoading, setProjectTeamsLoading] = useState(true)
+
+  useEffect(() => {
+    if (!user) {
+      setProjectTeamsLoading(false)
+      return
+    }
+    const fetchTeams = async () => {
+      try {
+        setProjectTeamsLoading(true)
+        const [myRes, allRes] = await Promise.all([
+          getMyProjectTeamsApi().catch(() => []),
+          getAllProjectTeamsApi().catch(() => [])
+        ])
+        const myTeams = Array.isArray(myRes) ? myRes : (myRes?.content || myRes?.data || [])
+        const allTeams = Array.isArray(allRes) ? allRes : (allRes?.content || allRes?.data || [])
+
+        const map = new Map()
+        myTeams.forEach(t => { if (t && t.id) map.set(t.id, t) })
+
+        const curName = (user.fullName || user.username || user.name || '').toLowerCase().trim()
+        const curId = user.id || user.userId
+
+        allTeams.forEach(t => {
+          if (!t || !t.id) return
+          const lName = (t.leaderName || '').toLowerCase().trim()
+          const lId = t.leaderId || t.leader_id
+          if ((lId && lId === curId) || (lName && lName === curName)) {
+            map.set(t.id, t)
+          }
+        })
+
+        setProjectTeams(Array.from(map.values()))
+      } catch (err) {
+        console.error('Failed to fetch project teams for stats:', err)
+      } finally {
+        setProjectTeamsLoading(false)
+      }
+    }
+    fetchTeams()
+  }, [user?.id, user?.userId, user?.username, user?.fullName])
 
   const [userRatings, setUserRatings] = useState([])
   const [ratingsLoading, setRatingsLoading] = useState(false)
@@ -496,9 +568,9 @@ function Profile({ user: userProp }) {
       case 'STAFF':
         return <ModeratorStats assignedLanguages={assignedLanguages} />
       case 'TRANSLATOR':
-        return <TranslatorStats />
+        return <TranslatorStats teams={projectTeams} loading={projectTeamsLoading} />
       case 'PROJECT_LEADER':
-        return <ProjectLeaderStats />
+        return <ProjectLeaderStats teams={projectTeams} loading={projectTeamsLoading} />
       case 'READER':
       case 'USER':
       default:

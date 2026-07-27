@@ -1092,7 +1092,8 @@ function TeamProjects() {
         membersCount: selectedDetails.membersCount,
         chaptersCount: selectedDetails.chaptersCount,
         progress: selectedDetails.progress,
-        assignedToMe: selectedDetails.assignedToMe
+        assignedToMe: selectedDetails.assignedToMe,
+        notes: selectedDetails.description || selectedDetails.notes || ''
       })
       const mappedUpdated = { ...selectedDetails, ...updated, team: updated.title || selectedDetails.team, title: updated.comicName || selectedDetails.title, isRecruiting: selectedDetails.isRecruiting }
       setProjects(prev => prev.map(proj => (proj.id === selectedDetails.id ? mappedUpdated : proj)))

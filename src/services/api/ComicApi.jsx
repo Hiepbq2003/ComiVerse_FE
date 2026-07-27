@@ -1,10 +1,9 @@
 import AxiosClient from './AxiosClient';
 
-export const getAllComicsApi = async () => {
+export const getAllComicsApi = async (config = {}) => {
   try {
-    return await AxiosClient.get('/comics/staff/all');
+    return await AxiosClient.get('/comics/staff/all', { timeout: 2500, ...config });
   } catch (err) {
-    console.warn('[ComicApi] getAllComicsApi fallback:', err?.message || err);
     return [];
   }
 };
