@@ -291,7 +291,13 @@ function ModeratorDashboard() {
         const match = idKey ? overrideById.get(String(idKey)) : null;
         if (match) {
           if (idKey) matchedIds.add(String(idKey));
-          return { ...item, ...match };
+          const merged = { ...item };
+          Object.keys(match).forEach(k => {
+            if (match[k] !== undefined && match[k] !== null && match[k] !== '') {
+              merged[k] = match[k];
+            }
+          });
+          return merged;
         }
         return item;
       });
@@ -315,7 +321,7 @@ function ModeratorDashboard() {
     try {
       const data = await getAllSubmissionsApi()
       const authUser = getAuth()?.user;
-      const filtered = (data || []).filter(s => isLanguageInModeratorScope(s.language || s.rawLanguage || s.targetLanguage || s.targetLang, authUser));
+      const filtered = (data || []).filter(s => isLanguageInModeratorScope(s.language || s.rawLanguage || s.targetLanguage || s.targetLang || s.originalLanguage, authUser));
       setSubmissions(syncSubmissionsWithLocalOverride(filtered))
     } catch (err) {
       console.error('Failed to fetch submissions:', err)
@@ -370,41 +376,28 @@ function ModeratorDashboard() {
           (titleClean && c.title && c.title.toLowerCase().trim() === titleClean)
         );
 
-        if (!matchComic) return s;
+        const baseObj = matchComic ? { ...matchComic, ...s } : { ...s };
 
         return {
-          ...matchComic,
-          ...s,
+          ...baseObj,
           comic: {
-            ...matchComic,
+            ...(matchComic || {}),
             ...(s.comic || {})
           },
-          originalLanguage: s.originalLanguage || s.original_language || s.language || s.rawLanguage || matchComic.originalLanguage || matchComic.language,
-          language: s.language || s.originalLanguage || s.rawLanguage || matchComic.language || matchComic.originalLanguage,
-          minAge: s.minAge ?? s.minimumAge ?? s.min_age ?? matchComic.minAge ?? matchComic.minimumAge,
-          publicationStatus: s.publicationStatus || s.publication_status || matchComic.publicationStatus || matchComic.publication_status || 'ONGOING',
-          submittedBy: s.submittedBy || s.submittedByEmail || s.author || matchComic.submittedBy || matchComic.author || matchComic.authorName,
-          description: s.description || s.summary || s.synopsis || matchComic.description || matchComic.summary || matchComic.synopsis
+          originalLanguage: s.originalLanguage || s.original_language || s.language || s.rawLanguage || matchComic?.originalLanguage || matchComic?.language || 'Japanese',
+          language: s.language || s.originalLanguage || s.rawLanguage || matchComic?.language || matchComic?.originalLanguage || 'Japanese',
+          minimumAge: s.minimumAge ?? s.minAge ?? s.min_age ?? matchComic?.minimumAge ?? matchComic?.minAge ?? 13,
+          minAge: s.minAge ?? s.minimumAge ?? s.min_age ?? matchComic?.minAge ?? matchComic?.minimumAge ?? 13,
+          publicationStatus: s.publicationStatus || s.publication_status || matchComic?.publicationStatus || matchComic?.publication_status || 'ONGOING',
+          submittedBy: s.submittedBy || s.submittedByEmail || s.author || matchComic?.submittedBy || matchComic?.author || matchComic?.authorName || 'Author One',
+          summary: s.summary || s.description || s.synopsis || matchComic?.summary || matchComic?.description || matchComic?.synopsis || '',
+          description: s.description || s.summary || s.synopsis || matchComic?.description || matchComic?.summary || matchComic?.synopsis || ''
         };
       });
 
       const filteredSubmissions = syncSubmissionsWithLocalOverride(
         enrichedRawSubmissions.filter(s => isLanguageInModeratorScope(s.language || s.rawLanguage || s.targetLanguage || s.targetLang || s.originalLanguage, authUser))
       );
-      
-      // DEBUG: log first submission and first comic to see actual field names
-      if ((submissionsData || []).length > 0) {
-        console.log('[DEBUG] Keys of raw submission[0]:', Object.keys(submissionsData[0]));
-        console.log('[DEBUG] Raw submission[0]:', JSON.parse(JSON.stringify(submissionsData[0])));
-      }
-      if ((comicsData || []).length > 0) {
-        console.log('[DEBUG] Keys of comic[0]:', Object.keys(comicsData[0]));
-        console.log('[DEBUG] Comic[0]:', JSON.parse(JSON.stringify(comicsData[0])));
-      }
-      if (enrichedRawSubmissions.length > 0) {
-        console.log('[DEBUG] Enriched submission[0]:', JSON.parse(JSON.stringify(enrichedRawSubmissions[0])));
-        console.log('[DEBUG] language:', enrichedRawSubmissions[0].language, '| minAge:', enrichedRawSubmissions[0].minAge, '| description:', enrichedRawSubmissions[0].description, '| submittedBy:', enrichedRawSubmissions[0].submittedBy);
-      }
       
       setSubmissions(filteredSubmissions)
 
@@ -1515,6 +1508,7 @@ function ModeratorDashboard() {
           {activeNav === 'review-queue' && (
             <ReviewQueue 
               submissions={submissions} 
+              comics={comics}
               handleApprove={handleApprove} 
               handleConfirmReject={handleConfirmReject} 
               handleApproveAndCreateProject={handleApproveAndCreateProject}
