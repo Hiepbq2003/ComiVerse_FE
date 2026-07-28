@@ -3,7 +3,9 @@ export const COMIC_LANGUAGE_OPTIONS = [
   'Vietnamese',
   'Japanese',
   'Korean',
-  'Chinese'
+  'Chinese',
+  'Spanish',
+  'French'
 ]
 
 export const normalizeComicLanguage = (value) => {

@@ -13,23 +13,7 @@ import '../../assets/style/common/ai-popover.css'
 import '../../assets/style/common/modern-pagination.css'
 import '../../assets/style/common/skeleton-loader.css'
 import '../../assets/style/admin/account-management.css'
-
-// Fallback mock data when API is not available
-const MOCK_ACCOUNTS = [
-  { id: 1, userId: 'USR-0001', fullName: 'John Doe', username: 'johndoe', email: 'john@gmail.com', role: 'Reader', status: 'Active', createdDate: '2023-01-15', lastActive: 'Today' },
-  { id: 2, userId: 'USR-0002', fullName: 'Spirit Group', username: 'spiritgroup', email: 'spirit@gmail.com', role: 'Translator', status: 'Active', createdDate: '2023-03-02', lastActive: '2 days ago' },
-  { id: 3, userId: 'USR-0003', fullName: 'Author X', username: 'authorx', email: 'authorx@gmail.com', role: 'Author', status: 'Active', createdDate: '2023-04-18', lastActive: 'Yesterday' },
-  { id: 4, userId: 'USR-0004', fullName: 'Mod Y', username: 'mody', email: 'mody@gmail.com', role: 'Moderator', status: 'Active', createdDate: '2023-05-10', lastActive: 'Today' },
-  { id: 13, userId: 'USR-0013', fullName: 'Project Lead', username: 'projectlead', email: 'lead@comiverse.com', role: 'Project Leader', status: 'Active', createdDate: '2023-05-21', lastActive: 'Today' },
-  { id: 5, userId: 'USR-0005', fullName: 'Sarah Chen', username: 'sarahchen', email: 'sarah@gmail.com', role: 'Reader', status: 'Active', createdDate: '2023-06-01', lastActive: '3 hours ago' },
-  { id: 6, userId: 'USR-0006', fullName: 'Dragon Scans', username: 'dragonscans', email: 'dragon@group.com', role: 'Translator', status: 'Banned', createdDate: '2023-07-22', lastActive: '1 month ago' },
-  { id: 7, userId: 'USR-0007', fullName: 'NoviceWriter', username: 'novicewriter', email: 'novice@mail.com', role: 'Author', status: 'Active', createdDate: '2023-08-05', lastActive: '5 days ago' },
-  { id: 8, userId: 'USR-0008', fullName: 'ContentMod', username: 'contentmod', email: 'cmod@site.com', role: 'Moderator', status: 'Active', createdDate: '2023-09-14', lastActive: 'Today' },
-  { id: 9, userId: 'USR-0009', fullName: 'MangaFan99', username: 'mangafan99', email: 'manga99@mail.com', role: 'Reader', status: 'Active', createdDate: '2023-10-03', lastActive: '1 hour ago' },
-  { id: 10, userId: 'USR-0010', fullName: 'TranslateHQ', username: 'translatehq', email: 'thq@group.com', role: 'Translator', status: 'Active', createdDate: '2023-11-11', lastActive: '4 days ago' },
-  { id: 11, userId: 'USR-0011', fullName: 'ProArtist', username: 'proartist', email: 'artist@mail.com', role: 'Author', status: 'Banned', createdDate: '2023-12-20', lastActive: '2 weeks ago' },
-  { id: 12, userId: 'USR-0012', fullName: 'SuperAdmin', username: 'superadmin', email: 'admin@comiverse.com', role: 'Admin', status: 'Active', createdDate: '2023-01-01', lastActive: 'Today' },
-]
+import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 
 const ITEMS_PER_PAGE = 10
 const ROLE_OPTIONS = [
@@ -86,7 +70,6 @@ function AccountManagement() {
   // Data states
   const [accounts, setAccounts] = useState([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isMockData, setIsMockData] = useState(false)
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('')
@@ -111,7 +94,7 @@ function AccountManagement() {
   const [confirmAction, setConfirmAction] = useState(null) // { type: 'ban'|'unban'|'reset-pw', account }
 
   // MODERATOR SPECIALIZATION LANGUAGES
-  const MODERATOR_LANGUAGES = ['Japanese', 'Korean', 'Chinese', 'English', 'Vietnamese', 'Spanish', 'French']
+  const MODERATOR_LANGUAGES = COMIC_LANGUAGE_OPTIONS
 
   // Edit user states
   const [showEditModal, setShowEditModal] = useState(false)
@@ -185,40 +168,12 @@ function AccountManagement() {
       setAccounts(normalized)
       setTotalPages(metadata.totalPages || 1)
       setTotalElements(metadata.totalElements || normalized.length)
-      setIsMockData(false)
     } catch (err) {
-      console.warn('API not available, using mock data:', err.message)
-      // Fallback local search/filter & slicing for Mock Data
-      const filteredMock = MOCK_ACCOUNTS.filter((account) => {
-        const name = (account.fullName || '').toLowerCase()
-        const email = (account.email || '').toLowerCase()
-        const uid = (account.userId || '').toLowerCase()
-        const uname = (account.username || '').toLowerCase()
-        const search = debouncedSearchTerm.toLowerCase()
-
-        const matchesSearch =
-          debouncedSearchTerm === '' || name.includes(search) || email.includes(search) || uid.includes(search) || uname.includes(search)
-
-        const matchesRole =
-          roleFilter === 'All Roles' ||
-          normalizeRoleValue(account.role) === normalizeRoleValue(roleFilter) ||
-          (roleFilter.toLowerCase() === 'reader' && (account.role || '').toLowerCase() === 'user')
-
-        const matchesStatus =
-          statusFilter === 'All Status' || (account.status || '').toLowerCase() === statusFilter.toLowerCase()
-
-        return matchesSearch && matchesRole && matchesStatus
-      })
-
-      setTotalPages(Math.max(1, Math.ceil(filteredMock.length / ITEMS_PER_PAGE)))
-      setTotalElements(filteredMock.length)
-
-      const paginatedMock = filteredMock.slice(
-        (currentPage - 1) * ITEMS_PER_PAGE,
-        currentPage * ITEMS_PER_PAGE
-      )
-      setAccounts(paginatedMock)
-      setIsMockData(true)
+      console.error('Failed to fetch accounts:', err.message)
+      setAccounts([])
+      setTotalPages(1)
+      setTotalElements(0)
+      toast.error('Could not load accounts.')
     } finally {
       setIsLoading(false)
     }
@@ -557,12 +512,6 @@ function AccountManagement() {
   return (
     <AdminLayout activeNav="account-management">
       <div className="admin-account-management-screen">
-      {/* Mock data indicator */}
-      {isMockData && !isLoading && (
-        <div className="admin-inline-alert admin-inline-alert--info">
-          ⓘ API is unavailable — displaying demo data. Connect the backend to see real accounts.
-        </div>
-      )}
 
       {/* Page Header */}
       <div className="admin-page-header">

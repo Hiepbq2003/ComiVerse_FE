@@ -6,16 +6,22 @@ import { searchTranslatorsApi, searchProjectLeadersApi } from '../../services/ap
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import ModernPagination from '../../components/common/ModernPagination'
 import { useTheme } from '../../context/ThemeContext'
+import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 
-const ALL_TARGET_LANGUAGES = [
-  { code: 'English', label: '🇬🇧 English' },
-  { code: 'Vietnamese', label: '🇻🇳 Vietnamese' },
-  { code: 'Japanese', label: '🇯🇵 Japanese' },
-  { code: 'Chinese', label: '🇨🇳 Chinese' },
-  { code: 'Korean', label: '🇰🇷 Korean' },
-  { code: 'French', label: '🇫🇷 French' },
-  { code: 'Spanish', label: '🇪🇸 Spanish' }
-]
+const LANGUAGE_FLAGS = {
+  'English': '🇬🇧',
+  'Vietnamese': '🇻🇳',
+  'Japanese': '🇯🇵',
+  'Chinese': '🇨🇳',
+  'Korean': '🇰🇷',
+  'French': '🇫🇷',
+  'Spanish': '🇪🇸'
+}
+
+const ALL_TARGET_LANGUAGES = COMIC_LANGUAGE_OPTIONS.map(lang => ({
+  code: lang,
+  label: `${LANGUAGE_FLAGS[lang] || '🏳️'} ${lang}`
+}))
 
 function ProjectTeams({
   projectTeams,

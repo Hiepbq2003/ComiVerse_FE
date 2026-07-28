@@ -941,9 +941,8 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
         const nextSubmissions = prev.map(item => {
           const itemTitleClean = (item.title || item.comicTitle || '').trim().toLowerCase();
           const isMatchById = (item.id === submissionId || item.submissionId === submissionId || item.id === cleanId || item.submissionId === cleanId || item.id === targetSubId);
-          const isMatchByTitle = (comicTitleClean && itemTitleClean && comicTitleClean === itemTitleClean);
 
-          if (isMatchById || isMatchByTitle) {
+          if (isMatchById) {
             return {
               ...item,
               status: 'rejected',

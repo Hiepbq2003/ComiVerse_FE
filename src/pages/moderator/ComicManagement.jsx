@@ -14,6 +14,7 @@ import { getComicByIdApi } from '../../services/api/ComicApi'
 import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
 import { getAuth } from '../../utils/Auth'
 import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
+import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 
 function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, handleArchiveComic, handleTriggerAssignTeam, fetchAllData }) {
   const navigate = useNavigate()
@@ -177,7 +178,11 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
           const fetchedRatingCount = Number(data.ratingCount || data.totalRatings || data.ratings) || 0;
           const finalRatingCount = fetchedRatingCount > 0 ? fetchedRatingCount : (comic.ratingCount || comic.totalRatings || comic.ratings || 0);
 
-          const fetchedChapsCount = Array.isArray(chapsData) ? chapsData.length : 0;
+          const approvedChaps = Array.isArray(chapsData) ? chapsData.filter(c => {
+            const s = (c.status || c.moderationStatus || '').toUpperCase();
+            return s === 'PUBLISHED' || s === 'APPROVED' || !s; 
+          }) : [];
+          const fetchedChapsCount = approvedChaps.length;
           const chapterCount = fetchedChapsCount > 0 ? fetchedChapsCount : (comic.chapterCount || comic.chapters || 0);
 
           nextStats[id] = {
@@ -212,7 +217,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   })
 
   // Translation Request modal states
-  const AVAILABLE_LANGUAGES = ['English', 'Vietnamese', 'Japanese', 'Korean', 'Chinese', 'Spanish', 'French']
+  const AVAILABLE_LANGUAGES = COMIC_LANGUAGE_OPTIONS
   const [showTransReqModal, setShowTransReqModal] = useState(false)
   const [transReqComic, setTransReqComic] = useState(null)
   const [transReqForm, setTransReqForm] = useState({
