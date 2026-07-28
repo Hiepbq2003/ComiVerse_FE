@@ -491,7 +491,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
           title: baseObj.title || baseObj.comicTitle || s.title || 'Untitled',
           cover: baseObj.coverImageUrl || baseObj.cover || s.cover || '',
           type: (s.submissionType || s.type || 'NEW_COMIC').toUpperCase(),
-          status: (s.status || 'PENDING').toUpperCase(),
+          status: (s.status || 'pending').toLowerCase(),
           author: baseObj.authorName || baseObj.author || s.submittedBy || 'Unknown',
           submittedAt: s.submittedAt || s.createdAt || new Date().toISOString(),
           comic: {
@@ -789,7 +789,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     const isFinalChapterOfSub = currentChapsForCheck.length > 0 && remainingChapsForCheck.length === 0;
 
     try {
-      if (isFinalChapterOfSub && targetApiId && !String(targetApiId).startsWith('group-') && !String(targetApiId).startsWith('chap-')) {
+      if (targetApiId && !String(targetApiId).startsWith('group-') && !String(targetApiId).startsWith('chap-')) {
         const res = await approveSubmissionApi(targetApiId);
         const realDbComic = res?.data || res;
         if (realDbComic && (realDbComic.id || realDbComic.comicId) && sub) {
@@ -835,6 +835,12 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                   chapters: [{ ...chapterObj, status: 'approved', approvedAt: nowIso }],
                   chapterNumber: 1,
                   number: 1
+                });
+              } else {
+                nextSubmissions.push({
+                  ...item,
+                  status: 'approved',
+                  approvedAt: nowIso
                 });
               }
             } else {

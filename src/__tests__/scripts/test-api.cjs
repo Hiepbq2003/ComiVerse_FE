@@ -1,16 +1,12 @@
-const http = require('http');
-
-http.get('http://localhost:8081/api/comics/explore?page=1&size=50', (res) => {
-  let data = '';
-  res.on('data', chunk => data += chunk);
-  res.on('end', () => {
-    try {
-      const parsed = JSON.parse(data);
-      const comics = parsed.data.items || parsed.data.content || parsed.data || [];
-      const comic = comics.find(c => c.title === 'Tạm biệt Long tóc đỏ');
-      console.log('Explore API:', comic ? { title: comic.title, chapterCount: comic.chapterCount } : 'Not found');
-    } catch(e) {
-      console.error('Failed to parse:', e.message);
-    }
+fetch('http://localhost:8081/api/comics/explore?page=1&size=50')
+  .then(res => res.json())
+  .then(parsed => {
+    const comics = parsed.data.items || parsed.data.content || parsed.data || [];
+    const comic = comics.find(c => c.title === 'AYASHII IYASHI NO YAKUMO-SAN');
+    console.log('Explore API:', comic ? { title: comic.title, ratingAverage: comic.ratingAverage, ratingCount: comic.ratingCount } : 'Not found');
+    process.exit(0);
+  })
+  .catch(err => {
+    console.error('Request failed:', err.message);
+    process.exit(1);
   });
-}).on('error', err => console.error('Request failed:', err.message));
