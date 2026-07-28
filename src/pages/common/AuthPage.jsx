@@ -48,7 +48,7 @@ function AuthPage() {
       return
     }
 
-    if (roleUpper === 'MODERATOR' || roleUpper === 'STAFF' ) {
+    if (roleUpper === 'MODERATOR') {
       setUser(userData)
       setView('profile')
       return
@@ -123,7 +123,6 @@ function AuthPage() {
       case 'AUTHOR':
         return <AuthorDashboard user={user} onLogout={handleLogout} />;
       case 'MODERATOR':
-      case 'STAFF':
         return <ModeratorDashboard user={user} onLogout={handleLogout} />;
       case 'TRANSLATOR':
       case 'PROJECT_LEADER':

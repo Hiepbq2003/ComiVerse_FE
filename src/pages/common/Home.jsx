@@ -78,7 +78,22 @@ function Home() {
     try {
       const savedLocal = localStorage.getItem('comiverse_local_comic_' + comic.id);
       if (savedLocal) {
-        return { ...comic, ...JSON.parse(savedLocal) };
+        const parsed = JSON.parse(savedLocal);
+        const merged = { ...comic, ...parsed };
+        
+        // Don't let an older local timestamp overwrite a fresh one
+        if (comic.lastChapterUpdatedAt && parsed.lastChapterUpdatedAt) {
+          if (new Date(comic.lastChapterUpdatedAt) > new Date(parsed.lastChapterUpdatedAt)) {
+            merged.lastChapterUpdatedAt = comic.lastChapterUpdatedAt;
+          }
+        }
+        
+        // Don't let older local chapters override the freshly merged chapters
+        if (comic.chaptersList && (!parsed.chaptersList || parsed.chaptersList.length < comic.chaptersList.length)) {
+          merged.chaptersList = comic.chaptersList;
+        }
+        
+        return merged;
       }
     } catch(e) {}
     return comic;
@@ -221,8 +236,8 @@ function Home() {
         }
       })
 
-    // 3. Fetch explore/recently updated (sortBy = Recently Updated, size = 8)
-    getExploreComicsApi({ sortBy: 'Recently Updated', size: 8 }, { signal })
+    // 3. Fetch explore/recently updated (sortBy = updatedAt, size = 8)
+    getExploreComicsApi({ sortBy: 'updatedAt', size: 8 }, { signal })
       .then(async (res) => {
         let exploreList = getArrayOrData(res)
 
@@ -234,12 +249,27 @@ function Home() {
               const comicTitle = (sub.title || sub.comicTitle || sub.comicName).trim();
               const stableId = sub.comicId || (sub.id ? `comic-${sub.id}` : (sub.submissionId ? `comic-${sub.submissionId}` : `comic-${comicTitle.replace(/\s+/g, '-').toLowerCase()}`));
               
-              const chapsList = Array.isArray(sub.allChapters) ? sub.allChapters : (Array.isArray(sub.chapters) ? (typeof sub.chapters[0] === 'object' ? sub.chapters : []) : []);
+              let chapsList = Array.isArray(sub.allChapters) ? sub.allChapters : (Array.isArray(sub.chapters) ? (typeof sub.chapters[0] === 'object' ? sub.chapters : []) : []);
+              if (chapsList.length === 0 && (sub.chapterNumber || sub.number)) {
+                chapsList = [{
+                  id: sub.chapterId || sub.id || sub.submissionId || Date.now(),
+                  chapterNumber: sub.chapterNumber || sub.number,
+                  createdAt: sub.approvedAt || new Date().toISOString()
+                }];
+              }
               const latestChapTime = chapsList.length > 0 ? (chapsList[chapsList.length - 1].createdAt || sub.approvedAt || new Date().toISOString()) : (sub.approvedAt || new Date().toISOString());
 
               const existingIdx = exploreList.findIndex(c => c.id === stableId || c.title?.toLowerCase() === comicTitle.toLowerCase());
               if (existingIdx !== -1) {
-                exploreList[existingIdx] = { ...exploreList[existingIdx], lastChapterUpdatedAt: latestChapTime, chaptersList: chapsList };
+                const existingChaps = exploreList[existingIdx].chaptersList || [];
+                // Merge the new chapters into existing chapters list
+                const mergedChaps = [...existingChaps];
+                chapsList.forEach(newChap => {
+                  if (!mergedChaps.some(c => c.chapterNumber === newChap.chapterNumber || c.id === newChap.id)) {
+                    mergedChaps.push(newChap);
+                  }
+                });
+                exploreList[existingIdx] = { ...exploreList[existingIdx], lastChapterUpdatedAt: latestChapTime, chaptersList: mergedChaps };
               } else {
                 exploreList.push({
                   id: stableId,

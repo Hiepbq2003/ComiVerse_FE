@@ -202,7 +202,6 @@ function AccountManagement() {
         const matchesRole =
           roleFilter === 'All Roles' ||
           normalizeRoleValue(account.role) === normalizeRoleValue(roleFilter) ||
-          (roleFilter.toLowerCase() === 'moderator' && (account.role || '').toLowerCase() === 'staff') ||
           (roleFilter.toLowerCase() === 'reader' && (account.role || '').toLowerCase() === 'user')
 
         const matchesStatus =

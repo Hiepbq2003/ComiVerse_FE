@@ -38,9 +38,7 @@ const ROLE_NOTIFICATION_OPTIONS = {
   MODERATOR: [{ title: 'Moderator Workspace', options: [
     { key: 'REVIEW_QUEUE', label: 'Review queue', description: 'New comic and chapter submissions waiting for moderation.' },
   ] }],
-  STAFF: [{ title: 'Moderator Workspace', options: [
-    { key: 'REVIEW_QUEUE', label: 'Review queue', description: 'New comic and chapter submissions waiting for moderation.' },
-  ] }],
+
   AUTHOR: [{ title: 'Author Hub', options: [
     { key: 'SUBMISSION_STATUS', label: 'Submission status', description: 'Approval, rejection, and change requests for your submitted work.' },
   ] }],
@@ -565,7 +563,6 @@ function Profile({ user: userProp }) {
       case 'AUTHOR':
         return <AuthorStats />
       case 'MODERATOR':
-      case 'STAFF':
         return <ModeratorStats assignedLanguages={assignedLanguages} />
       case 'TRANSLATOR':
         return <TranslatorStats teams={projectTeams} loading={projectTeamsLoading} />
@@ -586,7 +583,6 @@ function Profile({ user: userProp }) {
       case 'AUTHOR':
         return { label: 'Author', className: 'author', icon: '✍️' }
       case 'MODERATOR':
-      case 'STAFF':
         return { label: 'Moderator', className: 'moderator', icon: '⚖️' }
       case 'TRANSLATOR':
         return { label: 'Translator', className: 'translator', icon: '🌐' }
@@ -614,7 +610,6 @@ function Profile({ user: userProp }) {
       LayoutComponent = AuthorLayout
       break
     case 'MODERATOR':
-    case 'STAFF':
       LayoutComponent = ModeratorLayout
       break
     case 'TRANSLATOR':

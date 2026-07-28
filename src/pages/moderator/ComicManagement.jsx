@@ -43,9 +43,6 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
     const authUser = getAuth()?.user;
     return (comics || [])
       .filter(c => {
-        const matchesScope = isLanguageInModeratorScope(c.language || c.rawLanguage || c.originalLanguage, authUser);
-        if (!matchesScope) return false;
-
         const searchLower = comicSearch.toLowerCase();
         const matchesSearch = c.title.toLowerCase().includes(searchLower) ||
           (c.authorName || '').toLowerCase().includes(searchLower) ||

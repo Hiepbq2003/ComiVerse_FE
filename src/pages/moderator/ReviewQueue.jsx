@@ -235,7 +235,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
       ...c,
       submissionId: c.submissionId || item.id || c.id,
       originalSubmissionItem: c.originalSubmissionItem || item
-    }));
+    })).sort((a, b) => (Number(a.number) || 0) - (Number(b.number) || 0));
   };
 
   // Extract description/synopsis/summary safely from raw submission objects or matching comic
@@ -566,8 +566,8 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
         );
       })
       .sort((a, b) => {
-        const timeA = a.timestamp || 0;
-        const timeB = b.timestamp || 0;
+        const timeA = new Date(a.timestamp || a.submittedAt || a.createdAt || 0).getTime() || 0;
+        const timeB = new Date(b.timestamp || b.submittedAt || b.createdAt || 0).getTime() || 0;
         return sortFilter === 'Newest' ? timeB - timeA : timeA - timeB;
       });
   }, [submissions, activeTab, searchQuery, sortFilter]);
@@ -592,8 +592,10 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
         group.subItems.push(item);
 
         // Use newest timestamp for display
-        if ((item.timestamp || 0) > (group.timestamp || 0)) {
-          group.timestamp = item.timestamp;
+        const itemTime = new Date(item.timestamp || item.submittedAt || item.createdAt || 0).getTime() || 0;
+        const groupTime = new Date(group.timestamp || group.submittedAt || group.createdAt || 0).getTime() || 0;
+        if (itemTime > groupTime) {
+          group.timestamp = item.timestamp || item.submittedAt || item.createdAt;
         }
       }
     });
@@ -1214,7 +1216,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                   {getSubmissionMinAge(item) !== 'Not specified' && <span> · <strong>Age:</strong> {getSubmissionMinAge(item)}</span>}
                 </p>
                 <div className="submission-extra" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
-                  <span className="submission-extra-item">⏱️ {formatTimeAgo(item.timestamp)}</span>
+                  <span className="submission-extra-item">⏱️ {formatTimeAgo(item.timestamp || item.submittedAt || item.createdAt)}</span>
                   <span className="submission-extra-item" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '2px 8px', borderRadius: '6px', fontWeight: '800', fontSize: '11.5px' }}>
                     📚 {getSubmissionChapters(item).length} {getSubmissionChapters(item).length === 1 ? 'Chapter' : 'Chapters'}
                   </span>
@@ -1284,7 +1286,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                       📖 {selectedReview.title} {selectedChapter ? `— ${selectedChapter.title}` : ''}
                     </h3>
                     <div className="mod-inspector-subtitle">
-                      {getSubmissionAuthor(selectedReview)} · {formatTimeAgo(selectedReview.timestamp)}
+                      {getSubmissionAuthor(selectedReview)} · {formatTimeAgo(selectedReview.timestamp || selectedReview.submittedAt || selectedReview.createdAt)}
                     </div>
                   </div>
                 </div>
@@ -1740,13 +1742,17 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                                                 variant={2}
                                                 label="✓ Approve"
                                                 className="btn-approve"
-                                                onClick={() => onModalApproveClick(chap)}
+                                                disabled={idx !== 0}
+                                                title={idx !== 0 ? "You must approve earlier chapters first" : ""}
+                                                onClick={() => idx === 0 && onModalApproveClick(chap)}
                                               />
                                               <ModernButton
                                                 variant={2}
                                                 label="✗ Reject"
                                                 className="btn-reject"
-                                                onClick={() => onModalRejectClick(chap)}
+                                                disabled={idx !== 0}
+                                                title={idx !== 0 ? "You must review earlier chapters first" : ""}
+                                                onClick={() => idx === 0 && onModalRejectClick(chap)}
                                               />
                                             </>
                                           )}
