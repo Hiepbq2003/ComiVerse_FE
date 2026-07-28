@@ -36,28 +36,13 @@ export const updateComicApi = async (id, data) => {
     language: data.language || 'Vietnamese'
   };
 
-  const endpoints = [
-    () => AxiosClient.put(`/comics/${cid}`, formattedData),
-    () => AxiosClient.put(`/author/comics/${cid}`, formattedData),
-    () => AxiosClient.put(`/comics/staff/${cid}`, formattedData),
-    () => AxiosClient.put(`/moderator/comics/${cid}`, formattedData),
-    () => AxiosClient.patch(`/comics/${cid}`, formattedData),
-    () => AxiosClient.patch(`/author/comics/${cid}`, formattedData),
-    () => AxiosClient.patch(`/comics/staff/${cid}`, formattedData),
-    () => AxiosClient.patch(`/moderator/comics/${cid}`, formattedData)
-  ];
-
-  let lastError = null;
-  for (const fn of endpoints) {
-    try {
-      const res = await fn();
-      if (res) return res;
-    } catch (e) {
-      // Continue to next endpoint
-      lastError = e;
-    }
+  try {
+    const res = await AxiosClient.put(`/comics/${cid}`, formattedData);
+    return res;
+  } catch (e) {
+    console.error("PUT /comics/{id} failed with error:", e.response?.data || e);
+    throw e;
   }
-  throw lastError || new Error("All endpoints failed to update comic");
 };
 
 export const deleteComicApi = (id) => {

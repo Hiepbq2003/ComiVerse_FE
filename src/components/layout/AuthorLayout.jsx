@@ -107,8 +107,8 @@ function AuthorLayout({ children }) {
     <div className="author-layout">
       {/* Sidebar */}
       <aside className="author-sidebar">
-        <div className="author-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '20px 16px' }}>
-          <Link to="/" style={{ display: 'block', textDecoration: 'none' }}>
+        <div className="author-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px' }}>
+          <Link to="/" style={{ display: 'block', textDecoration: 'none', marginLeft: '38px' }}>
             <LogoIcon size={26} />
           </Link>
         </div>

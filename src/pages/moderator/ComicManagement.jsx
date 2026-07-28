@@ -142,7 +142,11 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
         // Calculate total views from chapters list as smart fallback
         const chapterViews = Array.isArray(chapsData) ? chapsData.reduce((acc, c) => acc + (Number(c.views || c.viewCount || c.view) || 0), 0) : 0;
         
-        const fetchedChapsCount = Array.isArray(chapsData) ? chapsData.length : 0;
+        const approvedChaps = Array.isArray(chapsData) ? chapsData.filter(c => {
+          const s = (c.status || c.moderationStatus || '').toUpperCase();
+          return s === 'PUBLISHED' || s === 'APPROVED' || !s; 
+        }) : [];
+        const fetchedChapsCount = approvedChaps.length;
         const chapterCount = fetchedChapsCount > 0 ? fetchedChapsCount : (comic.chapterCount || comic.chapters || 0);
         
         return {
@@ -385,9 +389,22 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
       return
     }
     const inputGenreNames = editComicForm.genres.split(',').map(g => g.trim().toLowerCase()).filter(Boolean)
-    const matchedGenreIds = (genres || [])
-      .filter(g => inputGenreNames.includes((g.name || '').toLowerCase()))
-      .map(g => g.id)
+    const matchedGenreIds = []
+    const invalidGenres = []
+    
+    inputGenreNames.forEach(inputName => {
+      const found = (genres || []).find(g => (g.name || '').toLowerCase() === inputName)
+      if (found) {
+        matchedGenreIds.push(found.id)
+      } else {
+        invalidGenres.push(inputName)
+      }
+    })
+
+    if (invalidGenres.length > 0) {
+      toast.warn(`Invalid genres: ${invalidGenres.join(', ')}. Please click on the registered genres below.`)
+      return
+    }
 
     const updatedData = {
       title: editComicForm.title.trim(),
@@ -427,7 +444,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               <path d="M0 25 C 20 25, 40 5, 60 10 C 80 15, 90 2, 100 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value active-count">{comics.filter(c => c.publicationStatus?.toUpperCase() === 'ONGOING').length}</span>
+          <span className="stat-value active-count">{comics.filter(c => !c.publicationStatus || c.publicationStatus.toUpperCase() === 'ONGOING').length}</span>
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
