@@ -5,7 +5,7 @@ import { API_BASE_URL } from '../../config/apiConfig';
 
 const AxiosClient = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 10000,
+    timeout: 30000,
 });
 
 AxiosClient.interceptors.request.use(

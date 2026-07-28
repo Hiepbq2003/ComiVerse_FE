@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import ModeratorLayout from '../../components/layout/ModeratorLayout'
-import { getComicByIdApi, getAllComicsApi, updateComicApi } from '../../services/api/ComicApi'
+import { getComicByIdApi, getAllComicsApi, updateComicApi, getComicsPageApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi, getChapterDetailApi, deleteChapterApi } from '../../services/api/ChapterApi'
 import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
 import { getAllSubmissionsApi } from '../../services/api/SubmissionApi'
@@ -1162,26 +1162,39 @@ function ModeratorComicDetail() {
                 onClick={async () => {
                   setIsSaving(true)
                   try {
+                    const rawGenres = Array.isArray(editForm.genres) ? editForm.genres : (typeof editForm.genres === 'string' ? editForm.genres.split(',').map(g => g.trim()).filter(Boolean) : []);
+                    const mappedGenreIds = rawGenres.map(gName => {
+                      const matched = systemGenres.find(sg => (sg.name || sg.title || '').toLowerCase() === (typeof gName === 'object' ? (gName.name || gName.title || '') : gName).toLowerCase());
+                      return matched ? matched.id : null;
+                    }).filter(Boolean);
+
                     const payload = {
                       ...editForm,
-                      genres: Array.isArray(editForm.genres) ? editForm.genres : (typeof editForm.genres === 'string' ? editForm.genres.split(',').map(g => g.trim()).filter(Boolean) : [])
+                      title: (editForm.title || comic.title || '').trim(),
+                      status: (editForm.status || editForm.publicationStatus || comic.publicationStatus || comic.status || 'ONGOING').toUpperCase(),
+                      publicationStatus: (editForm.publicationStatus || editForm.status || comic.publicationStatus || comic.status || 'ONGOING').toUpperCase(),
+                      language: editForm.language || comic.language || 'Vietnamese',
+                      genreIds: mappedGenreIds
                     }
                     try {
-                      await updateComicApi(comic.id, payload)
-                    } catch (err) {
-                      console.warn('[ModeratorComicDetail] Backend API 403/Error:', err?.response?.data || err?.message)
-                    }
-                    toast.success('Comic updated successfully!')
-                    try {
-                      localStorage.setItem('comiverse_local_comic_' + (comic.id || id), JSON.stringify(payload))
-                    } catch(e) {}
-                    setComic(prev => ({ ...prev, ...payload }))
-                    setIsEditing(false)
-                  } catch (err) {
-                    toast.error('Failed to update comic.')
-                  } finally {
-                    setIsSaving(false)
-                  }
+                        let targetId = comic.id || id;
+                        await updateComicApi(targetId, payload);
+                     } catch (err) {
+                       console.warn('[ModeratorComicDetail] Backend API 403/Error:', err?.response?.data || err?.message);
+                       throw err;
+                     }
+                     toast.success('Comic updated successfully!')
+                     try {
+                       localStorage.setItem('comiverse_local_comic_' + (comic.id || id), JSON.stringify({ ...payload, genres: rawGenres }))
+                     } catch(e) {}
+                     setComic(prev => ({ ...prev, ...payload, genres: rawGenres }))
+                     setIsEditing(false)
+                   } catch (err) {
+                     const msg = err?.response?.data?.message || err?.response?.data || err?.message || 'Unknown error';
+                     toast.error(`Update failed: ${msg}`);
+                   } finally {
+                     setIsSaving(false)
+                   }
                 }}
                 disabled={isSaving}
                 style={{ padding: '10px 24px', borderRadius: '500px', fontSize: '14px', fontWeight: '700' }}

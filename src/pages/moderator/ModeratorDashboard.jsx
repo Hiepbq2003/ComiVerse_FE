@@ -18,7 +18,7 @@ import { toast } from 'react-toastify'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import ModernButton from '../../components/common/ModernButton'
 import { getAuth } from '../../utils/Auth'
-import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
+import { isLanguageInModeratorScope, getModeratorScope } from '../../utils/moderatorScope'
 
 
 const formatSubmitterName = (submittedBy) => {
@@ -155,40 +155,63 @@ function ModeratorDashboard() {
         const coverVal = getComicCover(sub);
         if (existingIdx !== -1) {
           const finalCover = getComicCover(result[existingIdx]) || coverVal;
+          const subChapsCount = Array.isArray(sub.allChapters) ? sub.allChapters.length : (Array.isArray(sub.chapters) ? sub.chapters.length : 0);
+          const currentChapsCount = result[existingIdx].chapterCount || result[existingIdx].chapters || 0;
           result[existingIdx] = {
             ...result[existingIdx],
             cover: finalCover,
             coverImage: finalCover,
             coverImageUrl: finalCover,
             publicationStatus: result[existingIdx].publicationStatus || 'ONGOING',
-            status: 'Active'
+            status: 'Active',
+            chapterCount: Math.max(currentChapsCount, subChapsCount),
+            chapters: Math.max(currentChapsCount, subChapsCount)
           };
         } else {
           const authorNameClean = formatSubmitterName(sub.submittedBy || sub.author || sub.submittedByEmail || sub.authorName || 'Unknown Author').replace(/^Author:\s*/i, '');
           const stableId = sub.comicId || (sub.id ? `comic-${sub.id}` : (sub.submissionId ? `comic-${sub.submissionId}` : `comic-${comicTitle.replace(/\s+/g, '-').toLowerCase()}`));
-          result.unshift({
-            id: stableId,
-            title: comicTitle,
-            authorName: authorNameClean,
-            author: sub.submittedBy || sub.author || sub.submittedByEmail || sub.authorName || 'Unknown Author',
-            genres: Array.isArray(sub.genres) ? sub.genres : (typeof sub.genres === 'string' ? sub.genres.split(',').map(g => g.trim()) : []),
-            cover: coverVal,
-            coverImage: coverVal,
-            coverImageUrl: coverVal,
-            publicationStatus: 'ONGOING',
-            status: 'Active',
-            language: sub.language || sub.rawLanguage || sub.originalLanguage || sub.targetLanguage || '',
-            description: sub.description || sub.summary || sub.synopsis || sub.comicDescription || sub.overview || '',
-            chapterCount: sub.chapterNumber || sub.number || 1,
-            chapters: sub.chapterNumber || sub.number || 1,
-            views: 0,
-            viewCount: 0,
-            rating: sub.rating || sub.ratingAverage || 0.0,
-            ratingAverage: sub.ratingAverage || sub.rating || 0.0,
-            ratingCount: sub.ratingCount || 0,
-            projectTeam: '-',
-            lastChapterUpdatedAt: sub.approvedAt || sub.timestamp || new Date().toISOString()
-          });
+
+          // Check if local override marks this comic as archived
+          let isArchived = false;
+          try {
+            const l1 = JSON.parse(localStorage.getItem('comiverse_local_comic_' + stableId) || '{}');
+            const l2 = JSON.parse(localStorage.getItem('comiverse_local_comic_' + sub.comicId) || '{}');
+            if (l1.archived || l2.archived) isArchived = true;
+          } catch (e) {}
+
+          // Dynamically check if this submission holds a real comic UUID that no longer exists in backend DB
+          const isUUID = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str.trim());
+          const hasRealBackendComics = Array.isArray(initialComics) && initialComics.length > 0;
+          const isDeletedBackendComic = hasRealBackendComics && sub.comicId && sub.comicId !== sub.id && isUUID(sub.comicId);
+
+          if (!isArchived && !isDeletedBackendComic) {
+            const subChapsCount = Array.isArray(sub.allChapters) ? sub.allChapters.length : (Array.isArray(sub.chapters) ? sub.chapters.length : 0);
+            const initialChaps = subChapsCount > 0 ? subChapsCount : (sub.chapterCount || sub.chapters || sub.chapterNumber || sub.number || 0);
+
+            result.unshift({
+              id: stableId,
+              title: comicTitle,
+              authorName: authorNameClean,
+              author: sub.submittedBy || sub.author || sub.submittedByEmail || sub.authorName || 'Unknown Author',
+              genres: Array.isArray(sub.genres) ? sub.genres : (typeof sub.genres === 'string' ? sub.genres.split(',').map(g => g.trim()) : []),
+              cover: coverVal,
+              coverImage: coverVal,
+              coverImageUrl: coverVal,
+              publicationStatus: 'ONGOING',
+              status: 'Active',
+              language: sub.language || sub.rawLanguage || sub.originalLanguage || sub.targetLanguage || '',
+              description: sub.description || sub.summary || sub.synopsis || sub.comicDescription || sub.overview || '',
+              chapterCount: initialChaps,
+              chapters: initialChaps,
+              views: 0,
+              viewCount: 0,
+              rating: sub.rating || sub.ratingAverage || 0.0,
+              ratingAverage: sub.ratingAverage || sub.rating || 0.0,
+              ratingCount: sub.ratingCount || 0,
+              projectTeam: '-',
+              lastChapterUpdatedAt: sub.approvedAt || sub.timestamp || new Date().toISOString()
+            });
+          }
         }
       }
     });
@@ -236,7 +259,7 @@ function ModeratorDashboard() {
       } else {
         const authorNameClean = formatSubmitterName(sub.submittedBy || sub.author || sub.submittedByEmail || sub.authorName || 'Unknown Author').replace(/^Author:\s*/i, '');
         const initialChapsList = approvedChapObj ? [approvedChapObj] : (Array.isArray(sub.allChapters) ? sub.allChapters : (Array.isArray(sub.chapters) ? sub.chapters : []));
-        const initialChaps = initialChapsList.length > 0 ? initialChapsList.length : (isSingleChapter ? 1 : (sub.chapterNumber || sub.number || sub.chapters || 1));
+        const initialChaps = initialChapsList.length > 0 ? initialChapsList.length : (isSingleChapter ? 1 : (sub.chapterNumber || sub.number || sub.chapters || 0));
         const newComic = {
           id: sub.comicId || `comic-${Date.now()}`,
           title: comicTitle,
@@ -321,13 +344,31 @@ function ModeratorDashboard() {
             cover: cCover,
             coverImage: cCover,
             coverImageUrl: cCover,
-            projectTeam: team ? team.title : '-'
+            projectTeam: team ? team.title : 'Unassigned',
+            teamStatus: team ? team.status : 'None',
+            chaptersCount: merged.chaptersCount || merged.chapterCount || merged.latestChapterNumber || 0
           }
         }).filter(c => isLanguageInModeratorScope(c.language || c.rawLanguage || c.originalLanguage, authUser)),
         submissions
       ).map(c => syncComicWithLocalOverride(c)).filter(c => !c.archived);
       setComics(deduplicateComics(mappedComics))
-      setProjectTeams(teamsData || [])
+      
+      let localTeams = [];
+      try {
+        const localRaw = localStorage.getItem('comiverse_local_project_teams');
+        if (localRaw) localTeams = JSON.parse(localRaw);
+      } catch(e) {}
+
+      const rawTeams = Array.isArray(teamsData) ? teamsData : (teamsData?.data || []);
+      const mergedTeamsMap = new Map();
+      [...localTeams, ...rawTeams].forEach(t => {
+        if (!t) return;
+        const key = t.id || `${t.comicName}-${t.targetLang}`;
+        if (!mergedTeamsMap.has(key)) {
+          mergedTeamsMap.set(key, t);
+        }
+      });
+      setProjectTeams(Array.from(mergedTeamsMap.values()));
       setGenres(genresData?.data || genresData || [])
     } catch (err) {
       console.error('Failed to fetch comics/teams:', err)
@@ -408,7 +449,7 @@ function ModeratorDashboard() {
     }
   }
 
-const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
+const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
   return Promise.race([
     promise,
     new Promise(resolve => setTimeout(() => resolve(fallbackValue), ms))
@@ -444,6 +485,15 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
 
         return {
           ...baseObj,
+          id: s.id || `sub-${Date.now()}-${Math.random()}`,
+          originalId: s.id,
+          comicId: baseObj.comicId || baseObj.id,
+          title: baseObj.title || baseObj.comicTitle || s.title || 'Untitled',
+          cover: baseObj.coverImageUrl || baseObj.cover || s.cover || '',
+          type: (s.submissionType || s.type || 'NEW_COMIC').toUpperCase(),
+          status: (s.status || 'PENDING').toUpperCase(),
+          author: baseObj.authorName || baseObj.author || s.submittedBy || 'Unknown',
+          submittedAt: s.submittedAt || s.createdAt || new Date().toISOString(),
           comic: {
             ...(matchComic || {}),
             ...(s.comic || {})
@@ -475,13 +525,40 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
             cover: cCover,
             coverImage: cCover,
             coverImageUrl: cCover,
-            projectTeam: team ? team.title : '-'
+            projectTeam: team ? team.title : 'Unassigned',
+            teamStatus: team ? team.status : 'None',
+            chaptersCount: merged.chaptersCount || merged.chapterCount || merged.latestChapterNumber || 0
           }
         }).filter(c => isLanguageInModeratorScope(c.language || c.rawLanguage || c.originalLanguage, authUser)),
         filteredSubmissions
       ).map(c => syncComicWithLocalOverride(c)).filter(c => !c.archived);
-      setComics(mappedComics);
-      setProjectTeams(teamsData || []);
+
+      console.log('[ModeratorDashboard] Data Hydration Summary:', {
+        rawComicsData: comicsData,
+        rawComicsCount: comicsData?.length || 0,
+        submissionsCount: submissionsData?.length || 0,
+        filteredSubmissionsCount: filteredSubmissions?.length || 0,
+        mappedComicsCount: mappedComics?.length || 0,
+        moderatorScope: getModeratorScope(authUser)
+      });
+
+      setComics(deduplicateComics(mappedComics));
+      let localTeams = [];
+      try {
+        const localRaw = localStorage.getItem('comiverse_local_project_teams');
+        if (localRaw) localTeams = JSON.parse(localRaw);
+      } catch(e) {}
+
+      const rawTeams = Array.isArray(teamsData) ? teamsData : (teamsData?.data || []);
+      const mergedTeamsMap = new Map();
+      [...localTeams, ...rawTeams].forEach(t => {
+        if (!t) return;
+        const key = t.id || `${t.comicName}-${t.targetLang}`;
+        if (!mergedTeamsMap.has(key)) {
+          mergedTeamsMap.set(key, t);
+        }
+      });
+      setProjectTeams(Array.from(mergedTeamsMap.values()));
       setGenres(genresData?.data || (Array.isArray(genresData) ? genresData : []));
 
       // Release screen loading indicator immediately after Stage 1 (~50ms)
@@ -536,9 +613,11 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
 
       const appSub = subItem || submissions.find(item => (item.id || item) === id || item.submissionId === id || item.id === cleanId);
       
+      let realDbId = null;
       if (cleanId && !cleanId.startsWith('comic-') && !cleanId.startsWith('group-')) {
         try {
-          await approveSubmissionApi(cleanId);
+          const res = await approveSubmissionApi(cleanId);
+          realDbId = res?.data?.data?.comicId || res?.data?.comicId || res?.data?.data?.id || res?.data?.id || res?.id || null;
         } catch (apiErr) {
           console.warn(`[Backend Approve API Notice] ${apiErr?.message || apiErr}`);
         }
@@ -559,7 +638,12 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
           const isMatchByTitle = (targetTitle && itemTitle === targetTitle && (!targetSubmitter || !itemSubmitter || itemSubmitter === targetSubmitter));
 
           if (isMatchById || isMatchByTitle) {
-            return { ...item, status: 'approved', approvedAt: nowIso };
+            return { 
+              ...item, 
+              status: 'approved', 
+              approvedAt: nowIso,
+              comicId: realDbId || item.comicId || `comic-${Date.now()}` // Ensure we store real DB ID for synchronization
+            };
           }
           return item;
         });
@@ -580,17 +664,25 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
 
   const handleApproveAndCreateProject = async (item) => {
     try {
-      await approveSubmissionApi(item.id)
+      let realDbId = null;
+      try {
+        const res = await approveSubmissionApi(item.id)
+        realDbId = res?.data?.data?.comicId || res?.data?.comicId || res?.data?.data?.id || res?.data?.id || res?.id || null;
+      } catch (apiErr) {
+        console.warn(`[Backend Approve API Notice] ${apiErr?.message || apiErr}`);
+      }
+
       toast.success(`Approved "${item.title}" & published to Comic Management! Opening Translation Project setup...`)
       const nowIso = new Date().toISOString();
       setSubmissions(prev => {
-        const next = prev.map(s => s.id === item.id ? { ...s, status: 'approved', approvedAt: nowIso } : s);
+        const next = prev.map(s => s.id === item.id ? { ...s, status: 'approved', approvedAt: nowIso, comicId: realDbId || s.comicId || `comic-${Date.now()}` } : s);
         try { localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(next)); } catch (e) {}
         return next;
       });
       await fetchComicsAndTeams()
       publishComicToManagement(item)
 
+      const subChapsCount = Array.isArray(item.allChapters) ? item.allChapters.length : (Array.isArray(item.chapters) ? item.chapters.length : (item.chapterNumber || item.number || item.chapterCount || 1));
       setCreateTeamForm({
         title: `${item.title} - Translation Team`,
         comicName: item.title,
@@ -599,7 +691,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
         leaderName: '',
         leaderId: '',
         cover: getComicCover(item),
-        comicId: item.comicId || item.id || ''
+        comicId: item.comicId || item.id || '',
+        chapterCount: subChapsCount,
+        chaptersCount: subChapsCount
       })
       setCreateTeamStep(1)
       setShowCreateTeamModal(true)
@@ -699,7 +793,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
         const res = await approveSubmissionApi(targetApiId);
         const realDbComic = res?.data || res;
         if (realDbComic && (realDbComic.id || realDbComic.comicId) && sub) {
-          sub.comicId = realDbComic.id || realDbComic.comicId;
+          sub.comicId = realDbComic.comicId || realDbComic.id;
         }
       }
     } catch (apiErr) {
@@ -775,6 +869,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
             id: `${sub.id || sub.submissionId || 'sub'}-approved`,
             status: 'approved',
             approvedAt: nowIso,
+            comicId: sub.comicId || `comic-${Date.now()}`,
             allChapters: [{ ...chapterObj, status: 'approved', approvedAt: nowIso }],
             chapters: [{ ...chapterObj, status: 'approved', approvedAt: nowIso }],
             chapterNumber: 1,
@@ -852,8 +947,25 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
 
   const handleSaveEditComic = async (id, updatedFields) => {
     let cleanUpdated = { ...updatedFields };
+    const isValidId = (val) => Boolean(val && String(val).trim() !== '' && String(val) !== 'null' && String(val) !== 'undefined');
+    const targetItem = comics.find(c => c.id === id);
+    const targetTitle = targetItem?.title || updatedFields?.title;
+    const targetCover = targetItem?.cover || targetItem?.coverImage || targetItem?.coverImageUrl || updatedFields?.cover || '';
+
+    let matchedDbComic = isValidId(id) ? { id } : null;
+    if (!matchedDbComic) {
+      if (targetCover) {
+        matchedDbComic = comics.find(c => isValidId(c.id) && (c.cover === targetCover || c.coverImage === targetCover || c.coverImageUrl === targetCover));
+      }
+      if (!matchedDbComic && targetTitle) {
+        matchedDbComic = comics.find(c => isValidId(c.id) && isTitleMatch(c.title, targetTitle));
+      }
+    }
+
+    const realDbId = matchedDbComic?.id || id;
+
     try {
-      const updated = await updateComicApi(id, updatedFields);
+      const updated = await updateComicApi(realDbId, updatedFields);
       if (updated) {
         cleanUpdated = updated?.data || updated;
       }
@@ -864,9 +976,12 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
     try {
       const existing = JSON.parse(localStorage.getItem('comiverse_local_comic_' + id) || '{}');
       localStorage.setItem('comiverse_local_comic_' + id, JSON.stringify({ ...existing, ...cleanUpdated }));
+      if (realDbId !== id) {
+        localStorage.setItem('comiverse_local_comic_' + realDbId, JSON.stringify({ ...existing, ...cleanUpdated }));
+      }
     } catch(e) {}
 
-    setComics(prev => prev.map(c => c.id === id ? { ...c, ...cleanUpdated, projectTeam: c.projectTeam } : c));
+    setComics(prev => prev.map(c => (c.id === id || c.id === realDbId) ? { ...c, ...cleanUpdated, projectTeam: c.projectTeam } : c));
     toast.success('Comic updated successfully.');
   }
 
@@ -880,6 +995,27 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
     try {
       const existing = JSON.parse(localStorage.getItem('comiverse_local_comic_' + id) || '{}');
       localStorage.setItem('comiverse_local_comic_' + id, JSON.stringify({ ...existing, archived: true }));
+      
+      // Also scrub from submissions override cache to completely banish it from UI
+      const overrideRaw = localStorage.getItem('comiverse_moderator_submissions_override');
+      if (overrideRaw) {
+        let overrides = JSON.parse(overrideRaw);
+        overrides = overrides.filter(sub => {
+          const stableId = sub.comicId || (sub.id ? `comic-${sub.id}` : null);
+          return stableId !== id && sub.comicId !== id && sub.id !== id;
+        });
+        localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(overrides));
+      }
+      
+      const baseRaw = localStorage.getItem('comiverse_moderator_submissions');
+      if (baseRaw) {
+        let baseSubs = JSON.parse(baseRaw);
+        baseSubs = baseSubs.filter(sub => {
+          const stableId = sub.comicId || (sub.id ? `comic-${sub.id}` : null);
+          return stableId !== id && sub.comicId !== id && sub.id !== id;
+        });
+        localStorage.setItem('comiverse_moderator_submissions', JSON.stringify(baseSubs));
+      }
     } catch(e) {}
 
     // Always remove from UI regardless of backend result
@@ -889,6 +1025,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
 
   const handleTriggerAssignTeam = (comic) => {
     setActiveNav('project-teams')
+    const chCount = comic.chapterCount || comic.chaptersCount || comic.chapters || (Array.isArray(comic.allChapters) ? comic.allChapters.length : 1);
     setCreateTeamForm({
       title: `${comic.title} Team`,
       comicName: comic.title,
@@ -898,7 +1035,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
       leaderId: '',
       priority: 'High',
       cover: getComicCover(comic),
-      comicId: comic.id || comic.comicId || ''
+      comicId: comic.id || comic.comicId || '',
+      chapterCount: chCount,
+      chaptersCount: chCount
     })
     setCreateTeamStep(1)
     setShowCreateTeamModal(true)
@@ -906,8 +1045,8 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
 
   const handleCreateProjectTeam = async () => {
     const exists = projectTeams.some(
-      t => t.comicName && t.comicName.toLowerCase() === createTeamForm.comicName.toLowerCase() &&
-           t.targetLang && t.targetLang.toLowerCase() === createTeamForm.targetLang.toLowerCase()
+      t => t.comicName && (createTeamForm.comicName || '') && t.comicName.toLowerCase() === (createTeamForm.comicName || '').toLowerCase() &&
+           t.targetLang && (createTeamForm.targetLang || '') && t.targetLang.toLowerCase() === (createTeamForm.targetLang || '').toLowerCase()
     )
     if (exists) {
       toast.error(`A translation team for "${createTeamForm.comicName}" in "${createTeamForm.targetLang}" already exists!`)
@@ -940,8 +1079,16 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
 
     const targetName = (createTeamForm.comicName || '').toLowerCase().trim();
     const matchComic = comics.find(c => (c.title && c.title.toLowerCase().trim() === targetName) || (createTeamForm.comicId && (c.id === createTeamForm.comicId || c.comicId === createTeamForm.comicId)));
-    const comicChCount = matchComic ? (matchComic.latestChapterNumber || matchComic.latest_chapter_number || matchComic.chaptersCount || matchComic.chapterCount || matchComic.totalChapters || 0) : 0;
-    const initialChapterCount = parseInt(comicChCount, 10) || 0;
+    const matchSub = submissions.find(s => (s.title && s.title.toLowerCase().trim() === targetName) || (s.comicName && s.comicName.toLowerCase().trim() === targetName));
+    
+    let calcChaps = createTeamForm.chaptersCount || createTeamForm.chapterCount || 0;
+    if (!calcChaps && matchComic) {
+      calcChaps = matchComic.chapterCount || matchComic.chaptersCount || matchComic.chapters || matchComic.latestChapterNumber || (Array.isArray(matchComic.allChapters) ? matchComic.allChapters.length : 0);
+    }
+    if (!calcChaps && matchSub) {
+      calcChaps = (Array.isArray(matchSub.allChapters) ? matchSub.allChapters.length : (Array.isArray(matchSub.chapters) ? matchSub.chapters.length : (matchSub.chapterNumber || matchSub.number || matchSub.chapterCount || 0)));
+    }
+    const initialChapterCount = Math.max(1, parseInt(calcChaps, 10) || 1);
 
     const newTeam = {
       title: createTeamForm.title.trim() || `${createTeamForm.comicName} Team`,
@@ -968,11 +1115,41 @@ const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
     }
 
     try {
-      await createProjectTeamApi(newTeam)
-      
+      let createdObj = null;
+      try {
+        const res = await createProjectTeamApi(newTeam);
+        createdObj = res?.data?.data || res?.data || res;
+      } catch (err) {
+        console.warn('Backend createProjectTeamApi warning, keeping local team:', err?.message || err);
+      }
+
+      const finalTeam = {
+        ...newTeam,
+        ...(createdObj && typeof createdObj === 'object' ? createdObj : {}),
+        id: createdObj?.id || newTeam.id || `team-${Date.now()}`
+      };
+
+      setProjectTeams(prev => {
+        const filtered = (prev || []).filter(t => t.id !== finalTeam.id);
+        return [finalTeam, ...filtered];
+      });
+
+      try {
+        const localRaw = localStorage.getItem('comiverse_local_project_teams');
+        let localArr = localRaw ? JSON.parse(localRaw) : [];
+        localArr = [finalTeam, ...localArr.filter(t => t.id !== finalTeam.id)];
+        localStorage.setItem('comiverse_local_project_teams', JSON.stringify(localArr));
+      } catch (e) {}
+
+      setComics(prev => (prev || []).map(c => {
+        if (c.title && finalTeam.comicName && c.title.toLowerCase().trim() === finalTeam.comicName.toLowerCase().trim()) {
+          return { ...c, projectTeam: finalTeam.title };
+        }
+        return c;
+      }));
+
       toast.success('Project team created successfully!')
       setShowCreateTeamModal(false)
-      fetchComicsAndTeams()
     } catch (err) {
       console.error(err)
       toast.error('Failed to create translation project team.')
