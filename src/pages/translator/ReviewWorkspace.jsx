@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { toast } from "react-toastify";
+import useWorkspaceSecurity from "../../hooks/useWorkspaceSecurity";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -883,6 +884,11 @@ function usePageComments(pageId) {
 }
 
 export default function ReviewWorkspace() {
+  useWorkspaceSecurity({
+    targetElementId: "secure-workspace",
+    onDevToolsOpen: () => toast.warning("Vui lòng không mở DevTools trên trang này."),
+  });
+
   const { taskId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -1165,7 +1171,7 @@ export default function ReviewWorkspace() {
         onRequestChanges={() => handleDecision("changes_requested")}
       />
 
-      <div className="rvw-body">
+      <div className="rvw-body" id="secure-workspace">
         <BubbleOverlayPanel
           scrollRef={(el) => {
             originalRef.current = el;
