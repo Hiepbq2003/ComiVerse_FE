@@ -49,7 +49,7 @@ function AdminSystemSettings() {
 
   const formatVnd = (value) => {
     const number = Number(value || 0)
-    return number.toLocaleString('vi-VN') + 'd'
+    return number.toLocaleString('vi-VN') + ' ₫'
   }
 
   const handlePriceChange = (field, value) => {
@@ -64,8 +64,8 @@ function AdminSystemSettings() {
       toast.warning('This benefit already exists.')
       return
     }
-    if (settings.benefits.length >= 12) {
-      toast.warning('You can add up to 12 benefits only.')
+    if (settings.benefits.length >= 15) {
+      toast.warning('You can add up to 15 benefits only.')
       return
     }
     setSettings((prev) => ({ ...prev, benefits: [...prev.benefits, benefit] }))
@@ -88,8 +88,8 @@ function AdminSystemSettings() {
     const yearlyPrice = Number(settings.yearlyPrice)
     const benefits = settings.benefits.map((item) => item.trim()).filter(Boolean)
 
-    if (Number.isNaN(monthlyPrice) || monthlyPrice < 0 || Number.isNaN(yearlyPrice) || yearlyPrice < 0) {
-      toast.error('Premium prices must be valid non-negative numbers.')
+    if (Number.isNaN(monthlyPrice) || monthlyPrice <= 0 || Number.isNaN(yearlyPrice) || yearlyPrice <= 0) {
+      toast.error('Premium prices must be valid numbers greater than zero.')
       return
     }
     if (benefits.length === 0) {
@@ -210,7 +210,7 @@ function AdminSystemSettings() {
                     }
                   }}
                   placeholder="Add a premium benefit..."
-                  maxLength={140}
+                  maxLength={160}
                 />
                 <button type="button" className="admin-btn admin-btn--primary" onClick={handleAddBenefit}>
                   + Add

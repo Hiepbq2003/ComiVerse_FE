@@ -1,85 +1,122 @@
-import { useState, useEffect } from 'react'
-import { useLocation, Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { CheckCircle2, Clock3, XCircle } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
-import ComicCard from '../../components/common/ComicCard'
-import { getComicsPageApi } from '../../services/api/ComicApi'
+import { useAuth } from '../../context/AuthContext'
+import { getCheckoutStatusApi } from '../../services/api/SubscriptionApi'
+import '../../assets/style/reader/subscription.css'
 
-function SearchResults() {
-  const location = useLocation()
-  const [query, setQuery] = useState('')
-  const [comics, setComics] = useState([])
-  const [loading, setLoading] = useState(true)
+const FAILED_TERMINAL_STATUSES = new Set(['FAILED', 'EXPIRED', 'REFUNDED'])
+
+function SubscriptionResult({ cancelled = false }) {
+  const [searchParams] = useSearchParams()
+  const sessionId = searchParams.get('session_id')
+  const { refreshSubscription } = useAuth()
+  const [status, setStatus] = useState(cancelled ? 'CANCELLED' : 'PENDING')
+  const [details, setDetails] = useState(null)
+  const subscriptionSyncedRef = useRef(false)
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search)
-    const q = params.get('query') || ''
-    setQuery(q)
-  }, [location])
+    if (cancelled || !sessionId) return undefined
+    let active = true
+    let attempts = 0
+    let timer
 
-  useEffect(() => {
-    if (!query) {
-      setComics([])
-      setLoading(false)
-      return
+    const scheduleNextPoll = (delay = 1500) => {
+      if (!active) return
+      if (attempts >= 12) return
+      attempts += 1
+      timer = window.setTimeout(poll, delay)
     }
 
-    const fetchResults = async () => {
+    const poll = async () => {
       try {
-        setLoading(true)
-        const response = await getComicsPageApi(1, 10, query)
-        const list = response.data || response || []
-        setComics(list)
-      } catch (err) {
-        console.error(err)
-        setComics([])
-      } finally {
-        setLoading(false)
+        const data = await getCheckoutStatusApi(sessionId)
+        if (!active) return
+
+        const paymentStatus = data?.paymentStatus || 'PENDING'
+        setDetails(data)
+        setStatus(paymentStatus)
+
+        if (paymentStatus === 'PAID' && data?.premiumActive) {
+          if (!subscriptionSyncedRef.current) {
+            subscriptionSyncedRef.current = true
+            try {
+              await refreshSubscription()
+            } catch (error) {
+              console.warn('Payment succeeded but account refresh failed:', error?.message || error)
+            }
+          }
+          return
+        }
+
+        if (FAILED_TERMINAL_STATUSES.has(paymentStatus)) return
+
+        // PAID is not terminal until the local subscription row and premium cache
+        // have also been synchronized. This covers delayed Stripe webhooks safely.
+        scheduleNextPoll()
+      } catch (error) {
+        console.error(error)
+        if (attempts < 5) {
+          scheduleNextPoll(1800)
+        } else if (active) {
+          setStatus('UNKNOWN')
+        }
       }
     }
 
-    fetchResults()
-  }, [query])
+    poll()
+    return () => {
+      active = false
+      if (timer) window.clearTimeout(timer)
+    }
+  }, [cancelled, sessionId, refreshSubscription])
+
+  const isActivated = status === 'PAID' && Boolean(details?.premiumActive)
+  const isActivationPending = status === 'PAID' && !details?.premiumActive
+  const isFailed = ['FAILED', 'EXPIRED', 'REFUNDED', 'UNKNOWN'].includes(status)
+  const Icon = cancelled || isFailed ? XCircle : (isActivated ? CheckCircle2 : Clock3)
 
   return (
     <HomeLayout>
-      <div className="search-results-container">
-        <div className="search-results-header">
-          <h1 className="search-results-title">
-            Search Results for: <span className="search-results-query">"{query}"</span>
+      <section className="subscription-result-page">
+        <div className={`subscription-result-card ${isActivated ? 'success' : ''} ${(cancelled || isFailed) ? 'cancelled' : ''}`}>
+          <span className="subscription-result-icon"><Icon size={54} /></span>
+          <h1>
+            {cancelled
+              ? 'Checkout cancelled'
+              : isActivated
+                ? 'Premium activated'
+                : isActivationPending
+                  ? 'Payment received'
+                  : isFailed
+                    ? 'Payment was not completed'
+                    : 'Confirming your payment'}
           </h1>
-          {!loading && (
-            <p className="search-results-count">
-              Found {comics.length} {comics.length === 1 ? 'comic' : 'comics'}
-            </p>
+          <p>
+            {cancelled
+              ? 'No charge was made. You can return to the plans and choose again.'
+              : isActivated
+                ? `${details?.planName || 'Your subscription'} is now active.`
+                : isActivationPending
+                  ? 'Stripe confirmed the payment. ComiVerse is synchronizing your subscription and premium access.'
+                  : isFailed
+                    ? 'The transaction could not be confirmed. Review the payment status or try a new checkout.'
+                    : 'Stripe redirected you successfully. ComiVerse is verifying the signed payment event.'}
+          </p>
+          {details?.premiumExpiresAt && isActivated && (
+            <div className="subscription-result-meta">
+              Current period ends: {new Date(details.premiumExpiresAt).toLocaleString()}
+            </div>
           )}
+          <div className="subscription-result-actions">
+            <Link to="/" className="subscription-result-primary">Back to Home</Link>
+            {!isActivated && <Link to="/profile" className="subscription-result-secondary">View Account</Link>}
+          </div>
         </div>
-
-        {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '100px 0' }}>
-            <div className="search-spinner" style={{ width: '40px', height: '40px', borderWidth: '3px' }}></div>
-            <span style={{ marginLeft: '12px', color: '#94a3b8', fontSize: '16px' }}>Searching for comics...</span>
-          </div>
-        ) : comics.length === 0 ? (
-          <div className="search-empty-state">
-            <div className="search-empty-icon">🔍</div>
-            <h2 className="search-empty-title">No results found</h2>
-            <p className="search-empty-desc">
-              We couldn't find any comics matching "{query}". Try checking your spelling or search for something else.
-            </p>
-            <Link to="/" className="btn-search-back-home">
-              Back to Home
-            </Link>
-          </div>
-        ) : (
-          <div className="search-results-grid">
-            {comics.map((comic) => (
-              <ComicCard key={comic.id || comic._id} comic={comic} />
-            ))}
-          </div>
-        )}
-      </div>
+      </section>
     </HomeLayout>
   )
 }
 
-export default SearchResults
+export default SubscriptionResult

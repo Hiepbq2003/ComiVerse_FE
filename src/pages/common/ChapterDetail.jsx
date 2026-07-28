@@ -9,7 +9,7 @@ import ComicPageCanvas from '../../components/common/ComicPageCanvas'
 import '../../assets/style/reader/chapter-detail.css'
 import '../../assets/style/reader/comments.css'
 import { isValidUuid } from '../../utils/uuid'
-import { getAuth } from '../../utils/Auth'
+import { useAuth } from '../../context/AuthContext'
 import CommentSection from '../../components/common/CommentSection'
 import SubscriptionPlanModal from '../../components/common/SubscriptionPlanModal'
 
@@ -58,8 +58,7 @@ function ChapterDetail() {
   const [selectedLanguage, setSelectedLanguage] = useState(searchParams.get('lang') || '')
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
 
-  // User state
-  const [user, setUser] = useState(null)
+  const { user, refreshSubscription } = useAuth()
 
   const dropdownRef = useRef(null)
 
@@ -85,14 +84,6 @@ function ChapterDetail() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
   }, [chapterId])
-
-  // Get current user on mount
-  useEffect(() => {
-    const auth = getAuth()
-    if (auth && auth.user) {
-      setUser(auth.user)
-    }
-  }, [])
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -185,20 +176,33 @@ function ChapterDetail() {
     return `/comic/${comicId}/chapter/${targetChapterId}${langQuery}`
   }
 
+  const rawUserRole = typeof user?.role === 'string'
+    ? user.role
+    : (user?.role?.roleName || user?.roleName || '')
   const hasInternalChapterAccess = ['ADMIN', 'MODERATOR', 'AUTHOR', 'TRANSLATOR', 'PROJECT_LEADER']
-    .includes((user?.role || '').toUpperCase())
+    .includes(String(rawUserRole).trim().toUpperCase())
 
-  const openChapter = (chapter) => {
+  const openChapter = async (chapter) => {
     if (!chapter) return
 
-    if (chapter.isPremium && !user?.premiumActive && !hasInternalChapterAccess) {
+    if (chapter.isPremium && !hasInternalChapterAccess) {
       if (!user) {
         toast.info('Please sign in and upgrade to Premium to read this chapter.')
         navigate('/auth?mode=signin')
-      } else {
-        setShowSubscriptionModal(true)
+        return
       }
-      return
+
+      try {
+        const latestSubscription = await refreshSubscription()
+        if (!latestSubscription?.premiumActive) {
+          setShowSubscriptionModal(true)
+          return
+        }
+      } catch (error) {
+        console.error('Unable to verify Premium access:', error)
+        toast.error('Unable to verify your Premium subscription. Please try again.')
+        return
+      }
     }
 
     navigate(buildChapterUrl(chapter.id))
@@ -277,10 +281,11 @@ function ChapterDetail() {
   }
 
   const pages = currentChapter.images || []
+  // The backend decides access by returning chapter images only to authorized users.
+  // Do not trust a possibly stale local premium flag when rendering the lock state.
   const isPremiumLocked = Boolean(
     currentChapter.isPremium
       && pages.length === 0
-      && !user?.premiumActive
       && !hasInternalChapterAccess
   )
 
@@ -292,13 +297,6 @@ function ChapterDetail() {
   const selectedBubblesByPageNumber = activeTranslation
     ? parseTranslationBubblesByPage(activeTranslation.pagesBubbles)
     : {}
-  console.log("[DEBUG translations]", {
-    selectedLanguage,
-    translations,
-    availableLanguagesForChapter,
-    activeTranslation,
-    selectedBubblesByPageNumber,
-  })
   const currentChapterNumberStr = currentChapter.chapterNumber || '?'
   const currentChapterTitleStr = currentChapter.title || `Chapter ${currentChapterNumberStr}`
   const comicTitleStr = comic?.title || 'Comic Series'

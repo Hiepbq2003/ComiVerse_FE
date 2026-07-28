@@ -61,41 +61,66 @@ function SubscriptionManagement() {
   const [page, setPage] = useState(0)
   const [pagination, setPagination] = useState({ totalElements: 0, totalPages: 0, size: 20 })
 
-  const loadPlans = useCallback(async () => {
-    try {
-      setPlansLoading(true)
-      const data = await getAdminSubscriptionPlansApi()
-      setPlans(Array.isArray(data) ? data : [])
-    } catch (error) {
-      console.error(error)
-      toast.error('Unable to load subscription plans.')
-    } finally {
-      setPlansLoading(false)
-    }
-  }, [])
+const loadPlans = useCallback(async () => {
+  try {
+    setPlansLoading(true)
+
+    const data = await getAdminSubscriptionPlansApi()
+    setPlans(Array.isArray(data) ? data : [])
+  } catch (error) {
+    const message =
+      error.response?.data?.message ||
+      error.message ||
+      'Unable to load subscription plans.'
+
+    console.error('Load subscription plans failed:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      url: error.config?.url
+    })
+
+    toast.error(message)
+  } finally {
+    setPlansLoading(false)
+  }
+}, [])
 
   const loadLogs = useCallback(async () => {
-    try {
-      setLogsLoading(true)
-      const data = await getAdminPaymentLogsApi({
-        status: logStatus || undefined,
-        query: appliedQuery || undefined,
-        page,
-        size: 20
-      })
-      setLogs(Array.isArray(data?.content) ? data.content : [])
-      setPagination({
-        totalElements: Number(data?.totalElements || 0),
-        totalPages: Number(data?.totalPages || 0),
-        size: Number(data?.size || 20)
-      })
-    } catch (error) {
-      console.error(error)
-      toast.error('Unable to load Stripe payment logs.')
-    } finally {
-      setLogsLoading(false)
-    }
-  }, [appliedQuery, logStatus, page])
+  try {
+    setLogsLoading(true)
+
+    const data = await getAdminPaymentLogsApi({
+      status: logStatus || undefined,
+      query: appliedQuery || undefined,
+      page,
+      size: 20
+    })
+
+    setLogs(Array.isArray(data?.content) ? data.content : [])
+
+    setPagination({
+      totalElements: Number(data?.totalElements || 0),
+      totalPages: Number(data?.totalPages || 0),
+      size: Number(data?.size || 20)
+    })
+  } catch (error) {
+    const message =
+      error.response?.data?.message ||
+      error.message ||
+      'Unable to load Stripe payment logs.'
+
+    console.error('Load Stripe payment logs failed:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      url: error.config?.url,
+      params: error.config?.params
+    })
+
+    toast.error(message)
+  } finally {
+    setLogsLoading(false)
+  }
+}, [appliedQuery, logStatus, page])
 
   useEffect(() => { loadPlans() }, [loadPlans])
   useEffect(() => {

@@ -6,7 +6,6 @@ import { useAuth } from '../../context/AuthContext'
 import {
   createBillingPortalApi,
   createCheckoutSessionApi,
-  getMySubscriptionApi,
   getSubscriptionPlansApi
 } from '../../services/api/SubscriptionApi'
 import '../../assets/style/reader/subscription.css'
@@ -41,7 +40,9 @@ function intervalLabel(plan) {
 
 function SubscriptionPlanModal({ open, onClose }) {
   const navigate = useNavigate()
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, user, refreshSubscription } = useAuth()
+  const rawRole = typeof user?.role === 'string' ? user.role : (user?.role?.roleName || user?.roleName || '')
+  const isReader = String(rawRole).trim().toUpperCase() === 'READER'
   const [plans, setPlans] = useState([])
   const [subscription, setSubscription] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -50,6 +51,11 @@ function SubscriptionPlanModal({ open, onClose }) {
 
   const currentPlanId = subscription?.premiumActive ? subscription.planId : null
   const hasActiveSubscription = Boolean(subscription?.premiumActive)
+  const existingStatus = String(subscription?.status || '').toUpperCase()
+  const requiresBillingManagement = Boolean(
+    subscription?.id
+      && ['ACTIVE', 'TRIALING', 'PAST_DUE', 'UNPAID', 'PAUSED', 'INCOMPLETE'].includes(existingStatus)
+  )
   const canManageSubscription = Boolean(subscription?.id)
 
   useEffect(() => {
@@ -61,7 +67,7 @@ function SubscriptionPlanModal({ open, onClose }) {
       try {
         const [plansResult, subscriptionResult] = await Promise.allSettled([
           getSubscriptionPlansApi(),
-          isLoggedIn ? getMySubscriptionApi() : Promise.resolve(null)
+          isLoggedIn && isReader ? refreshSubscription() : Promise.resolve(null)
         ])
         if (!mounted) return
         setPlans(plansResult.status === 'fulfilled' && Array.isArray(plansResult.value) ? plansResult.value : [])
@@ -85,7 +91,7 @@ function SubscriptionPlanModal({ open, onClose }) {
       document.removeEventListener('keydown', handleEscape)
       document.body.classList.remove('subscription-modal-open')
     }
-  }, [open, isLoggedIn, onClose])
+  }, [open, isLoggedIn, isReader, onClose, refreshSubscription])
 
   const sortedPlans = useMemo(
     () => [...plans].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)),
@@ -96,6 +102,10 @@ function SubscriptionPlanModal({ open, onClose }) {
     if (!isLoggedIn) {
       onClose()
       navigate('/auth?mode=signin')
+      return
+    }
+    if (!isReader) {
+      toast.info('Reader Premium subscriptions are available to READER accounts only.')
       return
     }
     try {
@@ -223,10 +233,14 @@ function SubscriptionPlanModal({ open, onClose }) {
                         type="button"
                         className="subscription-plan-button"
                         onClick={() => handleCheckout(plan)}
-                        disabled={Boolean(processingPlanId) || hasActiveSubscription}
-                        title={hasActiveSubscription ? 'Manage your current subscription before choosing another plan.' : ''}
+                        disabled={Boolean(processingPlanId) || requiresBillingManagement}
+                        title={requiresBillingManagement ? 'Manage your existing Stripe subscription before choosing another plan.' : ''}
                       >
-                        {isProcessing ? 'Opening Stripe...' : `Choose ${plan.name}`}
+                        {isProcessing
+                          ? 'Opening Stripe...'
+                          : requiresBillingManagement
+                            ? 'Manage Billing First'
+                            : `Choose ${plan.name}`}
                       </button>
                     )}
                   </article>

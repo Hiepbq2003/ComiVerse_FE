@@ -27,10 +27,13 @@ export const resolveImageUrl = (url) => {
 
 // Compute Native WebSocket URL (ws:// or wss://)
 export const getWebSocketUrl = () => {
-  if (API_BASE_URL.startsWith('http://') || API_BASE_URL.startsWith('https://')) {
-    const serverOrigin = API_BASE_URL.replace(/\/api\/?$/, '');
-    return serverOrigin.replace(/^http/, 'ws') + '/ws';
+  if (
+    API_BASE_URL.startsWith('http://') ||
+    API_BASE_URL.startsWith('https://')
+  ) {
+    return API_BASE_URL.replace(/^http/, 'ws').replace(/\/$/, '') + '/ws'
   }
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${window.location.host}/ws`;
-};
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${window.location.host}/api/ws`
+}
