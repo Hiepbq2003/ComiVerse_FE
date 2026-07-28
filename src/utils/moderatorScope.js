@@ -41,7 +41,7 @@ export function isLanguageInModeratorScope(langStr, user) {
     return true;
   }
   if (!langStr) return false;
-  
+
   const n = String(langStr).toLowerCase().trim();
   if (!n || n === 'unknown' || n === 'original raw' || n === 'original author') return false;
 
@@ -49,7 +49,7 @@ export function isLanguageInModeratorScope(langStr, user) {
     if (!s) return false;
     if (n === s) return true;
     if (n.includes(s) || s.includes(n)) return true;
-    
+
     // Standard language code and name equivalencies
     if ((s === 'japanese' || s === 'japan') && (n === 'ja' || n === 'jp' || n.includes('japan'))) return true;
     if ((s === 'korean' || s === 'korea') && (n === 'ko' || n === 'kr' || n.includes('korea'))) return true;

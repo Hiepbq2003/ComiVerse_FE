@@ -2,7 +2,7 @@ import AxiosClient from './AxiosClient';
 
 export const getAllSubmissionsApi = async (config = {}) => {
   try {
-    return await AxiosClient.get('/submissions/all', { timeout: 2500, ...config });
+    return await AxiosClient.get('/submissions/all', { timeout: 10000, ...config });
   } catch (err) {
     return [];
   }
