@@ -353,6 +353,8 @@
     0 8px 32px rgba(0, 0, 0, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
   transition: all 0.3s ease;
+  position: relative;
+  z-index: 1;
 }
 
 .mod-chart-card:hover {
@@ -360,6 +362,7 @@
   box-shadow:
     0 12px 40px rgba(0, 0, 0, 0.4),
     0 0 40px rgba(168, 85, 247, 0.06);
+  z-index: 10;
 }
 
 .mod-chart-header {
