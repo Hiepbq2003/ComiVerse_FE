@@ -364,6 +364,10 @@
   font-family: var(--sans, system-ui, sans-serif);
 }
 
+.mod-modal-overlay.mod-inspector-high-priority {
+  z-index: 999999 !important;
+}
+
 .mod-inspector-overlay h1,
 .mod-inspector-overlay h2,
 .mod-inspector-overlay h3,
