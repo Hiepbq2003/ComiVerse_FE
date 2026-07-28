@@ -603,8 +603,28 @@ function Profile({ user: userProp }) {
   const displayUserName = `${firstName} ${lastName}`.trim() || user.fullName || 'Minh Khoa'
   const userInitials = displayUserName.substring(0, 2).toUpperCase()
 
-  const LayoutComponent = HomeLayout
+  let LayoutComponent = HomeLayout
   const layoutProps = {}
+
+  switch (roleUpper) {
+    case 'ADMIN':
+      LayoutComponent = AdminLayout
+      break
+    case 'AUTHOR':
+      LayoutComponent = AuthorLayout
+      break
+    case 'MODERATOR':
+    case 'STAFF':
+      LayoutComponent = ModeratorLayout
+      break
+    case 'TRANSLATOR':
+    case 'PROJECT_LEADER':
+      LayoutComponent = TranslatorLayout
+      break
+    default:
+      LayoutComponent = HomeLayout
+      break
+  }
 
   return (
     <LayoutComponent {...layoutProps}>

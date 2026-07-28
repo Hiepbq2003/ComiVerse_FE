@@ -3,6 +3,7 @@ import { toast } from 'react-toastify'
 import { loginApi, getMeApi } from '../../services/api/AuthApi'
 import { useAuth } from '../../context/AuthContext'
 import { setAuth, clearAuth } from '../../utils/Auth'
+import { getBackendHost } from '../../config/apiConfig'
 
 function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, loading, setLoading }) {
   const { login } = useAuth()
@@ -122,7 +123,7 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
       setFailedAttempts(0);
       setLockoutTimer(0);
 
-      login(data.token, userData)
+      login(data.token, userData, data.refreshToken)
       onLoginSuccess(userData)
       toast.success('Welcome back to ComiVerse!')
       if (typeof showAlert === 'function') {
@@ -202,7 +203,7 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
 
 
   const handleGoogleLogin = () => {
-    window.location.href = '/api/oauth2/authorization/google';
+    window.location.href = `${getBackendHost()}/api/oauth2/authorization/google`;
   }
 
   return (

@@ -1,9 +1,10 @@
 import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { AIPopover } from '../common/AIPopover'
+import LogoIcon from '../common/LogoIcon'
 import '../../assets/style/moderator/moderator.css'
 import { getModeratorScope } from '../../utils/moderatorScope'
 
@@ -128,9 +129,10 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
     <div className="moderator-layout">
       {/* Sidebar */}
       <aside className="moderator-sidebar">
-        <div className="moderator-sidebar-brand">
-          <h2>Moderator Panel</h2>
-          <span>Content Management</span>
+        <div className="moderator-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '20px 16px' }}>
+          <Link to="/" style={{ display: 'block', textDecoration: 'none' }}>
+            <LogoIcon size={26} />
+          </Link>
         </div>
 
         <nav className="moderator-sidebar-nav">
@@ -178,8 +180,10 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
         {/* Topbar */}
         <header className="moderator-topbar">
           <div className="moderator-topbar-left">
-            <span>Workspace:</span>
-            <span className="workspace-label">Moderator</span>
+            <span className="workspace-prefix">Workspace</span>
+            <div className="workspace-tag" style={{ marginTop: 0, fontSize: '12px', padding: '6px 12px' }}>
+              Moderator
+            </div>
             <span 
               className="mod-lang-scope-badge"
               title="Authorized moderation languages"
