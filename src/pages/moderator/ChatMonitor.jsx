@@ -361,7 +361,7 @@ function ModeratorLiveStream({ onFlagMessage, onWarnUser, onMuteUser, onBanUser,
 }
 
 function ChatMonitor({ fetchAllData }) {
-  const [activeTab, setActiveTab] = useState('flags') // 'flags' | 'keywords' | 'live'
+  const [activeTab, setActiveTab] = useState('live') // 'flags' | 'keywords' | 'live'
   const [flagSubTab, setFlagSubTab] = useState('active') // 'active' | 'resolved'
   
   // Data states
@@ -741,10 +741,10 @@ function ChatMonitor({ fetchAllData }) {
       {/* Workspace Tabs */}
       <div className="cv-chat-tabs-header">
         <button
-          className={`cv-chat-tab-btn ${activeTab === 'flags' ? 'active' : ''}`}
-          onClick={() => setActiveTab('flags')}
+          className={`cv-chat-tab-btn ${activeTab === 'live' ? 'active' : ''}`}
+          onClick={() => setActiveTab('live')}
         >
-          🚩 Flagged Accounts & Violations ({pendingFlags.length})
+          📡 Live Stream Inspector
         </button>
         <button
           className={`cv-chat-tab-btn ${activeTab === 'keywords' ? 'active' : ''}`}
@@ -753,10 +753,10 @@ function ChatMonitor({ fetchAllData }) {
           🚫 Banned Keywords & Filter ({keywords.length})
         </button>
         <button
-          className={`cv-chat-tab-btn ${activeTab === 'live' ? 'active' : ''}`}
-          onClick={() => setActiveTab('live')}
+          className={`cv-chat-tab-btn ${activeTab === 'flags' ? 'active' : ''}`}
+          onClick={() => setActiveTab('flags')}
         >
-          📡 Live Stream Inspector
+          🚩 Flagged Accounts & Violations ({pendingFlags.length})
         </button>
       </div>
 

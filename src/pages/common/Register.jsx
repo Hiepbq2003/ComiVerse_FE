@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { registerApi } from '../../services/api/AuthApi'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
+import { getBackendHost } from '../../config/apiConfig'
 
 function Register({ onNavigate, onVerificationRequired, showAlert, loading, setLoading, onOpenModal }) {
   const [form, setForm] = useState({
@@ -79,8 +80,11 @@ function Register({ onNavigate, onVerificationRequired, showAlert, loading, setL
       await registerApi({
         username: form.username.trim(),
         fullName: fullName || 'Unspecified Name',
+        firstName: form.firstName.trim() || null,
+        lastName: form.lastName.trim() || null,
         email,
-        password: form.password
+        password: form.password,
+        dateOfBirth: form.dateOfBirth || null
       })
 
       onVerificationRequired(email)
@@ -101,7 +105,7 @@ function Register({ onNavigate, onVerificationRequired, showAlert, loading, setL
   }
 
   const handleGoogleSignup = () => {
-    window.location.href = '/api/oauth2/authorization/google'
+    window.location.href = `${getBackendHost()}/api/oauth2/authorization/google`
   }
 
   return (

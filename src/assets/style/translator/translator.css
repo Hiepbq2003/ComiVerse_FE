@@ -108,22 +108,27 @@ html.light .trans-form-input {
   border-bottom: 1.5px solid rgba(255, 255, 255, 0.14) !important;
 }
 
-.translator-sidebar-brand h2 {
-  font-size: 18px;
+.workspace-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 14px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
   font-weight: 700;
-  margin: 0;
-  background: linear-gradient(135deg, #c084fc, #ec4899);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(20, 184, 166, 0.15);
+  color: #2dd4bf;
+  border: 1px solid rgba(20, 184, 166, 0.3);
 }
 
-.translator-sidebar-brand span {
-  display: block;
+.workspace-prefix {
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.35);
-  letter-spacing: 0.5px;
-  margin-top: 4px;
+  font-weight: 700;
+  color: var(--trans-text-secondary);
 }
 
 .translator-sidebar-nav {
@@ -147,8 +152,8 @@ html.light .trans-form-input {
   text-decoration: none;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   width: 100%;
   box-sizing: border-box;
   text-align: left;
@@ -2949,13 +2954,15 @@ html.light .translator-sidebar-brand {
   border-bottom: 1px solid var(--trans-border) !important;
 }
 
-html.light .translator-sidebar-brand span {
-  color: var(--trans-text-muted) !important;
+html.light .workspace-tag {
+  background: rgba(13, 148, 136, 0.1);
+  color: #0f766e;
+  border: 1px solid rgba(13, 148, 136, 0.25);
 }
 
 html.light .translator-nav-item {
   background: rgba(15, 23, 42, 0.02) !important;
-  border: 1px solid rgba(15, 23, 42, 0.05) !important;
+  border: 1px solid rgba(15, 23, 42, 0.16) !important;
   color: var(--trans-sidebar-text) !important;
 }
 

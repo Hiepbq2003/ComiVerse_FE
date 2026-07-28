@@ -1,6 +1,7 @@
 import comicAction from '../../assets/comic_action.png'
 import comicAdventure from '../../assets/comic_adventure.png'
 import comicScifi from '../../assets/comic_scifi.png'
+import LogoIcon from '../common/LogoIcon'
 import '../../assets/style/auth/auth.css'
 
 function AuthLayout({ children, alert, isWide }) {
@@ -10,12 +11,7 @@ function AuthLayout({ children, alert, isWide }) {
       {!isWide && (
         <div className="left-branding-pane">
           <div className="brand-header">
-            <div className="brand-logo-icon">
-              <svg viewBox="0 0 24 24" width="22" height="22">
-                <path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2zm-4 8H7v-2h6v2z"/>
-              </svg>
-            </div>
-            <span className="brand-logo-text">ComiVerse</span>
+            <LogoIcon size={36} />
           </div>
 
           {/* Floating Comic Cards Showcase */}
