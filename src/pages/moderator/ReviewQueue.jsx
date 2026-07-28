@@ -2220,8 +2220,8 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
 
       {/* ── MODAL: REJECTION REMARKS (UPGRADED WITH PAGE THUMBNAILS & PINNED COMMENTS REPORT) ───────────────── */}
       {selectedReject && createPortal(
-        <div className="mod-reject-modal-overlay">
-          <div className="mod-modal-card" style={{ maxWidth: '680px', width: '90%', borderRadius: '16px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+        <div className="mod-modal-overlay" style={{ zIndex: 9999 }}>
+          <div className="mod-modal-content mod-reject-modal" style={{ maxWidth: '680px', width: '90%', borderRadius: '16px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <div className="mod-modal-header" style={{ padding: '18px 24px', borderBottom: '1px solid rgba(148,163,184,0.15)' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#ef4444' }}>

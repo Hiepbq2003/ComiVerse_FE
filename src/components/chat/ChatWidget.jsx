@@ -3,7 +3,7 @@ import { useChat } from '../../hooks/useChat';
 import ChatTabBar from './ChatTabBar';
 import MessageList from './MessageList';
 import ChatInputBar from './ChatInputBar';
-import '../../assets/style/chat.css';
+import '../../assets/style/common/chat.css';
 
 function ChatWidget({ defaultGroupId = null, isEmbedded = false }) {
     const [isOpen, setIsOpen] = useState(false);

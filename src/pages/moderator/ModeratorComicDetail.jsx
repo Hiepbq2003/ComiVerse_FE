@@ -554,7 +554,11 @@ function ModeratorComicDetail() {
       let chaptersData = chaptersRes ? (chaptersRes.data?.data || chaptersRes.data || chaptersRes || []) : [];
 
       if (Array.isArray(chaptersData) && chaptersData.length > 0) {
-        setChapters(chaptersData.map((c, idx) => ({ ...c, title: getChapterDisplayTitle(c, idx) })));
+        const approvedChaps = chaptersData.filter(c => {
+          const s = (c.status || c.moderationStatus || '').toUpperCase();
+          return s === 'PUBLISHED' || s === 'APPROVED' || !s;
+        });
+        setChapters(approvedChaps.map((c, idx) => ({ ...c, title: getChapterDisplayTitle(c, idx) })));
       }
       setProjectTeams(Array.isArray(teamsData) ? teamsData : []);
 

@@ -6,6 +6,7 @@ import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi';
 import { createTeamRequestApi, getRequestsByNameApi } from '../../services/api/TeamWorkspaceApi';
 import { uploadFileApi } from '../../services/api/UploadApi';
 import { getAuth } from '../../utils/Auth';
+import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages';
 
 function ProjectList() {
   const [projects, setProjects] = useState([]);
@@ -285,13 +286,9 @@ function ProjectList() {
             onChange={(e) => setSelectedTargetLang(e.target.value)}
           >
             <option value="ALL">All Languages</option>
-            <option value="English">English</option>
-            <option value="Vietnamese">Vietnamese</option>
-            <option value="Japanese">Japanese</option>
-            <option value="Chinese">Chinese</option>
-            <option value="Korean">Korean</option>
-            <option value="French">French</option>
-            <option value="Spanish">Spanish</option>
+            {COMIC_LANGUAGE_OPTIONS.map(lang => (
+              <option key={lang} value={lang}>{lang}</option>
+            ))}
           </select>
         </div>
 
