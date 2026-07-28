@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import '../../assets/style/moderator/dashboard.css'
 import ModeratorLayout from '../../components/layout/ModeratorLayout'
 import ReviewQueue from './ReviewQueue'
@@ -8,7 +8,7 @@ import GenreManagement from './GenreManagement'
 import ProjectTeams from './ProjectTeams'
 import ChatMonitor from './ChatMonitor'
 import ForumModeration from './ForumModeration'
-import { getAllComicsApi, updateComicApi, deleteComicApi } from '../../services/api/ComicApi'
+import { getAllComicsApi, updateComicApi, deleteComicApi, getComicLeaderboardApi } from '../../services/api/ComicApi'
 import { getAllProjectTeamsApi, createProjectTeamApi, deleteProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getAllSubmissionsApi, approveSubmissionApi, rejectSubmissionApi } from '../../services/api/SubmissionApi'
 import { getAllGenresApi } from '../../services/api/GenreApi'
@@ -72,9 +72,17 @@ const renderDescription = (description) => {
 
 function ModeratorDashboard() {
   const location = useLocation()
+  const navigate = useNavigate()
   const [activeNav, setActiveNav] = useState(() => {
     return location.state?.activeNav || 'dashboard'
   })
+
+  // Sync activeNav changes back to history state so F5 preserves the current tab
+  useEffect(() => {
+    if (location.state?.activeNav !== activeNav) {
+      navigate(location.pathname, { replace: true, state: { ...location.state, activeNav } })
+    }
+  }, [activeNav, navigate, location.pathname, location.state])
   const [hoveredPoint, setHoveredPoint] = useState(null)
   const [pinnedPoint, setPinnedPoint] = useState(null)
   const [hoveredGenre, setHoveredGenre] = useState(null)
@@ -83,6 +91,7 @@ function ModeratorDashboard() {
   // Dynamic API backed states
   const [submissions, setSubmissions] = useState([])
   const [comics, setComics] = useState([])
+  const [topComics, setTopComics] = useState([])
   const [projectTeams, setProjectTeams] = useState([])
   const [genres, setGenres] = useState([])
   const [forumThreads, setForumThreads] = useState([])
@@ -463,14 +472,16 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     }
     try {
       // Phase 1: Core Dashboard Data (Comics, Teams, Submissions, Genres) with 2s max timeout
-      const [comicsData, teamsData, submissionsData, genresData] = await Promise.all([
+      const [comicsData, teamsData, submissionsData, genresData, leaderboardData] = await Promise.all([
         withTimeout(getAllComicsApi(), []),
         withTimeout(getAllProjectTeamsApi(), []),
         withTimeout(getAllSubmissionsApi(), []),
-        withTimeout(getAllGenresApi(), [])
+        withTimeout(getAllGenresApi(), []),
+        withTimeout(getComicLeaderboardApi({ timeframe: 'month' }), [])
       ]);
 
       const authUser = getAuth()?.user;
+      setTopComics(leaderboardData?.data || leaderboardData?.content || leaderboardData || []);
       
       const enrichedRawSubmissions = (submissionsData || []).map(s => {
         const titleClean = (s.title || s.comicTitle || '').toLowerCase().trim();
@@ -1741,20 +1752,32 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                       <span className="mod-overview-link" onClick={() => setActiveNav('project-teams')}>Manage teams</span>
                     </div>
                     <div className="mod-team-cards-row">
-                      {projectTeams.slice(0, 3).map(t => (
+                      {projectTeams.slice().sort((a, b) => {
+                        const scoreA = (a.tasksToday || 0) * 100 + (a.tasksWeek || 0) * 10 + (a.tasksMonth || 0);
+                        const scoreB = (b.tasksToday || 0) * 100 + (b.tasksWeek || 0) * 10 + (b.tasksMonth || 0);
+                        return scoreB - scoreA;
+                      }).slice(0, 3).map(t => (
                         <div key={t.id} className="mod-team-dashboard-card">
                           <div className="mod-team-card-header">
                             <h4 className="mod-team-card-title" title={t.title}>{t.title}</h4>
                             <span className={`team-status-badge ${(t.status || 'Active').toLowerCase()}`}>{t.status || 'Active'}</span>
                           </div>
                           
-                          <div className="team-progress-wrapper">
-                            <div className="team-progress-label">
-                              <span>Progress</span>
-                              <span>{t.progress || 0}%</span>
+                          <div className="team-stats-wrapper" style={{ marginTop: '12px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--mod-text-muted)' }}>
+                              <span>Completed Tasks</span>
+                              <span style={{ fontSize: '10px' }}>(Day / Wk / Mo)</span>
                             </div>
-                            <div className="team-progress-bar">
-                              <div className="team-progress-fill" style={{ width: `${t.progress || 0}%` }}></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '8px 12px', borderRadius: '6px' }}>
+                              <div style={{ textAlign: 'center', flex: 1, borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                                <div style={{ fontSize: '15px', fontWeight: '700', color: '#c084fc' }}>{t.tasksToday || 0}</div>
+                              </div>
+                              <div style={{ textAlign: 'center', flex: 1, borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                                <div style={{ fontSize: '15px', fontWeight: '700', color: '#a855f7' }}>{t.tasksWeek || 0}</div>
+                              </div>
+                              <div style={{ textAlign: 'center', flex: 1 }}>
+                                <div style={{ fontSize: '15px', fontWeight: '700', color: '#8b5cf6' }}>{t.tasksMonth || 0}</div>
+                              </div>
                             </div>
                           </div>
 
@@ -1783,8 +1806,35 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                       <span className="mod-overview-link" onClick={() => setActiveNav('comic-management')}>View all</span>
                     </div>
                     <div className="mod-rank-list">
-                      {comics.slice().sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0)).slice(0, 4).map((c, idx) => {
-                        const viewFormatted = c.viewCount >= 1000000 ? `${(c.viewCount / 1000000).toFixed(1)}M` : c.viewCount >= 1000 ? `${(c.viewCount / 1000).toFixed(1)}K` : c.viewCount || 0;
+                      {(topComics.length > 0 ? topComics : comics).slice().sort((a, b) => {
+                        const getV = x => {
+                          let v = x.viewCount || x.views || x.totalViews || 0;
+                          if (typeof v === 'string') {
+                            let num = parseFloat(v.replace(/[^0-9.]/g, '')) || 0;
+                            if (v.toUpperCase().includes('M')) num *= 1000000;
+                            if (v.toUpperCase().includes('K')) num *= 1000;
+                            return num;
+                          }
+                          return v;
+                        };
+                        return getV(b) - getV(a);
+                      }).slice(0, 4).map((c, idx) => {
+                        const getV = x => {
+                          let v = x.viewCount || x.views || x.totalViews || 0;
+                          if (typeof v === 'string') {
+                            let num = parseFloat(v.replace(/[^0-9.]/g, '')) || 0;
+                            if (v.toUpperCase().includes('M')) num *= 1000000;
+                            if (v.toUpperCase().includes('K')) num *= 1000;
+                            return num;
+                          }
+                          return v;
+                        };
+                        const numViews = getV(c);
+                        const viewFormatted = numViews >= 1000000 ? `${(numViews / 1000000).toFixed(1)}M` : numViews >= 1000 ? `${(numViews / 1000).toFixed(1)}K` : numViews;
+                        
+                        const rating = parseFloat(c.ratingAverage || c.rating || c.score || 0);
+                        const chaps = c.chapterCount || c.chapters || c.chaptersCount || 0;
+
                         return (
                           <div key={c.id} className="mod-rank-item">
                             <div className="mod-rank-left">
@@ -1792,11 +1842,11 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                               <div className="mod-rank-details">
                                 <div className="mod-rank-title" style={{ maxWidth: '240px' }} title={c.title}>{c.title}</div>
                                 <div className="mod-rank-meta">
-                                  {c.chapterCount || 0} chapters · {viewFormatted} views
+                                  {chaps} chapters · {viewFormatted} views
                                 </div>
                               </div>
                             </div>
-                            <span className="mod-rank-rating">★ {c.ratingAverage ? c.ratingAverage.toFixed(1) : '0.0'}</span>
+                            <span className="mod-rank-rating">★ {rating > 0 ? rating.toFixed(1) : '0.0'}</span>
                           </div>
                         );
                       })}

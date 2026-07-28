@@ -94,18 +94,7 @@ function ModeratorLiveStream({ onFlagMessage, onWarnUser, onMuteUser, onBanUser,
           <h3>📡 Realtime Global Room Stream — Moderator View</h3>
           <p>Hover any message to reveal moderation actions. Flag, warn, mute, or ban users directly from the live stream.</p>
         </div>
-        <div className="cv-chat-metrics-bar" style={{ marginLeft: 'auto' }}>
-          <div className="cv-metric-pill highlight">
-            <span className="cv-metric-val">{visibleMessages.length}</span>
-            <span className="cv-metric-lbl">Messages</span>
-          </div>
-          <div className="cv-metric-pill">
-            <span className="cv-metric-val" style={{ color: isConnected ? '#22c55e' : '#ef4444' }}>
-              {isConnected ? '●' : '○'}
-            </span>
-            <span className="cv-metric-lbl">{isConnected ? 'Connected' : 'Offline'}</span>
-          </div>
-        </div>
+
       </div>
 
       {/* Live Message Stream */}
