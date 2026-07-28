@@ -796,15 +796,23 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     }) || submissions.find(item => item.id === targetSubId || item.submissionId === targetSubId || item.id === submissionId);
 
     const currentChapsForCheck = sub ? (Array.isArray(sub.allChapters) && sub.allChapters.length > 0 ? sub.allChapters : (Array.isArray(sub.chapters) && sub.chapters.length > 0 ? sub.chapters : [])) : [];
-    const remainingChapsForCheck = currentChapsForCheck.filter(c => !isSameChapterItem(c, chapterObj));
+    const remainingChapsForCheck = currentChapsForCheck.filter(c => {
+      if (isSameChapterItem(c, chapterObj)) return false;
+      if (c.status === 'approved' || c.status === 'rejected') return false;
+      return true;
+    });
     const isFinalChapterOfSub = currentChapsForCheck.length > 0 && remainingChapsForCheck.length === 0;
 
     try {
       if (targetApiId && !String(targetApiId).startsWith('group-') && !String(targetApiId).startsWith('chap-')) {
-        const res = await approveSubmissionApi(targetApiId);
-        const realDbComic = res?.data || res;
-        if (realDbComic && (realDbComic.id || realDbComic.comicId) && sub) {
-          sub.comicId = realDbComic.comicId || realDbComic.id;
+        // ONLY call the backend API if this is the final chapter of the submission!
+        // Otherwise, the backend will prematurely approve the ENTIRE submission (all 3 chapters)
+        if (isFinalChapterOfSub || !sub || (sub.allChapters && sub.allChapters.length <= 1)) {
+          const res = await approveSubmissionApi(targetApiId);
+          const realDbComic = res?.data || res;
+          if (realDbComic && (realDbComic.id || realDbComic.comicId) && sub) {
+            sub.comicId = realDbComic.comicId || realDbComic.id;
+          }
         }
       }
     } catch (apiErr) {

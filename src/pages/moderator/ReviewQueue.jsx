@@ -229,8 +229,11 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
       }, 0)];
     }
 
-    const withPages = list.filter(c => Array.isArray(c.pages) && c.pages.length > 0);
-    const finalChaps = withPages.length > 0 ? withPages : list;
+    let finalChaps = list;
+    if (item.status === 'pending' || !item.status) {
+      finalChaps = list.filter(c => c.status !== 'approved' && c.status !== 'rejected');
+    }
+
     return finalChaps.map(c => ({
       ...c,
       submissionId: c.submissionId || item.id || c.id,
@@ -620,9 +623,8 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
         });
       });
 
-      // Filter out 0-page items if items with pages exist
-      const chaptersWithPages = combinedChaps.filter(c => Array.isArray(c.pages) && c.pages.length > 0);
-      group.allChapters = chaptersWithPages.length > 0 ? chaptersWithPages : combinedChaps;
+      // Do not filter out chapters without pages; preserve all chapters
+      group.allChapters = combinedChaps;
 
       // Synchronize group.chapters with group.allChapters for 100% consistent badge count
       group.chapters = group.allChapters;
@@ -955,10 +957,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
           }
         }
         
-        const chapsWithPages = chaps.filter(c => Array.isArray(c.pages) && c.pages.length > 0);
-        if (chapsWithPages.length > 0) {
-          chaps = chapsWithPages;
-        }
+        // Preserve all chapters regardless of pages array length
         
         item.allChapters = chaps;
         item.chapters = chaps;
@@ -1013,11 +1012,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
       }
     }
 
-    // Filter out 0-page placeholders if real chapters with pages exist
-    const chapsWithPages = chaps.filter(c => Array.isArray(c.pages) && c.pages.length > 0);
-    if (chapsWithPages.length > 0) {
-      chaps = chapsWithPages;
-    }
+    // Preserve all chapters regardless of pages array length
 
     item.allChapters = chaps;
     item.chapters = chaps;
@@ -1327,7 +1322,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                     💬 Feedback Pins ({activeComments.length})
                   </button>
 
-                  {selectedReview.status === 'pending' && (
+                  {selectedReview.status === 'pending' && (!activeChap || activeChap.id === chaptersList[0]?.id) && (
                     <>
                       <ModernButton 
                         variant={2} 
@@ -1736,23 +1731,19 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                                             label={isSelected ? '✓ Inspecting' : '👁️ View'}
                                             onClick={() => handleSelectChapterItem(chap)}
                                           />
-                                          {selectedReview.status === 'pending' && (
+                                          {selectedReview.status === 'pending' && idx === 0 && (
                                             <>
                                               <ModernButton
                                                 variant={2}
                                                 label="✓ Approve"
                                                 className="btn-approve"
-                                                disabled={idx !== 0}
-                                                title={idx !== 0 ? "You must approve earlier chapters first" : ""}
-                                                onClick={() => idx === 0 && onModalApproveClick(chap)}
+                                                onClick={() => onModalApproveClick(chap)}
                                               />
                                               <ModernButton
                                                 variant={2}
                                                 label="✗ Reject"
                                                 className="btn-reject"
-                                                disabled={idx !== 0}
-                                                title={idx !== 0 ? "You must review earlier chapters first" : ""}
-                                                onClick={() => idx === 0 && onModalRejectClick(chap)}
+                                                onClick={() => onModalRejectClick(chap)}
                                               />
                                             </>
                                           )}
