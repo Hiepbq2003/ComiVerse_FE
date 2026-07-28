@@ -658,7 +658,11 @@ function AccountManagement() {
                     </span>
                     {normalizeRoleValue(account.role) === 'MODERATOR' && (
                       <div className="admin-lang-scope-tag" style={{ marginTop: '4px', fontSize: '11px', color: '#c084fc', fontWeight: '600' }}>
-                        🌐 {getDisplayLanguages(account).join(', ')}
+                        🌐 {(() => {
+                          const langs = getDisplayLanguages(account);
+                          const isGlobal = langs.length >= 7 || langs.some(s => ['global', 'all', 'any', '*'].includes(String(s).toLowerCase()));
+                          return isGlobal ? 'All Languages' : langs.join(', ');
+                        })()}
                       </div>
                     )}
                   </td>
@@ -848,6 +852,38 @@ function AccountManagement() {
                     🌐 Assigned Moderation Languages <span className="required">*</span>
                   </label>
                   <div className="admin-lang-checkbox-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                    {(() => {
+                      const isAllSelected = (staffForm.assignedLanguages || []).length >= MODERATOR_LANGUAGES.length;
+                      return (
+                        <button
+                          type="button"
+                          className={`admin-lang-chip ${isAllSelected ? 'active' : ''}`}
+                          onClick={() => {
+                            if (isAllSelected) {
+                              setStaffForm(prev => ({ ...prev, assignedLanguages: [] }));
+                            } else {
+                              setStaffForm(prev => ({ ...prev, assignedLanguages: [...MODERATOR_LANGUAGES] }));
+                              if (staffFormErrors.assignedLanguages) {
+                                setStaffFormErrors(prev => ({ ...prev, assignedLanguages: null }));
+                              }
+                            }
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '20px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            border: isAllSelected ? '1.5px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.15)',
+                            background: isAllSelected ? 'rgba(168, 85, 247, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                            color: isAllSelected ? '#ffffff' : '#cbd5e1',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {isAllSelected ? '✓ All / Global' : 'All / Global'}
+                        </button>
+                      );
+                    })()}
                     {MODERATOR_LANGUAGES.map((lang) => {
                       const isChecked = (staffForm.assignedLanguages || []).includes(lang)
                       return (
@@ -994,6 +1030,38 @@ function AccountManagement() {
                     🌐 Assigned Moderation Languages <span className="required">*</span>
                   </label>
                   <div className="admin-lang-checkbox-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                    {(() => {
+                      const isAllSelected = (editForm.assignedLanguages || []).length >= MODERATOR_LANGUAGES.length;
+                      return (
+                        <button
+                          type="button"
+                          className={`admin-lang-chip ${isAllSelected ? 'active' : ''}`}
+                          onClick={() => {
+                            if (isAllSelected) {
+                              setEditForm(prev => ({ ...prev, assignedLanguages: [] }));
+                            } else {
+                              setEditForm(prev => ({ ...prev, assignedLanguages: [...MODERATOR_LANGUAGES] }));
+                              if (editFormErrors.assignedLanguages) {
+                                setEditFormErrors(prev => ({ ...prev, assignedLanguages: null }));
+                              }
+                            }
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '20px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            border: isAllSelected ? '1.5px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.15)',
+                            background: isAllSelected ? 'rgba(168, 85, 247, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                            color: isAllSelected ? '#ffffff' : '#cbd5e1',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {isAllSelected ? '✓ All / Global' : 'All / Global'}
+                        </button>
+                      );
+                    })()}
                     {MODERATOR_LANGUAGES.map((lang) => {
                       const isChecked = (editForm.assignedLanguages || []).includes(lang)
                       return (

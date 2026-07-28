@@ -805,14 +805,10 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
     try {
       if (targetApiId && !String(targetApiId).startsWith('group-') && !String(targetApiId).startsWith('chap-')) {
-        // ONLY call the backend API if this is the final chapter of the submission!
-        // Otherwise, the backend will prematurely approve the ENTIRE submission (all 3 chapters)
-        if (isFinalChapterOfSub || !sub || (sub.allChapters && sub.allChapters.length <= 1)) {
-          const res = await approveSubmissionApi(targetApiId);
-          const realDbComic = res?.data || res;
-          if (realDbComic && (realDbComic.id || realDbComic.comicId) && sub) {
-            sub.comicId = realDbComic.comicId || realDbComic.id;
-          }
+        const res = await approveSubmissionApi(targetApiId);
+        const realDbComic = res?.data || res;
+        if (realDbComic && (realDbComic.id || realDbComic.comicId) && sub) {
+          sub.comicId = realDbComic.comicId || realDbComic.id;
         }
       }
     } catch (apiErr) {

@@ -120,8 +120,8 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
     <div className="admin-layout">
       {/* Sidebar */}
       <aside className="admin-sidebar">
-        <div className="admin-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '20px 16px' }}>
-          <Link to="/" style={{ display: 'block', textDecoration: 'none' }}>
+        <div className="admin-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px' }}>
+          <Link to="/" style={{ display: 'block', textDecoration: 'none', marginLeft: '38px' }}>
             <LogoIcon size={26} />
           </Link>
         </div>
