@@ -540,20 +540,25 @@ function ModeratorComicDetail() {
       };
 
       // Launch ALL API calls (Stage 1 & Stage 2) concurrently to eliminate waterfall delays
-      const [comicRes, chaptersRes, teamsData, allComicsData, submissionsData, genresData] = await Promise.all([
+      const [comicRes, chaptersRes, teamsData, genresData] = await Promise.all([
         getComicByIdApi(id).catch(() => null),
         getChaptersByComicIdApi(id, {}, true).catch(() => []),
         getCachedOrFetch('teams', getAllProjectTeamsApi),
-        getCachedOrFetch('allComics', () => withTimeout(getAllComicsApi({ timeout: 2000 }))),
-        getCachedOrFetch('submissions', () => withTimeout(getAllSubmissionsApi({ timeout: 2000 }))),
         getCachedOrFetch('genres', () => withTimeout(getAllGenresApi({ timeout: 2000 })))
       ]);
+      
+      const allComicsData = [];
+      const submissionsData = [];
 
       let comicData = comicRes ? (comicRes.data?.data || comicRes.data || comicRes) : null;
       let chaptersData = chaptersRes ? (chaptersRes.data?.data || chaptersRes.data || chaptersRes || []) : [];
 
       if (Array.isArray(chaptersData) && chaptersData.length > 0) {
-        setChapters(chaptersData.map((c, idx) => ({ ...c, title: getChapterDisplayTitle(c, idx) })));
+        const approvedChaps = chaptersData.filter(c => {
+          const s = (c.status || c.moderationStatus || '').toUpperCase();
+          return s === 'PUBLISHED' || s === 'APPROVED' || !s;
+        });
+        setChapters(approvedChaps.map((c, idx) => ({ ...c, title: getChapterDisplayTitle(c, idx) })));
       }
       setProjectTeams(Array.isArray(teamsData) ? teamsData : []);
 

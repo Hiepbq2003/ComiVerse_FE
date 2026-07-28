@@ -121,8 +121,8 @@ function TranslatorLayout({ children }) {
     <div className="translator-layout">
       {/* Sidebar */}
       <aside className="translator-sidebar">
-        <div className="translator-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '20px 16px' }}>
-          <Link to="/" style={{ display: 'block', textDecoration: 'none' }}>
+        <div className="translator-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px' }}>
+          <Link to="/" style={{ display: 'block', textDecoration: 'none', marginLeft: '38px' }}>
             <LogoIcon size={26} />
           </Link>
         </div>

@@ -749,7 +749,8 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
 
   const onConfirmRejectClick = () => {
     if (!selectedReject) return
-    const comments = docCommentsMap[selectedReject.id] || selectedReject.notes || [];
+    const comicId = selectedReject.parentReviewId || selectedReject.id;
+    const comments = docCommentsMap[comicId] || selectedReject.notes || [];
     const userOverallNote = rejectionReason.trim();
     let finalPayload = '';
 
@@ -1231,14 +1232,14 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                     <>
                       <ModernButton 
                         variant={2} 
-                        label="✓ Approve" 
+                        label="✓ Approve All" 
                         className="btn-approve"
                         onClick={() => onApproveClick(item)} 
                       />
 
                       <ModernButton 
                         variant={2} 
-                        label="✗ Reject" 
+                        label="✗ Reject All" 
                         className="btn-reject"
                         onClick={() => onOpenReject(item)} 
                       />
@@ -2220,8 +2221,8 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
 
       {/* ── MODAL: REJECTION REMARKS (UPGRADED WITH PAGE THUMBNAILS & PINNED COMMENTS REPORT) ───────────────── */}
       {selectedReject && createPortal(
-        <div className="mod-reject-modal-overlay">
-          <div className="mod-modal-card" style={{ maxWidth: '680px', width: '90%', borderRadius: '16px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+        <div className="mod-modal-overlay mod-inspector-high-priority" style={{ zIndex: 999999 }}>
+          <div className="mod-modal-card mod-reject-modal" style={{ maxWidth: '680px', width: '90%', borderRadius: '16px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <div className="mod-modal-header" style={{ padding: '18px 24px', borderBottom: '1px solid rgba(148,163,184,0.15)' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#ef4444' }}>
@@ -2241,7 +2242,8 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
 
               {/* Detailed Pinned Comments Preview Report with Page Thumbnails */}
               {(() => {
-                const comments = docCommentsMap[selectedReject.id] || selectedReject.notes || [];
+                const comicId = selectedReject.parentReviewId || selectedReject.id;
+                const comments = docCommentsMap[comicId] || selectedReject.notes || [];
                 const chaptersList = getSubmissionChapters(selectedReject);
                 const firstChap = selectedChapter || chaptersList[0] || null;
                 const pages = (firstChap && Array.isArray(firstChap.pages)) ? firstChap.pages : [];
@@ -2342,7 +2344,8 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                 onClick={() => setSelectedReject(null)} 
               />
               {(() => {
-                const comments = selectedReject ? (docCommentsMap[selectedReject.id] || selectedReject.notes || []) : [];
+                const comicId = selectedReject ? (selectedReject.parentReviewId || selectedReject.id) : null;
+                const comments = selectedReject ? (docCommentsMap[comicId] || selectedReject.notes || []) : [];
                 const isFormDisabled = !rejectionReason.trim() && comments.length === 0;
                 return (
                   <ModernButton 

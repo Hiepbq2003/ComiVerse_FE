@@ -27,11 +27,14 @@ import {
   ZoomOut,
   Loader2,
   AlertCircle,
+  RefreshCw,
+  Sparkles,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getAuth } from "../../utils/Auth";
 import { toast } from "react-toastify";
+import useWorkspaceSecurity from "../../hooks/useWorkspaceSecurity";
 import "../../assets/style/translator/translate-workspace.css";
 import { API_BASE_URL as API_BASE, resolveImageUrl } from "../../config/apiConfig";
 
@@ -968,13 +971,630 @@ function TranslateTabPanel({
   );
 }
 
-function GlossaryTabPanel() {
+
+async function fetchGlossaryTerms(comicId, signal) {
+  const res = await fetch(`${API_BASE}/glossary/comic/${comicId}`, {
+    headers: authHeaders(),
+    signal,
+  });
+  if (!res.ok) throw new Error(`Failed to load glossary (${res.status})`);
+  const json = await res.json();
+  return json?.data !== undefined ? json.data : json;
+}
+
+async function createGlossaryTermApi(comicId, term, signal) {
+  const res = await fetch(`${API_BASE}/glossary/comic/${comicId}`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(term),
+    signal,
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.message || `Failed to add term (${res.status})`);
+  return json?.data !== undefined ? json.data : json;
+}
+
+async function updateGlossaryTermApi(id, updates, signal) {
+  const res = await fetch(`${API_BASE}/glossary/${id}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(updates),
+    signal,
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.message || `Failed to update term (${res.status})`);
+  return json?.data !== undefined ? json.data : json;
+}
+
+async function deleteGlossaryTermApi(id, signal) {
+  const res = await fetch(`${API_BASE}/glossary/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+    signal,
+  });
+  if (!res.ok) {
+    const json = await res.json().catch(() => null);
+    throw new Error(json?.message || `Failed to delete term (${res.status})`);
+  }
+  return true;
+}
+
+async function fetchGlossarySuggestions(comicId, { pageId, imageUrl }, signal) {
+  const body = pageId ? { pageId } : { imageUrl };
+  const res = await fetch(`${API_BASE}/glossary/comic/${comicId}/suggest`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+    signal,
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.message || `Failed to scan page (${res.status})`);
+  const data = json?.data !== undefined ? json.data : json;
+  return {
+    extractedText: data?.extractedText || "",
+    suggestions: Array.isArray(data?.suggestions) ? data.suggestions : [],
+  };
+}
+
+const glossarySuggestionCache = new Map();
+
+function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
+  const [terms, setTerms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  const [search, setSearch] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
+  const [newSource, setNewSource] = useState("");
+  const [newTarget, setNewTarget] = useState("");
+  const [newNote, setNewNote] = useState("");
+  const [editId, setEditId] = useState(null);
+  const [deleteId, setDeleteId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const sourceInputRef = useRef(null);
+
+  const pageKey = pageId || imageUrl || null;
+  const [mode, setMode] = useState(pageKey ? "page" : "all");
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [suggestError, setSuggestError] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [extractedText, setExtractedText] = useState("");
+  const [showExtractedText, setShowExtractedText] = useState(false);
+
+  useEffect(() => {
+    if (!comicId) {
+      setTerms([]);
+      setLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    setLoading(true);
+    setLoadError(null);
+    fetchGlossaryTerms(comicId, controller.signal)
+      .then((data) => setTerms(Array.isArray(data) ? data : []))
+      .catch((err) => {
+        if (err.name !== "AbortError") setLoadError(err.message || "Failed to load glossary");
+      })
+      .finally(() => setLoading(false));
+    return () => controller.abort();
+  }, [comicId]);
+
+  const runSuggestScan = useCallback(
+    (forceRefresh = false) => {
+      if (!comicId || !pageKey) return;
+      const cacheKey = `${comicId}::${pageKey}`;
+      if (!forceRefresh && glossarySuggestionCache.has(cacheKey)) {
+        const cached = glossarySuggestionCache.get(cacheKey);
+        setSuggestions(cached.suggestions);
+        setExtractedText(cached.extractedText);
+        setSuggestError(null);
+        return () => {};
+      }
+      const controller = new AbortController();
+      setSuggestLoading(true);
+      setSuggestError(null);
+      fetchGlossarySuggestions(comicId, { pageId, imageUrl }, controller.signal)
+        .then((result) => {
+          glossarySuggestionCache.set(cacheKey, result);
+          setSuggestions(result.suggestions);
+          setExtractedText(result.extractedText);
+        })
+        .catch((err) => {
+          if (err.name !== "AbortError") setSuggestError(err.message || "Failed to scan this page");
+        })
+        .finally(() => setSuggestLoading(false));
+      return () => controller.abort();
+    },
+    [comicId, pageId, imageUrl, pageKey]
+  );
+
+  useEffect(() => {
+    if (mode !== "page") return;
+    const cleanup = runSuggestScan(false);
+    return cleanup;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, pageKey]);
+
+  useEffect(() => {
+    if (addOpen) setTimeout(() => sourceInputRef.current?.focus(), 50);
+  }, [addOpen]);
+
+  const displayedTerms = mode === "page" ? suggestions : terms;
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return displayedTerms;
+    const q = search.toLowerCase();
+    return displayedTerms.filter(
+      (t) =>
+        t.source.toLowerCase().includes(q) ||
+        t.target.toLowerCase().includes(q) ||
+        (t.note || "").toLowerCase().includes(q)
+    );
+  }, [displayedTerms, search]);
+
+  function syncTermEverywhere(updatedTerm) {
+    setTerms((prev) => prev.map((t) => (t.id === updatedTerm.id ? updatedTerm : t)));
+    setSuggestions((prev) => prev.map((t) => (t.id === updatedTerm.id ? { ...t, ...updatedTerm } : t)));
+  }
+
+  function removeTermEverywhere(id) {
+    setTerms((prev) => prev.filter((t) => t.id !== id));
+    setSuggestions((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  async function handleAdd() {
+    if (!newSource.trim() || !newTarget.trim() || saving) return;
+    setSaving(true);
+    try {
+      const created = await createGlossaryTermApi(comicId, {
+        source: newSource.trim(),
+        target: newTarget.trim(),
+        note: newNote.trim(),
+      });
+      setTerms((prev) => [created, ...prev]);
+      setNewSource("");
+      setNewTarget("");
+      setNewNote("");
+      setAddOpen(false);
+      toast.success("Glossary term added");
+    } catch (err) {
+      toast.error(err.message || "Failed to add term");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleUpdate(id) {
+    if (!newSource.trim() || !newTarget.trim() || saving) return;
+    setSaving(true);
+    try {
+      const updated = await updateGlossaryTermApi(id, {
+        source: newSource.trim(),
+        target: newTarget.trim(),
+        note: newNote.trim(),
+      });
+      syncTermEverywhere(updated);
+      setEditId(null);
+      setNewSource("");
+      setNewTarget("");
+      setNewNote("");
+      toast.success("Term updated");
+    } catch (err) {
+      toast.error(err.message || "Failed to update term");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function startEdit(term) {
+    setEditId(term.id);
+    setNewSource(term.source);
+    setNewTarget(term.target);
+    setNewNote(term.note || "");
+    setAddOpen(false);
+  }
+
+  function cancelEdit() {
+    setEditId(null);
+    setNewSource("");
+    setNewTarget("");
+    setNewNote("");
+  }
+
+  function confirmDelete(id) {
+    setDeleteId(id);
+  }
+
+  async function handleDelete() {
+    const id = deleteId;
+    setDeleteId(null);
+    const previousTerms = terms;
+    const previousSuggestions = suggestions;
+    removeTermEverywhere(id);
+    try {
+      await deleteGlossaryTermApi(id);
+      toast.success("Term removed");
+    } catch (err) {
+      setTerms(previousTerms);
+      setSuggestions(previousSuggestions);
+      toast.error(err.message || "Failed to delete term");
+    }
+  }
+
+  function handleExport() {
+    const blob = new Blob([JSON.stringify(terms, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `glossary_${comicId || "project"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  if (loading) {
+    return (
+      <div className="tw-tabpanel tw-x-glossary-panel">
+        <div className="tw-x-glossary-empty">
+          <Loader2 size={22} className="tw-spin" />
+          <p>Loading glossary…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="tw-tabpanel tw-x-glossary-panel">
+        <div className="tw-x-glossary-empty">
+          <AlertCircle size={28} strokeWidth={1.5} />
+          <p>Couldn't load the glossary.</p>
+          <span>{loadError}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="tw-tabpanel">
-      <p style={{ color: "#8286A0", margin: 0 }}>Project-wide glossary terms would list here.</p>
+    <div className="tw-tabpanel tw-x-glossary-panel">
+      <div style={{ display: "flex", gap: 6, padding: "0 0 10px" }}>
+        <button
+          type="button"
+          onClick={() => setMode("page")}
+          disabled={!pageKey}
+          title={pageKey ? "Only terms detected on this page" : "No page loaded yet"}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
+            fontSize: 12,
+            fontWeight: 600,
+            padding: "6px 10px",
+            borderRadius: 6,
+            border: "1px solid",
+            borderColor: mode === "page" ? "#a855f7" : "rgba(255,255,255,0.12)",
+            background: mode === "page" ? "rgba(168,85,247,0.18)" : "transparent",
+            color: mode === "page" ? "#c084fc" : "var(--trans-text-secondary, #9ca3af)",
+            cursor: pageKey ? "pointer" : "not-allowed",
+            opacity: pageKey ? 1 : 0.5,
+          }}
+        >
+          <Sparkles size={12} /> This Page
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("all")}
+          title="Every term in the project glossary"
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            padding: "6px 10px",
+            borderRadius: 6,
+            border: "1px solid",
+            borderColor: mode === "all" ? "#a855f7" : "rgba(255,255,255,0.12)",
+            background: mode === "all" ? "rgba(168,85,247,0.18)" : "transparent",
+            color: mode === "all" ? "#c084fc" : "var(--trans-text-secondary, #9ca3af)",
+            cursor: "pointer",
+          }}
+        >
+          All Terms
+        </button>
+      </div>
+
+      <div className="tw-x-glossary-header">
+        <span className="tw-x-glossary-count">
+          {mode === "page"
+            ? `${suggestions.length} match${suggestions.length !== 1 ? "es" : ""} on this page`
+            : `${terms.length} term${terms.length !== 1 ? "s" : ""}`}
+        </span>
+        <div className="tw-x-glossary-header-actions">
+          {mode === "page" && (
+            <button
+              type="button"
+              className="tw-btn tw-x-mini-btn"
+              onClick={() => runSuggestScan(true)}
+              disabled={suggestLoading || !pageKey}
+              title="Re-scan this page's text"
+            >
+              <RefreshCw size={12} className={suggestLoading ? "tw-spin" : ""} /> Rescan
+            </button>
+          )}
+          {mode === "all" && terms.length > 0 && (
+            <button
+              type="button"
+              className="tw-btn tw-x-mini-btn"
+              onClick={handleExport}
+              title="Export glossary as JSON"
+            >
+              Export
+            </button>
+          )}
+          <button
+            type="button"
+            className="tw-btn-primary tw-x-glossary-add-btn"
+            onClick={() => { setAddOpen((v) => !v); setEditId(null); cancelEdit(); }}
+            title="Add a new glossary term"
+          >
+            <Plus size={13} /> Add Term
+          </button>
+        </div>
+      </div>
+
+      {addOpen && (
+        <div className="tw-x-glossary-form">
+          <div className="tw-x-glossary-form-row">
+            <div className="tw-x-glossary-form-field">
+              <label className="tw-caption tw-x-caption-tight">ORIGINAL TERM</label>
+              <input
+                ref={sourceInputRef}
+                className="tw-x-glossary-input"
+                placeholder="e.g. 先輩"
+                value={newSource}
+                onChange={(e) => setNewSource(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && document.getElementById("glossary-target-input")?.focus()}
+              />
+            </div>
+            <div className="tw-x-glossary-form-field">
+              <label className="tw-caption tw-x-caption-tight">TRANSLATION</label>
+              <input
+                id="glossary-target-input"
+                className="tw-x-glossary-input"
+                placeholder="e.g. Senpai"
+                value={newTarget}
+                onChange={(e) => setNewTarget(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+              />
+            </div>
+          </div>
+          <div className="tw-x-glossary-form-field">
+            <label className="tw-caption tw-x-caption-tight">NOTE (optional)</label>
+            <input
+              className="tw-x-glossary-input"
+              placeholder="Context or usage note..."
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+            />
+          </div>
+          <div className="tw-x-glossary-form-actions">
+            <button
+              type="button"
+              className="tw-btn"
+              onClick={() => { setAddOpen(false); setNewSource(""); setNewTarget(""); setNewNote(""); }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="tw-btn-primary"
+              onClick={handleAdd}
+              disabled={!newSource.trim() || !newTarget.trim() || saving}
+            >
+              {saving ? <Loader2 size={13} className="tw-spin" /> : <Check size={13} />} Save Term
+            </button>
+          </div>
+        </div>
+      )}
+
+      {mode === "page" && suggestLoading && (
+        <div className="tw-x-glossary-empty">
+          <Loader2 size={22} className="tw-spin" />
+          <p>Reading text on this page…</p>
+          <span>Gemini is scanning the page image, this can take a few seconds.</span>
+        </div>
+      )}
+
+      {mode === "page" && !suggestLoading && suggestError && (
+        <div className="tw-x-glossary-empty">
+          <AlertCircle size={28} strokeWidth={1.5} />
+          <p>Couldn't scan this page.</p>
+          <span>{suggestError}</span>
+          <button type="button" className="tw-btn-primary" onClick={() => runSuggestScan(true)}>
+            <RefreshCw size={13} /> Try Again
+          </button>
+        </div>
+      )}
+
+      {mode === "page" && !suggestLoading && !suggestError && (
+        <>
+          {extractedText && (
+            <div style={{ marginBottom: 10 }}>
+              <button
+                type="button"
+                onClick={() => setShowExtractedText((v) => !v)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#9ca3af",
+                  fontSize: 11,
+                  cursor: "pointer",
+                  padding: 0,
+                  textDecoration: "underline",
+                }}
+              >
+                {showExtractedText ? "Hide" : "Show"} text Gemini read on this page
+              </button>
+              {showExtractedText && (
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "#c8c8d8",
+                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 6,
+                    padding: "8px 10px",
+                    marginTop: 6,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {extractedText}
+                </p>
+              )}
+            </div>
+          )}
+          {suggestions.length === 0 && (
+            <div className="tw-x-glossary-empty">
+              <BookMarked size={28} strokeWidth={1.5} />
+              <p>No glossary terms detected on this page.</p>
+              <span>None of the saved terms matched the text Gemini read here.</span>
+              <button type="button" className="tw-btn" onClick={() => setMode("all")}>
+                View All Terms
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {terms.length > 2 && (mode === "all" || suggestions.length > 2) && (
+        <div className="tw-x-glossary-search-wrap">
+          <input
+            className="tw-x-glossary-input tw-x-glossary-search"
+            placeholder="🔍  Search terms..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
+            <button type="button" className="tw-x-glossary-search-clear" onClick={() => setSearch("")}>✕</button>
+          )}
+        </div>
+      )}
+
+      {mode === "all" && terms.length === 0 && !addOpen && (
+        <div className="tw-x-glossary-empty">
+          <BookMarked size={28} strokeWidth={1.5} />
+          <p>No glossary terms yet.</p>
+          <span>Add recurring terms like character names, honorifics, or special phrases so the whole team translates them consistently.</span>
+          <button type="button" className="tw-btn-primary" onClick={() => setAddOpen(true)}>
+            <Plus size={13} /> Add First Term
+          </button>
+        </div>
+      )}
+
+      {displayedTerms.length > 0 && filtered.length === 0 && (
+        <div className="tw-x-glossary-empty" style={{ paddingTop: 16 }}>
+          <p style={{ fontSize: 13 }}>No terms match "{search}"</p>
+        </div>
+      )}
+
+      <div className="tw-x-glossary-list">
+        {filtered.map((term) => (
+          <div key={term.id} className={`tw-x-glossary-card ${editId === term.id ? "is-editing" : ""}`}>
+            {editId === term.id ? (
+              <div className="tw-x-glossary-form" style={{ margin: 0, padding: 0, border: "none", background: "none" }}>
+                <div className="tw-x-glossary-form-row">
+                  <div className="tw-x-glossary-form-field">
+                    <label className="tw-caption tw-x-caption-tight">ORIGINAL</label>
+                    <input
+                      className="tw-x-glossary-input"
+                      value={newSource}
+                      onChange={(e) => setNewSource(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="tw-x-glossary-form-field">
+                    <label className="tw-caption tw-x-caption-tight">TRANSLATION</label>
+                    <input
+                      className="tw-x-glossary-input"
+                      value={newTarget}
+                      onChange={(e) => setNewTarget(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="tw-x-glossary-form-field">
+                  <label className="tw-caption tw-x-caption-tight">NOTE</label>
+                  <input
+                    className="tw-x-glossary-input"
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                  />
+                </div>
+                <div className="tw-x-glossary-form-actions">
+                  <button type="button" className="tw-btn" onClick={cancelEdit}>Cancel</button>
+                  <button
+                    type="button"
+                    className="tw-btn-primary"
+                    onClick={() => handleUpdate(term.id)}
+                    disabled={!newSource.trim() || !newTarget.trim() || saving}
+                  >
+                    {saving ? <Loader2 size={13} className="tw-spin" /> : <Check size={13} />} Update
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="tw-x-glossary-card-body">
+                  <div className="tw-x-glossary-term-pair">
+                    <span className="tw-x-glossary-source">{term.source}</span>
+                    <span className="tw-x-glossary-arrow">→</span>
+                    <span className="tw-x-glossary-target">{term.target}</span>
+                  </div>
+                  {mode === "page" && term.matchedText && term.matchedText !== term.source && (
+                    <p className="tw-x-glossary-note">Matched as "{term.matchedText}"</p>
+                  )}
+                  {term.note && (
+                    <p className="tw-x-glossary-note">{term.note}</p>
+                  )}
+                </div>
+                <div className="tw-x-glossary-card-actions">
+                  <button
+                    type="button"
+                    className="tw-btn-icon tw-x-glossary-action-btn"
+                    title="Edit term"
+                    onClick={() => startEdit(term)}
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    type="button"
+                    className="tw-btn-icon tw-x-glossary-action-btn is-danger"
+                    title="Delete term"
+                    onClick={() => confirmDelete(term.id)}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {deleteId && (
+        <div className="tw-x-glossary-modal-backdrop">
+          <div className="tw-x-glossary-modal">
+            <p className="tw-x-glossary-modal-title">Delete term?</p>
+            <p className="tw-x-glossary-modal-body">
+              "<strong>{displayedTerms.find((t) => t.id === deleteId)?.source}</strong>" will be permanently removed.
+            </p>
+            <div className="tw-x-glossary-modal-actions">
+              <button type="button" className="tw-btn" onClick={() => setDeleteId(null)}>Cancel</button>
+              <button type="button" className="tw-btn-primary is-danger-btn" onClick={handleDelete}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 
 function ChangeRequestCard({ comment, resolveBubbleLabel, onSelectBubble }) {
   const isClickable = comment.bubbleId != null && typeof onSelectBubble === "function";
@@ -1067,6 +1687,8 @@ function TranslationSidePanel({
   resolveBubbleLabel,
   userFullName,
   onSelectBubble,
+  comicId,
+  pageId,
 }) {
   return (
     <aside className="tw-rightpanel">
@@ -1098,7 +1720,9 @@ function TranslationSidePanel({
           userFullName={userFullName}
         />
       )}
-      {activeTab === "glossary" && <GlossaryTabPanel />}
+      {activeTab === "glossary" && (
+        <GlossaryTabPanel comicId={comicId} pageId={pageId} imageUrl={currentImage} />
+      )}
       {activeTab === "changes" && (
         <ChangeRequestsTabPanel
           comments={changeRequests}
@@ -1135,7 +1759,7 @@ async function fetchJson(url, signal) {
   }
 
   if (IS_DEV) {
-    // eslint-disable-next-line no-console
+    
     console.log(`[fetchJson] ${url} →`, json);
   }
 
@@ -1217,7 +1841,7 @@ function getTaskFallbackData(taskId) {
 async function fetchChapterForTask(taskId, signal) {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  // 1. Primary: get task from backend (only if taskId is a real UUID)
+  
   if (UUID_RE.test(taskId)) {
     try {
       const task = await fetchJson(`${API_BASE}/team-workspace/tasks/${taskId}`, signal);
@@ -1234,19 +1858,19 @@ async function fetchChapterForTask(taskId, signal) {
         try {
           const chapterResult = await fetchChapterById(chapterId, signal);
           return { ...chapterResult, projectTeamId: task?.projectTeamId ?? null };
-        } catch (chErr) { /* ignore */ }
+        } catch (chErr) {  }
       }
-    } catch (err) { /* ignore */ }
+    } catch (err) {  }
   }
 
-  // 2. Fallback: get chapterId from localStorage, then fetch chapter detail from DB
+  
   const fallback = getTaskFallbackData(taskId);
   const chId = fallback.chapter?.id;
   if (chId && UUID_RE.test(chId)) {
     try {
       const chapterResult = await fetchChapterById(chId, signal);
       return { ...chapterResult, projectTeamId: null };
-    } catch (chErr) { /* ignore */ }
+    } catch (chErr) {  }
   }
 
   return fallback.chapter;
@@ -1256,7 +1880,7 @@ async function fetchPagesForTask(taskId, signal) {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   let rawPages = [];
 
-  // 1. Primary: try the translate-workspace API (only if taskId is a real UUID)
+  
   if (UUID_RE.test(taskId)) {
     try {
       const list = await fetchJson(`${API_BASE}/translate-workspace/${taskId}`, signal);
@@ -1269,7 +1893,7 @@ async function fetchPagesForTask(taskId, signal) {
     }
   }
 
-  // 2. LocalStorage Task lookup -> Chapter ID or Comic Title lookup
+  
   const fallback = getTaskFallbackData(taskId);
   const foundTask = fallback.task;
   const chapterId = foundTask?.chapterId || fallback.chapter?.id;
@@ -1283,7 +1907,7 @@ async function fetchPagesForTask(taskId, signal) {
     }
   }
 
-  // 3. Direct fetch by Chapter ID if UUID
+  
   const uuidMatch = String(chapterId || '').match(UUID_RE);
   const realChapterId = uuidMatch ? uuidMatch[0] : null;
 
@@ -1292,10 +1916,10 @@ async function fetchPagesForTask(taskId, signal) {
       const data = await fetchJson(`${API_BASE}/chapters/detail/${realChapterId}`, signal);
       const pList = data?.pages || data?.images || (Array.isArray(data) ? data : []);
       if (Array.isArray(pList) && pList.length > 0) rawPages = pList;
-    } catch (e) { /* ignore */ }
+    } catch (e) {  }
   }
 
-  // 4. Smart Title Search Fallback - Parallel comic discovery
+  
   if (rawPages.length === 0) {
     try {
       const allComics = await fetchJson(`${API_BASE}/comics/all`, signal);
@@ -1309,7 +1933,7 @@ async function fetchPagesForTask(taskId, signal) {
       if (foundComic?.id) {
         let chapList = [];
 
-        // Parallel: chapters API + author chapters API
+        
         const chapResults = await Promise.allSettled([
           fetchJson(`${API_BASE}/chapters/comic/${foundComic.id}?includeAll=true`, signal),
           fetchJson(`${API_BASE}/author/comics/${foundComic.id}/chapters`, signal)
@@ -1336,7 +1960,7 @@ async function fetchPagesForTask(taskId, signal) {
               rawPages = matchedChap.images;
             }
 
-            // Parallel: detail + preview for matched chapter
+            
             if (rawPages.length === 0 && matchedChap.id) {
               const detailResults = await Promise.allSettled([
                 fetchJson(`${API_BASE}/chapters/detail/${matchedChap.id}`, signal),
@@ -1353,10 +1977,10 @@ async function fetchPagesForTask(taskId, signal) {
           }
         }
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {  }
   }
 
-  // Map & resolve real image URLs from DB
+  
   if (Array.isArray(rawPages) && rawPages.length > 0) {
     let finalPages = rawPages
       .map((item, idx) => {
@@ -1386,12 +2010,10 @@ async function fetchPagesForTask(taskId, signal) {
       })
       .filter(Boolean);
 
-    // If any page ended up with a fabricated (non-UUID) id — e.g. the
-    // primary /translate-workspace source didn't return real
-    // PageTranslationEntity ids — backfill the real ones from
-    // /review-workspace/{taskId} (same endpoint ReviewWorkspace.jsx relies
-    // on) by matching pageNumber. Without a real UUID here, "Change
-    // Requests" can never load: the backend rejects non-UUID page ids.
+
+    
+
+    
     const needsRealPageIds = finalPages.some((p) => !UUID_RE.test(p.pageId));
     if (needsRealPageIds && UUID_RE.test(taskId)) {
       try {
@@ -1434,12 +2056,10 @@ async function fetchPageChangeRequests(pageId, signal) {
 async function saveBubblesForPage(pageId, payload, signal) {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!pageId || !UUID_RE.test(pageId)) {
-    // This page has no real database id to save against at all — this is
-    // a genuine failure, not a "fine, saved locally" situation. Keep the
-    // localStorage stash as an emergency backup, but tell the caller the
-    // truth so saveStatus shows "unsaved" instead of silently lying that
-    // it's safe, which is what let bubbles quietly revert on the server
-    // while the UI kept claiming everything was saved.
+
+    
+
+    
     try {
       localStorage.setItem(`comiverse_bubbles_${pageId}`, JSON.stringify(payload));
     } catch (e) {}
@@ -2170,6 +2790,11 @@ function useSelectionAreas() {
 }
 
 export default function TranslateWorkspace() {
+  useWorkspaceSecurity({
+    targetElementId: "secure-workspace",
+    onDevToolsOpen: () => toast.warning("Vui lòng không mở DevTools trên trang này."),
+  });
+
   const { taskId } = useParams();
   const navigate = useNavigate();
   const { isLoggedIn } = useAuth();
@@ -2199,12 +2824,10 @@ export default function TranslateWorkspace() {
 
   const [imageNaturalSize, setImageNaturalSize] = useState(null);
 
-  // Real DOM node of the page <img>. persistBubbles() reads naturalWidth/
-  // naturalHeight straight off this element instead of trusting state/refs
-  // that get updated asynchronously via onLoad — that async update is exactly
-  // what caused the race condition (state could still reflect a previous
-  // page's image at the moment we needed to save). Reading the live DOM
-  // element right before navigating away is synchronous and can't race.
+
+  
+
+  
   const imgElRef = useRef(null);
 
   useEffect(() => {
@@ -2283,18 +2906,16 @@ export default function TranslateWorkspace() {
           loadSelections(pxSelections);
         }
       } catch (err) {
-        /* ignore parse error silently */
+        
       }
     },
     [canvasRef, loadSelections]
   );
 
   const handleImageLoad = (size, loadedSrc) => {
-    // Ignore late onLoad events firing for an image that is no longer the
-    // one currently displayed (e.g. user flipped pages before it finished
-    // loading). This only protects UI-facing state (crop preview, color
-    // picker) — it is NOT what guarantees save-time correctness anymore;
-    // persistBubbles() below reads the DOM directly instead.
+
+    
+
     if (loadedSrc && currentImage && loadedSrc !== currentImage) {
       return;
     }
@@ -2424,9 +3045,8 @@ export default function TranslateWorkspace() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeId, deleteArea]);
 
-  // Bold/Italic/Align now live on the active bubble itself, not on
-  // page-wide state — this just reflects the active selection's own values
-  // (for the toolbar's toggle states and the translation-editor preview).
+
+  
   const textStyle = useMemo(
     () => ({
       fontWeight: activeSelection?.isBold ? 700 : 400,
@@ -2442,7 +3062,7 @@ export default function TranslateWorkspace() {
     const controller = new AbortController();
     const cacheKey = `comiverse_ws_cache_${taskId}`;
 
-    // 0. Instant cache load from sessionStorage (<5ms)
+    
     let hasCache = false;
     try {
       const cached = sessionStorage.getItem(cacheKey);
@@ -2456,7 +3076,7 @@ export default function TranslateWorkspace() {
           setStatus("ready");
           setOpen({ [cChapter.id]: true });
           hasCache = true;
-          // Preload first 3 images for instant rendering
+          
           cPages.slice(0, 3).forEach(p => {
             if (p.imageUrl) { const img = new Image(); img.src = p.imageUrl; }
           });
@@ -2480,12 +3100,10 @@ export default function TranslateWorkspace() {
         if (!hasCache) {
           setCurrentPageIndex(0);
         } else {
-          // The instant cache already put the user somewhere, and they may
-          // have navigated further while this real fetch was still in
-          // flight. Re-locate them by pageId in the FRESH array rather than
-          // trusting the old index — the fresh array's order/contents can
-          // differ from what the cache showed, so keeping the same index
-          // could silently point at a completely different page.
+
+          
+
+          
           setCurrentPageIndex((prevIndex) => {
             const currentId = currentPageIdRef.current;
             if (currentId) {
@@ -2499,14 +3117,14 @@ export default function TranslateWorkspace() {
         }
         setStatus("ready");
         setOpen({ [chapterResult.id]: true });
-        // Cache for instant future opens
+        
         try {
           sessionStorage.setItem(cacheKey, JSON.stringify({
             chapter: chapterResult,
             pages: pagesResult
           }));
         } catch (e) {}
-        // Preload first 5 images
+        
         pagesResult.slice(0, 5).forEach(p => {
           if (p.imageUrl) { const img = new Image(); img.src = p.imageUrl; }
         });
@@ -2527,8 +3145,7 @@ export default function TranslateWorkspace() {
   const currentImage = images[currentPageIndex];
   const currentPageMeta = taskPages[currentPageIndex] ?? null;
 
-  // Auto-save draft to LocalStorage whenever bubbles change.
-  // Only depends on selections & pageId (stable string) — no function refs that change each render.
+
   const currentPageIdRef = useRef(null);
   useEffect(() => {
     currentPageIdRef.current = currentPageMeta?.pageId ?? null;
@@ -2548,10 +3165,10 @@ export default function TranslateWorkspace() {
       const percentSelections = selectionsToImagePercent(selections, canvasSize, naturalSize);
       localStorage.setItem(`comiverse_bubbles_${pageId}`, JSON.stringify({ selections: percentSelections }));
     } catch (e) {}
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  
   }, [selections]);
 
-  // Load saved bubbles when page changes. Depends only on pageId (stable string).
+  
   const clearSelectionsRef = useRef(clearSelections);
   const applyPendingBubblesRef = useRef(applyPendingBubbles);
   useEffect(() => { clearSelectionsRef.current = clearSelections; }, [clearSelections]);
@@ -2574,8 +3191,7 @@ export default function TranslateWorkspace() {
     if (imgEl && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0) {
       applyPendingBubblesRef.current({ width: imgEl.naturalWidth, height: imgEl.naturalHeight });
     }
-  // Only re-run when the page actually changes, NOT when function refs update
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [currentPageMeta?.pageId]);
 
   const [changeRequests, setChangeRequests] = useState([]);
@@ -2622,15 +3238,12 @@ export default function TranslateWorkspace() {
     ];
   }, [chapterData, currentChapterId, taskPages, currentPageIndex]);
 
-  // Resolves the TRUE natural size of a page's image, guaranteed correct
-  // regardless of React re-render/state timing. Tries the already-loaded
-  // DOM <img> first (fast path); if that hasn't finished loading yet (e.g.
-  // the user jumped to this page and hit Send almost immediately), loads
-  // the exact same URL into a fresh, isolated Image object and waits for
-  // it — this is what used to fall back to a stale `imageNaturalSize`
-  // state (left over from whichever page loaded last) or a hardcoded
-  // {1000, 1400} guess, silently skewing every bubble's saved % position
-  // on the page whenever the image hadn't finished loading in time.
+
+  
+
+  
+
+  
   const resolveNaturalSize = (imgEl, expectedImageUrl) => {
     const imgLoaded = !!imgEl && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0;
     if (imgLoaded) {
@@ -2659,11 +3272,9 @@ export default function TranslateWorkspace() {
         resolveNaturalSize(imgElRef.current, expectedImageUrl),
       ]).then(([canvasSize, naturalSize]) => {
         if (canvasSize.width <= 0 || canvasSize.height <= 0) {
-          // NEVER silently save — selectionsToImagePercent would just
-          // pass raw pixel coordinates straight through as if they were
-          // percentages (e.g. x:295px saved as x:295%), and every
-          // subsequent load+resave compounds the distortion further.
-          // This is exactly what corrupted bubbles in the past.
+
+          
+
           console.error(
             "[persistBubbles] Aborting save — canvas still has no valid size after waiting. Bubbles were NOT saved to avoid corrupting coordinates."
           );
@@ -2689,13 +3300,11 @@ export default function TranslateWorkspace() {
     [canvasRef]
   );
 
-  // Saves the page currently being viewed, using values that are guaranteed
-  // to still correspond to it (selectionsRef is a ref updated synchronously
-  // on every change, and currentImage/currentPageMeta come straight from
-  // render state for the page we're still on).
-  // Returns a Promise — callers that need the server to actually have the
-  // latest bubbles before doing something else (e.g. submit-for-review,
-  // which reads bubbles straight from the DB) MUST await this.
+
+  
+
+  
+  
   const persistCurrentPage = useCallback(() => {
     if (currentPageMeta?.pageId) {
       return persistBubbles(currentPageMeta.pageId, selectionsRef.current, currentImage);
@@ -2706,11 +3315,9 @@ export default function TranslateWorkspace() {
   const goToPage = useCallback(
     (index) => {
       if (index < 0 || index >= images.length) return;
-      // Persist the outgoing page's bubbles BEFORE React re-renders the
-      // <img src> to the new page. At this exact point in time, imgElRef
-      // still points at the DOM node showing the CURRENT page's image, so
-      // reading its naturalWidth/naturalHeight here is guaranteed correct —
-      // there is no async callback in between that could swap it out.
+
+      
+
       persistCurrentPage();
       setCurrentPageIndex(index);
     },
@@ -2751,9 +3358,8 @@ export default function TranslateWorkspace() {
   }, [navigate, chapterData, taskId, persistCurrentPage]);
 
   const handleSaveAndNext = useCallback(() => {
-    // goToPage already persists the current page synchronously before
-    // switching, so there's no need to call persistCurrentPage separately
-    // here (that used to cause the exact double-call/race pattern).
+
+    
     goToPage(currentPageIndex + 1);
   }, [goToPage, currentPageIndex]);
 
@@ -2772,12 +3378,10 @@ export default function TranslateWorkspace() {
 
     setSending(true);
     try {
-      // MUST await this: submit-for-review reads `bubbles` straight from the
-      // DB on the backend to snapshot it into reviewBaselineBubbles. If we
-      // don't wait for the save PUT to land first, the two requests race —
-      // submit-for-review can reach the server and read the OLD bubbles
-      // before our save finishes, silently dropping the last edit from the
-      // review baseline (looks like "coordinates changed after Send").
+
+      
+
+      
       const saved = await persistCurrentPage();
       if (saved === false) {
         alert(
@@ -2821,24 +3425,21 @@ export default function TranslateWorkspace() {
       applyPendingBubbles(null);
     }
 
-    // These are captured from THIS render, i.e. they describe the page being
-    // left, not whatever page we land on next.
+
     const pageIdBeingViewed = currentPageMeta?.pageId;
     const imageUrlBeingViewed = currentImage;
 
-    // Best-effort fallback only (e.g. route unmount without going through
-    // goToPage/persistCurrentPage). The primary save now always happens
-    // synchronously inside goToPage/persistCurrentPage BEFORE the page
-    // changes, so this cleanup is usually a safe no-op: by the time it runs,
-    // the DOM <img> has already switched to the next page's image, so
-    // persistBubbles' expectedImageUrl check will correctly skip it instead
-    // of saving corrupted coordinates.
+
+    
+
+    
+    
     return () => {
       if (pageIdBeingViewed) {
         persistBubbles(pageIdBeingViewed, selectionsRef.current, imageUrlBeingViewed);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [currentPageIndex, currentChapterId]);
 
   const applyPickedColor = (hex) => {
@@ -2919,7 +3520,7 @@ export default function TranslateWorkspace() {
           </button>
         </div>
 
-        <main className="tw-x-main-content">
+        <main className="tw-x-main-content" id="secure-workspace">
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div className="tw-canvas-toolbar">
               <ShapeToolbar
@@ -3027,6 +3628,8 @@ export default function TranslateWorkspace() {
           resolveBubbleLabel={resolveBubbleLabel}
           userFullName={userFullName}
           onSelectBubble={selectArea}
+          comicId={chapterData?.comicId}
+          pageId={currentPageMeta?.pageId}
         />
       </div>
     </div>

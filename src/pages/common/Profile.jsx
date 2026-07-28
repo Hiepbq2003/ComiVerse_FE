@@ -23,7 +23,7 @@ import { toast } from 'react-toastify'
 import { useAuth } from '../../context/AuthContext'
 import { getAuth } from '../../utils/Auth'
 import { getMyProjectTeamsApi, getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
-
+import { getModeratorScope } from '../../utils/moderatorScope'
 const COMMON_NOTIFICATION_OPTIONS = [
   {
     title: 'General Notifications',
@@ -158,16 +158,7 @@ function AuthorStats() {
   return (
     <div className="profile-stats-list">
       <div className="profile-stats-row">
-        <span>Comics published</span>
-        <span className="profile-stats-value">3</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Total views</span>
-        <span className="profile-stats-value">254K</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Subscribers</span>
-        <span className="profile-stats-value">15.2K</span>
+        <span className="profile-stats-value" style={{ fontSize: '14px', color: 'var(--text)' }}>No statistics available yet.</span>
       </div>
     </div>
   )
@@ -178,27 +169,21 @@ function ModeratorStats({ assignedLanguages = ['Japanese', 'Korean'] }) {
     ? assignedLanguages
     : ['Japanese', 'Korean'];
 
+  const isGlobal = langs.length >= 7 || langs.some(s => ['global', 'all', 'any', '*'].includes(String(s).toLowerCase()));
+
   return (
     <div className="profile-stats-list">
       <div className="profile-stats-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '6px' }}>
         <span>Assigned Scope</span>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-          {langs.map(l => (
-            <span key={l} className="profile-lang-chip">🌐 {l}</span>
-          ))}
+          {isGlobal ? (
+            <span className="profile-lang-chip">🌐 All Languages</span>
+          ) : (
+            langs.map(l => (
+              <span key={l} className="profile-lang-chip">🌐 {l}</span>
+            ))
+          )}
         </div>
-      </div>
-      <div className="profile-stats-row">
-        <span>Reports resolved</span>
-        <span className="profile-stats-value">412</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Comics checked</span>
-        <span className="profile-stats-value">84</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Banned users</span>
-        <span className="profile-stats-value">15</span>
       </div>
     </div>
   )
@@ -208,16 +193,8 @@ function AdminStats() {
   return (
     <div className="profile-stats-list">
       <div className="profile-stats-row">
-        <span>Total users managed</span>
-        <span className="profile-stats-value">15.2K</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Global logs audited</span>
-        <span className="profile-stats-value">2,450</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Settings updated</span>
-        <span className="profile-stats-value">38</span>
+        <span>Assigned Scope</span>
+        <span className="profile-stats-value">Full System</span>
       </div>
     </div>
   )
@@ -353,11 +330,10 @@ function Profile({ user: userProp }) {
   const [bio, setBio] = useState(user?.bio || '')
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || '')
   const [backgroundImageUrl, setBackgroundImageUrl] = useState(user?.backgroundImageUrl || '')
-  const [assignedLanguages, setAssignedLanguages] = useState(
-    Array.isArray(user?.assignedLanguages) && user.assignedLanguages.length > 0
-      ? user.assignedLanguages
-      : ['Japanese', 'Korean']
-  )
+  const [assignedLanguages, setAssignedLanguages] = useState(() => {
+    const rawScope = getModeratorScope(user);
+    return rawScope.map(lang => lang.charAt(0).toUpperCase() + lang.slice(1));
+  })
 
   // Password change states
   const [currentPassword, setCurrentPassword] = useState('')

@@ -129,8 +129,8 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
     <div className="moderator-layout">
       {/* Sidebar */}
       <aside className="moderator-sidebar">
-        <div className="moderator-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '20px 16px' }}>
-          <Link to="/" style={{ display: 'block', textDecoration: 'none' }}>
+        <div className="moderator-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px' }}>
+          <Link to="/" style={{ display: 'block', textDecoration: 'none', marginLeft: '38px' }}>
             <LogoIcon size={26} />
           </Link>
         </div>
@@ -189,7 +189,13 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
               title="Authorized moderation languages"
             >
               <span>🌐</span>
-              <span>Scope: {getModeratorScope(user).map(l => l.charAt(0).toUpperCase() + l.slice(1)).join(', ')}</span>
+              <span>
+                Scope: {(() => {
+                  const scope = getModeratorScope(user);
+                  const isGlobal = scope.length >= 7 || scope.some(s => ['global', 'all', 'any', '*'].includes(s));
+                  return isGlobal ? 'All Languages' : scope.map(l => l.charAt(0).toUpperCase() + l.slice(1)).join(', ');
+                })()}
+              </span>
             </span>
           </div>
 

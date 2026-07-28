@@ -6,10 +6,9 @@ import HomeLayout from "../../components/layout/HomeLayout"
 import { useAuth } from '../../context/AuthContext'
 import { Languages, Sparkles, Phone, Link2, CheckCircle2, ArrowLeft, AlertCircle, X } from "lucide-react"
 
-const SUGGESTED_LANGUAGES = [
-  'English', 'Japanese', 'Korean', 'Chinese', 'Vietnamese',
-  'French', 'Spanish'
-]
+import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
+
+const SUGGESTED_LANGUAGES = COMIC_LANGUAGE_OPTIONS
 
 const cardStyle = {
   background: 'var(--trans-card-bg, #1a1225)',

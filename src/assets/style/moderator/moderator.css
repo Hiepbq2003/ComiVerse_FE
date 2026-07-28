@@ -2077,46 +2077,81 @@ html.light .leader-search-result-card+.leader-search-result-card {
   text-transform: none !important;
 }
 
-/* 2. Approve Button - Green Theme (Variant 2) */
+/* 2. Approve Button - Green Theme (Premium Liquid) */
 .modern-btn-container .btn-2.btn-approve,
 .modern-btn-container .btn-5.btn-approve {
-  background: #10b981 !important;
-  color: #ffffff !important;
   border: none !important;
-  outline: none !important;
+  color: #ffffff !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+  background: linear-gradient(110deg, #10b981 0%, #059669 55%, #047857 100%) !important;
+  box-shadow: 0 4px 15px -3px rgba(16, 185, 129, 0.4) !important;
+}
+
+.modern-btn-container .btn-2.btn-approve:hover,
+.modern-btn-container .btn-5.btn-approve:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(16, 185, 129, 0.6) !important;
 }
 
 .modern-btn-container .btn-2.btn-approve::before,
 .modern-btn-container .btn-5.btn-approve::before {
-  background: #059669 !important;
+  display: none !important;
 }
 
 html.light .modern-btn-container .btn-2.btn-approve,
 html.light .modern-btn-container .btn-5.btn-approve {
-  background: #059669 !important;
+  background: linear-gradient(110deg, #059669 0%, #047857 55%, #065f46 100%) !important;
+  color: #ffffff !important;
 }
 
-html.light .modern-btn-container .btn-2.btn-approve::before,
-html.light .modern-btn-container .btn-5.btn-approve::before {
-  background: #047857 !important;
+html.light .modern-btn-container .btn-2.btn-approve span,
+html.light .modern-btn-container .btn-5.btn-approve span {
+  color: #ffffff !important;
 }
 
-/* 3. Reject & Archive Buttons - Red Theme (Variant 2 / 5) */
+/* 3. Reject & Archive Buttons - Red Theme (Premium Liquid) */
 .modern-btn-container .btn-2.btn-reject,
 .modern-btn-container .btn-2.btn-archive,
 .modern-btn-container .btn-5.btn-reject,
 .modern-btn-container .btn-5.btn-archive {
-  background: #ef4444 !important;
-  color: #ffffff !important;
   border: none !important;
-  outline: none !important;
+  color: #ffffff !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+  background: linear-gradient(110deg, #f43f5e 0%, #e11d48 55%, #be123c 100%) !important;
+  box-shadow: 0 4px 15px -3px rgba(225, 29, 72, 0.4) !important;
+}
+
+.modern-btn-container .btn-2.btn-reject:hover,
+.modern-btn-container .btn-2.btn-archive:hover,
+.modern-btn-container .btn-5.btn-reject:hover,
+.modern-btn-container .btn-5.btn-archive:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(225, 29, 72, 0.6) !important;
 }
 
 .modern-btn-container .btn-2.btn-reject::before,
 .modern-btn-container .btn-2.btn-archive::before,
 .modern-btn-container .btn-5.btn-reject::before,
 .modern-btn-container .btn-5.btn-archive::before {
-  background: #dc2626 !important;
+  display: none !important;
+}
+
+.modern-btn-container .btn-2.btn-approve span,
+.modern-btn-container .btn-5.btn-approve span,
+.modern-btn-container .btn-2.btn-reject span,
+.modern-btn-container .btn-2.btn-archive span,
+.modern-btn-container .btn-5.btn-reject span,
+.modern-btn-container .btn-5.btn-archive span {
+  color: #ffffff !important;
+  z-index: 10 !important;
+  position: relative !important;
+}
+
+html.light .modern-btn-container .btn-2.btn-reject span,
+html.light .modern-btn-container .btn-2.btn-archive span,
+html.light .modern-btn-container .btn-5.btn-reject span,
+html.light .modern-btn-container .btn-5.btn-archive span {
+  color: #ffffff !important;
 }
 
 html.light .modern-btn-container .btn-2.btn-reject,
@@ -2837,4 +2872,64 @@ html.light .mod-btn.approve {
   background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%) !important;
   color: #ffffff !important;
   box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3) !important;
+}
+
+/* --- PREMIUM LIQUID MOTION HOVER EFFECTS (AGENT.MD TASTE) --- */
+@keyframes shimmer-sweep {
+  0% { left: -100%; }
+  100% { left: 200%; }
+}
+
+@keyframes liquid-drift {
+  0%, 100% { transform: translate3d(-4px, 0, 0) scale(1); }
+  50% { transform: translate3d(4px, -1px, 0) scale(1.02); }
+}
+
+.moderator-layout .modern-btn-container .btn-2,
+.moderator-layout .modern-btn-container .btn-5 {
+  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+  background-size: 200% auto !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+
+/* Disable the old ugly skew effect */
+.moderator-layout .modern-btn-container .btn-2::before,
+.moderator-layout .modern-btn-container .btn-5::before {
+  display: none !important;
+}
+
+/* Hover Transform & Background Drift */
+.moderator-layout .modern-btn-container .btn-2:hover,
+.moderator-layout .modern-btn-container .btn-5:hover {
+  background-position: right center !important;
+  animation: liquid-drift 3s infinite ease-in-out !important;
+}
+
+/* Shimmer Sweep Element */
+.moderator-layout .modern-btn-container .btn-2::after,
+.moderator-layout .modern-btn-container .btn-5::after {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: -100% !important;
+  width: 50% !important;
+  height: 100% !important;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent) !important;
+  transform: skewX(-20deg) !important;
+  z-index: 5 !important;
+  pointer-events: none;
+  transition: none !important;
+}
+
+.moderator-layout .modern-btn-container .btn-2:hover::after,
+.moderator-layout .modern-btn-container .btn-5:hover::after {
+  animation: shimmer-sweep 0.75s ease-in-out forwards !important;
+}
+
+/* Ensure text stays on top */
+.moderator-layout .modern-btn-container .btn-2 span,
+.moderator-layout .modern-btn-container .btn-5 span {
+  z-index: 10 !important;
+  position: relative !important;
 }
