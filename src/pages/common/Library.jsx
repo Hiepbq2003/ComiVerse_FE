@@ -10,12 +10,8 @@ import { useAuth } from '../../context/AuthContext'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { toast } from 'react-toastify'
 import ConfirmModal from '../../components/common/ConfirmModal'
+import { Trash2 } from 'lucide-react'
 import '../../assets/style/reader/library.css'
-
-// Import assets
-import comicAction from '../../assets/comic_action.png'
-import comicAdventure from '../../assets/comic_adventure.png'
-import comicScifi from '../../assets/comic_scifi.png'
 
 function Library() {
   const navigate = useNavigate()
@@ -121,16 +117,7 @@ function Library() {
 
   // Cover image helper
   const getCoverImage = (comic) => {
-    if (comic.cover && typeof comic.cover === 'string') {
-      return comic.cover
-    }
-    const title = (comic.title || '').toLowerCase()
-    if (title.includes('action') || title.includes('battle')) return comicAction
-    if (title.includes('adventure') || title.includes('dragon')) return comicAdventure
-    if (title.includes('sci-fi') || title.includes('neon') || title.includes('cyber')) return comicScifi
-    const fallbacks = [comicAction, comicAdventure, comicScifi]
-    const idHash = typeof comic.id === 'string' ? comic.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : comic.id || 0
-    return fallbacks[idHash % 3] || comicAction
+    return comic.cover || comic.coverImage || comic.coverImageUrl || '';
   }
 
   // Action: Open popup confirm modal before deletion
@@ -425,7 +412,7 @@ function Library() {
                         onClick={(e) => requestRemoveItem(comicId, comicTitle, e)}
                         title="Xóa khỏi danh sách"
                       >
-                        🗑️
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   );

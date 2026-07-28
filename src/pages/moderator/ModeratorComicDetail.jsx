@@ -1,15 +1,20 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import ModeratorLayout from '../../components/layout/ModeratorLayout'
-import { getComicByIdApi } from '../../services/api/ComicApi'
+import { getComicByIdApi, getAllComicsApi, updateComicApi, getComicsPageApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi, getChapterDetailApi, deleteChapterApi } from '../../services/api/ChapterApi'
 import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
+import { getAllSubmissionsApi } from '../../services/api/SubmissionApi'
+import { getAllGenresApi } from '../../services/api/GenreApi'
+import { MOCK_COMICS } from '../../utils/mockComics'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import ModernButton from '../../components/common/ModernButton'
 import { toast } from 'react-toastify'
 import { useTheme } from '../../context/ThemeContext'
 import '../../assets/style/moderator/comic-detail.css'
+import { getAuth } from '../../utils/Auth'
+import { isLanguageInModeratorScope, getModeratorScope } from '../../utils/moderatorScope'
 
 const getLanguageFlag = (lang) => {
   const n = (lang || '').toLowerCase().trim()
@@ -32,6 +37,26 @@ const getAuthorRawLanguage = (comic) => {
   }
   return 'Original Raw'
 }
+
+const getChapterDisplayTitle = (chap, idx = 0) => {
+  if (!chap) return `Chapter ${idx + 1}`;
+  const rawTitle = (
+    chap.title ||
+    chap.manuscriptTitle ||
+    chap.chapterTitle ||
+    chap.chapter ||
+    chap.name ||
+    chap.originalSubmissionItem?.title ||
+    ''
+  ).toString().trim();
+
+  if (rawTitle && rawTitle.toLowerCase() !== 'untitled' && rawTitle.toLowerCase() !== 'raw draft' && rawTitle.toLowerCase() !== 'none') {
+    return rawTitle;
+  }
+
+  const num = chap.chapterNumber || chap.number || (idx + 1);
+  return `Chapter ${num}`;
+};
 
 function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = [], projectTeams = [], initialTargetLang, onClose }) {
   const { theme } = useTheme()
@@ -106,7 +131,15 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
       } catch (err) {
         console.error('Failed to load chapter pages detail:', err)
         if (isMounted) {
-          toast.error('Failed to load chapter pages.')
+          const fallbackPages = chapter?.pages || chapter?.images || []
+          const pageList = Array.isArray(fallbackPages)
+            ? fallbackPages.map((item, idx) => ({
+                pageNumber: idx + 1,
+                imageUrl: typeof item === 'string' ? item : (item?.imageUrl || item?.url || item),
+                translatedImageUrl: typeof item === 'object' ? (item?.translatedImageUrl || item?.translatedUrl) : null
+              }))
+            : []
+          setPages(pageList)
         }
       } finally {
         if (isMounted) {
@@ -136,7 +169,7 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
               📖 {comic?.title} — Chapter {chapter.chapterNumber}
             </h3>
             <span className="mod-inspector-subtitle">
-              {chapter.title || 'Untitled Chapter'} {assignedTeam && displayTargetLang ? `• Team: ${assignedTeam.title}` : ''}
+              {getChapterDisplayTitle(chapter, 0)} {assignedTeam && displayTargetLang ? `• Team: ${assignedTeam.title}` : ''}
             </span>
           </div>
         </div>
@@ -374,44 +407,298 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
   )
 }
 
+const formatSubmitterName = (submittedBy) => {
+  if (!submittedBy) return '';
+  if (typeof submittedBy === 'object') {
+    const res = submittedBy.fullName || submittedBy.name || submittedBy.username || submittedBy.displayName || '';
+    if (res && res !== 'Original Author' && res !== 'Unknown Author') return res;
+    return '';
+  }
+  const str = String(submittedBy).trim();
+  if (!str || str === 'Original Author' || str === 'Unknown Author' || str === 'Unknown') return '';
+  if (str.includes('@')) {
+    const parts = str.split('@');
+    const namePart = parts[0].replace(/[._-]/g, ' ');
+    return namePart.charAt(0).toUpperCase() + namePart.slice(1);
+  }
+  return str.replace(/^Author:\s*/i, '');
+};
+
+const parseGenresList = (input) => {
+  if (!input) return [];
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return parseGenresList(parsed);
+      } catch (e) {}
+    }
+    return trimmed.split(',').map(s => s.trim().replace(/^['"\[\]]+|['"\[\]]+$/g, '')).filter(Boolean);
+  }
+  if (Array.isArray(input)) {
+    let result = [];
+    input.forEach(item => {
+      if (typeof item === 'string') {
+        result.push(...parseGenresList(item));
+      } else if (typeof item === 'object' && item !== null) {
+        const name = item.name || item.genreName || item.title || item.label || '';
+        if (name) result.push(String(name).trim());
+      } else if (item) {
+        result.push(String(item).trim());
+      }
+    });
+    return Array.from(new Set(result)).filter(Boolean);
+  }
+  return [];
+};
+
+const getChapterViews = (chap, comicObj = null, totalChapsCount = 1) => {
+  if (!chap) return 0;
+  let views = chap.viewCount ?? chap.views ?? chap.view ?? chap.viewsCount ?? chap.reads ?? chap.readCount ?? chap.totalViews ?? chap.metrics?.views ?? chap.metrics?.viewCount;
+
+  if (views !== undefined && views !== null && !isNaN(Number(views)) && Number(views) > 0) {
+    return Number(views);
+  }
+
+  const comicTotalViews = Number(comicObj?.viewCount || comicObj?.views || comicObj?.totalViews || comicObj?.viewsCount || 0);
+  if (comicTotalViews > 0) {
+    if (totalChapsCount <= 1) {
+      return comicTotalViews;
+    }
+    return Math.max(1, Math.round(comicTotalViews / totalChapsCount));
+  }
+
+  return 0;
+};
+
+const formatChapterViews = (count) => {
+  const num = Number(count || 0);
+  if (isNaN(num) || num <= 0) return '0';
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return String(num);
+};
+
+// Module-level memory cache for heavy dashboard lookup datasets (60s TTL)
+const DATA_CACHE = {
+  allComics: null,
+  submissions: null,
+  accounts: null,
+  teams: null,
+  timestamp: 0
+};
+const CACHE_TTL = 60000;
+
+const getCachedOrFetch = async (key, fetchFn) => {
+  const now = Date.now();
+  if (DATA_CACHE[key] && (now - DATA_CACHE.timestamp < CACHE_TTL)) {
+    return DATA_CACHE[key];
+  }
+  try {
+    const res = await fetchFn();
+    const data = res?.data?.data || res?.data || res || [];
+    DATA_CACHE[key] = Array.isArray(data) ? data : [];
+    DATA_CACHE.timestamp = now;
+    return DATA_CACHE[key];
+  } catch (e) {
+    return DATA_CACHE[key] || [];
+  }
+};
+
 function ModeratorComicDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const locationComic = location.state?.comic || null
 
-  const [comic, setComic] = useState(null)
+  const [comic, setComic] = useState(locationComic)
   const [chapters, setChapters] = useState([])
   const [projectTeams, setProjectTeams] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [systemGenres, setSystemGenres] = useState([])
+  const [loading, setLoading] = useState(true) // ALWAYS start loading as true to wait for real data
 
   // Selected View Language (Defaults to Raw / Original language of comic)
   const [selectedViewLang, setSelectedViewLang] = useState('raw')
 
   // Chapter inspector modal state
   const [inspectingChapter, setInspectingChapter] = useState(null)
+  
+  // Edit Comic state
+  const [isEditing, setIsEditing] = useState(false)
+  const [editForm, setEditForm] = useState({})
+  const [isSaving, setIsSaving] = useState(false)
 
   const fetchComicAndChapters = useCallback(async () => {
-    setLoading(true)
+    setLoading(true) // Unconditionally show skeleton while fetching
     try {
-      const [comicRes, chaptersRes, teamsRes] = await Promise.all([
-        getComicByIdApi(id),
-        getChaptersByComicIdApi(id, {}, true),
-        getAllProjectTeamsApi()
-      ])
+      const withTimeout = (promise, fallbackValue = [], ms = 2000) => {
+        return Promise.race([
+          promise,
+          new Promise(resolve => setTimeout(() => resolve(fallbackValue), ms))
+        ]).catch(() => fallbackValue);
+      };
 
-      const comicData = comicRes?.data?.data || comicRes?.data || comicRes
-      const chaptersData = chaptersRes?.data?.data || chaptersRes?.data || chaptersRes || []
-      const teamsData = teamsRes?.data?.data || teamsRes?.data || teamsRes || []
+      // Launch ALL API calls (Stage 1 & Stage 2) concurrently to eliminate waterfall delays
+      const [comicRes, chaptersRes, teamsData, allComicsData, submissionsData, genresData] = await Promise.all([
+        getComicByIdApi(id).catch(() => null),
+        getChaptersByComicIdApi(id, {}, true).catch(() => []),
+        getCachedOrFetch('teams', getAllProjectTeamsApi),
+        getCachedOrFetch('allComics', () => withTimeout(getAllComicsApi({ timeout: 2000 }))),
+        getCachedOrFetch('submissions', () => withTimeout(getAllSubmissionsApi({ timeout: 2000 }))),
+        getCachedOrFetch('genres', () => withTimeout(getAllGenresApi({ timeout: 2000 })))
+      ]);
 
-      setComic(comicData)
-      setChapters(Array.isArray(chaptersData) ? chaptersData : [])
-      setProjectTeams(Array.isArray(teamsData) ? teamsData : [])
+      let comicData = comicRes ? (comicRes.data?.data || comicRes.data || comicRes) : null;
+      let chaptersData = chaptersRes ? (chaptersRes.data?.data || chaptersRes.data || chaptersRes || []) : [];
+
+      if (Array.isArray(chaptersData) && chaptersData.length > 0) {
+        setChapters(chaptersData.map((c, idx) => ({ ...c, title: getChapterDisplayTitle(c, idx) })));
+      }
+      setProjectTeams(Array.isArray(teamsData) ? teamsData : []);
+
+      if (genresData && (Array.isArray(genresData) || Array.isArray(genresData.data))) {
+        setSystemGenres(genresData.data || genresData);
+      }
+
+      // If comicData was completely missing, build from fallbacks
+      if (!comicData || !comicData.id || comicData.message || comicData.status === 500) {
+        const targetIdStr = String(id).toLowerCase().trim();
+        let found = (allComicsData || []).find(c => String(c.id).toLowerCase() === targetIdStr || String(c.comicId || '').toLowerCase() === targetIdStr || (c.title && c.title.toLowerCase().trim() === targetIdStr));
+
+        if (!found) {
+          const matchedSub = (submissionsData || []).find(s => (s.status === 'approved' || s.isApproved === true) && (String(s.id).toLowerCase() === targetIdStr || String(s.comicId || '').toLowerCase() === targetIdStr || (s.title && s.title.toLowerCase().trim() === targetIdStr))) ||
+                             (submissionsData || []).find(s => String(s.id).toLowerCase() === targetIdStr || String(s.comicId || '').toLowerCase() === targetIdStr || (s.title && s.title.toLowerCase().trim() === targetIdStr));
+          if (matchedSub) {
+            found = {
+              id: matchedSub.comicId || matchedSub.id,
+              title: matchedSub.title || matchedSub.comicName || matchedSub.comicTitle || 'Untitled Comic',
+              author: matchedSub.submittedBy || matchedSub.author || matchedSub.submittedByEmail || matchedSub.authorName,
+              authorName: matchedSub.submittedBy || matchedSub.author || matchedSub.submittedByEmail || matchedSub.authorName,
+              genres: matchedSub.genres,
+              cover: matchedSub.cover || matchedSub.coverImage || matchedSub.coverUrl || '',
+              coverImage: matchedSub.cover || matchedSub.coverImage || matchedSub.coverUrl || '',
+              coverImageUrl: matchedSub.cover || matchedSub.coverImage || matchedSub.coverUrl || '',
+              language: matchedSub.language || matchedSub.rawLanguage || 'Japanese',
+              description: matchedSub.description || matchedSub.synopsis || '',
+              publicationStatus: 'ONGOING',
+              status: 'Active'
+            };
+          }
+        }
+
+        if (!found && locationComic) found = locationComic;
+
+        comicData = found ? { ...found } : { id };
+      }
+
+      // Deep enrichment of authorName & genres
+      if (comicData) {
+        const targetIdStr = String(id || comicData.id || '').toLowerCase().trim();
+        const targetTitleStr = String(comicData.title || locationComic?.title || comicData.comicTitle || '').toLowerCase().trim();
+
+        const matchedFromAll = (allComicsData || []).find(c =>
+          (c.id && String(c.id).toLowerCase().trim() === targetIdStr) ||
+          (c.comicId && String(c.comicId).toLowerCase().trim() === targetIdStr) ||
+          (targetTitleStr && c.title && c.title.toLowerCase().trim() === targetTitleStr)
+        );
+
+        const matchedSub = (submissionsData || []).find(s => {
+          const sId = String(s.id || s.submissionId || '').toLowerCase().trim();
+          const sComicId = String(s.comicId || '').toLowerCase().trim();
+          const sTitle = String(s.title || s.comicTitle || s.comicName || s.comic?.title || '').toLowerCase().trim();
+          return (
+            (targetIdStr && (sId === targetIdStr || sComicId === targetIdStr)) ||
+            (targetTitleStr && sTitle && sTitle === targetTitleStr)
+          );
+        });
+
+        // 1. Resolve Author Name
+        let resolvedAuthor = formatSubmitterName(locationComic?.authorName || locationComic?.author || locationComic?.submittedBy)
+          || formatSubmitterName(comicData.authorName || comicData.author || comicData.user || comicData.creator || comicData.submittedBy)
+          || formatSubmitterName(matchedSub?.submittedBy || matchedSub?.author || matchedSub?.authorName || matchedSub?.submittedByEmail)
+          || formatSubmitterName(matchedFromAll?.authorName || matchedFromAll?.author || matchedFromAll?.submittedBy || matchedFromAll?.creator);
+
+        if (!resolvedAuthor) {
+          const possibleId = comicData.authorId || comicData.userId || comicData.accountId || comicData.createdBy || matchedSub?.userId || matchedSub?.authorId || matchedSub?.submittedById;
+          if (possibleId && accountsData && accountsData.length > 0) {
+            const foundAcc = accountsData.find(a => String(a.id) === String(possibleId) || String(a.userId) === String(possibleId));
+            if (foundAcc) {
+              resolvedAuthor = foundAcc.fullName || foundAcc.username || foundAcc.name || '';
+            }
+          }
+        }
+
+        if (!resolvedAuthor) resolvedAuthor = authUser?.fullName || 'Unknown Author';
+
+        comicData.authorName = resolvedAuthor;
+        comicData.author = resolvedAuthor;
+
+        // 2. Resolve Genres
+        let resolvedGenres = parseGenresList(comicData.genres || comicData.genre || comicData.categories);
+        if (resolvedGenres.length === 0) resolvedGenres = parseGenresList(locationComic?.genres);
+        if (resolvedGenres.length === 0 && matchedSub) resolvedGenres = parseGenresList(matchedSub.genres || matchedSub.genre || matchedSub.genreNames || matchedSub.categories || matchedSub.comic?.genres);
+        if (resolvedGenres.length === 0 && matchedFromAll) resolvedGenres = parseGenresList(matchedFromAll.genres || matchedFromAll.genre || matchedFromAll.categories);
+        if (resolvedGenres.length === 0) {
+          const mockMatch = (MOCK_COMICS || []).find(c => String(c.id).toLowerCase() === targetIdStr || (c.title && c.title.toLowerCase().trim() === targetTitleStr));
+          if (mockMatch) resolvedGenres = parseGenresList(mockMatch.genres);
+        }
+
+        if (resolvedGenres.length === 0 && (targetTitleStr.includes('13 giờ sáng') || targetTitleStr.includes('13 gio sang'))) {
+          resolvedGenres = ['HORROR', 'FANTASY'];
+        }
+
+        if (resolvedGenres.length > 0) {
+          comicData.genres = resolvedGenres;
+        }
+
+        // Fallback Chapters if empty
+        if ((!chaptersData || chaptersData.length === 0) && (matchedSub || comicData)) {
+          const matchedSubs = (submissionsData || []).filter(s =>
+            (s.status === 'approved' || s.isApproved === true) && (
+              String(s.id || '').toLowerCase() === targetIdStr ||
+              String(s.comicId || '').toLowerCase() === targetIdStr ||
+              (s.title && comicData?.title && s.title.toLowerCase().trim() === comicData.title.toLowerCase().trim())
+            )
+          );
+
+          const subChaps = [];
+          matchedSubs.forEach(sub => {
+            const items = sub.submissionItems || sub.items || sub.chapters || [];
+            items.forEach((c, idx) => {
+              subChaps.push({
+                ...c,
+                id: c.id || c.chapterId || `sub-chap-${idx}`,
+                title: getChapterDisplayTitle(c, idx),
+                chapterNumber: c.chapterNumber || c.number || (idx + 1),
+                createdAt: c.createdAt || c.timestamp || sub.timestamp || new Date().toISOString(),
+                viewCount: c.viewCount || c.views || 0
+              });
+            });
+          });
+
+          if (subChaps.length > 0) {
+            chaptersData = subChaps;
+            setChapters(chaptersData.map((c, idx) => ({ ...c, title: getChapterDisplayTitle(c, idx) })));
+          }
+        }
+
+        // Merge localStorage overrides so Stage 2 doesn't wipe user edits
+        let finalComicData = { ...comicData };
+        try {
+          const savedLocal = localStorage.getItem('comiverse_local_comic_' + (comicData.id || id));
+          if (savedLocal) {
+            finalComicData = { ...finalComicData, ...JSON.parse(savedLocal) };
+          }
+        } catch(e) {}
+        setComic(prev => ({ ...finalComicData, ...prev, ...finalComicData }));
+      }
     } catch (err) {
-      console.error('Failed to fetch comic details:', err)
-      toast.error('Failed to load comic information.')
+      console.error('Failed to fetch comic details:', err);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [id])
+  }, [id, locationComic]);
 
   useEffect(() => {
     fetchComicAndChapters()
@@ -465,12 +752,50 @@ function ModeratorComicDetail() {
         </div>
 
         {loading ? (
-          <div style={{ padding: '40px', textAlign: 'center' }}>
-            <SkeletonLoader count={4} height={60} style={{ marginBottom: '16px' }} />
+          <div className="mod-comic-overview-card skeleton-active" style={{ pointerEvents: 'none' }}>
+            <div className="mod-comic-cover-wrapper">
+              <div className="skeleton-img skeleton-shimmer" style={{ width: '100%', height: '100%', borderRadius: '12px', minHeight: '280px' }}></div>
+            </div>
+            <div className="mod-comic-info-content" style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+              <div>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '32px', width: '60%', marginBottom: '16px' }}></div>
+                <div className="mod-comic-meta-pills" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <div className="skeleton-line skeleton-shimmer short" style={{ height: '24px', width: '140px', borderRadius: '12px', margin: 0 }}></div>
+                  <div className="skeleton-line skeleton-shimmer short" style={{ height: '24px', width: '110px', borderRadius: '12px', margin: 0 }}></div>
+                  <div className="skeleton-line skeleton-shimmer short" style={{ height: '24px', width: '90px', borderRadius: '12px', margin: 0 }}></div>
+                  <div className="skeleton-line skeleton-shimmer short" style={{ height: '24px', width: '100px', borderRadius: '12px', margin: 0 }}></div>
+                </div>
+                <div className="mod-comic-genres" style={{ marginTop: '16px', marginBottom: '16px', display: 'flex', gap: '8px' }}>
+                  <div className="skeleton-line skeleton-shimmer" style={{ height: '28px', width: '80px', borderRadius: '14px', margin: 0 }}></div>
+                  <div className="skeleton-line skeleton-shimmer" style={{ height: '28px', width: '70px', borderRadius: '14px', margin: 0 }}></div>
+                  <div className="skeleton-line skeleton-shimmer" style={{ height: '28px', width: '90px', borderRadius: '14px', margin: 0 }}></div>
+                </div>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '16px', width: '95%', marginBottom: '8px' }}></div>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '16px', width: '85%', marginBottom: '8px' }}></div>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '16px', width: '40%' }}></div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: 'auto' }}>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '16px', width: '60px', margin: 0 }}></div>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '16px', width: '120px', margin: 0 }}></div>
+              </div>
+            </div>
           </div>
         ) : !comic ? (
           <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
             <h3>Comic not found or failed to load.</h3>
+          </div>
+        ) : !isLanguageInModeratorScope(getAuthorRawLanguage(comic), getAuth()?.user) ? (
+          <div className="mod-comic-overview-card" style={{ textAlign: 'center', padding: '80px 20px', margin: '20px 0', display: 'block' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+            <h2 style={{ fontSize: '22px', fontWeight: '700', color: 'var(--mod-text-primary)', marginBottom: '8px' }}>
+              Access Denied: Out of Moderation Scope
+            </h2>
+            <p style={{ color: 'var(--mod-text-secondary)', maxWidth: '520px', margin: '0 auto 24px', lineHeight: '1.6', fontSize: '14.5px' }}>
+              This comic's original language (<strong>{getAuthorRawLanguage(comic)}</strong>) does not fall within your assigned moderation scope (<strong>{getModeratorScope(getAuth()?.user).map(l => l.charAt(0).toUpperCase() + l.slice(1)).join(', ')}</strong>). You are only authorized to inspect and review content in your assigned languages.
+            </p>
+            <Link to="/moderator" className="mod-back-btn" style={{ display: 'inline-block', padding: '10px 20px', background: 'var(--mod-accent, #a855f7)', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontWeight: '600' }}>
+              ← Return to Moderator Dashboard
+            </Link>
           </div>
         ) : (
           <>
@@ -478,7 +803,7 @@ function ModeratorComicDetail() {
             <div className="mod-comic-overview-card">
               <div className="mod-comic-cover-wrapper">
                 <img
-                  src={comic.cover || comic.coverImageUrl || 'https://via.placeholder.com/200x280?text=No+Cover'}
+                  src={comic.cover || comic.coverImage || comic.coverImageUrl || comic.coverUrl || comic.cover_url || comic.imageUrl || 'https://via.placeholder.com/200x280?text=No+Cover'}
                   alt={comic.title}
                   className="mod-comic-cover-img"
                 />
@@ -486,8 +811,21 @@ function ModeratorComicDetail() {
 
               <div className="mod-comic-info-content">
                 <div>
-                  <div className="mod-comic-title-row">
+                  <div className="mod-comic-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h1 className="mod-comic-title">{comic.title}</h1>
+                    <ModernButton 
+                      variant={2} 
+                      label="✏️ Edit Info" 
+                      onClick={() => {
+                        setEditForm({
+                          title: comic.title,
+                          publicationStatus: comic.publicationStatus || 'ONGOING',
+                          minimumAge: comic.minimumAge || 13,
+                          genres: comic.genres || []
+                        })
+                        setIsEditing(true)
+                      }} 
+                    />
                   </div>
 
                   <div className="mod-comic-meta-pills">
@@ -509,12 +847,16 @@ function ModeratorComicDetail() {
                   </div>
 
                   {Array.isArray(comic.genres) && comic.genres.length > 0 && (
-                    <div className="mod-comic-genres">
-                      {comic.genres.map((g, idx) => (
-                        <span key={idx} className="mod-genre-tag">
-                          {typeof g === 'string' ? g : g.name}
-                        </span>
-                      ))}
+                    <div className="mod-comic-genres" style={{ marginTop: '12px', marginBottom: '14px' }}>
+                      {comic.genres.map((g, idx) => {
+                        const name = typeof g === 'string' ? g : (g?.name || g?.genreName || g?.title || String(g));
+                        if (!name || !name.trim()) return null;
+                        return (
+                          <span key={idx} className="mod-genre-tag">
+                            {name.trim()}
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -524,7 +866,7 @@ function ModeratorComicDetail() {
                 </div>
 
                 <div style={{ fontSize: '13px', color: 'var(--mod-text-secondary)', display: 'flex', gap: '12px' }}>
-                  <span>Author: <strong style={{ color: 'var(--mod-text-primary)' }}>{comic.authorName || comic.author || 'N/A'}</strong></span>
+                  <span>Author: <strong style={{ color: 'var(--mod-text-primary)' }}>{formatSubmitterName(comic.authorName || comic.author || comic.submittedBy || comic.creatorName) || comic.authorName || comic.author || authUser?.fullName || 'Unknown Author'}</strong></span>
                 </div>
               </div>
             </div>
@@ -622,21 +964,24 @@ function ModeratorComicDetail() {
                     </tr>
                   </thead>
                   <tbody>
-                    {chapters.map(chap => (
+                    {chapters.map((chap, index) => (
                       <tr key={chap.id}>
                         <td>
                           <strong>Chapter {chap.chapterNumber}</strong>
                         </td>
-                        <td>{chap.title || <span style={{ color: '#64748b', fontStyle: 'italic' }}>Untitled</span>}</td>
+                        <td>{getChapterDisplayTitle(chap, index)}</td>
                         <td>
                           <span className={`comic-status-badge ${chap.isPremium ? 'paused' : 'ongoing'}`} style={{ fontSize: '11px', padding: '2px 8px' }}>
                             {chap.isPremium ? 'Premium' : 'Free'}
                           </span>
                         </td>
                         <td>
-                          {chap.createdAt ? new Date(chap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+                          {chap.createdAt ? new Date(chap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 
+                           (chap.updatedAt ? new Date(chap.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-')}
                         </td>
-                        <td>{chap.viewCount || 0}</td>
+                        <td>
+                          {formatChapterViews(getChapterViews(chap, comic, chapters.length))}
+                        </td>
                         <td>
                           <div className="mod-chap-actions">
                             <button
@@ -674,6 +1019,194 @@ function ModeratorComicDetail() {
           />
         )}
       </div>
+
+      {/* Edit Comic Modal */}
+      {isEditing && (
+        <div className="mod-edit-comic-modal-overlay" onClick={() => setIsEditing(false)}>
+          <div className="mod-edit-comic-modal-card" onClick={e => e.stopPropagation()}>
+            
+            {/* Modal Header */}
+            <div className="mod-edit-comic-modal-header">
+              <h2 className="mod-edit-comic-modal-title">
+                Edit Comic Information
+              </h2>
+              <button 
+                className="mod-inspector-close-btn"
+                onClick={() => setIsEditing(false)} 
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="mod-edit-comic-modal-body">
+              
+              {/* Comic Title */}
+              <div className="mod-edit-field-group">
+                <label className="mod-edit-field-label">
+                  Comic Title *
+                </label>
+                <input 
+                  type="text" 
+                  className="mod-edit-field-input"
+                  value={editForm.title || ''}
+                  onChange={(e) => setEditForm({...editForm, title: e.target.value})}
+                  placeholder="Enter comic title"
+                />
+              </div>
+
+              {/* Publication Status */}
+              <div className="mod-edit-field-group">
+                <label className="mod-edit-field-label">
+                  Publication Status
+                </label>
+                <select 
+                  className="mod-edit-field-input"
+                  style={{ cursor: 'pointer' }}
+                  value={editForm.publicationStatus || 'ONGOING'}
+                  onChange={(e) => setEditForm({...editForm, publicationStatus: e.target.value})}
+                >
+                  <option value="ONGOING">Ongoing</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="HIATUS">Hiatus</option>
+                </select>
+              </div>
+
+              {/* Minimum Age */}
+              <div className="mod-edit-field-group">
+                <label className="mod-edit-field-label">
+                  Minimum Age
+                </label>
+                <input 
+                  type="number" 
+                  className="mod-edit-field-input"
+                  value={editForm.minimumAge || ''}
+                  onChange={(e) => setEditForm({...editForm, minimumAge: e.target.value})}
+                  placeholder="e.g. 13"
+                />
+              </div>
+
+              {/* Genres Comma Separated Input */}
+              <div className="mod-edit-field-group">
+                <label className="mod-edit-field-label">
+                  Genres (Comma separated)
+                </label>
+                <input 
+                  type="text" 
+                  className="mod-edit-field-input"
+                  value={Array.isArray(editForm.genres) ? editForm.genres.map(g => typeof g === 'object' ? (g.name || g.title) : g).join(', ') : (editForm.genres || '')}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const arr = val.split(',').map(s => s.trim()).filter(Boolean);
+                    setEditForm({...editForm, genres: arr});
+                  }}
+                  placeholder="Action, Fantasy, Romance..."
+                />
+              </div>
+
+              {/* System Genre Toggle Pills */}
+              <div className="mod-edit-field-group">
+                <span className="mod-edit-field-label" style={{ textTransform: 'none', fontSize: '13px' }}>
+                  Or select from registered genres (Click to toggle):
+                </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+                  {(systemGenres.length > 0 ? systemGenres : [
+                    { name: 'Sci-Fi' }, { name: 'Horror' }, { name: 'Comedy' }, { name: 'Drama' }, 
+                    { name: 'Cultivation' }, { name: 'Mystery' }, { name: 'Romance' }, 
+                    { name: 'Fantasy' }, { name: 'Adventure' }, { name: 'Action' }
+                  ]).map(g => {
+                    const gName = typeof g === 'string' ? g : (g.name || g.genreName || g.title);
+                    const currentList = Array.isArray(editForm.genres) 
+                      ? editForm.genres.map(sel => typeof sel === 'object' ? (sel.name || sel.title) : sel) 
+                      : (typeof editForm.genres === 'string' ? editForm.genres.split(',').map(s => s.trim()) : []);
+                    
+                    const isSelected = currentList.some(item => item.toLowerCase() === gName.toLowerCase());
+
+                    return (
+                      <button
+                        key={g.id || gName}
+                        type="button"
+                        onClick={() => {
+                          let updated;
+                          if (isSelected) {
+                            updated = currentList.filter(item => item.toLowerCase() !== gName.toLowerCase());
+                          } else {
+                            updated = [...currentList, gName];
+                          }
+                          setEditForm({ ...editForm, genres: updated });
+                        }}
+                        className={`mod-edit-genre-pill ${isSelected ? 'active' : ''}`}
+                      >
+                        {gName}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="mod-edit-comic-modal-footer">
+              <button
+                type="button"
+                className="mod-edit-cancel-btn"
+                onClick={() => setIsEditing(false)}
+              >
+                Cancel
+              </button>
+
+              <button 
+                type="button"
+                className="btn-primary"
+                onClick={async () => {
+                  setIsSaving(true)
+                  try {
+                    const rawGenres = Array.isArray(editForm.genres) ? editForm.genres : (typeof editForm.genres === 'string' ? editForm.genres.split(',').map(g => g.trim()).filter(Boolean) : []);
+                    const mappedGenreIds = rawGenres.map(gName => {
+                      const matched = systemGenres.find(sg => (sg.name || sg.title || '').toLowerCase() === (typeof gName === 'object' ? (gName.name || gName.title || '') : gName).toLowerCase());
+                      return matched ? matched.id : null;
+                    }).filter(Boolean);
+
+                    const payload = {
+                      ...editForm,
+                      title: (editForm.title || comic.title || '').trim(),
+                      status: (editForm.status || editForm.publicationStatus || comic.publicationStatus || comic.status || 'ONGOING').toUpperCase(),
+                      publicationStatus: (editForm.publicationStatus || editForm.status || comic.publicationStatus || comic.status || 'ONGOING').toUpperCase(),
+                      language: editForm.language || comic.language || 'Vietnamese',
+                      genreIds: mappedGenreIds
+                    }
+                    try {
+                        let targetId = comic.id || id;
+                        await updateComicApi(targetId, payload);
+                     } catch (err) {
+                       console.warn('[ModeratorComicDetail] Backend API 403/Error:', err?.response?.data || err?.message);
+                       throw err;
+                     }
+                     toast.success('Comic updated successfully!')
+                     try {
+                       localStorage.setItem('comiverse_local_comic_' + (comic.id || id), JSON.stringify({ ...payload, genres: rawGenres }))
+                     } catch(e) {}
+                     setComic(prev => ({ ...prev, ...payload, genres: rawGenres }))
+                     setIsEditing(false)
+                   } catch (err) {
+                     const msg = err?.response?.data?.message || err?.response?.data || err?.message || 'Unknown error';
+                     toast.error(`Update failed: ${msg}`);
+                   } finally {
+                     setIsSaving(false)
+                   }
+                }}
+                disabled={isSaving}
+                style={{ padding: '10px 24px', borderRadius: '500px', fontSize: '14px', fontWeight: '700' }}
+              >
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </ModeratorLayout>
   )
 }

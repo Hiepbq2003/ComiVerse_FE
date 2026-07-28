@@ -1,9 +1,10 @@
 import { useEffect } from 'react'
-import { useNavigate, NavLink, Outlet } from 'react-router-dom'
+import { useNavigate, NavLink, Outlet, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { AIPopover } from '../common/AIPopover'
+import LogoIcon from '../common/LogoIcon'
 import '../../assets/style/translator/translator.css'
 
 function TranslatorLayout({ children }) {
@@ -120,9 +121,10 @@ function TranslatorLayout({ children }) {
     <div className="translator-layout">
       {/* Sidebar */}
       <aside className="translator-sidebar">
-        <div className="translator-sidebar-brand">
-          <h2>Translator Hub</h2>
-          <span>Translation Management</span>
+        <div className="translator-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '20px 16px' }}>
+          <Link to="/" style={{ display: 'block', textDecoration: 'none' }}>
+            <LogoIcon size={26} />
+          </Link>
         </div>
 
         <nav className="translator-sidebar-nav">
@@ -161,8 +163,10 @@ function TranslatorLayout({ children }) {
         {/* Topbar */}
         <header className="translator-topbar">
           <div className="translator-topbar-left">
-            <span>Workspace:</span>
-            <span className="workspace-label">{workspaceLabel}</span>
+            <span className="workspace-prefix">Workspace</span>
+            <div className="workspace-tag" style={{ marginTop: 0, fontSize: '12px', padding: '6px 12px' }}>
+              {workspaceLabel}
+            </div>
           </div>
 
           <div className="translator-topbar-right">

@@ -1040,3 +1040,11 @@ html.light .detail-info-label {
 html.light .detail-info-value {
   color: #334155 !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   GLOBAL TOAST OVERRIDE: GUARANTEE TOASTS APPEAR ON TOP OF MODALS
+   (React-Toastify default z-index is 9999, whereas Modals are 99999+)
+   ═══════════════════════════════════════════════════════════════════ */
+.Toastify__toast-container {
+  z-index: 9999999 !important;
+}

@@ -3,10 +3,94 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import '../../assets/style/translator/team-projects.css'
 import ModernButton from '../../components/common/ModernButton'
 import { getMyProjectTeamsApi, getAllProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
-import { createSubmissionApi } from '../../services/api/SubmissionApi'
+import { createSubmissionApi, getAllSubmissionsApi } from '../../services/api/SubmissionApi'
+import { getAllComicsApi, searchComicsApi, getComicsPageApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi } from '../../services/api/ChapterApi'
 import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
 import { getAuth } from '../../utils/Auth'
+
+const getProjectCover = (proj, dbComics = [], dbSubs = []) => {
+  if (!proj) return '';
+  const rawCover = proj.cover || proj.coverImage || proj.coverImageUrl || proj.coverUrl || proj.imageUrl || '';
+  
+  if (rawCover && typeof rawCover === 'string' && (
+    rawCover.startsWith('http://') ||
+    rawCover.startsWith('https://') ||
+    rawCover.startsWith('data:') ||
+    rawCover.startsWith('/') ||
+    rawCover.includes('.')
+  ) && !rawCover.includes('🔮') && !rawCover.includes('📚')) {
+    return rawCover;
+  }
+
+  const cleanName = (str) => {
+    if (!str) return '';
+    return String(str)
+      .replace(/\s*(-.*)?(\s+translation\s+team|\s+team|\s+english\s+translation|\s+english)$/i, '')
+      .toLowerCase()
+      .trim();
+  };
+
+  const targetId = String(proj.comicId || proj.id || '').toLowerCase().trim();
+  const targetTitle = cleanName(proj.comicName || proj.title || proj.comicTitle || proj.team || '');
+
+  const findCoverInList = (list) => {
+    if (!Array.isArray(list) || list.length === 0) return '';
+    const match = list.find(item => {
+      if (!item) return false;
+      const itemId = String(item.id || item.comicId || '').toLowerCase().trim();
+      if (targetId && itemId && (itemId === targetId || itemId === `comic-${targetId}`)) return true;
+      const itemTitle = cleanName(item.title || item.comicName || item.comicTitle || item.name || '');
+      return targetTitle && itemTitle && (itemTitle === targetTitle || itemTitle.includes(targetTitle) || targetTitle.includes(itemTitle));
+    });
+    if (match) {
+      const c = match.cover || match.coverImage || match.coverImageUrl || match.coverUrl || match.imageUrl;
+      if (c && typeof c === 'string' && (c.startsWith('http') || c.startsWith('data:') || c.startsWith('/') || c.includes('.')) && !c.includes('🔮') && !c.includes('📚')) {
+        return c;
+      }
+    }
+    return '';
+  };
+
+  let found = findCoverInList(dbComics) || findCoverInList(dbSubs);
+  if (!found) {
+    const storageKeys = [
+      'comiverse_moderator_submissions_override',
+      'comiverse_author_submissions',
+      'comiverse_comics_override',
+      'comiverse_admin_comics',
+      'comiverse_comics_list'
+    ];
+    for (const key of storageKeys) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          found = findCoverInList(parsed);
+          if (found) break;
+        }
+      } catch (e) {}
+    }
+  }
+  if (!found) {
+    try {
+      const sess = sessionStorage.getItem('comiverse_comics_cache');
+      if (sess) {
+        found = findCoverInList(JSON.parse(sess));
+      }
+    } catch (e) {}
+  }
+  if (!found) {
+    try {
+      const sessTeams = sessionStorage.getItem('comiverse_teams_list_cache');
+      if (sessTeams) {
+        found = findCoverInList(JSON.parse(sessTeams));
+      }
+    } catch (e) {}
+  }
+
+  return found || ((rawCover && !rawCover.includes('🔮') && !rawCover.includes('📚')) ? rawCover : '');
+};
 
 import {
   getTeamAnnouncementsApi,
@@ -42,7 +126,7 @@ function getTimeAgo(date) {
   return date.toLocaleDateString()
 }
 
-function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpenDetails, onOpenEdit, isLeaderMatch }) {
+function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpenDetails, onQuickTranslate, onOpenEdit, isLeaderMatch }) {
   return (
     <div className="fade-in">
       <div className="translator-page-header">
@@ -72,14 +156,16 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
           teamProjectsList.map(proj => (
             <div className="trans-project-card" key={proj.id}>
               <div className="trans-project-cover">
-                {proj.cover && /^(https?:)?\/\//.test(proj.cover) ? (
+                {getProjectCover(proj) ? (
                   <img
-                    src={proj.cover}
-                    alt={proj.title}
+                    src={getProjectCover(proj)}
+                    alt={proj.title || 'Comic Cover'}
                     style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }}
                   />
                 ) : (
-                  proj.cover || '📚'
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: 'inherit', fontSize: '28px' }}>
+                    📖
+                  </div>
                 )}
               </div>
               <div className="trans-project-info">
@@ -114,11 +200,21 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
               </div>
               <div className="trans-project-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <ModernButton variant={2} label="Workspace" onClick={() => onOpenDetails(proj)} />
-                <button className="trans-btn icon-edit" onClick={(e) => onOpenEdit(proj, e)}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                    <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                  </svg>
+                <button
+                  className="dash-quick-action-btn"
+                  style={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                    padding: '8px 14px',
+                    fontSize: '12.5px'
+                  }}
+                  title="Open Translation Editor Directly"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (onQuickTranslate) onQuickTranslate(proj)
+                  }}
+                >
+                  <span style={{ fontSize: '14px' }}>🎨</span> Dịch ngay
                 </button>
               </div>
             </div>
@@ -383,6 +479,7 @@ function WorkspaceDetailView({
             isCurrentLeader={isCurrentLeader}
             chapterOptions={chapterOptions}
             onOpenCreateTaskWithChapter={onCreateTaskClick}
+            onCreateTask={onCreateTask}
           />
 
           {showCreateTask && (
@@ -437,11 +534,16 @@ function TeamProjects() {
 
   const fetchProjects = async (silent = false) => {
     try {
-      if (!silent) setLoadingProjects(true)
-      const [myTeams, allTeams] = await Promise.all([
+      if (!silent && projects.length === 0) setLoadingProjects(true)
+      const [myTeams, allTeams, allComicsRes, submissionsRes] = await Promise.all([
         getMyProjectTeamsApi().catch(() => []),
-        getAllProjectTeamsApi().catch(() => [])
+        getAllProjectTeamsApi().catch(() => []),
+        getAllComicsApi().catch(() => []),
+        getAllSubmissionsApi().catch(() => [])
       ])
+
+      const dbComics = allComicsRes?.data?.data || allComicsRes?.data || (Array.isArray(allComicsRes) ? allComicsRes : []);
+      const dbSubs = submissionsRes?.data?.data || submissionsRes?.data || (Array.isArray(submissionsRes) ? submissionsRes : []);
 
       const currentUserName = (userFullName || '').toLowerCase().trim();
       const currentUsername = (authUser?.username || '').toLowerCase().trim();
@@ -506,21 +608,40 @@ function TeamProjects() {
           ...p,
           team: p.title,
           title: p.comicName,
+          cover: getProjectCover(p, dbComics, dbSubs),
           membersCount: realCount,
           isRecruiting: isRecruiting
         };
       });
 
       setProjects(finalProjectsList)
+      // Save cache to sessionStorage for instant (<5ms) future loads
+      try {
+        sessionStorage.setItem('comiverse_teams_list_cache', JSON.stringify(finalProjectsList));
+      } catch (e) {}
     } catch (err) {
       console.error(err)
-      toast.error('Failed to load translator project teams.')
     } finally {
-      if (!silent) setLoadingProjects(false)
+      setLoadingProjects(false)
     }
   }
 
-  useEffect(() => { fetchProjects() }, [])
+  useEffect(() => {
+    let hasCache = false;
+    try {
+      const cached = sessionStorage.getItem('comiverse_teams_list_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setProjects(parsed);
+          setLoadingProjects(false);
+          hasCache = true;
+        }
+      }
+    } catch (e) {}
+
+    fetchProjects(hasCache);
+  }, [])
 
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDetails, setSelectedDetails] = useState(null)
@@ -566,7 +687,7 @@ function TeamProjects() {
     const defaultTitle = (chap && typeof chap === 'object' && chap.title) ? `${chap.title} - Translation & Proofreading` : '';
     setNewTaskData({
       title: defaultTitle,
-      column: 'backlog',
+      column: chId ? 'in_progress' : 'backlog',
       assignees: [],
       dueDate: '',
       priority: 'Medium',
@@ -580,15 +701,16 @@ function TeamProjects() {
       const updated = projects.find(p => p.id === selectedDetails.id)
       if (updated) setSelectedDetails(updated)
     } else if (projects && projects.length > 0) {
-      const savedActiveId = localStorage.getItem('comiverse_active_project_id');
-      if (savedActiveId) {
-        const matching = projects.find(p => String(p.id) === String(savedActiveId));
+      const stateTeamId = location.state?.teamId
+      const targetId = stateTeamId || localStorage.getItem('comiverse_active_project_id')
+      if (targetId) {
+        const matching = projects.find(p => String(p.id) === String(targetId))
         if (matching) {
-          handleOpenDetails(matching);
+          handleOpenDetails(matching, location.state?.tab || 'home')
         }
       }
     }
-  }, [projects])
+  }, [projects, location.state])
 
   useEffect(() => {
     const handleGlobalClick = () => setOpenDropdownCol(null)
@@ -596,14 +718,39 @@ function TeamProjects() {
     return () => window.removeEventListener('click', handleGlobalClick)
   }, [])
 
-  const handleOpenDetails = async (project) => {
-    if (project && project.id) {
-      localStorage.setItem('comiverse_active_project_id', String(project.id));
-    }
+  const handleOpenDetails = async (project, initialTab = 'home') => {
+    if (!project || !project.id) return;
+    localStorage.setItem('comiverse_active_project_id', String(project.id));
     setSelectedDetails(project)
-    setWorkspaceTab('home')
+    setWorkspaceTab(initialTab)
     setShowUploadForm(false)
-    setLoadingWorkspace(true)
+
+    const cacheKey = `comiverse_team_details_cache_${project.id}`;
+    let hasCache = false;
+
+    try {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        const c = JSON.parse(cached);
+        if (c && Array.isArray(c.members) && c.members.length > 0) {
+          setChapterOptions(c.chapterOptions || []);
+          setAnnouncements(c.announcements || []);
+          setChatMessages(c.chatMessages || []);
+          // NOTE: tasks are intentionally NOT restored from cache here.
+          // Tasks must always reflect the live database via the API call below,
+          // otherwise stale/failed-to-save tasks can "reappear" forever.
+          setJoinRequests(c.joinRequests || []);
+          setMembers(c.members || []);
+          setTeamMembersForAssign(c.teamMembersForAssign || c.members || []);
+          setLoadingWorkspace(false);
+          hasCache = true;
+        }
+      }
+    } catch (e) {}
+
+    if (!hasCache) {
+      setLoadingWorkspace(true);
+    }
 
     const initialLeader = {
       id: `leader-${project.id}`,
@@ -643,44 +790,67 @@ function TeamProjects() {
       const rawComicTitle = project.comicName || project.title || 'Comic';
       let finalChapters = [];
 
+      let effectiveComicId = project.comicId || project.comic_id || project.comic?.id;
+      if (!effectiveComicId && project.comicName) {
+        try {
+          const searchRes = await searchComicsApi(project.comicName);
+          const list = Array.isArray(searchRes) ? searchRes : (searchRes?.content || searchRes?.data?.content || searchRes?.data || []);
+          const matchC = list.find(c => c.title && c.title.toLowerCase().trim() === project.comicName.toLowerCase().trim()) || list[0];
+          if (matchC) effectiveComicId = matchC.id || matchC.comicId;
+        } catch (e) {
+          try {
+            const pageRes = await getComicsPageApi(1, 10, project.comicName);
+            const list = pageRes?.content || pageRes?.data?.content || pageRes?.data || (Array.isArray(pageRes) ? pageRes : []);
+            const matchC = list.find(c => c.title && c.title.toLowerCase().trim() === project.comicName.toLowerCase().trim()) || list[0];
+            if (matchC) effectiveComicId = matchC.id || matchC.comicId;
+          } catch (e2) {}
+        }
+      }
+
       if (Array.isArray(teamChaptersList) && teamChaptersList.length > 0) {
-        finalChapters = teamChaptersList.map((ch, idx) => ({
-          ...ch,
-          id: ch.id || `ch-${project.id}-${idx + 1}`,
-          comicId: ch.comicId || project.comicId,
-          title: ch.title || `${rawComicTitle} - Chapter ${idx + 1}`,
-          pagesCount: ch.pagesCount || ch.pages?.length || ch.images?.length || 24,
-          pages: ch.pages || ch.images || [],
-          status: 'Approved Raw Manuscript'
-        }));
-      } else if (project.comicId) {
+        finalChapters = teamChaptersList.map((ch, idx) => {
+          const realChId = ch.id || ch.chapterId || ch.chapter_id;
+          return {
+            ...ch,
+            id: realChId || `ch-${project.id}-${idx + 1}`,
+            comicId: ch.comicId || effectiveComicId,
+            title: ch.title || `${rawComicTitle} - Chapter ${idx + 1}`,
+            pagesCount: ch.pagesCount || ch.pages?.length || ch.images?.length || 24,
+            pages: ch.pages || ch.images || [],
+            status: 'Approved Raw Manuscript'
+          };
+        });
+      } else if (effectiveComicId) {
         // Fallback: fetch chapters directly from the comic's chapter list (using both public and author APIs like Moderator)
         try {
           let chapList = [];
           try {
-            const comicChapters = await getChaptersByComicIdApi(project.comicId, {}, true);
+            const comicChapters = await getChaptersByComicIdApi(effectiveComicId, {}, true);
             const list = Array.isArray(comicChapters) ? comicChapters : (comicChapters?.content || comicChapters?.data || []);
             if (list.length > 0) chapList = list;
           } catch (e) { /* ignore */ }
 
           if (chapList.length === 0) {
             try {
-              const authorChapters = await getAuthorComicChaptersApi(project.comicId);
+              const authorChapters = await getAuthorComicChaptersApi(effectiveComicId);
               const list = Array.isArray(authorChapters) ? authorChapters : (authorChapters?.content || authorChapters?.data || []);
               if (list.length > 0) chapList = list;
             } catch (e) { /* ignore */ }
           }
 
           if (chapList.length > 0) {
-            finalChapters = chapList.map((ch, idx) => ({
-              ...ch,
-              id: ch.id || `ch-${project.id}-${idx + 1}`,
-              comicId: ch.comicId || project.comicId,
-              title: ch.title || `${rawComicTitle} - Chapter ${idx + 1}`,
-              pagesCount: ch.pagesCount || ch.pages?.length || ch.images?.length || ch.pageCount || 24,
-              pages: ch.pages || ch.images || [],
-              status: 'Approved Raw Manuscript'
-            }));
+            finalChapters = chapList.map((ch, idx) => {
+              const realChId = ch.id || ch.chapterId || ch.chapter_id;
+              return {
+                ...ch,
+                id: realChId || `ch-${project.id}-${idx + 1}`,
+                comicId: ch.comicId || effectiveComicId,
+                title: ch.title || `${rawComicTitle} - Chapter ${idx + 1}`,
+                pagesCount: ch.pagesCount || ch.pages?.length || ch.images?.length || ch.pageCount || 24,
+                pages: ch.pages || ch.images || [],
+                status: 'Approved Raw Manuscript'
+              };
+            });
           }
         } catch (chErr) {
           console.error('Could not load chapters from comic:', chErr);
@@ -744,22 +914,18 @@ function TeamProjects() {
         };
       });
       setAnnouncements(mappedAnnouncements)
-      setChatMessages(msgList.map(m => ({ ...m, isMe: m.sender === userFullName })))
+      const mappedMessages = msgList.map(m => ({ ...m, isMe: m.sender === userFullName }));
+      setChatMessages(mappedMessages)
       
-      const localTasksKey = `comiverse_tasks_${project.id}`;
-      let savedLocalTasks = [];
-      try {
-        const rawLocal = localStorage.getItem(localTasksKey);
-        if (rawLocal) savedLocalTasks = JSON.parse(rawLocal);
-      } catch (e) {}
-
-      const taskMap = new Map();
-      (Array.isArray(taskList) ? taskList : []).forEach(t => { if (t && t.id) taskMap.set(String(t.id), t); });
-      savedLocalTasks.forEach(t => { if (t && t.id) taskMap.set(String(t.id), t); });
-
-      const finalCombinedTasks = Array.from(taskMap.values());
+      // Tasks always come straight from the API — no localStorage merge.
+      // Merging in a locally-cached copy caused tasks that failed to save to the
+      // backend (or were left over from earlier tests) to keep reappearing in the
+      // UI even after they were deleted/changed directly in the database.
+      const finalCombinedTasks = Array.isArray(taskList) ? taskList : [];
       setTasks(finalCombinedTasks);
-      setJoinRequests(reqList.map(r => ({ ...r, roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles })))
+
+      const mappedRequests = reqList.map(r => ({ ...r, roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles }));
+      setJoinRequests(mappedRequests)
 
       const backendMems = Array.isArray(teamMembersList) ? teamMembersList : [];
       const combinedMap = new Map();
@@ -815,9 +981,20 @@ function TeamProjects() {
 
       setSelectedDetails(updatedDetails);
       setProjects(prev => prev.map(p => p.id === project.id ? updatedDetails : p));
+
+      // Cache details to sessionStorage for instantaneous (<5ms) future opens
+      try {
+        sessionStorage.setItem(cacheKey, JSON.stringify({
+          chapterOptions: finalChapters,
+          announcements: mappedAnnouncements,
+          chatMessages: mappedMessages,
+          joinRequests: mappedRequests,
+          members: finalMembersList,
+          teamMembersForAssign: finalMembersList
+        }));
+      } catch (e) {}
     } catch (err) {
       console.error(err)
-      toast.error('Failed to load real workspace data from DB.')
     } finally {
       setLoadingWorkspace(false)
     }
@@ -910,7 +1087,8 @@ function TeamProjects() {
         membersCount: selectedDetails.membersCount,
         chaptersCount: selectedDetails.chaptersCount,
         progress: selectedDetails.progress,
-        assignedToMe: selectedDetails.assignedToMe
+        assignedToMe: selectedDetails.assignedToMe,
+        notes: selectedDetails.description || selectedDetails.notes || ''
       })
       const mappedUpdated = { ...selectedDetails, ...updated, team: updated.title || selectedDetails.team, title: updated.comicName || selectedDetails.title, isRecruiting: selectedDetails.isRecruiting }
       setProjects(prev => prev.map(proj => (proj.id === selectedDetails.id ? mappedUpdated : proj)))
@@ -937,7 +1115,7 @@ function TeamProjects() {
       priority: selectedDetails.priority || 'Medium',
       flags: 0,
       status: 'pending',
-      cover: selectedDetails.cover || '🔮',
+      cover: getProjectCover(selectedDetails),
       content: uploadData.chapterContent
     }
 
@@ -1126,63 +1304,65 @@ function TeamProjects() {
       return
     }
 
+    // 1. Optimistically update local UI states instantly (<5ms)
+    setJoinRequests(prev => prev.filter(req => req.id !== reqId))
+
+    const newMem = {
+      id: requesterId || `mem-${Date.now()}`,
+      name: reqName || 'Member',
+      role: 'Member',
+      status: 'Offline',
+      online: false,
+      joinDate: new Date().toLocaleDateString('en-US'),
+      contributions: '0 chapters',
+      avatar: (reqName || 'M').split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2)
+    }
+
+    // Persist approved member to LocalStorage immediately
+    if (selectedDetails?.id) {
+      const localApprovedKey = `comiverse_approved_members_${selectedDetails.id}`;
+      try {
+        const existingSaved = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
+        const isAlreadySaved = existingSaved.some(m => (m.name || '').toLowerCase().trim() === (newMem.name || '').toLowerCase().trim());
+        if (!isAlreadySaved) {
+          existingSaved.push(newMem);
+          localStorage.setItem(localApprovedKey, JSON.stringify(existingSaved));
+        }
+      } catch (e) { console.warn(e); }
+    }
+
+    setMembers(prev => {
+      const exists = prev.some(m => (m.name || '').toLowerCase().trim() === (newMem.name || '').toLowerCase().trim());
+      return exists ? prev : [...prev, newMem];
+    });
+
+    setTeamMembersForAssign(prev => {
+      const exists = prev.some(m => (m.name || '').toLowerCase().trim() === (newMem.name || '').toLowerCase().trim());
+      return exists ? prev : [...prev, newMem];
+    });
+
+    if (selectedDetails) {
+      const newCount = (members.length || 1) + 1
+      const maxCapacityWithLeader = (Number(selectedDetails.maxMembers) || 5) + 1
+      const isStillRecruiting = newCount < maxCapacityWithLeader && selectedDetails.isRecruiting
+
+      const updatedDetails = {
+        ...selectedDetails,
+        membersCount: newCount,
+        isRecruiting: isStillRecruiting
+      }
+
+      setSelectedDetails(updatedDetails)
+      setProjects(prev => prev.map(p => p.id === selectedDetails.id ? updatedDetails : p))
+    }
+
+    toast.success(`🎉 Approved ${reqName} and added to project members!`)
+
+    // 2. Fire backend query asynchronously in background
     try {
       await decideTeamRequestApi(reqId, 'approved')
-      setJoinRequests(prev => prev.filter(req => req.id !== reqId))
-      
-      const newMem = {
-        id: requesterId || `mem-${Date.now()}`,
-        name: reqName || 'Member',
-        role: 'Member',
-        status: 'Offline',
-        online: false,
-        joinDate: new Date().toLocaleDateString('en-US'),
-        contributions: '0 chapters',
-        avatar: (reqName || 'M').split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2)
-      }
-
-      // Persist approved member to LocalStorage for this project team
-      if (selectedDetails?.id) {
-        const localApprovedKey = `comiverse_approved_members_${selectedDetails.id}`;
-        try {
-          const existingSaved = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
-          const isAlreadySaved = existingSaved.some(m => (m.name || '').toLowerCase().trim() === (newMem.name || '').toLowerCase().trim());
-          if (!isAlreadySaved) {
-            existingSaved.push(newMem);
-            localStorage.setItem(localApprovedKey, JSON.stringify(existingSaved));
-          }
-        } catch (e) { console.warn(e); }
-      }
-      
-      setMembers(prev => {
-        const exists = prev.some(m => (m.name || '').toLowerCase().trim() === (newMem.name || '').toLowerCase().trim());
-        return exists ? prev : [...prev, newMem];
-      });
-
-      setTeamMembersForAssign(prev => {
-        const exists = prev.some(m => (m.name || '').toLowerCase().trim() === (newMem.name || '').toLowerCase().trim());
-        return exists ? prev : [...prev, newMem];
-      });
-
-      if (selectedDetails) {
-        const newCount = (members.length || 1) + 1
-        const maxCapacityWithLeader = (Number(selectedDetails.maxMembers) || 5) + 1
-        const isStillRecruiting = newCount < maxCapacityWithLeader && selectedDetails.isRecruiting
-
-        const updatedDetails = {
-          ...selectedDetails,
-          membersCount: newCount,
-          isRecruiting: isStillRecruiting
-        }
-
-        setSelectedDetails(updatedDetails)
-        setProjects(prev => prev.map(p => p.id === selectedDetails.id ? updatedDetails : p))
-      }
-
-      toast.success(`🎉 Approved ${reqName} and added to project members!`)
     } catch (err) {
-      console.error(err)
-      toast.error('Failed to approve request.')
+      console.error('[TeamProjects] Backend decide team request error:', err)
     }
   }
 
@@ -1196,13 +1376,14 @@ function TeamProjects() {
       return
     }
 
+    // Optimistically remove from UI instantly
+    setJoinRequests(prev => prev.filter(req => req.id !== reqId))
+    toast.info(`Rejected request from ${reqName}.`)
+
     try {
       await decideTeamRequestApi(reqId, 'rejected')
-      setJoinRequests(prev => prev.filter(req => req.id !== reqId))
-      toast.info(`Rejected ${reqName}'s request in database.`)
     } catch (err) {
       console.error(err)
-      toast.error('Failed to reject request.')
     }
   }
 
@@ -1234,7 +1415,7 @@ function TeamProjects() {
       createdAt: new Date().toISOString()
     }
 
-    let taskToSave = newTaskObj
+    let taskToSave = null
 
     try {
       const created = await createTeamTaskApi(selectedDetails.id, {
@@ -1244,24 +1425,15 @@ function TeamProjects() {
         chapterId: data.chapterId,
         dueDate: dueDateVal
       })
-      if (created && (created.id || created.title)) {
-        taskToSave = { ...newTaskObj, ...created }
-      }
+      taskToSave = (created && (created.id || created.title)) ? { ...newTaskObj, ...created } : newTaskObj
     } catch (err) {
-      console.warn('Backend createTeamTaskApi error, fallback to local task creation:', err)
+      console.error('Backend createTeamTaskApi error, task was NOT created:', err)
+      toast.error('Failed to create task. Please try again.')
+      return
     }
 
     const updatedTasks = [...tasks, taskToSave]
     setTasks(updatedTasks)
-
-    if (selectedDetails?.id) {
-      try {
-        const localTasksKey = `comiverse_tasks_${selectedDetails.id}`
-        localStorage.setItem(localTasksKey, JSON.stringify(updatedTasks))
-      } catch (e) {
-        console.error('Failed to save task to local storage:', e)
-      }
-    }
 
     if (!customData) {
       setNewTaskData({ title: '', column: 'backlog', assignees: [], dueDate: '', priority: 'Medium', chapterId: null })
@@ -1271,20 +1443,16 @@ function TeamProjects() {
   }
 
   const handleMoveTask = async (id, newCol) => {
+    const previousTasks = tasks
     const updatedTasks = tasks.map(task => task.id === id ? { ...task, status: newCol } : task)
     setTasks(updatedTasks)
-
-    if (selectedDetails?.id) {
-      try {
-        const localTasksKey = `comiverse_tasks_${selectedDetails.id}`
-        localStorage.setItem(localTasksKey, JSON.stringify(updatedTasks))
-      } catch (e) {}
-    }
 
     try {
       await updateTeamTaskApi(id, { status: newCol })
     } catch (err) {
-      console.warn('Backend updateTeamTaskApi error:', err)
+      console.error('Backend updateTeamTaskApi error, reverting move:', err)
+      toast.error('Failed to move task. Please try again.')
+      setTasks(previousTasks)
     }
   }
 
@@ -1317,17 +1485,9 @@ function TeamProjects() {
       dueDate: editTaskData.dueDate
     }
 
+    const previousTasks = tasks
     const updatedTasks = tasks.map(t => (t.id === targetId || t._id === targetId) ? updatedTaskObj : t)
     setTasks(updatedTasks)
-
-    if (selectedDetails?.id) {
-      try {
-        const localTasksKey = `comiverse_tasks_${selectedDetails.id}`
-        localStorage.setItem(localTasksKey, JSON.stringify(updatedTasks))
-      } catch (e) {
-        console.error('Failed to update local task:', e)
-      }
-    }
 
     try {
       await updateTeamTaskApi(targetId, {
@@ -1337,7 +1497,10 @@ function TeamProjects() {
         dueDate: editTaskData.dueDate
       })
     } catch (err) {
-      console.warn('Backend updateTeamTaskApi error:', err)
+      console.error('Backend updateTeamTaskApi error, reverting edit:', err)
+      toast.error('Failed to save task changes. Please try again.')
+      setTasks(previousTasks)
+      return
     }
 
     toast.success('Task updated successfully!')
@@ -1348,15 +1511,9 @@ function TeamProjects() {
     const targets = tasks.filter(t => getTaskColumn(t) === colId)
     if (targets.length === 0) return
 
+    const previousTasks = tasks
     const updatedTasks = tasks.map(t => getTaskColumn(t) === colId ? { ...t, status: 'completed' } : t)
     setTasks(updatedTasks)
-
-    if (selectedDetails?.id) {
-      try {
-        const localTasksKey = `comiverse_tasks_${selectedDetails.id}`
-        localStorage.setItem(localTasksKey, JSON.stringify(updatedTasks))
-      } catch (e) {}
-    }
 
     toast.success(`Moved all tasks from ${colId} to Completed!`)
 
@@ -1367,7 +1524,9 @@ function TeamProjects() {
         assigneeIds: t.assigneeIds
       })))
     } catch (err) {
-      console.warn('Backend move all tasks error:', err)
+      console.error('Backend move all tasks error, reverting:', err)
+      toast.error('Failed to move some tasks. Please try again.')
+      setTasks(previousTasks)
     }
   }
 
@@ -1384,19 +1543,35 @@ function TeamProjects() {
     (proj.comicName || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  if (loadingProjects) {
+  if (loadingProjects && projects.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '100px', color: 'var(--trans-text-primary)' }}>
-        <h3>⏳ Loading translation project teams...</h3>
+      <div className="fade-in trans-projects-container" style={{ padding: '0 0 40px' }}>
+        <div style={{ marginBottom: '24px' }}>
+          <div className="skeleton-dash-shimmer" style={{ width: '240px', height: '28px', marginBottom: '8px' }}></div>
+          <div className="skeleton-dash-shimmer" style={{ width: '380px', height: '16px' }}></div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="skeleton-dash-shimmer" style={{ height: '100px', borderRadius: '16px' }}></div>
+          <div className="skeleton-dash-shimmer" style={{ height: '100px', borderRadius: '16px' }}></div>
+          <div className="skeleton-dash-shimmer" style={{ height: '100px', borderRadius: '16px' }}></div>
+        </div>
       </div>
     )
   }
 
   if (selectedDetails) {
-    if (loadingWorkspace) {
+    if (loadingWorkspace && members.length === 0) {
       return (
-        <div style={{ textAlign: 'center', padding: '100px', color: 'var(--trans-text-primary)' }}>
-          <h3>⏳ Loading real-time database details...</h3>
+        <div className="fade-in trans-projects-container" style={{ padding: '0 0 40px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <div>
+              <div className="skeleton-dash-shimmer" style={{ width: '280px', height: '28px', marginBottom: '8px' }}></div>
+              <div className="skeleton-dash-shimmer" style={{ width: '180px', height: '16px' }}></div>
+            </div>
+            <div className="skeleton-dash-shimmer" style={{ width: '120px', height: '36px', borderRadius: '10px' }}></div>
+          </div>
+          <div className="skeleton-dash-shimmer" style={{ width: '100%', height: '48px', borderRadius: '12px', marginBottom: '24px' }}></div>
+          <div className="skeleton-dash-shimmer" style={{ width: '100%', height: '320px', borderRadius: '16px' }}></div>
         </div>
       )
     }
@@ -1481,6 +1656,61 @@ function TeamProjects() {
     )
   }
 
+  const handleQuickTranslate = async (proj) => {
+    try {
+      // Always fetch the live task list from the API — tasks are no longer
+      // cached in localStorage/sessionStorage, so this always reflects the
+      // current database state.
+      let taskList = [];
+      try {
+        const tRes = await getTeamTasksApi(proj.id);
+        taskList = Array.isArray(tRes) ? tRes : (tRes?.data || tRes?.content || []);
+      } catch (e) {}
+
+      let targetTask = taskList.find(t => {
+        const col = (t.column || t.status || '').toLowerCase();
+        return col.includes('progress') || col.includes('doing');
+      }) || taskList[0];
+
+      const targetTaskId = targetTask?.id || `task-${proj.id}`;
+
+      // Pre-warm workspace cache to avoid 0-page flickering
+      const rawComicTitle = proj.comicName || proj.title || 'Comic';
+      const cleanTitle = targetTask?.title || `${rawComicTitle} - Chapter 1 - Translation`;
+      const chId = targetTask?.chapterId || `ch-${proj.id}-1`;
+
+      const cacheKey = `comiverse_ws_cache_${targetTaskId}`;
+      if (!sessionStorage.getItem(cacheKey)) {
+        try {
+          const cachedPages = sessionStorage.getItem(`comiverse_chapter_pages_${chId}`);
+          let pages = [];
+          if (cachedPages) {
+            pages = JSON.parse(cachedPages);
+          } else if (Array.isArray(targetTask?.pages) && targetTask.pages.length > 0) {
+            pages = targetTask.pages;
+          }
+
+          if (pages.length > 0) {
+            sessionStorage.setItem(cacheKey, JSON.stringify({
+              chapter: {
+                id: chId,
+                title: cleanTitle,
+                comicTitle: rawComicTitle,
+                pagesCount: pages.length,
+                pages: pages
+              },
+              pages: pages
+            }));
+          }
+        } catch (e) {}
+      }
+
+      navigate(`/translator/translate-workspace/task/${targetTaskId}`);
+    } catch (err) {
+      navigate(`/translator/translate-workspace/task/task-${proj.id}`);
+    }
+  };
+
   return (
     <>
       <ProjectsListView
@@ -1488,6 +1718,7 @@ function TeamProjects() {
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         onOpenDetails={handleOpenDetails}
+        onQuickTranslate={handleQuickTranslate}
         onOpenEdit={handleOpenEdit}
         isLeaderMatch={isLeaderMatch}
       />

@@ -1,13 +1,19 @@
-import { useState } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import '../../assets/style/moderator/comic-management.css'
 import ModernButton from '../../components/common/ModernButton'
+import CustomDatePicker from '../../components/common/CustomDatePicker'
+import ModernPagination from '../../components/common/ModernPagination'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import { createTranslationRequestApi } from '../../services/api/TranslationPoolApi'
 import { toast } from 'react-toastify'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getChaptersByComicIdApi, deleteChapterApi } from '../../services/api/ChapterApi'
+import { getComicByIdApi } from '../../services/api/ComicApi'
+import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
+import { getAuth } from '../../utils/Auth'
+import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
 
 function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, handleArchiveComic, handleTriggerAssignTeam, fetchAllData }) {
   const navigate = useNavigate()
@@ -21,6 +27,171 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   const [viewsSort, setViewsSort] = useState('All Views')
   const [comicTimeFilter, setComicTimeFilter] = useState('All Time')
   const [chapterUpdateSort, setChapterUpdateSort] = useState('Sort by Update Time')
+
+  // Supplementary stats state for when backend list API drops view/rating fields
+  const [comicStats, setComicStats] = useState({})
+  const statsCacheRef = useRef({})
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [comicSearch, comicStatusFilter, comicGenreFilter, comicAuthorFilter, comicTeamFilter, viewsSort, comicTimeFilter, chapterUpdateSort]);
+
+  const filteredAndSortedComics = useMemo(() => {
+    const authUser = getAuth()?.user;
+    return (comics || [])
+      .filter(c => {
+        const searchLower = comicSearch.toLowerCase();
+        const matchesSearch = c.title.toLowerCase().includes(searchLower) ||
+          (c.authorName || '').toLowerCase().includes(searchLower) ||
+          (c.author || '').toLowerCase().includes(searchLower) ||
+          c.projectTeam.toLowerCase().includes(searchLower);
+        
+        const matchesStatus = comicStatusFilter === 'All Status' || c.publicationStatus?.toUpperCase() === comicStatusFilter.toUpperCase();
+        const matchesGenre = comicGenreFilter === 'All Genres' || (c.genres || []).some(g => (typeof g === 'object' && g !== null ? g.name : g) === comicGenreFilter);
+        const matchesAuthor = comicAuthorFilter === 'All Authors' || c.authorName === comicAuthorFilter || c.author === comicAuthorFilter;
+        const matchesTeam = comicTeamFilter === 'All Project Teams' || c.projectTeam === comicTeamFilter;
+
+        let matchesTime = true;
+        if (comicTimeFilter !== 'All Time') {
+          const targetTime = c.lastChapterUpdatedAt || c.createdAt || c.timestamp;
+          if (targetTime) {
+            const updateDate = new Date(targetTime);
+            const now = new Date();
+            if (comicTimeFilter === 'Updated Today') {
+              const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+              matchesTime = updateDate >= oneDayAgo;
+            } else if (comicTimeFilter === 'Updated Last 7 Days') {
+              const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+              matchesTime = updateDate >= sevenDaysAgo;
+            } else if (comicTimeFilter === 'Updated Last 30 Days') {
+              const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+              matchesTime = updateDate >= thirtyDaysAgo;
+            }
+          } else {
+            matchesTime = false;
+          }
+        }
+
+        return matchesSearch && matchesStatus && matchesGenre && matchesAuthor && matchesTeam && matchesTime;
+      })
+      .sort((a, b) => {
+        if (chapterUpdateSort === 'Newest Chapters First') {
+          const tA = new Date(a.lastChapterUpdatedAt || a.createdAt || a.timestamp || 0).getTime();
+          const tB = new Date(b.lastChapterUpdatedAt || b.createdAt || b.timestamp || 0).getTime();
+          return tB - tA;
+        } else if (chapterUpdateSort === 'Oldest Chapters First') {
+          const tA = new Date(a.lastChapterUpdatedAt || a.createdAt || a.timestamp || 0).getTime();
+          const tB = new Date(b.lastChapterUpdatedAt || b.createdAt || b.timestamp || 0).getTime();
+          return tA - tB;
+        }
+
+        const aViews = a.viewCount !== undefined ? a.viewCount : (a.views || 0);
+        const bViews = b.viewCount !== undefined ? b.viewCount : (b.views || 0);
+        if (viewsSort === 'Most Viewed') {
+          return bViews - aViews;
+        } else if (viewsSort === 'Least Viewed') {
+          return aViews - bViews;
+        }
+        return 0;
+      });
+  }, [comics, comicSearch, comicStatusFilter, comicGenreFilter, comicAuthorFilter, comicTeamFilter, comicTimeFilter, chapterUpdateSort, viewsSort]);
+
+  const totalPages = Math.ceil(filteredAndSortedComics.length / ITEMS_PER_PAGE);
+  const activePage = Math.min(currentPage, Math.max(1, totalPages));
+
+  const paginatedComics = useMemo(() => {
+    return filteredAndSortedComics.slice((activePage - 1) * ITEMS_PER_PAGE, activePage * ITEMS_PER_PAGE);
+  }, [filteredAndSortedComics, activePage]);
+
+  const [isHydratingList, setIsHydratingList] = useState(false);
+
+  // Fetch missing stats dynamically for visible items
+  useEffect(() => {
+    if (!paginatedComics || paginatedComics.length === 0) {
+      setIsHydratingList(false);
+      return;
+    }
+
+    let isMounted = true;
+    setIsHydratingList(true);
+
+    const hydratePromises = paginatedComics.map(comic => {
+      const cached = statsCacheRef.current[comic.id];
+      const hasRealStats = (comic.viewCount > 0 || comic.views > 0) || (comic.ratingAverage > 0 || comic.rating > 0);
+      const hasRealChapters = (comic.chapterCount > 0 || comic.chapters > 0);
+
+      if (cached || (hasRealStats && hasRealChapters)) {
+        return Promise.resolve(null);
+      }
+
+      // Mark as fetched immediately to prevent duplicate parallel requests
+      statsCacheRef.current[comic.id] = { fetched: true };
+
+      const pComic = getComicByIdApi(comic.id).catch(() => null);
+      const pChaps = getChaptersByComicIdApi(comic.id, {}, true)
+        .catch(() => getAuthorComicChaptersApi(comic.id))
+        .catch(() => null);
+
+      return Promise.all([pComic, pChaps]).then(([comicRes, chapsRes]) => {
+        const data = comicRes && comicRes.data ? (comicRes.data.data || comicRes.data || {}) : {};
+        const chapsData = chapsRes && (chapsRes.data !== undefined) ? chapsRes.data : (chapsRes || null);
+        console.log(`[Hydration] comicId: ${comic.id}, title: ${comic.title}, chapsData:`, chapsData, `comic.chapterCount:`, comic.chapterCount);
+        // Calculate total views from chapters list as smart fallback
+        const chapterViews = Array.isArray(chapsData) ? chapsData.reduce((acc, c) => acc + (Number(c.views || c.viewCount || c.view) || 0), 0) : 0;
+        
+        const fetchedChapsCount = Array.isArray(chapsData) ? chapsData.length : 0;
+        const chapterCount = fetchedChapsCount > 0 ? fetchedChapsCount : (comic.chapterCount || comic.chapters || 0);
+        
+        return {
+          id: comic.id,
+          data,
+          chapsData,
+          chapterViews,
+          comic
+        };
+      });
+    });
+
+    Promise.all(hydratePromises).then(results => {
+      if (!isMounted) return;
+      
+      setComicStats(prev => {
+        const nextStats = { ...prev };
+        results.forEach(res => {
+          if (!res) return;
+          const { id, data, chapsData, chapterViews, comic } = res;
+          
+          const fetchedViews = Number(data.viewCount || data.views || data.totalViews) || 0;
+          const finalViews = fetchedViews > 0 ? fetchedViews : (chapterViews > 0 ? chapterViews : (comic.viewCount || comic.views || 0));
+
+          const fetchedRatingAvg = Number(data.ratingAverage || data.averageRating || data.rating) || 0;
+          const finalRatingAvg = fetchedRatingAvg > 0 ? fetchedRatingAvg : (comic.ratingAverage || comic.averageRating || comic.rating || 0);
+
+          const fetchedRatingCount = Number(data.ratingCount || data.totalRatings || data.ratings) || 0;
+          const finalRatingCount = fetchedRatingCount > 0 ? fetchedRatingCount : (comic.ratingCount || comic.totalRatings || comic.ratings || 0);
+
+          const fetchedChapsCount = Array.isArray(chapsData) ? chapsData.length : 0;
+          const chapterCount = fetchedChapsCount > 0 ? fetchedChapsCount : (comic.chapterCount || comic.chapters || 0);
+
+          nextStats[id] = {
+            viewCount: finalViews,
+            ratingAverage: finalRatingAvg,
+            ratingCount: finalRatingCount,
+            chapterCount: chapterCount,
+            fetching: false
+          };
+          statsCacheRef.current[id] = nextStats[id]; // Update cache ref
+        });
+        return nextStats;
+      });
+      setIsHydratingList(false);
+    });
+
+    return () => { isMounted = false; };
+  }, [paginatedComics]);
 
   // Archive confirmation modal states
   const [showArchiveModal, setShowArchiveModal] = useState(false)
@@ -37,7 +208,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   })
 
   // Translation Request modal states
-  const AVAILABLE_LANGUAGES = ['English', 'Vietnamese', 'Japanese', 'Korean', 'Chinese', 'Spanish', 'French', 'Thai']
+  const AVAILABLE_LANGUAGES = ['English', 'Vietnamese', 'Japanese', 'Korean', 'Chinese', 'Spanish', 'French']
   const [showTransReqModal, setShowTransReqModal] = useState(false)
   const [transReqComic, setTransReqComic] = useState(null)
   const [transReqForm, setTransReqForm] = useState({
@@ -63,7 +234,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
   const [chaptersLoading, setChaptersLoading] = useState(false)
 
   const openChaptersModal = (comic) => {
-    navigate(`/moderator/comic/${comic.id}`)
+    navigate(`/moderator/comic/${comic.id}`, { state: { comic } })
   }
 
   const handleDeleteChapter = async (chapterId) => {
@@ -222,6 +393,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
       title: editComicForm.title.trim(),
       language: editComicForm.language.trim(),
       publicationStatus: editComicForm.publicationStatus?.toUpperCase(),
+      status: editComicForm.publicationStatus?.toUpperCase(),
       genreIds: matchedGenreIds
     }
     handleSaveEditComic(editingComic.id, updatedData)
@@ -372,7 +544,6 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
             <tr>
               <th>Comic</th>
               <th>Author</th>
-              <th>Project Team</th>
               <th>Chapters</th>
               <th>Views</th>
               <th>Rating</th>
@@ -381,70 +552,40 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
             </tr>
           </thead>
           <tbody>
-            {comics
-              .filter(c => {
-                const searchLower = comicSearch.toLowerCase();
-                const matchesSearch = c.title.toLowerCase().includes(searchLower) ||
-                  (c.authorName || '').toLowerCase().includes(searchLower) ||
-                  (c.author || '').toLowerCase().includes(searchLower) ||
-                  c.projectTeam.toLowerCase().includes(searchLower);
-                
-                const matchesStatus = comicStatusFilter === 'All Status' || c.publicationStatus?.toUpperCase() === comicStatusFilter.toUpperCase();
-                const matchesGenre = comicGenreFilter === 'All Genres' || c.genres.some(g => (typeof g === 'object' && g !== null ? g.name : g) === comicGenreFilter);
-                const matchesAuthor = comicAuthorFilter === 'All Authors' || c.authorName === comicAuthorFilter || c.author === comicAuthorFilter;
-                const matchesTeam = comicTeamFilter === 'All Project Teams' || c.projectTeam === comicTeamFilter;
-
-                let matchesTime = true;
-                if (comicTimeFilter !== 'All Time') {
-                  const targetTime = c.lastChapterUpdatedAt || c.createdAt || c.timestamp;
-                  if (targetTime) {
-                    const updateDate = new Date(targetTime);
-                    const now = new Date();
-                    if (comicTimeFilter === 'Updated Today') {
-                      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-                      matchesTime = updateDate >= oneDayAgo;
-                    } else if (comicTimeFilter === 'Updated Last 7 Days') {
-                      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                      matchesTime = updateDate >= sevenDaysAgo;
-                    } else if (comicTimeFilter === 'Updated Last 30 Days') {
-                      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-                      matchesTime = updateDate >= thirtyDaysAgo;
-                    }
-                  } else {
-                    matchesTime = false;
-                  }
-                }
-
-                return matchesSearch && matchesStatus && matchesGenre && matchesAuthor && matchesTeam && matchesTime;
-              })
-              .sort((a, b) => {
-                if (chapterUpdateSort === 'Newest Chapters First') {
-                  const tA = new Date(a.lastChapterUpdatedAt || a.createdAt || a.timestamp || 0).getTime();
-                  const tB = new Date(b.lastChapterUpdatedAt || b.createdAt || b.timestamp || 0).getTime();
-                  return tB - tA;
-                } else if (chapterUpdateSort === 'Oldest Chapters First') {
-                  const tA = new Date(a.lastChapterUpdatedAt || a.createdAt || a.timestamp || 0).getTime();
-                  const tB = new Date(b.lastChapterUpdatedAt || b.createdAt || b.timestamp || 0).getTime();
-                  return tA - tB;
-                }
-
-                const aViews = a.viewCount !== undefined ? a.viewCount : (a.views || 0);
-                const bViews = b.viewCount !== undefined ? b.viewCount : (b.views || 0);
-                if (viewsSort === 'Most Viewed') {
-                  return bViews - aViews;
-                } else if (viewsSort === 'Least Viewed') {
-                  return aViews - bViews;
-                }
-                return 0;
-              })
-              .map(comic => (
+            {isHydratingList ? (
+              [...Array(Math.min(ITEMS_PER_PAGE, filteredAndSortedComics.length || ITEMS_PER_PAGE))].map((_, i) => (
+                <tr key={i} className="skeleton-row">
+                  <td>
+                    <div className="comic-cell-info">
+                      <div className="skeleton-img skeleton-shimmer" style={{ width: '48px', height: '64px', borderRadius: '4px' }}></div>
+                      <div className="comic-cell-details" style={{ flex: 1, gap: '8px', paddingLeft: '12px' }}>
+                        <div className="skeleton-line skeleton-shimmer long" style={{ height: '16px', margin: 0 }}></div>
+                        <div className="skeleton-line skeleton-shimmer short" style={{ height: '14px', margin: 0, width: '120px' }}></div>
+                      </div>
+                    </div>
+                  </td>
+                  <td><div className="skeleton-line skeleton-shimmer short" style={{ height: '16px', width: '100px' }}></div></td>
+                  <td><div className="skeleton-line skeleton-shimmer short" style={{ height: '16px', width: '40px' }}></div></td>
+                  <td><div className="skeleton-line skeleton-shimmer short" style={{ height: '16px', width: '60px' }}></div></td>
+                  <td><div className="skeleton-line skeleton-shimmer short" style={{ height: '16px', width: '50px' }}></div></td>
+                  <td><div className="skeleton-line skeleton-shimmer short" style={{ height: '24px', width: '70px', borderRadius: '12px' }}></div></td>
+                  <td>
+                    <div className="comic-actions-cell" style={{ display: 'flex', gap: '8px' }}>
+                      <div className="skeleton-img skeleton-shimmer" style={{ width: '90px', height: '32px', borderRadius: '8px' }}></div>
+                      <div className="skeleton-img skeleton-shimmer" style={{ width: '90px', height: '32px', borderRadius: '8px' }}></div>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              paginatedComics.map(comic => (
                 <tr key={comic.id}>
                   <td>
                     <div className="comic-cell-info">
                       <div className="comic-cell-thumbnail">
-                        {(comic.cover || comic.coverImageUrl) ? (
+                        {(comic.cover || comic.coverImage || comic.coverImageUrl || comic.coverUrl || comic.cover_url || comic.imageUrl) ? (
                           <img 
-                            src={comic.cover || comic.coverImageUrl} 
+                            src={comic.cover || comic.coverImage || comic.coverImageUrl || comic.coverUrl || comic.cover_url || comic.imageUrl} 
                             alt={comic.title} 
                             onError={(e) => {
                               e.target.onerror = null;
@@ -460,7 +601,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                         <span 
                           className="comic-cell-title" 
                           style={{ cursor: 'pointer' }} 
-                          onClick={() => navigate(`/moderator/comic/${comic.id}`)}
+                          onClick={() => navigate(`/moderator/comic/${comic.id}`, { state: { comic } })}
                           title="Click to view comic details & chapters"
                         >
                           {comic.title}
@@ -475,29 +616,24 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                       </div>
                     </div>
                   </td>
-                  <td>{comic.authorName || comic.author || 'Original Author'}</td>
+                  <td>{comic.authorName || (typeof comic.author === 'object' ? (comic.author?.displayName || comic.author?.fullName || comic.author?.username) : comic.author) || (typeof comic.user === 'object' ? (comic.user?.fullName || comic.user?.username) : comic.user) || comic.creatorName || (typeof comic.creator === 'object' ? (comic.creator?.fullName || comic.creator?.username) : comic.creator) || comic.submittedBy || comic.createdByName || 'Original Author'}</td>
                   <td>
-                    {comic.projectTeam === '-' ? (
-                      <span style={{ color: 'var(--mod-text-muted)', fontSize: '13px' }}>Unassigned</span>
-                    ) : (
-                      <span style={{ fontWeight: '500' }}>{comic.projectTeam}</span>
-                    )}
-                  </td>
-                  <td>
-                    <strong>{comic.chapterCount !== undefined ? comic.chapterCount : (comic.chapters || 0)}</strong>
+                    <strong>{comicStats[comic.id]?.chapterCount !== undefined ? comicStats[comic.id].chapterCount : (comic.chapterCount !== undefined ? comic.chapterCount : (comic.chapters || 0))}</strong>
                     {comic.lastChapterUpdatedAt && (
                       <div style={{ fontSize: '11px', color: 'var(--mod-text-secondary)', marginTop: '4px' }}>
                         🕒 {new Date(comic.lastChapterUpdatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </div>
                     )}
                   </td>
-                  <td>{comic.viewCount !== undefined ? comic.viewCount : (comic.views || 0)}</td>
+                  <td>
+                    {comic.viewCount || comic.totalViews || comic.views || comic.view || comicStats[comic.id]?.viewCount || 0}
+                  </td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', color: '#f59e0b' }}>
                       <span style={{ fontSize: '15px' }}>★</span>
-                      <span>{comic.ratingAverage !== undefined ? comic.ratingAverage.toFixed(1) : (comic.rating !== undefined ? comic.rating.toFixed(1) : '0.0')}</span>
+                      <span>{Number(comic.ratingAverage || comic.averageRating || comic.rating || comicStats[comic.id]?.ratingAverage || 0).toFixed(1)}</span>
                       <span style={{ fontSize: '11px', color: 'var(--mod-text-secondary)', fontWeight: 'normal' }}>
-                        ({comic.ratingCount || 0})
+                        ({comic.ratingCount || comic.totalRatings || comic.ratings || comicStats[comic.id]?.ratingCount || 0})
                       </span>
                     </div>
                   </td>
@@ -510,15 +646,9 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                     <div className="comic-actions-cell">
                       <ModernButton 
                         variant={2} 
-                        label="📖 Chapters" 
+                        label="👁️ View Detail" 
                         className="btn-view"
-                        onClick={() => openChaptersModal(comic)} 
-                      />
-                      <ModernButton 
-                        variant={2} 
-                        label="📝 Edit" 
-                        className="btn-edit"
-                        onClick={() => openEditModal(comic)} 
+                        onClick={() => navigate(`/moderator/comic/${comic.id}`, { state: { comic } })} 
                       />
                       <ModernButton 
                         variant={5} 
@@ -529,10 +659,22 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+            )}
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
+          <ModernPagination 
+            currentPage={activePage} 
+            totalPages={totalPages} 
+            onPageChange={setCurrentPage} 
+            variant="pills"
+          />
+        </div>
+      )}
 
       {/* ── MODAL: EDIT COMIC INFO ─────────────────── */}
       {editingComic && createPortal(
@@ -752,11 +894,10 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                 </div>
                 <div className="mod-form-group">
                   <label className="mod-label">Deadline</label>
-                  <input 
-                    type="date" 
-                    className="mod-input"
+                  <CustomDatePicker 
                     value={transReqForm.deadline}
-                    onChange={(e) => setTransReqForm({ ...transReqForm, deadline: e.target.value })}
+                    onChange={(val) => setTransReqForm({ ...transReqForm, deadline: val })}
+                    placeholder="Select deadline"
                   />
                 </div>
               </div>
@@ -846,11 +987,10 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               {/* Deadline */}
               <div className="mod-form-group">
                 <label className="mod-label">Deadline</label>
-                <input 
-                  type="date" 
-                  className="mod-input"
+                <CustomDatePicker 
                   value={directAssignForm.deadline}
-                  onChange={(e) => setDirectAssignForm({ ...directAssignForm, deadline: e.target.value })}
+                  onChange={(val) => setDirectAssignForm({ ...directAssignForm, deadline: val })}
+                  placeholder="Select deadline"
                 />
               </div>
 
@@ -927,7 +1067,9 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                     {chaptersList.map((chap) => (
                       <tr key={chap.id} style={{ borderBottom: '1px solid var(--mod-border)' }}>
                         <td style={{ padding: '12px', fontWeight: 'bold' }}>Chapter {chap.chapterNumber}</td>
-                        <td style={{ padding: '12px' }}>{chap.title || <span style={{ color: 'var(--mod-text-muted)', fontStyle: 'italic' }}>Untitled</span>}</td>
+                        <td style={{ padding: '12px' }}>
+                          {chap.title || chap.manuscriptTitle || chap.chapterTitle || chap.chapter || chap.name || `Chapter ${chap.chapterNumber || chap.number || 1}`}
+                        </td>
                         <td style={{ padding: '12px' }}>
                           <span className={`comic-status-badge ${chap.isPremium ? 'paused' : 'ongoing'}`} style={{ fontSize: '11px', padding: '2px 6px' }}>
                             {chap.isPremium ? 'Premium' : 'Free'}

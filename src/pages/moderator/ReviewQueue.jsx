@@ -9,6 +9,8 @@ import { getChaptersByComicIdApi, getChapterDetailApi } from '../../services/api
 import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
 import { useTheme } from '../../context/ThemeContext'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
+import { getAuth } from '../../utils/Auth'
+import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
 
 const formatSubmitterName = (submittedBy) => {
   if (!submittedBy) return 'Unknown';
@@ -54,7 +56,22 @@ const renderCommentBadge = (c, globalPinIndex = null) => {
   }
 };
 
-function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
+const isSameChapterItem = (c, target) => {
+  if (!c || !target) return false;
+  if (c === target) return true;
+  
+  const cNum = Number(c.number !== undefined ? c.number : (c.chapterNumber !== undefined ? c.chapterNumber : NaN));
+  const tNum = Number(target.number !== undefined ? target.number : (target.chapterNumber !== undefined ? target.chapterNumber : NaN));
+  if (!isNaN(cNum) && !isNaN(tNum) && cNum > 0 && tNum > 0) {
+    if (cNum !== tNum) return false;
+  }
+  
+  if (c.id && target.id && c.id === target.id) return true;
+  if (c.title && target.title && c.title.trim().toLowerCase() === target.title.trim().toLowerCase()) return true;
+  return false;
+};
+
+function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfirmReject, handleApproveAndCreateProject, handleChapterApprove, handleChapterReject }) {
   const { theme } = useTheme()
   const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'approved' | 'rejected'
   
@@ -118,27 +135,429 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
   
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 5
+  
+  const [isHydrating, setIsHydrating] = useState(false)
+  const [hydratedItems, setHydratedItems] = useState([])
 
   useEffect(() => {
     setCurrentPage(1)
   }, [activeTab, sortFilter, searchQuery])
 
-  // 1. High-Performance Memoized Tab Counts
+  // Helper to find matching comic from comics list prop by ID or Title
+  const findMatchingComic = (item) => {
+    if (!item || !Array.isArray(comics) || comics.length === 0) return null;
+    const itemComicId = item.comicId || item.comic_id || item.comic?.id;
+    if (itemComicId) {
+      const match = comics.find(c => String(c.id) === String(itemComicId));
+      if (match) return match;
+    }
+    const itemTitle = (item.title || item.comicTitle || item.comicName || '').trim().toLowerCase();
+    if (itemTitle) {
+      const match = comics.find(c => (c.title || '').trim().toLowerCase() === itemTitle);
+      if (match) return match;
+    }
+    return null;
+  };
+
+  // Normalize a chapter object from the backend: map 'images' to 'pages'
+  const normalizeChapter = (chap, idx) => {
+    const pages = Array.isArray(chap.pages) && chap.pages.length > 0
+      ? chap.pages
+      : Array.isArray(chap.images) && chap.images.length > 0
+        ? chap.images
+        : [];
+    return {
+      ...chap,
+      id: chap.id || `chap-${idx}-${Date.now()}`,
+      number: chap.chapterNumber || chap.number || idx + 1,
+      title: chap.title || chap.chapter || `Chapter ${chap.chapterNumber || chap.number || idx + 1}`,
+      pages,
+      content: chap.content || null,
+      words: chap.words || chap.wordCount || null,
+      timestamp: chap.createdAt || chap.timestamp || Date.now()
+    };
+  };
+
+  // Helper to determine if a submission item is a real chapter submission (vs a raw comic catalog profile entry)
+  const isRealChapterSubmission = (item) => {
+    if (!item) return false;
+
+    // Explicit arrays
+    if (Array.isArray(item.pages) && item.pages.length > 0) return true;
+    if (Array.isArray(item.images) && item.images.length > 0) return true;
+    if (Array.isArray(item.chapters) && item.chapters.length > 0) return true;
+    if (Array.isArray(item.allChapters) && item.allChapters.length > 0) return true;
+
+    // Check title / chapter fields
+    const chapTitle = String(item.chapter || item.chapterTitle || '').trim().toLowerCase();
+    if (chapTitle && chapTitle !== 'raw draft' && chapTitle !== 'comic profile' && chapTitle !== 'chapter comic profile' && chapTitle !== 'none') {
+      return true;
+    }
+
+    if (item.chapterNumber && item.chapterNumber > 0) return true;
+    if (item.type === 'chapter' || item.submissionType === 'chapter') return true;
+
+    return false;
+  };
+
+  // Extract real DB submitted chapter list for a raw comic submission
+  const getSubmissionChapters = (item) => {
+    if (!item) return [];
+
+    let list = [];
+
+    if (Array.isArray(item.allChapters) && item.allChapters.length > 0) {
+      list = item.allChapters;
+    } else if (Array.isArray(item.chapters) && item.chapters.length > 0) {
+      list = item.chapters.map((c, i) => normalizeChapter(c, i));
+    } else {
+      if (!isRealChapterSubmission(item)) return [];
+      const pages = Array.isArray(item.pages) && item.pages.length > 0
+        ? item.pages
+        : Array.isArray(item.images) && item.images.length > 0
+          ? item.images
+          : [];
+
+      list = [normalizeChapter({
+        id: item.id || `chap-${Date.now()}`,
+        chapterNumber: item.chapterNumber || item.number || 1,
+        title: item.chapter || item.title || 'Chapter 1',
+        pages,
+        content: item.content || null,
+        words: item.words || null,
+        timestamp: item.timestamp || Date.now()
+      }, 0)];
+    }
+
+    let finalChaps = list;
+    if (item.status === 'pending' || !item.status) {
+      finalChaps = list.filter(c => c.status !== 'approved' && c.status !== 'rejected');
+    }
+
+    return finalChaps.map(c => ({
+      ...c,
+      submissionId: c.submissionId || item.id || c.id,
+      originalSubmissionItem: c.originalSubmissionItem || item
+    })).sort((a, b) => (Number(a.number) || 0) - (Number(b.number) || 0));
+  };
+
+  // Extract description/synopsis/summary safely from raw submission objects or matching comic
+  const getSubmissionDescription = (item) => {
+    if (!item) return '';
+
+    const check = (obj) => {
+      if (!obj || typeof obj !== 'object') return null;
+      const val = 
+        obj.description || 
+        obj.summary || 
+        obj.synopsis || 
+        obj.comicDescription || 
+        obj.comic_description || 
+        obj.overview || 
+        obj.details || 
+        obj.comic?.description || 
+        obj.comic?.summary || 
+        obj.comic?.synopsis;
+
+      const str = (val && String(val).trim() && String(val).trim() !== 'null' && String(val).trim() !== 'undefined') ? String(val).trim() : null;
+      return (str && str !== 'No description has been added yet.') ? str : null;
+    };
+
+    const direct = check(item);
+    if (direct) return direct;
+
+    if (Array.isArray(item.subItems)) {
+      for (const sub of item.subItems) {
+        const subDesc = check(sub);
+        if (subDesc) return subDesc;
+      }
+    }
+
+    if (item.comic) {
+      const comicDesc = check(item.comic);
+      if (comicDesc) return comicDesc;
+    }
+
+    const matchComic = findMatchingComic(item);
+    if (matchComic) {
+      const comicDesc = check(matchComic);
+      if (comicDesc) return comicDesc;
+    }
+
+    return '';
+  };
+
+  const getSubmissionLanguage = (item) => {
+    if (!item) return 'Not specified';
+
+    const check = (obj) => {
+      if (!obj || typeof obj !== 'object') return null;
+      const val = 
+        obj.language || 
+        obj.originalLanguage || 
+        obj.original_language || 
+        obj.rawLanguage || 
+        obj.raw_language || 
+        obj.targetLanguage || 
+        obj.target_language || 
+        obj.targetLang || 
+        obj.sourceLanguage || 
+        obj.sourceLang || 
+        obj.lang ||
+        obj.comicLanguage ||
+        obj.comic?.language ||
+        obj.comic?.originalLanguage ||
+        obj.comic?.original_language;
+
+      const clean = (val && String(val).trim() && String(val).trim() !== 'null' && String(val).trim() !== 'undefined' && String(val).trim() !== 'Not specified') ? String(val).trim() : null;
+      return clean;
+    };
+
+    const direct = check(item);
+    if (direct) return direct;
+
+    if (Array.isArray(item.subItems)) {
+      for (const sub of item.subItems) {
+        const subLang = check(sub);
+        if (subLang) return subLang;
+      }
+    }
+
+    if (item.comic) {
+      const comicLang = check(item.comic);
+      if (comicLang) return comicLang;
+    }
+
+    const matchComic = findMatchingComic(item);
+    if (matchComic) {
+      const comicLang = check(matchComic);
+      if (comicLang) return comicLang;
+    }
+
+    return 'Not specified';
+  };
+
+  const getSubmissionMinAge = (item) => {
+    if (!item) return 'Not specified';
+
+    const check = (obj) => {
+      if (!obj || typeof obj !== 'object') return null;
+      const val = 
+        obj.minAge ?? 
+        obj.min_age ?? 
+        obj.minimumAge ?? 
+        obj.minimum_age ?? 
+        obj.ageRating ?? 
+        obj.age_rating ?? 
+        obj.age ?? 
+        obj.comic?.minAge ?? 
+        obj.comic?.min_age ?? 
+        obj.comic?.minimumAge ?? 
+        obj.comic?.ageRating;
+
+      if (val === undefined || val === null) return null;
+      const str = String(val).trim();
+      if (!str || str === 'null' || str === 'undefined' || str === 'Not specified') return null;
+      return str.endsWith('+') ? str : `${str}+`;
+    };
+
+    const direct = check(item);
+    if (direct) return direct;
+
+    if (Array.isArray(item.subItems)) {
+      for (const sub of item.subItems) {
+        const subAge = check(sub);
+        if (subAge) return subAge;
+      }
+    }
+
+    if (item.comic) {
+      const comicAge = check(item.comic);
+      if (comicAge) return comicAge;
+    }
+
+    const matchComic = findMatchingComic(item);
+    if (matchComic) {
+      const comicAge = check(matchComic);
+      if (comicAge) return comicAge;
+    }
+
+    return 'Not specified';
+  };
+
+  const getSubmissionStatus = (item) => {
+    if (!item) return 'ONGOING';
+
+    const check = (obj) => {
+      if (!obj || typeof obj !== 'object') return null;
+      const val = 
+        obj.publicationStatus || 
+        obj.publication_status || 
+        obj.comicStatus || 
+        obj.comic_status || 
+        obj.comic?.publicationStatus ||
+        obj.comic?.publication_status;
+
+      return (val && String(val).trim() && String(val).trim() !== 'null' && String(val).trim() !== 'undefined') ? String(val).trim() : null;
+    };
+
+    const direct = check(item);
+    if (direct) return direct;
+
+    if (Array.isArray(item.subItems)) {
+      for (const sub of item.subItems) {
+        const subSt = check(sub);
+        if (subSt) return subSt;
+      }
+    }
+
+    if (item.comic) {
+      const comicSt = check(item.comic);
+      if (comicSt) return comicSt;
+    }
+
+    const matchComic = findMatchingComic(item);
+    if (matchComic) {
+      const comicSt = check(matchComic);
+      if (comicSt) return comicSt;
+    }
+
+    if (item.status && item.status !== 'pending' && item.status !== 'approved' && item.status !== 'rejected') {
+      return item.status;
+    }
+
+    return 'ONGOING';
+  };
+
+  const getSubmissionAuthor = (item) => {
+    if (!item) return 'Unknown Author';
+
+    const check = (obj) => {
+      if (!obj || typeof obj !== 'object') return null;
+      const val = 
+        obj.submittedBy || 
+        obj.submitted_by || 
+        obj.submittedByEmail || 
+        obj.submitted_by_email || 
+        obj.author || 
+        obj.authorName || 
+        obj.author_name || 
+        obj.authorId || 
+        obj.author_id || 
+        obj.userFullName || 
+        obj.userName || 
+        obj.creator || 
+        obj.uploader || 
+        obj.comic?.author || 
+        obj.comic?.authorName || 
+        obj.comic?.submittedBy;
+
+      if (!val) return null;
+      const str = String(val).trim();
+      if (!str || str === 'null' || str === 'undefined' || str === 'Original Author') return null;
+      return formatSubmitterName(str).replace(/^Author:\s*/i, '');
+    };
+
+    const direct = check(item);
+    if (direct && direct !== 'Unknown Author') return direct;
+
+    if (Array.isArray(item.subItems)) {
+      for (const sub of item.subItems) {
+        const subAuth = check(sub);
+        if (subAuth && subAuth !== 'Unknown Author') return subAuth;
+      }
+    }
+
+    if (item.comic) {
+      const comicAuth = check(item.comic);
+      if (comicAuth && comicAuth !== 'Unknown Author') return comicAuth;
+    }
+
+    const matchComic = findMatchingComic(item);
+    if (matchComic) {
+      const comicAuth = check(matchComic);
+      if (comicAuth && comicAuth !== 'Unknown Author') return comicAuth;
+    }
+
+    const fallbackId = item.authorId || item.author_id || item.userId || item.user_id || item.submittedBy || item.author;
+    if (fallbackId && String(fallbackId).trim() && String(fallbackId).trim() !== 'Original Author') {
+      return formatSubmitterName(String(fallbackId).trim()).replace(/^Author:\s*/i, '');
+    }
+
+    return 'Unknown Author';
+  };
+
+  const getSubmissionGenres = (item) => {
+    if (!item) return [];
+
+    const check = (obj) => {
+      if (!obj || typeof obj !== 'object') return null;
+      let raw = obj.genres || obj.genreList || obj.categories || obj.comic?.genres || obj.genre_names;
+      if (!raw) return null;
+      if (Array.isArray(raw) && raw.length > 0) {
+        return raw.map(g => typeof g === 'object' && g !== null ? (g.name || g.label || String(g)) : String(g)).filter(Boolean);
+      }
+      if (typeof raw === 'string' && raw.trim()) {
+        return raw.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      return null;
+    };
+
+    const direct = check(item);
+    if (direct && direct.length > 0) return direct;
+
+    if (Array.isArray(item.subItems)) {
+      for (const sub of item.subItems) {
+        const subG = check(sub);
+        if (subG && subG.length > 0) return subG;
+      }
+    }
+
+    if (item.comic) {
+      const comicG = check(item.comic);
+      if (comicG && comicG.length > 0) return comicG;
+    }
+
+    const matchComic = findMatchingComic(item);
+    if (matchComic) {
+      const comicG = check(matchComic);
+      if (comicG && comicG.length > 0) return comicG;
+    }
+
+    return [];
+  };
+
+  // 1. High-Performance Memoized Tab Counts (Grouped by Comic)
   const tabCounts = useMemo(() => {
     const counts = { pending: 0, approved: 0, rejected: 0 };
-    submissions.forEach(item => {
-      if (item.status && counts[item.status] !== undefined) {
-        counts[item.status]++;
-      }
+    const authUser = getAuth()?.user;
+
+    const scopedSubmissions = submissions.filter(item => 
+      isLanguageInModeratorScope(getSubmissionLanguage(item), authUser)
+    );
+
+    ['pending', 'approved', 'rejected'].forEach(tabStatus => {
+      const itemsInTab = scopedSubmissions.filter(i => i.status === tabStatus);
+      const uniqueKeys = new Set();
+      itemsInTab.forEach(item => {
+        const titleClean = (item.title || '').toLowerCase().trim();
+        const submitterClean = (item.submittedBy || '').toLowerCase().trim();
+        const key = item.comicId ? `comic-${item.comicId}` : `group-${titleClean}_${submitterClean}`;
+        uniqueKeys.add(key);
+      });
+      counts[tabStatus] = uniqueKeys.size;
     });
+
     return counts;
   }, [submissions]);
 
   // 2. High-Performance Instant Query Filter & Sort
   const filteredItems = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
+    const authUser = getAuth()?.user;
     
     return submissions
+      .filter(item => isLanguageInModeratorScope(getSubmissionLanguage(item), authUser))
       .filter(item => item.status === activeTab)
       .filter(item => {
         if (!query) return true;
@@ -150,22 +569,162 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
         );
       })
       .sort((a, b) => {
-        const timeA = a.timestamp || 0;
-        const timeB = b.timestamp || 0;
+        const timeA = new Date(a.timestamp || a.submittedAt || a.createdAt || 0).getTime() || 0;
+        const timeB = new Date(b.timestamp || b.submittedAt || b.createdAt || 0).getTime() || 0;
         return sortFilter === 'Newest' ? timeB - timeA : timeA - timeB;
       });
   }, [submissions, activeTab, searchQuery, sortFilter]);
 
-  const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE)
-  const paginatedItems = useMemo(() => {
-    return filteredItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-  }, [filteredItems, currentPage]);
+  // 3. Smart Comic Grouping: Consolidate multiple chapter submissions of the same comic into 1 card
+  const groupedItems = useMemo(() => {
+    const groupsMap = new Map();
 
-  const onApproveClick = (id) => {
-    handleApprove(id)
+    filteredItems.forEach(item => {
+      const titleClean = (item.title || '').toLowerCase().trim();
+      const submitterClean = (item.submittedBy || '').toLowerCase().trim();
+      const key = item.comicId ? `comic-${item.comicId}` : `group-${titleClean}_${submitterClean}`;
+
+      if (!groupsMap.has(key)) {
+        groupsMap.set(key, {
+          ...item,
+          groupKey: key,
+          subItems: [item]
+        });
+      } else {
+        const group = groupsMap.get(key);
+        group.subItems.push(item);
+
+        // Use newest timestamp for display
+        const itemTime = new Date(item.timestamp || item.submittedAt || item.createdAt || 0).getTime() || 0;
+        const groupTime = new Date(group.timestamp || group.submittedAt || group.createdAt || 0).getTime() || 0;
+        if (itemTime > groupTime) {
+          group.timestamp = item.timestamp || item.submittedAt || item.createdAt;
+        }
+      }
+    });
+
+    // Populate and clean up grouped chapters
+    groupsMap.forEach(group => {
+      // Prioritize real chapter submissions over raw comic catalog draft profiles
+      const realChapterItems = group.subItems.filter(isRealChapterSubmission);
+      const itemsToUse = realChapterItems.length > 0 ? realChapterItems : group.subItems;
+
+      const combinedChaps = [];
+      itemsToUse.forEach(item => {
+        const itemChaps = getSubmissionChapters(item);
+        itemChaps.forEach(newChap => {
+          const exists = combinedChaps.some(c => 
+            (c.id && newChap.id && c.id === newChap.id) || 
+            (c.title && newChap.title && c.title.toLowerCase().trim() === newChap.title.toLowerCase().trim())
+          );
+          if (!exists) {
+            combinedChaps.push(newChap);
+          }
+        });
+      });
+
+      // Do not filter out chapters without pages; preserve all chapters
+      group.allChapters = combinedChaps;
+
+      // Synchronize group.chapters with group.allChapters for 100% consistent badge count
+      group.chapters = group.allChapters;
+      
+      // Re-index chapter numbers for clean ordering if needed
+      group.allChapters.forEach((chap, idx) => {
+        if (!chap.number || chap.number === 1) {
+          chap.number = idx + 1;
+        }
+      });
+
+      // Enrich group root metadata from its subItems
+      group.language = getSubmissionLanguage(group);
+      group.minAge = getSubmissionMinAge(group);
+      group.publicationStatus = getSubmissionStatus(group);
+      group.submittedBy = getSubmissionAuthor(group);
+      group.description = getSubmissionDescription(group);
+      group.genres = getSubmissionGenres(group);
+    });
+
+    return Array.from(groupsMap.values());
+  }, [filteredItems]);
+
+  const totalPages = Math.ceil(groupedItems.length / ITEMS_PER_PAGE)
+  const paginatedItems = useMemo(() => {
+    return groupedItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  }, [groupedItems, currentPage]);
+
+  const onApproveClick = (groupOrItem) => {
+    const targetId = typeof groupOrItem === 'string' ? groupOrItem : (groupOrItem.id || groupOrItem);
+    const itemsToApprove = typeof groupOrItem === 'object' && groupOrItem.subItems ? groupOrItem.subItems : [{ id: targetId, ...groupOrItem }];
+    itemsToApprove.forEach(i => handleApprove(i.id || i, typeof i === 'object' ? i : null));
     setSelectedReview(null)
     setSelectedChapter(null)
   }
+
+  const onModalApproveClick = async (specificChap = null) => {
+    if (!selectedReview) return;
+    const chapToApprove = specificChap || selectedChapter || (selectedReview.allChapters && selectedReview.allChapters[0]);
+    if (!chapToApprove) return;
+
+    const targetSubId = chapToApprove.submissionId || chapToApprove.id || selectedReview.id;
+    const targetSubItem = chapToApprove.originalSubmissionItem || (selectedReview.subItems ? selectedReview.subItems.find(s => (s.id || s) === targetSubId) : selectedReview);
+
+    if (handleChapterApprove) {
+      await handleChapterApprove(selectedReview.id || targetSubId, chapToApprove);
+    } else {
+      await handleApprove(targetSubId, targetSubItem || chapToApprove);
+    }
+
+    const remainingChapters = (selectedReview.allChapters || []).filter(c => {
+      return !isSameChapterItem(c, chapToApprove);
+    });
+
+    const remainingSubItems = (selectedReview.subItems || []).filter(s => {
+      return !isSameChapterItem(s, targetSubItem) && !isSameChapterItem(s, chapToApprove);
+    });
+
+    if (remainingChapters.length === 0) {
+      setSelectedReview(null);
+      setSelectedChapter(null);
+    } else {
+      const updatedReview = {
+        ...selectedReview,
+        allChapters: remainingChapters,
+        chapters: remainingChapters,
+        subItems: remainingSubItems.length > 0 ? remainingSubItems : selectedReview.subItems,
+        chapterNumber: remainingChapters.length,
+        number: remainingChapters.length
+      };
+      setSelectedReview(updatedReview);
+
+      const nextChapter = remainingChapters[0];
+      setSelectedChapter(nextChapter);
+      setPageIndex(0);
+
+      if (remainingChapters.length > 1) {
+        setPreviewTab('chapters');
+      } else {
+        setPreviewTab(nextChapter && Array.isArray(nextChapter.pages) && nextChapter.pages.length > 0 ? 'reader' : 'chapters');
+      }
+    }
+  };
+
+  const onModalRejectClick = (specificChap = null) => {
+    if (!selectedReview) return;
+    const chapToReject = specificChap || selectedChapter || (selectedReview.allChapters && selectedReview.allChapters[0]);
+    if (!chapToReject) return;
+
+    const targetSubId = chapToReject.submissionId || chapToReject.id || selectedReview.id;
+    const targetSubItem = chapToReject.originalSubmissionItem || (selectedReview.subItems ? selectedReview.subItems.find(s => (s.id || s) === targetSubId) : selectedReview);
+    const baseItem = typeof targetSubItem === 'object' && targetSubItem !== null ? targetSubItem : (typeof selectedReview === 'object' && selectedReview !== null ? selectedReview : { id: targetSubId });
+    setSelectedReject({
+      ...baseItem,
+      id: targetSubId,
+      rejectChapterObj: chapToReject,
+      parentReviewId: selectedReview.id || targetSubId
+    });
+    setRejectionReason('');
+  };
 
   const onOpenReject = (item) => {
     setSelectedReject(item)
@@ -204,10 +763,52 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
       finalPayload = userOverallNote;
     }
 
-    handleConfirmReject(selectedReject.id, finalPayload)
-    
-    setSelectedReview(null)
-    setSelectedChapter(null)
+    if (selectedReject.rejectChapterObj && handleChapterReject) {
+      handleChapterReject(selectedReject.parentReviewId || selectedReject.id, selectedReject.rejectChapterObj, finalPayload);
+    } else {
+      const itemsToReject = selectedReject.subItems ? selectedReject.subItems : [selectedReject];
+      itemsToReject.forEach(i => handleConfirmReject(i.id || i, finalPayload));
+    }
+
+    if (selectedReview && (selectedReview.allChapters || selectedReview.subItems)) {
+      const targetObj = selectedReject.rejectChapterObj || selectedReject;
+
+      const remainingChapters = (selectedReview.allChapters || []).filter(c => {
+        return !isSameChapterItem(c, targetObj) && c !== selectedChapter;
+      });
+      const remainingSubItems = (selectedReview.subItems || []).filter(s => {
+        return !isSameChapterItem(s, targetObj) && s !== selectedReject;
+      });
+
+      if (remainingChapters.length === 0) {
+        setSelectedReview(null);
+        setSelectedChapter(null);
+      } else {
+        const updatedReview = {
+          ...selectedReview,
+          allChapters: remainingChapters,
+          chapters: remainingChapters,
+          subItems: remainingSubItems.length > 0 ? remainingSubItems : selectedReview.subItems,
+          chapterNumber: remainingChapters.length,
+          number: remainingChapters.length
+        };
+        setSelectedReview(updatedReview);
+
+        const nextChapter = remainingChapters[0];
+        setSelectedChapter(nextChapter);
+        setPageIndex(0);
+
+        if (remainingChapters.length > 1) {
+          setPreviewTab('chapters');
+        } else {
+          setPreviewTab(nextChapter && Array.isArray(nextChapter.pages) && nextChapter.pages.length > 0 ? 'reader' : 'chapters');
+        }
+      }
+    } else {
+      setSelectedReview(null);
+      setSelectedChapter(null);
+    }
+
     setSelectedReject(null)
     setRejectionReason('')
   }
@@ -273,59 +874,19 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
     }))
   }
 
-  // Normalize a chapter object from the backend: map 'images' to 'pages'
-  const normalizeChapter = (chap, idx) => {
-    const pages = Array.isArray(chap.pages) && chap.pages.length > 0
-      ? chap.pages
-      : Array.isArray(chap.images) && chap.images.length > 0
-        ? chap.images
-        : [];
-    return {
-      ...chap,
-      id: chap.id || `chap-${idx}-${Date.now()}`,
-      number: chap.chapterNumber || chap.number || idx + 1,
-      title: chap.title || chap.chapter || `Chapter ${chap.chapterNumber || chap.number || idx + 1}`,
-      pages,
-      content: chap.content || null,
-      words: chap.words || chap.wordCount || null,
-      timestamp: chap.createdAt || chap.timestamp || Date.now()
-    };
-  };
 
-  // Extract real DB submitted chapter list for a raw comic submission
-  const getSubmissionChapters = (item) => {
-    if (!item) return [];
-    
-    if (Array.isArray(item.chapters) && item.chapters.length > 0) {
-      return item.chapters.map((c, i) => normalizeChapter(c, i));
-    }
-
-    const pages = Array.isArray(item.pages) && item.pages.length > 0
-      ? item.pages
-      : Array.isArray(item.images) && item.images.length > 0
-        ? item.images
-        : [];
-
-    if (item.chapter || item.content || pages.length > 0) {
-      return [normalizeChapter({
-        id: item.id || `chap-${Date.now()}`,
-        chapterNumber: item.chapterNumber || 1,
-        title: item.chapter ? (item.chapter.toLowerCase().startsWith('chapter') ? item.chapter : `Chapter ${item.chapter}`) : 'Chapter 1',
-        pages,
-        content: item.content || null,
-        words: item.words || null,
-        timestamp: item.timestamp || Date.now()
-      }, 0)];
-    }
-
-    return [];
-  };
 
   // Accelerated Backend Chapter Fetching with In-Memory Cache
-  const fetchChaptersFromBackend = async (comicId) => {
+  const fetchChaptersFromBackend = async (comicId, fetchDetails = true) => {
     if (!comicId) return [];
-    if (chapterCacheRef.current.has(comicId)) {
-      return chapterCacheRef.current.get(comicId);
+    
+    const cacheKey = fetchDetails ? `full_${comicId}` : `shallow_${comicId}`;
+    if (chapterCacheRef.current.has(cacheKey)) {
+      return chapterCacheRef.current.get(cacheKey);
+    }
+    // Return full if shallow was requested but full is available
+    if (!fetchDetails && chapterCacheRef.current.has(`full_${comicId}`)) {
+      return chapterCacheRef.current.get(`full_${comicId}`);
     }
 
     try {
@@ -337,6 +898,12 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
       }
       const list = chaptersData?.data || chaptersData || [];
       if (!Array.isArray(list) || list.length === 0) return [];
+
+      if (!fetchDetails) {
+        const shallowResult = list.map((ch, idx) => normalizeChapter(ch, idx));
+        chapterCacheRef.current.set(`shallow_${comicId}`, shallowResult);
+        return shallowResult;
+      }
 
       // Parallel batch fetching for maximum throughput
       const detailed = await Promise.allSettled(
@@ -351,7 +918,7 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
         return normalizeChapter({ ...ch, ...detail }, idx);
       });
 
-      chapterCacheRef.current.set(comicId, result);
+      chapterCacheRef.current.set(`full_${comicId}`, result);
       return result;
     } catch (err) {
       console.warn('Failed to fetch chapters from backend:', err?.message);
@@ -359,28 +926,108 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
     }
   };
 
+  useEffect(() => {
+    let isMounted = true;
+    const hydrateItems = async () => {
+      setIsHydrating(true);
+      const itemsCopy = [...paginatedItems];
+      
+      const hydrated = await Promise.all(itemsCopy.map(async (item) => {
+        let chaps = (item.allChapters && item.allChapters.length > 0)
+          ? [...item.allChapters]
+          : getSubmissionChapters(item);
+          
+        const hasPages = chaps.some(c => Array.isArray(c.pages) && c.pages.length > 0);
+        if (!hasPages && item.comicId) {
+          try {
+            const backendChaps = await fetchChaptersFromBackend(item.comicId, false);
+            if (backendChaps.length > 0) {
+              backendChaps.forEach(bChap => {
+                const exists = chaps.some(c => 
+                  (c.id && bChap.id && c.id === bChap.id) || 
+                  (c.title && bChap.title && c.title.toLowerCase() === bChap.title.toLowerCase())
+                );
+                if (!exists) {
+                  chaps.push(bChap);
+                }
+              });
+            }
+          } catch (e) {
+            console.warn("Hydration failed for", item.comicId, e);
+          }
+        }
+        
+        // Preserve all chapters regardless of pages array length
+        
+        item.allChapters = chaps;
+        item.chapters = chaps;
+        return item;
+      }));
+      
+      if (isMounted) {
+        setHydratedItems(hydrated);
+        setIsHydrating(false);
+      }
+    };
+    
+    if (paginatedItems.length > 0) {
+      hydrateItems();
+    } else {
+      setHydratedItems([]);
+      setIsHydrating(false);
+    }
+    
+    return () => { isMounted = false; };
+  }, [paginatedItems]);
+
   const handleOpenReviewModal = async (item) => {
     setSelectedReview(item);
     setPageIndex(0);
     setFetchingChapters(true);
 
-    // First try to use inline chapter data
-    let chaps = getSubmissionChapters(item);
+    // Get combined chapters from group or item
+    let chaps = (item.allChapters && item.allChapters.length > 0)
+      ? [...item.allChapters]
+      : getSubmissionChapters(item);
 
     // If no pages found and we have a comicId, fetch from backend
     const hasPages = chaps.some(c => Array.isArray(c.pages) && c.pages.length > 0);
     if (!hasPages && item.comicId) {
-      const backendChaps = await fetchChaptersFromBackend(item.comicId);
+      const backendChaps = await fetchChaptersFromBackend(item.comicId, true);
       if (backendChaps.length > 0) {
-        chaps = backendChaps;
-        // Cache the fetched chapters back into the item for future access
-        item.chapters = chaps;
+        backendChaps.forEach(bChap => {
+          const exists = chaps.some(c => 
+            (c.id && bChap.id && c.id === bChap.id) || 
+            (c.title && bChap.title && c.title.toLowerCase() === bChap.title.toLowerCase())
+          );
+          if (!exists) {
+            chaps.push(bChap);
+          } else {
+            const existing = chaps.find(c => (c.id && bChap.id && c.id === bChap.id) || (c.title && bChap.title && c.title.toLowerCase() === bChap.title.toLowerCase()));
+            if (existing && (!existing.pages || existing.pages.length === 0) && bChap.pages?.length > 0) {
+              existing.pages = bChap.pages;
+            }
+          }
+        });
       }
     }
 
+    // Preserve all chapters regardless of pages array length
+
+    item.allChapters = chaps;
+    item.chapters = chaps;
+
     const firstChap = chaps[0] || null;
     setSelectedChapter(firstChap);
-    setPreviewTab(firstChap && Array.isArray(firstChap.pages) && firstChap.pages.length > 0 ? 'reader' : 'chapters');
+
+    // Dynamic Tab Selection for optimal Moderator UX:
+    // If comic has > 1 chapter, default focus to 'chapters' list; if 1 chapter, default to 'reader' image view
+    if (chaps.length > 1) {
+      setPreviewTab('chapters');
+    } else {
+      setPreviewTab(firstChap && Array.isArray(firstChap.pages) && firstChap.pages.length > 0 ? 'reader' : 'chapters');
+    }
+
     setFetchingChapters(false);
   };
 
@@ -484,21 +1131,21 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
           onClick={() => setActiveTab('pending')}
         >
           Pending Review
-          <span className="moderator-tab-btn-badge">{tabCounts.pending}</span>
+          <span className="moderator-tab-btn-badge pending">{tabCounts.pending}</span>
         </button>
         <button 
           className={`moderator-tab-btn ${activeTab === 'approved' ? 'active' : ''}`}
           onClick={() => setActiveTab('approved')}
         >
           Approved
-          <span className="moderator-tab-btn-badge">{tabCounts.approved}</span>
+          <span className="moderator-tab-btn-badge approved">{tabCounts.approved}</span>
         </button>
         <button 
           className={`moderator-tab-btn ${activeTab === 'rejected' ? 'active' : ''}`}
           onClick={() => setActiveTab('rejected')}
         >
           Rejected
-          <span className="moderator-tab-btn-badge">{tabCounts.rejected}</span>
+          <span className="moderator-tab-btn-badge rejected">{tabCounts.rejected}</span>
         </button>
       </div>
 
@@ -530,8 +1177,23 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
             <h3>No submissions found</h3>
             <p>There are no raw comic submissions matching your active filters.</p>
           </div>
+        ) : isHydrating ? (
+          <div className="skeleton-comic-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {[...Array(Math.min(ITEMS_PER_PAGE, filteredItems.length))].map((_, i) => (
+              <div key={i} className="submission-card" style={{ padding: '20px', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px' }}>
+                <div style={{ display: 'flex', gap: '20px' }}>
+                  <div className="skeleton-img skeleton-shimmer" style={{ width: '80px', height: '110px', borderRadius: '8px' }}></div>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', justifyContent: 'center' }}>
+                    <div className="skeleton-line skeleton-shimmer long" style={{ height: '24px', margin: 0 }}></div>
+                    <div className="skeleton-line skeleton-shimmer short" style={{ height: '16px', margin: 0, width: '120px' }}></div>
+                    <div className="skeleton-line skeleton-shimmer short" style={{ height: '22px', margin: 0, width: '80px', borderRadius: '6px' }}></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
-          paginatedItems.map(item => (
+          hydratedItems.map(item => (
             <div className="submission-card" key={item.id}>
               <div className="submission-cover-placeholder">
                 {item.cover && (item.cover.startsWith('http') || item.cover.includes('/')) ? (
@@ -544,13 +1206,15 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
               <div className="submission-info">
                 <h3 className="submission-title">{item.title}</h3>
                 <p className="submission-meta">
-                  <span><strong>Author:</strong> {formatSubmitterName(item.submittedBy).replace('Author: ', '')}</span>
-                  {item.language && <span> · <strong>Lang:</strong> {item.language}</span>}
-                  {item.minAge && <span> · <strong>Age:</strong> {item.minAge}</span>}
+                  <span><strong>Author:</strong> {getSubmissionAuthor(item)}</span>
+                  {getSubmissionLanguage(item) !== 'Not specified' && <span> · <strong>Lang:</strong> {getSubmissionLanguage(item)}</span>}
+                  {getSubmissionMinAge(item) !== 'Not specified' && <span> · <strong>Age:</strong> {getSubmissionMinAge(item)}</span>}
                 </p>
-                <div className="submission-extra">
-                  <span className="submission-extra-item">⏱️ {formatTimeAgo(item.timestamp)}</span>
-                  <span className="submission-extra-item">📄 {item.words || 'Raw Draft'}</span>
+                <div className="submission-extra" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
+                  <span className="submission-extra-item">⏱️ {formatTimeAgo(item.timestamp || item.submittedAt || item.createdAt)}</span>
+                  <span className="submission-extra-item" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '2px 8px', borderRadius: '6px', fontWeight: '800', fontSize: '11.5px' }}>
+                    📚 {getSubmissionChapters(item).length} {getSubmissionChapters(item).length === 1 ? 'Chapter' : 'Chapters'}
+                  </span>
                 </div>
               </div>
 
@@ -569,7 +1233,7 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
                         variant={2} 
                         label="✓ Approve" 
                         className="btn-approve"
-                        onClick={() => onApproveClick(item.id)} 
+                        onClick={() => onApproveClick(item)} 
                       />
 
                       <ModernButton 
@@ -617,12 +1281,12 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
                       📖 {selectedReview.title} {selectedChapter ? `— ${selectedChapter.title}` : ''}
                     </h3>
                     <div className="mod-inspector-subtitle">
-                      {formatSubmitterName(selectedReview.submittedBy)} · {formatTimeAgo(selectedReview.timestamp)}
+                      {getSubmissionAuthor(selectedReview)} · {formatTimeAgo(selectedReview.timestamp || selectedReview.submittedAt || selectedReview.createdAt)}
                     </div>
                   </div>
                 </div>
 
-                {/* Center: Mode Tabs */}
+                {/* Center: Fixed Standard Mode Tabs Order */}
                 <div className="mod-inspector-mode-tabs">
                   <button
                     type="button"
@@ -658,20 +1322,20 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
                     💬 Feedback Pins ({activeComments.length})
                   </button>
 
-                  {selectedReview.status === 'pending' && (
+                  {selectedReview.status === 'pending' && (!activeChap || activeChap.id === chaptersList[0]?.id) && (
                     <>
                       <ModernButton 
                         variant={2} 
                         label="✓ Approve" 
                         className="btn-approve"
-                        onClick={() => onApproveClick(selectedReview.id)} 
+                        onClick={() => onModalApproveClick()} 
                       />
 
                       <ModernButton 
                         variant={2} 
                         label="✗ Reject" 
                         className="btn-reject"
-                        onClick={() => onOpenReject(selectedReview)} 
+                        onClick={() => onModalRejectClick()} 
                       />
                     </>
                   )}
@@ -1061,11 +1725,29 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
                                         ⏱️ {formatTimeAgo(chap.timestamp || selectedReview.timestamp)}
                                       </td>
                                       <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-                                        <ModernButton
-                                          variant={2}
-                                          label={isSelected ? '✓ Inspecting' : '👁️ View Chapter'}
-                                          onClick={() => handleSelectChapterItem(chap)}
-                                        />
+                                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                          <ModernButton
+                                            variant={2}
+                                            label={isSelected ? '✓ Inspecting' : '👁️ View'}
+                                            onClick={() => handleSelectChapterItem(chap)}
+                                          />
+                                          {selectedReview.status === 'pending' && idx === 0 && (
+                                            <>
+                                              <ModernButton
+                                                variant={2}
+                                                label="✓ Approve"
+                                                className="btn-approve"
+                                                onClick={() => onModalApproveClick(chap)}
+                                              />
+                                              <ModernButton
+                                                variant={2}
+                                                label="✗ Reject"
+                                                className="btn-reject"
+                                                onClick={() => onModalRejectClick(chap)}
+                                              />
+                                            </>
+                                          )}
+                                        </div>
                                       </td>
                                     </tr>
                                   );
@@ -1111,102 +1793,64 @@ function ReviewQueue({ submissions = [], handleApprove, handleConfirmReject }) {
 
                           {/* Core Input Fields */}
                           <div style={{ flex: 1, minWidth: '260px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                              <div>
-                                <span className="mod-pane-title--raw" style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '4px' }}>
-                                  Comic Title *
-                                </span>
-                                <h2 className="mod-inspector-title" style={{ margin: 0, fontSize: '22px', fontWeight: '800' }}>
-                                  {selectedReview.title}
-                                </h2>
-                              </div>
-                              <ModernButton
-                                variant={2}
-                                label="💬 Comment"
-                                onClick={() => {
-                                  setFieldCommentModalTarget({
-                                    targetType: 'field',
-                                    targetKey: 'title',
-                                    targetLabel: 'Comic Title'
-                                  });
-                                }}
-                              />
+                            <div>
+                              <span className="mod-pane-title--raw" style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '4px' }}>
+                                Comic Title *
+                              </span>
+                              <h2 className="mod-inspector-title" style={{ margin: 0, fontSize: '22px', fontWeight: '800' }}>
+                                {selectedReview.title}
+                              </h2>
                             </div>
 
                             {/* Author Input Fields Grid */}
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Original Language *</span>
-                                  <button type="button" onClick={() => setFieldCommentModalTarget({ targetType: 'field', targetKey: 'language', targetLabel: 'Original Language' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#7c3aed' }}>💬</button>
-                                </div>
-                                <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{selectedReview.language || 'Japanese'}</strong>
+                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
+                                <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Original Language *</span>
+                                <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{getSubmissionLanguage(selectedReview)}</strong>
                               </div>
 
-                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Minimum Age</span>
-                                  <button type="button" onClick={() => setFieldCommentModalTarget({ targetType: 'field', targetKey: 'minAge', targetLabel: 'Minimum Age' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#7c3aed' }}>💬</button>
-                                </div>
-                                <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{selectedReview.minAge || selectedReview.ageRating || '13+'}</strong>
+                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
+                                <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Minimum Age</span>
+                                <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{getSubmissionMinAge(selectedReview)}</strong>
                               </div>
 
-                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Publication Status</span>
-                                  <button type="button" onClick={() => setFieldCommentModalTarget({ targetType: 'field', targetKey: 'status', targetLabel: 'Publication Status' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#7c3aed' }}>💬</button>
-                                </div>
-                                <strong style={{ fontSize: '13.5px', color: '#10b981', display: 'block', marginTop: '4px' }}>{selectedReview.publicationStatus || selectedReview.comicStatus || 'Ongoing'}</strong>
+                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
+                                <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Publication Status</span>
+                                <strong style={{ fontSize: '13.5px', color: '#10b981', display: 'block', marginTop: '4px' }}>{getSubmissionStatus(selectedReview)}</strong>
                               </div>
 
-                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Author Account</span>
-                                  <button type="button" onClick={() => setFieldCommentModalTarget({ targetType: 'field', targetKey: 'submittedBy', targetLabel: 'Author Account' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#7c3aed' }}>💬</button>
-                                </div>
-                                <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{formatSubmitterName(selectedReview.submittedBy).replace('Author: ', '')}</strong>
+                              <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
+                                <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Author Account</span>
+                                <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{getSubmissionAuthor(selectedReview)}</strong>
                               </div>
                             </div>
 
                             {/* Genres Input Field Display */}
-                            {selectedReview.genres && selectedReview.genres.length > 0 && (
-                              <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                  <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600' }}>Genres</span>
-                                  <button type="button" onClick={() => setFieldCommentModalTarget({ targetType: 'field', targetKey: 'genres', targetLabel: 'Genres' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#7c3aed' }}>💬 Comment</button>
+                            {(() => {
+                              const genresList = getSubmissionGenres(selectedReview);
+                              return genresList && genresList.length > 0 ? (
+                                <div>
+                                  <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Genres</span>
+                                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                    {genresList.map((genre, idx) => (
+                                      <span key={idx} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', background: 'rgba(124,58,237,0.15)', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)' }}>
+                                        {genre}
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
-                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                  {selectedReview.genres.map((genre, idx) => (
-                                    <span key={idx} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', background: 'rgba(124,58,237,0.15)', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)' }}>
-                                      {genre}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
+                              ) : null;
+                            })()}
                           </div>
                         </div>
 
                         {/* Description Field Review */}
                         <div style={{ borderTop: '1px solid rgba(148,163,184,0.15)', paddingTop: '16px', marginTop: '12px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                            <span className="mod-pane-title--raw" style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                              Description
-                            </span>
-                            <ModernButton
-                              variant={2}
-                              label="💬 Comment"
-                              onClick={() => {
-                                setFieldCommentModalTarget({
-                                  targetType: 'field',
-                                  targetKey: 'description',
-                                  targetLabel: 'Comic Description'
-                                });
-                              }}
-                            />
-                          </div>
+                          <span className="mod-pane-title--raw" style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '6px' }}>
+                            Description
+                          </span>
                           <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
-                            {selectedReview.description || selectedReview.synopsis || 'No description has been added yet.'}
+                            {getSubmissionDescription(selectedReview) || 'No description has been added yet.'}
                           </p>
                         </div>
                       </div>

@@ -7,6 +7,7 @@ import { useNotification } from '../../context/NotificationContext'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { getComicsPageApi } from '../../services/api/ComicApi'
 import ChatWidget from '../chat/ChatWidget'
+import LogoIcon from '../common/LogoIcon'
 import SubscriptionPlanModal from '../common/SubscriptionPlanModal'
 import { Crown } from 'lucide-react'
 
@@ -193,13 +194,8 @@ function HomeLayout({ children }) {
       <header className={`home-header ${!isHeaderVisible ? 'hidden' : ''}`}>
         <div className="home-header-left">
           {/* Logo */}
-          <Link to="/" className="home-brand">
-            <div className="home-brand-logo-icon">
-              <svg viewBox="0 0 24 24" width="20" height="20">
-                <path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2zm-4 8H7v-2h6v2z" />
-              </svg>
-            </div>
-            <span className="home-brand-logo-text">ComiVerse</span>
+          <Link to="/" className="home-brand" style={{ display: 'flex', alignItems: 'center' }}>
+            <LogoIcon size={30} />
           </Link>
 
           {/* Nav Links */}
@@ -590,13 +586,8 @@ function HomeLayout({ children }) {
         <div className="footer-inner">
           <div className="footer-top-row">
             <div className="footer-brand-col">
-              <Link to="/" className="home-brand">
-                <div className="home-brand-logo-icon">
-                  <svg viewBox="0 0 24 24" width="20" height="20">
-                    <path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2zm-4 8H7v-2h6v2z" />
-                  </svg>
-                </div>
-                <span className="home-brand-logo-text">ComiVerse</span>
+              <Link to="/" className="home-brand" style={{ display: 'flex', alignItems: 'center' }}>
+                <LogoIcon size={32} />
               </Link>
               <p className="footer-brand-tagline">
                 ComiVerse is a premium platform for comic creators and readers, bringing you over 1,000+ top-quality webcomics, manga, and manhwa.

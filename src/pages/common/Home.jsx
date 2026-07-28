@@ -11,11 +11,6 @@ import {
 } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi } from '../../services/api/ChapterApi'
 
-// Import assets
-import comicAction from '../../assets/comic_action.png'
-import comicAdventure from '../../assets/comic_adventure.png'
-import comicScifi from '../../assets/comic_scifi.png'
-
 const DEFAULT_SPOTLIGHT = {
   id: '',
   title: 'Welcome to ComiVerse',
@@ -79,13 +74,39 @@ function Home() {
     return !str.includes('/') && !str.includes('.') && str.trim().length <= 4
   }
 
+  const syncWithLocalOverride = (comic) => {
+    try {
+      const savedLocal = localStorage.getItem('comiverse_local_comic_' + comic.id);
+      if (savedLocal) {
+        const parsed = JSON.parse(savedLocal);
+        const merged = { ...comic, ...parsed };
+        
+        // Don't let an older local timestamp overwrite a fresh one
+        if (comic.lastChapterUpdatedAt && parsed.lastChapterUpdatedAt) {
+          if (new Date(comic.lastChapterUpdatedAt) > new Date(parsed.lastChapterUpdatedAt)) {
+            merged.lastChapterUpdatedAt = comic.lastChapterUpdatedAt;
+          }
+        }
+        
+        // Don't let older local chapters override the freshly merged chapters
+        if (comic.chaptersList && (!parsed.chaptersList || parsed.chaptersList.length < comic.chaptersList.length)) {
+          merged.chaptersList = comic.chaptersList;
+        }
+        
+        return merged;
+      }
+    } catch(e) {}
+    return comic;
+  };
+
   // Helper to reliably extract arrays from AxiosClient-unwrapped API responses
   const getArrayOrData = (res) => {
-    if (!res) return []
-    if (Array.isArray(res)) return res
-    if (res.data && Array.isArray(res.data)) return res.data
-    if (res.data?.data && Array.isArray(res.data.data)) return res.data.data
-    return []
+    let arr = []
+    if (!res) arr = []
+    else if (Array.isArray(res)) arr = res
+    else if (res.data && Array.isArray(res.data)) arr = res.data
+    else if (res.data?.data && Array.isArray(res.data.data)) arr = res.data.data
+    return arr.map(syncWithLocalOverride)
   }
 
   const handleFetchRecommendations = async (isInitial = false, signal = undefined) => {
@@ -130,6 +151,8 @@ function Home() {
           newHasMore = nested.hasMore || false
         }
       }
+
+      newList = newList.map(syncWithLocalOverride)
 
       if (!isMountedRef.current) return
 
@@ -213,10 +236,57 @@ function Home() {
         }
       })
 
-    // 3. Fetch explore/recently updated (sortBy = Recently Updated, size = 8)
-    getExploreComicsApi({ sortBy: 'Recently Updated', size: 8 }, { signal })
+    // 3. Fetch explore/recently updated (sortBy = updatedAt, size = 8)
+    getExploreComicsApi({ sortBy: 'updatedAt', size: 8 }, { signal })
       .then(async (res) => {
-        const exploreList = getArrayOrData(res)
+        let exploreList = getArrayOrData(res)
+
+        try {
+          const subsStr = localStorage.getItem('comiverse_moderator_submissions_override');
+          if (subsStr) {
+            const subs = JSON.parse(subsStr).filter(s => s.status === 'approved' && (s.title || s.comicTitle || s.comicName));
+            subs.forEach(sub => {
+              const comicTitle = (sub.title || sub.comicTitle || sub.comicName).trim();
+              const stableId = sub.comicId || (sub.id ? `comic-${sub.id}` : (sub.submissionId ? `comic-${sub.submissionId}` : `comic-${comicTitle.replace(/\s+/g, '-').toLowerCase()}`));
+              
+              let chapsList = Array.isArray(sub.allChapters) ? sub.allChapters : (Array.isArray(sub.chapters) ? (typeof sub.chapters[0] === 'object' ? sub.chapters : []) : []);
+              if (chapsList.length === 0 && (sub.chapterNumber || sub.number)) {
+                chapsList = [{
+                  id: sub.chapterId || sub.id || sub.submissionId || Date.now(),
+                  chapterNumber: sub.chapterNumber || sub.number,
+                  createdAt: sub.approvedAt || new Date().toISOString()
+                }];
+              }
+              const latestChapTime = chapsList.length > 0 ? (chapsList[chapsList.length - 1].createdAt || sub.approvedAt || new Date().toISOString()) : (sub.approvedAt || new Date().toISOString());
+
+              const existingIdx = exploreList.findIndex(c => c.id === stableId || c.title?.toLowerCase() === comicTitle.toLowerCase());
+              if (existingIdx !== -1) {
+                const existingChaps = exploreList[existingIdx].chaptersList || [];
+                // Merge the new chapters into existing chapters list
+                const mergedChaps = [...existingChaps];
+                chapsList.forEach(newChap => {
+                  if (!mergedChaps.some(c => c.chapterNumber === newChap.chapterNumber || c.id === newChap.id)) {
+                    mergedChaps.push(newChap);
+                  }
+                });
+                exploreList[existingIdx] = { ...exploreList[existingIdx], lastChapterUpdatedAt: latestChapTime, chaptersList: mergedChaps };
+              } else {
+                exploreList.push({
+                  id: stableId,
+                  title: comicTitle,
+                  cover: sub.cover || sub.coverImage || sub.coverImageUrl,
+                  lastChapterUpdatedAt: latestChapTime,
+                  chaptersList: chapsList
+                });
+              }
+            });
+          }
+        } catch(e) {}
+
+        exploreList = exploreList.map(syncWithLocalOverride).filter(c => !c.archived);
+        exploreList.sort((a, b) => new Date(b.lastChapterUpdatedAt || 0) - new Date(a.lastChapterUpdatedAt || 0));
+        exploreList = exploreList.slice(0, 8);
+
         if (exploreList.length === 0) {
           if (isMountedRef.current) {
             setNewUpdates([])
@@ -228,6 +298,15 @@ function Home() {
         try {
           const resolved = await Promise.all(
             exploreList.map(async (comic) => {
+              if (comic.chaptersList && comic.chaptersList.length > 0) {
+                 const chaps = comic.chaptersList.slice(-2).reverse().map(ch => ({
+                   id: ch.id || ch.chapterId,
+                   num: `Ch. ${ch.chapterNumber || ch.number || ''}`,
+                   time: formatTimeAgo(ch.createdAt || comic.lastChapterUpdatedAt)
+                 }));
+                 return { ...comic, chapters: chaps }
+              }
+
               try {
                 const chRes = await getChaptersByComicIdApi(comic.id, { signal })
                 const chData = getArrayOrData(chRes)
@@ -580,7 +659,6 @@ function Home() {
                   <div className="update-info">
                     <div className="update-title-block">
                       <h3 className="update-title" onClick={() => navigate(`/comic/${comic.id}`)}>{comic.title}</h3>
-                      <span className="update-genre">{getPrimaryGenre(comic)}</span>
                     </div>
 
                     <div className="update-chapters-list">

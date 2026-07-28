@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { AIPopover } from '../common/AIPopover'
+import LogoIcon from '../common/LogoIcon'
 import '../../assets/style/author/author.css'
 
 function AuthorLayout({ children }) {
@@ -106,9 +107,10 @@ function AuthorLayout({ children }) {
     <div className="author-layout">
       {/* Sidebar */}
       <aside className="author-sidebar">
-        <div className="author-sidebar-brand">
-          <h2>Author Hub</h2>
-          <span>CREATIVE STUDIO</span>
+        <div className="author-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '20px 16px' }}>
+          <Link to="/" style={{ display: 'block', textDecoration: 'none' }}>
+            <LogoIcon size={26} />
+          </Link>
         </div>
 
         <nav className="author-sidebar-nav">
@@ -139,8 +141,10 @@ function AuthorLayout({ children }) {
         {/* Topbar */}
         <header className="author-topbar">
           <div className="author-topbar-left">
-            <span>Workspace:</span>
-            <span className="workspace-label">Author</span>
+            <span className="workspace-prefix">Workspace</span>
+            <div className="workspace-tag" style={{ marginTop: 0, fontSize: '12px', padding: '6px 12px' }}>
+              Author Studio
+            </div>
           </div>
 
           <div className="author-topbar-right">

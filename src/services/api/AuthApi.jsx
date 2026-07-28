@@ -8,6 +8,10 @@ export const registerApi = (userData) => {
   return AxiosClient.post('/auth/register', userData);
 };
 
+export const refreshTokenApi = (refreshToken) => {
+  return AxiosClient.post('/auth/refresh', { refreshToken });
+};
+
 export const verifyEmailApi = (email, otp) => {
   return AxiosClient.post('/auth/verify-email', { email, otp });
 };
@@ -32,8 +36,8 @@ export const changePasswordApi = (currentPassword, newPassword) => {
   return AxiosClient.post('/auth/change-password', { currentPassword, newPassword });
 };
 
-export const updateProfileApi = (fullName, avatarUrl, backgroundImageUrl) => {
-  return AxiosClient.put('/auth/profile', { fullName, avatarUrl, backgroundImageUrl });
+export const updateProfileApi = (profile) => {
+  return AxiosClient.put('/auth/profile', profile);
 };
 
 export const uploadAvatarApi = (file) => {
@@ -45,3 +49,8 @@ export const uploadAvatarApi = (file) => {
     }
   });
 };
+
+export const getUserInteractionCountsApi = () => {
+  return AxiosClient.get('/users/me/interaction-counts');
+};
+

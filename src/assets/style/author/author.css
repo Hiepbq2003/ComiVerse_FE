@@ -106,13 +106,15 @@ html.light .author-sidebar-brand {
   border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
 }
 
-html.light .author-sidebar-brand span {
-  color: #64748b !important;
+html.light .workspace-tag {
+  background: rgba(225, 29, 72, 0.1);
+  color: #e11d48;
+  border: 1px solid rgba(225, 29, 72, 0.25);
 }
 
 html.light .author-nav-item {
-  background: rgba(0, 0, 0, 0.02) !important;
-  border: 1px solid rgba(0, 0, 0, 0.04) !important;
+  background: rgba(0, 0, 0, 0.01) !important;
+  border: 1px solid rgba(0, 0, 0, 0.16) !important;
   color: #475569 !important;
 }
 
@@ -168,24 +170,27 @@ html.light .author-sidebar-footer {
   border-bottom: 1.5px solid rgba(255, 255, 255, 0.14) !important;
 }
 
-.author-sidebar-brand h2 {
-  font-size: 18px;
+.workspace-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 14px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
   font-weight: 700;
-  margin: 0;
-  background: linear-gradient(135deg, #c084fc, #ec4899);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: 0.3px;
-  font-family: var(--author-font);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(244, 63, 94, 0.15);
+  color: #fb7185;
+  border: 1px solid rgba(244, 63, 94, 0.3);
 }
 
-.author-sidebar-brand span {
-  display: block;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.35);
-  letter-spacing: 0.5px;
-  margin-top: 4px;
+.workspace-prefix {
   text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--author-text-secondary);
 }
 
 .author-sidebar-nav {
@@ -208,8 +213,8 @@ html.light .author-sidebar-footer {
   color: #cbd5e1;
   text-decoration: none;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   box-sizing: border-box;
   text-align: left;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);

@@ -19,3 +19,11 @@ export const markAsReadApi = (id) => {
 export const markAllAsReadApi = () => {
   return AxiosClient.put('/notifications/read-all', {}, { timeout: 5000 });
 };
+
+export const getNotificationPreferencesApi = () => {
+  return AxiosClient.get('/notifications/preferences');
+};
+
+export const updateNotificationPreferencesApi = (preferences) => {
+  return AxiosClient.put('/notifications/preferences', { preferences });
+};

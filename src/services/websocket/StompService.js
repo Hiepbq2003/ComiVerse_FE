@@ -1,5 +1,6 @@
 import { Client } from '@stomp/stompjs';
 import { getAuth } from '../../utils/Auth';
+import { getWebSocketUrl } from '../../config/apiConfig';
 
 class StompService {
     constructor() {
@@ -16,16 +17,7 @@ class StompService {
      * Compute Native WebSocket URL (ws:// or wss://)
      */
     getWsUrl() {
-        const apiBase = import.meta.env.VITE_API_BASE_URL || '';
-        
-        if (apiBase.startsWith('http://') || apiBase.startsWith('https://')) {
-            const serverOrigin = apiBase.replace(/\/api\/?$/, '');
-            return serverOrigin.replace(/^http/, 'ws') + '/ws';
-        }
-        
-        // Relative path -> use window.location.host so Vite proxy handles /ws
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        return `${protocol}//${window.location.host}/ws`;
+        return getWebSocketUrl();
     }
 
     /**
@@ -65,7 +57,7 @@ class StompService {
                 token: token, // Fallback header
             },
             debug: (str) => {
-                if (import.meta.env.DEV && !str.includes('ping') && !str.includes('pong')) {
+                if (import.meta.env.DEV && !str.includes('ping') && !str.includes('pong') && !str.includes('scheduling reconnection') && !str.includes('Opening Web Socket') && !str.includes('Connection closed') && !str.includes('Whoops! Lost connection')) {
                     console.log('[STOMP Debug]', str);
                 }
             },
@@ -76,6 +68,8 @@ class StompService {
 
         this.client.onConnect = (frame) => {
             this.connectionState = 'CONNECTED';
+            this.failedConnectCount = 0;
+            if (this.client) this.client.reconnectDelay = 5000;
             console.log('[StompService] Connected successfully to WebSocket STOMP');
 
             // Notify connect listeners
@@ -105,9 +99,21 @@ class StompService {
         };
 
         this.client.onWebSocketClose = () => {
-            console.log('[StompService] WebSocket connection closed');
             this.connectionState = 'DISCONNECTED';
             this.onDisconnectCallbacks.forEach((cb) => cb());
+
+            this.failedConnectCount = (this.failedConnectCount || 0) + 1;
+            if (this.failedConnectCount <= 2) {
+                console.log('[StompService] WebSocket connection closed');
+            } else if (this.failedConnectCount === 3) {
+                console.warn('[StompService] WebSocket server unavailable after multiple retries. Slowing down reconnection attempts to 30s.');
+                if (this.client) this.client.reconnectDelay = 30000;
+            } else if (this.failedConnectCount >= 6) {
+                if (this.failedConnectCount === 6) {
+                    console.warn('[StompService] WebSocket server remains unreachable. Slowing down reconnection attempts to 60s.');
+                }
+                if (this.client) this.client.reconnectDelay = 60000;
+            }
         };
 
         this.client.activate();

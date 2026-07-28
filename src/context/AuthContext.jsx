@@ -14,8 +14,8 @@ export function AuthProvider({ children }) {
     }
   })
 
-  const login = (token, user) => {
-    setAuth(token, user)
+  const login = (token, user, refreshToken) => {
+    setAuth(token, user, refreshToken)
     setAuthState({
       token,
       user,

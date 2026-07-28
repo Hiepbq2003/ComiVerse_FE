@@ -408,36 +408,6 @@ function EditComicModal({ comic, onClose, onSaved }) {
   )
 }
 
-function ChapterPreviewPanel({ preview, onClose }) {
-  const pages = normalizeArrayResponse(preview?.pages)
-  if (!preview) return null
-
-  return (
-    <section className="author-preview-section-card">
-      <div className="author-chapter-section-head">
-        <div>
-          <h2>Preview · Chapter {getChapterNumber(preview)}</h2>
-          <p>{pages.length} pages returned from backend upload.</p>
-        </div>
-        <button className="btn-author-action" onClick={onClose}>Close Preview</button>
-      </div>
-
-      {pages.length === 0 ? (
-        <div className="author-empty-state small">No page URL was returned for this chapter.</div>
-      ) : (
-        <div className="author-page-preview-grid">
-          {pages.map((page) => (
-            <figure key={page.id || page.pageNumber || page.imageUrl}>
-              <img src={page.imageUrl} alt={`Page ${page.pageNumber}`} />
-              <figcaption>Page {page.pageNumber}</figcaption>
-            </figure>
-          ))}
-        </div>
-      )}
-    </section>
-  )
-}
-
 function AuthorComicDetail() {
   const { id } = useParams()
   const location = useLocation()
@@ -452,7 +422,6 @@ function AuthorComicDetail() {
   const [showEditComic, setShowEditComic] = useState(false)
   const [showUploadGuide, setShowUploadGuide] = useState(false)
   const [actionMessage, setActionMessage] = useState(location.state?.message || '')
-  const [preview, setPreview] = useState(null)
   const [actionLoadingId, setActionLoadingId] = useState(null)
   const [uploadTask, setUploadTask] = useState(null)
   const [submittingComic, setSubmittingComic] = useState(false)
@@ -468,12 +437,40 @@ function AuthorComicDetail() {
         getAuthorComicMetricsApi(id),
       ])
 
-      if (comicResponse.status !== 'fulfilled') {
-        throw comicResponse.reason
-      }
+      const rawComic = comicResponse.value;
+      const rawChapters = chaptersResponse.status === 'fulfilled' ? normalizeArrayResponse(chaptersResponse.value) : [];
 
-      setComic(comicResponse.value)
-      setChapters(chaptersResponse.status === 'fulfilled' ? normalizeArrayResponse(chaptersResponse.value) : [])
+      let hasRejectedOverride = false;
+      try {
+        const rawOverrides = localStorage.getItem('comiverse_moderator_submissions_override');
+        if (rawOverrides) {
+          const overrides = JSON.parse(rawOverrides);
+          const comicTitleClean = (rawComic.title || '').trim().toLowerCase();
+          const comicIdStr = String(rawComic.id || rawComic.comicId || id || '');
+
+          const matchingOverrides = overrides.filter(o => {
+            const matchId = (o.comicId && String(o.comicId) === comicIdStr) || (o.id && String(o.id) === comicIdStr);
+            const matchTitle = (comicTitleClean && o.title && o.title.trim().toLowerCase() === comicTitleClean);
+            return matchId || matchTitle;
+          });
+
+          hasRejectedOverride = matchingOverrides.some(o => (o.status || '').toString().toUpperCase() === 'REJECTED');
+        }
+      } catch (e) {}
+
+      const chaptersWithRejection = rawChapters.map(c => {
+        if (hasRejectedOverride) {
+          return { ...c, status: 'REJECTED' };
+        }
+        return c;
+      });
+
+      const finalModerationStatus = (hasRejectedOverride || chaptersWithRejection.some(c => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED'))
+        ? 'REJECTED'
+        : (rawComic.moderationStatus || rawComic.approvalStatus || 'DRAFT');
+
+      setComic({ ...rawComic, moderationStatus: finalModerationStatus });
+      setChapters(chaptersWithRejection);
       setMetrics(metricsResponse.status === 'fulfilled' ? metricsResponse.value : null)
     } catch {
       setComic(null)
@@ -510,7 +507,12 @@ function AuthorComicDetail() {
       ...current,
       chapterCount: Number(getChapterCount(current)) + 1,
     }))
-    setPreview(uploadedPreview)
+    
+    // Auto-navigate to preview mode after successful upload
+    const uploadedChapterId = getChapterId(uploadedPreview)
+    if (uploadedChapterId) {
+      navigate(`/author/comics/${id}/preview/${uploadedChapterId}`, { state: { preview: uploadedPreview } })
+    }
   }
 
   const pollChapterUploadTask = (taskId) => {
@@ -557,9 +559,15 @@ function AuthorComicDetail() {
 
     try {
       const data = await getAuthorChapterPreviewApi(getComicId(comic), chapterId)
-      setPreview(data)
+      const mergedPreview = {
+        ...chapter,
+        ...(data || {}),
+        status: data?.status || chapter?.status || chapter?.moderationStatus,
+        rejectionReason: data?.rejectionReason || chapter?.rejectionReason || chapter?.rejection_reason || chapter?.rejectionNote
+      }
+      navigate(`/author/comics/${id}/preview/${chapterId}`, { state: { preview: mergedPreview } })
     } catch {
-      setActionMessage('Could not load chapter preview. Please check API/backend connection.')
+      navigate(`/author/comics/${id}/preview/${chapterId}`, { state: { preview: chapter } })
     } finally {
       setActionLoadingId(null)
     }
@@ -754,8 +762,6 @@ function AuthorComicDetail() {
           </div>
         )}
 
-        <ChapterPreviewPanel preview={preview} onClose={() => setPreview(null)} />
-
         <section className="author-chapter-section-card">
           <div className="author-chapter-section-head">
             <div>
@@ -769,6 +775,14 @@ function AuthorComicDetail() {
               </button>
             </div>
           </div>
+
+          {chapters.some(c => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED') && (
+            <div className="author-alert error" style={{ margin: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', padding: '14px 18px', borderRadius: '8px' }}>
+              <div>
+                <strong>⛔ Chapter Rejected by Moderator:</strong> One or more chapters were rejected. Click <strong>Preview</strong> on the rejected chapter below to inspect full moderator feedback and page pins.
+              </div>
+            </div>
+          )}
 
           {chapters.length === 0 ? (
             <div className="author-empty-state small">

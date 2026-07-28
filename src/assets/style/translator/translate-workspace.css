@@ -1,9 +1,17 @@
-/* ---------------------------------------------------------------------
-   Design tokens
-   Ink desk (dark chrome) + washi paper (light canvas, like a page on a
-   lightbox) + aizuri indigo (primary action) + shu vermillion (editorial
-   correction-mark red, used for "needs attention" / current-state signals).
---------------------------------------------------------------------- */
+.tw-x-change-request-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #8a8a99;
+  margin: 0 0 8px;
+}
+
+.tw-x-change-request-empty {
+  font-size: 13px;
+  color: #8286A0;
+  margin: 0 0 12px;
+}
 .tw-root {
   --ink-950: #12141c;
   --ink-900: #1b1e2b;
@@ -902,6 +910,7 @@
   text-align: var(--text-align, left);
   font-weight: var(--font-weight, 400);
   font-style: var(--font-style, normal);
+  z-index: 8; /* ➕ THÊM DÒNG NÀY — đảm bảo nằm trên SVG (z-index 6) và resize handle (z-index 7) */
 }
 .tw-x-inline-textarea.is-active { cursor: move; }
 .tw-x-inline-textarea.is-zoom-picking { cursor: zoom-in; }

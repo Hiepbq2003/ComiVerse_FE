@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { AIPopover } from '../common/AIPopover'
+import LogoIcon from '../common/LogoIcon'
 import '../../assets/style/admin/admin.css'
 
 function AdminLayout({ children, activeNav = 'account-management' }) {
@@ -126,9 +127,10 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
     <div className="admin-layout">
       {/* Sidebar */}
       <aside className="admin-sidebar">
-        <div className="admin-sidebar-brand">
-          <h2>Admin Portal</h2>
-          <span>System Administration</span>
+        <div className="admin-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '20px 16px' }}>
+          <Link to="/" style={{ display: 'block', textDecoration: 'none' }}>
+            <LogoIcon size={26} />
+          </Link>
         </div>
 
         <nav className="admin-sidebar-nav">
@@ -165,8 +167,10 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
         {/* Top Bar */}
         <header className="admin-topbar">
           <div className="admin-topbar-left">
-            <span>Workspace:</span>
-            <span className="workspace-label">Admin</span>
+            <span className="workspace-prefix">Workspace</span>
+            <div className="workspace-tag" style={{ marginTop: 0, fontSize: '12px', padding: '6px 12px' }}>
+              System Admin
+            </div>
           </div>
 
           <div className="admin-topbar-right">
