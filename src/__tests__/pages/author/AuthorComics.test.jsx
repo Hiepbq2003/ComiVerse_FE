@@ -153,7 +153,7 @@ describe('Author My Comics workflow', () => {
     expect(AuthorComicApi.createAuthorComicApi).not.toHaveBeenCalled()
   })
 
-  it('uploads a correctly named CBZ chapter with the expected FormData', async () => {
+  it('uploads a correctly named ZIP chapter with the expected FormData', async () => {
     AuthorComicApi.getAuthorComicsApi.mockResolvedValue([draftComic])
     AuthorComicApi.uploadAuthorChapterZipApi.mockResolvedValue({
       taskId: 'task-1',
@@ -167,8 +167,8 @@ describe('Author My Comics workflow', () => {
         if (delay === 2500) return 0
         return realSetTimeout(callback, delay, ...args)
       })
-    const chapterFile = new File(['cbz-bytes'], 'Chapter 2.cbz', {
-      type: 'application/vnd.comicbook+zip',
+    const chapterFile = new File(['zip-bytes'], 'Chapter 2.zip', {
+      type: 'application/zip',
     })
 
     renderAuthorComics()
@@ -181,9 +181,9 @@ describe('Author My Comics workflow', () => {
     fireEvent.change(screen.getByLabelText(/chapter title/i), {
       target: { value: 'Moonlit Duel' },
     })
-    const chapterInput = document.querySelector('input[type="file"][accept=".cbz"]')
+    const chapterInput = document.querySelector('input[type="file"][accept=".zip"]')
     fireEvent.change(chapterInput, { target: { files: [chapterFile] } })
-    fireEvent.click(screen.getByRole('button', { name: 'Upload CBZ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Upload ZIP' }))
 
     await waitFor(() => {
       expect(AuthorComicApi.uploadAuthorChapterZipApi).toHaveBeenCalledTimes(1)
@@ -210,9 +210,9 @@ describe('Author My Comics workflow', () => {
     renderAuthorComics()
     await screen.findByText('Moonblade Chronicle')
     fireEvent.click(screen.getByRole('button', { name: /add chapter/i }))
-    const chapterInput = document.querySelector('input[type="file"][accept=".cbz"]')
+    const chapterInput = document.querySelector('input[type="file"][accept=".zip"]')
     fireEvent.change(chapterInput, { target: { files: [invalidFile] } })
-    fireEvent.click(screen.getByRole('button', { name: 'Upload CBZ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Upload ZIP' }))
 
     expect(
       await screen.findByText(/chapter archive name must be like/i),

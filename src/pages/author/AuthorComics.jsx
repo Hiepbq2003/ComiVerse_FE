@@ -45,7 +45,7 @@ const getViews = (comic) => comic?.viewCount ?? 0
 const getTaskId = (task) => task?.taskId || task?.id || task?.uploadTaskId
 const isFinalUploadStatus = (status) => ['COMPLETED', 'FAILED'].includes((status || '').toString().toUpperCase())
 const UPLOAD_POLL_INTERVAL_MS = 2500
-const CHAPTER_ARCHIVE_NAME_REGEX = /^chapter\s+[1-9][0-9]*(?:[,.][0-9]+)?\.cbz$/i
+const CHAPTER_ARCHIVE_NAME_REGEX = /^chapter\s+[1-9][0-9]*(?:[,.][0-9]+)?\.zip$/i
 
 const formatPublicationStatus = (status) => {
   const value = (status || 'ONGOING').toString().toUpperCase()
@@ -250,11 +250,11 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
   const handleSubmit = async (event) => {
     event.preventDefault()
     if (!zipFile) {
-      setError('Please select a .cbz chapter file.')
+      setError('Please select a .zip chapter file.')
       return
     }
     if (!CHAPTER_ARCHIVE_NAME_REGEX.test(zipFile.name)) {
-      setError("Chapter archive name must be like 'Chapter 1.cbz' or 'Chapter 1,5.cbz'.")
+      setError("Chapter archive name must be like 'Chapter 1.zip' or 'Chapter 1,5.zip'.")
       return
     }
 
@@ -269,7 +269,7 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
       onUploaded(task, comic)
       onClose()
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Could not upload chapter CBZ.')
+      setError(err?.response?.data?.message || err?.message || 'Could not upload chapter ZIP.')
     } finally {
       setSubmitting(false)
     }
@@ -292,9 +292,9 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
             </label>
           </div>
           <label className="author-upload-zone file-picker-zone">
-            <input type="file" accept=".cbz" onChange={(event) => setZipFile(event.target.files?.[0] || null)} />
+            <input type="file" accept=".zip" onChange={(event) => setZipFile(event.target.files?.[0] || null)} />
             <div className="author-upload-icon">⇧</div>
-            <strong>{zipFile ? zipFile.name : 'Select chapter CBZ'}</strong>
+            <strong>{zipFile ? zipFile.name : 'Select chapter ZIP'}</strong>
             <span>After processing, the chapter status becomes PREVIEW_READY.</span>
           </label>
           <div className="author-alert info">Upload rules are available from the comic detail page.</div>
@@ -302,7 +302,7 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
         </div>
         <div className="author-modal-actions">
           <button type="button" className="btn-author-action" onClick={onClose} disabled={submitting}>Cancel</button>
-          <button type="submit" className="btn-author-action black" disabled={submitting}>{submitting ? 'Uploading...' : 'Upload CBZ'}</button>
+          <button type="submit" className="btn-author-action black" disabled={submitting}>{submitting ? 'Uploading...' : 'Upload ZIP'}</button>
         </div>
       </form>
     </div>

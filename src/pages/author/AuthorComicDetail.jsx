@@ -61,9 +61,9 @@ const normalizePublicationStatusValue = (status) => {
   return 'ONGOING'
 }
 
-const isCbzFile = (file) => {
+const isZipFile = (file) => {
   const name = file?.name?.toLowerCase() || ''
-  return name.endsWith('.cbz')
+  return name.endsWith('.zip')
 }
 
 const UPLOAD_POLL_INTERVAL_MS = 2500
@@ -78,21 +78,21 @@ const formatUploadStatus = (status) => {
   return 'Queued'
 }
 
-const CHAPTER_ZIP_NAME_REGEX = /^chapter\s+[1-9][0-9]*(?:[,.][0-9]+)?\.cbz$/i
+const CHAPTER_ZIP_NAME_REGEX = /^chapter\s+[1-9][0-9]*(?:[,.][0-9]+)?\.zip$/i
 
 const isChapterZipName = (file) => CHAPTER_ZIP_NAME_REGEX.test(file?.name || '')
 
 const getChapterNumberFromZipName = (file) => {
-  const match = (file?.name || '').match(/^chapter\s+([1-9][0-9]*(?:[,.][0-9]+)?)\.cbz$/i)
+  const match = (file?.name || '').match(/^chapter\s+([1-9][0-9]*(?:[,.][0-9]+)?)\.zip$/i)
   return match ? match[1] : ''
 }
 
 const validateChapterZip = (file) => {
-  if (!file) return 'Please select a .cbz chapter file.'
-  if (!isCbzFile(file)) return 'Chapter file must be a .cbz file.'
+  if (!file) return 'Please select a .zip chapter file.'
+  if (!isZipFile(file)) return 'Chapter file must be a .zip file.'
 
   if (!isChapterZipName(file)) {
-    return "Chapter archive name must be like 'Chapter 1.cbz' or 'Chapter 1,5.cbz'."
+    return "Chapter archive name must be like 'Chapter 1.zip' or 'Chapter 1,5.zip'."
   }
 
   return ''
@@ -148,10 +148,10 @@ const formatMoney = (value) => {
 function ZipPackagingGuideMini({ onOpenGuide }) {
   return (
     <div className="author-upload-guide-card compact">
-      <strong>Chapter CBZ format</strong>
+      <strong>Chapter ZIP format</strong>
       <ul>
-        <li>File name must be <code>Chapter 1.cbz</code> or <code>Chapter 1,5.cbz</code>.</li>
-        <li>Inside the CBZ must be page images directly at root: <code>01.jpg</code>, <code>02.jpg</code>.</li>
+        <li>File name must be <code>Chapter 1.zip</code> or <code>Chapter 1,5.zip</code>.</li>
+        <li>Inside the ZIP must be page images directly at root: <code>01.jpg</code>, <code>02.jpg</code>.</li>
         <li>No wrapper folder, nested archive, PDF, TXT, PSD, README, or hidden files. Each image max 10MB.</li>
       </ul>
       <button type="button" className="author-guide-link" onClick={onOpenGuide}>Read full guide</button>
@@ -180,7 +180,7 @@ function AddChapterModal({ comic, onClose, onUploaded, onOpenGuide }) {
     setError('')
 
     try {
-      toast.info('Uploading chapter CBZ, please wait...')
+      toast.info('Uploading chapter ZIP, please wait...')
       const uploadTask = await uploadAuthorChapterZipApi(
         getComicId(comic),
         buildChapterFormData({ chapterNumber, chapterTitle: title, zipFile }),
@@ -190,7 +190,7 @@ function AddChapterModal({ comic, onClose, onUploaded, onOpenGuide }) {
       toast.success('Chapter uploaded successfully!')
       onClose()
     } catch (err) {
-      const message = err?.response?.data?.message || err?.message || 'Could not upload CBZ. Please check API/backend connection.'
+      const message = err?.response?.data?.message || err?.message || 'Could not upload ZIP. Please check API/backend connection.'
       setError(message)
       toast.error(message)
     } finally {
@@ -233,11 +233,11 @@ function AddChapterModal({ comic, onClose, onUploaded, onOpenGuide }) {
         </div>
 
         <label className="author-form-label">
-          Upload Pages (.cbz) *
+          Upload Pages (.zip) *
           <div className="author-upload-zone file-picker-zone">
             <input
               type="file"
-              accept=".cbz,application/vnd.comicbook+zip,application/x-cbz"
+              accept=".zip,application/zip,application/x-zip-compressed"
               onChange={(event) => {
                 const file = event.target.files?.[0] || null
                 setZipFile(file)
@@ -252,8 +252,8 @@ function AddChapterModal({ comic, onClose, onUploaded, onOpenGuide }) {
               }}
             />
             <div className="author-upload-icon">⇧</div>
-            <strong>{zipFile ? zipFile.name : 'Drop chapter CBZ or select file'}</strong>
-            <span>Example: Chapter 1.cbz or Chapter 1,5.cbz. Put images directly inside the CBZ: 01.jpg, 02.jpg.</span>
+            <strong>{zipFile ? zipFile.name : 'Drop chapter ZIP or select file'}</strong>
+            <span>Example: Chapter 1.zip or Chapter 1,5.zip. Put images directly inside the ZIP: 01.jpg, 02.jpg.</span>
           </div>
         </label>
 
@@ -268,7 +268,7 @@ function AddChapterModal({ comic, onClose, onUploaded, onOpenGuide }) {
         <div className="author-modal-actions">
           <button type="button" className="btn-author-action" onClick={onClose} disabled={submitting}>Cancel</button>
           <button type="submit" className="btn-author-action black" disabled={submitting}>
-            {submitting ? 'Sending file...' : 'Upload CBZ'}
+            {submitting ? 'Sending file...' : 'Upload ZIP'}
           </button>
         </div>
       </form>
@@ -528,7 +528,7 @@ function AuthorComicDetail() {
           if (latest?.chapter) {
             appendUploadedChapter(latest.chapter)
           }
-          setActionMessage('CBZ processed. Preview is ready; submit it for moderator review after checking pages.')
+          setActionMessage('ZIP processed. Preview is ready; submit it for moderator review after checking pages.')
         } else {
           setActionMessage(latest?.error || 'Upload processing failed.')
         }
@@ -546,7 +546,7 @@ function AuthorComicDetail() {
     if (!taskId) return
 
     setUploadTask(task)
-    setActionMessage('Chapter CBZ accepted. Backend is processing it in the background.')
+    setActionMessage('Chapter ZIP accepted. Backend is processing it in the background.')
     pollChapterUploadTask(taskId)
   }
 
@@ -760,7 +760,7 @@ function AuthorComicDetail() {
           <div className="author-chapter-section-head">
             <div>
               <h2>Chapters ({chapters.length})</h2>
-              <p>Upload CBZ, preview pages, then submit each chapter for moderator review.</p>
+              <p>Upload ZIP, preview pages, then submit each chapter for moderator review.</p>
             </div>
             <div className="author-header-actions">
               <button className="btn-author-action" type="button" onClick={() => setShowUploadGuide(true)}>Upload Guide</button>
@@ -773,7 +773,7 @@ function AuthorComicDetail() {
           {chapters.length === 0 ? (
             <div className="author-empty-state small">
               <h3>No chapters yet</h3>
-              <p>Upload your first CBZ file to create real chapter pages.</p>
+              <p>Upload your first ZIP file to create real chapter pages.</p>
             </div>
           ) : (
             <div className="author-table-scroll">

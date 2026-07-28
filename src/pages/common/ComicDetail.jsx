@@ -12,6 +12,7 @@ import { toast } from 'react-toastify'
 import { getReadChaptersByComicIdApi } from '../../services/api/ReadingHistoryApi'
 import CommentSection from '../../components/common/CommentSection'
 import StarRating from '../../components/common/StarRating'
+import SubscriptionPlanModal from '../../components/common/SubscriptionPlanModal'
 
 // Import assets
 import comicAction from '../../assets/comic_action.png'
@@ -38,6 +39,7 @@ function ComicDetail() {
   const [readChapterIds, setReadChapterIds] = useState([])
   const [availableLanguages, setAvailableLanguages] = useState([])
   const [selectedLanguage, setSelectedLanguage] = useState('') // '' = original (no overlay)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
 
   // Spam prevention and state mapping refs
   const likeTimeoutRef = useRef(null)
@@ -244,13 +246,31 @@ function ComicDetail() {
     }
   }, [targetCommentIdFromUrl])
 
+  const hasInternalChapterAccess = ['ADMIN', 'MODERATOR', 'AUTHOR', 'TRANSLATOR', 'PROJECT_LEADER']
+    .includes((user?.role || '').toUpperCase())
+
+  const openChapter = (chapter) => {
+    if (!chapter) return
+
+    if (chapter.isPremium && !user?.premiumActive && !hasInternalChapterAccess) {
+      if (!user) {
+        toast.info('Please sign in and upgrade to Premium to read this chapter.')
+        navigate('/auth?mode=signin')
+      } else {
+        setShowSubscriptionModal(true)
+      }
+      return
+    }
+
+    const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(selectedLanguage)}` : ''
+    navigate(`/comic/${id}/chapter/${chapter.id}${langQuery}`)
+  }
+
   const handleReadChapter1 = () => {
     if (chapters && chapters.length > 0) {
       // Find the first chapter (sorting by chapter number ascending)
       const sorted = [...chapters].sort((a, b) => Number(a.chapterNumber) - Number(b.chapterNumber))
-      const firstChap = sorted[0]
-      const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(selectedLanguage)}` : ''
-      navigate(`/comic/${id}/chapter/${firstChap.id}${langQuery}`)
+      openChapter(sorted[0])
     } else {
       toast.warning('No chapters available for this comic yet.')
     }
@@ -663,10 +683,7 @@ function ComicDetail() {
                         cursor: 'pointer',
                         transition: 'all 0.2s'
                       }}
-                      onClick={() => {
-                        const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(selectedLanguage)}` : ''
-                        navigate(`/comic/${id}/chapter/${ch.id}${langQuery}`)
-                      }}
+                      onClick={() => openChapter(ch)}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = 'rgba(168, 85, 247, 0.08)'
                         e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.4)'
@@ -684,6 +701,23 @@ function ComicDetail() {
                           fontSize: '14px'
                         }}>
                           {chTitle}
+                          {ch.isPremium && (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              marginLeft: '10px',
+                              padding: '2px 7px',
+                              borderRadius: '999px',
+                              background: 'rgba(245, 158, 11, 0.14)',
+                              border: '1px solid rgba(245, 158, 11, 0.35)',
+                              color: '#fbbf24',
+                              fontSize: '10px',
+                              verticalAlign: 'middle'
+                            }}>
+                              🔒 Premium
+                            </span>
+                          )}
                         </span>
                         <span style={{ fontSize: '11px', color: '#64748b' }}>Views: {chViewsStr}</span>
                       </div>
@@ -751,6 +785,11 @@ function ComicDetail() {
 
         </div>
       </div>
+
+      <SubscriptionPlanModal
+        open={showSubscriptionModal}
+        onClose={() => setShowSubscriptionModal(false)}
+      />
     </HomeLayout>
   )
 }
