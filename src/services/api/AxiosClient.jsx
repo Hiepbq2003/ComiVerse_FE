@@ -1,12 +1,29 @@
 import axios from 'axios';
-import { getAuth, clearAuth } from '../../utils/Auth';
+import { getAuth, clearAuth, setAuth } from '../../utils/Auth';
 import { toast } from 'react-toastify';
 import { API_BASE_URL } from '../../config/apiConfig';
 
 const AxiosClient = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 10000,
+    timeout: 30000,
 });
+
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+const subscribeTokenRefresh = (cb, errCb) => {
+    refreshSubscribers.push({ cb, errCb });
+};
+
+const onRefreshed = (token) => {
+    refreshSubscribers.forEach(({ cb }) => cb(token));
+    refreshSubscribers = [];
+};
+
+const onRefreshFailed = (error) => {
+    refreshSubscribers.forEach(({ errCb }) => errCb(error));
+    refreshSubscribers = [];
+};
 
 AxiosClient.interceptors.request.use(
     (config) => {
@@ -43,11 +60,54 @@ AxiosClient.interceptors.response.use(
         }
 
         if (status === 401) {
-            if (isLoginRequest) {
+            const originalRequest = error.config;
+            if (isLoginRequest || originalRequest.url.includes('/auth/refresh') || originalRequest._retry) {
                 return Promise.reject(error);
             }
 
-            // 401: Unauthorized / Session Expired
+            if (auth && auth.user) {
+                const refreshToken = localStorage.getItem('refreshToken');
+                if (refreshToken) {
+                    if (!isRefreshing) {
+                        isRefreshing = true;
+
+                        axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken }, { timeout: 15000 })
+                            .then(res => {
+                                const newAuth = res.data?.data || res.data;
+                                setAuth(newAuth.token, auth.user, newAuth.refreshToken);
+                                isRefreshing = false;
+                                onRefreshed(newAuth.token);
+                            })
+                            .catch(refreshErr => {
+                                isRefreshing = false;
+                                onRefreshFailed(refreshErr);
+                                clearAuth();
+                                const privatePaths = ['/profile', '/admin', '/author', '/moderator', '/translator', '/forum'];
+                                const currentPath = window.location.pathname;
+                                const isPrivate = privatePaths.some(path => currentPath.startsWith(path));
+                                if (isPrivate) {
+                                    toast.error("Session expired. Please log in again!", { toastId: "session-expired-401" });
+                                    window.location.href = '/';
+                                }
+                            });
+                    }
+
+                    originalRequest._retry = true;
+                    return new Promise((resolve, reject) => {
+                        subscribeTokenRefresh(
+                            (newToken) => {
+                                originalRequest.headers.Authorization = `Bearer ${newToken}`;
+                                resolve(AxiosClient(originalRequest));
+                            },
+                            (err) => {
+                                reject(err);
+                            }
+                        );
+                    });
+                }
+            }
+
+            // 401: Unauthorized / Session Expired (Fallback)
             clearAuth();
             
             const privatePaths = ['/profile', '/admin', '/author', '/moderator', '/translator', '/forum'];

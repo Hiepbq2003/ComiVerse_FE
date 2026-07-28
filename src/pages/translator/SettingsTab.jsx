@@ -50,7 +50,7 @@ function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorks
               value={selectedDetails.isRecruiting ? "true" : "false"}
               onChange={(e) => setSelectedDetails({ ...selectedDetails, isRecruiting: e.target.value === "true" })}
             >
-              <option value="true">Open — recruiting new members (Visible in pool)</option>
+              <option value="true">Open — recruiting new members</option>
               <option value="false">Closed — not accepting new members</option>
             </select>
           </div>

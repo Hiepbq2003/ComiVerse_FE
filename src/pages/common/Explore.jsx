@@ -88,7 +88,7 @@ function Explore() {
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
-  const ITEMS_PER_PAGE = 12
+  const ITEMS_PER_PAGE = 15
 
   // Hover states for sidebar menu items
   const [hoveredGenre, setHoveredGenre] = useState(null)

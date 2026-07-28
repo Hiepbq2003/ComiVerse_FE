@@ -153,7 +153,7 @@ function StarRating({ comicId, user, initialRatingAverage = 0, initialRatingCoun
           <span style={{ fontSize: '24px', fontWeight: '800', color: '#fbbf24', fontFamily: 'var(--font-serif)' }}>
             ⭐ {ratingAverage > 0 ? ratingAverage.toFixed(1) : '0.0'}
           </span>
-          <span style={{ fontSize: '13px', color: '#94a3b8' }}>
+          <span style={{ fontSize: '13px', color: 'var(--star-text-muted, #94a3b8)' }}>
             / 5 ({ratingCount} ratings)
           </span>
         </div>
@@ -196,7 +196,7 @@ function StarRating({ comicId, user, initialRatingAverage = 0, initialRatingCoun
                   lineHeight: '1',
                   transition: 'transform 0.15s ease, color 0.15s ease',
                   transform: hoverScore === starIndex ? 'scale(1.25)' : 'scale(1)',
-                  color: isFilled ? '#fbbf24' : 'rgba(255, 255, 255, 0.2)'
+                  color: isFilled ? '#fbbf24' : 'var(--star-empty, rgba(255, 255, 255, 0.2))'
                 }}
                 title={STAR_LABELS[starIndex]}
               >
@@ -207,7 +207,7 @@ function StarRating({ comicId, user, initialRatingAverage = 0, initialRatingCoun
         </div>
 
         {/* Hover label hint */}
-        <span style={{ fontSize: '13px', color: '#cbd5e1', fontStyle: 'italic', marginLeft: '6px' }}>
+        <span style={{ fontSize: '13px', color: 'var(--star-text-hint, #cbd5e1)', fontStyle: 'italic', marginLeft: '6px' }}>
           {hoverScore ? STAR_LABELS[hoverScore] : userScore ? `(Selected ${userScore} stars)` : '(Click star to rate)'}
         </span>
       </div>

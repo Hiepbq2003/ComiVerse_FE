@@ -135,6 +135,9 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
   
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 5
+  
+  const [isHydrating, setIsHydrating] = useState(false)
+  const [hydratedItems, setHydratedItems] = useState([])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -208,6 +211,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
     } else if (Array.isArray(item.chapters) && item.chapters.length > 0) {
       list = item.chapters.map((c, i) => normalizeChapter(c, i));
     } else {
+      if (!isRealChapterSubmission(item)) return [];
       const pages = Array.isArray(item.pages) && item.pages.length > 0
         ? item.pages
         : Array.isArray(item.images) && item.images.length > 0
@@ -225,13 +229,16 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
       }, 0)];
     }
 
-    const withPages = list.filter(c => Array.isArray(c.pages) && c.pages.length > 0);
-    const finalChaps = withPages.length > 0 ? withPages : list;
+    let finalChaps = list;
+    if (item.status === 'pending' || !item.status) {
+      finalChaps = list.filter(c => c.status !== 'approved' && c.status !== 'rejected');
+    }
+
     return finalChaps.map(c => ({
       ...c,
       submissionId: c.submissionId || item.id || c.id,
       originalSubmissionItem: c.originalSubmissionItem || item
-    }));
+    })).sort((a, b) => (Number(a.number) || 0) - (Number(b.number) || 0));
   };
 
   // Extract description/synopsis/summary safely from raw submission objects or matching comic
@@ -562,8 +569,8 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
         );
       })
       .sort((a, b) => {
-        const timeA = a.timestamp || 0;
-        const timeB = b.timestamp || 0;
+        const timeA = new Date(a.timestamp || a.submittedAt || a.createdAt || 0).getTime() || 0;
+        const timeB = new Date(b.timestamp || b.submittedAt || b.createdAt || 0).getTime() || 0;
         return sortFilter === 'Newest' ? timeB - timeA : timeA - timeB;
       });
   }, [submissions, activeTab, searchQuery, sortFilter]);
@@ -588,8 +595,10 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
         group.subItems.push(item);
 
         // Use newest timestamp for display
-        if ((item.timestamp || 0) > (group.timestamp || 0)) {
-          group.timestamp = item.timestamp;
+        const itemTime = new Date(item.timestamp || item.submittedAt || item.createdAt || 0).getTime() || 0;
+        const groupTime = new Date(group.timestamp || group.submittedAt || group.createdAt || 0).getTime() || 0;
+        if (itemTime > groupTime) {
+          group.timestamp = item.timestamp || item.submittedAt || item.createdAt;
         }
       }
     });
@@ -614,9 +623,8 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
         });
       });
 
-      // Filter out 0-page items if items with pages exist
-      const chaptersWithPages = combinedChaps.filter(c => Array.isArray(c.pages) && c.pages.length > 0);
-      group.allChapters = chaptersWithPages.length > 0 ? chaptersWithPages : combinedChaps;
+      // Do not filter out chapters without pages; preserve all chapters
+      group.allChapters = combinedChaps;
 
       // Synchronize group.chapters with group.allChapters for 100% consistent badge count
       group.chapters = group.allChapters;
@@ -869,10 +877,16 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
 
 
   // Accelerated Backend Chapter Fetching with In-Memory Cache
-  const fetchChaptersFromBackend = async (comicId) => {
+  const fetchChaptersFromBackend = async (comicId, fetchDetails = true) => {
     if (!comicId) return [];
-    if (chapterCacheRef.current.has(comicId)) {
-      return chapterCacheRef.current.get(comicId);
+    
+    const cacheKey = fetchDetails ? `full_${comicId}` : `shallow_${comicId}`;
+    if (chapterCacheRef.current.has(cacheKey)) {
+      return chapterCacheRef.current.get(cacheKey);
+    }
+    // Return full if shallow was requested but full is available
+    if (!fetchDetails && chapterCacheRef.current.has(`full_${comicId}`)) {
+      return chapterCacheRef.current.get(`full_${comicId}`);
     }
 
     try {
@@ -884,6 +898,12 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
       }
       const list = chaptersData?.data || chaptersData || [];
       if (!Array.isArray(list) || list.length === 0) return [];
+
+      if (!fetchDetails) {
+        const shallowResult = list.map((ch, idx) => normalizeChapter(ch, idx));
+        chapterCacheRef.current.set(`shallow_${comicId}`, shallowResult);
+        return shallowResult;
+      }
 
       // Parallel batch fetching for maximum throughput
       const detailed = await Promise.allSettled(
@@ -898,13 +918,67 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
         return normalizeChapter({ ...ch, ...detail }, idx);
       });
 
-      chapterCacheRef.current.set(comicId, result);
+      chapterCacheRef.current.set(`full_${comicId}`, result);
       return result;
     } catch (err) {
       console.warn('Failed to fetch chapters from backend:', err?.message);
       return [];
     }
   };
+
+  useEffect(() => {
+    let isMounted = true;
+    const hydrateItems = async () => {
+      setIsHydrating(true);
+      const itemsCopy = [...paginatedItems];
+      
+      const hydrated = await Promise.all(itemsCopy.map(async (item) => {
+        let chaps = (item.allChapters && item.allChapters.length > 0)
+          ? [...item.allChapters]
+          : getSubmissionChapters(item);
+          
+        const hasPages = chaps.some(c => Array.isArray(c.pages) && c.pages.length > 0);
+        if (!hasPages && item.comicId) {
+          try {
+            const backendChaps = await fetchChaptersFromBackend(item.comicId, false);
+            if (backendChaps.length > 0) {
+              backendChaps.forEach(bChap => {
+                const exists = chaps.some(c => 
+                  (c.id && bChap.id && c.id === bChap.id) || 
+                  (c.title && bChap.title && c.title.toLowerCase() === bChap.title.toLowerCase())
+                );
+                if (!exists) {
+                  chaps.push(bChap);
+                }
+              });
+            }
+          } catch (e) {
+            console.warn("Hydration failed for", item.comicId, e);
+          }
+        }
+        
+        // Preserve all chapters regardless of pages array length
+        
+        item.allChapters = chaps;
+        item.chapters = chaps;
+        return item;
+      }));
+      
+      if (isMounted) {
+        setHydratedItems(hydrated);
+        setIsHydrating(false);
+      }
+    };
+    
+    if (paginatedItems.length > 0) {
+      hydrateItems();
+    } else {
+      setHydratedItems([]);
+      setIsHydrating(false);
+    }
+    
+    return () => { isMounted = false; };
+  }, [paginatedItems]);
 
   const handleOpenReviewModal = async (item) => {
     setSelectedReview(item);
@@ -919,7 +993,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
     // If no pages found and we have a comicId, fetch from backend
     const hasPages = chaps.some(c => Array.isArray(c.pages) && c.pages.length > 0);
     if (!hasPages && item.comicId) {
-      const backendChaps = await fetchChaptersFromBackend(item.comicId);
+      const backendChaps = await fetchChaptersFromBackend(item.comicId, true);
       if (backendChaps.length > 0) {
         backendChaps.forEach(bChap => {
           const exists = chaps.some(c => 
@@ -938,11 +1012,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
       }
     }
 
-    // Filter out 0-page placeholders if real chapters with pages exist
-    const chapsWithPages = chaps.filter(c => Array.isArray(c.pages) && c.pages.length > 0);
-    if (chapsWithPages.length > 0) {
-      chaps = chapsWithPages;
-    }
+    // Preserve all chapters regardless of pages array length
 
     item.allChapters = chaps;
     item.chapters = chaps;
@@ -1107,8 +1177,23 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
             <h3>No submissions found</h3>
             <p>There are no raw comic submissions matching your active filters.</p>
           </div>
+        ) : isHydrating ? (
+          <div className="skeleton-comic-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {[...Array(Math.min(ITEMS_PER_PAGE, filteredItems.length))].map((_, i) => (
+              <div key={i} className="submission-card" style={{ padding: '20px', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px' }}>
+                <div style={{ display: 'flex', gap: '20px' }}>
+                  <div className="skeleton-img skeleton-shimmer" style={{ width: '80px', height: '110px', borderRadius: '8px' }}></div>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', justifyContent: 'center' }}>
+                    <div className="skeleton-line skeleton-shimmer long" style={{ height: '24px', margin: 0 }}></div>
+                    <div className="skeleton-line skeleton-shimmer short" style={{ height: '16px', margin: 0, width: '120px' }}></div>
+                    <div className="skeleton-line skeleton-shimmer short" style={{ height: '22px', margin: 0, width: '80px', borderRadius: '6px' }}></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
-          paginatedItems.map(item => (
+          hydratedItems.map(item => (
             <div className="submission-card" key={item.id}>
               <div className="submission-cover-placeholder">
                 {item.cover && (item.cover.startsWith('http') || item.cover.includes('/')) ? (
@@ -1126,9 +1211,9 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                   {getSubmissionMinAge(item) !== 'Not specified' && <span> · <strong>Age:</strong> {getSubmissionMinAge(item)}</span>}
                 </p>
                 <div className="submission-extra" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
-                  <span className="submission-extra-item">⏱️ {formatTimeAgo(item.timestamp)}</span>
+                  <span className="submission-extra-item">⏱️ {formatTimeAgo(item.timestamp || item.submittedAt || item.createdAt)}</span>
                   <span className="submission-extra-item" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '2px 8px', borderRadius: '6px', fontWeight: '800', fontSize: '11.5px' }}>
-                    📚 {(item.allChapters?.length || (item.chapters ? item.chapters.length : 1))} {(item.allChapters?.length || 1) === 1 ? 'Chapter' : 'Chapters'}
+                    📚 {getSubmissionChapters(item).length} {getSubmissionChapters(item).length === 1 ? 'Chapter' : 'Chapters'}
                   </span>
                 </div>
               </div>
@@ -1196,7 +1281,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                       📖 {selectedReview.title} {selectedChapter ? `— ${selectedChapter.title}` : ''}
                     </h3>
                     <div className="mod-inspector-subtitle">
-                      {getSubmissionAuthor(selectedReview)} · {formatTimeAgo(selectedReview.timestamp)}
+                      {getSubmissionAuthor(selectedReview)} · {formatTimeAgo(selectedReview.timestamp || selectedReview.submittedAt || selectedReview.createdAt)}
                     </div>
                   </div>
                 </div>
@@ -1237,7 +1322,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                     💬 Feedback Pins ({activeComments.length})
                   </button>
 
-                  {selectedReview.status === 'pending' && (
+                  {selectedReview.status === 'pending' && (!activeChap || activeChap.id === chaptersList[0]?.id) && (
                     <>
                       <ModernButton 
                         variant={2} 
@@ -1646,7 +1731,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                                             label={isSelected ? '✓ Inspecting' : '👁️ View'}
                                             onClick={() => handleSelectChapterItem(chap)}
                                           />
-                                          {selectedReview.status === 'pending' && (
+                                          {selectedReview.status === 'pending' && idx === 0 && (
                                             <>
                                               <ModernButton
                                                 variant={2}

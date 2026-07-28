@@ -1,10 +1,9 @@
 import AxiosClient from './AxiosClient';
 
-export const getAllSubmissionsApi = async () => {
+export const getAllSubmissionsApi = async (config = {}) => {
   try {
-    return await AxiosClient.get('/submissions/all');
+    return await AxiosClient.get('/submissions/all', { params: { t: Date.now() }, timeout: 10000, ...config });
   } catch (err) {
-    console.warn('[SubmissionApi] getAllSubmissionsApi fallback:', err?.message || err);
     return [];
   }
 };

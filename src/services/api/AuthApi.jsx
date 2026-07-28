@@ -8,6 +8,10 @@ export const registerApi = (userData) => {
   return AxiosClient.post('/auth/register', userData);
 };
 
+export const refreshTokenApi = (refreshToken) => {
+  return AxiosClient.post('/auth/refresh', { refreshToken });
+};
+
 export const verifyEmailApi = (email, otp) => {
   return AxiosClient.post('/auth/verify-email', { email, otp });
 };
