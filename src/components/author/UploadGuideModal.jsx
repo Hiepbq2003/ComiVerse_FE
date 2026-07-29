@@ -28,10 +28,10 @@ function UploadGuideModal({ onClose }) {
 
         <div className="author-upload-guide-content">
           <section className="author-section-card">
-            <h2 className="author-section-title">Required CBZ Structure</h2>
-            <p className="author-guide-lead">Each chapter is uploaded as one CBZ file. Page images must be located directly at the archive root.</p>
+            <h2 className="author-section-title">Required ZIP Structure</h2>
+            <p className="author-guide-lead">Each chapter is uploaded as one ZIP file. Page images must be located directly at the archive root.</p>
             <div className="author-code-card">
-              <pre>{`Chapter 2.cbz
+              <pre>{`Chapter 2.zip
 ├── 01.jpg
 ├── 02.jpg
 ├── 03.jpg
@@ -42,7 +42,7 @@ function UploadGuideModal({ onClose }) {
               <div className="author-guide-box success">
                 <h3>Accepted</h3>
                 <ul>
-                  <li>Names such as <code>Chapter 1.cbz</code>, <code>Chapter 1,5.cbz</code>, or <code>Chapter 1.5.cbz</code>.</li>
+                  <li>Names such as <code>Chapter 1.zip</code>, <code>Chapter 1,5.zip</code>, or <code>Chapter 1.5.zip</code>.</li>
                   <li>Page files such as <code>01.jpg</code>, <code>02.png</code>, and <code>003.webp</code>.</li>
                   <li>JPG, JPEG, PNG, WEBP, and GIF images.</li>
                   <li>Duplicate source image names are handled safely.</li>
@@ -53,7 +53,7 @@ function UploadGuideModal({ onClose }) {
                 <h3>Rejected</h3>
                 <ul>
                   <li>Wrapper folders such as <code>Chapter 2/01.jpg</code>.</li>
-                  <li>Another ZIP or CBZ nested inside the chapter CBZ.</li>
+                  <li>Another archive nested inside the chapter ZIP.</li>
                   <li>PDF, TXT, PSD, README, hidden files, or <code>__MACOSX</code>.</li>
                   <li>Images larger than the backend upload limit.</li>
                 </ul>
@@ -63,7 +63,7 @@ function UploadGuideModal({ onClose }) {
 
           <ol className="author-guide-steps">
             <li>Create the comic draft with its information and cover image.</li>
-            <li>Open Comic Detail and upload one chapter CBZ.</li>
+            <li>Open Comic Detail and upload one chapter ZIP.</li>
             <li>Check the page order while the chapter is <strong>PREVIEW_READY</strong>.</li>
             <li>Submit the chapter, then press <strong>Push Review</strong> for the comic profile.</li>
           </ol>
