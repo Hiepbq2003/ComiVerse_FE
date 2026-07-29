@@ -673,7 +673,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                         onClick={() => navigate(`/moderator/comic/${comic.id}`, { state: { comic } })} 
                       />
                       <ModernButton 
-                        variant={5} 
+                        variant={2} 
                         label="🗑️ Archive" 
                         className="btn-archive"
                         onClick={() => { setComicToArchive(comic); setShowArchiveModal(true); }} 
@@ -1081,6 +1081,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                       <th style={{ textAlign: 'left', padding: '12px' }}>Title</th>
                       <th style={{ textAlign: 'left', padding: '12px' }}>Type</th>
                       <th style={{ textAlign: 'left', padding: '12px' }}>Created Date</th>
+                      <th style={{ textAlign: 'left', padding: '12px' }}>Moderator</th>
                       <th style={{ textAlign: 'left', padding: '12px' }}>Views</th>
                       <th style={{ textAlign: 'right', padding: '12px' }}>Actions</th>
                     </tr>
@@ -1100,10 +1101,24 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                         <td style={{ padding: '12px', fontSize: '13px' }}>
                           {chap.createdAt ? new Date(chap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
                         </td>
+                        <td style={{ padding: '12px', fontSize: '13px' }}>
+                          {chap.approvedBy ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <span style={{ fontWeight: '600', color: '#10b981' }}>✓ {chap.approvedBy}</span>
+                              {chap.approvedAt && (
+                                <span style={{ fontSize: '11px', color: 'var(--mod-text-secondary)' }}>
+                                  {new Date(chap.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span style={{ fontStyle: 'italic', color: 'var(--mod-text-secondary)' }}>-</span>
+                          )}
+                        </td>
                         <td style={{ padding: '12px' }}>{chap.viewCount || 0}</td>
                         <td style={{ padding: '12px', textAlign: 'right' }}>
                           <ModernButton 
-                            variant={5} 
+                            variant={2} 
                             label="🗑️ Delete" 
                             className="btn-archive"
                             onClick={() => handleDeleteChapter(chap.id)}

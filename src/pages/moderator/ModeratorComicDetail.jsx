@@ -842,6 +842,12 @@ function ModeratorComicDetail() {
                       Status: {comic.publicationStatus || 'ONGOING'}
                     </span>
 
+                    {comic.approvedBy && (
+                      <span className="mod-meta-pill" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                        ✓ Approved by: <strong>{comic.approvedBy}</strong> {comic.approvedAt && `• ${new Date(comic.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                      </span>
+                    )}
+
                     <span className="mod-meta-pill">
                       ⭐ Rating: {comic.ratingAverage !== undefined ? comic.ratingAverage.toFixed(1) : (comic.rating !== undefined ? comic.rating.toFixed(1) : '0.0')} ({comic.ratingCount || 0})
                     </span>
@@ -964,6 +970,7 @@ function ModeratorComicDetail() {
                       <th>Title</th>
                       <th>Type</th>
                       <th>Uploaded Date</th>
+                      <th>Moderation</th>
                       <th>Views</th>
                       <th style={{ textAlign: 'right' }}>Actions</th>
                     </tr>
@@ -983,6 +990,26 @@ function ModeratorComicDetail() {
                         <td>
                           {chap.createdAt ? new Date(chap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 
                            (chap.updatedAt ? new Date(chap.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-')}
+                        </td>
+                        <td>
+                          {chap.moderationStatus === 'PUBLISHED' ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <span style={{ fontSize: '12px', fontWeight: '700', color: '#10b981' }}>
+                                ✓ {chap.approvedBy ? chap.approvedBy : 'Published'}
+                              </span>
+                              {chap.approvedAt && (
+                                <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                  {new Date(chap.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '11.5px', color: '#94a3b8', fontStyle: 'italic', fontWeight: '500' }}>
+                              {chap.moderationStatus === 'PREVIEW_READY' ? 'Author Drafting' : 
+                               (chap.moderationStatus === 'SUBMITTED_FOR_REVIEW' || chap.moderationStatus === 'PENDING_REVIEW' ? 'Pending Review' : 
+                                (chap.moderationStatus === 'REJECTED' ? 'Rejected' : (chap.moderationStatus || 'Draft')))}
+                            </span>
+                          )}
                         </td>
                         <td>
                           {formatChapterViews(getChapterViews(chap, comic, chapters.length))}

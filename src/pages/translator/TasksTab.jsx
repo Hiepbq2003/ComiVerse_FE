@@ -890,7 +890,7 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
       }
 
       if (isMounted) {
-        setPages([]);
+        setPages(prev => prev.length > 0 ? prev : []);
         setLoading(false);
       }
     };

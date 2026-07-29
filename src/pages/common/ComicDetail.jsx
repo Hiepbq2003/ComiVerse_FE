@@ -1,8 +1,7 @@
-import { useCallback, useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getAuth } from '../../utils/Auth'
-import { useAuth } from '../../context/AuthContext'
 import axios from 'axios'
 import { getComicByIdApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi, getComicTranslationLanguagesApi } from '../../services/api/ChapterApi'
@@ -15,10 +14,7 @@ import { getReadChaptersByComicIdApi } from '../../services/api/ReadingHistoryAp
 import CommentSection from '../../components/common/CommentSection'
 import StarRating from '../../components/common/StarRating'
 import SubscriptionPlanModal from '../../components/common/SubscriptionPlanModal'
-import {
-  ArrowLeft, Bookmark, BookOpen, Check, Clock3, Eye, Heart, Info,
-  Languages, LockKeyhole, MessageCircle, Play, Star
-} from 'lucide-react'
+import { LockKeyhole } from 'lucide-react'
 import '../../assets/style/reader/comic-detail.css'
 function ComicDetail() {
   const { id } = useParams()
@@ -28,7 +24,7 @@ function ComicDetail() {
   const targetCommentIdFromUrl = searchParams.get('comment')
 
   const [activeTab, setActiveTab] = useState('chapters')
-  const { user, refreshSubscription } = useAuth()
+  const [user, setUser] = useState(null)
   const [inLibrary, setInLibrary] = useState(false)
 
   // Backend integration states
@@ -64,6 +60,14 @@ function ComicDetail() {
     return String(num)
   }
 
+  // Get current user on mount
+  useEffect(() => {
+    const auth = getAuth()
+    if (auth && auth.user) {
+      setUser(auth.user)
+    }
+  }, [])
+
   // Load details from API or fall back to mock
   useEffect(() => {
     const controller = new AbortController()
@@ -87,7 +91,7 @@ function ComicDetail() {
           getComicTranslationLanguagesApi(id, { signal }).catch(() => ({ data: [] }))
         ])
 
-        let comicData = comicRes?.data || comicRes
+        const comicData = comicRes?.data || comicRes
         const chaptersData = chaptersRes?.data || chaptersRes || []
         const languagesData = languagesRes?.data || languagesRes || []
 
@@ -95,24 +99,6 @@ function ComicDetail() {
         const savedStatus = saveCheckRes?.data !== undefined ? saveCheckRes.data : !!saveCheckRes
         const likedStatus = likeCheckRes?.data !== undefined ? likeCheckRes.data : !!likeCheckRes
         const readHistoryData = readHistoryRes?.data || readHistoryRes || []
-
-        try {
-          // Attempt to merge from override if it's a new submission
-          const subsStr = localStorage.getItem('comiverse_moderator_submissions_override');
-          if (subsStr) {
-            const subs = JSON.parse(subsStr);
-            const override = subs.find(s => String(s.comicId || s.id) === String(id));
-            if (override) {
-              comicData = { ...comicData, ...override, genres: override.genres || override.genre || comicData?.genres || [] };
-            }
-          }
-          // Attempt to merge from Moderator/Author edits
-          const localEdit = localStorage.getItem('comiverse_local_comic_' + id);
-          if (localEdit) {
-            const parsedEdit = JSON.parse(localEdit);
-            comicData = { ...comicData, ...parsedEdit, genres: parsedEdit.genres || parsedEdit.genre || comicData?.genres || [] };
-          }
-        } catch(e) {}
 
         setComic(comicData)
         setChapters(chaptersData)
@@ -154,7 +140,7 @@ function ComicDetail() {
     return () => {
       controller.abort()
     }
-  }, [id])
+  }, [id, user])
 
   const handleAddToLibrary = () => {
     if (!user) {
@@ -261,33 +247,20 @@ function ComicDetail() {
     }
   }, [targetCommentIdFromUrl])
 
-  const rawUserRole = typeof user?.role === 'string'
-    ? user.role
-    : (user?.role?.roleName || user?.roleName || '')
   const hasInternalChapterAccess = ['ADMIN', 'MODERATOR', 'AUTHOR', 'TRANSLATOR', 'PROJECT_LEADER']
-    .includes(String(rawUserRole).trim().toUpperCase())
+    .includes((user?.role || '').toUpperCase())
 
-  const openChapter = async (chapter) => {
+  const openChapter = (chapter) => {
     if (!chapter) return
 
-    if (chapter.isPremium && !hasInternalChapterAccess) {
+    if (chapter.isPremium && !user?.premiumActive && !hasInternalChapterAccess) {
       if (!user) {
         toast.info('Please sign in and upgrade to Premium to read this chapter.')
         navigate('/auth?mode=signin')
-        return
+      } else {
+        setShowSubscriptionModal(true)
       }
-
-      try {
-        const latestSubscription = await refreshSubscription()
-        if (!latestSubscription?.premiumActive) {
-          setShowSubscriptionModal(true)
-          return
-        }
-      } catch (error) {
-        console.error('Unable to verify Premium access:', error)
-        toast.error('Unable to verify your Premium subscription. Please try again.')
-        return
-      }
+      return
     }
 
     const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(selectedLanguage)}` : ''
@@ -296,13 +269,13 @@ function ComicDetail() {
 
   const handleReadChapter1 = () => {
     if (chapters && chapters.length > 0) {
-      // Find the first chapter (sorting by chapter number ascending)
       const sorted = [...chapters].sort((a, b) => Number(a.chapterNumber) - Number(b.chapterNumber))
       openChapter(sorted[0])
     } else {
       toast.warning('No chapters available for this comic yet.')
     }
   }
+
 
   if (loading || !comic) {
     return (
@@ -368,13 +341,7 @@ function ComicDetail() {
   );
   const displayGenres = parsedGenres.length > 0 ? parsedGenres : ['Fantasy'];
 
-  let rawDisplayAuthor = comic.authorName || (typeof comic.author === 'object' ? (comic.author?.displayName || comic.author?.fullName || comic.author?.username) : comic.author) || (typeof comic.user === 'object' ? (comic.user?.fullName || comic.user?.username) : comic.user) || comic.creatorName || comic.submittedBy || user?.fullName || 'Unknown Author';
-  
-  if (typeof rawDisplayAuthor === 'string') {
-    rawDisplayAuthor = rawDisplayAuthor.replace(/^(Author:\s*)+/gi, '').trim();
-  }
-  const displayAuthor = rawDisplayAuthor;
-
+  const displayAuthor = comic.authorName || (typeof comic.author === 'object' ? (comic.author?.displayName || comic.author?.fullName || comic.author?.username) : comic.author) || (typeof comic.user === 'object' ? (comic.user?.fullName || comic.user?.username) : comic.user) || comic.creatorName || comic.submittedBy || 'Author'
   const displayLanguage = comic.language || comic.rawLanguage || 'Unknown'
 
   const displayRating = comic.ratingAverage !== undefined
@@ -397,7 +364,6 @@ function ComicDetail() {
   const sortedChapters = [...chapters].sort(
     (a, b) => Number(a.chapterNumber || 0) - Number(b.chapterNumber || 0)
   )
-
   return (
     <HomeLayout>
       {/* CINEMATIC HERO SECTION */}
@@ -411,17 +377,25 @@ function ComicDetail() {
         <div className="hero-backdrop-overlay" />
 
         <div className="comic-detail-hero-content">
+          {/* Cover */}
+          <div className="comic-detail-cover-wrapper">
+            {isEmoji(displayCover) ? (
+              <div style={{ fontSize: '7rem', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at center, rgba(168, 85, 247, 0.2) 0%, rgba(13, 9, 25, 0.98) 100%)' }}>{displayCover}</div>
+            ) : (
+              <img src={displayCover} alt={displayTitle} />
+            )}
+          </div>
+
           {/* Details */}
-          <div className="comic-detail-hero-copy">
+          <div style={{ flex: '1', minWidth: '300px' }}>
             <button onClick={() => navigate(-1)} className="hero-back-btn">
-              <ArrowLeft size={16} aria-hidden="true" />
-              Back
+              ← Back
             </button>
 
             <div className="hero-badges-row">
               <span className="hero-status-badge">{displayStatus}</span>
               {displayGenres.map((genre, idx) => (
-                <span key={idx} className="hero-genre-tag">
+                <span key={idx} className="detail-genre-tag">
                   {genre}
                 </span>
               ))}
@@ -437,44 +411,41 @@ function ComicDetail() {
             <div className="hero-stats-glass-bar">
               <div className="hero-stat-item">
                 <span className="hero-stat-label">Rating</span>
-                <span className="hero-stat-val rating"><Star size={17} fill="currentColor" /> {displayRating}</span>
+                <span className="hero-stat-val rating">⭐ {displayRating}</span>
               </div>
               <div className="hero-stat-divider" />
               <div className="hero-stat-item">
                 <span className="hero-stat-label">Views</span>
-                <span className="hero-stat-val"><Eye size={17} /> {displayViews}</span>
+                <span className="hero-stat-val">👁️ {displayViews}</span>
               </div>
               <div className="hero-stat-divider" />
               <div className="hero-stat-item">
                 <span className="hero-stat-label">Likes</span>
-                <span className="hero-stat-val"><Heart size={17} fill="currentColor" /> {displayLikes}</span>
+                <span className="hero-stat-val">❤️ {displayLikes}</span>
               </div>
               <div className="hero-stat-divider" />
               <div className="hero-stat-item">
                 <span className="hero-stat-label">Bookmarks</span>
-                <span className="hero-stat-val"><Bookmark size={17} fill="currentColor" /> {displayBookmarks}</span>
+                <span className="hero-stat-val">🔖 {displayBookmarks}</span>
               </div>
             </div>
 
             {/* Action Buttons */}
             <div className="hero-actions-group">
               <button onClick={handleReadChapter1} className="hero-btn-primary">
-                <Play size={17} fill="currentColor" />
-                Read Chapter 1
+                ▶ Read Chapter 1
               </button>
               <button
                 onClick={handleAddToLibrary}
                 className={`hero-btn-glass ${inLibrary ? 'active-saved' : ''}`}
               >
-                {inLibrary ? <Check size={17} /> : <Bookmark size={17} />}
-                {inLibrary ? 'Saved in Library' : 'Add to Library'}
+                {inLibrary ? '✓ Saved in Library' : '🔖 Add to Library'}
               </button>
               <button
                 onClick={handleToggleLike}
                 className={`hero-btn-glass ${isLiked ? 'active-liked' : ''}`}
               >
-                <Heart size={17} fill={isLiked ? 'currentColor' : 'none'} />
-                {isLiked ? 'Liked' : 'Like'}
+                {isLiked ? '❤️ Liked' : '🤍 Like'}
               </button>
             </div>
 
@@ -497,15 +468,6 @@ function ComicDetail() {
               />
             </div>
           </div>
-
-          {/* Cover */}
-          <div className="comic-detail-cover-wrapper">
-            {isEmoji(displayCover) ? (
-              <div className="comic-detail-cover-placeholder">{displayCover}</div>
-            ) : (
-              <img src={displayCover} alt={displayTitle} />
-            )}
-          </div>
         </div>
       </div>
 
@@ -514,11 +476,11 @@ function ComicDetail() {
         <div className="comic-detail-main-grid">
 
           {/* Left Column: Synopsis + Tabs */}
-          <div className="comic-detail-content-column">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
 
             {/* Synopsis */}
             <div className="detail-synopsis-card">
-              <h3 className="detail-section-title"><BookOpen size={19} /> Synopsis</h3>
+              <h3 className="detail-section-title">📖 Synopsis</h3>
               <p className="detail-synopsis-text">{displaySummary}</p>
             </div>
 
@@ -528,14 +490,12 @@ function ComicDetail() {
                 onClick={() => setActiveTab('chapters')}
                 className={`detail-tab-button ${activeTab === 'chapters' ? 'active' : ''}`}
               >
-                <BookOpen size={17} />
                 Chapters ({chapters.length})
               </button>
               <button
                 onClick={() => setActiveTab('comments')}
                 className={`detail-tab-button ${activeTab === 'comments' ? 'active' : ''}`}
               >
-                <MessageCircle size={17} />
                 Comments
               </button>
             </div>
@@ -545,9 +505,8 @@ function ComicDetail() {
               <div>
                 {availableLanguages.length > 0 && (
                   <div className="chapter-controls-bar">
-                    <label htmlFor="comic-reading-language" className="chapter-language-label">
-                      <Languages size={16} />
-                      Reading language
+                    <label htmlFor="comic-reading-language" style={{ fontSize: '13px', fontWeight: '600' }}>
+                      🌐 Reading Language:
                     </label>
                     <select
                       id="comic-reading-language"
@@ -585,20 +544,31 @@ function ComicDetail() {
                           className={`detail-chapter-card ${isRead ? 'read' : ''}`}
                           onClick={() => openChapter(ch)}
                         >
-                          <div className="detail-chapter-content">
+                          <div>
                             <span className="detail-chapter-name">
                               {chTitle}
                               {ch.isPremium && (
-                                <span className="premium-status-pill">
-                                  <LockKeyhole size={10} />
-                                  PREMIUM
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  marginLeft: '10px',
+                                  padding: '2px 7px',
+                                  borderRadius: '999px',
+                                  background: 'rgba(245, 158, 11, 0.14)',
+                                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                                  color: '#fbbf24',
+                                  fontSize: '10px',
+                                  verticalAlign: 'middle'
+                                }}>
+                                  <LockKeyhole size={10} /> PREMIUM
                                 </span>
                               )}
-                              {isRead && <span className="read-status-pill"><Check size={10} /> READ</span>}
+                              {isRead && <span className="read-status-pill">✓ READ</span>}
                             </span>
-                            <span className="detail-chapter-views"><Eye size={13} /> {chViewsStr} views</span>
+                            <span style={{ fontSize: '12px', opacity: 0.75 }}>Views: {chViewsStr}</span>
                           </div>
-                          <span className="detail-chapter-meta"><Clock3 size={13} /> {chDateStr}</span>
+                          <span className="detail-chapter-meta">{chDateStr}</span>
                         </div>
                       )
                     })
@@ -619,11 +589,10 @@ function ComicDetail() {
           </div>
 
           {/* Right Column: Sidebar */}
-          <aside className="comic-detail-sidebar">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div className="detail-sidebar-info-card">
-              <h3 className="detail-section-title detail-sidebar-title">
-                <Info size={18} />
-                Information
+              <h3 className="detail-section-title" style={{ fontSize: '16px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '10px' }}>
+                Comic Info
               </h3>
 
               <div>
@@ -641,7 +610,7 @@ function ComicDetail() {
                 <span className="info-item-val">{displayStatus}</span>
               </div>
             </div>
-          </aside>
+          </div>
 
         </div>
       </div>

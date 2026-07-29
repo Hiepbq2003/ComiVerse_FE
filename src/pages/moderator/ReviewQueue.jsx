@@ -85,6 +85,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
   const [readerLayout, setReaderLayout] = useState('single') // 'single' | 'vertical'
 
   const [selectedReject, setSelectedReject] = useState(null)
+  const [inspectedChapterIds, setInspectedChapterIds] = useState(new Set())
   const [rejectionReason, setRejectionReason] = useState('')
   const [fetchingChapters, setFetchingChapters] = useState(false)
   const chapterCacheRef = useRef(new Map())
@@ -1036,6 +1037,9 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
     setSelectedChapter(chap);
     setPageIndex(0);
     setPreviewTab('reader');
+    if (chap?.id) {
+      setInspectedChapterIds(prev => new Set(prev).add(chap.id));
+    }
   };
 
   // Accelerated Image Preloading Strategy
@@ -1093,10 +1097,10 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
 
       {/* Dynamic Statistics Ribbon */}
       {(() => {
-        const total = submissions.length;
         const pending = tabCounts.pending;
         const approved = tabCounts.approved;
         const rejected = tabCounts.rejected;
+        const total = pending + approved + rejected;
         const rate = (approved + rejected) > 0 ? Math.round((approved / (approved + rejected)) * 100) : 0;
 
         return (
@@ -1323,23 +1327,6 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                     💬 Feedback Pins ({activeComments.length})
                   </button>
 
-                  {selectedReview.status === 'pending' && (!activeChap || activeChap.id === chaptersList[0]?.id) && (
-                    <>
-                      <ModernButton 
-                        variant={2} 
-                        label="✓ Approve" 
-                        className="btn-approve"
-                        onClick={() => onModalApproveClick()} 
-                      />
-
-                      <ModernButton 
-                        variant={2} 
-                        label="✗ Reject" 
-                        className="btn-reject"
-                        onClick={() => onModalRejectClick()} 
-                      />
-                    </>
-                  )}
                   <button 
                     className="mod-inspector-close-btn" 
                     onClick={() => { setSelectedReview(null); setSelectedChapter(null); }}
@@ -2236,9 +2223,24 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
             </div>
 
             <div className="mod-modal-body" style={{ padding: '20px 24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <p style={{ fontSize: '13.5px', margin: 0, lineHeight: '1.5', color: 'var(--mod-text-secondary)' }}>
-                You are about to reject raw submission <strong>"{selectedReject.title}"</strong>. Review the attached inspection feedback report below before sending it to the author.
-              </p>
+              {(() => {
+                const chaptersList = getSubmissionChapters(selectedReject);
+                const totalChapters = chaptersList.length;
+                const uninspectedCount = chaptersList.filter(c => !inspectedChapterIds.has(c.id)).length;
+                
+                return (
+                  <>
+                    <p style={{ fontSize: '13.5px', margin: 0, lineHeight: '1.5', color: 'var(--mod-text-secondary)' }}>
+                      You are about to reject raw submission <strong>"{selectedReject.title}"</strong> (which contains {totalChapters} chapter{totalChapters !== 1 ? 's' : ''}). Review the attached inspection feedback report below before sending it to the author.
+                    </p>
+                    {uninspectedCount > 0 && (
+                      <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '12px 16px', borderRadius: '8px', color: '#b91c1c', fontSize: '13.5px' }}>
+                        ⚠️ <strong>Warning:</strong> {uninspectedCount} chapter{uninspectedCount !== 1 ? 's have' : ' has'} not been inspected yet. Are you sure you want to proceed with rejecting the entire submission?
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               {/* Detailed Pinned Comments Preview Report with Page Thumbnails */}
               {(() => {
