@@ -480,3 +480,21 @@ html.light .subscription-result-card {
     flex-direction: column;
   }
 }
+
+.subscription-error-state {
+  flex-direction: column;
+  gap: 14px;
+  min-height: 180px;
+  text-align: center;
+}
+
+.subscription-error-state p {
+  margin: 0;
+  color: var(--subscription-muted, #a3a3a3);
+}
+
+.subscription-error-state .subscription-plan-button {
+  width: auto;
+  min-width: 140px;
+  padding-inline: 22px;
+}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getComicByIdApi } from '../../services/api/ComicApi'
@@ -57,6 +57,7 @@ function ChapterDetail() {
   const [translations, setTranslations] = useState([])
   const [selectedLanguage, setSelectedLanguage] = useState(searchParams.get('lang') || '')
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+  const closeSubscriptionModal = useCallback(() => setShowSubscriptionModal(false), [])
 
   const { user, refreshSubscription } = useAuth()
 
@@ -545,7 +546,7 @@ function ChapterDetail() {
 
       <SubscriptionPlanModal
         open={showSubscriptionModal}
-        onClose={() => setShowSubscriptionModal(false)}
+        onClose={closeSubscriptionModal}
       />
     </HomeLayout>
   )

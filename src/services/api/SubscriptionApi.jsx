@@ -1,8 +1,8 @@
 import AxiosClient from './AxiosClient'
 
-export const getSubscriptionPlansApi = () => AxiosClient.get('/subscriptions/plans')
+export const getSubscriptionPlansApi = (config = {}) => AxiosClient.get('/subscriptions/plans', config)
 
-export const getMySubscriptionApi = () => AxiosClient.get('/subscriptions/me')
+export const getMySubscriptionApi = (config = {}) => AxiosClient.get('/subscriptions/me', config)
 
 export const createCheckoutSessionApi = (planId) => (
   AxiosClient.post('/subscriptions/checkout', { planId })

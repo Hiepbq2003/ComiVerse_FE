@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getAuth } from '../../utils/Auth'
@@ -41,6 +41,7 @@ function ComicDetail() {
   const [availableLanguages, setAvailableLanguages] = useState([])
   const [selectedLanguage, setSelectedLanguage] = useState('') // '' = original (no overlay)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+  const closeSubscriptionModal = useCallback(() => setShowSubscriptionModal(false), [])
 
   // Spam prevention and state mapping refs
   const likeTimeoutRef = useRef(null)
@@ -647,7 +648,7 @@ function ComicDetail() {
 
       <SubscriptionPlanModal
         open={showSubscriptionModal}
-        onClose={() => setShowSubscriptionModal(false)}
+        onClose={closeSubscriptionModal}
       />
     </HomeLayout>
   )

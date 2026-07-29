@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, Crown, ShieldCheck, Star, X, Zap } from 'lucide-react'
 import { toast } from 'react-toastify'
 import { useNavigate } from 'react-router-dom'
@@ -38,6 +38,15 @@ function intervalLabel(plan) {
   return count === 1 ? `per ${unit}` : `every ${count} ${unit}s`
 }
 
+
+function normalizePlansResponse(response) {
+  if (Array.isArray(response)) return response
+  if (Array.isArray(response?.content)) return response.content
+  if (Array.isArray(response?.plans)) return response.plans
+  if (Array.isArray(response?.items)) return response.items
+  return []
+}
+
 function SubscriptionPlanModal({ open, onClose }) {
   const navigate = useNavigate()
   const { isLoggedIn, user, refreshSubscription } = useAuth()
@@ -46,6 +55,7 @@ function SubscriptionPlanModal({ open, onClose }) {
   const [plans, setPlans] = useState([])
   const [subscription, setSubscription] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const [processingPlanId, setProcessingPlanId] = useState(null)
   const [portalLoading, setPortalLoading] = useState(false)
 
@@ -58,40 +68,71 @@ function SubscriptionPlanModal({ open, onClose }) {
   )
   const canManageSubscription = Boolean(subscription?.id)
 
+  const loadPlans = useCallback(async () => {
+    setLoading(true)
+    setLoadError('')
+
+    try {
+      const plansResponse = await getSubscriptionPlansApi({
+        suppressToast: true,
+        headers: { 'X-Suppress-Toast': 'true' }
+      })
+      const loadedPlans = normalizePlansResponse(plansResponse)
+      setPlans(loadedPlans)
+
+      if (loadedPlans.length === 0) {
+        setLoadError('No active Premium plans are available right now.')
+      }
+    } catch (error) {
+      console.error('Unable to load subscription plans:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        url: error.config?.url
+      })
+      setPlans([])
+      setLoadError(
+        error.response?.data?.message
+          || error.message
+          || 'Unable to load subscription plans.'
+      )
+      return
+    } finally {
+      setLoading(false)
+    }
+
+    if (isLoggedIn && isReader) {
+      try {
+        const currentSubscription = await refreshSubscription()
+        setSubscription(currentSubscription)
+      } catch (error) {
+        console.warn('Unable to load the current subscription:', error?.message || error)
+        setSubscription(null)
+      }
+    } else {
+      setSubscription(null)
+    }
+  }, [isLoggedIn, isReader, refreshSubscription])
+
+  useEffect(() => {
+    if (!open) return
+    loadPlans()
+  }, [open, loadPlans])
+
   useEffect(() => {
     if (!open) return undefined
 
-    let mounted = true
-    const loadPlans = async () => {
-      setLoading(true)
-      try {
-        const [plansResult, subscriptionResult] = await Promise.allSettled([
-          getSubscriptionPlansApi(),
-          isLoggedIn && isReader ? refreshSubscription() : Promise.resolve(null)
-        ])
-        if (!mounted) return
-        setPlans(plansResult.status === 'fulfilled' && Array.isArray(plansResult.value) ? plansResult.value : [])
-        setSubscription(subscriptionResult.status === 'fulfilled' ? subscriptionResult.value : null)
-      } catch (error) {
-        console.error(error)
-        if (mounted) toast.error('Unable to load subscription plans.')
-      } finally {
-        if (mounted) setLoading(false)
-      }
-    }
-
-    loadPlans()
     const handleEscape = (event) => {
       if (event.key === 'Escape') onClose()
     }
+
     document.addEventListener('keydown', handleEscape)
     document.body.classList.add('subscription-modal-open')
+
     return () => {
-      mounted = false
       document.removeEventListener('keydown', handleEscape)
       document.body.classList.remove('subscription-modal-open')
     }
-  }, [open, isLoggedIn, isReader, onClose, refreshSubscription])
+  }, [open, onClose])
 
   const sortedPlans = useMemo(
     () => [...plans].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)),
@@ -161,6 +202,13 @@ function SubscriptionPlanModal({ open, onClose }) {
             <div className="subscription-loading-state">
               <span className="subscription-spinner" />
               Loading plans...
+            </div>
+          ) : loadError ? (
+            <div className="subscription-loading-state subscription-error-state">
+              <p>{loadError}</p>
+              <button type="button" className="subscription-plan-button" onClick={loadPlans}>
+                Try Again
+              </button>
             </div>
           ) : (
             <div className="subscription-plan-grid">
