@@ -1440,6 +1440,22 @@ html.light .footer-col-title {
 }
 
 @media (max-width: 480px) {
+  .home-header {
+    padding-inline: 16px;
+  }
+
+  .home-header-right {
+    gap: 10px;
+  }
+
+  /* Keep the compact header usable without horizontal overflow. The sign-in
+     screen still exposes account creation on small screens. */
+  .home-header-right > .btn-home-primary {
+    display: none !important;
+  }
+}
+
+@media (max-width: 480px) {
   .recommended-grid {
     grid-template-columns: repeat(2, 1fr);
   }
