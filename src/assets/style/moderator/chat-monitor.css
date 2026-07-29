@@ -483,6 +483,7 @@
 .cv-mod-stream-viewport {
   height: 520px;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -495,6 +496,11 @@
 
 .cv-mod-stream-viewport::-webkit-scrollbar {
   width: 6px;
+  height: 0;
+}
+
+.cv-mod-stream-viewport::-webkit-scrollbar:horizontal {
+  display: none;
 }
 
 .cv-mod-stream-viewport::-webkit-scrollbar-track {

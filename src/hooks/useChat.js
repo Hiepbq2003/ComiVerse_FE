@@ -3,7 +3,7 @@ import stompService from '../services/websocket/StompService';
 import { getChatMessagesApi, sendChatMessageApi } from '../services/api/ChatApi';
 import { getTeamMessagesApi, createTeamMessageApi } from '../services/api/TeamWorkspaceApi';
 import { getAuth, getUserChatRestriction } from '../utils/Auth';
-import { checkBannedContent } from '../services/api/BannedKeywordApi';
+import { getBannedKeywordsApi, checkBannedContent } from '../services/api/BannedKeywordApi';
 import { toast } from 'react-toastify';
 
 const PAGE_SIZE = 10;
@@ -82,6 +82,9 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
         setChatType(initialChatType);
         setGroupId(initialGroupId);
         setMessages(loadCachedMessages(initialChatType, initialGroupId, userId));
+        
+        // Fetch banned keywords to sync local cache with DB
+        getBannedKeywordsApi().catch(err => console.warn('Failed to sync banned keywords:', err));
     }, [initialChatType, initialGroupId, userId]);
 
     // Helper: Normalize messages array to always be chronological (oldest -> newest)
