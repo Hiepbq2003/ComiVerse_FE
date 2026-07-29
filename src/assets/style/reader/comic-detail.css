@@ -8,7 +8,7 @@
   min-height: 420px;
   background: var(--hero-bg, #090614);
   color: var(--hero-text-primary, #ffffff);
-  padding: 44px 8% 36px;
+  padding: 48px 40px;
   overflow: hidden;
   border-bottom: 1px solid var(--hero-border, rgba(255, 255, 255, 0.08));
   display: flex;
@@ -66,10 +66,15 @@ html.light .hero-backdrop-img {
   display: flex;
   gap: 40px;
   width: 100%;
-  max-width: 1200px;
+  max-width: 1220px;
   margin: 0 auto;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.comic-detail-hero-copy {
+  flex: 1;
+  min-width: 0;
 }
 
 /* 3D Elevated Cover Card */
@@ -103,6 +108,16 @@ html.light .comic-detail-cover-wrapper {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.comic-detail-cover-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at center, rgba(168, 85, 247, 0.2) 0%, rgba(13, 9, 25, 0.98) 100%);
+  font-size: 7rem;
 }
 
 /* Badges & Meta Header */
@@ -341,7 +356,7 @@ html.light .hero-comic-title {
 
 /* ── BODY SECTION (Theme Aware: Light & Dark) ── */
 .comic-detail-body-container {
-  padding: 40px 8%;
+  padding: 40px;
   background: var(--reader-bg, var(--bg, #0f0b18));
   color: var(--reader-text-primary, var(--text-h, #f1f5f9));
   min-height: 500px;
@@ -356,12 +371,24 @@ html.light .comic-detail-body-container {
   display: grid;
   grid-template-columns: 2.5fr 1fr;
   gap: 40px;
+  width: 100%;
+  max-width: 1220px;
+  margin: 0 auto;
 }
 
-@media (max-width: 900px) {
-  .comic-detail-main-grid {
-    grid-template-columns: 1fr;
-  }
+.comic-detail-content-column,
+.comic-detail-sidebar {
+  display: flex;
+  flex-direction: column;
+}
+
+.comic-detail-content-column {
+  min-width: 0;
+  gap: 32px;
+}
+
+.comic-detail-sidebar {
+  gap: 24px;
 }
 
 /* Synopsis Card */
@@ -427,6 +454,9 @@ html.light .detail-tabs-header {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .detail-tab-button.active {
@@ -451,6 +481,15 @@ html.light .detail-tab-button.active {
   gap: 16px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+}
+
+.chapter-language-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--reader-text-secondary, #94a3b8);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .chapter-lang-select {
@@ -490,6 +529,21 @@ html.light .chapter-lang-select {
   border-radius: 14px;
   cursor: pointer;
   transition: all 0.25s ease;
+}
+
+.detail-chapter-content {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.detail-chapter-views {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--reader-text-muted, #64748b);
+  font-size: 12px;
 }
 
 html.light .detail-chapter-card {
@@ -543,6 +597,22 @@ html.light .detail-chapter-card.read .detail-chapter-name {
   color: #c084fc;
   font-weight: 600;
   letter-spacing: 0.3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.premium-status-pill {
+  margin-left: 2px;
+  padding: 2px 7px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.14);
+  color: #fbbf24;
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .detail-chapter-meta {
@@ -563,6 +633,12 @@ html.light .detail-chapter-card.read .detail-chapter-name {
   flex-direction: column;
   gap: 18px;
   box-shadow: 0 10px 30px var(--reader-card-shadow, rgba(0, 0, 0, 0.2));
+}
+
+.detail-sidebar-title {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--reader-border, rgba(255, 255, 255, 0.08));
+  font-size: 16px;
 }
 
 html.light .detail-sidebar-info-card {
@@ -589,4 +665,114 @@ html.light .detail-sidebar-info-card {
 
 html.light .info-item-val {
   color: #182235;
+}
+
+@media (max-width: 1024px) {
+  .comic-detail-hero-section,
+  .comic-detail-body-container {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .comic-detail-main-grid {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 24px;
+  }
+
+  .comic-detail-cover-wrapper {
+    width: 240px;
+    height: 342px;
+  }
+
+  .hero-stats-glass-bar {
+    gap: 14px;
+    padding: 10px 18px;
+  }
+}
+
+@media (max-width: 800px) {
+  .comic-detail-hero-section {
+    min-height: auto;
+    padding-top: 32px;
+    padding-bottom: 32px;
+  }
+
+  .comic-detail-hero-content {
+    align-items: flex-start;
+    flex-direction: column-reverse;
+    gap: 24px;
+  }
+
+  .comic-detail-cover-wrapper {
+    width: 160px;
+    height: 228px;
+    border-radius: 14px;
+  }
+
+  .comic-detail-main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .comic-detail-sidebar {
+    order: -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .comic-detail-hero-section,
+  .comic-detail-body-container {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .comic-detail-body-container {
+    padding-top: 28px;
+  }
+
+  .comic-detail-hero-section h1.hero-comic-title,
+  .hero-comic-title {
+    font-size: 30px !important;
+  }
+
+  .hero-stats-glass-bar {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    box-sizing: border-box;
+  }
+
+  .hero-stat-divider {
+    display: none;
+  }
+
+  .hero-actions-group,
+  .hero-btn-primary,
+  .hero-btn-glass {
+    width: 100%;
+  }
+
+  .hero-btn-primary,
+  .hero-btn-glass {
+    justify-content: center;
+  }
+
+  .detail-synopsis-card,
+  .detail-sidebar-info-card {
+    padding: 20px;
+  }
+
+  .detail-chapter-card {
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+
+  .detail-chapter-name {
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  .detail-chapter-meta {
+    flex-shrink: 0;
+  }
 }

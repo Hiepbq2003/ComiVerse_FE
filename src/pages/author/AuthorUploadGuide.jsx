@@ -8,7 +8,7 @@ function AuthorUploadGuide() {
       <div className="author-upload-guide-page">
         <div className="author-page-header">
           <h1>Author Upload Guide</h1>
-          <p>There are two upload formats: full comic package ZIP and single chapter CBZ. Large files are accepted first, then processed by background status task.</p>
+          <p>There are two upload formats: full comic package ZIP and single chapter ZIP. Large files are accepted first, then processed by background status task.</p>
         </div>
 
         <section className="author-section-card">
@@ -18,12 +18,12 @@ function AuthorUploadGuide() {
           <div className="author-code-card">
             <pre>{`Required structure:
 TenTruyen.zip
-├── Chapter 1.cbz
-├── Chapter 2.cbz
-└── Chapter 3.cbz
+├── Chapter 1.zip
+├── Chapter 2.zip
+└── Chapter 3.zip
 
-Inside each chapter CBZ:
-Chapter 1.cbz
+Inside each chapter ZIP:
+Chapter 1.zip
 ├── 01.jpg
 ├── 02.jpg
 └── 03.jpg`}</pre>
@@ -33,17 +33,17 @@ Chapter 1.cbz
             <div className="author-guide-box success">
               <h3>Accepted in outer ZIP</h3>
               <ul>
-                <li>Only chapter archives directly at root, for example <code>Chapter 1.cbz</code>, <code>Chapter 2.cbz</code>.</li>
-                <li>Chapter number supports comma or dot decimal: <code>Chapter 1,5.cbz</code> or <code>Chapter 1.5.cbz</code>.</li>
-                <li>Each chapter CBZ contains page images directly at root: <code>01.jpg</code>, <code>02.jpg</code>.</li>
+                <li>Only chapter archives directly at root, for example <code>Chapter 1.zip</code>, <code>Chapter 2.zip</code>.</li>
+                <li>Chapter number supports comma or dot decimal: <code>Chapter 1,5.zip</code> or <code>Chapter 1.5.zip</code>.</li>
+                <li>Each chapter ZIP contains page images directly at root: <code>01.jpg</code>, <code>02.jpg</code>.</li>
               </ul>
             </div>
             <div className="author-guide-box danger">
               <h3>Rejected in outer ZIP</h3>
               <ul>
                 <li>Images directly inside <code>TenTruyen.zip</code>.</li>
-                <li>Wrapper folder such as <code>TenTruyen/Chapter 1.cbz</code>.</li>
-                <li>Chapter ZIP files such as <code>Chapter 1.zip</code>; chapter archive must be <code>.cbz</code>.</li>
+                <li>Wrapper folder such as <code>TenTruyen/Chapter 1.zip</code>.</li>
+                <li>Chapter archives using another extension such as <code>Chapter 1.rar</code> or <code>Chapter 1.7z</code>; chapter archive must be <code>.zip</code>.</li>
                 <li><code>readme.txt</code>, <code>chapter.pdf</code>, hidden files, or <code>__MACOSX</code>.</li>
               </ul>
             </div>
@@ -51,11 +51,11 @@ Chapter 1.cbz
         </section>
 
         <section className="author-section-card">
-          <h2 className="author-section-title">2. Upload One Chapter CBZ</h2>
+          <h2 className="author-section-title">2. Upload One Chapter ZIP</h2>
           <p className="author-guide-lead">Use this when the comic already exists and the author wants to add one chapter.</p>
 
           <div className="author-code-card">
-            <pre>{`Chapter 2.cbz
+            <pre>{`Chapter 2.zip
 ├── 01.jpg
 ├── 02.jpg
 ├── 03.jpg
@@ -64,7 +64,7 @@ Chapter 1.cbz
 
           <div className="author-guide-grid">
             <div className="author-guide-box success">
-              <h3>Accepted in chapter CBZ</h3>
+              <h3>Accepted in chapter ZIP</h3>
               <ul>
                 <li><code>01.jpg</code></li>
                 <li><code>02.png</code></li>
@@ -74,10 +74,10 @@ Chapter 1.cbz
               </ul>
             </div>
             <div className="author-guide-box danger">
-              <h3>Rejected in chapter CBZ</h3>
+              <h3>Rejected in chapter ZIP</h3>
               <ul>
                 <li>Wrapper folder such as <code>Chapter 2/01.jpg</code>.</li>
-                <li>Nested archive such as <code>Chapter 2.cbz</code> inside another CBZ.</li>
+                <li>Nested archive such as <code>Chapter 2.zip</code> inside another ZIP.</li>
                 <li><code>readme.txt</code>, <code>chapter.pdf</code>, <code>cover.psd</code>, <code>.DS_Store</code>.</li>
               </ul>
             </div>
@@ -93,15 +93,15 @@ Chapter 1.cbz
             </div>
             <div>
               <strong>Chapter archive name</strong>
-              <span>Use <code>Chapter 1.cbz</code>, <code>Chapter 1,5.cbz</code>, or <code>Chapter 1.5.cbz</code>. The backend reads the number from the filename.</span>
+              <span>Use <code>Chapter 1.zip</code>, <code>Chapter 1,5.zip</code>, or <code>Chapter 1.5.zip</code>. The backend reads the number from the filename.</span>
             </div>
             <div>
               <strong>Page image name</strong>
               <span>Use zero-padding: <code>01.jpg</code>, <code>02.jpg</code>, <code>010.jpg</code>. This keeps page order clear.</span>
             </div>
             <div>
-              <strong>One chapter CBZ = one chapter</strong>
-              <span>For Add Chapter, do not put many chapter archives together. For Upload Comic, put many chapter CBZ files directly inside the outer ZIP.</span>
+              <strong>One chapter ZIP = one chapter</strong>
+              <span>For Add Chapter, do not put many chapter archives together. For Upload Comic, put many chapter ZIP files directly inside the outer ZIP.</span>
             </div>
           </div>
         </section>
@@ -134,7 +134,7 @@ Content-Type: multipart/form-data
 Fields:
 - chapterNumber: 2
 - title: Optional chapter title
-- zipFile: Chapter 2.cbz
+- zipFile: Chapter 2.zip
 
 Response: 202 ACCEPTED with taskId
 Status: GET /api/author/comics/{comicId}/chapters/upload-zip/status/{taskId}`}</pre>
@@ -144,12 +144,12 @@ Status: GET /api/author/comics/{comicId}/chapters/upload-zip/status/{taskId}`}</
         <section className="author-section-card">
           <h2 className="author-section-title">5. Windows Packaging Steps</h2>
           <ol className="author-guide-steps">
-            <li>Create each chapter as a CBZ first: <code>Chapter 1.cbz</code>, <code>Chapter 2.cbz</code>.</li>
-            <li>Put page images directly inside each CBZ: <code>01.jpg</code>, <code>02.jpg</code>.</li>
-            <li>Put only chapter CBZ files directly into the final outer ZIP: <code>TenTruyen.zip</code>.</li>
-            <li>Do not let Windows create <code>TenTruyen.zip/TenTruyen/Chapter 1.cbz</code>; that wrapper folder will be rejected.</li>
+            <li>Create each chapter as a ZIP first: <code>Chapter 1.zip</code>, <code>Chapter 2.zip</code>.</li>
+            <li>Put page images directly inside each ZIP: <code>01.jpg</code>, <code>02.jpg</code>.</li>
+            <li>Put only chapter ZIP files directly into the final outer ZIP: <code>TenTruyen.zip</code>.</li>
+            <li>Do not let Windows create <code>TenTruyen.zip/TenTruyen/Chapter 1.zip</code>; that wrapper folder will be rejected.</li>
             <li>Upload the full comic package from <strong>Upload New Comic</strong>.</li>
-            <li>Upload one chapter CBZ from <strong>Add Chapter</strong>.</li>
+            <li>Upload one chapter ZIP from <strong>Add Chapter</strong>.</li>
             <li>Open Preview, check the page order, then submit for review.</li>
           </ol>
         </section>

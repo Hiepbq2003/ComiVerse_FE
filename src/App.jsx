@@ -18,6 +18,7 @@ import StatisticsDashboard from './pages/admin/StatisticsDashboard'
 import RevenueManagement from './pages/admin/RevenueManagement'
 import PayoutManagement from './pages/admin/PayoutManagement'
 import AdminSystemSettings from './pages/admin/AdminSystemSettings'
+import SubscriptionManagement from './pages/admin/SubscriptionManagement'
 import AuthorDashboard from './pages/author/AuthorDashboard'
 import AuthorComics from './pages/author/AuthorComics'
 import AuthorComicDetail from './pages/author/AuthorComicDetail'
@@ -33,6 +34,7 @@ import Policy from './pages/common/Policy'
 import About from './pages/common/About'
 import Terms from './pages/common/Terms'
 import Contact from './pages/common/Contact'
+import SubscriptionResult from './pages/common/SubscriptionResult'
 import TranslatorRegister from './pages/common/TranslatorRegister'
 import TranslateDashboard from './pages/translator/TranslatorDashboard'
 import TranslateWorkspace from './pages/translator/TranslateWorkspace'
@@ -103,6 +105,8 @@ function App() {
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/translator-register" element={<TranslatorRegister />} />
+                <Route path="/subscription/success" element={<SubscriptionResult />} />
+                <Route path="/subscription/cancel" element={<SubscriptionResult cancelled />} />
                 {/* Admin */}
                 <Route path="/admin/statistics" element={<StatisticsDashboard />} />
                 <Route path="/admin/revenue" element={<RevenueManagement />} />
@@ -110,6 +114,7 @@ function App() {
                 <Route path="/admin/broadcast" element={<BroadcastManagement />} />
                 <Route path="/admin/payout" element={<PayoutManagement />} />
                 <Route path="/admin/settings" element={<AdminSystemSettings />} />
+                <Route path="/admin/subscriptions" element={<SubscriptionManagement />} />
                 {/* Moderator */}
                 <Route path="/moderator" element={<ModeratorDashboard />} />
                 <Route path="/moderator/comic/:id" element={<ModeratorComicDetail />} />
