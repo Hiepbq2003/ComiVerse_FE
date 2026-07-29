@@ -35,7 +35,7 @@ const saveLocalKeywords = (keywords) => {
 let localKeywords = loadLocalKeywords();
 
 // Flag to indicate if backend has implemented /chat/banned-keywords endpoint
-const HAS_BACKEND_ENDPOINT = false;
+const HAS_BACKEND_ENDPOINT = true;
 
 /**
  * Helper: Converts Vietnamese Telex IME outputs back to original English keystrokes
