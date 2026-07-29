@@ -673,7 +673,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                         onClick={() => navigate(`/moderator/comic/${comic.id}`, { state: { comic } })} 
                       />
                       <ModernButton 
-                        variant={5} 
+                        variant={2} 
                         label="🗑️ Archive" 
                         className="btn-archive"
                         onClick={() => { setComicToArchive(comic); setShowArchiveModal(true); }} 
@@ -1103,7 +1103,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                         <td style={{ padding: '12px' }}>{chap.viewCount || 0}</td>
                         <td style={{ padding: '12px', textAlign: 'right' }}>
                           <ModernButton 
-                            variant={5} 
+                            variant={2} 
                             label="🗑️ Delete" 
                             className="btn-archive"
                             onClick={() => handleDeleteChapter(chap.id)}
