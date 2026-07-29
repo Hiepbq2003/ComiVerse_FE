@@ -1042,7 +1042,7 @@ function Forum() {
 
   return (
     <HomeLayout>
-      <div className="home-sections-container" style={{ paddingTop: '40px' }}>
+      <div className="home-sections-container" style={{ paddingTop: '40px', maxWidth: '1050px', margin: '0 auto' }}>
         <div className="home-section">
           {threadId && selectedThread ? (
             /* ── DETAILED THREAD FULL PAGE VIEW (STV STYLE - PAGE) ── */

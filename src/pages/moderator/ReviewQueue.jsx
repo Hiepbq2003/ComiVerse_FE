@@ -1093,10 +1093,10 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
 
       {/* Dynamic Statistics Ribbon */}
       {(() => {
-        const total = submissions.length;
         const pending = tabCounts.pending;
         const approved = tabCounts.approved;
         const rejected = tabCounts.rejected;
+        const total = pending + approved + rejected;
         const rate = (approved + rejected) > 0 ? Math.round((approved / (approved + rejected)) * 100) : 0;
 
         return (
