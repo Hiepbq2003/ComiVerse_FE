@@ -8,7 +8,7 @@
 
   --mod-bg: radial-gradient(circle at 50% 50%, #150d2c 0%, #070511 70%, #030206 100%);
   --mod-sidebar-bg: rgba(10, 7, 20, 0.45);
-  --mod-topbar-bg: rgba(19, 16, 30, 0.4);
+  --mod-topbar-bg: #13101e;
   --mod-card-bg: rgba(255, 255, 255, 0.02);
   --mod-sidebar-text: #94a3b8;
   --mod-sidebar-active: #ffffff;
@@ -200,8 +200,6 @@
 .moderator-topbar {
   height: var(--mod-topbar-h);
   background: var(--mod-topbar-bg) !important;
-  backdrop-filter: blur(20px) saturate(140%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
   padding: 0 24px;
   display: flex;

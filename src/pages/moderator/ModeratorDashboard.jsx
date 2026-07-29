@@ -390,48 +390,7 @@ function ModeratorDashboard() {
   }
 
   const syncSubmissionsWithLocalOverride = (rawSubmissions) => {
-    try {
-      const overrideRaw = localStorage.getItem('comiverse_moderator_submissions_override');
-      if (!overrideRaw) return rawSubmissions || [];
-      const overrides = JSON.parse(overrideRaw);
-      if (!Array.isArray(overrides) || overrides.length === 0) return rawSubmissions || [];
-
-      const overrideById = new Map();
-      overrides.forEach(o => {
-        const idKey = o.id || o.submissionId;
-        if (idKey) overrideById.set(String(idKey), o);
-      });
-
-      const matchedIds = new Set();
-      const synced = (rawSubmissions || []).map(item => {
-        const idKey = item.id || item.submissionId;
-        const match = idKey ? overrideById.get(String(idKey)) : null;
-        if (match) {
-          if (idKey) matchedIds.add(String(idKey));
-          const merged = { ...item };
-          Object.keys(match).forEach(k => {
-            if (match[k] !== undefined && match[k] !== null && match[k] !== '') {
-              merged[k] = match[k];
-            }
-          });
-          return merged;
-        }
-        return item;
-      });
-
-      overrides.forEach(o => {
-        const idKey = o.id || o.submissionId;
-        if (idKey && !matchedIds.has(String(idKey))) {
-          synced.push(o);
-        } else if (!idKey) {
-          synced.push(o);
-        }
-      });
-
-      return synced;
-    } catch (e) {
-      return rawSubmissions || [];
-    }
+    return rawSubmissions || [];
   };
 
   const fetchSubmissionsData = async () => {
@@ -532,7 +491,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       setSubmissions(filteredSubmissions);
 
       const mappedComics = syncApprovedComics(
-        (comicsData || []).map(c => {
+        (comicsData || []).filter(c => c.moderationStatus === 'PUBLISHED').map(c => {
           const merged = syncComicWithLocalOverride(c);
           const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === merged.title.toLowerCase())
           const cCover = getComicCover(merged);

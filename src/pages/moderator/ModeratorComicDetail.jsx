@@ -844,7 +844,7 @@ function ModeratorComicDetail() {
 
                     {comic.approvedBy && (
                       <span className="mod-meta-pill" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                        ✓ Approved by: <strong>{formatSubmitterName(comic.approvedBy)}</strong> {comic.approvedAt && `• ${new Date(comic.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                        ✓ Approved by: <strong>{comic.approvedBy}</strong> {comic.approvedAt && `• ${new Date(comic.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
                       </span>
                     )}
 
@@ -992,10 +992,10 @@ function ModeratorComicDetail() {
                            (chap.updatedAt ? new Date(chap.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-')}
                         </td>
                         <td>
-                          {chap.approvedBy ? (
+                          {chap.moderationStatus === 'PUBLISHED' ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                               <span style={{ fontSize: '12px', fontWeight: '700', color: '#10b981' }}>
-                                ✓ {formatSubmitterName(chap.approvedBy)}
+                                ✓ {chap.approvedBy ? chap.approvedBy : 'Published'}
                               </span>
                               {chap.approvedAt && (
                                 <span style={{ fontSize: '11px', color: '#64748b' }}>
@@ -1005,7 +1005,9 @@ function ModeratorComicDetail() {
                             </div>
                           ) : (
                             <span style={{ fontSize: '11.5px', color: '#94a3b8', fontStyle: 'italic', fontWeight: '500' }}>
-                              Pending Review
+                              {chap.moderationStatus === 'PREVIEW_READY' ? 'Author Drafting' : 
+                               (chap.moderationStatus === 'SUBMITTED_FOR_REVIEW' || chap.moderationStatus === 'PENDING_REVIEW' ? 'Pending Review' : 
+                                (chap.moderationStatus === 'REJECTED' ? 'Rejected' : (chap.moderationStatus || 'Draft')))}
                             </span>
                           )}
                         </td>

@@ -8,7 +8,7 @@
 
   --trans-bg: radial-gradient(circle at 50% 50%, #150d2c 0%, #070511 70%, #030206 100%);
   --trans-sidebar-bg: rgba(10, 7, 20, 0.45);
-  --trans-topbar-bg: rgba(19, 16, 30, 0.4);
+  --trans-topbar-bg: #13101e;
   --trans-card-bg: rgba(255, 255, 255, 0.02);
   --trans-sidebar-text: #94a3b8;
   --trans-sidebar-active: #ffffff;
@@ -224,8 +224,6 @@ html.light .trans-form-input {
 .translator-topbar {
   height: var(--trans-topbar-h);
   background: var(--trans-topbar-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--trans-border);
   padding: 0 32px;
   display: flex;
@@ -3264,6 +3262,7 @@ html.light .request-review-msg-box.empty {
   flex: 1 !important;
   padding: 16px !important;
   overflow-y: auto !important;
+  overflow-x: hidden !important;
   display: flex !important;
   flex-direction: column !important;
   gap: 14px !important;
@@ -3274,6 +3273,11 @@ html.light .request-review-msg-box.empty {
 
 .chat-messages-container::-webkit-scrollbar {
   width: 5px !important;
+  height: 0 !important;
+}
+
+.chat-messages-container::-webkit-scrollbar:horizontal {
+  display: none !important;
 }
 
 .chat-messages-container::-webkit-scrollbar-thumb {
