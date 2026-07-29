@@ -513,7 +513,11 @@ function AuthorComics() {
     setError('')
     try {
       const updated = await submitAuthorComicReviewApi(comicId)
-      setComics((current) => current.map((item) => getComicId(item) === comicId ? { ...item, ...updated } : item))
+      setComics((current) => current.map((item) => getComicId(item) === comicId ? { 
+        ...item, 
+        ...(typeof updated === 'object' ? updated : {}),
+        moderationStatus: 'SUBMITTED_FOR_REVIEW'
+      } : item))
       toast.success('Comic submitted for moderator review.')
     } catch (err) {
       const message = err?.response?.data?.message || err?.message || 'Could not submit comic for review.'

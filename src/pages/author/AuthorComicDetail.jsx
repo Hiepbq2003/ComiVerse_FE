@@ -613,7 +613,11 @@ function AuthorComicDetail() {
     setActionMessage('')
     try {
       const updatedComic = await submitAuthorComicReviewApi(getComicId(comic))
-      setComic((current) => ({ ...current, ...updatedComic }))
+      setComic((current) => ({ 
+        ...current, 
+        ...(typeof updatedComic === 'object' ? updatedComic : {}), 
+        moderationStatus: 'SUBMITTED_FOR_REVIEW' 
+      }))
       const message = 'Comic submitted for moderator review.'
       setActionMessage(message)
       toast.success(message)

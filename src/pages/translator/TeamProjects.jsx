@@ -214,7 +214,7 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
                     if (onQuickTranslate) onQuickTranslate(proj)
                   }}
                 >
-                  <span style={{ fontSize: '14px' }}>🎨</span> Dịch ngay
+                  Translate
                 </button>
               </div>
             </div>
@@ -856,6 +856,42 @@ function TeamProjects() {
           console.error('Could not load chapters from comic:', chErr);
         }
       }
+
+      // Attempt to load mock images from moderator's local override
+      try {
+        const overrideRaw = localStorage.getItem('comiverse_moderator_submissions_override');
+        if (overrideRaw) {
+          const parsed = JSON.parse(overrideRaw);
+          const targetName = (project.comicName || project.title || '').toLowerCase().trim();
+          const matchSub = parsed.find(s => (s.title && s.title.toLowerCase().trim() === targetName) || (s.comicName && s.comicName.toLowerCase().trim() === targetName));
+          if (matchSub) {
+            const chaps = matchSub.allChapters || matchSub.chapters || [];
+            if (chaps.length > 0) {
+              const enrichedChapters = chaps.map((ch, idx) => {
+                const realChId = ch.id || ch.chapterId || ch.chapter_id;
+                return {
+                  ...ch,
+                  id: realChId || `ch-${project.id}-${idx + 1}`,
+                  comicId: ch.comicId || effectiveComicId,
+                  title: ch.title || `${rawComicTitle} - Chapter ${idx + 1}`,
+                  pagesCount: ch.pagesCount || ch.pages?.length || ch.images?.length || ch.pageCount || 24,
+                  pages: ch.pages || ch.images || [],
+                  status: 'Approved Raw Manuscript'
+                };
+              });
+              
+              if (finalChapters.length > 0) {
+                finalChapters = finalChapters.map((fc, i) => {
+                  const match = enrichedChapters.find(ec => ec.title === fc.title || ec.id === fc.id) || enrichedChapters[i];
+                  return match && (match.pages?.length > 0) ? { ...fc, pages: match.pages, pagesCount: match.pagesCount } : fc;
+                });
+              } else {
+                finalChapters = enrichedChapters;
+              }
+            }
+          }
+        }
+      } catch (e) { /* ignore */ }
 
       // Default: Every approved comic submitted by author has at least Chapter 1 (Approved Raw Manuscript)
       if (finalChapters.length === 0) {
