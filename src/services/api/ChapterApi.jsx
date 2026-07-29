@@ -16,6 +16,10 @@ export const deleteChapterApi = (chapterId) => {
   return AxiosClient.delete(`/chapters/${chapterId}`);
 };
 
+export const approveChapterDirectApi = (chapterId) => {
+  return AxiosClient.put(`/chapters/${chapterId}/approve`);
+};
+
 export const getChapterTranslationsApi = (chapterId) => {
   return AxiosClient.get(`/chapters/${chapterId}/translations`);
 };

@@ -14,6 +14,7 @@ import { getAllSubmissionsApi, approveSubmissionApi, rejectSubmissionApi } from 
 import { getAllGenresApi } from '../../services/api/GenreApi'
 import { getAllForumThreadsApi } from '../../services/api/ForumThreadApi'
 import { getAllChatFlagsApi } from '../../services/api/ChatFlagApi'
+import { approveChapterDirectApi } from '../../services/api/ChapterApi'
 import { toast } from 'react-toastify'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import ModernButton from '../../components/common/ModernButton'
@@ -768,7 +769,11 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     const isFinalChapterOfSub = currentChapsForCheck.length > 0 && remainingChapsForCheck.length === 0;
 
     try {
-      if (targetApiId && !String(targetApiId).startsWith('group-') && !String(targetApiId).startsWith('chap-')) {
+      if (chapterObj?.id && !String(chapterObj.id).startsWith('chap-') && !isFinalChapterOfSub) {
+        // Approve this specific chapter directly without changing submission status
+        await approveChapterDirectApi(chapterObj.id);
+      } else if (targetApiId && !String(targetApiId).startsWith('group-') && !String(targetApiId).startsWith('chap-')) {
+        // Fallback: approve the entire submission
         const res = await approveSubmissionApi(targetApiId);
         const realDbComic = res?.data || res;
         if (realDbComic && (realDbComic.id || realDbComic.comicId) && sub) {
@@ -776,7 +781,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
         }
       }
     } catch (apiErr) {
-      console.warn(`[Backend DB Sync] approveSubmissionApi(${targetApiId}) notice:`, apiErr?.message || apiErr);
+      console.warn(`[Backend DB Sync] approve API notice:`, apiErr?.message || apiErr);
     }
 
     try {
