@@ -166,7 +166,7 @@
   overflow: hidden;
 }
 
-/* View Language Tabs Strip */
+/* View Language Tabs Strip*/
 .mod-lang-tabs-card {
   background: rgba(15, 10, 26, 0.65);
   backdrop-filter: blur(16px);
@@ -1850,8 +1850,3 @@ html.light .mod-edit-cancel-btn:hover {
   background: #cbd5e1;
   color: #0f172a;
 }
-
-
-
-
-
