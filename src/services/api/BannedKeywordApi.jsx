@@ -177,8 +177,8 @@ export const getBannedKeywordsApi = async () => {
   if (HAS_BACKEND_ENDPOINT) {
     try {
       const res = await AxiosClient.get('/chat/banned-keywords');
-      if (res?.data?.data && Array.isArray(res.data.data)) {
-        return res.data.data;
+      if (Array.isArray(res)) {
+        return res;
       }
       if (res?.data && Array.isArray(res.data)) {
         return res.data;
@@ -197,8 +197,8 @@ export const addBannedKeywordApi = async (data) => {
   if (HAS_BACKEND_ENDPOINT) {
     try {
       const res = await AxiosClient.post('/chat/banned-keywords', data);
-      if (res?.data?.data) {
-        return res.data.data;
+      if (res) {
+        return res;
       }
     } catch (err) {
       // Fallback
