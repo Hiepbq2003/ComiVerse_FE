@@ -234,6 +234,9 @@ function ModeratorDashboard() {
 
     const coverVal = getComicCover(sub);
     const nowIso = new Date().toISOString();
+    const currentUser = getAuth()?.user;
+    const currentUsername = currentUser?.fullName || currentUser?.username || 'Moderator';
+
     setComics(prev => {
       const existingIdx = prev.findIndex(c => isTitleMatch(c.title, comicTitle) || (sub.comicId && String(c.id) === String(sub.comicId)));
       if (existingIdx !== -1) {
@@ -243,10 +246,11 @@ function ModeratorDashboard() {
         const currentChapsList = Array.isArray(existing.allChapters) ? existing.allChapters : (Array.isArray(existing.chaptersData) ? existing.chaptersData : []);
         let newChapsList = currentChapsList;
         if (approvedChapObj) {
+          const enrichedChap = { ...approvedChapObj, approvedBy: approvedChapObj.approvedBy || currentUsername, approvedAt: approvedChapObj.approvedAt || nowIso };
           const exists = currentChapsList.some(c => isSameChapterItem(c, approvedChapObj));
-          if (!exists) newChapsList = [...currentChapsList, approvedChapObj];
+          if (!exists) newChapsList = [...currentChapsList, enrichedChap];
         } else if (Array.isArray(sub.allChapters) && sub.allChapters.length > 0) {
-          newChapsList = sub.allChapters;
+          newChapsList = sub.allChapters.map(c => ({ ...c, approvedBy: c.approvedBy || currentUsername, approvedAt: c.approvedAt || nowIso }));
         }
         const currentCount = existing.chapterCount !== undefined ? existing.chapterCount : (existing.chapters || 0);
         const newChapCount = newChapsList.length > 0 ? newChapsList.length : (isSingleChapter ? currentCount + 1 : Math.max(currentCount, sub.chapterNumber || sub.number || (currentCount + 1)));
@@ -262,12 +266,13 @@ function ModeratorDashboard() {
           allChapters: newChapsList,
           chaptersData: newChapsList,
           approvedAt: existing.approvedAt || nowIso,
+          approvedBy: existing.approvedBy || currentUsername,
           lastChapterUpdatedAt: nowIso
         };
         return deduplicateComics(updated);
       } else {
         const authorNameClean = formatSubmitterName(sub.submittedBy || sub.author || sub.submittedByEmail || sub.authorName || 'Unknown Author').replace(/^Author:\s*/i, '');
-        const initialChapsList = approvedChapObj ? [approvedChapObj] : (Array.isArray(sub.allChapters) ? sub.allChapters : (Array.isArray(sub.chapters) ? sub.chapters : []));
+        const initialChapsList = approvedChapObj ? [{ ...approvedChapObj, approvedBy: currentUsername, approvedAt: nowIso }] : (Array.isArray(sub.allChapters) ? sub.allChapters.map(c => ({ ...c, approvedBy: c.approvedBy || currentUsername, approvedAt: c.approvedAt || nowIso })) : (Array.isArray(sub.chapters) ? sub.chapters.map(c => ({ ...c, approvedBy: c.approvedBy || currentUsername, approvedAt: c.approvedAt || nowIso })) : []));
         const initialChaps = initialChapsList.length > 0 ? initialChapsList.length : (isSingleChapter ? 1 : (sub.chapterNumber || sub.number || sub.chapters || 0));
         const newComic = {
           id: sub.comicId || `comic-${Date.now()}`,

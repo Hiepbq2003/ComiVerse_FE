@@ -2115,6 +2115,7 @@ html.light .modern-btn-container .btn-5.btn-approve span {
 .modern-btn-container .btn-5.btn-reject,
 .modern-btn-container .btn-5.btn-archive {
   border: none !important;
+  outline: none !important;
   color: #ffffff !important;
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
   background: linear-gradient(110deg, #f43f5e 0%, #e11d48 55%, #be123c 100%) !important;

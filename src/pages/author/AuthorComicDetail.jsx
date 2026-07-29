@@ -441,6 +441,7 @@ function AuthorComicDetail() {
       const rawChapters = chaptersResponse.status === 'fulfilled' ? normalizeArrayResponse(chaptersResponse.value) : [];
 
       let hasRejectedOverride = false;
+      let overallRejectionReason = null;
       try {
         const rawOverrides = localStorage.getItem('comiverse_moderator_submissions_override');
         if (rawOverrides) {
@@ -454,7 +455,11 @@ function AuthorComicDetail() {
             return matchId || matchTitle;
           });
 
-          hasRejectedOverride = matchingOverrides.some(o => (o.status || '').toString().toUpperCase() === 'REJECTED');
+          const rejectedOverride = matchingOverrides.find(o => (o.status || '').toString().toUpperCase() === 'REJECTED');
+          if (rejectedOverride) {
+            hasRejectedOverride = true;
+            overallRejectionReason = rejectedOverride.rejectionReason || rejectedOverride.reason || null;
+          }
         }
       } catch (e) {}
 
@@ -469,7 +474,7 @@ function AuthorComicDetail() {
         ? 'REJECTED'
         : (rawComic.moderationStatus || rawComic.approvalStatus || 'DRAFT');
 
-      setComic({ ...rawComic, moderationStatus: finalModerationStatus });
+      setComic({ ...rawComic, moderationStatus: finalModerationStatus, rejectionReason: overallRejectionReason || rawComic.rejectionReason });
       setChapters(chaptersWithRejection);
       setMetrics(metricsResponse.status === 'fulfilled' ? metricsResponse.value : null)
     } catch {
@@ -776,11 +781,17 @@ function AuthorComicDetail() {
             </div>
           </div>
 
-          {chapters.some(c => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED') && (
-            <div className="author-alert error" style={{ margin: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', padding: '14px 18px', borderRadius: '8px' }}>
+          {(comic?.moderationStatus?.toUpperCase() === 'REJECTED' || chapters.some(c => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED')) && (
+            <div className="author-alert error" style={{ margin: '16px 24px', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', padding: '14px 18px', borderRadius: '8px' }}>
               <div>
-                <strong>⛔ Chapter Rejected by Moderator:</strong> One or more chapters were rejected. Click <strong>Preview</strong> on the rejected chapter below to inspect full moderator feedback and page pins.
+                <strong>🚫 Submission Rejected:</strong> Your submission requires revisions. Please review the feedback below. You can also click <strong>Preview</strong> on the rejected chapter below to inspect page-specific pins if any.
               </div>
+              {comic?.rejectionReason && (
+                <div style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.25)', borderRadius: '6px', borderLeft: '3px solid #ef4444', color: '#fff', fontSize: '14px', width: '100%', lineHeight: '1.5' }}>
+                  <div style={{ fontSize: '11px', color: '#fca5a5', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: '4px', letterSpacing: '0.5px' }}>Overall Moderator Feedback</div>
+                  {comic.rejectionReason}
+                </div>
+              )}
             </div>
           )}
 
