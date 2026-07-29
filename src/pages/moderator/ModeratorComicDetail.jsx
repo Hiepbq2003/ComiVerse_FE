@@ -844,7 +844,7 @@ function ModeratorComicDetail() {
 
                     {comic.approvedBy && (
                       <span className="mod-meta-pill" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                        ✓ Approved by: <strong>{formatSubmitterName(comic.approvedBy)}</strong> {comic.approvedAt && `• ${new Date(comic.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                        ✓ Approved by: <strong>{comic.approvedBy}</strong> {comic.approvedAt && `• ${new Date(comic.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
                       </span>
                     )}
 
@@ -995,7 +995,7 @@ function ModeratorComicDetail() {
                           {chap.moderationStatus === 'PUBLISHED' ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                               <span style={{ fontSize: '12px', fontWeight: '700', color: '#10b981' }}>
-                                ✓ Published
+                                ✓ {chap.approvedBy ? chap.approvedBy : 'Published'}
                               </span>
                               {chap.approvedAt && (
                                 <span style={{ fontSize: '11px', color: '#64748b' }}>
