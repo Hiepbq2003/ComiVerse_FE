@@ -772,17 +772,13 @@ function TeamProjects() {
     } catch (e) { /* ignore */ }
 
     try {
-      const [annList, msgList, taskList, reqList, teamMembersList, teamChaptersList] = await Promise.all([
+      const [annList, msgList, taskList, reqList, teamMembersList] = await Promise.all([
         getTeamAnnouncementsApi(project.id),
         getTeamMessagesApi(project.id),
         getTeamTasksApi(project.id),
         getTeamRequestsApi(project.id),
         getTeamMembersApi(project.id).catch((err) => {
           console.error('Could not load real team members for assignee picker:', err)
-          return []
-        }),
-        getTeamChaptersApi(project.id).catch((err) => {
-          console.error('Could not load chapters for team:', err)
           return []
         })
       ])
@@ -806,21 +802,7 @@ function TeamProjects() {
           } catch (e2) {}
         }
       }
-
-      if (Array.isArray(teamChaptersList) && teamChaptersList.length > 0) {
-        finalChapters = teamChaptersList.map((ch, idx) => {
-          const realChId = ch.id || ch.chapterId || ch.chapter_id;
-          return {
-            ...ch,
-            id: realChId || `ch-${project.id}-${idx + 1}`,
-            comicId: ch.comicId || effectiveComicId,
-            title: ch.title || `${rawComicTitle} - Chapter ${idx + 1}`,
-            pagesCount: ch.pagesCount || ch.pages?.length || ch.images?.length || 24,
-            pages: ch.pages || ch.images || [],
-            status: 'Approved Raw Manuscript'
-          };
-        });
-      } else if (effectiveComicId) {
+      if (effectiveComicId) {
         // Fallback: fetch chapters directly from the comic's chapter list (using both public and author APIs like Moderator)
         try {
           let chapList = [];
