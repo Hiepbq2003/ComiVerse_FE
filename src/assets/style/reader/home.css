@@ -972,14 +972,16 @@ html.light .btn-home-auth-link:hover {
 /* HOT COMICS SPLIT SECTION */
 .hot-section-split {
   display: grid;
-  grid-template-columns: 1fr 1.8fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.8fr);
   gap: 30px;
+  align-items: start;
 }
 
 /* Left Featured Hot Card */
 .hot-featured-wrapper {
   display: flex;
   flex-direction: column;
+  height: 508px;
 }
 
 .hot-featured-card {
@@ -988,21 +990,26 @@ html.light .btn-home-auth-link:hover {
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.05);
   overflow: hidden;
-  flex-grow: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .hot-featured-card:hover {
-  transform: translateY(-6px);
+  transform: translateY(-4px);
   border-color: rgba(236, 72, 153, 0.35);
-  box-shadow: 0 20px 40px rgba(236, 72, 153, 0.12);
+  box-shadow: 0 16px 36px rgba(236, 72, 153, 0.12);
 }
 
 .hot-featured-cover {
   width: 100%;
-  height: 280px;
+  height: 350px;
+  min-height: 350px;
+  max-height: 350px;
   position: relative;
+  overflow: hidden;
 }
 
 .hot-featured-cover img {
@@ -1025,25 +1032,39 @@ html.light .btn-home-auth-link:hover {
   display: flex;
   align-items: center;
   gap: 4px;
+  z-index: 2;
 }
 
 .hot-featured-info {
-  padding: 24px;
-  background: var(--reader-card-bg);
+  padding: 18px 22px;
+  background: linear-gradient(to bottom, #0d0919, #05030a);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
 }
 
 .hot-featured-title {
   font-size: 20px;
   font-weight: 700;
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hot-featured-tagline {
   font-size: 13px;
   color: #94a3b8;
-  line-height: 1.5;
-  margin-bottom: 16px;
+  line-height: 1.4;
+  margin-bottom: 12px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hot-featured-meta {
@@ -1052,6 +1073,8 @@ html.light .btn-home-auth-link:hover {
   justify-content: space-between;
   font-size: 13px;
   color: #cbd5e1;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 10px;
 }
 
 /* Right Hot List */
@@ -1059,16 +1082,22 @@ html.light .btn-home-auth-link:hover {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  height: 508px;
 }
 
 .ranking-item {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 16px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: 12px;
-  padding: 12px 20px;
+  padding: 11px 20px;
+  height: 92px;
+  min-height: 92px;
+  max-height: 92px;
+  box-sizing: border-box;
   transition: all 0.2s ease;
   cursor: pointer;
   position: relative;
@@ -1077,7 +1106,7 @@ html.light .btn-home-auth-link:hover {
 .ranking-item:hover {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(168, 85, 247, 0.2);
-  transform: translateX(6px);
+  transform: translateX(4px);
 }
 
 .rank-number {
@@ -1087,6 +1116,7 @@ html.light .btn-home-auth-link:hover {
   text-align: center;
   color: #64748b;
   font-family: var(--font-sans);
+  flex-shrink: 0;
 }
 
 .rank-number.top-2 {
@@ -1098,12 +1128,16 @@ html.light .btn-home-auth-link:hover {
 }
 
 .rank-item-thumb {
-  width: 48px;
-  height: 64px;
+  width: 46px;
+  height: 60px;
   border-radius: 6px;
   overflow: hidden;
   flex-shrink: 0;
   border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .rank-item-thumb img {
@@ -1113,11 +1147,12 @@ html.light .btn-home-auth-link:hover {
 }
 
 .rank-item-details {
-  flex-grow: 1;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 0;
+  overflow: hidden;
 }
 
 .rank-item-title {
@@ -1128,26 +1163,32 @@ html.light .btn-home-auth-link:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .rank-item-genre {
-  font-size: 11px;
+  font-size: 12px;
   color: #a855f7;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }
 
 .rank-item-meta {
   display: flex;
   align-items: center;
   gap: 16px;
-  font-size: 11px;
+  font-size: 13px;
   color: #64748b;
+  flex-shrink: 0;
 }
 
 .rank-item-meta-item {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
 }
 
 
@@ -1436,6 +1477,22 @@ html.light .footer-col-title {
   .footer-top-row {
     grid-template-columns: 1fr;
     gap: 30px;
+  }
+}
+
+@media (max-width: 480px) {
+  .home-header {
+    padding-inline: 16px;
+  }
+
+  .home-header-right {
+    gap: 10px;
+  }
+
+  /* Keep the compact header usable without horizontal overflow. The sign-in
+     screen still exposes account creation on small screens. */
+  .home-header-right > .btn-home-primary {
+    display: none !important;
   }
 }
 

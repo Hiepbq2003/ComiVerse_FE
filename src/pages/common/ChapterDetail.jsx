@@ -12,6 +12,7 @@ import { isValidUuid } from '../../utils/uuid'
 import { useAuth } from '../../context/AuthContext'
 import CommentSection from '../../components/common/CommentSection'
 import SubscriptionPlanModal from '../../components/common/SubscriptionPlanModal'
+import ReadingLanguageSelector from '../../components/common/ReadingLanguageSelector'
 
 // pagesBubbles is a JSON string: [{ pageNumber, imageUrl, bubbles }, ...]
 // where `bubbles` is itself a JSON string ({"selections":[...]}) — same
@@ -410,27 +411,13 @@ function ChapterDetail() {
               </button>
 
               {availableLanguagesForChapter.length > 0 && (
-                <select
-                  value={selectedLanguage}
-                  onChange={(e) => setSelectedLanguage(e.target.value)}
-                  title="Reading language"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.04)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '8px',
-                    padding: '6px 12px',
-                    color: 'white',
-                    fontSize: '13px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="" style={{ color: '#111', background: '#fff' }}>Original</option>
-                  {availableLanguagesForChapter.map((lang) => (
-                    <option key={lang} value={lang} style={{ color: '#111', background: '#fff' }}>
-                      {lang}
-                    </option>
-                  ))}
-                </select>
+                <ReadingLanguageSelector
+                  languages={availableLanguagesForChapter}
+                  selectedLanguage={selectedLanguage}
+                  onChange={setSelectedLanguage}
+                  compact={true}
+                  showLabel={false}
+                />
               )}
             </div>
           </div>

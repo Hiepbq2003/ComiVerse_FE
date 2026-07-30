@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getAuth } from '../../utils/Auth'
@@ -7,15 +7,20 @@ import { getComicByIdApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi, getComicTranslationLanguagesApi } from '../../services/api/ChapterApi'
 import { checkLikeStatusApi, toggleLikeStatusApi } from '../../services/api/LikeApi'
 import { checkSaveStatusApi, toggleSaveStatusApi } from '../../services/api/SaveApi'
-import { getComicCommentsApi } from '../../services/api/CommentApi'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { toast } from 'react-toastify'
 import { getReadChaptersByComicIdApi } from '../../services/api/ReadingHistoryApi'
 import CommentSection from '../../components/common/CommentSection'
 import StarRating from '../../components/common/StarRating'
+import ReadingLanguageSelector from '../../components/common/ReadingLanguageSelector'
+import { useAuth } from '../../context/AuthContext'
 import SubscriptionPlanModal from '../../components/common/SubscriptionPlanModal'
-import { LockKeyhole } from 'lucide-react'
-import '../../assets/style/reader/comic-detail.css'
+
+// Import assets
+import comicAction from '../../assets/comic_action.png'
+import comicAdventure from '../../assets/comic_adventure.png'
+import comicScifi from '../../assets/comic_scifi.png'
+
 function ComicDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -37,7 +42,8 @@ function ComicDetail() {
   const [availableLanguages, setAvailableLanguages] = useState([])
   const [selectedLanguage, setSelectedLanguage] = useState('') // '' = original (no overlay)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
-  const closeSubscriptionModal = useCallback(() => setShowSubscriptionModal(false), [])
+
+  const { user: authUser, isLoggedIn } = useAuth()
 
   // Spam prevention and state mapping refs
   const likeTimeoutRef = useRef(null)
@@ -133,9 +139,6 @@ function ComicDetail() {
     }
 
     fetchComicDetail()
-    if (id) {
-      getComicCommentsApi(id, '', 1, 10).catch(() => {})
-    }
 
     return () => {
       controller.abort()
@@ -247,35 +250,17 @@ function ComicDetail() {
     }
   }, [targetCommentIdFromUrl])
 
-  const hasInternalChapterAccess = ['ADMIN', 'MODERATOR', 'AUTHOR', 'TRANSLATOR', 'PROJECT_LEADER']
-    .includes((user?.role || '').toUpperCase())
-
-  const openChapter = (chapter) => {
-    if (!chapter) return
-
-    if (chapter.isPremium && !user?.premiumActive && !hasInternalChapterAccess) {
-      if (!user) {
-        toast.info('Please sign in and upgrade to Premium to read this chapter.')
-        navigate('/auth?mode=signin')
-      } else {
-        setShowSubscriptionModal(true)
-      }
-      return
-    }
-
-    const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(selectedLanguage)}` : ''
-    navigate(`/comic/${id}/chapter/${chapter.id}${langQuery}`)
-  }
-
   const handleReadChapter1 = () => {
     if (chapters && chapters.length > 0) {
+      // Find the first chapter (sorting by chapter number ascending)
       const sorted = [...chapters].sort((a, b) => Number(a.chapterNumber) - Number(b.chapterNumber))
-      openChapter(sorted[0])
+      const firstChap = sorted[0]
+      const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(selectedLanguage)}` : ''
+      navigate(`/comic/${id}/chapter/${firstChap.id}${langQuery}`)
     } else {
       toast.warning('No chapters available for this comic yet.')
     }
   }
-
 
   if (loading || !comic) {
     return (
@@ -294,9 +279,19 @@ function ComicDetail() {
     return !str.includes('/') && !str.includes('.') && str.trim().length <= 4
   }
 
-  // Cover image helper
+  // Cover image fallback picker
   const getCoverImage = (coverPath, titleVal, comicId) => {
-    return coverPath || '';
+    if (coverPath && typeof coverPath === 'string') {
+      return coverPath
+    }
+    const t = (titleVal || '').toLowerCase()
+    if (t.includes('action') || t.includes('battle')) return comicAction
+    if (t.includes('adventure') || t.includes('dragon')) return comicAdventure
+    if (t.includes('sci-fi') || t.includes('neon') || t.includes('cyber')) return comicScifi
+    // Default fallback cycling
+    const fallbacks = [comicAction, comicAdventure, comicScifi]
+    const idHash = typeof comicId === 'string' ? comicId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : comicId || 0
+    return fallbacks[idHash % 3] || comicAction
   }
 
   const displayCover = getCoverImage(comic.cover, comic.title, comic.id)
@@ -304,45 +299,13 @@ function ComicDetail() {
   const publicationStatus = comic.publicationStatus || 'ONGOING'
   const displayStatus = publicationStatus.charAt(0).toUpperCase() + publicationStatus.slice(1).toLowerCase()
 
-  const parseGenresList = (input) => {
-    if (!input) return [];
-    if (typeof input === 'string') {
-      const trimmed = input.trim();
-      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-        try {
-          return parseGenresList(JSON.parse(trimmed));
-        } catch (e) {}
-      }
-      return trimmed.split(',').map(s => s.trim().replace(/^['"\[\]]+|['"\[\]]+$/g, '')).filter(Boolean);
-    }
-    if (Array.isArray(input)) {
-      let result = [];
-      input.forEach(item => {
-        if (typeof item === 'string') {
-          result.push(...parseGenresList(item));
-        } else if (typeof item === 'object' && item !== null) {
-          const name = item.name || item.genreName || item.title || item.label || item.genre?.name || item.category?.name || '';
-          if (name) result.push(String(name).trim());
-        } else if (item) {
-          result.push(String(item).trim());
-        }
-      });
-      return Array.from(new Set(result));
-    }
-    if (typeof input === 'object' && input !== null) {
-      const name = input.name || input.genreName || input.title || input.label || input.genre?.name || input.category?.name || '';
-      if (name) return [String(name).trim()];
-    }
-    return [];
-  };
+  const displayGenres = comic.genres
+    ? comic.genres.map(g => typeof g === 'object' && g !== null ? g.name : g)
+    : []
 
-  const parsedGenres = parseGenresList(
-    comic.genres || comic.genre || comic.categories || comic.genreNames || comic.tags
-  );
-  const displayGenres = parsedGenres.length > 0 ? parsedGenres : ['Fantasy'];
-
-  const displayAuthor = comic.authorName || (typeof comic.author === 'object' ? (comic.author?.displayName || comic.author?.fullName || comic.author?.username) : comic.author) || (typeof comic.user === 'object' ? (comic.user?.fullName || comic.user?.username) : comic.user) || comic.creatorName || comic.submittedBy || 'Author'
-  const displayLanguage = comic.language || comic.rawLanguage || 'Unknown'
+  const displayAuthor = comic.author || 'Unknown'
+  const displayArtist = comic.artist || 'Unknown'
+  const displayLanguage = comic.language || 'Unknown'
 
   const displayRating = comic.ratingAverage !== undefined
     ? comic.ratingAverage.toFixed(1)
@@ -361,96 +324,206 @@ function ComicDetail() {
     : (comic.likes || '0')
 
   const displaySummary = comic.summary || comic.tagline || 'No synopsis available.'
-  const sortedChapters = [...chapters].sort(
-    (a, b) => Number(a.chapterNumber || 0) - Number(b.chapterNumber || 0)
-  )
+
   return (
     <HomeLayout>
-      {/* CINEMATIC HERO SECTION */}
-      <div className="comic-detail-hero-section">
-        {!isEmoji(displayCover) && (
+      {/* BACKGROUND BANNER */}
+      <div
+        className="comic-detail-hero"
+        style={{
+          position: 'relative',
+          minHeight: '380px',
+          display: 'flex',
+          alignItems: 'flex-end',
+          padding: '40px 10%',
+          overflow: 'hidden',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+        }}
+      >
+        {isEmoji(displayCover) ? (
+          <div className="hero-banner-bg-emoji-fallback" style={{ zIndex: 0 }}>{displayCover}</div>
+        ) : (
           <div
-            className="hero-backdrop-img"
-            style={{ backgroundImage: `url(${displayCover})` }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `url(${displayCover})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center 25%',
+              filter: 'brightness(0.15) blur(10px)',
+              transform: 'scale(1.1)',
+              zIndex: 0
+            }}
           />
         )}
-        <div className="hero-backdrop-overlay" />
+        <div
+          className="detail-banner-gradient"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(to top, var(--color-bg-dark) 0%, transparent 100%)',
+            zIndex: 1
+          }}
+        />
 
-        <div className="comic-detail-hero-content">
+        {/* COMIC MAIN METADATA CARD */}
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 2,
+            display: 'flex',
+            gap: '40px',
+            width: '100%',
+            alignItems: 'center',
+            flexWrap: 'wrap'
+          }}
+        >
           {/* Cover */}
-          <div className="comic-detail-cover-wrapper">
+          <div
+            className="comic-detail-cover"
+            style={{
+              width: '200px',
+              height: '280px',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(168, 85, 247, 0.15)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(255, 255, 255, 0.03)'
+            }}
+          >
             {isEmoji(displayCover) ? (
               <div style={{ fontSize: '7rem', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at center, rgba(168, 85, 247, 0.2) 0%, rgba(13, 9, 25, 0.98) 100%)' }}>{displayCover}</div>
             ) : (
-              <img src={displayCover} alt={displayTitle} />
+              <img src={displayCover} alt={displayTitle} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             )}
           </div>
 
           {/* Details */}
           <div style={{ flex: '1', minWidth: '300px' }}>
-            <button onClick={() => navigate(-1)} className="hero-back-btn">
-              ← Back
-            </button>
-
-            <div className="hero-badges-row">
-              <span className="hero-status-badge">{displayStatus}</span>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  background: 'rgba(168, 85, 247, 0.15)',
+                  border: '1px solid rgba(168, 85, 247, 0.3)',
+                  color: '#c084fc',
+                  padding: '4px 12px',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  fontWeight: '600'
+                }}
+              >
+                {displayStatus}
+              </span>
               {displayGenres.map((genre, idx) => (
-                <span key={idx} className="detail-genre-tag">
+                <span
+                  key={idx}
+                  className="detail-genre-tag"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    color: '#cbd5e1',
+                    padding: '4px 12px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    fontWeight: '500'
+                  }}
+                >
                   {genre}
                 </span>
               ))}
             </div>
 
-            <h1 className="hero-comic-title">{displayTitle}</h1>
+            <h1
+              className="detail-title"
+              style={{
+                fontFamily: 'var(--font-serif)',
+                fontSize: '42px',
+                fontWeight: '700',
+                margin: '0 0 8px',
+                color: 'white',
+                lineHeight: '1.2'
+              }}
+            >
+              {displayTitle}
+            </h1>
 
-            <p className="hero-comic-credits">
-              Author: <strong>{displayAuthor}</strong>
+            <p className="detail-author-artist" style={{ margin: '0 0 16px', color: '#94a3b8', fontSize: '15px' }}>
+              Story by <strong style={{ color: 'white' }}>{displayAuthor}</strong>  •  Art by <strong style={{ color: 'white' }}>{displayArtist}</strong>
             </p>
 
-            {/* Glassmorphism Stats Bar */}
-            <div className="hero-stats-glass-bar">
-              <div className="hero-stat-item">
-                <span className="hero-stat-label">Rating</span>
-                <span className="hero-stat-val rating">⭐ {displayRating}</span>
+            {/* Stats Row */}
+            <div
+              className="detail-stats-card"
+              style={{
+                display: 'flex',
+                gap: '24px',
+                marginBottom: '24px',
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                padding: '12px 20px',
+                borderRadius: '12px',
+                width: 'max-content',
+                maxWidth: '100%',
+                boxSizing: 'border-box'
+              }}
+            >
+              <div style={{ textAlign: 'center' }}>
+                <span className="detail-stats-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Rating</span>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#fbbf24' }}>⭐ {displayRating}</span>
               </div>
-              <div className="hero-stat-divider" />
-              <div className="hero-stat-item">
-                <span className="hero-stat-label">Views</span>
-                <span className="hero-stat-val">👁️ {displayViews}</span>
+              <div className="detail-stats-divider" style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+              <div style={{ textAlign: 'center' }}>
+                <span className="detail-stats-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Views</span>
+                <span className="detail-stats-value" style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>👁️ {displayViews}</span>
               </div>
-              <div className="hero-stat-divider" />
-              <div className="hero-stat-item">
-                <span className="hero-stat-label">Likes</span>
-                <span className="hero-stat-val">❤️ {displayLikes}</span>
+              <div className="detail-stats-divider" style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+              <div style={{ textAlign: 'center' }}>
+                <span className="detail-stats-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Likes</span>
+                <span className="detail-stats-value" style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>❤️ {displayLikes}</span>
               </div>
-              <div className="hero-stat-divider" />
-              <div className="hero-stat-item">
-                <span className="hero-stat-label">Bookmarks</span>
-                <span className="hero-stat-val">🔖 {displayBookmarks}</span>
+              <div className="detail-stats-divider" style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+              <div style={{ textAlign: 'center' }}>
+                <span className="detail-stats-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Bookmarks</span>
+                <span className="detail-stats-value" style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>🔖 {displayBookmarks}</span>
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="hero-actions-group">
-              <button onClick={handleReadChapter1} className="hero-btn-primary">
-                ▶ Read Chapter 1
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+              <button
+                onClick={handleReadChapter1}
+                className="btn-home-primary"
+                style={{ padding: '12px 30px', fontSize: '15px' }}
+              >
+                Read Chapter 1
               </button>
               <button
                 onClick={handleAddToLibrary}
-                className={`hero-btn-glass ${inLibrary ? 'active-saved' : ''}`}
+                className="btn-hero-outline detail-action-btn"
+                style={{ padding: '12px 24px', fontSize: '15px', borderColor: inLibrary ? '#10b981' : 'rgba(255, 255, 255, 0.15)', color: inLibrary ? '#10b981' : 'white' }}
               >
-                {inLibrary ? '✓ Saved in Library' : '🔖 Add to Library'}
+                {inLibrary ? '✓ Saved to Library' : '🔖 Add to Library'}
               </button>
               <button
                 onClick={handleToggleLike}
-                className={`hero-btn-glass ${isLiked ? 'active-liked' : ''}`}
+                className="btn-hero-outline detail-action-btn"
+                style={{
+                  padding: '12px 24px',
+                  fontSize: '15px',
+                  borderColor: isLiked ? '#ec4899' : 'rgba(255, 255, 255, 0.15)',
+                  color: isLiked ? '#ec4899' : 'white'
+                }}
               >
                 {isLiked ? '❤️ Liked' : '🤍 Like'}
               </button>
             </div>
 
             {/* Interactive Star Rating */}
-            <div className="hero-rating-box">
+            <div style={{ marginTop: '20px' }}>
               <StarRating
                 comicId={id}
                 user={user}
@@ -467,34 +540,64 @@ function ComicDetail() {
                 }}
               />
             </div>
+
           </div>
         </div>
       </div>
 
-      {/* CONTENT BODY SECTION */}
-      <div className="comic-detail-body-container">
-        <div className="comic-detail-main-grid">
+      {/* CONTENT BODY */}
+      <div className="home-sections-container" style={{ padding: '40px 10%' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr', gap: '40px' }}>
 
-          {/* Left Column: Synopsis + Tabs */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          {/* Left Column: Description + Chapters / Reviews */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
 
             {/* Synopsis */}
-            <div className="detail-synopsis-card">
-              <h3 className="detail-section-title">📖 Synopsis</h3>
-              <p className="detail-synopsis-text">{displaySummary}</p>
+            <div className="detail-synopsis-card" style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', padding: '24px', borderRadius: '16px' }}>
+              <h3 className="detail-section-title" style={{ margin: '0 0 12px', fontSize: '18px', color: 'white' }}>Synopsis</h3>
+              <p className="detail-synopsis-text" style={{ margin: 0, fontSize: '15px', color: '#cbd5e1', lineHeight: '1.6' }}>{displaySummary}</p>
             </div>
 
             {/* Tabs Selector */}
-            <div className="detail-tabs-header">
+            <div
+              className="detail-tabs-selector"
+              style={{
+                display: 'flex',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                gap: '24px'
+              }}
+            >
               <button
                 onClick={() => setActiveTab('chapters')}
-                className={`detail-tab-button ${activeTab === 'chapters' ? 'active' : ''}`}
+                className={`detail-tab-btn ${activeTab === 'chapters' ? 'active' : ''}`}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: activeTab === 'chapters' ? '2px solid #a855f7' : '2px solid transparent',
+                  color: activeTab === 'chapters' ? 'white' : '#94a3b8',
+                  padding: '12px 8px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
               >
                 Chapters ({chapters.length})
               </button>
               <button
                 onClick={() => setActiveTab('comments')}
-                className={`detail-tab-button ${activeTab === 'comments' ? 'active' : ''}`}
+                className={`detail-tab-btn ${activeTab === 'comments' ? 'active' : ''}`}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: activeTab === 'comments' ? '2px solid #a855f7' : '2px solid transparent',
+                  color: activeTab === 'comments' ? 'white' : '#94a3b8',
+                  padding: '12px 8px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
               >
                 Comments
               </button>
@@ -504,75 +607,142 @@ function ComicDetail() {
             {activeTab === 'chapters' && (
               <div>
                 {availableLanguages.length > 0 && (
-                  <div className="chapter-controls-bar">
-                    <label htmlFor="comic-reading-language" style={{ fontSize: '13px', fontWeight: '600' }}>
-                      🌐 Reading Language:
-                    </label>
-                    <select
-                      id="comic-reading-language"
-                      value={selectedLanguage}
-                      onChange={(e) => setSelectedLanguage(e.target.value)}
-                      className="chapter-lang-select"
-                    >
-                      <option value="" style={{ color: '#111', background: '#fff' }}>Original</option>
-                      {availableLanguages.map((lang) => (
-                        <option key={lang} value={lang} style={{ color: '#111', background: '#fff' }}>
-                          {lang}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <ReadingLanguageSelector
+                    languages={availableLanguages}
+                    selectedLanguage={selectedLanguage}
+                    onChange={setSelectedLanguage}
+                  />
                 )}
 
-                <div className="detail-chapters-list">
-                  {chapters.length === 0 ? (
-                    <div style={{ padding: '40px', textAlign: 'center', opacity: 0.7 }}>
-                      No chapters available yet for this comic.
+                <div
+                  className="comic-detail-chapter-list"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    maxHeight: '600px',
+                    overflowY: 'auto',
+                    paddingRight: '8px'
+                  }}
+                >
+                {chapters.map((ch) => {
+                  const chNumber = ch.chapterNumber || '0'
+                  const chTitle = ch.title || `Chapter ${chNumber}`
+                  const chViewsStr = formatViews(ch.viewCount || 0)
+                  const chDateStr = formatTimeAgo(ch.createdAt)
+
+                  const isRead = readChapterIds.includes(ch.id)
+                  const isPremium = Boolean(ch.isPremium === true || ch.isPremium === 'true' || ch.isPremium === 1)
+
+                  return (
+                    <div
+                      key={ch.id || ch.chapterNumber}
+                      className={`detail-chapter-row ${isRead ? 'read' : ''} ${isPremium ? 'premium' : ''}`}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '15.5px 20px',
+                        background: isRead
+                          ? 'rgba(168, 85, 247, 0.04)'
+                          : isPremium
+                          ? 'rgba(245, 158, 11, 0.05)'
+                          : 'rgba(255, 255, 255, 0.02)',
+                        border: isRead
+                          ? '1px solid rgba(168, 85, 247, 0.25)'
+                          : isPremium
+                          ? '1px solid rgba(245, 158, 11, 0.3)'
+                          : '1px solid rgba(255, 255, 255, 0.04)',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      onClick={() => {
+                        if (isPremium) {
+                          const auth = getAuth()
+                          const activeUser = authUser || auth?.user || user
+                          const loggedIn = isLoggedIn || !!(auth && auth.user && auth.token)
+
+                          if (!loggedIn || !activeUser) {
+                            toast.info('Please sign in to read this Premium chapter.')
+                            navigate('/auth?mode=signin', { state: { from: location } })
+                            return
+                          }
+
+                          const roleStr = String(activeUser.role || activeUser.roleName || activeUser.role?.roleName || '').toUpperCase()
+                          const isVip = Boolean(
+                            activeUser.premiumActive ||
+                            activeUser.isVip ||
+                            activeUser.isPremium ||
+                            roleStr === 'ADMIN' ||
+                            roleStr === 'MODERATOR'
+                          )
+
+                          if (!isVip) {
+                            setShowSubscriptionModal(true)
+                            return
+                          }
+                        }
+
+                        const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(selectedLanguage)}` : ''
+                        navigate(`/comic/${id}/chapter/${ch.id}${langQuery}`)
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = isPremium
+                          ? 'rgba(245, 158, 11, 0.12)'
+                          : 'rgba(168, 85, 247, 0.08)'
+                        e.currentTarget.style.borderColor = isPremium
+                          ? 'rgba(245, 158, 11, 0.55)'
+                          : 'rgba(168, 85, 247, 0.4)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = isRead
+                          ? 'rgba(168, 85, 247, 0.04)'
+                          : isPremium
+                          ? 'rgba(245, 158, 11, 0.05)'
+                          : 'rgba(255, 255, 255, 0.02)'
+                        e.currentTarget.style.borderColor = isRead
+                          ? 'rgba(168, 85, 247, 0.25)'
+                          : isPremium
+                          ? '1px solid rgba(245, 158, 11, 0.3)'
+                          : 'rgba(255, 255, 255, 0.04)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span className="detail-chapter-title" style={{
+                          fontWeight: '600',
+                          color: isRead ? '#c084fc' : 'white',
+                          fontSize: '14px'
+                        }}>
+                          {chTitle}
+                        </span>
+
+                        {isPremium && (
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                            color: '#ffffff',
+                            padding: '2px 9px',
+                            borderRadius: '12px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            boxShadow: '0 2px 8px rgba(245, 158, 11, 0.35)',
+                            letterSpacing: '0.3px'
+                          }}>
+                            🔒 Premium
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>Views: {chViewsStr}</span>
+                        <span className="detail-chapter-date" style={{ fontSize: '12px', color: '#94a3b8' }}>{chDateStr}</span>
+                      </div>
                     </div>
-                  ) : (
-                    sortedChapters.map((ch) => {
-                      const chNumber = ch.chapterNumber || '0'
-                      const chTitle = ch.title || `Chapter ${chNumber}`
-                      const chViewsStr = formatViews(ch.viewCount || 0)
-                      const chDateStr = formatTimeAgo(ch.createdAt)
-
-                      const isRead = readChapterIds.includes(ch.id)
-
-                      return (
-                        <div
-                          key={ch.id || ch.chapterNumber}
-                          className={`detail-chapter-card ${isRead ? 'read' : ''}`}
-                          onClick={() => openChapter(ch)}
-                        >
-                          <div>
-                            <span className="detail-chapter-name">
-                              {chTitle}
-                              {ch.isPremium && (
-                                <span style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  marginLeft: '10px',
-                                  padding: '2px 7px',
-                                  borderRadius: '999px',
-                                  background: 'rgba(245, 158, 11, 0.14)',
-                                  border: '1px solid rgba(245, 158, 11, 0.35)',
-                                  color: '#fbbf24',
-                                  fontSize: '10px',
-                                  verticalAlign: 'middle'
-                                }}>
-                                  <LockKeyhole size={10} /> PREMIUM
-                                </span>
-                              )}
-                              {isRead && <span className="read-status-pill">✓ READ</span>}
-                            </span>
-                            <span style={{ fontSize: '12px', opacity: 0.75 }}>Views: {chViewsStr}</span>
-                          </div>
-                          <span className="detail-chapter-meta">{chDateStr}</span>
-                        </div>
-                      )
-                    })
-                  )}
+                  )
+                })}
                 </div>
               </div>
             )}
@@ -588,36 +758,54 @@ function ComicDetail() {
             )}
           </div>
 
-          {/* Right Column: Sidebar */}
+          {/* Right Column: Sidebar (About / Artist / Info) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div className="detail-sidebar-info-card">
-              <h3 className="detail-section-title" style={{ fontSize: '16px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '10px' }}>
-                Comic Info
-              </h3>
+            <div
+              className="detail-info-card"
+              style={{
+                background: 'var(--reader-card-bg)',
+                border: '1px solid var(--reader-card-border)',
+                padding: '24px',
+                borderRadius: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}
+            >
+              <h3 className="detail-info-title" style={{ margin: 0, fontSize: '16px', color: 'white', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '8px' }}>Comic Info</h3>
 
               <div>
-                <span className="info-item-label">Author</span>
-                <span className="info-item-val">{displayAuthor}</span>
+                <span className="detail-info-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Author</span>
+                <span className="detail-info-value" style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayAuthor}</span>
               </div>
 
               <div>
-                <span className="info-item-label">Original Language</span>
-                <span className="info-item-val">{displayLanguage}</span>
+                <span className="detail-info-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Artist</span>
+                <span className="detail-info-value" style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayArtist}</span>
               </div>
 
               <div>
-                <span className="info-item-label">Status</span>
-                <span className="info-item-val">{displayStatus}</span>
+                <span className="detail-info-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Original Language</span>
+                <span className="detail-info-value" style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayLanguage}</span>
+              </div>
+
+              <div>
+                <span className="detail-info-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Status</span>
+                <span className="detail-info-value" style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayStatus}</span>
+              </div>
+
+              <div>
+                <span className="detail-info-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Publish Date</span>
+                <span className="detail-info-value" style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>Jan 12, 2025</span>
               </div>
             </div>
           </div>
 
         </div>
       </div>
-
       <SubscriptionPlanModal
         open={showSubscriptionModal}
-        onClose={closeSubscriptionModal}
+        onClose={() => setShowSubscriptionModal(false)}
       />
     </HomeLayout>
   )
