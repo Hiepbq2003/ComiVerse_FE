@@ -287,8 +287,14 @@ function ProjectTeams({
     }
   }, [showAssignModal])
 
-  const openAssignLeaderModal = (teamId) => {
-    setAssignTeamId(teamId)
+  const openAssignLeaderModal = (team) => {
+    if (team.leaderId || team.leaderName) {
+      const isConfirmed = window.confirm(
+        `⚠️ WARNING: This team already has a Leader (${team.leaderName}).\n\nAssigning a new leader will revoke their permissions and might disrupt ongoing translations. Are you sure you want to Reassign the leader?`
+      );
+      if (!isConfirmed) return;
+    }
+    setAssignTeamId(team.id)
     setLeaderSearch('')
     setShowAssignModal(true)
   }
@@ -516,9 +522,9 @@ function ProjectTeams({
                   </button>
                   <button 
                     className="comic-btn-action btn-action-assign"
-                    onClick={() => openAssignLeaderModal(team.id)}
+                    onClick={() => openAssignLeaderModal(team)}
                   >
-                    👤 Leader
+                    👤 {team.leaderName || team.leaderId ? 'Reassign' : 'Leader'}
                   </button>
                 </div>
               </div>

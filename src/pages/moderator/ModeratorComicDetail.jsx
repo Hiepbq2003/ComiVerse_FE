@@ -634,7 +634,7 @@ function ModeratorComicDetail() {
           }
         }
 
-        if (!resolvedAuthor) resolvedAuthor = authUser?.fullName || 'Unknown Author';
+        if (!resolvedAuthor) resolvedAuthor = getAuth()?.user?.fullName || 'Unknown Author';
 
         comicData.authorName = resolvedAuthor;
         comicData.author = resolvedAuthor;
@@ -842,9 +842,9 @@ function ModeratorComicDetail() {
                       Status: {comic.publicationStatus || 'ONGOING'}
                     </span>
 
-                    {comic.approvedBy && (
+                    {(comic.approvedBy || comic.moderatorName) && (
                       <span className="mod-meta-pill" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                        ✓ Approved by: <strong>{comic.approvedBy}</strong> {comic.approvedAt && `• ${new Date(comic.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                        ✅ Approved by: <strong>{comic.approvedBy || comic.moderatorName}</strong> {comic.approvedAt && `• ${new Date(comic.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
                       </span>
                     )}
 
@@ -992,13 +992,13 @@ function ModeratorComicDetail() {
                            (chap.updatedAt ? new Date(chap.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-')}
                         </td>
                         <td>
-                          {chap.moderationStatus === 'PUBLISHED' ? (
+                          {(chap.moderationStatus === 'PUBLISHED' || chap.moderationStatus === 'APPROVED') ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                               <span style={{ fontSize: '12px', fontWeight: '700', color: '#10b981' }}>
-                                ✓ Published
+                                ✓ {chap.moderationStatus === 'PUBLISHED' ? 'Published' : 'Approved'}
                               </span>
                               <span style={{ fontSize: '11px', color: '#64748b' }}>
-                                by: {chap.approvedBy || 'Unknown'}
+                                  by: {chap.approvedBy || chap.moderatorName || 'Unknown'}
                               </span>
                               {chap.approvedAt && (
                                 <span style={{ fontSize: '11px', color: '#64748b' }}>
@@ -1020,10 +1020,7 @@ function ModeratorComicDetail() {
                               <span style={{ fontSize: '11.5px', color: '#94a3b8', fontStyle: 'italic', fontWeight: '500' }}>
                                 {chap.moderationStatus === 'PREVIEW_READY' ? 'Author Drafting' : 
                                  (chap.moderationStatus === 'SUBMITTED_FOR_REVIEW' || chap.moderationStatus === 'PENDING_REVIEW' ? 'Pending Review' : 
-                                  (chap.moderationStatus || 'Draft'))}
-                              </span>
-                              <span style={{ fontSize: '11px', color: '#cbd5e1' }}>
-                                Reviewer: -
+                                  (chap.moderationStatus || 'Pending'))}
                               </span>
                             </div>
                           )}

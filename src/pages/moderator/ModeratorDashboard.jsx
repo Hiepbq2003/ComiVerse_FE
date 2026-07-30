@@ -593,7 +593,12 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
     return {
       'review-queue': (() => {
-        const itemsInTab = submissions.filter(item => item.status === 'pending');
+        const authUser = getAuth()?.user;
+        const scopedSubmissions = submissions.filter(item => {
+          const lang = item.language || item.rawLanguage || item.originalLanguage || item.lang || 'Original Raw';
+          return isLanguageInModeratorScope(lang, authUser);
+        });
+        const itemsInTab = scopedSubmissions.filter(item => item.status === 'pending' || !item.status);
         const uniqueKeys = new Set();
         itemsInTab.forEach(item => {
           const titleClean = (item.title || '').toLowerCase().trim();
