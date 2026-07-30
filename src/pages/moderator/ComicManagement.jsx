@@ -148,7 +148,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
           return s === 'PUBLISHED' || s === 'APPROVED' || !s; 
         }) : [];
         const fetchedChapsCount = approvedChaps.length;
-        const chapterCount = fetchedChapsCount > 0 ? fetchedChapsCount : (comic.chapterCount || comic.chapters || 0);
+        const chapterCount = Array.isArray(chapsData) ? fetchedChapsCount : (comic.chapterCount || comic.chapters || 0);
         
         return {
           id: comic.id,
@@ -183,7 +183,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
             return s === 'PUBLISHED' || s === 'APPROVED' || !s; 
           }) : [];
           const fetchedChapsCount = approvedChaps.length;
-          const chapterCount = fetchedChapsCount > 0 ? fetchedChapsCount : (comic.chapterCount || comic.chapters || 0);
+          const chapterCount = Array.isArray(chapsData) ? fetchedChapsCount : (comic.chapterCount || comic.chapters || 0);
 
           nextStats[id] = {
             viewCount: finalViews,
@@ -1102,9 +1102,9 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                           {chap.createdAt ? new Date(chap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
                         </td>
                         <td style={{ padding: '12px', fontSize: '13px' }}>
-                          {chap.approvedBy ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              <span style={{ fontWeight: '600', color: '#10b981' }}>✓ {chap.approvedBy}</span>
+                          {(chap.approvedBy || chap.moderatorName) ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
+                              <span style={{ fontWeight: '600', color: '#10b981' }}>✓ {chap.approvedBy || chap.moderatorName}</span>
                               {chap.approvedAt && (
                                 <span style={{ fontSize: '11px', color: 'var(--mod-text-secondary)' }}>
                                   {new Date(chap.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}

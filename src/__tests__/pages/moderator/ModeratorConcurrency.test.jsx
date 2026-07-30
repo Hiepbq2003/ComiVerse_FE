@@ -14,6 +14,7 @@ import { toast } from 'react-toastify'
 vi.mock('../../../services/api/ChatFlagApi')
 vi.mock('../../../services/api/ProjectTeamApi')
 vi.mock('../../../services/api/ForumThreadApi')
+vi.mock('../../../services/api/AccountApi')
 vi.mock('../../../services/api/BannedKeywordApi', () => ({
   getBannedKeywordsApi: vi.fn().mockResolvedValue([]),
   addBannedKeywordApi: vi.fn(),
@@ -246,6 +247,70 @@ describe('Moderator Concurrency & Race Conditions', () => {
     
     await waitFor(() => {
       expect(screen.queryByText('Great Chapter 5')).not.toBeInTheDocument()
+    })
+  })
+
+  it('5. ProjectTeams: Handles 409 Conflict when assigning a leader concurrently', async () => {
+    const mockTeams = [
+      { id: 'team-2', title: 'One Piece - Vietnam Team', status: 'ACTIVE', leaderId: null, leaderName: null }
+    ]
+    const setProjectTeamsMock = vi.fn()
+    
+    // Simulate API throwing 409 when trying to assign a leader
+    const error409 = new Error('Conflict')
+    error409.response = { status: 409 }
+    ProjectTeamApi.updateProjectTeamApi.mockRejectedValueOnce(error409)
+
+    render(
+      <MemoryRouter>
+        <ThemeProvider>
+          <ProjectTeams 
+            projectTeams={mockTeams}
+            setProjectTeams={setProjectTeamsMock}
+            genres={[]}
+            comics={[]}
+            submissions={[]}
+            showCreateTeamModal={false}
+            createTeamForm={{}}
+          />
+        </ThemeProvider>
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('One Piece - Vietnam Team')).toBeInTheDocument()
+    })
+
+    // Click on Leader button
+    const assignBtn = screen.getByRole('button', { name: /Leader/i })
+    fireEvent.click(assignBtn)
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/Type Project Leader username or email to search/i)).toBeInTheDocument()
+    })
+
+    // Mock search results
+    const translator = { id: 'trans-1', fullName: 'John Translator', email: 'john@test.com' }
+    
+    // Since we mocked searchProjectLeadersApi globally, let's redefine it here
+    const { searchProjectLeadersApi } = await import('../../../services/api/AccountApi')
+    searchProjectLeadersApi.mockResolvedValueOnce([translator])
+
+    const searchInput = screen.getByPlaceholderText(/Type Project Leader username or email to search/i)
+    fireEvent.change(searchInput, { target: { value: 'John' } })
+
+    await waitFor(() => {
+      expect(screen.getByText('John Translator')).toBeInTheDocument()
+    })
+
+    // Click assign button on translator card
+    const assignTranslatorBtn = screen.getByRole('button', { name: /John Translator/i })
+    fireEvent.click(assignTranslatorBtn)
+
+    // Wait for the API to be called and 409 error toast
+    await waitFor(() => {
+      expect(ProjectTeamApi.updateProjectTeamApi).toHaveBeenCalledWith('team-2', expect.objectContaining({ leaderId: 'trans-1' }))
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Conflict: Leader was already assigned'))
     })
   })
 })
