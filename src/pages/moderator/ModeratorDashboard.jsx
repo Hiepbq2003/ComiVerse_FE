@@ -391,7 +391,28 @@ function ModeratorDashboard() {
   }
 
   const syncSubmissionsWithLocalOverride = (rawSubmissions) => {
-    return rawSubmissions || [];
+    if (!rawSubmissions) return [];
+    try {
+      const localStr = localStorage.getItem('comiverse_moderator_submissions_override');
+      if (localStr) {
+        const localOverrides = JSON.parse(localStr);
+        return rawSubmissions.map(raw => {
+          const override = localOverrides.find(o => 
+            o.id === raw.id || 
+            o.submissionId === raw.id || 
+            o.submissionId === raw.submissionId ||
+            (o.title && raw.title && o.title.trim().toLowerCase() === raw.title.trim().toLowerCase() && o.submittedBy === raw.submittedBy)
+          );
+          if (override && (override.status === 'approved' || override.status === 'rejected')) {
+            return { ...raw, ...override };
+          }
+          return raw;
+        });
+      }
+    } catch (e) {
+      console.error('Failed to sync submissions with local override', e);
+    }
+    return rawSubmissions;
   };
 
   const fetchSubmissionsData = async () => {
@@ -571,7 +592,17 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     const pendingChatFlags = allFlags.filter(item => !item.status || item.status === 'pending').length
 
     return {
-      'review-queue': submissions.filter(item => item.status === 'pending').length,
+      'review-queue': (() => {
+        const itemsInTab = submissions.filter(item => item.status === 'pending');
+        const uniqueKeys = new Set();
+        itemsInTab.forEach(item => {
+          const titleClean = (item.title || '').toLowerCase().trim();
+          const submitterClean = (item.submittedBy || '').toLowerCase().trim();
+          const key = item.comicId ? `comic-${item.comicId}` : `group-${titleClean}_${submitterClean}`;
+          uniqueKeys.add(key);
+        });
+        return uniqueKeys.size;
+      })(),
       'chat-monitor': pendingChatFlags,
       'forum': forumThreads.filter(item => item.isReported).length,
     }
