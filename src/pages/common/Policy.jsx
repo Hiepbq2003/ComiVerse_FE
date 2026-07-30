@@ -1,6 +1,6 @@
 import React from "react";
 import HomeLayout from "../../components/layout/HomeLayout";
-import { ShieldCheck, FileText, UserCheck, Mail, UserPlus } from "lucide-react"; // Đã thêm icon UserPlus
+import { ShieldCheck, FileText, UserCheck, Mail, UserPlus } from "lucide-react";
 
 const Policy = () => {
   return (

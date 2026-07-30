@@ -664,7 +664,7 @@ function ComicDetail() {
                           const loggedIn = isLoggedIn || !!(auth && auth.user && auth.token)
 
                           if (!loggedIn || !activeUser) {
-                            toast.info('Vui lòng đăng nhập để đọc chương Premium này.')
+                            toast.info('Please sign in to read this Premium chapter.')
                             navigate('/auth?mode=signin', { state: { from: location } })
                             return
                           }
