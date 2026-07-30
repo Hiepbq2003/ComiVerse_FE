@@ -208,62 +208,63 @@ function AddChapterModal({ comic, onClose, onUploaded, onOpenGuide }) {
           </div>
           <button type="button" className="author-icon-btn ghost" onClick={onClose} aria-label="Close">×</button>
         </div>
+        <div className="author-modal-body">
+          <div className="author-chapter-form-grid">
+            <label className="author-form-label">
+              Chapter # *
+              <input
+                className="author-input"
+                type="text"
+                value={chapterNumber}
+                onChange={(event) => setChapterNumber(event.target.value)}
+                placeholder="1 or 1,5"
+              />
+            </label>
 
-        <div className="author-chapter-form-grid">
-          <label className="author-form-label">
-            Chapter # *
-            <input
-              className="author-input"
-              type="text"
-              value={chapterNumber}
-              onChange={(event) => setChapterNumber(event.target.value)}
-              placeholder="1 or 1,5"
-            />
-          </label>
-
-          <label className="author-form-label">
-            Chapter Title
-            <input
-              className="author-input"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="Optional title"
-            />
-          </label>
-        </div>
-
-        <label className="author-form-label">
-          Upload Pages (.zip) *
-          <div className="author-upload-zone file-picker-zone">
-            <input
-              type="file"
-              accept=".zip,application/zip,application/x-zip-compressed"
-              onChange={(event) => {
-                const file = event.target.files?.[0] || null
-                setZipFile(file)
-
-                const numberFromFile = getChapterNumberFromZipName(file)
-                if (numberFromFile) {
-                  setChapterNumber(numberFromFile)
-                }
-
-                const zipError = validateChapterZip(file)
-                setError(zipError)
-              }}
-            />
-            <div className="author-upload-icon">⇧</div>
-            <strong>{zipFile ? zipFile.name : 'Drop chapter ZIP or select file'}</strong>
-            <span>Example: Chapter 1.zip or Chapter 1,5.zip. Put images directly inside the ZIP: 01.jpg, 02.jpg.</span>
+            <label className="author-form-label">
+              Chapter Title
+              <input
+                className="author-input"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="Optional title"
+              />
+            </label>
           </div>
-        </label>
 
-        <ZipPackagingGuideMini onOpenGuide={onOpenGuide} />
+          <label className="author-form-label">
+            Upload Pages (.zip) *
+            <div className="author-upload-zone file-picker-zone">
+              <input
+                type="file"
+                accept=".zip,application/zip,application/x-zip-compressed"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] || null
+                  setZipFile(file)
 
-        <div className="author-alert info">
-          ℹ Chapter will be created as preview first. Submit it for moderator review after checking pages.
+                  const numberFromFile = getChapterNumberFromZipName(file)
+                  if (numberFromFile) {
+                    setChapterNumber(numberFromFile)
+                  }
+
+                  const zipError = validateChapterZip(file)
+                  setError(zipError)
+                }}
+              />
+              <div className="author-upload-icon">⇧</div>
+              <strong>{zipFile ? zipFile.name : 'Drop chapter ZIP or select file'}</strong>
+              <span>Example: Chapter 1.zip or Chapter 1,5.zip. Put images directly inside the ZIP: 01.jpg, 02.jpg.</span>
+            </div>
+          </label>
+
+          <ZipPackagingGuideMini onOpenGuide={onOpenGuide} />
+
+          {error && <div className="author-alert error">{error}</div>}
+          
+          <div className="author-alert info">
+            <strong>i</strong> Chapter will be created as preview first. Submit it for moderator review after checking pages.
+          </div>
         </div>
-
-        {error && <div className="author-form-error">{error}</div>}
 
         <div className="author-modal-actions">
           <button type="button" className="btn-author-action" onClick={onClose} disabled={submitting}>Cancel</button>

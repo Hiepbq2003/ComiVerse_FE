@@ -469,7 +469,32 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       const authUser = getAuth()?.user;
       setTopComics(leaderboardData?.data || leaderboardData?.content || leaderboardData || []);
       
-      const enrichedRawSubmissions = (submissionsData || []).map(s => {
+      const mergedSubmissionsData = [...(submissionsData || [])];
+      // Auto-generate mock submissions for any PENDING comics if they don't already exist
+      // This ensures the Review Queue isn't empty when using mock backend data
+      (comicsData || []).forEach(c => {
+        if (c.approvalStatus === 'PENDING') {
+          const exists = mergedSubmissionsData.find(s => 
+            String(s.comicId) === String(c.id) || 
+            (s.title && c.title && s.title.toLowerCase() === c.title.toLowerCase())
+          );
+          if (!exists) {
+            mergedSubmissionsData.push({
+              id: `sub-mock-${c.id}`,
+              comicId: c.id,
+              title: c.title,
+              submissionType: 'NEW_COMIC',
+              status: 'pending',
+              submittedBy: c.authorName || c.author || 'Unknown Author',
+              submittedAt: c.createdAt || new Date().toISOString(),
+              language: c.language || c.originalLanguage,
+              comic: c
+            });
+          }
+        }
+      });
+
+      const enrichedRawSubmissions = mergedSubmissionsData.map(s => {
         const titleClean = (s.title || s.comicTitle || '').toLowerCase().trim();
         const cIdMatch = s.comicId ? String(s.comicId) : (s.id ? String(s.id) : null);
 

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Login from '../../../pages/common/Login';
@@ -62,7 +62,7 @@ describe('Login Component Unit & Security Tests (Login.test.jsx)', () => {
     const mockUserPayload = {
       userId: 'uuid-user-123',
       username: 'hiep_user',
-      fullName: 'Hiệp Nguyễn',
+      fullName: 'Hiá»‡p Nguyá»…n',
       email: 'hiep@example.com',
       role: 'READER',
       avatarUrl: 'http://example.com/avatar.png'
@@ -168,5 +168,46 @@ describe('Login Component Unit & Security Tests (Login.test.jsx)', () => {
       expect(submitBtn).toBeDisabled();
     });
   });
+
+  it('should handle banned user login attempt (BANNED status returned)', async () => {
+    AuthApi.loginApi.mockResolvedValueOnce({
+      data: {
+        accessToken: 'fake-jwt-token',
+        refreshToken: 'fake-refresh-token',
+      }
+    });
+
+    AuthApi.getMeApi.mockResolvedValueOnce({
+      data: {
+        id: 'usr-4',
+        username: 'banned_user',
+        email: 'banned@example.com',
+        role: 'READER',
+        status: 'BANNED',
+        banned: true
+      }
+    });
+
+    renderLogin();
+
+    const usernameInput = screen.getByPlaceholderText(/Enter username or email/i);
+    const passwordInput = screen.getByPlaceholderText(/â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢/i);
+    fireEvent.change(usernameInput, { target: { value: 'banned_user' } });
+    fireEvent.change(passwordInput, { target: { value: 'Password123!' } });
+
+    const submitBtn = screen.getByRole('button', { name: /^sign in$/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockShowAlert).toHaveBeenCalledWith(
+        'error',
+        'Your account has been banned. Please contact administration for support.'
+      );
+    });
+
+    // It should NOT trigger onLoginSuccess for banned users
+    expect(mockOnLoginSuccess).not.toHaveBeenCalled();
+  });
 });
+
 

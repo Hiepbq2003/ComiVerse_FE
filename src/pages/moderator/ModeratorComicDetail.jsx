@@ -558,7 +558,24 @@ function ModeratorComicDetail() {
           const s = (c.status || c.moderationStatus || '').toUpperCase();
           return s === 'PUBLISHED' || s === 'APPROVED' || !s;
         });
-        setChapters(approvedChaps.map((c, idx) => ({ ...c, title: getChapterDisplayTitle(c, idx) })));
+        setChapters(approvedChaps.map((c, idx) => {
+          let modStatus = c.moderationStatus;
+          let approvedBy = c.approvedBy;
+          
+          if (!modStatus) {
+            modStatus = (comicData?.publicationStatus === 'ONGOING' || comicData?.publicationStatus === 'COMPLETED') ? 'APPROVED' : 'Pending';
+          }
+          if (!approvedBy && (modStatus === 'APPROVED' || modStatus === 'PUBLISHED')) {
+             approvedBy = comicData?.approvedBy || comicData?.moderatorName || 'Unknown';
+          }
+
+          return { 
+            ...c, 
+            moderationStatus: modStatus,
+            approvedBy: approvedBy,
+            title: getChapterDisplayTitle(c, idx) 
+          };
+        }));
       }
       setProjectTeams(Array.isArray(teamsData) ? teamsData : []);
 
