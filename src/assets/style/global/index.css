@@ -1048,3 +1048,13 @@ html.light .detail-info-value {
 .Toastify__toast-container {
   z-index: 9999999 !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   WORKSPACE LOGO ALIGNMENT
+   ═══════════════════════════════════════════════════════════════════ */
+.admin-sidebar-brand .comiverse-full-logo,
+.author-sidebar-brand .comiverse-full-logo,
+.moderator-sidebar-brand .comiverse-full-logo,
+.translator-sidebar-brand .comiverse-full-logo {
+  transform: translateX(-20px);
+}
