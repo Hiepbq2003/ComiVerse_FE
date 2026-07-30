@@ -360,10 +360,7 @@ function AuthorComics() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [chapterTarget, setChapterTarget] = useState(null)
   const [uploadTasks, setUploadTasks] = useState([])
-  const [reviewingId, setReviewingId] = useState(null)
-  const comicsLoadedRef = useRef(false)
-
-  const [activeTab, setActiveTab] = useState('all') // 'all' | 'rejected' | 'pending' | 'approved'
+  const [activeTab, setActiveTab] = useState('all') // 'all' | 'rejected' | 'pending' | 'approved' | 'draft'
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState('action_first') // 'action_first' | 'updated' | 'created' | 'title'
 
@@ -371,6 +368,7 @@ function AuthorComics() {
     let rejected = 0
     let pending = 0
     let approved = 0
+    let draft = 0
 
     comics.forEach((comic) => {
       const status = (comic.moderationStatus || '').toString().toUpperCase()
@@ -381,9 +379,10 @@ function AuthorComics() {
       if (isRejected) rejected++
       else if (isPending) pending++
       else if (isApproved) approved++
+      else draft++
     })
 
-    return { all: comics.length, rejected, pending, approved }
+    return { all: comics.length, rejected, pending, approved, draft }
   }, [comics])
 
   const filteredAndSortedComics = useMemo(() => {
@@ -397,10 +396,12 @@ function AuthorComics() {
       const isRejected = status === 'REJECTED' || (comic.rejectedChapterCount > 0) || comic.hasRejectedOverride
       const isPending = !isRejected && (status.includes('REVIEW') || status.includes('SUBMITTED') || (comic.pendingChapterCount > 0))
       const isApproved = !isRejected && !isPending && (status === 'APPROVED' || status === 'PUBLISHED')
+      const isDraft = !isRejected && !isPending && !isApproved
 
       if (activeTab === 'rejected') return isRejected
       if (activeTab === 'pending') return isPending
       if (activeTab === 'approved') return isApproved
+      if (activeTab === 'draft') return isDraft
       return true
     })
 
@@ -581,6 +582,13 @@ function AuthorComics() {
               onClick={() => setActiveTab('approved')}
             >
               ✓ Approved <span className="author-tab-count">{counts.approved}</span>
+            </button>
+
+            <button
+              className={`author-tab-btn ${activeTab === 'draft' ? 'active' : ''}`}
+              onClick={() => setActiveTab('draft')}
+            >
+              📝 Draft <span className="author-tab-count">{counts.draft}</span>
             </button>
           </div>
 
