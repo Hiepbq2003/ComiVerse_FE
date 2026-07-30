@@ -354,6 +354,7 @@ function enrichComicWithModeratorOverrides(comic) {
 
 function AuthorComics() {
   const navigate = useNavigate()
+  const comicsLoadedRef = useRef(false)
   const [comics, setComics] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
