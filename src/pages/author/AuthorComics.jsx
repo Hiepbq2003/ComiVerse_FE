@@ -249,6 +249,13 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    
+    const parsedNumber = Number(chapterNumber)
+    if (!chapterNumber || isNaN(parsedNumber) || parsedNumber <= 0) {
+      setError('Chapter number is required and must be a positive number.')
+      return
+    }
+
     if (!zipFile) {
       setError('Please select a .zip chapter file.')
       return
@@ -364,6 +371,7 @@ function AuthorComics() {
   const [activeTab, setActiveTab] = useState('all') // 'all' | 'rejected' | 'pending' | 'approved' | 'draft'
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState('action_first') // 'action_first' | 'updated' | 'created' | 'title'
+  const [reviewingId, setReviewingId] = useState(null)
 
   const counts = useMemo(() => {
     let rejected = 0
