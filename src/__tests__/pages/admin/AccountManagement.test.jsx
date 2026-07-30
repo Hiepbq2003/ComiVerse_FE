@@ -225,4 +225,80 @@ describe('Admin Account Management Unit & Integration Tests (AccountManagement.j
       });
     });
   });
+  // UNHAPPY PATHS & ERROR GUESSING
+  it('Error Guessing: Should handle failure to fetch accounts list on mount', async () => {
+    AccountApi.getAllAccountsApi.mockRejectedValueOnce(new Error('Network Error'));
+    renderAccountManagement();
+
+    await waitFor(() => {
+      expect(AccountApi.getAllAccountsApi).toHaveBeenCalled();
+    });
+  });
+
+  it('Error Guessing: Should handle API failure when registering a user', async () => {
+    AccountApi.registerStaffApi.mockRejectedValueOnce(new Error('500 Internal Server Error'));
+    renderAccountManagement();
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const createBtn = screen.getByRole('button', { name: /\+ create user account/i });
+    fireEvent.click(createBtn);
+
+    fireEvent.change(screen.getByPlaceholderText(/^enter username$/i), { target: { value: 'new_staff' } });
+    fireEvent.change(screen.getByPlaceholderText(/^enter full name$/i), { target: { value: 'New Staff User' } });
+    fireEvent.change(screen.getByPlaceholderText(/staff@comiverse\.com/i), { target: { value: 'staff@example.com' } });
+    fireEvent.change(screen.getByPlaceholderText(/min\. 6 characters/i), { target: { value: 'StaffPass123!' } });
+
+    const submitStaffBtn = screen.getByRole('button', { name: /^create account$/i });
+    fireEvent.click(submitStaffBtn);
+
+    await waitFor(() => {
+      expect(AccountApi.registerStaffApi).toHaveBeenCalled();
+    });
+  });
+
+  it('Error Guessing: Should handle API failure when banning a user', async () => {
+    AccountApi.banUserApi.mockRejectedValueOnce(new Error('500 Internal Server Error'));
+    renderAccountManagement();
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const banButtons = screen.getAllByRole('button', { name: /ban/i });
+    fireEvent.click(banButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText(/ban this account\?/i)).toBeInTheDocument();
+    });
+
+    const confirmBanBtn = screen.getByRole('button', { name: /yes, ban/i });
+    fireEvent.click(confirmBanBtn);
+
+    await waitFor(() => {
+      expect(AccountApi.banUserApi).toHaveBeenCalled();
+    });
+  });
+
+  it('Boundary & Equivalence Testing: Staff Creation Form Validation', async () => {
+    renderAccountManagement();
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const addStaffBtn = screen.getByRole('button', { name: /\+ Create User Account/i });
+    fireEvent.click(addStaffBtn);
+
+    const submitStaffBtn = screen.getByRole('button', { name: /^create account$/i });
+    fireEvent.click(submitStaffBtn);
+
+    // Wait for form validation to prevent API call
+    await waitFor(() => {
+      expect(AccountApi.registerStaffApi).not.toHaveBeenCalled();
+    });
+  });
 });
+

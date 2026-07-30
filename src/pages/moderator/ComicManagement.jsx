@@ -180,9 +180,19 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
 
           const approvedChaps = Array.isArray(chapsData) ? chapsData.filter(c => {
             const s = (c.status || c.moderationStatus || '').toUpperCase();
-            return s === 'PUBLISHED' || s === 'APPROVED' || !s; 
+            return s === 'PUBLISHED' || s === 'APPROVED'; 
           }) : [];
-          const fetchedChapsCount = approvedChaps.length;
+          
+          // Merge approvedBy from existing comic state to preserve local moderation data
+          const enrichedChaps = approvedChaps.map(chap => {
+            const oldChap = Array.isArray(comic.allChapters) ? comic.allChapters.find(c => c.id === chap.id || (c.chapterNumber === chap.chapterNumber && c.chapterNumber)) : null;
+            if (oldChap && (oldChap.approvedBy || oldChap.moderatorName)) {
+              return { ...chap, approvedBy: oldChap.approvedBy || oldChap.moderatorName, approvedAt: oldChap.approvedAt || chap.createdAt };
+            }
+            return chap;
+          });
+
+          const fetchedChapsCount = enrichedChaps.length;
           const chapterCount = Array.isArray(chapsData) ? fetchedChapsCount : (comic.chapterCount || comic.chapters || 0);
 
           nextStats[id] = {

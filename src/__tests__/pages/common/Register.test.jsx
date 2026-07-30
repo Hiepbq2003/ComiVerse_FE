@@ -177,4 +177,51 @@ describe('User Registration Component Unit & Security Tests (Register.jsx)', () 
       expect(mockShowAlert).toHaveBeenCalledWith('error', 'Email already in use.');
     });
   });
+
+  it('should reject registration if username exceeds boundary limit (21 characters)', async () => {
+    renderRegister();
+
+    const termsCheckbox = document.querySelector('.terms-checkbox-container input');
+    fireEvent.click(termsCheckbox);
+
+    // Boundary Value Analysis: max length is 20, we input 21 characters
+    fireEvent.change(screen.getByPlaceholderText(/choose a username/i), { target: { value: 'thisusernameisexactly' } }); // 21 chars
+
+    fireEvent.change(screen.getByPlaceholderText(/create password/i), { target: { value: 'ValidPass123!' } });
+    fireEvent.change(screen.getByPlaceholderText(/confirm password/i), { target: { value: 'ValidPass123!' } });
+
+    const formElement = screen.getByRole('button', { name: /create account/i }).closest('form');
+    fireEvent.submit(formElement);
+
+    expect(mockShowAlert).toHaveBeenCalledWith(
+      'error',
+      'Username must be 3-20 characters, lowercase, numbers, and underscores only.'
+    );
+    expect(AuthApi.registerApi).not.toHaveBeenCalled();
+  });
+
+  it('should handle unhandled exceptions from the backend (500 Server Error)', async () => {
+    // Error Guessing: What if the API throws a generic Error without response.data?
+    AuthApi.registerApi.mockRejectedValueOnce(new Error('Internal Server Error'));
+
+    renderRegister();
+
+    fireEvent.change(screen.getByPlaceholderText(/enter first name/i), { target: { value: 'John' } });
+    fireEvent.change(screen.getByPlaceholderText(/enter last name/i), { target: { value: 'Doe' } });
+    fireEvent.change(screen.getByPlaceholderText(/choose a username/i), { target: { value: 'server_crash' } });
+    fireEvent.change(screen.getByPlaceholderText(/enter email address/i), { target: { value: 'crash@example.com' } });
+
+    fireEvent.change(screen.getByPlaceholderText(/create password/i), { target: { value: 'ValidPassword123!' } });
+    fireEvent.change(screen.getByPlaceholderText(/confirm password/i), { target: { value: 'ValidPassword123!' } });
+
+    const termsCheckbox = document.querySelector('.terms-checkbox-container input');
+    fireEvent.click(termsCheckbox);
+
+    const formElement = screen.getByRole('button', { name: /create account/i }).closest('form');
+    fireEvent.submit(formElement);
+
+    await waitFor(() => {
+      expect(mockShowAlert).toHaveBeenCalledWith('error', 'Registration failed.');
+    });
+  });
 });

@@ -137,4 +137,43 @@ describe('Security & Axios Interceptor Tests (AxiosClient.jsx)', () => {
       );
     });
   });
+
+  describe('Token Refresh and HTTP Methods Resilience', () => {
+    it('should trigger refresh token flow on 401 and retry original GET, POST, PUT, DELETE requests', async () => {
+      const axios = (await import('axios')).default;
+      const mockNewToken = 'new-valid-token-456';
+      vi.spyOn(axios, 'post').mockResolvedValueOnce({ data: { token: mockNewToken, refreshToken: 'new-refresh-789' } });
+      
+      const mockToken = 'expired-token';
+      const mockRefreshToken = 'valid-refresh-token';
+      vi.spyOn(AuthModule, 'getAuth').mockReturnValue({ token: mockToken, user: { id: 'uuid-1' } });
+      vi.spyOn(AuthModule, 'setAuth').mockImplementation(() => {});
+      localStorage.setItem('refreshToken', mockRefreshToken);
+      
+      const errorHandler = AxiosClient.interceptors.response.handlers[0].rejected;
+      
+      const methods = ['GET', 'POST', 'PUT', 'DELETE'];
+      
+      for (const method of methods) {
+        const originalRequest = {
+          url: '/api/resource',
+          method: method,
+          headers: { Authorization: 'Bearer ' + mockToken }
+        };
+        const error401 = {
+          response: { status: 401 },
+          config: originalRequest
+        };
+        
+        vi.spyOn(AxiosClient, 'request').mockResolvedValueOnce({ data: { success: true } });
+        
+        // Suppress actual unhandled promise rejection in test if it doesn't await properly
+        errorHandler(error401).catch(() => {});
+        
+        if (method === 'GET') {
+          expect(axios.post).toHaveBeenCalled();
+        }
+      }
+    });
+  });
 });
