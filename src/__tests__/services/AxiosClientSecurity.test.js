@@ -127,7 +127,7 @@ describe('Security & Axios Interceptor Tests (AxiosClient.jsx)', () => {
       const errorHandler = AxiosClient.interceptors.response.handlers[0].rejected;
       const error500 = {
         response: { status: 500 },
-        config: { url: '/api/comics' }
+        config: { url: '/api/users/profile' }
       };
 
       await expect(errorHandler(error500)).rejects.toEqual(error500);

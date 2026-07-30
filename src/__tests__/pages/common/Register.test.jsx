@@ -141,8 +141,11 @@ describe('User Registration Component Unit & Security Tests (Register.jsx)', () 
       expect(AuthApi.registerApi).toHaveBeenCalledWith({
         username: 'john_doe',
         fullName: 'John Doe',
+        firstName: 'John',
+        lastName: 'Doe',
         email: 'john@example.com',
-        password: 'ValidPassword123!'
+        password: 'ValidPassword123!',
+        dateOfBirth: null
       });
       expect(mockOnVerificationRequired).toHaveBeenCalledWith('john@example.com');
       expect(mockShowAlert).toHaveBeenCalledWith('success', 'Account created. Please check your email for the OTP code.');
