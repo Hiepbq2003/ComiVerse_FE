@@ -504,6 +504,15 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
         );
 
         const baseObj = matchComic ? { ...matchComic, ...s } : { ...s };
+        
+        let normalizedStatus = (s.status || baseObj.approvalStatus || baseObj.moderationStatus || 'pending').toLowerCase();
+        if (normalizedStatus.includes('pending') || normalizedStatus === 'submitted' || normalizedStatus === 'new') {
+          normalizedStatus = 'pending';
+        } else if (normalizedStatus.includes('approve') || normalizedStatus === 'published') {
+          normalizedStatus = 'approved';
+        } else if (normalizedStatus.includes('reject')) {
+          normalizedStatus = 'rejected';
+        }
 
         return {
           ...baseObj,
@@ -513,7 +522,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
           title: baseObj.title || baseObj.comicTitle || s.title || 'Untitled',
           cover: baseObj.coverImageUrl || baseObj.cover || s.cover || '',
           type: (s.submissionType || s.type || 'NEW_COMIC').toUpperCase(),
-          status: (s.status || 'pending').toLowerCase(),
+          status: normalizedStatus,
           author: baseObj.authorName || baseObj.author || s.submittedBy || 'Unknown',
           submittedAt: s.submittedAt || s.createdAt || new Date().toISOString(),
           comic: {
