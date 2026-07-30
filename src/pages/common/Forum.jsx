@@ -5,7 +5,7 @@ import { getForumThreadsPageApi, deleteForumThreadApi, createForumThreadApi, get
 import { createForumCommentApi, getForumCommentsApi } from '../../services/api/ForumCommentApi'
 import { getAuth } from '../../utils/Auth'
 import { toast } from 'react-toastify'
-import { Trash2 } from 'lucide-react'
+import { ArrowLeft, Eye, Flag, Heart, Lock, MessageCircle, Plus, Search, Star, Trash2 } from 'lucide-react'
 import '../../assets/style/reader/forum.css'
 
 const formatTimeAgo = (createdAtString) => {
@@ -547,7 +547,9 @@ function Forum() {
       }
     } catch (err) {
       console.error(err)
-      toast.error('Failed to load forum thread posts.')
+      toast.error('Failed to load forum thread posts.', {
+        toastId: 'forum-thread-list-load-error',
+      })
     } finally {
       setLoading(false)
     }
@@ -1042,32 +1044,35 @@ function Forum() {
 
   return (
     <HomeLayout>
-      <div className="home-sections-container" style={{ paddingTop: '40px', maxWidth: '1050px', margin: '0 auto' }}>
-        <div className="home-section">
+      <div className="home-sections-container forum-page-container">
+        <div className="home-section forum-page-section">
           {threadId && selectedThread ? (
             /* ── DETAILED THREAD FULL PAGE VIEW (STV STYLE - PAGE) ── */
-            <div style={{ display: 'flex', gap: '32px' }}>
+            <div className="forum-thread-detail-shell">
               {/* Left Column: Threads list sidebar */}
-              <aside style={{ width: '320px', flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.06)', paddingRight: '24px' }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '20px' }}>
+              <aside className="forum-thread-index">
+                <div className="forum-thread-index-heading">
                   <button 
+                    type="button"
                     className="forum-back-btn-stv" 
                     onClick={() => navigate('/forum')}
                   >
-                    ← Back
+                    <ArrowLeft size={16} aria-hidden="true" /> Back
                   </button>
-                  <h4 className="forum-sidebar-header-stv" style={{ fontSize: '13px', margin: 0, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <h4 className="forum-sidebar-header-stv">
                     Threads
                   </h4>
                 </div>
                 
                 {/* Scrollable list of other threads */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', paddingRight: '4px' }}>
+                <div className="forum-thread-index-list">
                   {allThreadsForCounts.map(otherThread => (
-                    <div 
+                    <button
+                      type="button"
                       key={otherThread.id}
                       onClick={() => navigate(`/forum/thread/${otherThread.id}`)}
                       className={`forum-sidebar-thread-card-stv ${String(otherThread.id) === String(threadId) ? 'active' : ''}`}
+                      aria-current={String(otherThread.id) === String(threadId) ? 'page' : undefined}
                     >
                       <ForumAvatar
                         avatarUrl={otherThread.avatarUrl || (otherThread.author === currentUser?.fullName || otherThread.author === currentUser?.username ? currentUser?.avatarUrl : null)}
@@ -1075,28 +1080,33 @@ function Forum() {
                         className="forum-card-avatar-stv"
                         style={{ background: getCategoryColor(otherThread.category), width: '28px', height: '28px', fontSize: '12px' }}
                       />
-                      <div style={{ flexGrow: 1, minWidth: 0 }}>
+                      <div className="forum-sidebar-thread-copy">
                         <div className="forum-sidebar-thread-title-stv">
                           {otherThread.title}
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', fontSize: '11px', color: '#64748b' }}>
+                        <div className="forum-sidebar-thread-meta">
                           <span>{otherThread.category || 'General'}</span>
-                          <span>💬 {otherThread.replies}</span>
+                          <span><MessageCircle size={12} aria-hidden="true" /> {otherThread.replies}</span>
                         </div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </aside>
-              <div style={{ flexGrow: 1, minWidth: 0 }}>
+              <div className="forum-thread-main">
                 {/* Colored Banner Header */}
-                <div className="forum-detail-banner-stv" style={{ borderRadius: '8px 8px 0 0' }}>
+                <div className="forum-detail-banner-stv">
                   <span className="forum-detail-banner-tag">{selectedThread.category || 'General'}</span>
                   <h3 className="forum-detail-banner-title">{selectedThread.title}</h3>
+                  <div className="forum-detail-banner-meta">
+                    <span>Started by <strong>{selectedThread.author}</strong></span>
+                    <span>{selectedThread.timeAgo || 'recently'}</span>
+                    <span><MessageCircle size={14} aria-hidden="true" /> {threadComments.length} replies</span>
+                  </div>
                 </div>
                 
                 {/* 2-Columns Body Layout */}
-                <div className="forum-detail-columns-stv" style={{ padding: '24px 0 0 0' }}>
+                <div className="forum-detail-columns-stv">
                   {/* Left Column: Post & Comments */}
                   <div className="forum-detail-left-stv">
                     {/* Original Post */}
@@ -1119,24 +1129,24 @@ function Forum() {
                       <div className="forum-post-content-stv">{renderFormattedContent(selectedThread.content)}</div>
                       
                       <div className="forum-post-likes-row">
-                        <span>👁️ {selectedThread.views} views</span>
+                        <span className="forum-inline-metric"><Eye size={15} aria-hidden="true" /> {selectedThread.views} views</span>
                         <button 
                           className={`forum-card-action-btn ${likedThreads.includes(selectedThread.id) ? 'liked-active' : ''}`}
                           onClick={() => handleToggleThreadLike(selectedThread)}
                           style={{ cursor: 'pointer' }}
                         >
-                          <span>❤️</span> {selectedThread.likes || 0} likes
+                          <Heart size={15} aria-hidden="true" /> {selectedThread.likes || 0} likes
                         </button>
                       </div>
                     </div>
 
                     {/* Comments / Discussion List */}
-                    <div className="forum-comments-section" style={{ borderTop: 'none', paddingTop: 0 }}>
-                      <h4 className="forum-comments-title" style={{ marginBottom: '12px' }}>
-                        💬 Comments ({threadComments.length})
+                    <div className="forum-comments-section forum-thread-comments">
+                      <h4 className="forum-comments-title">
+                        <MessageCircle size={24} aria-hidden="true" /> Comments <span>({threadComments.length})</span>
                       </h4>
 
-                      <div className="forum-comments-list" style={{ maxHeight: 'none' }}>
+                      <div className="forum-comments-list forum-thread-comments-list">
                         {commentsLoading && (
                           <p className="forum-comments-loading">Loading comments...</p>
                         )}
@@ -1171,12 +1181,12 @@ function Forum() {
                                 }
                               </div>
                               
-                              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                              <div className="forum-comment-actions">
                                 <button 
                                   className={`forum-card-action-btn ${isCommentLiked ? 'liked-active' : ''}`}
                                   onClick={() => handleToggleCommentLike(comment.id)}
                                 >
-                                  <span>❤️</span> {comment.likesCount || 0}
+                                  <Heart size={14} aria-hidden="true" /> {comment.likesCount || 0}
                                 </button>
                                 {!selectedThread.isLocked && (
                                   <button 
@@ -1363,6 +1373,7 @@ function Forum() {
                     <div className="forum-sidebar-panel">
                       {/* Action buttons */}
                       <button 
+                        type="button"
                         className="forum-panel-btn primary"
                         disabled={selectedThread.isLocked}
                         onClick={() => {
@@ -1373,16 +1384,17 @@ function Forum() {
                         }}
                         style={{ opacity: selectedThread.isLocked ? 0.5 : 1, cursor: selectedThread.isLocked ? 'not-allowed' : 'pointer' }}
                       >
-                        {selectedThread.isLocked ? '🔒 Locked' : 'Reply'}
+                        {selectedThread.isLocked ? <><Lock size={16} aria-hidden="true" /> Locked</> : <><MessageCircle size={16} aria-hidden="true" /> Reply</>}
                       </button>
                       
                       {/* Follow dropdown setting */}
-                      <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                      <div className="forum-follow-control" onClick={(e) => e.stopPropagation()}>
                         <button 
+                          type="button"
                           className="forum-panel-btn follow" 
                           onClick={() => setShowDetailFollowDropdown(!showDetailFollowDropdown)}
                         >
-                          ⭐ {followedThreads.includes(selectedThread.id) ? 'Following' : 'Not Tracking'}
+                          <Star size={16} aria-hidden="true" /> {followedThreads.includes(selectedThread.id) ? 'Following' : 'Not Tracking'}
                         </button>
                         
                         {showDetailFollowDropdown && (
@@ -1421,10 +1433,11 @@ function Forum() {
                         if (isCreator) return null;
                         return (
                           <button 
+                            type="button"
                             className="forum-panel-btn report" 
                             onClick={() => handleTriggerReport(selectedThread)}
                           >
-                            🚩 Report Thread
+                            <Flag size={16} aria-hidden="true" /> Report Thread
                           </button>
                         );
                       })()}
@@ -1500,33 +1513,28 @@ function Forum() {
             /* ── NORMAL LIST LAYOUT ── */
             <>
               {/* Header */}
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                marginBottom: '28px',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                paddingBottom: '16px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
-                  <h2 className="section-title" style={{ margin: 0 }}>💬 Forum Discussions</h2>
-                  <span style={{ fontSize: '12.5px', color: '#64748b' }}>
-                    {totalElements} posts total
+              <div className="section-header forum-page-heading">
+                <div className="section-title-group">
+                  <h2 className="section-title">Forum Discussions</h2>
+                  <span className="section-subtitle">
+                    Share ideas and connect with the ComiVerse community
                   </span>
                 </div>
+                <span className="forum-total-posts">{totalElements} posts</span>
               </div>
 
-              <div style={{ display: 'flex', gap: '32px' }}>
+              <div className="forum-list-layout">
                 {/* ── LEFT SIDEBAR (STV STYLE) ───────── */}
-                <aside style={{ width: '240px', flexShrink: 0 }}>
+                <aside className="forum-list-sidebar">
                   <button 
+                    type="button"
                     className="forum-btn-create-stv" 
                     onClick={() => setShowNewPostModal(true)}
                   >
-                    <span>+</span> Create Discussion
+                    <Plus size={18} aria-hidden="true" /> Create Discussion
                   </button>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <div className="forum-category-list">
                     <div 
                       className={`forum-sidebar-item-stv ${selectedCategory === 'All' ? 'active' : ''}`}
                       onClick={() => setSelectedCategory('All')}
@@ -1565,53 +1573,36 @@ function Forum() {
                 </aside>
 
                 {/* ── RIGHT MAIN CONTENT AREA ────────────────── */}
-                <main style={{ flexGrow: 1, minWidth: 0 }}>
+                <main className="forum-list-main">
                   {/* Sorter tabs & Search input row */}
                   <div className="forum-search-row">
                     {/* Tabs */}
-                    <div style={{ display: 'flex', gap: '16px', borderBottom: '1px solid rgba(255,255,255,0.04)', flexGrow: 1, paddingBottom: '1px' }}>
+                    <div className="forum-sort-tabs" role="tablist" aria-label="Sort discussions">
                       {['All', 'Hot', 'New', 'Announcements'].map(tab => (
-                        <div
+                        <button
+                          type="button"
                           key={tab}
                           onClick={() => setActiveSortTab(tab)}
-                          style={{
-                            color: activeSortTab === tab ? 'white' : '#94a3b8',
-                            fontSize: '13.5px',
-                            fontWeight: '600',
-                            padding: '8px 4px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            borderBottom: '2px solid transparent',
-                            borderBottomColor: activeSortTab === tab ? '#a855f7' : 'transparent'
-                          }}
+                          className={`forum-sort-tab ${activeSortTab === tab ? 'active' : ''}`}
+                          role="tab"
+                          aria-selected={activeSortTab === tab}
                         >
                           {tab}
-                        </div>
+                        </button>
                       ))}
                     </div>
 
                     {/* Search posts inside thread list */}
-                    <div className="forum-search-input-wrapper" style={{ width: '240px', flexGrow: 0 }}>
+                    <div className="forum-search-input-wrapper forum-list-search">
                       <input 
                         type="text" 
                         placeholder="Search posts..." 
                         className="forum-search-field"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        style={{ padding: '8px 12px 8px 34px' }}
+                        aria-label="Search forum posts"
                       />
-                      <svg 
-                        viewBox="0 0 24 24" 
-                        width="14" 
-                        height="14" 
-                        fill="none" 
-                        stroke="#64748b" 
-                        strokeWidth="2.5" 
-                        style={{ position: 'absolute', left: '12px', top: '11px' }}
-                      >
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                      </svg>
+                      <Search className="forum-search-icon" size={15} aria-hidden="true" />
                     </div>
                   </div>
 

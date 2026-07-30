@@ -410,7 +410,7 @@ function Library() {
                       <button 
                         className="lib-comic-delete-btn"
                         onClick={(e) => requestRemoveItem(comicId, comicTitle, e)}
-                        title="Xóa khỏi danh sách"
+                        title="Remove from list"
                       >
                         <Trash2 size={16} />
                       </button>
