@@ -1,4 +1,4 @@
-function LogoIcon({ size = 32, className = '' }) {
+function LogoIcon({ size = 32, className = '', color = 'currentColor' }) {
   return (
     <svg 
       viewBox="0 0 240 40" 
@@ -31,7 +31,7 @@ function LogoIcon({ size = 32, className = '' }) {
             font-size: 28px; 
             font-weight: 900; 
             font-style: italic;
-            fill: #ffffff;
+            fill: ${color};
             letter-spacing: -0.5px;
           }
           .logo-verse { 
@@ -55,7 +55,7 @@ function LogoIcon({ size = 32, className = '' }) {
       {/* Speed Slashes */}
       <g transform="translate(0, 0)">
         <path d="M 18 4 L 4 34 L 15 34 L 29 4 Z" className="slash-primary" filter="url(#premiumGlow)" />
-        <path d="M 32 14 L 23 34 L 29 34 L 38 14 Z" fill="#ffffff" opacity="0.9" />
+        <path d="M 32 14 L 23 34 L 29 34 L 38 14 Z" fill={color} opacity="0.9" />
       </g>
       
       {/* Text Logo */}
