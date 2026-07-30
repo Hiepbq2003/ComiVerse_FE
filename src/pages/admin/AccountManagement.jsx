@@ -53,16 +53,7 @@ const getDisplayLanguages = (acc) => {
   if (Array.isArray(acc?.assignedLanguages) && acc.assignedLanguages.length > 0) {
     return acc.assignedLanguages
   }
-  try {
-    const scopesMap = JSON.parse(localStorage.getItem('comiverse_mod_scopes') || '{}')
-    const keys = [acc?.username, acc?.email, acc?.userId, acc?.id].filter(Boolean).map(k => String(k).toLowerCase())
-    for (const k of keys) {
-      if (Array.isArray(scopesMap[k]) && scopesMap[k].length > 0) {
-        return scopesMap[k]
-      }
-    }
-  } catch (e) {}
-  return ['Japanese', 'Korean']
+  return []
 }
 
 function AccountManagement() {
@@ -275,14 +266,6 @@ function AccountManagement() {
       }
       if (staffForm.role === 'MODERATOR') {
         payload.assignedLanguages = staffForm.assignedLanguages || []
-        try {
-          const scopesMap = JSON.parse(localStorage.getItem('comiverse_mod_scopes') || '{}')
-          const keys = [staffForm.username, staffForm.email].filter(Boolean).map(k => String(k).toLowerCase())
-          for (const k of keys) {
-            scopesMap[k] = staffForm.assignedLanguages || []
-          }
-          localStorage.setItem('comiverse_mod_scopes', JSON.stringify(scopesMap))
-        } catch (e) {}
       }
 
       const result = await registerStaffApi(payload)
@@ -382,26 +365,6 @@ function AccountManagement() {
       }
       if (normalizeRoleValue(editForm.role) === 'MODERATOR') {
         updatePayload.assignedLanguages = editForm.assignedLanguages || []
-        try {
-          const scopesMap = JSON.parse(localStorage.getItem('comiverse_mod_scopes') || '{}')
-          const keys = [editingAccount.username, editingAccount.email, editingAccount.userId, editingAccount.id].filter(Boolean).map(k => String(k).toLowerCase())
-          for (const k of keys) {
-            scopesMap[k] = editForm.assignedLanguages || []
-          }
-          localStorage.setItem('comiverse_mod_scopes', JSON.stringify(scopesMap))
-
-          const storedUserStr = localStorage.getItem('user')
-          if (storedUserStr) {
-            const storedUser = JSON.parse(storedUserStr)
-            if (keys.includes(String(storedUser.username || storedUser.email || storedUser.userId || storedUser.id).toLowerCase())) {
-              storedUser.assignedLanguages = editForm.assignedLanguages || []
-              storedUser.role = 'Moderator'
-              localStorage.setItem('user', JSON.stringify(storedUser))
-            }
-          }
-        } catch (e) {
-          console.error('Failed to save mod scopes:', e)
-        }
       }
 
       const response = await updateUserApi(editingAccount.id, updatePayload)

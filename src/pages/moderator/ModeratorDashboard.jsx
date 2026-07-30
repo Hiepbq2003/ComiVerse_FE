@@ -391,30 +391,9 @@ function ModeratorDashboard() {
   }
 
   const syncSubmissionsWithLocalOverride = (rawSubmissions) => {
-    if (!rawSubmissions) return [];
-    try {
-      const localStr = localStorage.getItem('comiverse_moderator_submissions_override');
-      if (localStr) {
-        const localOverrides = JSON.parse(localStr);
-        return rawSubmissions.map(raw => {
-          const override = localOverrides.find(o => 
-            o.id === raw.id || 
-            o.submissionId === raw.id || 
-            o.submissionId === raw.submissionId ||
-            (o.title && raw.title && o.title.trim().toLowerCase() === raw.title.trim().toLowerCase() && o.submittedBy === raw.submittedBy)
-          );
-          if (override && (override.status === 'approved' || override.status === 'rejected')) {
-            return { ...raw, ...override };
-          }
-          return raw;
-        });
-      }
-    } catch (e) {
-      console.error('Failed to sync submissions with local override', e);
-    }
-    return rawSubmissions;
+    return rawSubmissions || [];
   };
-
+  
   const fetchSubmissionsData = async () => {
     try {
       const data = await getAllSubmissionsApi()
