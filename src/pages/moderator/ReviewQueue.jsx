@@ -1677,7 +1677,6 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                               <thead>
                                 <tr>
                                   <th style={{ padding: '14px 18px', color: theme === 'light' ? '#334155' : '#cbd5e1', fontWeight: '800' }}>Chapter #</th>
-                                  <th style={{ padding: '14px 18px', color: theme === 'light' ? '#334155' : '#cbd5e1', fontWeight: '800' }}>Manuscript Title</th>
                                   <th style={{ padding: '14px 18px', color: theme === 'light' ? '#334155' : '#cbd5e1', fontWeight: '800' }}>Pages / Length</th>
                                   <th style={{ padding: '14px 18px', color: theme === 'light' ? '#334155' : '#cbd5e1', fontWeight: '800' }}>Submitted Time</th>
                                   <th style={{ padding: '14px 18px', textAlign: 'right', color: theme === 'light' ? '#334155' : '#cbd5e1', fontWeight: '800' }}>Actions</th>
@@ -1702,9 +1701,6 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                                     >
                                       <td style={{ padding: '14px 18px', fontWeight: '800', color: rowTextColor }}>
                                         Chapter {chap.number || idx + 1}
-                                      </td>
-                                      <td style={{ padding: '14px 18px', fontWeight: '700', color: rowTextColor }}>
-                                        {chap.title}
                                       </td>
                                       <td style={{ padding: '14px 18px', fontWeight: '600', color: rowTextColor }}>
                                         📄 {Array.isArray(chap.pages) ? chap.pages.length : (Array.isArray(chap.images) ? chap.images.length : 0)} Pages {chap.words ? `· ${chap.words}` : ''}

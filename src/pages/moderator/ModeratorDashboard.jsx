@@ -820,7 +820,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     try {
       if (chapterObj?.id && !String(chapterObj.id).startsWith('chap-') && !isFinalChapterOfSub) {
         // Approve this specific chapter directly without changing submission status
-        await approveChapterDirectApi(chapterObj.id);
+        await approveSubmissionApi(chapterObj.id);
       } else if (targetApiId && !String(targetApiId).startsWith('group-') && !String(targetApiId).startsWith('chap-')) {
         // Fallback: approve the entire submission
         const res = await approveSubmissionApi(targetApiId);
