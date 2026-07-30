@@ -31,7 +31,7 @@ function LogoIcon({ size = 32, className = '', color = 'currentColor' }) {
             font-size: 28px; 
             font-weight: 900; 
             font-style: italic;
-            fill: ${color};
+            fill: var(--text-h, ${color});
             letter-spacing: -0.5px;
           }
           .logo-verse { 

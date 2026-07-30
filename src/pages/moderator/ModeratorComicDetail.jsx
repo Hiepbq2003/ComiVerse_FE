@@ -995,7 +995,10 @@ function ModeratorComicDetail() {
                           {chap.moderationStatus === 'PUBLISHED' ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                               <span style={{ fontSize: '12px', fontWeight: '700', color: '#10b981' }}>
-                                ✓ {chap.approvedBy ? chap.approvedBy : 'Published'}
+                                ✓ Published
+                              </span>
+                              <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                by: {chap.approvedBy || 'Unknown'}
                               </span>
                               {chap.approvedAt && (
                                 <span style={{ fontSize: '11px', color: '#64748b' }}>
@@ -1003,12 +1006,26 @@ function ModeratorComicDetail() {
                                 </span>
                               )}
                             </div>
+                          ) : chap.moderationStatus === 'REJECTED' ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <span style={{ fontSize: '12px', fontWeight: '700', color: '#ef4444' }}>
+                                ✗ Rejected
+                              </span>
+                              <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                by: {chap.rejectedBy || 'Unknown'}
+                              </span>
+                            </div>
                           ) : (
-                            <span style={{ fontSize: '11.5px', color: '#94a3b8', fontStyle: 'italic', fontWeight: '500' }}>
-                              {chap.moderationStatus === 'PREVIEW_READY' ? 'Author Drafting' : 
-                               (chap.moderationStatus === 'SUBMITTED_FOR_REVIEW' || chap.moderationStatus === 'PENDING_REVIEW' ? 'Pending Review' : 
-                                (chap.moderationStatus === 'REJECTED' ? 'Rejected' : (chap.moderationStatus || 'Draft')))}
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <span style={{ fontSize: '11.5px', color: '#94a3b8', fontStyle: 'italic', fontWeight: '500' }}>
+                                {chap.moderationStatus === 'PREVIEW_READY' ? 'Author Drafting' : 
+                                 (chap.moderationStatus === 'SUBMITTED_FOR_REVIEW' || chap.moderationStatus === 'PENDING_REVIEW' ? 'Pending Review' : 
+                                  (chap.moderationStatus || 'Draft'))}
+                              </span>
+                              <span style={{ fontSize: '11px', color: '#cbd5e1' }}>
+                                Reviewer: -
+                              </span>
+                            </div>
                           )}
                         </td>
                         <td>
