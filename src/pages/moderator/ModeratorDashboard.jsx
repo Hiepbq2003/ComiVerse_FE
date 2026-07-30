@@ -506,7 +506,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
         const baseObj = matchComic ? { ...matchComic, ...s } : { ...s };
         
         let normalizedStatus = (s.status || baseObj.approvalStatus || baseObj.moderationStatus || 'pending').toLowerCase();
-        if (normalizedStatus.includes('pending') || normalizedStatus === 'submitted' || normalizedStatus === 'new') {
+        if (normalizedStatus.includes('pending') || normalizedStatus.includes('submitted') || normalizedStatus === 'new') {
           normalizedStatus = 'pending';
         } else if (normalizedStatus.includes('approve') || normalizedStatus === 'published') {
           normalizedStatus = 'approved';
