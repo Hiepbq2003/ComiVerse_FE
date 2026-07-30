@@ -15,18 +15,6 @@ export function getModeratorScope(user) {
     return user.assignedLanguages.map(l => String(l).toLowerCase().trim());
   }
 
-  try {
-    const scopesMap = JSON.parse(localStorage.getItem('comiverse_mod_scopes') || '{}');
-    const keys = [user.username, user.email, user.userId, user.id].filter(Boolean).map(k => String(k).toLowerCase());
-    for (const key of keys) {
-      if (Array.isArray(scopesMap[key]) && scopesMap[key].length > 0) {
-        return scopesMap[key].map(l => String(l).toLowerCase().trim());
-      }
-    }
-  } catch (e) {
-    console.error("Error reading mod scopes from localStorage:", e);
-  }
-
   return ['japanese', 'korean'];
 }
 
