@@ -530,15 +530,15 @@ function Home() {
           {trendingLoading ? (
             <div className="hot-section-split">
               <div className="hot-featured-wrapper">
-                <div className="skeleton-comic-card" style={{ height: '360px', width: '100%' }}>
+                <div className="skeleton-comic-card" style={{ height: '508px', width: '100%' }}>
                   <div className="skeleton-img skeleton-shimmer" style={{ height: '70%' }}></div>
                   <div className="skeleton-line skeleton-shimmer short" style={{ marginTop: '12px' }}></div>
                   <div className="skeleton-line skeleton-shimmer long"></div>
                 </div>
               </div>
               <div className="hot-ranking-list">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="ranking-item skeleton-shimmer" style={{ height: '70px', background: 'rgba(255,255,255,0.02)', padding: '10px 16px', display: 'flex', alignItems: 'center', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="ranking-item skeleton-shimmer" style={{ height: '92px', background: 'rgba(255,255,255,0.02)', padding: '10px 16px', display: 'flex', alignItems: 'center', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
                     <div className="skeleton-circle" style={{ width: '40px', height: '40px', marginRight: '16px' }}></div>
                     <div style={{ flex: 1 }}>
                       <div className="skeleton-line short" style={{ margin: 0, height: '10px' }}></div>
@@ -579,9 +579,9 @@ function Home() {
                 </div>
               )}
 
-              {/* Right Column: Rank list 2 to 5 */}
+              {/* Right Column: Rank list 2 to 6 */}
               <div className="hot-ranking-list">
-                {trending.slice(1, 5).map((comic, index) => (
+                {trending.slice(1, 6).map((comic, index) => (
                   <div
                     key={comic.id}
                     className="ranking-item"
