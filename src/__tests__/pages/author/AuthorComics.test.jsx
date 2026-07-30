@@ -244,4 +244,33 @@ describe('Author My Comics workflow', () => {
       ).not.toBeInTheDocument()
     })
   })
+
+  it('validates the required chapter number before uploading chapter zip', async () => {
+    AuthorComicApi.getAuthorComicsApi.mockResolvedValue([draftComic])
+    const chapterFile = new File(['zip-bytes'], 'Chapter 2.zip', {
+      type: 'application/zip',
+    })
+
+    renderAuthorComics()
+    await screen.findByText('Moonblade Chronicle')
+    fireEvent.click(screen.getByRole('button', { name: /add chapter/i }))
+
+    // Clear the chapter number (simulating an invalid empty input)
+    fireEvent.change(screen.getByLabelText(/chapter number/i), {
+      target: { value: '' },
+    })
+    
+    const chapterInput = document.querySelector('input[type="file"][accept=".zip"]')
+    fireEvent.change(chapterInput, { target: { files: [chapterFile] } })
+    
+    // Attempt upload
+    fireEvent.click(screen.getByRole('button', { name: 'Upload ZIP' }))
+
+    // We expect a validation error to appear instead of calling the API
+    expect(
+      await screen.findByText(/Chapter number is required and must be a positive number/i),
+    ).toBeInTheDocument()
+    
+    expect(AuthorComicApi.uploadAuthorChapterZipApi).not.toHaveBeenCalled()
+  })
 })

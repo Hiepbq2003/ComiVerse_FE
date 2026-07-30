@@ -100,7 +100,7 @@ describe('Role-Based Access Control (RBAC) Security Tests', () => {
       );
 
       expect(screen.getByText('Protected Admin Dashboard Content')).toBeInTheDocument();
-      expect(screen.getByText('Admin Portal')).toBeInTheDocument();
+      expect(screen.getByText('Statistics Dashboard')).toBeInTheDocument();
     });
   });
 
