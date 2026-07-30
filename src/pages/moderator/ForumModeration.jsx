@@ -122,7 +122,8 @@ function ForumModeration({ fetchAllData }) {
       toast.info(nextState ? `Thread "${thread.title}" pinned!` : `Thread "${thread.title}" unpinned!`)
     } catch (err) {
       console.error(err)
-      toast.error('Failed to update pin state in DB!')
+      toast.error(err.response?.status === 409 ? 'Thread was already modified by another moderator.' : 'Failed to update pin state in DB!')
+      fetchThreads()
     } finally {
       setSubmitting(false)
     }
@@ -144,7 +145,8 @@ function ForumModeration({ fetchAllData }) {
       toast.info(nextState ? `Thread "${thread.title}" locked!` : `Thread "${thread.title}" unlocked!`)
     } catch (err) {
       console.error(err)
-      toast.error('Failed to update lock state in DB!')
+      toast.error(err.response?.status === 409 ? 'Thread was already modified by another moderator.' : 'Failed to update lock state in DB!')
+      fetchThreads()
     } finally {
       setSubmitting(false)
     }
@@ -161,7 +163,8 @@ function ForumModeration({ fetchAllData }) {
         toast.success(`Thread "${title}" deleted successfully.`)
       } catch (err) {
         console.error(err)
-        toast.error('Failed to delete thread!')
+        toast.error(err.response?.status === 409 ? 'Thread was already deleted by another moderator.' : 'Failed to delete thread!')
+        fetchThreads()
       } finally {
         setSubmitting(false)
       }
@@ -185,7 +188,8 @@ function ForumModeration({ fetchAllData }) {
       toast.success('Report resolved successfully.')
     } catch (err) {
       console.error(err)
-      toast.error('Failed to resolve report!')
+      toast.error(err.response?.status === 409 ? 'Report was already actioned by another moderator.' : 'Failed to resolve report!')
+      fetchThreads()
     } finally {
       setSubmitting(false)
     }
@@ -207,7 +211,8 @@ function ForumModeration({ fetchAllData }) {
       toast.success('Report dismissed.')
     } catch (err) {
       console.error(err)
-      toast.error('Failed to dismiss report!')
+      toast.error(err.response?.status === 409 ? 'Report was already actioned by another moderator.' : 'Failed to dismiss report!')
+      fetchThreads()
     } finally {
       setSubmitting(false)
     }
@@ -224,7 +229,8 @@ function ForumModeration({ fetchAllData }) {
         toast.success('Reported thread removed successfully.')
       } catch (err) {
         console.error(err)
-        toast.error('Failed to remove thread!')
+        toast.error(err.response?.status === 409 ? 'Report was already actioned by another moderator.' : 'Failed to remove thread!')
+        fetchThreads()
       } finally {
         setSubmitting(false)
       }

@@ -1104,13 +1104,8 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     }
 
     try {
-      let createdObj = null;
-      try {
-        const res = await createProjectTeamApi(newTeam);
-        createdObj = res?.data?.data || res?.data || res;
-      } catch (err) {
-        console.warn('Backend createProjectTeamApi warning, keeping local team:', err?.message || err);
-      }
+      const res = await createProjectTeamApi(newTeam);
+      const createdObj = res?.data?.data || res?.data || res;
 
       const finalTeam = {
         ...newTeam,
@@ -1141,7 +1136,8 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       setShowCreateTeamModal(false)
     } catch (err) {
       console.error(err)
-      toast.error('Failed to create translation project team.')
+      toast.error(err.response?.status === 409 ? `Conflict: A translation team for "${createTeamForm.comicName}" in "${createTeamForm.targetLang}" was just created by another moderator.` : 'Failed to create translation project team.')
+      fetchComicsAndTeams() // Re-fetch on conflict
     }
   }
 

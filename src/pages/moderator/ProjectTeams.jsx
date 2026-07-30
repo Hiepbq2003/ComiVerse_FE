@@ -350,7 +350,7 @@ function ProjectTeams({
       setShowAssignModal(false)
     } catch (err) {
       console.error(err)
-      toast.error('Failed to assign the project leader.')
+      toast.error(err.response?.status === 409 ? 'Conflict: Leader was already assigned by another moderator or team was modified.' : 'Failed to assign the project leader.')
     }
   }
 
@@ -384,7 +384,7 @@ function ProjectTeams({
       toast.success(`Project Team status updated to ${nextStatus}!`);
     } catch (err) {
       console.error(err);
-      toast.error('Failed to update team status on database.');
+      toast.error(err.response?.status === 409 ? 'Conflict: Team status was already changed by another moderator.' : 'Failed to update team status on database.');
     }
   };
 
