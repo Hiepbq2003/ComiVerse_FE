@@ -620,11 +620,12 @@ function ProjectTeams({
 
                   {/* Select Approved Comic Dropdown */}
                   <div className="mod-form-group">
-                    <label className="mod-label" style={{ marginBottom: '4px' }}>
+                    <label htmlFor="approved-comic-select" className="mod-label" style={{ marginBottom: '4px' }}>
                       Select Approved Comic *
                     </label>
                     
                     <select
+                      id="approved-comic-select"
                       className="mod-input select"
                       value={createTeamForm.comicName}
                       onChange={(e) => handleSelectApprovedComic(e.target.value)}
@@ -659,9 +660,10 @@ function ProjectTeams({
                     </div>
 
                     <div className="mod-form-group half">
-                      <label className="mod-label">Target Language *</label>
+                      <label htmlFor="target-language-select" className="mod-label">Target Language *</label>
                       {availableTargetLanguages.length > 0 ? (
                         <select
+                          id="target-language-select"
                           className="mod-input select"
                           value={createTeamForm.targetLang}
                           onChange={(e) => {
@@ -829,7 +831,11 @@ function ProjectTeams({
                       handleCreateProjectTeam();
                     }
                   }}
-                  disabled={createTeamStep === 1 && (!createTeamForm.comicName || !createTeamForm.title.trim() || availableTargetLanguages.length === 0)}
+                  disabled={(() => {
+                    const isDisabled = createTeamStep === 1 && (!createTeamForm.comicName || !createTeamForm.title.trim() || availableTargetLanguages.length === 0);
+                    if (isDisabled) console.log("DISABLED REASON:", { step: createTeamStep, comic: createTeamForm.comicName, title: createTeamForm.title, langLen: availableTargetLanguages.length });
+                    return isDisabled;
+                  })()}
                 >
                   {createTeamStep === 1 ? 'Next →' : 'Create Team'}
                 </button>
