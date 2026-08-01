@@ -127,6 +127,7 @@
   gap: 14px;
   z-index: 10;
   position: relative;
+  --text-h: #ffffff; /* Fix dark logo text on dark auth bg */
 }
 
 .brand-logo-icon {

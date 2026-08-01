@@ -648,6 +648,20 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
         }
       }
 
+      // Also directly approve all chapter records associated with this submission group
+      // The submission approve API only updates submission.status but NOT chapter.moderation_status
+      const allSubItems = appSub?.subItems || [appSub];
+      for (const si of allSubItems) {
+        const chapDbId = si?.chapterId || si?.chapter_id;
+        if (chapDbId && !String(chapDbId).startsWith('chap-')) {
+          try {
+            await approveChapterDirectApi(chapDbId);
+          } catch (chapErr) {
+            console.warn(`[Backend DB Sync] approveChapterDirectApi(${chapDbId}) notice:`, chapErr?.message || chapErr);
+          }
+        }
+      }
+
       toast.success('Submission approved and published to Comic Management!')
       const nowIso = new Date().toISOString();
 
@@ -695,6 +709,19 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
         realDbId = res?.data?.data?.comicId || res?.data?.comicId || res?.data?.data?.id || res?.data?.id || res?.id || null;
       } catch (apiErr) {
         console.warn(`[Backend Approve API Notice] ${apiErr?.message || apiErr}`);
+      }
+
+      // Also directly approve all chapter records
+      const allSubItems = item?.subItems || [item];
+      for (const si of allSubItems) {
+        const chapDbId = si?.chapterId || si?.chapter_id;
+        if (chapDbId && !String(chapDbId).startsWith('chap-')) {
+          try {
+            await approveChapterDirectApi(chapDbId);
+          } catch (chapErr) {
+            console.warn(`[Backend DB Sync] approveChapterDirectApi(${chapDbId}) notice:`, chapErr?.message || chapErr);
+          }
+        }
       }
 
       toast.success(`Approved "${item.title}" & published to Comic Management! Opening Translation Project setup...`)
@@ -797,10 +824,10 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
   };
 
   const handleChapterApprove = async (submissionId, chapterObj) => {
-    const targetApiId = chapterObj?.submissionId || submissionId;
     const chapTitle = chapterObj?.title || `Chapter ${chapterObj?.number || chapterObj?.chapterNumber || ''}`.trim() || 'Chapter';
 
-    const targetSubId = chapterObj?.submissionId || chapterObj?.id || submissionId;
+    // Find the real submission record that owns this chapter
+    const targetSubId = chapterObj?.submissionId || submissionId;
     const sub = submissions.find(item => {
       if (item.status === 'approved' || item.status === 'rejected') return false;
       const chaps = item.allChapters || item.chapters || [];
@@ -809,28 +836,35 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       return false;
     }) || submissions.find(item => item.id === targetSubId || item.submissionId === targetSubId || item.id === submissionId);
 
-    const currentChapsForCheck = sub ? (Array.isArray(sub.allChapters) && sub.allChapters.length > 0 ? sub.allChapters : (Array.isArray(sub.chapters) && sub.chapters.length > 0 ? sub.chapters : [])) : [];
-    const remainingChapsForCheck = currentChapsForCheck.filter(c => {
-      if (isSameChapterItem(c, chapterObj)) return false;
-      if (c.status === 'approved' || c.status === 'rejected') return false;
-      return true;
-    });
-    const isFinalChapterOfSub = currentChapsForCheck.length > 0 && remainingChapsForCheck.length === 0;
+    // The chapter's actual DB ID (not the submission ID)
+    const chapterDbId = chapterObj?.chapterId || chapterObj?.chapter_id || chapterObj?.id;
 
     try {
-      if (chapterObj?.id && !String(chapterObj.id).startsWith('chap-') && !isFinalChapterOfSub) {
-        // Approve this specific chapter directly without changing submission status
-        await approveSubmissionApi(chapterObj.id);
-      } else if (targetApiId && !String(targetApiId).startsWith('group-') && !String(targetApiId).startsWith('chap-')) {
-        // Fallback: approve the entire submission
-        const res = await approveSubmissionApi(targetApiId);
-        const realDbComic = res?.data || res;
-        if (realDbComic && (realDbComic.id || realDbComic.comicId) && sub) {
-          sub.comicId = realDbComic.comicId || realDbComic.id;
+      // 1. Always approve the submission record (this updates submissions table → disappears from pending queue)
+      const realSubmissionId = String(targetSubId || '');
+      if (realSubmissionId && !realSubmissionId.startsWith('group-') && !realSubmissionId.startsWith('chap-')) {
+        try {
+          const res = await approveSubmissionApi(realSubmissionId);
+          const realDbComic = res?.data || res;
+          if (realDbComic && (realDbComic.id || realDbComic.comicId) && sub) {
+            sub.comicId = realDbComic.comicId || realDbComic.id;
+          }
+        } catch (subErr) {
+          console.warn(`[handleChapterApprove] approveSubmissionApi(${realSubmissionId}) failed:`, subErr?.message);
+        }
+      }
+
+      // 2. Also approve chapter directly to ensure chapters table is updated (moderationStatus → PUBLISHED)
+      const cleanChapterDbId = String(chapterDbId || '');
+      if (cleanChapterDbId && !cleanChapterDbId.startsWith('chap-') && !cleanChapterDbId.startsWith('group-')) {
+        try {
+          await approveChapterDirectApi(cleanChapterDbId);
+        } catch (chapErr) {
+          console.warn(`[handleChapterApprove] approveChapterDirectApi(${cleanChapterDbId}) failed:`, chapErr?.message);
         }
       }
     } catch (apiErr) {
-      console.warn(`[Backend DB Sync] approve API notice:`, apiErr?.message || apiErr);
+      console.warn('[handleChapterApprove] Outer API error:', apiErr?.message);
     }
 
     try {
@@ -927,6 +961,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       toast.error('Failed to approve chapter.');
     }
   };
+
 
   const handleChapterReject = async (submissionId, chapterObj, reason) => {
     let cleanId = String(chapterObj?.submissionId || submissionId || '').replace(/^(comic|group|chap)-/, '');

@@ -850,41 +850,64 @@ function ModeratorComicDetail() {
                     />
                   </div>
 
-                  <div className="mod-comic-meta-pills">
+                  <div className="mod-comic-meta-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '16px', alignItems: 'center' }}>
                     <span className="mod-meta-pill mod-meta-pill--lang">
-                      {getLanguageFlag(getAuthorRawLanguage(comic))} Author Input Raw: <strong>{getAuthorRawLanguage(comic)}</strong>
+                      {getLanguageFlag(getAuthorRawLanguage(comic))} Author Input: <strong>{getAuthorRawLanguage(comic)}</strong>
                     </span>
 
                     <span className={`mod-meta-pill mod-meta-pill--status-${(comic.publicationStatus || 'ONGOING').toLowerCase()}`}>
                       Status: {comic.publicationStatus || 'ONGOING'}
                     </span>
 
-                    {(comic.approvedBy || comic.moderatorName) && (
-                      <span className="mod-meta-pill" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                        ✅ Approved by: <strong>{comic.approvedBy || comic.moderatorName}</strong> {comic.approvedAt && `• ${new Date(comic.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
-                      </span>
-                    )}
-
-                    <span className="mod-meta-pill">
-                      ⭐ Rating: {comic.ratingAverage !== undefined ? comic.ratingAverage.toFixed(1) : (comic.rating !== undefined ? comic.rating.toFixed(1) : '0.0')} ({comic.ratingCount || 0})
+                    <span className="mod-meta-pill" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                      ⭐ Rating: <strong>{comic.ratingAverage !== undefined ? comic.ratingAverage.toFixed(1) : (comic.rating !== undefined ? comic.rating.toFixed(1) : '0.0')}</strong> <span style={{ color: '#64748b' }}>({comic.ratingCount || 0})</span>
                     </span>
 
-                    <span className="mod-meta-pill">
-                      📖 {chapters.length} Chapters
+                    <span className="mod-meta-pill" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                      📖 <strong>{chapters.length}</strong> Chapters
                     </span>
                   </div>
 
                   {Array.isArray(comic.genres) && comic.genres.length > 0 && (
-                    <div className="mod-comic-genres" style={{ marginTop: '12px', marginBottom: '14px' }}>
+                    <div className="mod-comic-genres" style={{ marginBottom: '20px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {comic.genres.map((g, idx) => {
                         const name = typeof g === 'string' ? g : (g?.name || g?.genreName || g?.title || String(g));
                         if (!name || !name.trim()) return null;
                         return (
-                          <span key={idx} className="mod-genre-tag">
+                          <span key={idx} className="mod-genre-tag" style={{ padding: '6px 14px', background: 'rgba(168, 85, 247, 0.1)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.2)', borderRadius: '8px', fontSize: '12px', fontWeight: '500' }}>
                             {name.trim()}
                           </span>
                         );
                       })}
+                    </div>
+                  )}
+
+                  {(comic.approvedBy || comic.moderatorName) && (
+                    <div className="mod-approval-banner" style={{ 
+                      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(52, 211, 153, 0.02) 100%)', 
+                      borderLeft: '4px solid #10b981', 
+                      borderRadius: '4px 12px 12px 4px', 
+                      padding: '12px 16px', 
+                      marginBottom: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '14px',
+                      border: '1px solid rgba(16, 185, 129, 0.1)',
+                      borderLeftWidth: '4px'
+                    }}>
+                      <div style={{ 
+                        width: '36px', height: '36px', borderRadius: '50%', 
+                        background: 'rgba(16, 185, 129, 0.2)', display: 'flex', 
+                        alignItems: 'center', justifyContent: 'center', color: '#10b981',
+                        fontSize: '18px'
+                      }}>✓</div>
+                      <div>
+                        <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>Verified & Published</div>
+                        <div style={{ color: '#e2e8f0', fontSize: '15px' }}>
+                           By <strong style={{ color: '#10b981' }}>{comic.approvedBy || comic.moderatorName}</strong> 
+                           {comic.approvedAt && <span style={{ color: '#64748b', fontSize: '13px', marginLeft: '8px' }}>• {new Date(comic.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -1053,12 +1076,12 @@ function ModeratorComicDetail() {
                             >
                               👁️ Inspect Raw vs Translated
                             </button>
-                            <ModernButton
-                              variant={5}
-                              label="🗑️ Delete"
+                            <button
+                              className="btn-delete-chap"
                               onClick={() => handleDeleteChapterItem(chap.id)}
-                              style={{ height: '30px', minHeight: '30px', minWidth: '70px', padding: '0 10px', fontSize: '12px' }}
-                            />
+                            >
+                              🗑️ Delete
+                            </button>
                           </div>
                         </td>
                       </tr>

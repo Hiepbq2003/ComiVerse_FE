@@ -595,3 +595,58 @@ html.light .author-primary-btn:hover {
   }
 }
 
+
+.author-analytics-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.author-chart-toggle {
+  display: flex;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 500px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.author-chart-toggle-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 6px 16px;
+  border-radius: 500px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.author-chart-toggle-btn:hover {
+  color: #fff;
+}
+
+.author-chart-toggle-btn.active {
+  background: #aa3bff;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(170, 59, 255, 0.3);
+}
+
+html.light .author-chart-toggle {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+html.light .author-chart-toggle-btn {
+  color: #64748b;
+}
+
+html.light .author-chart-toggle-btn:hover {
+  color: #0f172a;
+}
+
+html.light .author-chart-toggle-btn.active {
+  background: #aa3bff;
+  color: #fff;
+}
