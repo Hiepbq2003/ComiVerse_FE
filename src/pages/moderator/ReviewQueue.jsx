@@ -160,18 +160,27 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
     return null;
   };
 
-  // Normalize a chapter object from the backend: map 'images' to 'pages'
   const normalizeChapter = (chap, idx) => {
     const pages = Array.isArray(chap.pages) && chap.pages.length > 0
       ? chap.pages
       : Array.isArray(chap.images) && chap.images.length > 0
         ? chap.images
         : [];
+        
+    const rawTitle = String(chap.title || chap.chapter || '');
+    let extractedNum = null;
+    if (rawTitle) {
+      const match = rawTitle.match(/chapter\s+(\d+)/i);
+      if (match) extractedNum = parseInt(match[1], 10);
+    }
+    
+    const computedNum = extractedNum || chap.chapterNumber || chap.number || idx + 1;
+
     return {
       ...chap,
       id: chap.id || `chap-${idx}-${Date.now()}`,
-      number: chap.chapterNumber || chap.number || idx + 1,
-      title: chap.title || chap.chapter || `Chapter ${chap.chapterNumber || chap.number || idx + 1}`,
+      number: computedNum,
+      title: rawTitle || `Chapter ${computedNum}`,
       pages,
       content: chap.content || null,
       words: chap.words || chap.wordCount || null,
@@ -232,14 +241,36 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
 
     let finalChaps = list;
     if (item.status === 'pending' || !item.status) {
-      finalChaps = list.filter(c => c.status !== 'approved' && c.status !== 'rejected');
+      finalChaps = list.filter(c => {
+        if (c.status === 'approved' || c.status === 'rejected') return false;
+        const modStatus = (c.moderationStatus || '').toUpperCase();
+        if (modStatus === 'PUBLISHED' || modStatus === 'REJECTED') return false;
+        return true;
+      });
     }
 
-    return finalChaps.map(c => ({
+    const sortedChaps = finalChaps.map(c => ({
       ...c,
       submissionId: c.submissionId || item.id || c.id,
       originalSubmissionItem: c.originalSubmissionItem || item
-    })).sort((a, b) => (Number(a.number) || 0) - (Number(b.number) || 0));
+    })).sort((a, b) => {
+      const numA = Number(a.number) || 0;
+      const numB = Number(b.number) || 0;
+      if (numA !== numB) return numA - numB;
+      return (a.timestamp || 0) - (b.timestamp || 0);
+    });
+
+    const usedNumbers = new Set();
+    sortedChaps.forEach(c => {
+      let num = Number(c.number) || 1;
+      while (usedNumbers.has(num)) {
+        num++;
+      }
+      c.number = num;
+      usedNumbers.add(num);
+    });
+
+    return sortedChaps.sort((a, b) => (Number(a.number) || 0) - (Number(b.number) || 0));
   };
 
   // Extract description/synopsis/summary safely from raw submission objects or matching comic
@@ -630,12 +661,27 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
       // Synchronize group.chapters with group.allChapters for 100% consistent badge count
       group.chapters = group.allChapters;
       
-      // Re-index chapter numbers for clean ordering if needed
-      group.allChapters.forEach((chap, idx) => {
-        if (!chap.number || chap.number === 1) {
-          chap.number = idx + 1;
-        }
+      // Sort chapters initially by their existing number and timestamp
+      group.allChapters.sort((a, b) => {
+        const numA = Number(a.number) || 0;
+        const numB = Number(b.number) || 0;
+        if (numA !== numB) return numA - numB;
+        return (a.timestamp || 0) - (b.timestamp || 0);
       });
+
+      // Resolve duplicate chapter numbers robustly
+      const usedNumbers = new Set();
+      group.allChapters.forEach(chap => {
+        let num = Number(chap.number) || 1;
+        while (usedNumbers.has(num)) {
+          num++;
+        }
+        chap.number = num;
+        usedNumbers.add(num);
+      });
+
+      // Re-sort just in case the resolution changed the logical order
+      group.allChapters.sort((a, b) => (Number(a.number) || 0) - (Number(b.number) || 0));
 
       // Enrich group root metadata from its subItems
       group.language = getSubmissionLanguage(group);
@@ -1700,7 +1746,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                                       }}
                                     >
                                       <td style={{ padding: '14px 18px', fontWeight: '800', color: rowTextColor }}>
-                                        Chapter {chap.number || idx + 1}
+                                        {chap.title && !chap.title.toLowerCase().startsWith('chapter') ? `Chapter ${chap.number || idx + 1} — ${chap.title}` : (chap.title || `Chapter ${chap.number || idx + 1}`)}
                                       </td>
                                       <td style={{ padding: '14px 18px', fontWeight: '600', color: rowTextColor }}>
                                         📄 {Array.isArray(chap.pages) ? chap.pages.length : (Array.isArray(chap.images) ? chap.images.length : 0)} Pages {chap.words ? `· ${chap.words}` : ''}
@@ -1715,7 +1761,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                                             label={isSelected ? '✓ Inspecting' : '👁️ View'}
                                             onClick={() => handleSelectChapterItem(chap)}
                                           />
-                                          {selectedReview.status === 'pending' && idx === 0 && (
+                                          {selectedReview.status === 'pending' && chap.status !== 'approved' && chap.status !== 'rejected' && (
                                             <>
                                               <ModernButton
                                                 variant={2}

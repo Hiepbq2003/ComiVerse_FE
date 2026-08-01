@@ -113,19 +113,20 @@ function AuthorDashboard() {
   const [dashboard, setDashboard] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [chartPeriod, setChartPeriod] = useState('WEEK') // WEEK, MONTH, YEAR
 
   const loadDashboard = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      setDashboard(await getAuthorDashboardMetricsApi(12))
+      setDashboard(await getAuthorDashboardMetricsApi(chartPeriod))
     } catch (err) {
       setDashboard(null)
       setError(err?.response?.data?.message || err?.message || 'Could not load author dashboard metrics.')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [chartPeriod])
 
   useEffect(() => {
     loadDashboard()
@@ -154,10 +155,8 @@ function AuthorDashboard() {
     const views = monthlyMetrics.map((item) => numberValue(item.views))
     const followers = monthlyMetrics.map((item) => numberValue(item.followers))
     const revenue = monthlyMetrics.map((item) => numberValue(item.estimatedRevenue))
-    const maxViews = Math.max(1, ...views)
-    const scaleMax = Math.ceil(maxViews * 1.1)
-    const followerIndex = normalizeToScale(followers, Math.max(0, ...followers), scaleMax)
-    const revenueIndex = normalizeToScale(revenue, Math.max(0, ...revenue), scaleMax)
+    const maxValRaw = Math.max(1, ...views, ...followers, ...revenue)
+    const scaleMax = Math.ceil(maxValRaw * 1.1)
 
     return {
       chartW,
@@ -166,9 +165,11 @@ function AuthorDashboard() {
       padY,
       maxVal: scaleMax,
       views,
+      revenue,
+      followers,
       viewPath: buildLinePath(views, scaleMax, chartW, chartH, padX, padY),
-      revenuePath: buildLinePath(revenueIndex, scaleMax, chartW, chartH, padX, padY),
-      followerPath: buildLinePath(followerIndex, scaleMax, chartW, chartH, padX, padY),
+      revenuePath: buildLinePath(revenue, scaleMax, chartW, chartH, padX, padY),
+      followerPath: buildLinePath(followers, scaleMax, chartW, chartH, padX, padY),
     }
   }, [monthlyMetrics])
 
@@ -238,11 +239,31 @@ function AuthorDashboard() {
         ))}
       </div>
 
-      <div className="author-analytics-chart-card">
+        <div className="author-analytics-chart-card">
         <div className="author-analytics-chart-header">
           <div>
             <h2 className="author-analytics-chart-title">Reader Growth</h2>
-            <p className="author-analytics-chart-subtitle">Views with normalized revenue and follower trends</p>
+            <p className="author-analytics-chart-subtitle">Absolute values for Views, Revenue and Followers</p>
+          </div>
+          <div className="author-chart-toggle">
+            <button 
+              className={`author-chart-toggle-btn ${chartPeriod === 'WEEK' ? 'active' : ''}`}
+              onClick={() => setChartPeriod('WEEK')}
+            >
+              Week
+            </button>
+            <button 
+              className={`author-chart-toggle-btn ${chartPeriod === 'MONTH' ? 'active' : ''}`}
+              onClick={() => setChartPeriod('MONTH')}
+            >
+              Month
+            </button>
+            <button 
+              className={`author-chart-toggle-btn ${chartPeriod === 'YEAR' ? 'active' : ''}`}
+              onClick={() => setChartPeriod('YEAR')}
+            >
+              Year
+            </button>
           </div>
         </div>
         <div className="author-analytics-chart-body">
@@ -263,15 +284,23 @@ function AuthorDashboard() {
             {lineChart.views.map((value, index) => {
               const denominator = Math.max(1, lineChart.views.length - 1)
               const x = lineChart.padX + (index / denominator) * (lineChart.chartW - lineChart.padX * 2)
-              const y = lineChart.padY + (1 - value / lineChart.maxVal) * (lineChart.chartH - lineChart.padY * 2)
-              return <circle key={index} cx={x} cy={y} r="3" fill="#c084fc"/>
+              const vy = lineChart.padY + (1 - value / lineChart.maxVal) * (lineChart.chartH - lineChart.padY * 2)
+              const ry = lineChart.padY + (1 - lineChart.revenue[index] / lineChart.maxVal) * (lineChart.chartH - lineChart.padY * 2)
+              const fy = lineChart.padY + (1 - lineChart.followers[index] / lineChart.maxVal) * (lineChart.chartH - lineChart.padY * 2)
+              return (
+                <g key={index}>
+                  <circle cx={x} cy={vy} r="4" fill="#c084fc"><title>Views: {formatFullNumber(value)}</title></circle>
+                  <circle cx={x} cy={ry} r="4" fill="#aa3bff"><title>Revenue: ${formatFullNumber(lineChart.revenue[index])}</title></circle>
+                  <circle cx={x} cy={fy} r="4" fill="#10b981"><title>Followers: {formatFullNumber(lineChart.followers[index])}</title></circle>
+                </g>
+              )
             })}
           </svg>
         </div>
         <div className="author-analytics-legend">
           <span className="author-legend-item"><span className="author-legend-dot dark"/>Views</span>
-          <span className="author-legend-item"><span className="author-legend-dot purple"/>Revenue trend</span>
-          <span className="author-legend-item"><span className="author-legend-dot green"/>Follower trend</span>
+          <span className="author-legend-item"><span className="author-legend-dot purple"/>Revenue</span>
+          <span className="author-legend-item"><span className="author-legend-dot green"/>Followers</span>
         </div>
       </div>
 
