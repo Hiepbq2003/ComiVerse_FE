@@ -1,54 +1,103 @@
-import { useState, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { toast } from 'react-toastify'
 import AdminLayout from '../../components/layout/AdminLayout'
 import '../../assets/style/admin/payout.css'
+import {
+  approveAdminPayoutApi,
+  getAdminPayoutsApi,
+  payAdminPayoutApi,
+  rejectAdminPayoutApi,
+} from '../../services/api/PayoutApi'
 
-// ── Mock payout data ───────────────────────────────
-const MOCK_PAYOUTS = [
-  { id: 'PR-001', user: 'Author X', reason: '', role: 'Author', amount: '2,100,000đ', bank: 'Vietcombank · 1234567890', type: 'Scheduled', date: 'Dec 28, 2024', status: 'Pending' },
-  { id: 'PR-002', user: 'Spirit Group', reason: 'Reason: Urgent financial need', role: 'Translator', amount: '1,800,000đ', bank: 'MoMo · 0901234567', type: 'Early', date: 'Dec 30, 2024', status: 'Pending' },
-  { id: 'PR-003', user: 'PhoenixWriter', reason: '', role: 'Author', amount: '3,500,000đ', bank: 'Techcombank · 9876543210', type: 'Scheduled', date: 'Dec 25, 2024', status: 'Processing' },
-  { id: 'PR-004', user: 'JadeGroup', reason: 'Reason: Project expenses', role: 'Translator', amount: '2,200,000đ', bank: 'Vietinbank · 1122334455', type: 'Early', date: 'Dec 20, 2024', status: 'Processing' },
-  { id: 'PR-005', user: 'NoviceWriter', reason: '', role: 'Author', amount: '950,000đ', bank: 'BIDV · 5544332211', type: 'Scheduled', date: 'Dec 15, 2024', status: 'Completed' },
-  { id: 'PR-006', user: 'Dragon Scans', reason: '', role: 'Translator', amount: '1,450,000đ', bank: 'ACB · 7788996655', type: 'Scheduled', date: 'Dec 10, 2024', status: 'Completed' },
-  { id: 'PR-007', user: 'Author X', reason: 'Reason: Wrong bank account info', role: 'Author', amount: '500,000đ', bank: 'Vietcombank · 1234567890', type: 'Early', date: 'Nov 30, 2024', status: 'Rejected' },
+const FILTER_TABS = [
+  { label: 'All', value: '' },
+  { label: 'Pending', value: 'PENDING' },
+  { label: 'Approved', value: 'APPROVED' },
+  { label: 'Processing', value: 'PROCESSING' },
+  { label: 'Paid', value: 'PAID' },
+  { label: 'Rejected', value: 'REJECTED' },
+  { label: 'Failed', value: 'FAILED' },
 ]
 
-const SUMMARY = [
-  { label: 'Pending', count: 2, total: '3.9M đ total', color: 'orange' },
-  { label: 'Processing', count: 2, total: '5.7M đ total', color: 'blue' },
-  { label: 'Completed', count: 2, total: '2.4M đ total', color: 'green' },
-  { label: 'Rejected', count: 1, total: '0.5M đ total', color: 'red' },
-]
+const formatMoney = (value, currency = 'VND') => new Intl.NumberFormat('vi-VN', {
+  style: 'currency', currency: currency || 'VND', maximumFractionDigits: currency === 'VND' ? 0 : 2,
+}).format(Number(value) || 0)
 
-const FILTER_TABS = ['All', 'Pending', 'Processing', 'Completed', 'Rejected']
+const formatDate = (value) => {
+  if (!value) return '—'
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString('vi-VN')
+}
 
 function PayoutManagement() {
-  const [activeFilter, setActiveFilter] = useState('All')
+  const [activeStatus, setActiveStatus] = useState('')
+  const [data, setData] = useState({ items: [], counts: {}, totals: {} })
+  const [loading, setLoading] = useState(true)
+  const [workingId, setWorkingId] = useState('')
+  const [error, setError] = useState('')
 
-  const filteredPayouts = useMemo(() => {
-    if (activeFilter === 'All') return MOCK_PAYOUTS
-    return MOCK_PAYOUTS.filter((p) => p.status === activeFilter)
-  }, [activeFilter])
+  const loadPayouts = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError('')
+      const result = await getAdminPayoutsApi({ status: activeStatus || undefined, size: 100 })
+      setData(result || { items: [], counts: {}, totals: {} })
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || 'Could not load payout requests.')
+    } finally {
+      setLoading(false)
+    }
+  }, [activeStatus])
 
-  const getFilterCount = (filter) => {
-    if (filter === 'All') return MOCK_PAYOUTS.length
-    return MOCK_PAYOUTS.filter((p) => p.status === filter).length
+  useEffect(() => { loadPayouts() }, [loadPayouts])
+
+  const items = Array.isArray(data?.items) ? data.items : []
+  const summaryCards = useMemo(() => ['PENDING', 'APPROVED', 'PROCESSING', 'PAID', 'FAILED'].map((status) => ({
+    status,
+    count: Number(data?.counts?.[status]) || 0,
+    total: Number(data?.totals?.[status]) || 0,
+  })), [data])
+
+  const runAction = async (payout, action) => {
+    try {
+      setWorkingId(payout.id)
+      if (action === 'approve') {
+        const note = window.prompt('Optional approval note:', '') || ''
+        await approveAdminPayoutApi(payout.id, note)
+        toast.success('Payout approved.')
+      } else if (action === 'reject') {
+        const reason = window.prompt('Reason for rejection:')
+        if (!reason?.trim()) return
+        await rejectAdminPayoutApi(payout.id, reason.trim())
+        toast.success('Payout rejected.')
+      } else if (action === 'pay') {
+        await payAdminPayoutApi(payout.id)
+        toast.success('Stripe sandbox transfer completed.')
+      }
+      await loadPayouts()
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Payout action failed.'
+      toast.error(message)
+      setError(message)
+    } finally {
+      setWorkingId('')
+    }
   }
 
-  const getActionButtons = (payout) => {
-    switch (payout.status) {
-      case 'Pending':
-        return (
-          <>
-            <button className="btn-table-action payout-approve">Approve</button>
-            <button className="btn-table-action payout-reject">Reject</button>
-          </>
-        )
-      case 'Processing':
-        return <button className="btn-table-action payout-mark-paid">Mark Paid</button>
-      default:
-        return <span className="payout-no-action">—</span>
+  const renderActions = (payout) => {
+    const disabled = workingId === payout.id
+    if (payout.status === 'PENDING') {
+      return (
+        <>
+          <button disabled={disabled} className="btn-table-action payout-approve" onClick={() => runAction(payout, 'approve')}>Approve</button>
+          <button disabled={disabled} className="btn-table-action payout-reject" onClick={() => runAction(payout, 'reject')}>Reject</button>
+        </>
+      )
     }
+    if (payout.status === 'APPROVED' || payout.status === 'FAILED') {
+      return <button disabled={disabled} className="btn-table-action payout-mark-paid" onClick={() => runAction(payout, 'pay')}>{disabled ? 'Processing...' : 'Pay with Stripe'}</button>
+    }
+    return <span className="payout-no-action">—</span>
   }
 
   return (
@@ -56,82 +105,50 @@ function PayoutManagement() {
       <div className="admin-page-header">
         <div className="admin-page-header-info">
           <h1>Payout Management</h1>
-          <p>Review and process payout requests from Authors and Translators</p>
+          <p>Review monthly payout requests and send test transfers to Stripe connected accounts.</p>
         </div>
+        <button className="btn-table-action" onClick={loadPayouts} disabled={loading}>Refresh</button>
       </div>
 
-      {/* ── Summary Cards ───────────────────────── */}
       <div className="payout-summary-grid">
-        {SUMMARY.map((s) => (
-          <div key={s.label} className="payout-summary-card">
-            <span className={`payout-summary-badge payout-summary-badge--${s.color}`}>{s.label}</span>
-            <div className="payout-summary-count">{s.count}</div>
-            <div className="payout-summary-total">{s.total}</div>
+        {summaryCards.map((card) => (
+          <div key={card.status} className="payout-summary-card">
+            <span className={`payout-summary-badge payout-summary-badge--${card.status.toLowerCase()}`}>{card.status}</span>
+            <div className="payout-summary-count">{card.count}</div>
+            <div className="payout-summary-total">{formatMoney(card.total)}</div>
           </div>
         ))}
       </div>
 
-      {/* ── Filter Tabs ─────────────────────────── */}
       <div className="payout-filter-tabs">
-        {FILTER_TABS.map((tab) => {
-          const count = getFilterCount(tab)
-          return (
-            <button
-              key={tab}
-              className={`payout-filter-tab ${activeFilter === tab ? 'active' : ''}`}
-              onClick={() => setActiveFilter(tab)}
-            >
-              {tab}{tab !== 'All' ? ` (${count})` : ''}
-            </button>
-          )
-        })}
+        {FILTER_TABS.map((tab) => (
+          <button key={tab.label} className={`payout-filter-tab ${activeStatus === tab.value ? 'active' : ''}`} onClick={() => setActiveStatus(tab.value)}>
+            {tab.label}{tab.value ? ` (${Number(data?.counts?.[tab.value]) || 0})` : ''}
+          </button>
+        ))}
       </div>
 
-      {/* ── Data Table ──────────────────────────── */}
+      {error && <div className="admin-payout-error">{error}</div>}
+
       <div className="admin-data-table-wrapper">
-        <table className="admin-data-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>User</th>
-              <th>Role</th>
-              <th>Amount</th>
-              <th>Bank Info</th>
-              <th>Type</th>
-              <th>Date</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
+        <table className="admin-data-table admin-payout-table">
+          <thead><tr><th>Creator</th><th>Role</th><th>Month</th><th>Amount</th><th>Stripe account</th><th>Status</th><th>Requested</th><th>Details</th><th>Actions</th></tr></thead>
           <tbody>
-            {filteredPayouts.map((p) => (
-              <tr key={p.id}>
-                <td className="cell-user-id">{p.id}</td>
-                <td>
-                  <div className="payout-user-cell">
-                    <span className="cell-name">{p.user}</span>
-                    {p.reason && <span className="payout-reason">{p.reason}</span>}
-                  </div>
-                </td>
-                <td>
-                  <span className={`role-badge ${p.role.toLowerCase()}`}>{p.role}</span>
-                </td>
-                <td className="payout-amount">{p.amount}</td>
-                <td className="payout-bank">{p.bank}</td>
-                <td>
-                  <span className={`payout-type-badge payout-type--${p.type.toLowerCase()}`}>
-                    {p.type === 'Scheduled' ? '📅' : '⚡'} {p.type}
-                  </span>
-                </td>
-                <td>{p.date}</td>
-                <td>
-                  <span className={`status-badge ${p.status.toLowerCase()}`}>{p.status}</span>
-                </td>
-                <td>
-                  <div className="table-actions">
-                    {getActionButtons(p)}
-                  </div>
-                </td>
+            {loading ? (
+              <tr><td colSpan="9" className="admin-payout-empty">Loading payout requests...</td></tr>
+            ) : items.length === 0 ? (
+              <tr><td colSpan="9" className="admin-payout-empty">No payout requests match this filter.</td></tr>
+            ) : items.map((payout) => (
+              <tr key={payout.id}>
+                <td><div className="payout-user-cell"><span className="cell-name">{payout.userName || payout.userEmail}</span><span className="payout-reason">{payout.userEmail}</span></div></td>
+                <td><span className={`role-badge ${(payout.role || '').toLowerCase()}`}>{payout.role}</span></td>
+                <td>{payout.payoutMonth}</td>
+                <td className="payout-amount">{formatMoney(payout.amount, payout.currency)}</td>
+                <td className="payout-bank">{payout.stripeConnectedAccountId}</td>
+                <td><span className={`status-badge ${(payout.status || '').toLowerCase()}`}>{payout.status}</span></td>
+                <td>{formatDate(payout.requestedAt || payout.createdAt)}</td>
+                <td className="admin-payout-details">{payout.failureReason || payout.adminNote || payout.calculationDetails || payout.requestNote || '—'}{payout.stripeTransferId && <small>Transfer: {payout.stripeTransferId}</small>}</td>
+                <td><div className="table-actions">{renderActions(payout)}</div></td>
               </tr>
             ))}
           </tbody>

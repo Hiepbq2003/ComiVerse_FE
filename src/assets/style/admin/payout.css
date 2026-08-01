@@ -3,3 +3,35 @@
 .admin-payout-screen {
   isolation: isolate;
 }
+
+.payout-summary-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin: 20px 0; }
+.payout-summary-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; }
+.payout-summary-badge { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; background: #e5e7eb; }
+.payout-summary-badge--pending { background: #fef3c7; color: #92400e; }
+.payout-summary-badge--approved, .payout-summary-badge--processing { background: #dbeafe; color: #1d4ed8; }
+.payout-summary-badge--paid { background: #dcfce7; color: #15803d; }
+.payout-summary-badge--failed { background: #fee2e2; color: #b91c1c; }
+.payout-summary-count { font-size: 28px; font-weight: 800; margin-top: 12px; }
+.payout-summary-total { color: #64748b; font-size: 13px; margin-top: 4px; }
+.payout-filter-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.payout-filter-tab { border: 1px solid #dbe1ea; background: #fff; border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+.payout-filter-tab.active { background: #111827; color: #fff; border-color: #111827; }
+.payout-user-cell { display: flex; flex-direction: column; gap: 3px; }
+.payout-reason { font-size: 11px; color: #64748b; }
+.payout-amount { font-weight: 700; white-space: nowrap; }
+.payout-bank { max-width: 180px; word-break: break-all; font-family: monospace; font-size: 12px; }
+.admin-payout-details { min-width: 220px; max-width: 320px; white-space: normal; }
+.admin-payout-details small { display: block; margin-top: 5px; color: #64748b; word-break: break-all; }
+.table-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn-table-action { border: 1px solid #dbe1ea; border-radius: 7px; padding: 7px 10px; background: #fff; cursor: pointer; font-weight: 600; }
+.payout-approve { color: #15803d; border-color: #86efac; }
+.payout-reject { color: #b91c1c; border-color: #fca5a5; }
+.payout-mark-paid { color: #1d4ed8; border-color: #93c5fd; }
+.btn-table-action:disabled { opacity: .5; cursor: not-allowed; }
+.admin-payout-error { margin-bottom: 14px; padding: 12px 14px; background: #fee2e2; color: #b91c1c; border-radius: 8px; }
+.admin-payout-empty { text-align: center !important; padding: 28px !important; color: #64748b; }
+@media (max-width: 1100px) { .payout-summary-grid { grid-template-columns: repeat(2, 1fr); } }
+.status-badge.approved { background: #dbeafe; color: #1d4ed8; }
+.status-badge.paid { background: #dcfce7; color: #15803d; }
+.status-badge.failed { background: #fee2e2; color: #b91c1c; }
+.status-badge.approved::before, .status-badge.paid::before, .status-badge.failed::before { background: currentColor; }
