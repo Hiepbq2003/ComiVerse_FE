@@ -229,7 +229,7 @@ function CommentThread({ comment, onResolve, onDelete, onUpdate, currentUserId, 
           <span className="rvw-comment-author">{comment.authorName}</span>
           <div className="rvw-comment-header-right">
             <span className="rvw-comment-time">{formatTime(comment.createdAt)}</span>
-            {isOwner && !isEditing && (
+            {isOwner && !isEditing && !comment.resolved && (
               <>
                 <button type="button" onClick={startEdit} className="rvw-delete-btn" title="Edit comment">
                   <Pencil size={12} />
@@ -238,6 +238,11 @@ function CommentThread({ comment, onResolve, onDelete, onUpdate, currentUserId, 
                   <Trash2 size={12} />
                 </button>
               </>
+            )}
+            {isOwner && !isEditing && comment.resolved && (
+              <button type="button" onClick={() => onDelete(comment.id)} className="rvw-delete-btn" title="Delete comment">
+                <Trash2 size={12} />
+              </button>
             )}
           </div>
         </div>
@@ -262,16 +267,20 @@ function CommentThread({ comment, onResolve, onDelete, onUpdate, currentUserId, 
         )}
 
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          {!isEditing && !comment.resolved && (
-            <button type="button" onClick={() => onResolve(comment.id)} className="rvw-resolve-btn">
-              <CheckCircle2 size={13} /> Resolve
+          {!isEditing && (
+            <button
+              type="button"
+              onClick={() => onResolve(comment.id)}
+              className={comment.resolved ? "rvw-resolved-tag rvw-resolved-tag--clickable" : "rvw-resolve-btn"}
+              title={comment.resolved ? "Click to mark as unresolved" : "Mark as resolved"}
+              style={
+                comment.resolved
+                  ? { border: "none", background: "transparent", font: "inherit", cursor: "pointer", padding: 0 }
+                  : undefined
+              }
+            >
+              <CheckCircle2 size={comment.resolved ? 12 : 13} /> {comment.resolved ? "Resolved" : "Resolve"}
             </button>
-          )}
-
-          {!isEditing && comment.resolved && (
-            <span className="rvw-resolved-tag">
-              <CheckCircle2 size={12} /> Resolved
-            </span>
           )}
 
           {isEditing && (
@@ -455,12 +464,6 @@ function BubbleOverlayPanel({
   const imgRef = useRef(null);
   const [imgSize, setImgSize] = useState({ width: 0, height: 0 });
 
-  // Measure the ACTUAL rendered <img> box in pixels, rather than assuming
-  // it fills 100% of its parent frame. This is what guarantees bubbles
-  // stay pinned to the real artwork even if some other CSS rule in the
-  // app (outside review-workspace.css) constrains the image's width —
-  // whatever size the image really renders at, the overlay wrapper below
-  // is sized to match it exactly.
   useEffect(() => {
     const el = imgRef.current;
     if (!el) return;
@@ -614,11 +617,6 @@ function CommentsSidebar({
         ))}
       </div>
 
-      {/* Only for composing a BRAND NEW comment on a bubble that doesn't
-          already have one — once it does, editing happens inline on the
-          CommentThread above, so this whole block (including the
-          "select a bubble..." messaging) is hidden entirely rather than
-          showing a placeholder that no longer applies. */}
       {!bubbleAlreadyHasComment && (
         <div className="rvw-composer">
           {selectedBubbleId == null && (
@@ -771,7 +769,6 @@ function useReviewZoom() {
   const [zoomScale, setZoomScale] = useState(1);
   const [isPickingZoomPoint, setIsPickingZoomPoint] = useState(false);
 
-  // Refs to each scroll container so we can centre on the click point after zoom
   const panelScrollRefs = useRef([]);
 
   const toggleZoomIn = () => setIsPickingZoomPoint((v) => !v);
@@ -787,7 +784,6 @@ function useReviewZoom() {
   const resetZoom = () => {
     setZoomScale(1);
     setIsPickingZoomPoint(false);
-    // Reset scroll to top-left
     panelScrollRefs.current.forEach((el) => {
       if (el) { el.scrollTop = 0; el.scrollLeft = 0; }
     });
@@ -796,14 +792,11 @@ function useReviewZoom() {
   const handleFrameMouseDown = (e, frameEl, scrollEl) => {
     if (!isPickingZoomPoint || !frameEl) return false;
     const bounds = frameEl.getBoundingClientRect();
-    // fraction of the frame where the user clicked
     const fracX = (e.clientX - bounds.left) / bounds.width;
     const fracY = (e.clientY - bounds.top) / bounds.height;
 
     setZoomScale((prev) => {
       const next = Math.min(ZOOM_MAX, prev * ZOOM_STEP);
-      // After the state update re-render widens the frame, scroll so the
-      // clicked point stays roughly centred in the viewport.
       requestAnimationFrame(() => {
         panelScrollRefs.current.forEach((el) => {
           if (!el) return;
@@ -905,9 +898,6 @@ export default function ReviewWorkspace() {
   const [generalComposeValue, setGeneralComposeValue] = useState("");
   const [selectedBubbleId, setSelectedBubbleId] = useState(null);
 
-  // Scroll the active bubble into view whenever selection changes (e.g. via
-  // Prev/Next or clicking a bubble). There are two panels (Original +
-  // Translated) both rendering the same bubble ids, so scroll both.
   useEffect(() => {
     if (selectedBubbleId == null) return;
     const elements = document.querySelectorAll(`[data-bubble-id="${selectedBubbleId}"]`);
@@ -930,7 +920,6 @@ export default function ReviewWorkspace() {
     panelScrollRefs,
   } = useReviewZoom();
 
-  // Register both scroll panels so resetZoom can scroll them back to origin
   const setOriginalScrollRef = useCallback((el) => {
     panelScrollRefs.current[0] = el;
   }, [panelScrollRefs]);
@@ -973,11 +962,8 @@ export default function ReviewWorkspace() {
   const changedFlags = useMemo(() => computeChangedFlags(currentSelections, baselineSelections), [currentSelections, baselineSelections]);
   const changeCount = changedFlags.filter(Boolean).length;
 
-  // Default to the first bubble on the page (instead of nothing selected)
-  // whenever the page changes.
   useEffect(() => {
     setSelectedBubbleId(currentSelections.length > 0 ? currentSelections[0].id : null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage?.pageId]);
 
   const goToBubble = (direction) => {
@@ -1072,8 +1058,6 @@ export default function ReviewWorkspace() {
     }
   };
 
-  // Inline edit — called directly from a CommentThread's own textarea, no
-  // separate "editing mode" on the shared composer needed anymore.
   const handleUpdateComment = async (commentId, content) => {
     try {
       const updated = await updateCommentApi(commentId, content);
@@ -1098,7 +1082,7 @@ export default function ReviewWorkspace() {
   const handleResolve = async (commentId) => {
     try {
       await resolveComment(commentId);
-      setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, resolved: true } : c)));
+      setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, resolved: !c.resolved } : c)));
     } catch (err) {
       console.error("Failed to resolve comment:", err);
     }

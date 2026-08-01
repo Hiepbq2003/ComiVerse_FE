@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useChat } from '../../hooks/useChat';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
 
-function TeamGroupChat({ groupId}) {
+function TeamGroupChat({ groupId, onClose, style }) {
     const [inputValue, setInputValue] = useState('');
 
     const {
@@ -81,7 +81,7 @@ function TeamGroupChat({ groupId}) {
     };
 
     return (
-        <div className="group-chat-sidebar-card">
+        <div className="group-chat-sidebar-card" style={style}>
             <div className="chat-card-header">
                 <div className="chat-header-title">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -89,15 +89,28 @@ function TeamGroupChat({ groupId}) {
                     </svg>
                     <span>Group Chat</span>
                 </div>
-                <span className="chat-online-badge">
-                    <span className="online-dot"></span> Live
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="chat-online-badge">
+                        <span className="online-dot"></span> Live
+                    </span>
+                    {onClose && (
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            title="Close"
+                            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '16px', lineHeight: 1, padding: '2px 4px' }}
+                        >
+                            ×
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div
                 className="chat-messages-container"
                 ref={scrollContainerRef}
                 onScroll={handleScroll}
+                style={{ flex: 1, minHeight: 0, overflowY: "auto" }}
             >
                 {isLoadingMore && (
                     <div style={{ textAlign: 'center', fontSize: '11px', color: '#94a3b8', padding: '6px 0' }}>

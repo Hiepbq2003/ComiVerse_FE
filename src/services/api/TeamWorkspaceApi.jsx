@@ -57,29 +57,25 @@ export const createTeamTaskApi = async (teamId, task) => {
 
   const rawChapterId = task?.chapterId
 
-  // Synthetic chapter IDs generated on FE start with 'ch-' (e.g. 'ch-{teamId}-1').
-  // Since synthetic chapters do not exist in the Spring Boot 'chapters' database table,
-  // sending them to Backend will cause 400 'Chapter not found'. Return null to safely fall back to local task creation.
   if (typeof rawChapterId === 'string' && rawChapterId.startsWith('ch-')) {
     console.log('[TeamWorkspaceApi] Synthetic chapter detected, falling back to local task storage.')
     return null
   }
 
-  // Real Chapter UUID validation
   const chapterId = isUuid(rawChapterId) ? rawChapterId : null
   if (!chapterId) {
     console.warn('[TeamWorkspaceApi] No valid real Chapter UUID, falling back to local task storage.')
     return null
   }
 
-  const validAssigneeIds = Array.isArray(task?.assigneeIds) ? task.assigneeIds.filter(isUuid) : []
+  const assigneeId = isUuid(task?.assigneeId) ? task.assigneeId : null
 
   const sanitizedTask = {
     title: task.title,
     status: task.status || 'backlog',
     dueDate: task.dueDate || new Date().toISOString().split('T')[0],
     chapterId: chapterId,
-    ...(validAssigneeIds.length > 0 ? { assigneeIds: validAssigneeIds } : {})
+    ...(assigneeId ? { assigneeId } : {})
   }
 
   try {
@@ -91,8 +87,7 @@ export const createTeamTaskApi = async (teamId, task) => {
 }
 
 export const updateTeamTaskApi = async (id, updates) => {
-  const isUuid = typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-  if (!isUuid) {
+  if (!isUuid(id)) {
     return { success: true, message: 'Local task updated' }
   }
   return AxiosClient.put(`/team-workspace/tasks/${id}`, updates)
