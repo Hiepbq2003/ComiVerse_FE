@@ -337,6 +337,7 @@ function WorkspaceDetailView({
   selectedDetails,
   setSelectedDetails,
   onBackToProjects,
+  tasksLoading,
   workspaceTab,
   setWorkspaceTab,
   isCurrentLeader,
@@ -442,6 +443,7 @@ function WorkspaceDetailView({
           leaderName={selectedDetails.leaderName}
           isCurrentLeader={isCurrentLeader}
           members={members}
+          tasks={tasks}
           memberSearch={memberSearch}
           setMemberSearch={setMemberSearch}
           onMembersLoaded={onMembersLoaded}
@@ -456,31 +458,38 @@ function WorkspaceDetailView({
 
       {workspaceTab === 'tasks' && (
         <>
-          <TasksTab
-            comicName={comicName}
-            comicId={selectedDetails?.comicId}
-            tasks={tasks}
-            activeTasks={activeTasks}
-            pausedTasks={pausedTasks}
-            lockedColumns={lockedColumns}
-            setLockedColumns={setLockedColumns}
-            highlightedColumns={highlightedColumns}
-            setHighlightedColumns={setHighlightedColumns}
-            sortedColumns={sortedColumns}
-            setSortedColumns={setSortedColumns}
-            openDropdownCol={openDropdownCol}
-            setOpenDropdownCol={setOpenDropdownCol}
-            onCreateTaskClick={onCreateTaskClick}
-            onMoveAllToDone={onMoveAllToDone}
-            onMoveTask={onMoveTask}
-            onOpenTaskDetails={onOpenTaskDetails}
-            getAssigneeInitials={getAssigneeInitials}
-            members={members}
-            isCurrentLeader={isCurrentLeader}
-            chapterOptions={chapterOptions}
-            onOpenCreateTaskWithChapter={onCreateTaskClick}
-            onCreateTask={onCreateTask}
-          />
+          {tasksLoading ? (
+            <div className="fade-in" style={{ padding: '40px 0', textAlign: 'center' }}>
+              <div className="skeleton-dash-shimmer" style={{ width: '100%', height: '48px', borderRadius: '12px', marginBottom: '24px' }}></div>
+              <div className="skeleton-dash-shimmer" style={{ width: '100%', height: '320px', borderRadius: '16px' }}></div>
+            </div>
+          ) : (
+            <TasksTab
+              comicName={comicName}
+              comicId={selectedDetails?.comicId}
+              tasks={tasks}
+              activeTasks={activeTasks}
+              pausedTasks={pausedTasks}
+              lockedColumns={lockedColumns}
+              setLockedColumns={setLockedColumns}
+              highlightedColumns={highlightedColumns}
+              setHighlightedColumns={setHighlightedColumns}
+              sortedColumns={sortedColumns}
+              setSortedColumns={setSortedColumns}
+              openDropdownCol={openDropdownCol}
+              setOpenDropdownCol={setOpenDropdownCol}
+              onCreateTaskClick={onCreateTaskClick}
+              onMoveAllToDone={onMoveAllToDone}
+              onMoveTask={onMoveTask}
+              onOpenTaskDetails={onOpenTaskDetails}
+              getAssigneeInitials={getAssigneeInitials}
+              members={members}
+              isCurrentLeader={isCurrentLeader}
+              chapterOptions={chapterOptions}
+              onOpenCreateTaskWithChapter={onCreateTaskClick}
+              onCreateTask={onCreateTask}
+            />
+          )}
 
           {showCreateTask && (
             <CreateTaskModal
@@ -489,6 +498,7 @@ function WorkspaceDetailView({
               setNewTaskData={setNewTaskData}
               chapterOptions={chapterOptions}
               teamMembersForAssign={teamMembersForAssign}
+              tasks={tasks}
               onCancel={onCancelCreateTask}
               onCreate={onCreateTask}
             />
@@ -652,6 +662,7 @@ function TeamProjects() {
 
   const [workspaceTab, setWorkspaceTab] = useState('home')
   const [loadingWorkspace, setLoadingWorkspace] = useState(false)
+  const [tasksLoading, setTasksLoading] = useState(false)
 
   const [announcements, setAnnouncements] = useState([])
   const [newPostText, setNewPostText] = useState('')
@@ -665,7 +676,7 @@ function TeamProjects() {
   const [openDropdownCol, setOpenDropdownCol] = useState(null)
   const [selectedTask, setSelectedTask] = useState(null)
   const [editTaskData, setEditTaskData] = useState({
-    title: '', status: 'backlog', priority: 'Medium', assignees: [], dueDate: ''
+    title: '', status: 'backlog', priority: 'Medium', assigneeId: null, dueDate: ''
   })
 
   const [members, setMembers] = useState([])
@@ -674,7 +685,7 @@ function TeamProjects() {
   const [memberSearch, setMemberSearch] = useState('')
   const [showCreateTask, setShowCreateTask] = useState(false)
   const [newTaskData, setNewTaskData] = useState({
-    title: '', column: 'backlog', assignees: [], dueDate: '', priority: 'Medium', chapterId: null
+    title: '', column: 'backlog', assigneeId: null, dueDate: '', priority: 'Medium', chapterId: null
   })
 
   const getAssigneeInitials = (memberId) => {
@@ -688,7 +699,7 @@ function TeamProjects() {
     setNewTaskData({
       title: defaultTitle,
       column: chId ? 'in_progress' : 'backlog',
-      assignees: [],
+      assigneeId: null,
       dueDate: '',
       priority: 'Medium',
       chapterId: chId
@@ -724,6 +735,7 @@ function TeamProjects() {
     setSelectedDetails(project)
     setWorkspaceTab(initialTab)
     setShowUploadForm(false)
+    setTasksLoading(true)
 
     const cacheKey = `comiverse_team_details_cache_${project.id}`;
     let hasCache = false;
@@ -941,6 +953,7 @@ function TeamProjects() {
       // UI even after they were deleted/changed directly in the database.
       const finalCombinedTasks = Array.isArray(taskList) ? taskList : [];
       setTasks(finalCombinedTasks);
+      setTasksLoading(false);
 
       const mappedRequests = reqList.map(r => ({ ...r, roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles }));
       setJoinRequests(mappedRequests)
@@ -1015,6 +1028,7 @@ function TeamProjects() {
       console.error(err)
     } finally {
       setLoadingWorkspace(false)
+      setTasksLoading(false)
     }
   }
 
@@ -1412,8 +1426,8 @@ function TeamProjects() {
       toast.error('Please select a chapter.')
       return
     }
-    if (!data.assignees || data.assignees.length === 0) {
-      toast.error('Please assign at least one person.')
+    if (!data.assigneeId) {
+      toast.error('Please assign someone to this task.')
       return
     }
 
@@ -1426,8 +1440,7 @@ function TeamProjects() {
       id: `task-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       title: formattedTitle,
       status: data.column || 'backlog',
-      assignees: data.assignees,
-      assigneeIds: data.assignees,
+      assigneeId: data.assigneeId,
       chapterId: data.chapterId,
       dueDate: dueDateVal,
       createdAt: new Date().toISOString()
@@ -1439,7 +1452,7 @@ function TeamProjects() {
       const created = await createTeamTaskApi(selectedDetails.id, {
         title: formattedTitle,
         status: data.column || 'backlog',
-        assigneeIds: data.assignees,
+        assigneeId: data.assigneeId,
         chapterId: data.chapterId,
         dueDate: dueDateVal
       })
@@ -1454,7 +1467,7 @@ function TeamProjects() {
     setTasks(updatedTasks)
 
     if (!customData) {
-      setNewTaskData({ title: '', column: 'backlog', assignees: [], dueDate: '', priority: 'Medium', chapterId: null })
+      setNewTaskData({ title: '', column: 'backlog', assigneeId: null, dueDate: '', priority: 'Medium', chapterId: null })
       setShowCreateTask(false)
     }
     toast.success('Task created successfully!')
@@ -1483,7 +1496,7 @@ function TeamProjects() {
       comic: comicProject || '',
       status: getTaskColumn(task),
       priority: priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase(),
-      assignees: task.assigneeIds || [],
+      assigneeId: task.assigneeId || null,
       dueDate: task.dueDate || '',
       taskId: task.id || task._id || task.taskId || task.TaskID || 'KHONG-TIM-THAY-ID'
     })
@@ -1499,7 +1512,7 @@ function TeamProjects() {
       ...selectedTask,
       title: formattedTitle,
       status: editTaskData.status,
-      assigneeIds: editTaskData.assignees,
+      assigneeId: editTaskData.assigneeId,
       dueDate: editTaskData.dueDate
     }
 
@@ -1511,7 +1524,7 @@ function TeamProjects() {
       await updateTeamTaskApi(targetId, {
         title: formattedTitle,
         status: editTaskData.status,
-        assigneeIds: editTaskData.assignees,
+        assigneeId: editTaskData.assigneeId,
         dueDate: editTaskData.dueDate
       })
     } catch (err) {
@@ -1539,7 +1552,7 @@ function TeamProjects() {
       await Promise.all(targets.map(t => updateTeamTaskApi(t.id, {
         status: 'completed',
         dueDate: t.dueDate,
-        assigneeIds: t.assigneeIds
+        assigneeId: t.assigneeId
       })))
     } catch (err) {
       console.error('Backend move all tasks error, reverting:', err)
@@ -1605,6 +1618,7 @@ function TeamProjects() {
       <WorkspaceDetailView
         selectedDetails={selectedDetails}
         setSelectedDetails={setSelectedDetails}
+        tasksLoading={tasksLoading}
         onBackToProjects={() => {
           localStorage.removeItem('comiverse_active_project_id');
           setSelectedDetails(null);

@@ -16,7 +16,6 @@ import {
   Send,
   MessageSquare,
   BookMarked,
-  HelpCircle,
   Square,
   Pentagon,
   Minus,
@@ -30,11 +29,12 @@ import {
   RefreshCw,
   Sparkles,
 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getAuth } from "../../utils/Auth";
 import { toast } from "react-toastify";
 import useWorkspaceSecurity from "../../hooks/useWorkspaceSecurity";
+import { useChat } from "../../hooks/useChat";
 import "../../assets/style/translator/translate-workspace.css";
 import { API_BASE_URL as API_BASE, resolveImageUrl } from "../../config/apiConfig";
 
@@ -98,49 +98,65 @@ function PageStatusDot({ status }) {
   );
 }
 
-function ChapterList({ chapters, open, onToggle, currentChapterId, currentPageIndex, onSelectPage }) {
+function ChapterList({ chapters, openChapterId, onToggleChapter, chapterPagesLoading, currentChapterId, currentPageIndex, onSelectPage }) {
   return (
     <>
-      {chapters.map((ch) => (
-        <div key={ch.chapterId}>
-          <button onClick={() => onToggle(ch.chapterId)} className="tw-chapter-row">
-            {open[ch.chapterId] ? (
-              <ChevronDown size={14} color="#6C6F86" />
-            ) : (
-              <ChevronRight size={14} color="#6C6F86" />
+      {chapters.map((ch) => {
+        const isCurrent = ch.chapterId === currentChapterId;
+        const isOpen = ch.chapterId === openChapterId;
+        const isLoadingPages = isOpen && !isCurrent && chapterPagesLoading === ch.taskId;
+        return (
+          <div key={ch.chapterId}>
+            <button
+              onClick={() => onToggleChapter(ch)}
+              className={`tw-chapter-row ${isCurrent ? "is-current" : ""}`}
+            >
+              {isOpen ? (
+                <ChevronDown size={14} color="#6C6F86" />
+              ) : (
+                <ChevronRight size={14} color="#6C6F86" />
+              )}
+              <BookMarked size={14} color="#6C6F86" />
+              <span className="tw-chapter-title">{ch.title}</span>
+              <span className="tw-chapter-progress tw-font-mono">{ch.progress}</span>
+            </button>
+            <div
+              className="tw-chapter-assignee"
+              style={{ fontSize: "10.5px", color: "#6C6F86", padding: "0 8px 6px 34px", display: "flex", alignItems: "center", gap: "4px" }}
+              title={ch.assigneeLabel}
+            >
+              👤 {ch.assigneeLabel}
+            </div>
+            {isOpen && isLoadingPages && (
+              <div style={{ padding: "6px 8px 6px 34px", fontSize: "11px", color: "#6C6F86" }}>Loading pages…</div>
             )}
-            <BookMarked size={14} color="#6C6F86" />
-            <span className="tw-chapter-title">{ch.title}</span>
-            <span className="tw-chapter-progress tw-font-mono">{ch.progress}</span>
-          </button>
-          {open[ch.chapterId] &&
-            (ch.pages || []).map((page) => {
-              const pageIndex = page.pageNumber - 1;
-              const isSameChapter = ch.chapterId === currentChapterId;
-              const isCurrent = isSameChapter && pageIndex === currentPageIndex;
-              const status = isCurrent ? "current" : page.status === "DONE" ? "done" : "todo";
-              return (
-                <button
-                  key={page.pageId}
-                  className={`tw-page-row ${isCurrent ? "current" : ""} ${isSameChapter ? "" : "is-disabled"}`}
-                  onClick={() => isSameChapter && onSelectPage(ch.chapterId, pageIndex)}
-                  disabled={!isSameChapter}
-                  title={isSameChapter ? undefined : "View only — you can't switch chapters from here"}
-                >
-                  <span className="tw-page-row-inner">
-                    <PageStatusDot status={status} />
-                    Page {page.pageNumber}
-                  </span>
-                </button>
-              );
-            })}
-        </div>
-      ))}
+            {isOpen &&
+              !isLoadingPages &&
+              (ch.pages || []).map((page) => {
+                const pageIndex = page.pageNumber - 1;
+                const isCurrentPage = isCurrent && pageIndex === currentPageIndex;
+                const status = isCurrentPage ? "current" : page.status === "DONE" ? "done" : "todo";
+                return (
+                  <button
+                    key={page.pageId}
+                    className={`tw-page-row ${isCurrentPage ? "current" : ""}`}
+                    onClick={() => onSelectPage(ch, pageIndex)}
+                  >
+                    <span className="tw-page-row-inner">
+                      <PageStatusDot status={status} />
+                      Page {page.pageNumber}
+                    </span>
+                  </button>
+                );
+              })}
+          </div>
+        );
+      })}
     </>
   );
 }
 
-function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend, sending, saveStatus }) {
+function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend, sending, saveStatus, canEdit = true }) {
   const badgeConfig = {
     saving: { icon: <Loader2 size={11} strokeWidth={3} className="tw-spin" />, label: "SAVING" },
     saved: { icon: <Check size={11} strokeWidth={3} />, label: "SAVED" },
@@ -166,10 +182,20 @@ function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend,
       </div>
 
       <div className="tw-header-right">
+        {!canEdit && (
+          <span className="tw-badge-saved tw-font-mono" title="You are not assigned to this task">
+            🔒 VIEW ONLY
+          </span>
+        )}
         <span className={`tw-badge-saved tw-font-mono is-${statusKey}`}>
           {badgeConfig.icon} {badgeConfig.label}
         </span>
-        <button className="tw-btn">
+        <button
+          className="tw-btn"
+          disabled={!canEdit}
+          title={canEdit ? undefined : "You don't have permission to edit this task"}
+          style={!canEdit ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+        >
           <Upload size={14} /> Upload
         </button>
         <button
@@ -459,7 +485,7 @@ function PageNav({
 
 const RESIZE_HANDLES = ["nw", "ne", "sw", "se"];
 
-function ShapeToolbar({ activeTool, onSetTool }) {
+function ShapeToolbar({ activeTool, onSetTool, canEdit = true }) {
   const tools = [
     { id: "rect", label: "Rectangle", Icon: Square },
     { id: "ellipse", label: "Oval", Icon: Circle },
@@ -471,9 +497,10 @@ function ShapeToolbar({ activeTool, onSetTool }) {
         <button
           key={t.id}
           type="button"
-          onClick={() => onSetTool(t.id)}
+          onClick={() => canEdit && onSetTool(t.id)}
+          disabled={!canEdit}
           className={`tw-btn-icon ${activeTool === t.id ? "active" : ""}`}
-          title={t.label}
+          title={canEdit ? t.label : "You don't have permission to edit this task"}
         >
           <t.Icon size={14} />
         </button>
@@ -867,6 +894,7 @@ function TranslateTabPanel({
   onDeleteArea,
   zoomScale,
   userFullName,
+  canEdit = true,
 }) {
   const hasActiveSelection = activeSelection != null;
   const translationValue = activeSelection?.translation ?? "";
@@ -887,10 +915,10 @@ function TranslateTabPanel({
             </button>
             <button
               type="button"
-              onClick={() => hasActiveSelection && onDeleteArea(activeSelection.id)}
-              disabled={!hasActiveSelection}
-              className={`tw-btn-icon tw-x-delete-btn ${hasActiveSelection ? "is-enabled" : ""}`}
-              title={hasActiveSelection ? "Delete the selected area" : "Select an area first"}
+              onClick={() => hasActiveSelection && canEdit && onDeleteArea(activeSelection.id)}
+              disabled={!hasActiveSelection || !canEdit}
+              className={`tw-btn-icon tw-x-delete-btn ${hasActiveSelection && canEdit ? "is-enabled" : ""}`}
+              title={!canEdit ? "You don't have permission to edit this task" : hasActiveSelection ? "Delete the selected area" : "Select an area first"}
             >
               <Trash2 size={14} />
             </button>
@@ -949,28 +977,40 @@ function TranslateTabPanel({
         </p>
         <textarea
           value={translationValue}
-          onChange={(e) => onChangeTranslation(e.target.value)}
+          onChange={(e) => canEdit && onChangeTranslation(e.target.value)}
           className="tw-textarea tw-x-translation-textarea"
           style={{
             "--text-align": textStyle.textAlign,
             "--font-weight": textStyle.fontWeight,
             "--font-style": textStyle.fontStyle,
           }}
-          placeholder={hasActiveSelection ? "Enter translation for this area..." : "Select an area first"}
-          disabled={!hasActiveSelection}
+          placeholder={
+            !canEdit
+              ? "View only — you're not assigned to this task"
+              : hasActiveSelection
+              ? "Enter translation for this area..."
+              : "Select an area first"
+          }
+          disabled={!hasActiveSelection || !canEdit}
+          readOnly={!canEdit}
         />
         <div className="tw-textarea-footer">
           <span>{translationValue.length} CHARS</span>
         </div>
       </div>
 
-      <button onClick={onSaveProgress} className="tw-save-next-btn">
+      <button
+        onClick={onSaveProgress}
+        className="tw-save-next-btn"
+        disabled={!canEdit}
+        title={canEdit ? undefined : "You don't have permission to edit this task"}
+        style={!canEdit ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+      >
         Save
       </button>
     </div>
   );
 }
-
 
 async function fetchGlossaryTerms(comicId, signal) {
   const res = await fetch(`${API_BASE}/glossary/comic/${comicId}`, {
@@ -1689,9 +1729,13 @@ function TranslationSidePanel({
   onSelectBubble,
   comicId,
   pageId,
+  canEdit = true,
+  projectTeamId,
 }) {
+  const [isMsgOpen, setIsMsgOpen] = useState(false);
+
   return (
-    <aside className="tw-rightpanel">
+    <aside className="tw-rightpanel" style={{ position: "relative" }}>
       <div className="tw-tabs">
         {TABS.map((t) => (
           <button key={t.id} onClick={() => onChangeTab(t.id)} className={`tw-tab ${activeTab === t.id ? "active" : ""}`}>
@@ -1718,6 +1762,7 @@ function TranslationSidePanel({
           onDeleteArea={onDeleteArea}
           zoomScale={zoomScale}
           userFullName={userFullName}
+          canEdit={canEdit}
         />
       )}
       {activeTab === "glossary" && (
@@ -1732,12 +1777,134 @@ function TranslationSidePanel({
         />
       )}
 
-      <div className="tw-panel-footer">
-        <button className="tw-help-btn">
-          <HelpCircle size={14} />
+      <div className="tw-panel-footer" style={{ position: "relative" }}>
+        <button
+          className="tw-help-btn"
+          onClick={() => setIsMsgOpen((v) => !v)}
+          title="Team messages"
+        >
+          <MessageSquare size={14} />
         </button>
+        {isMsgOpen && (
+          <TeamMessagePopup
+            groupId={projectTeamId}
+            onClose={() => setIsMsgOpen(false)}
+          />
+        )}
       </div>
     </aside>
+  );
+}
+
+function TeamMessagePopup({ groupId, onClose }) {
+  const [inputValue, setInputValue] = useState("");
+  const {
+    messages,
+    hasMore,
+    isLoadingInitial,
+    isLoadingMore,
+    isSending,
+    currentUser,
+    scrollContainerRef,
+    isNearBottomRef,
+    fetchOlderMessages,
+    sendMessage,
+  } = useChat("GROUP", groupId);
+
+  const handleScroll = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    if (container.scrollTop < 30 && hasMore && !isLoadingMore && !isLoadingInitial) {
+      fetchOlderMessages();
+    }
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (isNearBottomRef) isNearBottomRef.current = distanceFromBottom < 80;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!inputValue.trim() || isSending) return;
+    const text = inputValue.trim();
+    setInputValue("");
+    try {
+      await sendMessage(text);
+    } catch (err) {
+      console.error("Failed to send group message:", err);
+    }
+  };
+
+  const isMyMessage = (msg) => {
+    if (!msg) return false;
+    if (msg.isMe) return true;
+    if (currentUser?.id && String(msg.senderId) === String(currentUser.id)) return true;
+    if (currentUser?.username && (msg.senderName === currentUser.username || msg.sender === currentUser.username)) return true;
+    if (currentUser?.fullName && (msg.senderName === currentUser.fullName || msg.sender === currentUser.fullName)) return true;
+    return false;
+  };
+  const getSenderName = (msg) => msg.senderName || msg.sender || msg.sender_name || "Someone";
+  const formatMsgTime = (msg) => {
+    if (msg.time) return msg.time;
+    if (msg.createdAt) {
+      const d = new Date(msg.createdAt);
+      if (!isNaN(d.getTime())) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+    return "";
+  };
+
+  return (
+    <div className="tw-msg-popup">
+      <div className="tw-msg-popup-header">
+        <span className="tw-msg-popup-title">
+          <MessageSquare size={14} /> Group Chat
+        </span>
+        <div className="tw-msg-popup-header-actions">
+          <span className="tw-msg-popup-badge">
+            <span className="tw-msg-popup-badge-dot" /> Live
+          </span>
+          <button type="button" onClick={onClose} title="Close" className="tw-msg-popup-close">
+            ×
+          </button>
+        </div>
+      </div>
+
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="tw-msg-popup-body">
+        {isLoadingMore && <div className="tw-msg-popup-loading-more">Loading older messages…</div>}
+        {isLoadingInitial ? (
+          <div className="tw-msg-popup-status">Loading messages…</div>
+        ) : messages.length === 0 ? (
+          <div className="tw-msg-popup-status">No messages yet — say hi to your team!</div>
+        ) : (
+          messages.map((m, idx) => {
+            const isMe = isMyMessage(m);
+            const content = m.content || m.text || "";
+            const time = formatMsgTime(m);
+            return (
+              <div key={m.id || idx} className={`tw-msg-row ${isMe ? "is-me" : ""}`}>
+                <div className="tw-msg-row-inner">
+                  {!isMe && <div className="tw-msg-sender">{getSenderName(m)}</div>}
+                  <div className="tw-msg-bubble">{content}</div>
+                  {time && <div className="tw-msg-time">{time}</div>}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit} className="tw-msg-popup-form">
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder="Type a message…"
+          disabled={isSending}
+          className="tw-msg-popup-input"
+        />
+        <button type="submit" disabled={!inputValue.trim() || isSending} className="tw-msg-popup-send">
+          <Send size={16} />
+        </button>
+      </form>
+    </div>
   );
 }
 
@@ -1841,39 +2008,125 @@ function getTaskFallbackData(taskId) {
 async function fetchChapterForTask(taskId, signal) {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  
   if (UUID_RE.test(taskId)) {
-    try {
-      const task = await fetchJson(`${API_BASE}/team-workspace/tasks/${taskId}`, signal);
+    // Real backend task — let failures propagate as real errors instead of
+    // silently falling back to generic "Chapter 1 - Translation" demo data.
+    // Masking a failed load as fake-but-successful content is exactly what
+    // caused chapters to mysteriously "turn into Chapter 1" on switch.
+    const task = await fetchJson(`${API_BASE}/team-workspace/tasks/${taskId}`, signal);
 
-      const chapterId =
-        task?.chapter?.id ??
-        task?.chapterId ??
-        task?.chapter_id ??
-        task?.data?.chapterId ??
-        task?.task?.chapterId ??
-        (Array.isArray(task) ? task[0]?.chapterId : undefined);
+    const chapterId =
+      task?.chapter?.id ??
+      task?.chapterId ??
+      task?.chapter_id ??
+      task?.data?.chapterId ??
+      task?.task?.chapterId ??
+      (Array.isArray(task) ? task[0]?.chapterId : undefined);
 
-      if (chapterId && UUID_RE.test(chapterId)) {
-        try {
-          const chapterResult = await fetchChapterById(chapterId, signal);
-          return { ...chapterResult, projectTeamId: task?.projectTeamId ?? null };
-        } catch (chErr) {  }
-      }
-    } catch (err) {  }
+    const taskAssigneeId = task?.assigneeId ?? null;
+
+    if (!chapterId || !UUID_RE.test(chapterId)) {
+      throw new Error(`Task ${taskId} has no valid chapter linked (got chapterId: ${chapterId ?? "none"})`);
+    }
+
+    const chapterResult = await fetchChapterById(chapterId, signal);
+    return {
+      ...chapterResult,
+      projectTeamId: task?.projectTeamId ?? null,
+      taskAssigneeId,
+    };
   }
 
-  
+  // Only synthetic/local-only task IDs (never saved to the backend) fall back
+  // to the localStorage demo cache — this is its actual intended use case.
   const fallback = getTaskFallbackData(taskId);
+  const fallbackAssigneeId = fallback.task?.assigneeId ?? null;
   const chId = fallback.chapter?.id;
   if (chId && UUID_RE.test(chId)) {
-    try {
-      const chapterResult = await fetchChapterById(chId, signal);
-      return { ...chapterResult, projectTeamId: null };
-    } catch (chErr) {  }
+    const chapterResult = await fetchChapterById(chId, signal);
+    return {
+      ...chapterResult,
+      projectTeamId: null,
+      taskAssigneeId: fallbackAssigneeId,
+    };
   }
 
-  return fallback.chapter;
+  return { ...fallback.chapter, taskAssigneeId: fallbackAssigneeId };
+}
+
+// ChapterEntity has no `title` field — only `chapterNumber`. Every place that
+// displays a chapter's name must derive it, or it silently falls back to
+// whatever hardcoded default happens to be nearby (which is how the sidebar
+// ended up always showing "Chapter 1" regardless of which chapter was open).
+function deriveChapterTitle(chapter) {
+  if (!chapter) return null;
+  if (chapter.title) return chapter.title;
+  if (chapter.chapterNumber != null) return `Chapter ${chapter.chapterNumber}`;
+  return null;
+}
+
+// Strips a leading "[PRIORITY] [ComicName]" prefix off a task title, leaving
+// just the clean chapter/task name. Used whenever we have to fall back to a
+// task's raw title (e.g. when the chapter relation isn't populated) instead of
+// the real chapter title.
+function stripTaskTitlePrefix(title) {
+  if (!title) return title;
+  const match = String(title).match(/^\[(URGENT|HIGH|MEDIUM|LOW)\]\s*(?:\[([^\]]+)\])?\s*(.*)$/i);
+  return match ? match[3] || title : title;
+}
+
+// Fetches the other tasks (chapters) that belong to the same project team, so the
+// sidebar can offer chapter switching. GET /team-workspace/{teamId}/tasks
+async function fetchProjectTeamTasks(projectTeamId, signal) {
+  if (!projectTeamId) return [];
+  try {
+    const list = await fetchJson(`${API_BASE}/team-workspace/${projectTeamId}/tasks`, signal);
+    const arr = Array.isArray(list) ? list : list?.data || list?.content || [];
+    return arr.map((t) => ({
+      id: t?.id,
+      chapterId: t?.chapter?.id ?? t?.chapterId,
+      chapterNumber: t?.chapter?.chapterNumber ?? null,
+      title: deriveChapterTitle(t?.chapter) ?? stripTaskTitlePrefix(t?.title) ?? "Untitled chapter",
+      status: t?.status,
+      assigneeId: t?.assigneeId ?? null,
+    })).filter((t) => t.id);
+  } catch (err) {
+    return [];
+  }
+}
+
+// GET /team-workspace/{teamId}/members -> List<TeamMemberDto> { id, name, role, avatar, online, lastSeenAt }
+async function fetchTeamMembers(projectTeamId, signal) {
+  if (!projectTeamId) return [];
+  try {
+    const list = await fetchJson(`${API_BASE}/team-workspace/${projectTeamId}/members`, signal);
+    return Array.isArray(list) ? list : list?.data || list?.content || [];
+  } catch (err) {
+    return [];
+  }
+}
+
+// Does this single assigneeId belong to the given user?
+function isSameUser(assigneeId, userId) {
+  if (assigneeId == null || userId == null) return false;
+  return String(assigneeId) === String(userId);
+}
+
+// Look up a member's display name by id from the fetched team member list.
+function resolveMemberName(memberId, teamMembers) {
+  if (memberId == null) return null;
+  const member = (teamMembers || []).find((m) => String(m.id) === String(memberId));
+  return member?.name || null;
+}
+
+// Readable "who's assigned" label for the sidebar, resolved against the real team
+// member list. Falls back to a short id fragment only if the member list hasn't
+// loaded yet or the id isn't found (e.g. member removed from the team).
+function formatAssigneeLabel(assigneeId, teamMembers) {
+  if (assigneeId == null) return "Unassigned";
+  const name = resolveMemberName(assigneeId, teamMembers);
+  if (name) return name;
+  return `Assignee ${String(assigneeId).slice(0, 8)}`;
 }
 
 async function fetchPagesForTask(taskId, signal) {
@@ -2364,7 +2617,7 @@ function selectionsFromImagePercent(selections, canvasSize, naturalSize) {
   });
 }
 
-function useSelectionAreas() {
+function useSelectionAreas(canEdit = true) {
   const [selections, setSelections] = useState([]);
   const [drawing, setDrawing] = useState(null);
   const [activeId, setActiveId] = useState(null);
@@ -2427,6 +2680,7 @@ function useSelectionAreas() {
     }
 
     if (dragState.current) return;
+    if (!canEdit) return;
 
     const pos = getRelativePos(e);
 
@@ -2519,6 +2773,7 @@ function useSelectionAreas() {
   };
 
   const finishPolygon = () => {
+    if (!canEdit) return;
     if (polygonDraft && polygonDraft.length >= 3) {
       const newArea = {
         id: generateId(),
@@ -2544,6 +2799,7 @@ function useSelectionAreas() {
   const selectArea = (id) => setActiveId(id);
 
   const deleteArea = (id) => {
+    if (!canEdit) return;
     setSelections((prev) => prev.filter((s) => s.id !== id));
     setActiveId((cur) => (cur === id ? null : cur));
   };
@@ -2571,14 +2827,17 @@ function useSelectionAreas() {
   };
 
   const updateTranslation = (id, translation) => {
+    if (!canEdit) return;
     setSelections((prev) => prev.map((s) => (s.id === id ? { ...s, translation } : s)));
   };
 
   const updateName = (id, name) => {
+    if (!canEdit) return;
     setSelections((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
   };
 
   const updateSelectionStyle = (id, patch) => {
+    if (!canEdit) return;
     setSelections((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   };
 
@@ -2603,6 +2862,7 @@ function useSelectionAreas() {
   };
 
   const startMove = (e, id) => {
+    if (!canEdit) return;
     const selection = selections.find((s) => s.id === id);
     if (!selection) return;
     dragState.current = {
@@ -2615,6 +2875,7 @@ function useSelectionAreas() {
   };
 
   const startResize = (e, id, handle) => {
+    if (!canEdit) return;
     const selection = selections.find((s) => s.id === id);
     if (!selection) {
       return;
@@ -2630,6 +2891,7 @@ function useSelectionAreas() {
   };
 
   const startVertexDrag = (e, id, vertexIndex) => {
+    if (!canEdit) return;
     const selection = selections.find((s) => s.id === id);
     if (!selection) {
       return;
@@ -2797,6 +3059,7 @@ export default function TranslateWorkspace() {
 
   const { taskId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isLoggedIn } = useAuth();
   const auth = getAuth();
   const authUser = auth?.user;
@@ -2812,7 +3075,6 @@ export default function TranslateWorkspace() {
 
   const [activeTab, setActiveTab] = useState("translate");
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
-  const [open, setOpen] = useState({});
   const pixelCanvasRef = useRef(null);
   if (!pixelCanvasRef.current && typeof document !== "undefined") {
     pixelCanvasRef.current = document.createElement("canvas");
@@ -2838,6 +3100,35 @@ export default function TranslateWorkspace() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [pickingColorFor]);
+
+  const currentUserId = authUser?.id ?? authUser?.userId ?? null;
+
+  const [teamMembers, setTeamMembers] = useState([]);
+
+  useEffect(() => {
+    const projectTeamId = chapterData?.projectTeamId;
+    if (!projectTeamId) {
+      setTeamMembers([]);
+      return;
+    }
+    const controller = new AbortController();
+    fetchTeamMembers(projectTeamId, controller.signal)
+      .then(setTeamMembers)
+      .catch(() => setTeamMembers([]));
+    return () => controller.abort();
+  }, [chapterData?.projectTeamId]);
+
+  const isAssignedToTask = isSameUser(chapterData?.taskAssigneeId, currentUserId);
+
+  const isProjectLeader = useMemo(() => {
+    const me = (teamMembers || []).find((m) => String(m.id) === String(currentUserId));
+    return me?.role === "Group Leader";
+  }, [teamMembers, currentUserId]);
+
+  // Nobody is allowed to edit until we've actually loaded the task and know
+  // who's assigned — default is read-only, not editable.
+  const canEdit = status === "ready" && (isProjectLeader || isAssignedToTask);
+
 
   const {
     containerRef: canvasRef,
@@ -2872,7 +3163,7 @@ export default function TranslateWorkspace() {
     zoomOut,
     resetZoom,
     cancelZoomPick,
-  } = useSelectionAreas(userFullName);
+  } = useSelectionAreas(canEdit);
 
   const applyPendingBubbles = useCallback(
     (naturalSize) => {
@@ -3056,6 +3347,16 @@ export default function TranslateWorkspace() {
     [activeSelection]
   );
 
+  const pendingTargetPageRef = useRef(null);
+  const consumePendingTargetIndex = (pages) => {
+    const target = pendingTargetPageRef.current;
+    if (target == null) return null;
+    pendingTargetPageRef.current = null;
+    const idx = pages.findIndex((p) => p.pageNumber === target);
+    if (idx !== -1) return idx;
+    return Math.max(0, Math.min(target - 1, pages.length - 1));
+  };
+
   useEffect(() => {
     if (!taskId) return;
 
@@ -3072,9 +3373,9 @@ export default function TranslateWorkspace() {
           setChapterData(cChapter);
           setTaskPages(cPages);
           setCurrentChapterId(cChapter.id);
-          setCurrentPageIndex(0);
+          const pendingIdx = consumePendingTargetIndex(cPages);
+          setCurrentPageIndex(pendingIdx != null ? pendingIdx : 0);
           setStatus("ready");
-          setOpen({ [cChapter.id]: true });
           hasCache = true;
           
           cPages.slice(0, 3).forEach(p => {
@@ -3097,7 +3398,10 @@ export default function TranslateWorkspace() {
         setChapterData(chapterResult);
         setTaskPages(pagesResult);
         setCurrentChapterId(chapterResult.id);
-        if (!hasCache) {
+        const pendingIdx = consumePendingTargetIndex(pagesResult);
+        if (pendingIdx != null) {
+          setCurrentPageIndex(pendingIdx);
+        } else if (!hasCache) {
           setCurrentPageIndex(0);
         } else {
 
@@ -3116,8 +3420,7 @@ export default function TranslateWorkspace() {
           });
         }
         setStatus("ready");
-        setOpen({ [chapterResult.id]: true });
-        
+
         try {
           sessionStorage.setItem(cacheKey, JSON.stringify({
             chapter: chapterResult,
@@ -3218,25 +3521,114 @@ export default function TranslateWorkspace() {
     return idx >= 0 ? `Bubble ${idx + 1}` : "Bubble (deleted)";
   }, []);
 
+  const [siblingTasks, setSiblingTasks] = useState([]);
+
+  useEffect(() => {
+    const projectTeamId = chapterData?.projectTeamId;
+    if (!projectTeamId) {
+      setSiblingTasks([]);
+      return;
+    }
+    const controller = new AbortController();
+    fetchProjectTeamTasks(projectTeamId, controller.signal)
+      .then(setSiblingTasks)
+      .catch(() => setSiblingTasks([]));
+    return () => controller.abort();
+  }, [chapterData?.projectTeamId]);
+
+  const [chapterPagesCache, setChapterPagesCache] = useState({});
+  const [chapterPagesLoadingId, setChapterPagesLoadingId] = useState(null);
+  const [openChapterId, setOpenChapterId] = useState(null);
+
+  // Whenever the actively-open task changes (a real switch happened), that
+  // chapter's row should be the one expanded by default.
+  useEffect(() => {
+    if (currentChapterId) setOpenChapterId(currentChapterId);
+  }, [currentChapterId]);
+
   const sidebarChapters = useMemo(() => {
     if (!chapterData && taskPages.length === 0) return [];
     const chapId = chapterData?.id || currentChapterId || 'ch-1';
-    const chapTitle = chapterData?.title || 'Chapter 1';
+    const chapTitle = deriveChapterTitle(chapterData) || 'Chapter';
     const doneCount = taskPages.filter((p) => p.status === "DONE").length;
-    return [
-      {
-        chapterId: chapId,
-        title: chapTitle,
-        progress: `${doneCount > 0 ? doneCount : (taskPages.length > 0 ? currentPageIndex + 1 : 0)}/${taskPages.length}`,
-        pages: taskPages.map((p, idx) => ({
-          ...p,
-          pageId: p.pageId || p.id || `p-${idx + 1}`,
-          pageNumber: p.pageNumber || idx + 1,
-          status: p.status === "DONE" ? "DONE" : (idx === currentPageIndex ? "current" : "todo")
-        })),
-      },
-    ];
-  }, [chapterData, currentChapterId, taskPages, currentPageIndex]);
+
+    const currentEntry = {
+      chapterId: chapId,
+      taskId,
+      chapterNumber: chapterData?.chapterNumber ?? null,
+      title: chapTitle,
+      progress: `${doneCount > 0 ? doneCount : (taskPages.length > 0 ? currentPageIndex + 1 : 0)}/${taskPages.length}`,
+      assigneeLabel: formatAssigneeLabel(chapterData?.taskAssigneeId, teamMembers),
+      pages: taskPages.map((p, idx) => ({
+        ...p,
+        pageId: p.pageId || p.id || `p-${idx + 1}`,
+        pageNumber: p.pageNumber || idx + 1,
+        status: p.status === "DONE" ? "DONE" : (idx === currentPageIndex ? "current" : "todo")
+      })),
+    };
+
+    const siblingEntries = (siblingTasks || [])
+      .filter((t) => String(t.id) !== String(taskId))
+      .map((t) => {
+        const cachedPages = chapterPagesCache[t.id];
+        return {
+          chapterId: t.chapterId || t.id,
+          taskId: t.id,
+          chapterNumber: t.chapterNumber ?? null,
+          title: t.title,
+          progress: t.status || '',
+          assigneeLabel: formatAssigneeLabel(t.assigneeId, teamMembers),
+          pages: (cachedPages || []).map((p, idx) => ({
+            ...p,
+            pageId: p.pageId || p.id || `p-${idx + 1}`,
+            pageNumber: p.pageNumber || idx + 1,
+            status: p.status === "DONE" ? "DONE" : "todo",
+          })),
+        };
+      });
+
+    // Keep a stable order by chapter number — switching the active chapter
+    // should never reshuffle the list (e.g. bump it to the top).
+    const orderKey = (entry) => {
+      if (entry.chapterNumber != null) {
+        const fromField = Number(entry.chapterNumber);
+        if (!Number.isNaN(fromField)) return fromField;
+      }
+      const match = String(entry.title || "").match(/(\d+)/);
+      return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+    };
+    return [currentEntry, ...siblingEntries].sort((a, b) => {
+      const diff = orderKey(a) - orderKey(b);
+      if (diff !== 0) return diff;
+      return String(a.title).localeCompare(String(b.title));
+    });
+  }, [chapterData, currentChapterId, taskPages, currentPageIndex, taskId, siblingTasks, teamMembers, chapterPagesCache]);
+
+  // Chapter row clicked: just expand/collapse locally — no navigation, no
+  // switching the active editing task. Lazily fetch that chapter's page list
+  // the first time it's expanded (skipped for the currently active chapter,
+  // which already has its real page list loaded).
+  const toggleChapterPreview = useCallback(
+    (entry) => {
+      setOpenChapterId((prev) => (prev === entry.chapterId ? null : entry.chapterId));
+      if (entry.taskId === taskId) return;
+      if (chapterPagesCache[entry.taskId]) return;
+      setChapterPagesLoadingId(entry.taskId);
+      fetchPagesForTask(entry.taskId)
+        .then((pages) => {
+          setChapterPagesCache((prev) => ({ ...prev, [entry.taskId]: pages || [] }));
+        })
+        .catch(() => {
+          setChapterPagesCache((prev) => ({ ...prev, [entry.taskId]: [] }));
+        })
+        .finally(() => {
+          setChapterPagesLoadingId((prev) => (prev === entry.taskId ? null : prev));
+        });
+    },
+    [taskId, chapterPagesCache]
+  );
+
+
 
 
   
@@ -3264,6 +3656,7 @@ export default function TranslateWorkspace() {
   const persistBubbles = useCallback(
     (pageId, selectionsArray, expectedImageUrl) => {
       if (!pageId) return Promise.resolve(false);
+      if (!canEdit) return Promise.resolve(false);
 
       setSaveStatus("saving");
 
@@ -3297,7 +3690,7 @@ export default function TranslateWorkspace() {
         });
       });
     },
-    [canvasRef]
+    [canvasRef, canEdit]
   );
 
 
@@ -3312,6 +3705,18 @@ export default function TranslateWorkspace() {
     return Promise.resolve(false);
   }, [currentPageMeta, currentImage, persistBubbles]);
 
+  const switchToTask = useCallback(
+    (entry, pageNumber = null) => {
+      if (!entry || !entry.taskId || String(entry.taskId) === String(taskId)) return;
+      pendingTargetPageRef.current = pageNumber;
+      persistCurrentPage();
+      const newPath = location.pathname.replace(String(taskId), String(entry.taskId));
+      navigate(newPath);
+    },
+    [taskId, location.pathname, navigate, persistCurrentPage]
+  );
+
+
   const goToPage = useCallback(
     (index) => {
       if (index < 0 || index >= images.length) return;
@@ -3324,16 +3729,15 @@ export default function TranslateWorkspace() {
     [images.length, persistCurrentPage]
   );
 
-  const toggleChapter = useCallback((id) => {
-    setOpen((o) => ({ ...o, [id]: !o[id] }));
-  }, []);
-
   const handleSelectPage = useCallback(
-    (chapterId, pageIndex) => {
-      if (chapterId !== currentChapterId) return;
-      goToPage(pageIndex);
+    (entry, pageIndex) => {
+      if (entry.chapterId === currentChapterId) {
+        goToPage(pageIndex);
+      } else {
+        switchToTask(entry, pageIndex + 1);
+      }
     },
-    [currentChapterId, goToPage]
+    [currentChapterId, goToPage, switchToTask]
   );
 
   const gotoProjectList = useCallback(() => {
@@ -3364,17 +3768,21 @@ export default function TranslateWorkspace() {
   }, [goToPage, currentPageIndex]);
 
   const handleSaveProgress = useCallback(() => {
+    if (!canEdit) {
+      toast.warning("You don't have permission to edit this task.");
+      return;
+    }
     persistCurrentPage().then((success) => {
       if (success !== false) {
         toast.success("Translation saved successfully!");
       }
     });
-  }, [persistCurrentPage]);
+  }, [persistCurrentPage, canEdit]);
 
   const isLastPage = images.length > 0 && currentPageIndex === images.length - 1;
 
   const handleSend = useCallback(async () => {
-    if (!isLastPage || sending) return;
+    if (!isLastPage || sending || !canEdit) return;
 
     setSending(true);
     try {
@@ -3400,7 +3808,7 @@ export default function TranslateWorkspace() {
     } finally {
       setSending(false);
     }
-  }, [isLastPage, sending, persistCurrentPage, taskId, navigate, chapterData]);
+  }, [isLastPage, sending, canEdit, persistCurrentPage, taskId, navigate, chapterData]);
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -3484,10 +3892,11 @@ export default function TranslateWorkspace() {
     <div className="tw-root">
       <TranslateHeaderBar
         comicTitle={chapterData?.comicTitle}
-        chapterTitle={chapterData?.title}
+        chapterTitle={deriveChapterTitle(chapterData)}
         onBack={gotoProjectList}
         onSend={handleSend}
-        canSend={isLastPage}
+        canSend={isLastPage && canEdit}
+        canEdit={canEdit}
         sending={sending}
         saveStatus={saveStatus}
       />
@@ -3499,8 +3908,9 @@ export default function TranslateWorkspace() {
               <p className="tw-sidebar-label">PROJECT FILES</p>
               <ChapterList
                 chapters={sidebarChapters}
-                open={open}
-                onToggle={toggleChapter}
+                openChapterId={openChapterId}
+                onToggleChapter={toggleChapterPreview}
+                chapterPagesLoading={chapterPagesLoadingId}
                 currentChapterId={currentChapterId}
                 currentPageIndex={currentPageIndex}
                 onSelectPage={handleSelectPage}
@@ -3525,6 +3935,7 @@ export default function TranslateWorkspace() {
             <div className="tw-canvas-toolbar">
               <ShapeToolbar
                 activeTool={activeTool}
+                canEdit={canEdit}
                 onSetTool={(tool) => {
                   cancelZoomPick();
                   setActiveTool(tool);
@@ -3551,7 +3962,7 @@ export default function TranslateWorkspace() {
                 fontFamily={activeSelection?.fontFamily ?? COMIC_FONT_LIBRARY[0].value}
                 textColor={activeSelection?.textColor ?? "#000000"}
                 textBgColor={activeSelection?.textBgColor ?? "#ffffff"}
-                hasActiveSelection={activeSelection != null}
+                hasActiveSelection={activeSelection != null && canEdit}
                 onToggleBold={() =>
                   activeId != null && updateSelectionStyle(activeId, { isBold: !(activeSelection?.isBold) })
                 }
@@ -3630,6 +4041,8 @@ export default function TranslateWorkspace() {
           onSelectBubble={selectArea}
           comicId={chapterData?.comicId}
           pageId={currentPageMeta?.pageId}
+          canEdit={canEdit}
+          projectTeamId={chapterData?.projectTeamId}
         />
       </div>
     </div>

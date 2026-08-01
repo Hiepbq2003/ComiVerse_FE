@@ -15,7 +15,8 @@ export default function CustomDatePicker({
   placeholder = 'Select date of birth',
   style,
   className = '',
-  disabled = false
+  disabled = false,
+  minDate = null
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
@@ -111,6 +112,16 @@ export default function CustomDatePicker({
     }
   }, [isOpen]);
 
+  const parsedMin = parseValue(minDate);
+
+  const isDateDisabled = (y, m, d) => {
+    if (!parsedMin) return false;
+    const mm = String(m + 1).padStart(2, '0');
+    const dd = String(d).padStart(2, '0');
+    const dateStr = `${y}-${mm}-${dd}`;
+    return dateStr < minDate;
+  };
+
   const handlePrevMonth = () => {
     if (viewMonth === 0) {
       setViewMonth(11);
@@ -130,6 +141,7 @@ export default function CustomDatePicker({
   };
 
   const handleSelectDay = (day) => {
+    if (isDateDisabled(viewYear, viewMonth, day)) return;
     const mm = String(viewMonth + 1).padStart(2, '0');
     const dd = String(day).padStart(2, '0');
     const formatted = `${viewYear}-${mm}-${dd}`;
@@ -142,6 +154,7 @@ export default function CustomDatePicker({
     const y = today.getFullYear();
     const m = today.getMonth();
     const d = today.getDate();
+    if (isDateDisabled(y, m, d)) return;
     setViewYear(y);
     setViewMonth(m);
     const mm = String(m + 1).padStart(2, '0');
@@ -276,12 +289,16 @@ export default function CustomDatePicker({
                 new Date().getMonth() === viewMonth && 
                 new Date().getDate() === dayNum;
 
+              const isDisabled = isDateDisabled(viewYear, viewMonth, dayNum);
+
               return (
                 <button
                   type="button"
                   key={`day-${dayNum}`}
-                  className={`custom-datepicker-day ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
+                  className={`custom-datepicker-day ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''} ${isDisabled ? 'is-disabled' : ''}`}
                   onClick={() => handleSelectDay(dayNum)}
+                  disabled={isDisabled}
+                  style={isDisabled ? { opacity: 0.35, cursor: 'not-allowed', pointerEvents: 'none' } : undefined}
                 >
                   {dayNum}
                 </button>

@@ -94,29 +94,56 @@ export function isUserAssignedToTask(t, teamMembers = [], authUser) {
   const currentUserName = (authUser.fullName || authUser.username || '').toLowerCase().trim();
   const currentUserId = authUser.id ? String(authUser.id) : null;
 
-  const assignees = t.assignees || t.assigneeIds || t.assignedMembers || [];
-  if (!Array.isArray(assignees) || assignees.length === 0) return false;
+  // Single-assignee model — matches backend's TeamTaskEntity.assigneeId (UUID).
+  const mId = t.assigneeId;
+  if (!mId) return false;
 
-  return assignees.some(mId => {
-    if (!mId) return false;
+  // 1. Direct ID match
+  if (currentUserId && String(mId) === currentUserId) return true;
 
+  // 2. Direct string name match (covers local/demo data where the id slot holds a name)
+  if (typeof mId === 'string') {
+    const s = mId.toLowerCase().trim();
+    if (s === currentUserName || (currentUserId && s === currentUserId)) return true;
+  }
+
+  // 3. Candidate lookup in team members list
+  const mem = teamMembers.find(m => String(m?.id) === String(mId));
+  if (mem) {
+    const mName = (mem.name || mem.fullName || mem.username || '').toLowerCase().trim();
+    if (mName === currentUserName || (currentUserId && String(mem.id) === currentUserId)) return true;
+  }
+
+  return false;
+}
+
+export function filterUnassignedChapters(chapterOptions, tasks) {
+  const assignedChapterIds = new Set(
+    (tasks || [])
+      .map(t => String(t?.chapterId || t?.chapter_id || ''))
+      .filter(Boolean)
+  );
+
+  return (chapterOptions || []).filter(ch => {
+    if (!ch) return false;
     // 1. Direct ID match
-    if (currentUserId && String(mId) === currentUserId) return true;
+    if (ch.id && assignedChapterIds.has(String(ch.id))) return false;
 
-    // 2. Direct string name match
-    if (typeof mId === 'string') {
-      const s = mId.toLowerCase().trim();
-      if (s === currentUserName || (currentUserId && s === currentUserId)) return true;
-    }
+    // 2. Title / Chapter number pattern match against existing tasks
+    const chTitleLower = (ch.title || '').toLowerCase();
+    const chNumMatch = chTitleLower.match(/chapter\s*(\d+)/i);
 
-    // 3. Candidate lookup in team members list
-    const mem = teamMembers.find(m => String(m?.id) === String(mId));
-    if (mem) {
-      const mName = (mem.name || mem.fullName || mem.username || '').toLowerCase().trim();
-      if (mName === currentUserName || (currentUserId && String(mem.id) === currentUserId)) return true;
-    }
+    const isTaskCreated = (tasks || []).some(t => {
+      if (!t || !t.title) return false;
+      const tLower = t.title.toLowerCase();
 
-    return false;
+      if (chTitleLower && tLower.includes(chTitleLower)) return true;
+      if (chNumMatch && tLower.includes(`chapter ${chNumMatch[1]}`)) return true;
+
+      return false;
+    });
+
+    return !isTaskCreated;
   });
 }
 
@@ -127,41 +154,20 @@ const COLUMN_LIST = [
   { id: 'completed', title: 'Completed', dotClass: 'column__dot--done' }
 ]
 
-function TaskAssigneeAvatars({ assigneeIds, getAssigneeInitials }) {
-  const ids = assigneeIds && assigneeIds.length > 0 ? assigneeIds : [null]
+function TaskAssigneeAvatar({ assigneeId, getAssigneeInitials }) {
   return (
     <div style={{ display: 'flex' }}>
-      {ids.slice(0, 3).map((memberId, i) => (
-        <div
-          key={memberId || i}
-          className="avatar avatar--fallback"
-          style={{
-            fontSize: '9px',
-            width: '22px',
-            height: '22px',
-            marginLeft: i > 0 ? '-6px' : 0,
-            border: '1.5px solid var(--trans-card-bg, #1a1225)',
-            zIndex: 3 - i
-          }}
-        >
-          {memberId ? getAssigneeInitials(memberId) : 'TL'}
-        </div>
-      ))}
-      {assigneeIds && assigneeIds.length > 3 && (
-        <div
-          className="avatar avatar--fallback"
-          style={{
-            fontSize: '9px',
-            width: '22px',
-            height: '22px',
-            marginLeft: '-6px',
-            border: '1.5px solid var(--trans-card-bg, #1a1225)',
-            background: '#475569'
-          }}
-        >
-          +{assigneeIds.length - 3}
-        </div>
-      )}
+      <div
+        className="avatar avatar--fallback"
+        style={{
+          fontSize: '9px',
+          width: '22px',
+          height: '22px',
+          border: '1.5px solid var(--trans-card-bg, #1a1225)'
+        }}
+      >
+        {assigneeId ? getAssigneeInitials(assigneeId) : 'TL'}
+      </div>
     </div>
   )
 }
@@ -193,7 +199,7 @@ function TaskCard({ task, colId, comicName, onOpenTaskDetails, getAssigneeInitia
       <p className="task__desc">Task for {comicName}</p>
 
       <footer className="task__footer">
-        <TaskAssigneeAvatars assigneeIds={task.assigneeIds} getAssigneeInitials={getAssigneeInitials} />
+        <TaskAssigneeAvatar assigneeId={task.assigneeId} getAssigneeInitials={getAssigneeInitials} />
         <span className="task__date">📅 {task.dueDate}</span>
       </footer>
     </article>
@@ -259,7 +265,7 @@ function KanbanColumn({
             <button type="button" className="dropdown__item" onClick={onToggleHighlight}>
               {isHighlighted ? 'Unhighlight' : 'Highlight column'}
             </button>
-            {col.id !== 'completed' && (
+            {col.id !== 'completed' && isCurrentLeader && (
               <button type="button" className="dropdown__item" onClick={onMoveAllToDone}>
                 Move all to Done
               </button>
@@ -394,43 +400,21 @@ function TasksTab({
   const [inspectingChapter, setInspectingChapter] = useState(null);
   const [isBacklogCollapsed, setIsBacklogCollapsed] = useState(false);
 
-  // Filter out chapters that already have a task created for them
-  const assignedChapterIds = new Set(
-    (tasks || [])
-      .map(t => String(t.chapterId || t.chapter_id || ''))
-      .filter(Boolean)
-  );
-
-  const unassignedChapterOptions = (chapterOptions || []).filter(ch => {
-    if (!ch) return false;
-    // 1. Direct ID match
-    if (ch.id && assignedChapterIds.has(String(ch.id))) return false;
-
-    // 2. Title / Chapter number pattern match against existing tasks
-    const chTitleLower = (ch.title || '').toLowerCase();
-    const chNumMatch = chTitleLower.match(/chapter\s*(\d+)/i);
-
-    const isTaskCreated = (tasks || []).some(t => {
-      if (!t || !t.title) return false;
-      const tLower = t.title.toLowerCase();
-
-      // Check if task title contains exact chapter title
-      if (chTitleLower && tLower.includes(chTitleLower)) return true;
-
-      // Check if task title contains "chapter X"
-      if (chNumMatch && tLower.includes(`chapter ${chNumMatch[1]}`)) return true;
-
-      return false;
-    });
-
-    return !isTaskCreated;
-  });
+  const unassignedChapterOptions = filterUnassignedChapters(chapterOptions, tasks);
 
   const auth = getAuth();
   const authUser = auth?.user;
 
   // Leader sees ALL tasks in project. Members ONLY see tasks they are assigned to.
   const visibleTasks = (tasks || []).filter(t => {
+    if (isCurrentLeader) return true;
+    return isUserAssignedToTask(t, members, authUser);
+  });
+
+  // Same rule applies to paused tasks — a member must never see or be able to
+  // resume a paused task that isn't assigned to them, regardless of what the
+  // parent component passes down.
+  const visiblePausedTasks = (pausedTasks || []).filter(t => {
     if (isCurrentLeader) return true;
     return isUserAssignedToTask(t, members, authUser);
   });
@@ -575,6 +559,7 @@ function TasksTab({
                   setOpenDropdownCol(null)
                 }}
                 onMoveAllToDone={() => {
+                  if (!isCurrentLeader) return;
                   onMoveAllToDone(col.id)
                   setOpenDropdownCol(null)
                 }}
@@ -594,14 +579,23 @@ function TasksTab({
           paddingLeft: '24px', paddingRight: '24px', width: '100%', clear: 'both'
         }}>
           <h4 className="paused-tasks-title" style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--trans-text-primary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span>⏸</span> Paused ({pausedTasks.length})
+            <span>⏸</span> Paused ({visiblePausedTasks.length})
           </h4>
-          {pausedTasks.length === 0 ? (
+          {visiblePausedTasks.length === 0 ? (
             <p style={{ fontStyle: 'italic', color: 'var(--trans-text-muted)', fontSize: '13px', margin: 0 }}>No paused tasks.</p>
           ) : (
             <div className="paused-tasks-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-              {pausedTasks.map(task => (
-                <PausedTaskCard key={task.id} task={task} comicName={comicName} onResume={() => onMoveTask(task.id, 'backlog')} />
+              {visiblePausedTasks.map(task => (
+                <PausedTaskCard
+                  key={task.id}
+                  task={task}
+                  comicName={comicName}
+                  onResume={() => {
+                    const canResume = isCurrentLeader || isUserAssignedToTask(task, members, authUser);
+                    if (!canResume) return;
+                    onMoveTask(task.id, 'backlog');
+                  }}
+                />
               ))}
             </div>
           )}
@@ -617,7 +611,10 @@ function TasksTab({
           comicId={comicId}
           chapterOptions={chapterOptions}
           teamMembersForAssign={members}
+          tasks={tasks}
+          isCurrentLeader={isCurrentLeader}
           onCreateTask={async (taskData) => {
+            if (!isCurrentLeader) return;
             if (onCreateTask) {
               await onCreateTask(taskData);
               setInspectingChapter(null);
@@ -671,7 +668,7 @@ function PriorityPicker({ value, onChange }) {
   )
 }
 
-function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOptions = [], teamMembersForAssign = [], onCreateTask }) {
+function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOptions = [], teamMembersForAssign = [], tasks = [], onCreateTask, isCurrentLeader = false }) {
   const [loading, setLoading] = useState(true);
   const [pages, setPages] = useState([]);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'reader'
@@ -681,19 +678,20 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
   const [inspectTaskData, setInspectTaskData] = useState({
     title: '',
     column: 'in_progress',
-    assignees: [],
+    assigneeId: null,
     dueDate: '',
     priority: 'High',
     chapterId: null
   });
 
   const handleOpenCreateTask = () => {
+    if (!isCurrentLeader) return;
     const chId = chapter?.id || null;
     const defaultTitle = `${chapter?.title || `Chapter ${chapter?.number || chapter?.chapterNumber || ''}`} - Translation & Proofreading`;
     setInspectTaskData({
       title: defaultTitle,
       column: 'in_progress',
-      assignees: [],
+      assigneeId: null,
       dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
       priority: 'High',
       chapterId: chId
@@ -961,7 +959,7 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, flexWrap: 'wrap' }}>
-          {onCreateTask && (
+          {onCreateTask && isCurrentLeader && (
             <button
               type="button"
               className="mod-mode-tab active"
@@ -1340,6 +1338,7 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
             setNewTaskData={setInspectTaskData}
             chapterOptions={chapterOptions && chapterOptions.length > 0 ? chapterOptions : [chapter]}
             teamMembersForAssign={teamMembersForAssign}
+            tasks={tasks}
             onCancel={() => setShowCreateTaskModal(false)}
             onCreate={async () => {
               setShowCreateTaskModal(false);
@@ -1356,7 +1355,7 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
   );
 }
 
-function AssigneeChipPicker({ candidates, selectedIds, onToggle, emptyLabel, readOnly = false }) {
+function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, readOnly = false }) {
   const assignableCandidates = (candidates || []).filter(m => {
     const roleStr = String(m.role || '').toLowerCase().trim();
     const isLeaderRole = m.isLeader || roleStr.includes('leader') || roleStr === 'group leader' || roleStr === 'project leader' || roleStr === 'team leader' || roleStr === 'project_leader' || roleStr === 'team_leader';
@@ -1370,7 +1369,7 @@ function AssigneeChipPicker({ candidates, selectedIds, onToggle, emptyLabel, rea
     <div className="trans-assignees-picker" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '4px 0' }}>
       {assignableCandidates.map((m) => {
         const memberId = m.id || m.userId;
-        const isSelected = (selectedIds || []).includes(memberId);
+        const isSelected = selectedId != null && String(selectedId) === String(memberId);
         const displayName = m.fullName || m.name || m.username || 'User';
         const initial = (m.avatar && m.avatar.length <= 3 ? m.avatar : displayName.charAt(0)).toUpperCase();
         const roleLabel = m.role || (m.isLeader ? 'Leader' : 'Member');
@@ -1380,7 +1379,7 @@ function AssigneeChipPicker({ candidates, selectedIds, onToggle, emptyLabel, rea
             key={memberId}
             type="button"
             className={`trans-assignee-chip${isSelected ? ' selected' : ''}`}
-            onClick={() => !readOnly && onToggle && onToggle(memberId, isSelected)}
+            onClick={() => !readOnly && onSelect && onSelect(isSelected ? null : memberId)}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -1450,28 +1449,23 @@ export function CreateTaskModal({
   setNewTaskData,
   chapterOptions,
   teamMembersForAssign,
+  tasks = [],
   onCancel,
   onCreate
 }) {
   const [submitted, setSubmitted] = useState(false)
 
+  const todayStr = new Date().toISOString().split('T')[0]
+  const availableChapterOptions = filterUnassignedChapters(chapterOptions, tasks)
+
   const errors = {
     title: !newTaskData.title.trim(),
     chapterId: !newTaskData.chapterId,
-    assignees: newTaskData.assignees.length === 0,
-    dueDate: !newTaskData.dueDate
+    assigneeId: !newTaskData.assigneeId,
+    dueDate: !newTaskData.dueDate || newTaskData.dueDate < todayStr
   }
   const showError = (field) => submitted && errors[field]
   const errorBorder = (field) => showError(field) ? { borderColor: '#ef4444' } : undefined
-
-  const toggleAssignee = (memberId, isSelected) => {
-    setNewTaskData({
-      ...newTaskData,
-      assignees: isSelected
-        ? newTaskData.assignees.filter(a => a !== memberId)
-        : [...newTaskData.assignees, memberId]
-    })
-  }
 
   const setQuickDueDate = (days) => {
     const d = new Date()
@@ -1522,20 +1516,20 @@ export function CreateTaskModal({
               value={newTaskData.chapterId || ''}
               onChange={(e) => {
                 const chId = e.target.value || null;
-                const foundCh = chapterOptions.find(c => String(c.id) === String(chId));
+                const foundCh = availableChapterOptions.find(c => String(c.id) === String(chId));
                 setNewTaskData(prev => ({
                   ...prev,
                   chapterId: chId,
                   title: (!prev.title.trim() && foundCh) ? `${foundCh.title} - Translation & Proofreading` : prev.title
                 }));
               }}
-              disabled={chapterOptions.length === 0}
+              disabled={availableChapterOptions.length === 0}
               style={{ ...errorBorder('chapterId') }}
             >
               <option value="">
-                {chapterOptions.length === 0 ? 'No chapters found for this project' : 'Select a chapter…'}
+                {availableChapterOptions.length === 0 ? 'No available chapters (all already have a task)' : 'Select a chapter…'}
               </option>
-              {chapterOptions.map((ch) => (
+              {availableChapterOptions.map((ch) => (
                 <option key={ch.id} value={ch.id}>
                   📖 {ch.title}{ch.pagesCount > 0 ? ` (${ch.pagesCount} pages)` : ''}
                 </option>
@@ -1552,15 +1546,15 @@ export function CreateTaskModal({
           </div>
 
           <div className="trans-form-group" style={{ marginTop: '14px' }}>
-            <label className="trans-form-label">Assignees *</label>
+            <label className="trans-form-label">Assignee *</label>
             <AssigneeChipPicker
               candidates={teamMembersForAssign}
-              selectedIds={newTaskData.assignees}
-              onToggle={toggleAssignee}
+              selectedId={newTaskData.assigneeId}
+              onSelect={(memberId) => setNewTaskData({ ...newTaskData, assigneeId: memberId })}
               emptyLabel="No team members found for this project."
             />
-            {showError('assignees') && (
-              <p style={{ color: '#ef4444', fontSize: '11px', margin: '6px 0 0' }}>Please assign at least one person</p>
+            {showError('assigneeId') && (
+              <p style={{ color: '#ef4444', fontSize: '11px', margin: '6px 0 0' }}>Please assign someone to this task</p>
             )}
           </div>
 
@@ -1573,13 +1567,19 @@ export function CreateTaskModal({
 
             <CustomDatePicker
               value={newTaskData.dueDate}
-              onChange={(val) => setNewTaskData({ ...newTaskData, dueDate: val })}
+              onChange={(val) => {
+                if (val && val < todayStr) return;
+                setNewTaskData({ ...newTaskData, dueDate: val });
+              }}
               placeholder="Select due date"
+              minDate={todayStr}
               style={errorBorder('dueDate')}
             />
 
             {showError('dueDate') && (
-              <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>This field is required</p>
+              <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>
+                {!newTaskData.dueDate ? 'This field is required' : 'Due date cannot be in the past'}
+              </p>
             )}
           </div>
 
@@ -1639,7 +1639,9 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   const currentUserName = (auth?.user?.fullName || auth?.user?.username || '').toLowerCase().trim();
   const currentUserId = auth?.user?.id || auth?.user?.userId;
 
-  const isAssigned = (editTaskData.assignees || []).some(id => {
+  const isAssigned = (() => {
+    const id = editTaskData.assigneeId;
+    if (!id) return false;
     if (currentUserId && String(id) === String(currentUserId)) return true;
     if (typeof id === 'string' && id.toLowerCase().trim() === currentUserName) return true;
     const matchedMem = (teamMembersForAssign || []).find(m => String(m.id || m.userId) === String(id));
@@ -1648,13 +1650,13 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
       if (memName === currentUserName) return true;
     }
     return false;
-  });
+  })();
 
   const canAccessWorkspace = isProjectLeader || isAssigned;
 
   const errors = {
     title: !editTaskData.title.trim(),
-    assignees: (editTaskData.assignees || []).length === 0,
+    assigneeId: !editTaskData.assigneeId,
     dueDate: !editTaskData.dueDate
   }
   const showError = (field) => submitted && errors[field]
@@ -1664,14 +1666,9 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   const canReview = isProjectLeader && isUnderReview
   const isInProgress = editTaskData.status === 'in_progress'
 
-  const toggleAssignee = (memberId, isSelected) => {
+  const selectAssignee = (memberId) => {
     if (!isProjectLeader) return;
-    setEditTaskData({
-      ...editTaskData,
-      assignees: isSelected
-        ? editTaskData.assignees.filter(a => a !== memberId)
-        : [...(editTaskData.assignees || []), memberId]
-    })
+    setEditTaskData({ ...editTaskData, assigneeId: memberId })
   }
 
   const handleSaveClick = () => {
@@ -1754,17 +1751,17 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
               </div>
 
               <div className="trans-form-group">
-                <label className="trans-form-label">Assignees *</label>
-                <div style={showError('assignees') ? { border: '1px solid #ef4444', borderRadius: '12px', padding: '8px' } : undefined}>
+                <label className="trans-form-label">Assignee *</label>
+                <div style={showError('assigneeId') ? { border: '1px solid #ef4444', borderRadius: '12px', padding: '8px' } : undefined}>
                   <AssigneeChipPicker
                     candidates={teamMembersForAssign}
-                    selectedIds={editTaskData.assignees}
-                    onToggle={toggleAssignee}
+                    selectedId={editTaskData.assigneeId}
+                    onSelect={selectAssignee}
                     emptyLabel="No team members found for this project."
                   />
                 </div>
-                {showError('assignees') && (
-                  <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>At least one assignee is required</p>
+                {showError('assigneeId') && (
+                  <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>An assignee is required</p>
                 )}
               </div>
 
@@ -1819,12 +1816,12 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
               </div>
 
               <div className="trans-form-group">
-                <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assigned Members</label>
+                <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assigned Member</label>
                 <AssigneeChipPicker
                   candidates={teamMembersForAssign}
-                  selectedIds={editTaskData.assignees}
+                  selectedId={editTaskData.assigneeId}
                   readOnly={true}
-                  emptyLabel="No assigned members."
+                  emptyLabel="No assigned member."
                 />
               </div>
 

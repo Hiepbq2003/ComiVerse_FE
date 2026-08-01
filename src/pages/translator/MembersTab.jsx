@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { getTeamMembersApi } from '../../services/api/TeamWorkspaceApi'
 import { getAuth } from '../../utils/Auth'
@@ -42,6 +42,16 @@ export function formatMemberPresence(member, now = Date.now()) {
   return `Offline · ${elapsedDays}d ago`
 }
 
+// A task counts as "published" once its translation work is fully done —
+// i.e. status reached "completed" in the kanban pipeline (backlog -> in_progress
+// -> under_review -> completed). Every task's chapter is already a PUBLISHED
+// chapter by the time a task can be created for it, so "completed task" is the
+// meaningful signal for a member's contribution count.
+function isPublishedTaskStatus(status) {
+  const s = String(status || '').toLowerCase().trim()
+  return s === 'completed' || s === 'done'
+}
+
 function MembersTab({
   teamId,
   leaderName,
@@ -49,6 +59,7 @@ function MembersTab({
   memberSearch = '',
   setMemberSearch,
   members: parentMembers = [],
+  tasks = [],
   onMembersLoaded,
   onLeaveTeam,
   onRemoveMember,
@@ -214,8 +225,32 @@ function MembersTab({
     return () => window.removeEventListener('scroll', handleClose, true)
   }, [activeDropdownMemberId])
 
-  // Filter & Sort logic (Group Leader is ALWAYS pinned to top!)
-  const processedMembers = members
+  // Count completed ("published") tasks per member, matched by their real
+  // backend id against each task's single assigneeId.
+  const contributionCounts = useMemo(() => {
+    const counts = new Map()
+    ;(tasks || []).forEach(t => {
+      if (!t || !t.assigneeId) return
+      if (!isPublishedTaskStatus(t.status)) return
+      const key = String(t.assigneeId)
+      counts.set(key, (counts.get(key) || 0) + 1)
+    })
+    return counts
+  }, [tasks])
+
+  const membersWithContributions = useMemo(() => {
+    return members.map(m => {
+      const count = contributionCounts.get(String(m.id)) || 0
+      return { ...m, contributions: `${count} chapter${count !== 1 ? 's' : ''}` }
+    })
+  }, [members, contributionCounts])
+
+  const teamLeader = membersWithContributions.find(m => m.role === 'Group Leader') || null
+
+  // Filter & Sort logic — leader is shown separately above, so the table itself
+  // only ever contains regular members now (no more pinning-to-top needed).
+  const processedMembers = membersWithContributions
+    .filter(m => m.role !== 'Group Leader')
     .filter(m => {
       const matchesSearch = m.name.toLowerCase().includes((memberSearch || '').toLowerCase())
       const count = parseInt(String(m.contributions || '0')) || 0
@@ -223,11 +258,7 @@ function MembersTab({
       return matchesSearch && matchesContrib
     })
     .sort((a, b) => {
-      // 1. Group Leader ALWAYS stays at the very top
-      if (a.role === 'Group Leader' && b.role !== 'Group Leader') return -1
-      if (a.role !== 'Group Leader' && b.role === 'Group Leader') return 1
-
-      // 2. Sub-sorting for other members by contributions if selected
+      // 1. Sub-sorting by contributions if selected
       if (contribFilter === 'desc') {
         const countA = parseInt(String(a.contributions || '0')) || 0
         const countB = parseInt(String(b.contributions || '0')) || 0
@@ -238,7 +269,7 @@ function MembersTab({
         if (countB !== countA) return countA - countB
       }
 
-      // 3. Sub-sorting by Join Date
+      // 2. Sub-sorting by Join Date
       if (joinDateSort === 'oldest') {
         const dateA = new Date(a.joinDate).getTime() || 0
         const dateB = new Date(b.joinDate).getTime() || 0
@@ -309,6 +340,36 @@ function MembersTab({
 
   return (
     <div className="members-tab-container fade-in" onClick={() => setActiveDropdownMemberId(null)}>
+      {/* Group Leader — shown separately, not mixed into the members table */}
+      {teamLeader && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            padding: '16px 20px',
+            marginBottom: '16px',
+            borderRadius: '14px',
+            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(217, 119, 6, 0.06) 100%)',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+          }}
+        >
+          <div className="chat-avatar avatar-leader">
+            {teamLeader.avatar || teamLeader.name.substring(0, 2).toUpperCase()}
+          </div>
+          <div className="member-status-details" style={{ flex: 1 }}>
+            <span className="member-name-text">
+              👑 {teamLeader.name} {teamLeader.name.toLowerCase().trim() === currentUserName && <small className="member-you-tag">(You)</small>}
+            </span>
+            <div className="member-status-row">
+              <span className={`status-dot ${String(teamLeader.status || (teamLeader.online ? 'active' : 'offline')).toLowerCase()}`}></span>
+              <span>{formatMemberPresence(teamLeader)}</span>
+            </div>
+          </div>
+          <span className="member-role-badge leader">Group Leader</span>
+        </div>
+      )}
+
       {/* Search & Filter Toolbar */}
       <div className="members-actions-bar">
         <div className="members-filter-group">
