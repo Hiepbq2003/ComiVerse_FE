@@ -24,6 +24,17 @@ export const clearAuth = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
   localStorage.removeItem('refreshToken');
+  
+  // Clear any global workspace/layout session state so it doesn't bleed to the next logged-in user
+  localStorage.removeItem('comiverse_active_project_id');
+  localStorage.removeItem('comiverse_moderator_submissions_override');
+  
+  try {
+    sessionStorage.clear();
+  } catch (e) {
+    console.warn("Failed to clear sessionStorage on logout:", e);
+  }
+
   try {
     stompService.disconnect();
   } catch (e) {

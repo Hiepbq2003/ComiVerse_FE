@@ -251,9 +251,13 @@ function ComicDetail() {
   }, [targetCommentIdFromUrl])
 
   const handleReadChapter1 = () => {
-    if (chapters && chapters.length > 0) {
+    const filteredChapters = selectedLanguage 
+      ? chapters.filter(ch => ch.translatedLanguages && ch.translatedLanguages.includes(selectedLanguage))
+      : chapters;
+      
+    if (filteredChapters && filteredChapters.length > 0) {
       // Find the first chapter (sorting by chapter number ascending)
-      const sorted = [...chapters].sort((a, b) => Number(a.chapterNumber) - Number(b.chapterNumber))
+      const sorted = [...filteredChapters].sort((a, b) => Number(a.chapterNumber) - Number(b.chapterNumber))
       const firstChap = sorted[0]
       const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(selectedLanguage)}` : ''
       navigate(`/comic/${id}/chapter/${firstChap.id}${langQuery}`)
@@ -625,7 +629,9 @@ function ComicDetail() {
                     paddingRight: '8px'
                   }}
                 >
-                {chapters.map((ch) => {
+                {chapters
+                  .filter(ch => !selectedLanguage || (ch.translatedLanguages && ch.translatedLanguages.includes(selectedLanguage)))
+                  .map((ch) => {
                   const chNumber = ch.chapterNumber || '0'
                   const chTitle = ch.title || `Chapter ${chNumber}`
                   const chViewsStr = formatViews(ch.viewCount || 0)
