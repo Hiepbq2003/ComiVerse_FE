@@ -107,6 +107,7 @@ import {
   getTeamRequestsApi,
   decideTeamRequestApi,
   deleteTeamAnnouncementApi,
+  removeTeamMemberApi,
 } from '../../services/api/TeamWorkspaceApi'
 import { toast } from 'react-toastify'
 
@@ -561,17 +562,19 @@ function TeamProjects() {
         if (p && p.id) combinedProjectsMap.set(p.id, p);
       });
 
-      // 2. Add projects from allTeams if current user is the leader OR an approved member in LocalStorage
+      // 2. Add projects from allTeams if current user is the leader
       (allTeams || []).forEach(p => {
         if (!p || !p.id) return;
 
+        const isLeader = (p.leaderName || '').toLowerCase().trim() === currentUserName || (p.leaderName || '').toLowerCase().trim() === currentUsername;
+        
+        // Restore local storage check so members who were approved locally can still see the project during testing
         const localApprovedKey = `comiverse_approved_members_${p.id}`;
         let savedMems = [];
         try {
           savedMems = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
         } catch (e) {}
 
-        const isLeader = (p.leaderName || '').toLowerCase().trim() === currentUserName || (p.leaderName || '').toLowerCase().trim() === currentUsername;
         const isApprovedMember = savedMems.some(m => {
           const mn = (m.name || '').toLowerCase().trim();
           return mn === currentUserName || mn === currentUsername;
@@ -583,15 +586,8 @@ function TeamProjects() {
       });
 
       const finalProjectsList = Array.from(combinedProjectsMap.values()).map(p => {
-        const localApprovedKey = `comiverse_approved_members_${p.id}`;
-        let savedCount = 0;
-        try {
-          const saved = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
-          savedCount = saved.length;
-        } catch (e) { /* ignore */ }
-
-        // Real members count = 1 (leader) + backend members + any local approved members
-        const realCount = 1 + Math.max(savedCount, p.membersCount || 0);
+        // Real members count: backend usually counts the leader in members. If it's 0, assume at least 1 (the leader)
+        const realCount = Math.max(1, p.membersCount || 0);
         const maxCap = (Number(p.maxMembers) || 5) + 1;
 
         // Recruitment status: Default to OPEN unless full or manually closed by leader
@@ -729,6 +725,7 @@ function TeamProjects() {
     setSelectedDetails(project)
     setWorkspaceTab(initialTab)
     setShowUploadForm(false)
+    setTasks([])
     setTasksLoading(true)
 
     const cacheKey = `comiverse_team_details_cache_${project.id}`;
@@ -754,8 +751,15 @@ function TeamProjects() {
     } catch (e) {}
 
     if (!hasCache) {
+      setMembers([]);
+      setAnnouncements([]);
+      setJoinRequests([]);
       setLoadingWorkspace(true);
     }
+
+    const leaderJoinDate = project.createdAt 
+      ? new Date(project.createdAt).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+      : '01/15/2024';
 
     const initialLeader = {
       id: `leader-${project.id}`,
@@ -763,7 +767,7 @@ function TeamProjects() {
       role: 'Group Leader',
       status: 'Offline',
       online: false,
-      joinDate: '01/15/2024',
+      joinDate: leaderJoinDate,
       contributions: `${project.chaptersCount || 0} chapters`,
       avatar: project.leaderInitials || 'TL'
     };
@@ -959,17 +963,15 @@ function TeamProjects() {
       // 2. Add backend members
       backendMems.forEach(m => {
         if (m && m.name) {
-          const key = m.name.toLowerCase().trim();
+          const mappedMember = { ...m };
+          if (mappedMember.joinDate) {
+            mappedMember.joinDate = new Date(mappedMember.joinDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+          } else {
+            mappedMember.joinDate = 'Recent';
+          }
+          const key = mappedMember.name.toLowerCase().trim();
           const existing = combinedMap.get(key);
-          combinedMap.set(key, existing ? { ...existing, ...m } : m);
-        }
-      });
-
-      // 3. Add saved approved members
-      savedApprovedMems.forEach(m => {
-        if (m && m.name) {
-          const key = m.name.toLowerCase().trim();
-          if (!combinedMap.has(key)) combinedMap.set(key, m);
+          combinedMap.set(key, existing ? { ...existing, ...mappedMember } : mappedMember);
         }
       });
 
@@ -1346,9 +1348,15 @@ function TeamProjects() {
     toast.info('You have left the project team.')
   }
 
-  const handleRemoveMember = (teamId, memberId, memberName) => {
-    setMembers(prev => prev.filter(m => m.id !== memberId))
-    toast.success(`Removed ${memberName} from the project team.`)
+  const handleRemoveMember = async (teamId, memberId, memberName) => {
+    try {
+      await removeTeamMemberApi(teamId, memberId)
+      setMembers(prev => prev.filter(m => m.id !== memberId))
+      toast.success(`Removed ${memberName} from the project team.`)
+    } catch (err) {
+      console.error('Failed to remove member:', err)
+      toast.error(`Failed to remove ${memberName}.`)
+    }
   }
 
   const handleLikePost = async (id) => {

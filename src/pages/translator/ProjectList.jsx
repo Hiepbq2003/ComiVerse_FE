@@ -340,14 +340,7 @@ function ProjectList() {
         {paginatedProjects.map((project) => {
           const alreadyApplied = appliedIds.includes(project.id);
           
-          const localApprovedKey = `comiverse_approved_members_${project.id}`;
-          let savedCount = 0;
-          try {
-            const saved = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
-            savedCount = saved.length;
-          } catch (e) { /* ignore */ }
-
-          const recruitedCount = Math.max(savedCount, project.membersCount || 0);
+          const recruitedCount = Math.max(1, project.membersCount || 0);
           const limit = Number(project.maxMembers) || 5;
           const spotsLeft = Math.max(0, limit - recruitedCount);
 

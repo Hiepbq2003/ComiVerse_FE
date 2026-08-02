@@ -56,6 +56,10 @@ export const getTeamMembersApi = async (teamId) => {
   return AxiosClient.get(`/team-workspace/${teamId}/members`)
 }
 
+export const removeTeamMemberApi = async (teamId, memberId) => {
+  return AxiosClient.delete(`/team-workspace/${teamId}/members/${memberId}`)
+}
+
 export const getTeamChaptersApi = async (teamId) => {
   return AxiosClient.get(`/team-workspace/${teamId}/chapters`)
 }
