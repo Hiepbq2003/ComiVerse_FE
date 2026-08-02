@@ -633,8 +633,7 @@ function AuthorComicDetail() {
         setUploadTask(latest)
         
         if (toastIdRef.current) {
-          const progressText = latest.progress != null ? `${latest.progress}%` : 'Processing...';
-          toast.update(toastIdRef.current, { render: `Chapter background upload: ${progressText}` })
+          toast.update(toastIdRef.current, { render: `Chapter background upload: Processing...` })
         }
 
         if (!isFinalUploadStatus(latest?.status)) {

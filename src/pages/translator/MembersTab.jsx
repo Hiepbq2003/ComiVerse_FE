@@ -9,6 +9,10 @@ export function mapTeamMember(m, leaderName) {
   const name = m?.name || m?.fullName || m?.username || 'Member'
   const isLeader = m?.role === 'Group Leader' || (!!leaderName && String(name).toLowerCase().trim() === String(leaderName).toLowerCase().trim())
   const online = m?.online === true
+  const formattedJoinDate = m?.joinDate && new Date(m.joinDate).getTime() > 0 
+    ? new Date(m.joinDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) 
+    : 'Recent'
+
   return {
     id: m?.id || `mem-${Math.random()}`,
     name,
@@ -16,7 +20,7 @@ export function mapTeamMember(m, leaderName) {
     status: m?.status || (online ? 'Active' : 'Offline'),
     online,
     lastSeenAt: m?.lastSeenAt || null,
-    joinDate: m?.joinDate || '—',
+    joinDate: formattedJoinDate,
     contributions: m?.contributions || '0 chapters',
     avatar: m?.avatar || String(name).split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2)
   }
