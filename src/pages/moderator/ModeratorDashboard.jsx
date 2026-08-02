@@ -448,11 +448,18 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       const authUser = getAuth()?.user;
       setTopComics(leaderboardData?.data || leaderboardData?.content || leaderboardData || []);
       
-      const mergedSubmissionsData = [...(submissionsData || [])];
+      const mergedSubmissionsData = [...(submissionsData || [])].filter(s => {
+        // If we can map the submission to a comic, filter out comics with 0 chapters
+        const comic = (comicsData || []).find(c => String(c.id) === String(s.comicId));
+        if (comic && (!comic.chapterCount || comic.chapterCount <= 0)) {
+          return false;
+        }
+        return true;
+      });
       // Auto-generate mock submissions for any PENDING comics if they don't already exist
       // This ensures the Review Queue isn't empty when using mock backend data
       (comicsData || []).forEach(c => {
-        if (c.approvalStatus === 'PENDING' || c.moderationStatus === 'SUBMITTED_FOR_REVIEW') {
+        if ((c.approvalStatus === 'PENDING' || c.moderationStatus === 'SUBMITTED_FOR_REVIEW') && c.chapterCount > 0) {
           const exists = mergedSubmissionsData.find(s => 
             String(s.comicId) === String(c.id) || 
             (s.title && c.title && s.title.toLowerCase() === c.title.toLowerCase())
