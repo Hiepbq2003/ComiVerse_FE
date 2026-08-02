@@ -722,7 +722,8 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
       await handleApprove(targetSubId, targetSubItem || chapToApprove);
     }
 
-    const remainingChapters = (selectedReview.allChapters || []).filter(c => {
+    const currentPendingChapters = getSubmissionChapters(selectedReview);
+    const remainingChapters = currentPendingChapters.filter(c => {
       return !isSameChapterItem(c, chapToApprove);
     });
 
@@ -821,8 +822,9 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
     if (selectedReview && (selectedReview.allChapters || selectedReview.subItems)) {
       const targetObj = selectedReject.rejectChapterObj || selectedReject;
 
-      const remainingChapters = (selectedReview.allChapters || []).filter(c => {
-        return !isSameChapterItem(c, targetObj) && c !== selectedChapter;
+      const currentPendingChapters = getSubmissionChapters(selectedReview);
+      const remainingChapters = currentPendingChapters.filter(c => {
+        return !isSameChapterItem(c, targetObj);
       });
       const remainingSubItems = (selectedReview.subItems || []).filter(s => {
         return !isSameChapterItem(s, targetObj) && s !== selectedReject;
@@ -944,8 +946,16 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
       } catch {
         chaptersData = await getAuthorComicChaptersApi(comicId);
       }
-      const list = chaptersData?.data || chaptersData || [];
-      if (!Array.isArray(list) || list.length === 0) return [];
+      let list = chaptersData?.data || chaptersData || [];
+      if (!Array.isArray(list)) list = [];
+      
+      // Filter out PREVIEW_READY or DRAFT chapters since moderator should not see them
+      list = list.filter(ch => {
+        const status = (ch.status || ch.moderationStatus || '').toUpperCase();
+        return !status || status === 'APPROVED' || status === 'PUBLISHED' || status === 'SUBMITTED_FOR_REVIEW' || status === 'REJECTED';
+      });
+
+      if (list.length === 0) return [];
 
       if (!fetchDetails) {
         const shallowResult = list.map((ch, idx) => normalizeChapter(ch, idx));

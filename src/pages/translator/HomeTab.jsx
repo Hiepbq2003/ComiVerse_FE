@@ -17,11 +17,13 @@ function HomeTab({
   announcements = [],
   onLikePost,
   onTogglePinPost,
+  onDeletePost,
   onAddComment,
   onLikeComment,
 }) {
   const [visibleCount, setVisibleCount] = useState(5)
   const [attachedImage, setAttachedImage] = useState(null)
+  const [selectedImageFile, setSelectedImageFile] = useState(null)
   const [openComments, setOpenComments] = useState({})
   const [commentInputs, setCommentInputs] = useState({})
   const fileInputRef = useRef(null)
@@ -39,6 +41,8 @@ function HomeTab({
       return
     }
 
+    setSelectedImageFile(file)
+
     const reader = new FileReader()
     reader.onload = () => {
       setAttachedImage(reader.result)
@@ -48,6 +52,7 @@ function HomeTab({
 
   const handleRemoveImage = () => {
     setAttachedImage(null)
+    setSelectedImageFile(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -56,9 +61,10 @@ function HomeTab({
   }
 
   const handleFormPostSubmit = () => {
-    if (!newPostText.trim() && !attachedImage) return
-    onPostAnnouncement(newPostText, attachedImage)
+    if (!newPostText.trim() && !selectedImageFile) return
+    onPostAnnouncement(newPostText, selectedImageFile)
     setAttachedImage(null)
+    setSelectedImageFile(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -189,9 +195,10 @@ function HomeTab({
           )}
         </div>
 
-        <div className="post-creation-card">
-          <div className="post-user-avatar">YS</div>
-          <div className="post-creation-input-wrapper">
+        {isCurrentLeader && (
+          <div className="post-creation-card">
+            <div className="post-user-avatar">YS</div>
+            <div className="post-creation-input-wrapper">
             <textarea
               className="post-textarea"
               placeholder="Post an announcement, update, or share with the group..."
@@ -278,6 +285,7 @@ function HomeTab({
             </div>
           </div>
         </div>
+        )}
 
         <div className="announcement-feed-list">
           {sortedAnnouncements.length === 0 ? (
@@ -326,9 +334,18 @@ function HomeTab({
                       💬 Comments ({commentsList.length})
                     </button>
                     {isCurrentLeader && (
-                      <button className={`post-action-btn pin-btn ${post.isPinned ? 'active' : ''}`} onClick={() => onTogglePinPost(post.id)}>
-                        📌 {post.isPinned ? 'Unpin Post' : 'Pin Post'}
-                      </button>
+                      <>
+                        <button className={`post-action-btn pin-btn ${post.isPinned ? 'active' : ''}`} onClick={() => onTogglePinPost(post.id)}>
+                          📌 {post.isPinned ? 'Unpin Post' : 'Pin Post'}
+                        </button>
+                        <button className="post-action-btn delete-btn" style={{ color: '#ef4444' }} onClick={() => {
+                          if (window.confirm("Are you sure you want to delete this post?")) {
+                            onDeletePost && onDeletePost(post.id);
+                          }
+                        }}>
+                          🗑️ Delete Post
+                        </button>
+                      </>
                     )}
                   </div>
 
@@ -436,6 +453,7 @@ function HomeTab({
       <TeamGroupChat
         groupId={selectedDetails?.id}
         teamName={selectedDetails?.title || selectedDetails?.team}
+        isLeader={isCurrentLeader}
       />
     </div>
   )

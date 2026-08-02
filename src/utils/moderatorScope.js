@@ -9,13 +9,13 @@ export function getModeratorScope(user) {
     const auth = getAuth();
     user = auth?.user;
   }
-  if (!user) return ['japanese', 'korean'];
+  if (!user) return [];
 
   if (Array.isArray(user.assignedLanguages) && user.assignedLanguages.length > 0) {
     return user.assignedLanguages.map(l => String(l).toLowerCase().trim());
   }
 
-  return ['japanese', 'korean'];
+  return [];
 }
 
 /**

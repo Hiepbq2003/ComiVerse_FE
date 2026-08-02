@@ -227,8 +227,33 @@ function ProjectList() {
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '100px', color: 'var(--trans-text-primary)' }}>
-        <h3>⏳ Loading available projects...</h3>
+      <div className="translator-project-list-container container-fluid py-4" style={{ padding: '24px' }}>
+        <div className="mb-4">
+          <h1 className="fw-bold" style={{ color: 'var(--trans-text-primary)', margin: '0 0 8px 0' }}>Available Projects</h1>
+          <p style={{ color: 'var(--trans-text-secondary)', margin: 0 }}>
+            Browse open translation projects and apply to join a team.
+          </p>
+        </div>
+        <div className="available-projects-grid">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="available-project-card" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="skeleton-line skeleton-shimmer" style={{ width: '60%', height: '24px', margin: 0 }}></div>
+                <div className="skeleton-line skeleton-shimmer" style={{ width: '80px', height: '24px', margin: 0, borderRadius: '12px' }}></div>
+              </div>
+              <div className="skeleton-line skeleton-shimmer" style={{ width: '40%', height: '16px', margin: '4px 0' }}></div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                <div className="skeleton-line skeleton-shimmer" style={{ width: '90%', height: '18px', margin: 0 }}></div>
+                <div className="skeleton-line skeleton-shimmer" style={{ width: '70%', height: '18px', margin: 0 }}></div>
+                <div className="skeleton-line skeleton-shimmer" style={{ width: '85%', height: '18px', margin: 0 }}></div>
+                <div className="skeleton-line skeleton-shimmer" style={{ width: '50%', height: '18px', margin: 0 }}></div>
+              </div>
+              <div style={{ marginTop: 'auto', paddingTop: '24px' }}>
+                <div className="skeleton-line skeleton-shimmer" style={{ width: '100%', height: '40px', margin: 0, borderRadius: '8px' }}></div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -322,7 +347,7 @@ function ProjectList() {
             savedCount = saved.length;
           } catch (e) { /* ignore */ }
 
-          const recruitedCount = savedCount;
+          const recruitedCount = Math.max(savedCount, project.membersCount || 0);
           const limit = Number(project.maxMembers) || 5;
           const spotsLeft = Math.max(0, limit - recruitedCount);
 
@@ -532,7 +557,7 @@ function ProjectList() {
                 <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: 'var(--trans-text-secondary)' }}>Comic Project:</p>
                 <strong style={{ fontSize: '15px', color: '#c084fc' }}>{selectedProject.comicName || selectedProject.title}</strong>
                 <p style={{ margin: '8px 0 0 0', fontSize: '12.5px', color: '#10b981' }}>
-                  Open Positions: {Math.max(0, (selectedProject.maxMembers || 5) - Math.max(0, (selectedProject.membersCount || 1) - 1))} spots left
+                  Open Positions: {Math.max(0, (selectedProject.maxMembers || 5) - Math.max(0, selectedProject.membersCount || 0))} spots left
                 </p>
               </div>
 

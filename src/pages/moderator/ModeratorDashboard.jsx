@@ -452,7 +452,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       // Auto-generate mock submissions for any PENDING comics if they don't already exist
       // This ensures the Review Queue isn't empty when using mock backend data
       (comicsData || []).forEach(c => {
-        if (c.approvalStatus === 'PENDING') {
+        if (c.approvalStatus === 'PENDING' || c.moderationStatus === 'SUBMITTED_FOR_REVIEW') {
           const exists = mergedSubmissionsData.find(s => 
             String(s.comicId) === String(c.id) || 
             (s.title && c.title && s.title.toLowerCase() === c.title.toLowerCase())
@@ -539,7 +539,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
             teamStatus: team ? team.status : 'None',
             chaptersCount: merged.chaptersCount || merged.chapterCount || merged.latestChapterNumber || 0
           }
-        }).filter(c => isLanguageInModeratorScope(c.language || c.rawLanguage || c.originalLanguage, authUser)),
+        }),
         filteredSubmissions
       ).map(c => syncComicWithLocalOverride(c)).filter(c => !c.archived);
 
@@ -765,12 +765,24 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
         cleanId = String(subItem.id);
       }
 
-      if (cleanId && !cleanId.startsWith('comic-') && !cleanId.startsWith('group-')) {
+      if (cleanId.includes('mock')) {
+        const targetSub = subItem || submissions.find(item => item.id === id || item.id === cleanId);
+        if (targetSub && targetSub.comicId) {
+          const realSub = submissions.find(s => s.comicId === targetSub.comicId && (s.type === 'NEW_COMIC' || s.submissionType === 'NEW_COMIC') && !String(s.id).includes('mock'));
+          if (realSub && realSub.id) {
+            cleanId = String(realSub.id).replace(/^(comic|group|chap)-/, '');
+          }
+        }
+      }
+
+      if (cleanId && !cleanId.startsWith('comic-') && !cleanId.startsWith('group-') && !cleanId.includes('mock')) {
         try {
           await rejectSubmissionApi(cleanId, reason || 'Submission rejected');
         } catch (apiErr) {
           console.warn(`[Backend Reject API Notice] ${apiErr?.message || apiErr}`);
         }
+      } else if (cleanId.includes('mock')) {
+        console.warn(`[Backend DB Sync] Could not find real submission ID for mock submission. Comic rejection may not persist.`);
       }
 
       toast.success('Submission rejected.')
@@ -841,8 +853,16 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
     try {
       // 1. Always approve the submission record (this updates submissions table → disappears from pending queue)
-      const realSubmissionId = String(targetSubId || '');
-      if (realSubmissionId && !realSubmissionId.startsWith('group-') && !realSubmissionId.startsWith('chap-')) {
+      let realSubmissionId = String(targetSubId || '');
+      if (realSubmissionId.includes('mock')) {
+        const realSub = submissions.find(s => s.chapterId && String(s.chapterId) === String(chapterObj?.id));
+        if (realSub && realSub.id && !String(realSub.id).includes('mock')) {
+          realSubmissionId = String(realSub.id);
+        }
+      }
+      realSubmissionId = realSubmissionId.replace(/^(comic|group|chap)-/, '');
+
+      if (realSubmissionId && !realSubmissionId.startsWith('group-') && !realSubmissionId.startsWith('chap-') && !realSubmissionId.includes('mock')) {
         try {
           const res = await approveSubmissionApi(realSubmissionId);
           const realDbComic = res?.data || res;
@@ -965,6 +985,12 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
   const handleChapterReject = async (submissionId, chapterObj, reason) => {
     let cleanId = String(chapterObj?.submissionId || submissionId || '').replace(/^(comic|group|chap)-/, '');
+    if (cleanId.includes('mock') || String(submissionId).includes('mock')) {
+      const realSub = submissions.find(s => s.chapterId && String(s.chapterId) === String(chapterObj?.id));
+      if (realSub && realSub.id && !String(realSub.id).includes('mock')) {
+        cleanId = String(realSub.id).replace(/^(comic|group|chap)-/, '');
+      }
+    }
     const chapTitle = chapterObj?.title || `Chapter ${chapterObj?.number || chapterObj?.chapterNumber || ''}`.trim() || 'Chapter';
 
     const targetSubId = chapterObj?.submissionId || chapterObj?.id || submissionId;
@@ -976,12 +1002,47 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       return false;
     }) || submissions.find(item => item.id === targetSubId || item.submissionId === targetSubId || item.id === submissionId);
 
-    if (cleanId && !cleanId.startsWith('group-') && !cleanId.startsWith('comic-')) {
+    if (cleanId && !cleanId.startsWith('group-') && !cleanId.startsWith('comic-') && !cleanId.includes('mock')) {
       try {
-        await rejectSubmissionApi(cleanId, reason || 'Chapter rejected');
+        const rejectResponse = await rejectSubmissionApi(cleanId, reason || 'Chapter rejected');
+        const responseData = rejectResponse?.data || rejectResponse;
+        if (responseData?.comicAutoRejected) {
+          toast.success(`Rejected "${chapTitle}" — All chapters rejected, comic profile auto-rejected!`);
+          
+          // Mark ALL submissions for this comic as rejected
+          const nowIso = new Date().toISOString();
+          const comicId = sub?.comicId || chapterObj?.comicId;
+          const comicTitleClean = (sub?.title || sub?.comicName || sub?.comicTitle || chapterObj?.comicTitle || '').trim().toLowerCase();
+          
+          setSubmissions(prev => {
+            const nextSubmissions = prev.map(item => {
+              const matchByComicId = comicId && String(item.comicId) === String(comicId);
+              const matchByTitle = comicTitleClean && (item.title || '').trim().toLowerCase() === comicTitleClean;
+              
+              if (matchByComicId || matchByTitle) {
+                return {
+                  ...item,
+                  status: 'rejected',
+                  rejectedAt: nowIso,
+                  rejectionReason: item.chapterId ? (reason || 'Chapter rejected') : 'All chapters were rejected. Comic profile auto-rejected.'
+                };
+              }
+              return item;
+            });
+
+            try {
+              localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(nextSubmissions));
+            } catch (e) {}
+
+            return nextSubmissions;
+          });
+          return; // Early return — everything is handled
+        }
       } catch (apiErr) {
         console.warn(`[Backend DB Sync] rejectSubmissionApi(${cleanId}) notice:`, apiErr?.message || apiErr);
       }
+    } else if (cleanId.includes('mock')) {
+      console.warn(`[Backend DB Sync] Could not find real submission ID for mock submission. Chapter rejection may not persist.`);
     }
 
     try {
@@ -991,11 +1052,13 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       const comicTitleClean = (sub?.title || sub?.comicName || sub?.comicTitle || chapterObj?.comicTitle || chapterObj?.originalSubmissionItem?.title || chapterObj?.title || '').trim().toLowerCase();
 
       setSubmissions(prev => {
+        let sourceMatched = false;
         const nextSubmissions = prev.map(item => {
-          const itemTitleClean = (item.title || item.comicTitle || '').trim().toLowerCase();
-          const isMatchById = (item.id === submissionId || item.submissionId === submissionId || item.id === cleanId || item.submissionId === cleanId || item.id === targetSubId);
+          const isSourceItem = (sub && (item === sub || item.id === sub.id || item.submissionId === sub.id)) ||
+            (!sourceMatched && item.status !== 'approved' && item.status !== 'rejected' && ((item.allChapters || item.chapters || []).some(c => isSameChapterItem(c, chapterObj))));
 
-          if (isMatchById) {
+          if (isSourceItem) {
+            sourceMatched = true;
             return {
               ...item,
               status: 'rejected',
