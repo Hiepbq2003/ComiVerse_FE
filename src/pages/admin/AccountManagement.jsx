@@ -572,7 +572,7 @@ function AccountManagement() {
                       <div className="admin-lang-scope-tag" style={{ marginTop: '4px', fontSize: '11px', color: '#c084fc', fontWeight: '600' }}>
                         🌐 {(() => {
                           const langs = getDisplayLanguages(account);
-                          const isGlobal = langs.length >= 7 || langs.some(s => ['global', 'all', 'any', '*'].includes(String(s).toLowerCase()));
+                          const isGlobal = langs.length === 0 || langs.length >= 7 || langs.some(s => ['global', 'all', 'any', '*'].includes(String(s).toLowerCase()));
                           return isGlobal ? 'All Languages' : langs.join(', ');
                         })()}
                       </div>

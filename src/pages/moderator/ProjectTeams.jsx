@@ -356,7 +356,7 @@ function ProjectTeams({
       setShowAssignModal(false)
     } catch (err) {
       console.error(err)
-      toast.error(err.response?.status === 409 ? 'Conflict: Leader was already assigned by another moderator or team was modified.' : 'Failed to assign the project leader.')
+      toast.error(err.response?.data?.message || (err.response?.status === 409 ? 'Conflict: Leader was already assigned by another moderator or team was modified.' : 'Failed to assign the project leader.'))
     }
   }
 

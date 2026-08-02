@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
@@ -560,6 +560,7 @@ function AuthorComicDetail() {
   const [actionLoadingId, setActionLoadingId] = useState(null)
   const [uploadTask, setUploadTask] = useState(null)
   const [submittingComic, setSubmittingComic] = useState(false)
+  const toastIdRef = useRef(null)
 
   const loadDetail = useCallback(async () => {
     setLoading(true)
@@ -630,6 +631,11 @@ function AuthorComicDetail() {
       try {
         const latest = await getAuthorChapterUploadStatusApi(id, taskId)
         setUploadTask(latest)
+        
+        if (toastIdRef.current) {
+          const progressText = latest.progress != null ? `${latest.progress}%` : 'Processing...';
+          toast.update(toastIdRef.current, { render: `Chapter background upload: ${progressText}` })
+        }
 
         if (!isFinalUploadStatus(latest?.status)) {
           window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
@@ -640,12 +646,21 @@ function AuthorComicDetail() {
           if (latest?.chapter) {
             appendUploadedChapter(latest.chapter)
           }
+          if (toastIdRef.current) {
+            toast.update(toastIdRef.current, { render: 'ZIP processed! Preview is ready.', type: 'success', isLoading: false, autoClose: 5000 })
+          }
           setActionMessage('ZIP processed. Preview is ready; submit it for moderator review after checking pages.')
         } else {
+          if (toastIdRef.current) {
+            toast.update(toastIdRef.current, { render: latest?.error || 'Upload processing failed.', type: 'error', isLoading: false, autoClose: 5000 })
+          }
           setActionMessage(latest?.error || 'Upload processing failed.')
         }
       } catch (err) {
         setUploadTask({ taskId, status: 'FAILED', error: err?.message || 'Could not check upload status.' })
+        if (toastIdRef.current) {
+          toast.update(toastIdRef.current, { render: err?.message || 'Could not check upload status.', type: 'error', isLoading: false, autoClose: 5000 })
+        }
         setActionMessage('Could not check upload status.')
       }
     }
@@ -658,6 +673,7 @@ function AuthorComicDetail() {
     if (!taskId) return
 
     setUploadTask(task)
+    toastIdRef.current = toast.loading('Chapter background upload: Processing chapter ZIP...')
     setActionMessage('Chapter ZIP accepted. Backend is processing it in the background.')
     pollChapterUploadTask(taskId)
   }
@@ -904,18 +920,6 @@ function AuthorComicDetail() {
         </section>
 
         {actionMessage && <div className="author-alert info detail-message">{actionMessage}</div>}
-        {uploadTask && (
-          <div className={`author-upload-task-card ${(uploadTask.status || 'queued').toString().toLowerCase()} detail-message`}>
-            <div>
-              <strong>Chapter background upload</strong>
-              <p>{uploadTask.error || uploadTask.message || 'Waiting for backend status...'}</p>
-            </div>
-            <div className="author-upload-task-meta">
-              <span>{formatUploadStatus(uploadTask.status)}</span>
-              <small>{uploadTask.progress ?? 0}%</small>
-            </div>
-          </div>
-        )}
 
         <section className="author-chapter-section-card">
           <div className="author-chapter-section-head">

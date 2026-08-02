@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useChat } from '../../hooks/useChat';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
+import { warnTeamMemberApi } from '../../services/api/TeamWorkspaceApi';
+import { toast } from 'react-toastify';
 
-function TeamGroupChat({ groupId, onClose, style }) {
+function TeamGroupChat({ groupId, onClose, style, isLeader }) {
     const [inputValue, setInputValue] = useState('');
 
     const {
@@ -16,7 +18,32 @@ function TeamGroupChat({ groupId, onClose, style }) {
         isNearBottomRef,
         fetchOlderMessages,
         sendMessage,
-    } = useChat('GROUP', groupId);
+        deleteMessage,
+    } = useChat('TEAM', groupId);
+
+    const handleDeleteMessage = async (msgId) => {
+        if (!window.confirm("Are you sure you want to delete this message?")) return;
+        try {
+            await deleteMessage(msgId);
+            toast.success("Message deleted");
+        } catch (err) {
+            toast.error("Failed to delete message");
+            console.error(err);
+        }
+    };
+
+    const handleWarnMember = async (memberName) => {
+        if (!window.confirm(`Are you sure you want to warn member ${memberName}?`)) return;
+        try {
+            await warnTeamMemberApi(groupId, memberName);
+            toast.success(`Member ${memberName} warned`);
+            // The STOMP socket might broadcast the new warning message, 
+            // but if not, user can just see it when they refresh or we can optionally fetch it.
+        } catch (err) {
+            toast.error("Failed to warn member");
+            console.error(err);
+        }
+    };
 
     const handleScroll = () => {
         const container = scrollContainerRef.current;
@@ -145,7 +172,21 @@ function TeamGroupChat({ groupId, onClose, style }) {
                                 <div className="chat-bubble-wrapper">
                                     {!isMe && <span className="chat-sender-info">{senderName}</span>}
                                     <div className="chat-bubble">{content}</div>
-                                    {time && <span className="chat-time">{time}</span>}
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px' }}>
+                                        {time && <span className="chat-time" style={{ margin: 0 }}>{time}</span>}
+                                        {isLeader && senderName !== 'SYSTEM' && !String(msg.id).startsWith('temp-') && (
+                                            <div className="chat-mod-actions" style={{ display: 'flex', gap: '6px', fontSize: '11px', opacity: 0.7 }}>
+                                                <button onClick={() => handleDeleteMessage(msg.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0 }} title="Delete Message">
+                                                    Delete
+                                                </button>
+                                                {!isMe && (
+                                                    <button onClick={() => handleWarnMember(senderName)} style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', padding: 0 }} title="Warn Member">
+                                                        Warn
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         );

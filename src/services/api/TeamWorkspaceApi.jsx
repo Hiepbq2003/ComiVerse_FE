@@ -12,6 +12,10 @@ export const likeTeamAnnouncementApi = async (id) => {
   return AxiosClient.put(`/team-workspace/announcements/${id}/like`)
 }
 
+export const deleteTeamAnnouncementApi = async (id) => {
+  return AxiosClient.delete(`/team-workspace/announcements/${id}`)
+}
+
 export const pinTeamAnnouncementApi = async (id) => {
   return AxiosClient.put(`/team-workspace/announcements/${id}/pin`)
 }
@@ -34,6 +38,14 @@ export const getTeamMessagesApi = async (teamId) => {
 
 export const createTeamMessageApi = async (teamId, message) => {
   return AxiosClient.post(`/team-workspace/${teamId}/messages`, message)
+}
+
+export const deleteTeamMessageApi = async (teamId, messageId) => {
+  return AxiosClient.delete(`/team-workspace/${teamId}/messages/${messageId}`)
+}
+
+export const warnTeamMemberApi = async (teamId, memberName) => {
+  return AxiosClient.post(`/team-workspace/${teamId}/messages/warn`, { memberName })
 }
 
 export const getTeamTasksApi = async (teamId) => {

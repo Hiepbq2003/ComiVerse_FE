@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { getChapterDetailApi, getChaptersByComicIdApi } from "../../services/api/ChapterApi";
 import { getAuthorComicByIdApi, getAuthorComicChaptersApi, getAuthorChapterPreviewApi } from "../../services/api/AuthorComicApi";
-import { getComicByIdApi, searchComicsApi, getAllComicsApi } from "../../services/api/ComicApi";
+import { getComicByIdApi, getAllComicsApi } from "../../services/api/ComicApi";
 import { getAuth } from "../../utils/Auth";
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { resolveImageUrl } from '../../config/apiConfig';
@@ -292,7 +292,7 @@ function KanbanColumn({
             onClick={() => onViewChapterClick && onViewChapterClick(ch)}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '11px', background: 'rgba(168, 85, 247, 0.25)', color: '#c084fc', padding: '3px 8px', borderRadius: '6px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <span className="raw-chapter-badge">
                 📖 Raw Chapter
               </span>
               {ch.pagesCount > 0 && (
@@ -306,9 +306,10 @@ function KanbanColumn({
               {ch.title}
             </h4>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-              <span style={{ fontSize: '11.5px', color: '#34d399', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                ● Ready to Translate
+            <div className="backlog-card-footer">
+              <span className="ready-to-translate-text">
+                <div className="status-dot-pulse"></div>
+                Ready to Translate
               </span>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <button

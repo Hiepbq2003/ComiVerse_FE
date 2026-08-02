@@ -361,10 +361,18 @@ function MembersTab({
             <span className="member-name-text">
               👑 {teamLeader.name} {teamLeader.name.toLowerCase().trim() === currentUserName && <small className="member-you-tag">(You)</small>}
             </span>
-            <div className="member-status-row">
-              <span className={`status-dot ${String(teamLeader.status || (teamLeader.online ? 'active' : 'offline')).toLowerCase()}`}></span>
-              <span>{formatMemberPresence(teamLeader)}</span>
-            </div>
+              <div className="member-status-row">
+                {(() => {
+                  const presenceText = formatMemberPresence(teamLeader);
+                  const isActuallyOnline = presenceText === 'Active now';
+                  return (
+                    <>
+                      <span className={`status-dot ${isActuallyOnline ? 'active' : 'offline'}`}></span>
+                      <span className={`presence-text ${isActuallyOnline ? 'active' : ''}`}>{presenceText}</span>
+                    </>
+                  );
+                })()}
+              </div>
           </div>
           <span className="member-role-badge leader">Group Leader</span>
         </div>
@@ -446,10 +454,18 @@ function MembersTab({
                             <span className="member-name-text">
                               {memName} {isMe && <small className="member-you-tag">(You)</small>}
                             </span>
-                            <div className="member-status-row">
-                              <span className={`status-dot ${statusClass}`}></span>
-                              <span>{formatMemberPresence(member)}</span>
-                            </div>
+                              <div className="member-status-row">
+                                {(() => {
+                                  const presenceText = formatMemberPresence(member);
+                                  const isActuallyOnline = presenceText === 'Active now';
+                                  return (
+                                    <>
+                                      <span className={`status-dot ${isActuallyOnline ? 'active' : 'offline'}`}></span>
+                                      <span className={`presence-text ${isActuallyOnline ? 'active' : ''}`}>{presenceText}</span>
+                                    </>
+                                  );
+                                })()}
+                              </div>
                           </div>
                         </div>
                       </td>
