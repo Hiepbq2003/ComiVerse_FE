@@ -1346,6 +1346,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
           {(() => {
             const viewPages = getReviewViewPages(selectedReview, selectedChapter, docCommentsMap);
             const activeComments = docCommentsMap[selectedReview.id] || [];
+            const chaptersList = getSubmissionChapters(selectedReview);
 
             return (
               <div className="mod-inspector-topbar">
@@ -1415,6 +1416,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', position: 'relative' }}>
               {(() => {
                 const viewPages = getReviewViewPages(selectedReview, selectedChapter, docCommentsMap);
+                const chaptersList = getSubmissionChapters(selectedReview);
 
                 /* MODE 1: RAW IMAGE READER VIEW */
                 if (previewTab === 'reader') {
