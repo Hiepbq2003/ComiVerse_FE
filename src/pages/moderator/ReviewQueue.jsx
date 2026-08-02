@@ -1417,6 +1417,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
               {(() => {
                 const viewPages = getReviewViewPages(selectedReview, selectedChapter, docCommentsMap);
                 const chaptersList = getSubmissionChapters(selectedReview);
+                const activeChap = selectedChapter || chaptersList[0] || null;
 
                 /* MODE 1: RAW IMAGE READER VIEW */
                 if (previewTab === 'reader') {
