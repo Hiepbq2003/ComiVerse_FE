@@ -1098,22 +1098,40 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
     }
   };
 
+  const getReviewViewPages = (submission, chapter, docComments) => {
+    if (!submission) return [];
+    const chaps = (submission.allChapters && submission.allChapters.length > 0) 
+      ? [...submission.allChapters] 
+      : getSubmissionChapters(submission);
+    const active = chapter || chaps[0] || null;
+    const base = (active && Array.isArray(active.pages)) ? active.pages : [];
+    
+    let viewPages = base.map((url, idx) => ({ url, originalIdx: idx, pNum: idx + 1 }));
+    if (submission.status === 'rejected' || submission.status === 'approved') {
+       const comments = docComments[submission.id] || [];
+       const pinnedSet = new Set(comments.map(c => {
+         const match = c.targetKey?.match(/^page-(\d+)$/);
+         return match ? parseInt(match[1], 10) : null;
+       }).filter(n => n !== null));
+       
+       if (pinnedSet.size > 0) {
+         viewPages = viewPages.filter(p => pinnedSet.has(p.pNum));
+       }
+    }
+    return viewPages;
+  }
+
   // Accelerated Image Preloading Strategy
   useEffect(() => {
     if (!selectedReview || previewTab !== 'reader') return
-    const chaptersList = getSubmissionChapters(selectedReview)
-    const activeChap = selectedChapter || chaptersList[0] || null
-    const pages = (activeChap && Array.isArray(activeChap.pages)) ? activeChap.pages : []
+    const viewPages = getReviewViewPages(selectedReview, selectedChapter, docCommentsMap);
 
-    if (pages.length > 0) {
+    if (viewPages.length > 0) {
       const preloadIndices = [pageIndex, pageIndex + 1, pageIndex - 1, pageIndex + 2]
       preloadIndices.forEach(idx => {
-        if (idx >= 0 && idx < pages.length && pages[idx]) {
-          const rawUrl = typeof pages[idx] === 'string' ? pages[idx] : (pages[idx].imageUrl || pages[idx].url || pages[idx].pageUrl)
-          if (rawUrl && typeof rawUrl === 'string' && rawUrl.startsWith('http')) {
-            const img = new Image()
-            img.src = rawUrl
-          }
+        if (idx >= 0 && idx < viewPages.length && viewPages[idx]) {
+          const img = new Image()
+          img.src = viewPages[idx].url
         }
       })
     }
@@ -1125,12 +1143,10 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
     const handleKeyDown = (e) => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return
 
-      const chaptersList = getSubmissionChapters(selectedReview)
-      const activeChap = selectedChapter || chaptersList[0] || null
-      const pages = (activeChap && Array.isArray(activeChap.pages)) ? activeChap.pages : []
+      const viewPages = getReviewViewPages(selectedReview, selectedChapter, docCommentsMap);
 
       if (e.key === 'ArrowRight' || e.key === 'PageDown') {
-        if (pageIndex < pages.length - 1) {
+        if (pageIndex < viewPages.length - 1) {
           setPageIndex(prev => prev + 1)
         }
       } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
@@ -1283,7 +1299,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                 <div className="submission-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <ModernButton 
                     variant={2} 
-                    label="👁️ Review Content" 
+                    label={item.status === 'pending' ? "👁 Review Content" : "👁 View Evidence"} 
                     className="btn-review"
                     onClick={() => handleOpenReviewModal(item)} 
                   />
@@ -1328,9 +1344,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
         <div className={`mod-inspector-overlay fade-in ${theme === 'light' ? 'light-theme' : 'dark-theme'}`}>
           {/* Topbar Navigation & Review Actions */}
           {(() => {
-            const chaptersList = getSubmissionChapters(selectedReview);
-            const activeChap = selectedChapter || chaptersList[0] || null;
-            const pages = (activeChap && Array.isArray(activeChap.pages)) ? activeChap.pages : [];
+            const viewPages = getReviewViewPages(selectedReview, selectedChapter, docCommentsMap);
             const activeComments = docCommentsMap[selectedReview.id] || [];
 
             return (
@@ -1354,7 +1368,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                     className={`mod-mode-tab ${previewTab === 'reader' ? 'active' : ''}`}
                     onClick={() => setPreviewTab('reader')}
                   >
-                    🖼️ Image Reader ({pages.length})
+                    🖼️ Image Reader ({viewPages.length})
                   </button>
                   <button
                     type="button"
@@ -1400,13 +1414,11 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
             {/* Left Content Area */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', position: 'relative' }}>
               {(() => {
-                const chaptersList = getSubmissionChapters(selectedReview);
-                const activeChap = selectedChapter || chaptersList[0] || null;
-                const pages = (activeChap && Array.isArray(activeChap.pages)) ? activeChap.pages : [];
+                const viewPages = getReviewViewPages(selectedReview, selectedChapter, docCommentsMap);
 
                 /* MODE 1: RAW IMAGE READER VIEW */
                 if (previewTab === 'reader') {
-                  if (pages.length === 0) {
+                  if (viewPages.length === 0) {
                     return (
                       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
                         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🖼️</div>
@@ -1427,9 +1439,9 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                     );
                   }
 
-                  const currentPageUrl = pages[pageIndex] || pages[0];
+                  const current = viewPages[pageIndex] || viewPages[0];
                   const pageComments = (docCommentsMap[selectedReview.id] || [])
-                    .filter(c => c.targetKey === `page-${pageIndex + 1}`);
+                    .filter(c => c.targetKey === `page-${current.pNum}`);
 
                   return (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', position: 'relative' }}>
@@ -1437,7 +1449,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                       <div className="mod-inspector-subbanner">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <span className="mod-pane-title--raw" style={{ fontWeight: '700' }}>
-                            🌐 Original Raw Manuscript — {activeChap ? activeChap.title : 'Chapter Page'} (Page {pageIndex + 1} of {pages.length})
+                            🌐 Original Raw Manuscript — {activeChap ? activeChap.title : 'Chapter Page'} (Page {pageIndex + 1} of {viewPages.length})
                           </span>
                           <span className="mod-inspector-subtitle" style={{ fontSize: '12px' }}>
                             💡 Click anywhere on image to drop a Google Docs style comment pin!
@@ -1474,23 +1486,19 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                         {readerLayout === 'single' ? (
                           <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', textAlign: 'center' }}>
                             <img
-                              src={currentPageUrl}
-                              alt={`Page ${pageIndex + 1}`}
+                              src={current.url}
+                              alt={`Page ${current.pNum}`}
                               decoding="async"
                               loading="eager"
                               onClick={(e) => {
-                                if (!isPinLocationMode) {
-                                  // Mode A: Normal Page View Mode — Select Page without modal popup!
-                                  return;
-                                }
-                                // Mode B: Pin Location Mode — Drop Coordinate Pin!
+                                if (!isPinLocationMode) return;
                                 const rect = e.currentTarget.getBoundingClientRect();
                                 const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
                                 const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
                                 setFieldCommentModalTarget({
                                   targetType: 'point',
-                                  targetKey: `page-${pageIndex + 1}`,
-                                  targetLabel: `Page ${pageIndex + 1}`,
+                                  targetKey: `page-${current.pNum}`,
+                                  targetLabel: `Page ${current.pNum}`,
                                   coords: { x, y }
                                 });
                               }}
@@ -1503,7 +1511,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                                 border: '1px solid rgba(148, 163, 184, 0.2)',
                                 cursor: isPinLocationMode ? 'crosshair' : 'pointer'
                               }}
-                              title={isPinLocationMode ? "Click to drop a location pin comment on this image" : `Page ${pageIndex + 1}`}
+                              title={isPinLocationMode ? "Click to drop a location pin comment on this image" : `Page ${current.pNum}`}
                             />
 
                             {/* Render Pinned Comment Markers over Image */}
@@ -1544,37 +1552,31 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                           </div>
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', width: '100%', maxWidth: '850px' }}>
-                            {pages.map((imgUrl, pIdx) => {
-                              const pNum = pIdx + 1;
+                            {viewPages.map((pageObj, pIdx) => {
                               const pComments = (docCommentsMap[selectedReview.id] || [])
-                                .filter(c => c.targetKey === `page-${pNum}`);
+                                .filter(c => c.targetKey === `page-${pageObj.pNum}`);
 
                               return (
-                                <div key={pIdx} id={`page-container-${pNum}`} style={{ width: '100%', textAlign: 'center', position: 'relative' }}>
+                                <div key={pIdx} id={`page-container-${pageObj.pNum}`} style={{ width: '100%', textAlign: 'center', position: 'relative' }}>
                                   <img
-                                    src={imgUrl}
-                                    alt={`Page ${pNum}`}
+                                    src={pageObj.url}
+                                    alt={`Page ${pageObj.pNum}`}
                                     decoding="async"
                                     loading="lazy"
                                     onClick={(e) => {
                                       if (selectedReview.status !== 'pending') return;
-                                      
                                       setPageIndex(pIdx);
-
                                       if (!isPinLocationMode) {
-                                        // Mode A: Normal Page View Mode — Select Page & Smooth Scroll without modal popup!
-                                        scrollToPageElement(pNum);
+                                        scrollToPageElement(pageObj.pNum);
                                         return;
                                       }
-
-                                      // Mode B: Pin Location Mode — Drop Coordinate Pin!
                                       const rect = e.currentTarget.getBoundingClientRect();
                                       const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
                                       const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
                                       setFieldCommentModalTarget({
                                         targetType: 'point',
-                                        targetKey: `page-${pNum}`,
-                                        targetLabel: `Page ${pNum}`,
+                                        targetKey: `page-${pageObj.pNum}`,
+                                        targetLabel: `Page ${pageObj.pNum}`,
                                         coords: { x, y }
                                       });
                                     }}
@@ -1587,7 +1589,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                                       border: '1px solid rgba(148, 163, 184, 0.2)',
                                       cursor: selectedReview.status === 'pending' ? (isPinLocationMode ? 'crosshair' : 'pointer') : 'default'
                                     }}
-                                    title={selectedReview.status === 'pending' ? (isPinLocationMode ? 'Click to drop a location pin comment on this image' : `Click to select Page ${pNum}`) : `Page ${pNum}`}
+                                    title={selectedReview.status === 'pending' ? (isPinLocationMode ? 'Click to drop a location pin comment on this image' : `Click to select Page ${pageObj.pNum}`) : `Page ${pageObj.pNum}`}
                                   />
 
                                   {/* Render Pinned Comment Markers over Image in Vertical Scroll Mode */}
@@ -1627,7 +1629,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                                   })}
 
                                   <span className="mod-inspector-subtitle" style={{ display: 'inline-block', marginTop: '6px', fontSize: '11.5px' }}>
-                                    Page {pNum} of {pages.length}
+                                    Page {pageObj.pNum} of {viewPages.length}
                                   </span>
                                 </div>
                               );
@@ -1645,7 +1647,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                             onClick={() => {
                               const targetP = Math.max(0, pageIndex - 1);
                               setPageIndex(targetP);
-                              if (readerLayout === 'vertical') scrollToPageElement(targetP + 1);
+                              if (readerLayout === 'vertical') scrollToPageElement(viewPages[targetP].pNum);
                             }}
                             disabled={pageIndex === 0}
                           >
@@ -1658,13 +1660,16 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                               className="mod-inspect-select"
                               value={pageIndex}
                               onChange={(e) => {
-                                const targetP = Number(e.target.value);
-                                setPageIndex(targetP);
-                                if (readerLayout === 'vertical') scrollToPageElement(targetP + 1);
+                                const targetIdx = Number(e.target.value);
+                                setPageIndex(targetIdx);
+                                if (readerLayout === 'vertical') {
+                                  const current = viewPages[targetIdx];
+                                  if (current) scrollToPageElement(current.pNum);
+                                }
                               }}
                             >
-                              {pages.map((_, pIdx) => (
-                                <option key={pIdx} value={pIdx}>{pIdx + 1} of {pages.length}</option>
+                              {viewPages.map((p, pOptionIdx) => (
+                                <option key={pOptionIdx} value={pOptionIdx}>Page {p.pNum} ({pOptionIdx + 1} of {viewPages.length})</option>
                               ))}
                             </select>
                           </div>
@@ -1673,11 +1678,11 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                             type="button"
                             className="mod-nav-arrow"
                             onClick={() => {
-                              const targetP = Math.min(pages.length - 1, pageIndex + 1);
+                              const targetP = Math.min(viewPages.length - 1, pageIndex + 1);
                               setPageIndex(targetP);
-                              if (readerLayout === 'vertical') scrollToPageElement(targetP + 1);
+                              if (readerLayout === 'vertical') scrollToPageElement(viewPages[targetP].pNum);
                             }}
-                            disabled={pageIndex >= pages.length - 1}
+                            disabled={pageIndex === viewPages.length - 1}
                           >
                             Next Page →
                           </button>
@@ -2296,11 +2301,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
 
               {/* Detailed Pinned Comments Preview Report with Page Thumbnails */}
               {(() => {
-                const comicId = selectedReject.parentReviewId || selectedReject.id;
-                const comments = docCommentsMap[comicId] || selectedReject.notes || [];
-                const chaptersList = getSubmissionChapters(selectedReject);
-                const firstChap = selectedChapter || chaptersList[0] || null;
-                const pages = (firstChap && Array.isArray(firstChap.pages)) ? firstChap.pages : [];
+                const viewPages = getReviewViewPages(selectedReject, selectedChapter, docCommentsMap);
 
                 if (comments.length === 0) return null;
 
