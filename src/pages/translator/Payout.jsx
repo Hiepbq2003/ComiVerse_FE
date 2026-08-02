@@ -16,7 +16,7 @@ function Payout() {
       <div className="translator-page-header">
         <div className="translator-page-header-info">
           <h1>Payout Management</h1>
-          <p>Request payment for completed translations in a closed month through Stripe sandbox.</p>
+          <p>Request payment for completed team tasks assigned to you in a closed month through Stripe sandbox.</p>
         </div>
       </div>
       <CreatorPayoutPanel heading="Translator Monthly Payout" />

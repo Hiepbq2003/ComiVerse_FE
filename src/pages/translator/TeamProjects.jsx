@@ -1406,6 +1406,10 @@ function TeamProjects() {
   }
 
   const handleCreateTask = async (customData = null) => {
+    if (!isLeaderMatch(selectedDetails?.leaderName)) {
+      toast.error('Only the Project Leader can create or assign team tasks.')
+      return
+    }
     const data = customData || newTaskData
     if (!data || !data.title || !data.title.trim()) return
     if (!data.chapterId) {
@@ -1461,6 +1465,10 @@ function TeamProjects() {
   }
 
   const handleMoveTask = async (id, newCol) => {
+    if (!isLeaderMatch(selectedDetails?.leaderName)) {
+      toast.error('Only the Project Leader can change task status.')
+      return
+    }
     const previousTasks = tasks
     const updatedTasks = tasks.map(task => task.id === id ? { ...task, status: newCol } : task)
     setTasks(updatedTasks)
@@ -1491,6 +1499,10 @@ function TeamProjects() {
 
   const handleSaveEditTask = async () => {
     if (!selectedTask || !editTaskData) return
+    if (!isLeaderMatch(selectedDetails?.leaderName)) {
+      toast.error('Only the Project Leader can edit team tasks.')
+      return
+    }
     const comicFallback = selectedDetails?.comicName || selectedDetails?.title || 'Unknown Comic'
     const formattedTitle = `[${(editTaskData.priority || 'MEDIUM').toUpperCase()}] [${editTaskData.comic || comicFallback}] ${editTaskData.title.trim()}`
 
@@ -1526,6 +1538,10 @@ function TeamProjects() {
   }
 
   const handleMoveAllToDone = async (colId) => {
+    if (!isLeaderMatch(selectedDetails?.leaderName)) {
+      toast.error('Only the Project Leader can mark tasks as completed.')
+      return
+    }
     const targets = tasks.filter(t => getTaskColumn(t) === colId)
     if (targets.length === 0) return
 

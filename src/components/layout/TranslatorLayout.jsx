@@ -71,9 +71,11 @@ function TranslatorLayout({ children }) {
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', path: '/translator/dashboard' },
     { id: 'project-list', label: 'Project List', icon: 'list', path: '/translator/project-list' },
     { id: 'project-teams', label: 'Project Teams', icon: 'comics', path: '/translator/project-teams' },
-    { id: 'revenue', label: 'Revenue', icon: 'revenue', path: '/translator/revenue' },
     ...(roleUpper === 'TRANSLATOR'
-      ? [{ id: 'payout', label: 'Payout', icon: 'payout', path: '/translator/payout' }]
+      ? [
+          { id: 'revenue', label: 'Revenue', icon: 'revenue', path: '/translator/revenue' },
+          { id: 'payout', label: 'Payout', icon: 'payout', path: '/translator/payout' },
+        ]
       : []),
   ]
 

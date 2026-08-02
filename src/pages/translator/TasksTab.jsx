@@ -259,7 +259,7 @@ function KanbanColumn({
             <button type="button" className="dropdown__item" onClick={onToggleHighlight}>
               {isHighlighted ? 'Unhighlight' : 'Highlight column'}
             </button>
-            {col.id !== 'completed' && (
+            {isCurrentLeader && col.id !== 'completed' && (
               <button type="button" className="dropdown__item" onClick={onMoveAllToDone}>
                 Move all to Done
               </button>
@@ -348,7 +348,7 @@ function KanbanColumn({
   )
 }
 
-function PausedTaskCard({ task, comicName, onResume }) {
+function PausedTaskCard({ task, comicName, onResume, canResume = false }) {
   const { priority, cleanTitle } = parseTaskTitle(task.title, comicName)
   return (
     <div className="paused-task-card task-card-item" style={{ opacity: 0.75 }}>
@@ -360,7 +360,9 @@ function PausedTaskCard({ task, comicName, onResume }) {
       <span style={{ fontSize: '11px', color: 'var(--trans-text-muted)' }}>Project: {task.project || comicName}</span>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
         <span style={{ fontSize: '11px', color: 'var(--trans-text-secondary)' }}>Due: {task.dueDate}</span>
-        <button className="trans-btn primary" style={{ fontSize: '9px', padding: '2px 8px' }} onClick={onResume}>Resume</button>
+        {canResume && (
+          <button className="trans-btn primary" style={{ fontSize: '9px', padding: '2px 8px' }} onClick={onResume}>Resume</button>
+        )}
       </div>
     </div>
   )
@@ -431,6 +433,10 @@ function TasksTab({
 
   // Leader sees ALL tasks in project. Members ONLY see tasks they are assigned to.
   const visibleTasks = (tasks || []).filter(t => {
+    if (isCurrentLeader) return true;
+    return isUserAssignedToTask(t, members, authUser);
+  });
+  const visiblePausedTasks = (pausedTasks || []).filter(t => {
     if (isCurrentLeader) return true;
     return isUserAssignedToTask(t, members, authUser);
   });
@@ -594,14 +600,20 @@ function TasksTab({
           paddingLeft: '24px', paddingRight: '24px', width: '100%', clear: 'both'
         }}>
           <h4 className="paused-tasks-title" style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--trans-text-primary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span>⏸</span> Paused ({pausedTasks.length})
+            <span>⏸</span> Paused ({visiblePausedTasks.length})
           </h4>
-          {pausedTasks.length === 0 ? (
+          {visiblePausedTasks.length === 0 ? (
             <p style={{ fontStyle: 'italic', color: 'var(--trans-text-muted)', fontSize: '13px', margin: 0 }}>No paused tasks.</p>
           ) : (
             <div className="paused-tasks-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-              {pausedTasks.map(task => (
-                <PausedTaskCard key={task.id} task={task} comicName={comicName} onResume={() => onMoveTask(task.id, 'backlog')} />
+              {visiblePausedTasks.map(task => (
+                <PausedTaskCard
+                  key={task.id}
+                  task={task}
+                  comicName={comicName}
+                  canResume={isCurrentLeader}
+                  onResume={() => onMoveTask(task.id, 'backlog')}
+                />
               ))}
             </div>
           )}
