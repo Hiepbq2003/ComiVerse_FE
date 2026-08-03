@@ -2274,45 +2274,132 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
 
       {/* ── SIMPLE EVIDENCE VIEW MODAL ────────── */}
       {simpleEvidenceView && createPortal(
-        <div className="mod-modal-overlay mod-inspector-high-priority" style={{ zIndex: 999999 }}>
-          <div className="mod-modal-card mod-reject-modal" style={{ maxWidth: '500px', width: '90%', borderRadius: '16px', background: theme === 'light' ? '#ffffff' : '#1e1b4b', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-            <div className="mod-modal-header" style={{ padding: '20px 24px', borderBottom: '1px solid rgba(148,163,184,0.1)' }}>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: theme === 'light' ? '#0f172a' : '#f8fafc' }}>📄 Submission Evidence</h3>
-                <span style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+        <div className="mod-modal-overlay mod-inspector-high-priority" style={{ 
+          zIndex: 999999, 
+          backdropFilter: 'blur(16px)', 
+          WebkitBackdropFilter: 'blur(16px)',
+          backgroundColor: theme === 'light' ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.7)',
+          animation: 'fadeIn 0.3s ease-out'
+        }}>
+          <div style={{ 
+            maxWidth: '480px', 
+            width: '90%', 
+            borderRadius: '24px', 
+            background: theme === 'light' 
+              ? 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.85) 100%)' 
+              : 'linear-gradient(135deg, rgba(30,27,75,0.95) 0%, rgba(15,23,42,0.85) 100%)',
+            boxShadow: theme === 'light' 
+              ? '0 20px 40px -10px rgba(124,58,237,0.15), 0 0 0 1px rgba(255,255,255,0.5) inset' 
+              : '0 25px 50px -12px rgba(0,0,0,0.8), 0 0 0 1px rgba(124,58,237,0.3) inset',
+            border: theme === 'light' ? '1px solid rgba(124,58,237,0.1)' : '1px solid rgba(139,92,246,0.2)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            transform: 'scale(1)',
+            animation: 'slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}>
+            
+            {/* Top decorative gradient bar */}
+            <div style={{ height: '6px', width: '100%', background: 'linear-gradient(90deg, #a855f7 0%, #ec4899 50%, #ff6b35 100%)' }} />
+
+            <div style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <h3 style={{ 
+                  margin: 0, 
+                  fontSize: '22px', 
+                  fontWeight: '800', 
+                  background: 'linear-gradient(90deg, #9333ea, #db2777)', 
+                  WebkitBackgroundClip: 'text', 
+                  WebkitTextFillColor: 'transparent',
+                  letterSpacing: '-0.5px'
+                }}>
+                  Submission Evidence
+                </h3>
+                <span style={{ fontSize: '14px', color: theme === 'light' ? '#64748b' : '#94a3b8', fontWeight: '500' }}>
                   {simpleEvidenceView.title || simpleEvidenceView.comicName}
                 </span>
               </div>
               <button 
-                className="mod-modal-close-btn"
                 onClick={() => setSimpleEvidenceView(null)}
+                style={{
+                  background: theme === 'light' ? 'rgba(15,23,42,0.05)' : 'rgba(255,255,255,0.1)',
+                  border: 'none',
+                  width: '32px', height: '32px',
+                  borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: theme === 'light' ? '#64748b' : '#94a3b8',
+                  transition: 'all 0.2s',
+                }}
+                onMouseOver={(e) => { e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.color = '#fff'; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = theme === 'light' ? 'rgba(15,23,42,0.05)' : 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = theme === 'light' ? '#64748b' : '#94a3b8'; }}
               >
-                ×
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
               </button>
             </div>
             
-            <div className="mod-modal-body" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <div style={{ padding: '0 32px 32px 32px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+              
+              {/* Image Section */}
+              <div style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
+                <div style={{ 
+                  position: 'absolute', 
+                  width: '140px', height: '140px', 
+                  background: '#a855f7', 
+                  filter: 'blur(50px)', 
+                  opacity: theme === 'light' ? 0.15 : 0.25, 
+                  borderRadius: '50%', 
+                  top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                  zIndex: 0
+                }} />
                 <img 
                   src={simpleEvidenceView.cover || simpleEvidenceView.coverImageUrl || '/assets/default_cover.jpg'} 
                   alt="Cover" 
-                  style={{ width: '120px', height: '160px', objectFit: 'cover', borderRadius: '8px', border: '1px solid rgba(148,163,184,0.2)' }}
+                  style={{ 
+                    width: '130px', height: '180px', 
+                    objectFit: 'cover', 
+                    borderRadius: '12px', 
+                    border: theme === 'light' ? '1px solid rgba(0,0,0,0.05)' : '1px solid rgba(255,255,255,0.1)',
+                    boxShadow: theme === 'light' ? '0 15px 35px -5px rgba(0,0,0,0.15)' : '0 15px 35px -5px rgba(0,0,0,0.5)',
+                    position: 'relative',
+                    zIndex: 1,
+                    transition: 'transform 0.3s ease'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05) translateY(-5px)'}
+                  onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1) translateY(0)'}
                 />
               </div>
               
-              <div>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#7c3aed', textTransform: 'uppercase' }}>
-                  Overall {simpleEvidenceView.status === 'rejected' ? 'Rejection Reason' : 'Status Reason'}
-                </h4>
-                <div style={{ padding: '16px', background: theme === 'light' ? '#f8fafc' : 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(148,163,184,0.15)', fontSize: '14px', lineHeight: '1.6', color: theme === 'light' ? '#334155' : '#cbd5e1' }}>
+              {/* Reason Section */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: simpleEvidenceView.status === 'rejected' ? '#ef4444' : '#10b981', boxShadow: `0 0 10px ${simpleEvidenceView.status === 'rejected' ? '#ef4444' : '#10b981'}` }} />
+                  <h4 style={{ margin: 0, fontSize: '13px', color: theme === 'light' ? '#334155' : '#e2e8f0', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '700' }}>
+                    {simpleEvidenceView.status === 'rejected' ? 'Rejection Reason' : 'Status Reason'}
+                  </h4>
+                </div>
+                
+                <div className="glass-input-wrapper" style={{
+                  padding: '18px 20px', 
+                  background: theme === 'light' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.2)',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                  borderRadius: '12px', 
+                  border: theme === 'light' ? '1px solid rgba(148,163,184,0.2)' : '1px solid rgba(148,163,184,0.1)', 
+                  fontSize: '14.5px', 
+                  lineHeight: '1.7', 
+                  color: theme === 'light' ? '#1e293b' : '#f8fafc',
+                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)',
+                  whiteSpace: 'pre-wrap',
+                  maxHeight: '200px',
+                  overflowY: 'auto'
+                }}>
                   {simpleEvidenceView.rejectionReason || simpleEvidenceView.notes || 'No specific reason provided.'}
                 </div>
               </div>
+              
             </div>
             
-            <div className="mod-modal-footer" style={{ padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(148,163,184,0.1)' }}>
-              <ModernButton variant={3} label="Close" onClick={() => setSimpleEvidenceView(null)} />
-            </div>
           </div>
         </div>,
         document.body
