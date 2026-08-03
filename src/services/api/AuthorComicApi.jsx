@@ -39,14 +39,14 @@ export const submitAuthorComicReviewApi = (comicId) => {
 }
 
 export const uploadAuthorChapterFolderApi = (comicId, formData, onUploadProgress) => {
-  return AxiosClient.post(`/author/comics/${comicId}/chapters/upload-folder`, formData, {
+  return AxiosClient.post(`/author/comics/${comicId}/chapters/upload-zip`, formData, {
     timeout: 120000,
     onUploadProgress
   })
 }
 
 export const getAuthorChapterUploadStatusApi = (comicId, taskId) => {
-  return AxiosClient.get(`/author/comics/${comicId}/chapters/upload-folder/status/${taskId}`)
+  return AxiosClient.get(`/author/comics/${comicId}/chapters/upload-zip/status/${taskId}`)
 }
 
 export const getAuthorChapterPreviewApi = (comicId, chapterId) => {
