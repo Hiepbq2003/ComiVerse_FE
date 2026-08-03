@@ -13,7 +13,7 @@ import {
   uploadAuthorChapterFolderApi,
 } from '../../services/api/AuthorComicApi'
 import { uploadImageApi } from '../../services/api/UploadApi'
-import { buildChapterFolderFormData, validateChapterFolder } from '../../utils/chapterFolderUpload'
+import { buildChapterZipFormData, validateChapterFolder } from '../../utils/chapterFolderUpload'
 
 const GENRE_OPTIONS = [
   'Action', 'Adventure', 'Fantasy', 'Romance', 'Drama',
@@ -304,7 +304,7 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
     try {
       const task = await uploadAuthorChapterFolderApi(
         getComicId(comic),
-        buildChapterFolderFormData({ chapterNumber, chapterTitle: title, files: result.files }),
+        await buildChapterZipFormData({ chapterNumber, chapterTitle: title, files: result.files }),
       )
       toast.success('Chapter folder accepted for processing.')
       onUploaded(task, comic)

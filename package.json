@@ -16,6 +16,7 @@
     "axios": "^1.18.1",
     "bootstrap": "^5.3.8",
     "e": "^0.2.33",
+    "jszip": "^3.10.1",
     "lucide-react": "^1.23.0",
     "pg": "^8.22.0",
     "polygon-clipping": "^0.15.7",
