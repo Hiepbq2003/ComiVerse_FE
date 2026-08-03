@@ -31,3 +31,7 @@ export const updateAdminSubscriptionPlanStatusApi = (planId, active) => (
 export const getAdminPaymentLogsApi = (params = {}) => (
   AxiosClient.get('/admin/subscriptions/payments', { params })
 )
+
+export const getAdminPaymentStatisticsApi = (params = {}) => (
+  AxiosClient.get('/admin/subscriptions/payments/statistics', { params })
+)
