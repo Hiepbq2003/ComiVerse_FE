@@ -19,7 +19,7 @@ import {
   uploadAuthorChapterFolderApi,
   replaceAuthorChapterZipApi,
 } from '../../services/api/AuthorComicApi'
-import { buildChapterFolderFormData, validateChapterFolder } from '../../utils/chapterFolderUpload'
+import { buildChapterZipFormData, validateChapterFolder } from '../../utils/chapterFolderUpload'
 
 const normalizeArrayResponse = (payload) => {
   if (Array.isArray(payload)) return payload
@@ -174,7 +174,7 @@ function AddChapterModal({ comic, onClose, onUploaded, onOpenGuide }) {
       toast.info('Uploading chapter folder, please wait...')
       const uploadTask = await uploadAuthorChapterFolderApi(
         getComicId(comic),
-        buildChapterFolderFormData({ chapterNumber, chapterTitle: title, files: result.files }),
+        await buildChapterZipFormData({ chapterNumber, chapterTitle: title, files: result.files }),
       )
       onUploaded(uploadTask)
       toast.success('Chapter folder accepted for processing.')

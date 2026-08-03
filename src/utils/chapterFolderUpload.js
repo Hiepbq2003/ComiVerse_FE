@@ -1,3 +1,5 @@
+import JSZip from 'jszip'
+
 const ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 const MAX_PAGE_COUNT = 200
@@ -60,16 +62,19 @@ export const validateChapterFolder = (fileList) => {
   return { error: '', files: selected, chapterNumber: '', folderName }
 }
 
-export const buildChapterFolderFormData = ({ chapterNumber, chapterTitle, files }) => {
+export const buildChapterZipFormData = async ({ chapterNumber, chapterTitle, files }) => {
+  const zip = new JSZip()
+  
+  files.forEach((file) => {
+    zip.file(file.name, file)
+  })
+
+  const zipBlob = await zip.generateAsync({ type: 'blob' })
+
   const formData = new FormData()
   formData.append('chapterNumber', chapterNumber)
   formData.append('title', chapterTitle || '')
-  const relativePaths = files.map((file) => getRelativePath(file))
-  files.forEach((file) => {
-    formData.append('files', file, file.name)
-  })
-  // Send the complete path manifest as one multipart field. Repeating one
-  // relativePaths field per image doubles Tomcat's multipart part count.
-  formData.append('relativePathsJson', JSON.stringify(relativePaths))
+  formData.append('zipFile', zipBlob, `Chapter ${chapterNumber}.zip`)
+  
   return formData
 }
