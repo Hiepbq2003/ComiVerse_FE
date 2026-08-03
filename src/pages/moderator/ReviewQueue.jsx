@@ -79,6 +79,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
   const [searchQuery, setSearchQuery] = useState('')
 
   const [selectedReview, setSelectedReview] = useState(null)
+  const [simpleEvidenceView, setSimpleEvidenceView] = useState(null)
   const [selectedChapter, setSelectedChapter] = useState(null)
   const [previewTab, setPreviewTab] = useState('reader') // 'reader' | 'script' | 'chapters' | 'synopsis'
   const [pageIndex, setPageIndex] = useState(0)
@@ -1039,6 +1040,11 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
   }, [paginatedItems]);
 
   const handleOpenReviewModal = async (item) => {
+    if (item.status !== 'pending') {
+      setSimpleEvidenceView(item);
+      return;
+    }
+
     setSelectedReview(item);
     setPageIndex(0);
     setFetchingChapters(true);
@@ -2266,6 +2272,52 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
         document.body
       )}
 
+      {/* ── SIMPLE EVIDENCE VIEW MODAL ────────── */}
+      {simpleEvidenceView && createPortal(
+        <div className="mod-modal-overlay mod-inspector-high-priority" style={{ zIndex: 999999 }}>
+          <div className="mod-modal-card mod-reject-modal" style={{ maxWidth: '500px', width: '90%', borderRadius: '16px', background: theme === 'light' ? '#ffffff' : '#1e1b4b', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
+            <div className="mod-modal-header" style={{ padding: '20px 24px', borderBottom: '1px solid rgba(148,163,184,0.1)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: theme === 'light' ? '#0f172a' : '#f8fafc' }}>📄 Submission Evidence</h3>
+                <span style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+                  {simpleEvidenceView.title || simpleEvidenceView.comicName}
+                </span>
+              </div>
+              <button 
+                className="mod-modal-close-btn"
+                onClick={() => setSimpleEvidenceView(null)}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="mod-modal-body" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <img 
+                  src={simpleEvidenceView.cover || simpleEvidenceView.coverImageUrl || '/assets/default_cover.jpg'} 
+                  alt="Cover" 
+                  style={{ width: '120px', height: '160px', objectFit: 'cover', borderRadius: '8px', border: '1px solid rgba(148,163,184,0.2)' }}
+                />
+              </div>
+              
+              <div>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#7c3aed', textTransform: 'uppercase' }}>
+                  Overall {simpleEvidenceView.status === 'rejected' ? 'Rejection Reason' : 'Status Reason'}
+                </h4>
+                <div style={{ padding: '16px', background: theme === 'light' ? '#f8fafc' : 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(148,163,184,0.15)', fontSize: '14px', lineHeight: '1.6', color: theme === 'light' ? '#334155' : '#cbd5e1' }}>
+                  {simpleEvidenceView.rejectionReason || simpleEvidenceView.notes || 'No specific reason provided.'}
+                </div>
+              </div>
+            </div>
+            
+            <div className="mod-modal-footer" style={{ padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(148,163,184,0.1)' }}>
+              <ModernButton variant={3} label="Close" onClick={() => setSimpleEvidenceView(null)} />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* ── MODAL: REJECTION REMARKS (UPGRADED WITH PAGE THUMBNAILS & PINNED COMMENTS REPORT) ───────────────── */}
       {selectedReject && createPortal(
         <div className="mod-modal-overlay mod-inspector-high-priority" style={{ zIndex: 999999 }}>
@@ -2302,94 +2354,14 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                 );
               })()}
 
-              {/* Detailed Pinned Comments Preview Report with Page Thumbnails */}
-              {(() => {
-                const viewPages = getReviewViewPages(selectedReject, selectedChapter, docCommentsMap);
-                const reviewId = selectedReject ? (selectedReject.parentReviewId || selectedReject.id) : null;
-                const comments = selectedReject ? (docCommentsMap[reviewId] || selectedReject.notes || []) : [];
-
-                if (comments.length === 0) return null;
-
-                return (
-                  <div style={{ padding: '14px', borderRadius: '12px', background: theme === 'light' ? '#f8fafc' : 'rgba(255,255,255,0.03)', border: '1px solid rgba(148,163,184,0.15)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', color: '#7c3aed' }}>
-                        📋 Inspection Feedback Report ({comments.length} Pinned Items)
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
-                      {comments.map((c, idx) => {
-                        let pageThumb = null;
-                        if (c.targetKey && c.targetKey.startsWith('page-')) {
-                          const pNum = parseInt(c.targetKey.replace('page-', ''), 10);
-                          const foundPage = viewPages.find(p => p.pNum === pNum);
-                          if (foundPage) {
-                            pageThumb = foundPage.url;
-                          }
-                        }
-
-                        return (
-                          <div key={c.id || idx} style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '8px 12px', borderRadius: '8px', background: theme === 'light' ? '#ffffff' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(148,163,184,0.15)' }}>
-                            {pageThumb ? (
-                              <img
-                                src={pageThumb}
-                                alt={c.targetLabel}
-                                style={{ width: '42px', height: '56px', objectFit: 'cover', borderRadius: '4px', border: '1px solid rgba(148,163,184,0.2)', flexShrink: 0 }}
-                              />
-                            ) : (
-                              <div style={{ width: '42px', height: '56px', borderRadius: '4px', background: 'rgba(124,58,237,0.1)', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>
-                                📌
-                              </div>
-                            )}
-
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                {renderCommentBadge(c, idx + 1)}
-                                {c.targetKey && c.targetKey.startsWith('page-') && (
-                                  <button
-                                    type="button"
-                                    style={{
-                                      padding: '3px 8px',
-                                      fontSize: '11px',
-                                      fontWeight: '700',
-                                      borderRadius: '6px',
-                                      border: '1px solid rgba(124,58,237,0.3)',
-                                      background: 'rgba(124,58,237,0.1)',
-                                      color: '#a855f7',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      transition: 'all 0.2s ease'
-                                    }}
-                                    onClick={() => handleJumpToPageFromReport(selectedReject, c)}
-                                    title="Jump directly to this page in inspector to re-check"
-                                  >
-                                    👁️ View Page {parseInt(c.targetKey.replace('page-', ''), 10)}
-                                  </button>
-                                )}
-                              </div>
-                              <p style={{ margin: 0, fontSize: '12.5px', whiteSpace: 'pre-wrap', color: theme === 'light' ? '#0f172a' : '#f1f5f9' }}>
-                                {c.text}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
-
               {/* Editable Rejection Reason Area */}
               <div>
                 <label style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--mod-text-secondary)', display: 'block', marginBottom: '6px' }}>
-                  Rejection Message / Overall Remarks (Optional if pins attached)
+                  Rejection Message / Overall Remarks (Required)
                 </label>
                 <textarea
                   className="rejection-reason-textarea"
-                  placeholder="Type optional overall rejection remarks or specific revision instructions for the author..."
+                  placeholder="Type overall rejection remarks or specific revision instructions for the author..."
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   style={{ width: '100%', minHeight: '110px', padding: '12px', borderRadius: '8px', fontSize: '13.5px', outline: 'none' }}
@@ -2404,20 +2376,13 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                 className="btn-cancel"
                 onClick={() => setSelectedReject(null)} 
               />
-              {(() => {
-                const comicId = selectedReject ? (selectedReject.parentReviewId || selectedReject.id) : null;
-                const comments = selectedReject ? (docCommentsMap[comicId] || selectedReject.notes || []) : [];
-                const isFormDisabled = !rejectionReason.trim() && comments.length === 0;
-                return (
-                  <ModernButton 
-                    variant={2} 
-                    label="✗ Confirm & Send Rejection" 
-                    className="btn-reject"
-                    onClick={onConfirmRejectClick}
-                    disabled={isFormDisabled}
-                  />
-                );
-              })()}
+              <ModernButton 
+                variant={2} 
+                label="✗ Confirm & Send Rejection" 
+                className="btn-reject"
+                onClick={onConfirmRejectClick}
+                disabled={!rejectionReason.trim()}
+              />
             </div>
           </div>
         </div>,
