@@ -38,7 +38,7 @@ export const submitAuthorComicReviewApi = (comicId) => {
   return AxiosClient.post(`/author/comics/${comicId}/submit-review`)
 }
 
-export const uploadAuthorChapterFolderApi = (comicId, formData) => {
+export const uploadAuthorChapterFolderApi = (comicId, formData, onUploadProgress) => {
   return AxiosClient.post(`/author/comics/${comicId}/chapters/upload-folder`, formData, {
     timeout: 120000,
     onUploadProgress
