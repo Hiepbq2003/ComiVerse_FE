@@ -2305,6 +2305,8 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
               {/* Detailed Pinned Comments Preview Report with Page Thumbnails */}
               {(() => {
                 const viewPages = getReviewViewPages(selectedReject, selectedChapter, docCommentsMap);
+                const reviewId = selectedReject ? (selectedReject.parentReviewId || selectedReject.id) : null;
+                const comments = selectedReject ? (docCommentsMap[reviewId] || selectedReject.notes || []) : [];
 
                 if (comments.length === 0) return null;
 
@@ -2321,8 +2323,9 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                         let pageThumb = null;
                         if (c.targetKey && c.targetKey.startsWith('page-')) {
                           const pNum = parseInt(c.targetKey.replace('page-', ''), 10);
-                          if (!isNaN(pNum) && pages[pNum - 1]) {
-                            pageThumb = pages[pNum - 1];
+                          const foundPage = viewPages.find(p => p.pNum === pNum);
+                          if (foundPage) {
+                            pageThumb = foundPage.url;
                           }
                         }
 
