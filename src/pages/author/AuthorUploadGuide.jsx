@@ -8,7 +8,7 @@ function AuthorUploadGuide() {
       <div className="author-upload-guide-page">
         <div className="author-page-header">
           <h1>Author Upload Guide</h1>
-          <p>There are two upload formats: full comic package ZIP and single chapter ZIP. Large files are accepted first, then processed by background status task.</p>
+          <p>There are two upload formats: full comic package ZIP and a page-image folder for adding one chapter. Uploads are accepted first, then processed by a background status task.</p>
         </div>
 
         <section className="author-section-card">
@@ -51,11 +51,11 @@ Chapter 1.zip
         </section>
 
         <section className="author-section-card">
-          <h2 className="author-section-title">2. Upload One Chapter ZIP</h2>
+          <h2 className="author-section-title">2. Upload One Chapter Folder</h2>
           <p className="author-guide-lead">Use this when the comic already exists and the author wants to add one chapter.</p>
 
           <div className="author-code-card">
-            <pre>{`Chapter 2.zip
+            <pre>{`Chapter 2/
 ├── 01.jpg
 ├── 02.jpg
 ├── 03.jpg
@@ -64,7 +64,7 @@ Chapter 1.zip
 
           <div className="author-guide-grid">
             <div className="author-guide-box success">
-              <h3>Accepted in chapter ZIP</h3>
+              <h3>Accepted in chapter folder</h3>
               <ul>
                 <li><code>01.jpg</code></li>
                 <li><code>02.png</code></li>
@@ -74,10 +74,10 @@ Chapter 1.zip
               </ul>
             </div>
             <div className="author-guide-box danger">
-              <h3>Rejected in chapter ZIP</h3>
+              <h3>Rejected in chapter folder</h3>
               <ul>
-                <li>Wrapper folder such as <code>Chapter 2/01.jpg</code>.</li>
-                <li>Nested archive such as <code>Chapter 2.zip</code> inside another ZIP.</li>
+                <li>Nested folder such as <code>Chapter 2/pages/01.jpg</code>.</li>
+                <li>Archive files such as <code>Chapter 2.zip</code> or <code>pages.rar</code>.</li>
                 <li><code>readme.txt</code>, <code>chapter.pdf</code>, <code>cover.psd</code>, <code>.DS_Store</code>.</li>
               </ul>
             </div>
@@ -92,16 +92,16 @@ Chapter 1.zip
               <span>Use the comic name with outer <code>.zip</code>, for example <code>TenTruyen.zip</code>.</span>
             </div>
             <div>
-              <strong>Chapter archive name</strong>
-              <span>Use <code>Chapter 1.zip</code>, <code>Chapter 1,5.zip</code>, or <code>Chapter 1.5.zip</code>. The backend reads the number from the filename.</span>
+              <strong>Chapter folder name</strong>
+              <span>Any folder name is accepted. Enter the chapter number separately in the upload form.</span>
             </div>
             <div>
               <strong>Page image name</strong>
               <span>Use zero-padding: <code>01.jpg</code>, <code>02.jpg</code>, <code>010.jpg</code>. This keeps page order clear.</span>
             </div>
             <div>
-              <strong>One chapter ZIP = one chapter</strong>
-              <span>For Add Chapter, do not put many chapter archives together. For Upload Comic, put many chapter ZIP files directly inside the outer ZIP.</span>
+              <strong>One folder = one chapter</strong>
+              <span>For Add Chapter, select exactly one chapter folder. The full comic package flow still uses chapter ZIP files inside the outer ZIP.</span>
             </div>
           </div>
         </section>
@@ -128,16 +128,17 @@ Status: GET /api/author/comics/upload-package/status/{taskId}`}</pre>
           </div>
 
           <div className="author-code-card">
-            <pre>{`POST /api/author/comics/{comicId}/chapters/upload-zip
+            <pre>{`POST /api/author/comics/{comicId}/chapters/upload-folder
 Content-Type: multipart/form-data
 
 Fields:
 - chapterNumber: 2
 - title: Optional chapter title
-- zipFile: Chapter 2.zip
+- files: 01.jpg (repeat for every page)
+- relativePathsJson: ["Any Folder/01.jpg", "Any Folder/02.jpg"]
 
 Response: 202 ACCEPTED with taskId
-Status: GET /api/author/comics/{comicId}/chapters/upload-zip/status/{taskId}`}</pre>
+Status: GET /api/author/comics/{comicId}/chapters/upload-folder/status/{taskId}`}</pre>
           </div>
         </section>
 
@@ -149,7 +150,7 @@ Status: GET /api/author/comics/{comicId}/chapters/upload-zip/status/{taskId}`}</
             <li>Put only chapter ZIP files directly into the final outer ZIP: <code>TenTruyen.zip</code>.</li>
             <li>Do not let Windows create <code>TenTruyen.zip/TenTruyen/Chapter 1.zip</code>; that wrapper folder will be rejected.</li>
             <li>Upload the full comic package from <strong>Upload New Comic</strong>.</li>
-            <li>Upload one chapter ZIP from <strong>Add Chapter</strong>.</li>
+            <li>For one new chapter, create a folder with any name, put images directly inside it, select it from <strong>Add Chapter</strong>, and enter the chapter number separately.</li>
             <li>Open Preview, check the page order, then submit for review.</li>
           </ol>
         </section>

@@ -265,7 +265,7 @@ function KanbanColumn({
             <button type="button" className="dropdown__item" onClick={onToggleHighlight}>
               {isHighlighted ? 'Unhighlight' : 'Highlight column'}
             </button>
-            {col.id !== 'completed' && isCurrentLeader && (
+            {isCurrentLeader && col.id !== 'completed' && (
               <button type="button" className="dropdown__item" onClick={onMoveAllToDone}>
                 Move all to Done
               </button>
@@ -355,7 +355,7 @@ function KanbanColumn({
   )
 }
 
-function PausedTaskCard({ task, comicName, onResume }) {
+function PausedTaskCard({ task, comicName, onResume, canResume = false }) {
   const { priority, cleanTitle } = parseTaskTitle(task.title, comicName)
   return (
     <div className="paused-task-card task-card-item" style={{ opacity: 0.75 }}>
@@ -367,7 +367,9 @@ function PausedTaskCard({ task, comicName, onResume }) {
       <span style={{ fontSize: '11px', color: 'var(--trans-text-muted)' }}>Project: {task.project || comicName}</span>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
         <span style={{ fontSize: '11px', color: 'var(--trans-text-secondary)' }}>Due: {task.dueDate}</span>
-        <button className="trans-btn primary" style={{ fontSize: '9px', padding: '2px 8px' }} onClick={onResume}>Resume</button>
+        {canResume && (
+          <button className="trans-btn primary" style={{ fontSize: '9px', padding: '2px 8px' }} onClick={onResume}>Resume</button>
+        )}
       </div>
     </div>
   )
@@ -411,10 +413,6 @@ function TasksTab({
     if (isCurrentLeader) return true;
     return isUserAssignedToTask(t, members, authUser);
   });
-
-  // Same rule applies to paused tasks — a member must never see or be able to
-  // resume a paused task that isn't assigned to them, regardless of what the
-  // parent component passes down.
   const visiblePausedTasks = (pausedTasks || []).filter(t => {
     if (isCurrentLeader) return true;
     return isUserAssignedToTask(t, members, authUser);
@@ -591,11 +589,8 @@ function TasksTab({
                   key={task.id}
                   task={task}
                   comicName={comicName}
-                  onResume={() => {
-                    const canResume = isCurrentLeader || isUserAssignedToTask(task, members, authUser);
-                    if (!canResume) return;
-                    onMoveTask(task.id, 'backlog');
-                  }}
+                  canResume={isCurrentLeader}
+                  onResume={() => onMoveTask(task.id, 'backlog')}
                 />
               ))}
             </div>

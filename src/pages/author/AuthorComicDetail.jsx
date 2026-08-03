@@ -16,9 +16,10 @@ import {
   submitAuthorChapterReviewApi,
   submitAuthorComicReviewApi,
   updateAuthorComicApi,
-  uploadAuthorChapterZipApi,
+  uploadAuthorChapterFolderApi,
   replaceAuthorChapterZipApi,
 } from '../../services/api/AuthorComicApi'
+import { buildChapterFolderFormData, validateChapterFolder } from '../../utils/chapterFolderUpload'
 
 const normalizeArrayResponse = (payload) => {
   if (Array.isArray(payload)) return payload
@@ -62,9 +63,15 @@ const normalizePublicationStatusValue = (status) => {
   return 'ONGOING'
 }
 
-const isZipFile = (file) => {
-  const name = file?.name?.toLowerCase() || ''
-  return name.endsWith('.zip')
+const validateChapterZip = (file) => {
+  if (!file) return 'Please select a chapter ZIP file.'
+
+  const fileName = (file.name || '').toLowerCase()
+  if (!fileName.endsWith('.zip')) {
+    return 'Replacement chapter file must use the .zip extension.'
+  }
+
+  return ''
 }
 
 const UPLOAD_POLL_INTERVAL_MS = 2500
@@ -77,34 +84,6 @@ const formatUploadStatus = (status) => {
   if (value === 'FAILED') return 'Failed'
   if (value === 'PROCESSING') return 'Processing'
   return 'Queued'
-}
-
-const CHAPTER_ZIP_NAME_REGEX = /^chapter\s+[1-9][0-9]*(?:[,.][0-9]+)?\.zip$/i
-
-const isChapterZipName = (file) => CHAPTER_ZIP_NAME_REGEX.test(file?.name || '')
-
-const getChapterNumberFromZipName = (file) => {
-  const match = (file?.name || '').match(/^chapter\s+([1-9][0-9]*(?:[,.][0-9]+)?)\.zip$/i)
-  return match ? match[1] : ''
-}
-
-const validateChapterZip = (file) => {
-  if (!file) return 'Please select a .zip chapter file.'
-  if (!isZipFile(file)) return 'Chapter file must be a .zip file.'
-
-  if (!isChapterZipName(file)) {
-    return "Chapter archive name must be like 'Chapter 1.zip' or 'Chapter 1,5.zip'."
-  }
-
-  return ''
-}
-
-const buildChapterFormData = ({ chapterNumber, chapterTitle, zipFile }) => {
-  const formData = new FormData()
-  formData.append('chapterNumber', chapterNumber)
-  formData.append('title', chapterTitle || '')
-  formData.append('zipFile', zipFile)
-  return formData
 }
 
 const formatStatus = (status) => {
@@ -149,11 +128,11 @@ const formatMoney = (value) => {
 function ZipPackagingGuideMini({ onOpenGuide }) {
   return (
     <div className="author-upload-guide-card compact">
-      <strong>Chapter ZIP format</strong>
+      <strong>Chapter folder format</strong>
       <ul>
-        <li>File name must be <code>Chapter 1.zip</code> or <code>Chapter 1,5.zip</code>.</li>
-        <li>Inside the ZIP must be page images directly at root: <code>01.jpg</code>, <code>02.jpg</code>.</li>
-        <li>No wrapper folder, nested archive, PDF, TXT, PSD, README, or hidden files. Each image max 10MB.</li>
+        <li>Folder name can be anything; chapter number is entered separately.</li>
+        <li>Put page images directly inside: <code>01.jpg</code>, <code>02.jpg</code>.</li>
+        <li>No nested folder, archive, PDF, TXT, or hidden file. Each image max 10MB.</li>
       </ul>
       <button type="button" className="author-guide-link" onClick={onOpenGuide}>Read full guide</button>
     </div>
@@ -163,121 +142,81 @@ function ZipPackagingGuideMini({ onOpenGuide }) {
 function AddChapterModal({ comic, onClose, onUploaded, onOpenGuide }) {
   const [chapterNumber, setChapterNumber] = useState(String((Number(getChapterCount(comic)) || 0) + 1))
   const [title, setTitle] = useState('')
-  const [zipFile, setZipFile] = useState(null)
+  const [folderFiles, setFolderFiles] = useState([])
+  const [folderName, setFolderName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  const handleSubmit = (event) => {
-    event.preventDefault()
+  const handleFolderChange = (event) => {
+    const result = validateChapterFolder(event.target.files)
+    setFolderFiles(result.files)
+    setFolderName(result.folderName)
+    setError(result.error)
+    if (result.chapterNumber) setChapterNumber(result.chapterNumber)
+  }
 
-    const zipError = validateChapterZip(zipFile)
-    if (zipError) {
-      setError(zipError)
-      toast.warning(zipError)
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    const result = validateChapterFolder(folderFiles)
+    if (result.error) {
+      setError(result.error)
+      toast.warning(result.error)
+      return
+    }
+    if (!chapterNumber.trim()) {
+      setError('Chapter number is required.')
       return
     }
 
     setSubmitting(true)
     setError('')
-
-    const toastId = toast.loading(`Uploading Chapter ${chapterNumber}... 0%`)
-    
-    uploadAuthorChapterZipApi(
-      getComicId(comic),
-      buildChapterFormData({ chapterNumber, chapterTitle: title, zipFile }),
-      (progressEvent) => {
-        if (progressEvent.lengthComputable) {
-          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-          const text = progress === 100 ? 'Processing...' : `${progress}%`
-          toast.update(toastId, { render: `Uploading Chapter ${chapterNumber}... ${text}` })
-        }
-      }
-    ).then((uploadTask) => {
-      toast.update(toastId, { render: 'Upload complete! Backend is processing...', type: 'info', isLoading: false, autoClose: 4000 })
-      if (typeof onUploaded === 'function') {
-        onUploaded(uploadTask)
-      }
-    }).catch((err) => {
-      const message = err?.response?.data?.message || err?.message || 'Could not upload ZIP. Please check API/backend connection.'
-      toast.update(toastId, { render: message, type: 'error', isLoading: false, autoClose: 5000 })
-    })
-
-    onClose()
+    try {
+      toast.info('Uploading chapter folder, please wait...')
+      const uploadTask = await uploadAuthorChapterFolderApi(
+        getComicId(comic),
+        buildChapterFolderFormData({ chapterNumber, chapterTitle: title, files: result.files }),
+      )
+      onUploaded(uploadTask)
+      toast.success('Chapter folder accepted for processing.')
+      onClose()
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Could not upload chapter folder.'
+      setError(message)
+      toast.error(message)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
     <div className="author-modal-backdrop" role="presentation">
       <form className="author-modal author-chapter-modal" onSubmit={handleSubmit}>
         <div className="author-modal-head">
-          <div>
-            <h2>Add Chapter</h2>
-            <p>{comic.title}</p>
-          </div>
+          <div><h2>Add Chapter</h2><p>{comic.title}</p></div>
           <button type="button" className="author-icon-btn ghost" onClick={onClose} aria-label="Close">×</button>
         </div>
-        <div className="author-modal-body">
-          <div className="author-chapter-form-grid">
-            <label className="author-form-label">
-              Chapter # *
-              <input
-                className="author-input"
-                type="text"
-                value={chapterNumber}
-                onChange={(event) => setChapterNumber(event.target.value)}
-                placeholder="1 or 1,5"
-              />
-            </label>
-
-            <label className="author-form-label">
-              Chapter Title
-              <input
-                className="author-input"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="Optional title"
-              />
-            </label>
-          </div>
-
-          <label className="author-form-label">
-            Upload Pages (.zip) *
-            <div className="author-upload-zone file-picker-zone">
-              <input
-                type="file"
-                accept=".zip,application/zip,application/x-zip-compressed"
-                onChange={(event) => {
-                  const file = event.target.files?.[0] || null
-                  setZipFile(file)
-
-                  const numberFromFile = getChapterNumberFromZipName(file)
-                  if (numberFromFile) {
-                    setChapterNumber(numberFromFile)
-                  }
-
-                  const zipError = validateChapterZip(file)
-                  setError(zipError)
-                }}
-              />
-              <div className="author-upload-icon">⇧</div>
-              <strong>{zipFile ? zipFile.name : 'Drop chapter ZIP or select file'}</strong>
-              <span>Example: Chapter 1.zip or Chapter 1,5.zip. Put images directly inside the ZIP: 01.jpg, 02.jpg.</span>
-            </div>
+        <div className="author-chapter-form-grid">
+          <label className="author-form-label">Chapter # *
+            <input className="author-input" type="text" value={chapterNumber} onChange={(event) => setChapterNumber(event.target.value)} placeholder="1 or 1,5" />
           </label>
-
-          <ZipPackagingGuideMini onOpenGuide={onOpenGuide} />
-
-          {error && <div className="author-alert error">{error}</div>}
-          
-          <div className="author-alert info">
-            <strong>i</strong> Chapter will be created as preview first. Submit it for moderator review after checking pages.
-          </div>
+          <label className="author-form-label">Chapter Title
+            <input className="author-input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Optional title" />
+          </label>
         </div>
-
+        <label className="author-form-label">Upload page folder *
+          <div className="author-upload-zone file-picker-zone">
+            <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple webkitdirectory="" directory="" onChange={handleFolderChange} />
+            <div className="author-upload-icon">⇧</div>
+            <strong>{folderFiles.length ? `${folderName || 'Selected folder'} · ${folderFiles.length} pages` : 'Select chapter folder'}</strong>
+            <span>Example: Any Folder Name/01.jpg, Any Folder Name/02.jpg. Files are naturally sorted.</span>
+          </div>
+        </label>
+        <ZipPackagingGuideMini onOpenGuide={onOpenGuide} />
+        <div className="author-alert info">ℹ The chapter is created as preview first. Review pages before submitting to moderation.</div>
+        {error && <div className="author-form-error">{error}</div>}
         <div className="author-modal-actions">
           <button type="button" className="btn-author-action" onClick={onClose} disabled={submitting}>Cancel</button>
-          <button type="submit" className="btn-author-action black" disabled={submitting}>
-            {submitting ? 'Sending file...' : 'Upload ZIP'}
-          </button>
+          <button type="submit" className="btn-author-action black" disabled={submitting}>{submitting ? 'Sending folder...' : 'Upload Folder'}</button>
         </div>
       </form>
     </div>
@@ -463,6 +402,7 @@ function EditComicModal({ comic, onClose, onSaved }) {
     } catch (err) {
       const message = err?.response?.data?.message || err?.message || 'Could not update comic information.'
       setError(message)
+      if (err?.response?.status === 409) toast.warning(message)
     } finally {
       setSaving(false)
     }
@@ -646,9 +586,15 @@ function AuthorComicDetail() {
             appendUploadedChapter(latest.chapter)
           }
           if (toastIdRef.current) {
-            toast.update(toastIdRef.current, { render: 'ZIP processed! Preview is ready.', type: 'success', isLoading: false, autoClose: 5000 })
+            toast.update(toastIdRef.current, {
+              render: 'Folder processed! Preview is ready.',
+              type: 'success',
+              isLoading: false,
+              autoClose: 5000,
+            })
+            toastIdRef.current = null
           }
-          setActionMessage('ZIP processed. Preview is ready; submit it for moderator review after checking pages.')
+          setActionMessage('Folder processed. Preview is ready; submit it for moderator review after checking pages.')
         } else {
           if (toastIdRef.current) {
             toast.update(toastIdRef.current, { render: latest?.error || 'Upload processing failed.', type: 'error', isLoading: false, autoClose: 5000 })
@@ -672,8 +618,10 @@ function AuthorComicDetail() {
     if (!taskId) return
 
     setUploadTask(task)
-    toastIdRef.current = toast.loading('Chapter background upload: Processing chapter ZIP...')
-    setActionMessage('Chapter ZIP accepted. Backend is processing it in the background.')
+    toastIdRef.current = toast.loading(
+      'Chapter background upload: Processing chapter folder...'
+    )
+    setActionMessage('Chapter folder accepted. Backend is processing it in the background.')
     pollChapterUploadTask(taskId)
   }
 
@@ -924,7 +872,7 @@ function AuthorComicDetail() {
           <div className="author-chapter-section-head">
             <div>
               <h2>Chapters ({chapters.length})</h2>
-              <p>Upload ZIP, preview pages, then submit each chapter for moderator review.</p>
+              <p>Upload a page folder, preview pages, then submit each chapter for moderator review.</p>
             </div>
             <div className="author-header-actions">
               <button className="btn-author-action" type="button" onClick={() => setShowUploadGuide(true)}>Upload Guide</button>
@@ -951,7 +899,7 @@ function AuthorComicDetail() {
           {chapters.length === 0 ? (
             <div className="author-empty-state small">
               <h3>No chapters yet</h3>
-              <p>Upload your first ZIP file to create real chapter pages.</p>
+              <p>Upload your first chapter folder to create real chapter pages.</p>
             </div>
           ) : (
             <div className="author-table-scroll">
