@@ -762,6 +762,8 @@ function ModeratorComicDetail() {
     ) || null
   }, [selectedViewLang, assignedTeamsForComic])
 
+  const hasScopePermission = comic ? isLanguageInModeratorScope(getAuthorRawLanguage(comic), getAuth()?.user) : false;
+
   return (
     <ModeratorLayout activeNav="comic-management">
       <div className="mod-detail-container fade-in">
@@ -806,19 +808,6 @@ function ModeratorComicDetail() {
           <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
             <h3>Comic not found or failed to load.</h3>
           </div>
-        ) : !isLanguageInModeratorScope(getAuthorRawLanguage(comic), getAuth()?.user) ? (
-          <div className="mod-comic-overview-card" style={{ textAlign: 'center', padding: '80px 20px', margin: '20px 0', display: 'block' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
-            <h2 style={{ fontSize: '22px', fontWeight: '700', color: 'var(--mod-text-primary)', marginBottom: '8px' }}>
-              Access Denied: Out of Moderation Scope
-            </h2>
-            <p style={{ color: 'var(--mod-text-secondary)', maxWidth: '520px', margin: '0 auto 24px', lineHeight: '1.6', fontSize: '14.5px' }}>
-              This comic's original language (<strong>{getAuthorRawLanguage(comic)}</strong>) does not fall within your assigned moderation scope (<strong>{getModeratorScope(getAuth()?.user).map(l => l.charAt(0).toUpperCase() + l.slice(1)).join(', ')}</strong>). You are only authorized to inspect and review content in your assigned languages.
-            </p>
-            <Link to="/moderator" className="mod-back-btn" style={{ display: 'inline-block', padding: '10px 20px', background: 'var(--mod-accent, #a855f7)', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontWeight: '600' }}>
-              ← Return to Moderator Dashboard
-            </Link>
-          </div>
         ) : (
           <>
             {/* Comic Overview Card */}
@@ -835,56 +824,86 @@ function ModeratorComicDetail() {
                 <div>
                   <div className="mod-comic-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h1 className="mod-comic-title">{comic.title}</h1>
-                    <ModernButton 
-                      variant={2} 
-                      label="✏️ Edit Info" 
-                      onClick={() => {
-                        setEditForm({
-                          title: comic.title,
-                          publicationStatus: comic.publicationStatus || 'ONGOING',
-                          minimumAge: comic.minimumAge || 13,
-                          genres: comic.genres || []
-                        })
-                        setIsEditing(true)
-                      }} 
-                    />
+                    {hasScopePermission && (
+                      <div title={!hasScopePermission ? "Out of scope" : ""}>
+                        <ModernButton 
+                          variant={2} 
+                          label="✏️ Edit Info" 
+                          disabled={!hasScopePermission}
+                          onClick={() => {
+                            if (!hasScopePermission) return;
+                            setEditForm({
+                              title: comic.title,
+                              language: comic.language || 'Unknown',
+                              publicationStatus: comic.publicationStatus || 'ONGOING',
+                              minimumAge: comic.minimumAge || 13,
+                              genres: comic.genres || []
+                            })
+                            setIsEditing(true)
+                          }} 
+                        />
+                      </div>
+                    )}
                   </div>
 
-                  <div className="mod-comic-meta-pills">
+                  <div className="mod-comic-meta-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '16px', alignItems: 'center' }}>
                     <span className="mod-meta-pill mod-meta-pill--lang">
-                      {getLanguageFlag(getAuthorRawLanguage(comic))} Author Input Raw: <strong>{getAuthorRawLanguage(comic)}</strong>
+                      {getLanguageFlag(getAuthorRawLanguage(comic))} Author Input: <strong>{getAuthorRawLanguage(comic)}</strong>
                     </span>
 
                     <span className={`mod-meta-pill mod-meta-pill--status-${(comic.publicationStatus || 'ONGOING').toLowerCase()}`}>
                       Status: {comic.publicationStatus || 'ONGOING'}
                     </span>
 
-                    {(comic.approvedBy || comic.moderatorName) && (
-                      <span className="mod-meta-pill" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                        ✅ Approved by: <strong>{comic.approvedBy || comic.moderatorName}</strong> {comic.approvedAt && `• ${new Date(comic.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
-                      </span>
-                    )}
-
-                    <span className="mod-meta-pill">
-                      ⭐ Rating: {comic.ratingAverage !== undefined ? comic.ratingAverage.toFixed(1) : (comic.rating !== undefined ? comic.rating.toFixed(1) : '0.0')} ({comic.ratingCount || 0})
+                    <span className="mod-meta-pill" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                      ⭐ Rating: <strong>{comic.ratingAverage !== undefined ? comic.ratingAverage.toFixed(1) : (comic.rating !== undefined ? comic.rating.toFixed(1) : '0.0')}</strong> <span style={{ color: '#64748b' }}>({comic.ratingCount || 0})</span>
                     </span>
 
-                    <span className="mod-meta-pill">
-                      📖 {chapters.length} Chapters
+                    <span className="mod-meta-pill" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                      📖 <strong>{chapters.length}</strong> Chapters
                     </span>
                   </div>
 
                   {Array.isArray(comic.genres) && comic.genres.length > 0 && (
-                    <div className="mod-comic-genres" style={{ marginTop: '12px', marginBottom: '14px' }}>
+                    <div className="mod-comic-genres" style={{ marginBottom: '20px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {comic.genres.map((g, idx) => {
                         const name = typeof g === 'string' ? g : (g?.name || g?.genreName || g?.title || String(g));
                         if (!name || !name.trim()) return null;
                         return (
-                          <span key={idx} className="mod-genre-tag">
+                          <span key={idx} className="mod-genre-tag" style={{ padding: '6px 14px', background: 'rgba(168, 85, 247, 0.1)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.2)', borderRadius: '8px', fontSize: '12px', fontWeight: '500' }}>
                             {name.trim()}
                           </span>
                         );
                       })}
+                    </div>
+                  )}
+
+                  {(comic.approvedBy || comic.moderatorName) && (
+                    <div className="mod-approval-banner" style={{ 
+                      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(52, 211, 153, 0.02) 100%)', 
+                      borderLeft: '4px solid #10b981', 
+                      borderRadius: '4px 12px 12px 4px', 
+                      padding: '12px 16px', 
+                      marginBottom: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '14px',
+                      border: '1px solid rgba(16, 185, 129, 0.1)',
+                      borderLeftWidth: '4px'
+                    }}>
+                      <div style={{ 
+                        width: '36px', height: '36px', borderRadius: '50%', 
+                        background: 'rgba(16, 185, 129, 0.2)', display: 'flex', 
+                        alignItems: 'center', justifyContent: 'center', color: '#10b981',
+                        fontSize: '18px'
+                      }}>✓</div>
+                      <div>
+                        <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>Verified & Published</div>
+                        <div style={{ color: '#e2e8f0', fontSize: '15px' }}>
+                           By <strong style={{ color: '#10b981' }}>{comic.approvedBy || comic.moderatorName}</strong> 
+                           {comic.approvedAt && <span style={{ color: '#64748b', fontSize: '13px', marginLeft: '8px' }}>• {new Date(comic.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -1053,12 +1072,14 @@ function ModeratorComicDetail() {
                             >
                               👁️ Inspect Raw vs Translated
                             </button>
-                            <ModernButton
-                              variant={5}
-                              label="🗑️ Delete"
-                              onClick={() => handleDeleteChapterItem(chap.id)}
-                              style={{ height: '30px', minHeight: '30px', minWidth: '70px', padding: '0 10px', fontSize: '12px' }}
-                            />
+                            {hasScopePermission && (
+                              <button
+                                className="btn-delete-chap"
+                                onClick={() => handleDeleteChapterItem(chap.id)}
+                              >
+                                🗑️ Delete
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1104,18 +1125,25 @@ function ModeratorComicDetail() {
             {/* Modal Body */}
             <div className="mod-edit-comic-modal-body">
               
-              {/* Comic Title */}
+              {/* Comic Title (Read-only for Moderators) */}
               <div className="mod-edit-field-group">
                 <label className="mod-edit-field-label">
-                  Comic Title *
+                  Comic Title
+                  <span style={{ 
+                    fontSize: '11px', fontWeight: '400', color: '#94a3b8', marginLeft: '8px',
+                    background: 'rgba(168, 85, 247, 0.1)', padding: '2px 8px', borderRadius: '4px'
+                  }}>🔒 Author Property</span>
                 </label>
-                <input 
-                  type="text" 
-                  className="mod-edit-field-input"
-                  value={editForm.title || ''}
-                  onChange={(e) => setEditForm({...editForm, title: e.target.value})}
-                  placeholder="Enter comic title"
-                />
+                <div style={{
+                  padding: '10px 14px', borderRadius: '8px', fontSize: '14px',
+                  background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)',
+                  color: '#94a3b8', cursor: 'not-allowed', userSelect: 'none'
+                }}>
+                  {editForm.title || 'Untitled'}
+                </div>
+                <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                  Title is the Author's intellectual property. To request changes, use the <strong>Reject</strong> action with a reason.
+                </span>
               </div>
 
               {/* Publication Status */}
@@ -1132,6 +1160,30 @@ function ModeratorComicDetail() {
                   <option value="ONGOING">Ongoing</option>
                   <option value="COMPLETED">Completed</option>
                   <option value="HIATUS">Hiatus</option>
+                </select>
+              </div>
+
+              {/* Language */}
+              <div className="mod-edit-field-group">
+                <label className="mod-edit-field-label">
+                  Language
+                </label>
+                <select 
+                  className="mod-edit-field-input"
+                  style={{ cursor: 'pointer' }}
+                  value={editForm.language || comic.language || 'Unknown'}
+                  onChange={(e) => setEditForm({...editForm, language: e.target.value})}
+                >
+                  <option value="Vietnamese">Vietnamese</option>
+                  <option value="English">English</option>
+                  <option value="Japanese">Japanese</option>
+                  <option value="Korean">Korean</option>
+                  <option value="Chinese">Chinese</option>
+                  <option value="Spanish">Spanish</option>
+                  <option value="French">French</option>
+                  <option value="Thai">Thai</option>
+                  <option value="Indonesian">Indonesian</option>
+                  <option value="Unknown">Unknown</option>
                 </select>
               </div>
 
@@ -1231,12 +1283,13 @@ function ModeratorComicDetail() {
                       return matched ? matched.id : null;
                     }).filter(Boolean);
 
+                    // Moderators can only edit: language, genres, minimumAge, publicationStatus
+                    // Title is Author's property — never sent from Mod edit form
                     const payload = {
-                      ...editForm,
-                      title: (editForm.title || comic.title || '').trim(),
-                      status: (editForm.status || editForm.publicationStatus || comic.publicationStatus || comic.status || 'ONGOING').toUpperCase(),
+                      status: (editForm.publicationStatus || editForm.status || comic.publicationStatus || comic.status || 'ONGOING').toUpperCase(),
                       publicationStatus: (editForm.publicationStatus || editForm.status || comic.publicationStatus || comic.status || 'ONGOING').toUpperCase(),
                       language: editForm.language || comic.language || 'Vietnamese',
+                      minimumAge: editForm.minimumAge,
                       genreIds: mappedGenreIds
                     }
                     try {

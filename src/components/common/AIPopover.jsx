@@ -368,8 +368,7 @@ export const AIPopover = ({
               {data.unreadCount > 0 && (
                 <button 
                   type="button" 
-                  className="pop-btn pop-btn--ghost" 
-                  style={{ fontSize: '11px', padding: '2px 6px', height: 'auto', minHeight: 'auto', border: '1px solid var(--border)' }}
+                  className="pop-btn pop-btn--mark-read" 
                   onClick={(e) => { e.stopPropagation(); onAction('markAllRead'); }}
                 >
                   Mark all as read

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
@@ -17,6 +17,7 @@ import {
   submitAuthorComicReviewApi,
   updateAuthorComicApi,
   uploadAuthorChapterFolderApi,
+  replaceAuthorChapterZipApi,
 } from '../../services/api/AuthorComicApi'
 import { buildChapterFolderFormData, validateChapterFolder } from '../../utils/chapterFolderUpload'
 
@@ -60,6 +61,17 @@ const normalizePublicationStatusValue = (status) => {
   if (value === 'HIATUS') return 'HIATUS'
   if (value === 'CANCEL') return 'CANCEL'
   return 'ONGOING'
+}
+
+const validateChapterZip = (file) => {
+  if (!file) return 'Please select a chapter ZIP file.'
+
+  const fileName = (file.name || '').toLowerCase()
+  if (!fileName.endsWith('.zip')) {
+    return 'Replacement chapter file must use the .zip extension.'
+  }
+
+  return ''
 }
 
 const UPLOAD_POLL_INTERVAL_MS = 2500
@@ -211,6 +223,132 @@ function AddChapterModal({ comic, onClose, onUploaded, onOpenGuide }) {
   )
 }
 
+function ResubmitChapterModal({ comic, chapter, onClose, onResubmitted, onOpenGuide }) {
+  const chapterNumber = getChapterNumber(chapter) || ''
+  const title = chapter?.title || ''
+  const [zipFile, setZipFile] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = (event) => {
+    event.preventDefault()
+
+    const zipError = validateChapterZip(zipFile)
+    if (zipError) {
+      setError(zipError)
+      toast.warning(zipError)
+      return
+    }
+
+    setSubmitting(true)
+    setError('')
+
+    const toastId = toast.loading(`Replacing Chapter ${chapterNumber}... 0%`)
+      
+    const formData = new FormData()
+    formData.append('zipFile', zipFile)
+
+    replaceAuthorChapterZipApi(
+      getComicId(comic),
+      getChapterId(chapter),
+      formData,
+      (progressEvent) => {
+        if (progressEvent.lengthComputable) {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          const text = progress === 100 ? 'Processing...' : `${progress}%`
+          toast.update(toastId, { render: `Replacing Chapter ${chapterNumber}... ${text}` })
+        }
+      }
+    ).then((response) => {
+      toast.update(toastId, { render: 'Chapter ZIP replaced successfully! Please review the preview before submitting.', type: 'success', isLoading: false, autoClose: 5000 })
+      if (typeof onResubmitted === 'function') {
+        onResubmitted(response)
+      }
+    }).catch((err) => {
+      const message = err?.response?.data?.message || err?.message || 'Could not replace ZIP. Please check API/backend connection.'
+      toast.update(toastId, { render: message, type: 'error', isLoading: false, autoClose: 5000 })
+    })
+
+    onClose()
+  }
+
+  return (
+    <div className="author-modal-backdrop" role="presentation">
+      <form className="author-modal author-chapter-modal" onSubmit={handleSubmit}>
+        <div className="author-modal-head">
+          <div>
+            <h2>Resubmit Chapter</h2>
+            <p>{comic.title}</p>
+          </div>
+          <button type="button" className="author-icon-btn ghost" onClick={onClose} aria-label="Close">×</button>
+        </div>
+        <div className="author-modal-body">
+          <div className="author-chapter-form-grid">
+            <label className="author-form-label">
+              Chapter #
+              <input
+                className="author-input"
+                type="text"
+                value={chapterNumber}
+                disabled
+              />
+            </label>
+
+            <label className="author-form-label">
+              Chapter Title
+              <input
+                className="author-input"
+                value={title}
+                disabled
+              />
+            </label>
+          </div>
+
+          <label className="author-form-label">
+            Upload Replacement Pages (.zip) *
+            <div className="author-upload-zone file-picker-zone">
+              <input
+                type="file"
+                accept=".zip,application/zip,application/x-zip-compressed"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] || null
+                  setZipFile(file)
+                  const zipError = validateChapterZip(file)
+                  if (zipError) {
+                    setError(zipError)
+                    toast.warning(zipError)
+                  } else {
+                    setError('')
+                  }
+                }}
+              />
+              <div className="upload-zone-content">
+                <span className="upload-zone-icon">📁</span>
+                <strong>{zipFile ? zipFile.name : 'Click or drag ZIP file here'}</strong>
+                <p>Contains numbered image files (.jpg, .png)</p>
+              </div>
+            </div>
+            {error && <span className="author-form-error" style={{ display: 'block', marginTop: '8px' }}>{error}</span>}
+          </label>
+
+          <div className="author-modal-actions">
+            <button type="button" className="author-secondary-btn" onClick={onOpenGuide}>
+              View ZIP Guidelines
+            </button>
+            <div style={{ flex: 1 }} />
+            <button type="button" className="author-secondary-btn" onClick={onClose} disabled={submitting}>
+              Cancel
+            </button>
+            <button type="submit" className="author-primary-btn" disabled={!zipFile || submitting}>
+              {submitting ? 'Uploading...' : 'Replace & Continue'}
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 function EditComicModal({ comic, onClose, onSaved }) {
   const [form, setForm] = useState({
     title: comic?.title || '',
@@ -356,11 +494,13 @@ function AuthorComicDetail() {
   const [error, setError] = useState('')
   const [showAddChapter, setShowAddChapter] = useState(false)
   const [showEditComic, setShowEditComic] = useState(false)
+  const [resubmitChapter, setResubmitChapter] = useState(null)
   const [showUploadGuide, setShowUploadGuide] = useState(false)
   const [actionMessage, setActionMessage] = useState(location.state?.message || '')
   const [actionLoadingId, setActionLoadingId] = useState(null)
   const [uploadTask, setUploadTask] = useState(null)
   const [submittingComic, setSubmittingComic] = useState(false)
+  const toastIdRef = useRef(null)
 
   const loadDetail = useCallback(async () => {
     setLoading(true)
@@ -376,42 +516,12 @@ function AuthorComicDetail() {
       const rawComic = comicResponse.value;
       const rawChapters = chaptersResponse.status === 'fulfilled' ? normalizeArrayResponse(chaptersResponse.value) : [];
 
-      let hasRejectedOverride = false;
-      let overallRejectionReason = null;
-      try {
-        const rawOverrides = localStorage.getItem('comiverse_moderator_submissions_override');
-        if (rawOverrides) {
-          const overrides = JSON.parse(rawOverrides);
-          const comicTitleClean = (rawComic.title || '').trim().toLowerCase();
-          const comicIdStr = String(rawComic.id || rawComic.comicId || id || '');
-
-          const matchingOverrides = overrides.filter(o => {
-            const matchId = (o.comicId && String(o.comicId) === comicIdStr) || (o.id && String(o.id) === comicIdStr);
-            const matchTitle = (comicTitleClean && o.title && o.title.trim().toLowerCase() === comicTitleClean);
-            return matchId || matchTitle;
-          });
-
-          const rejectedOverride = matchingOverrides.find(o => (o.status || '').toString().toUpperCase() === 'REJECTED');
-          if (rejectedOverride) {
-            hasRejectedOverride = true;
-            overallRejectionReason = rejectedOverride.rejectionReason || rejectedOverride.reason || null;
-          }
-        }
-      } catch (e) {}
-
-      const chaptersWithRejection = rawChapters.map(c => {
-        if (hasRejectedOverride) {
-          return { ...c, status: 'REJECTED' };
-        }
-        return c;
-      });
-
-      const finalModerationStatus = (hasRejectedOverride || chaptersWithRejection.some(c => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED'))
+      const finalModerationStatus = (rawChapters.some(c => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED'))
         ? 'REJECTED'
         : (rawComic.moderationStatus || rawComic.approvalStatus || 'DRAFT');
 
-      setComic({ ...rawComic, moderationStatus: finalModerationStatus, rejectionReason: overallRejectionReason || rawComic.rejectionReason });
-      setChapters(chaptersWithRejection);
+      setComic({ ...rawComic, moderationStatus: finalModerationStatus, rejectionReason: rawComic.rejectionReason });
+      setChapters(rawChapters);
       setMetrics(metricsResponse.status === 'fulfilled' ? metricsResponse.value : null)
     } catch {
       setComic(null)
@@ -461,6 +571,10 @@ function AuthorComicDetail() {
       try {
         const latest = await getAuthorChapterUploadStatusApi(id, taskId)
         setUploadTask(latest)
+        
+        if (toastIdRef.current) {
+          toast.update(toastIdRef.current, { render: `Chapter background upload: Processing...` })
+        }
 
         if (!isFinalUploadStatus(latest?.status)) {
           window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
@@ -471,12 +585,27 @@ function AuthorComicDetail() {
           if (latest?.chapter) {
             appendUploadedChapter(latest.chapter)
           }
+          if (toastIdRef.current) {
+            toast.update(toastIdRef.current, {
+              render: 'Folder processed! Preview is ready.',
+              type: 'success',
+              isLoading: false,
+              autoClose: 5000,
+            })
+            toastIdRef.current = null
+          }
           setActionMessage('Folder processed. Preview is ready; submit it for moderator review after checking pages.')
         } else {
+          if (toastIdRef.current) {
+            toast.update(toastIdRef.current, { render: latest?.error || 'Upload processing failed.', type: 'error', isLoading: false, autoClose: 5000 })
+          }
           setActionMessage(latest?.error || 'Upload processing failed.')
         }
       } catch (err) {
         setUploadTask({ taskId, status: 'FAILED', error: err?.message || 'Could not check upload status.' })
+        if (toastIdRef.current) {
+          toast.update(toastIdRef.current, { render: err?.message || 'Could not check upload status.', type: 'error', isLoading: false, autoClose: 5000 })
+        }
         setActionMessage('Could not check upload status.')
       }
     }
@@ -489,6 +618,9 @@ function AuthorComicDetail() {
     if (!taskId) return
 
     setUploadTask(task)
+    toastIdRef.current = toast.loading(
+      'Chapter background upload: Processing chapter folder...'
+    )
     setActionMessage('Chapter folder accepted. Backend is processing it in the background.')
     pollChapterUploadTask(taskId)
   }
@@ -534,6 +666,42 @@ function AuthorComicDetail() {
       setActionMessage(message)
     } finally {
       setActionLoadingId(null)
+    }
+  }
+
+  const handleResubmitChapter = async (chapter) => {
+    const chapterId = getChapterId(chapter)
+    setActionLoadingId(chapterId)
+    setActionMessage('')
+
+    try {
+      const response = await submitAuthorChapterReviewApi(getComicId(comic), chapterId)
+
+      setChapters((current) => current.map((item) => (
+        getChapterId(item) === chapterId
+          ? { ...item, status: response?.status || 'SUBMITTED_FOR_REVIEW', rejectionReason: null }
+          : item
+      )))
+
+      toast.success(`Chapter resubmitted for moderator review!`)
+      setActionMessage('Chapter resubmitted for moderator review.')
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Could not resubmit chapter.'
+      setActionMessage(message)
+      toast.error(message)
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  const handleChapterResubmitted = (response) => {
+    const updatedChapter = response?.data || response
+    if (updatedChapter) {
+      setChapters((current) => current.map((item) => (
+        getChapterId(item) === getChapterId(updatedChapter)
+          ? { ...item, ...updatedChapter, status: updatedChapter.status || updatedChapter.moderationStatus || 'PREVIEW_READY', rejectionReason: null }
+          : item
+      )))
     }
   }
 
@@ -598,10 +766,15 @@ function AuthorComicDetail() {
     try {
       await deleteAuthorChapterApi(getComicId(comic), chapterId)
       setChapters((current) => current.filter((item) => getChapterId(item) !== chapterId))
-      setComic((current) => ({
-        ...current,
-        chapterCount: Math.max(0, Number(getChapterCount(current)) - 1),
-      }))
+      setComic((current) => {
+        const currentChapterCount = Math.max(0, Number(getChapterCount(current)) - 1)
+        const isDraftReverted = currentChapterCount === 0 && current.moderationStatus === 'SUBMITTED_FOR_REVIEW'
+        return {
+          ...current,
+          chapterCount: currentChapterCount,
+          moderationStatus: isDraftReverted ? 'DRAFT' : current.moderationStatus
+        }
+      })
       setActionMessage('Chapter permanently deleted.')
     } catch (err) {
       const message = err?.response?.data?.message || err?.message || 'Could not delete chapter.'
@@ -694,18 +867,6 @@ function AuthorComicDetail() {
         </section>
 
         {actionMessage && <div className="author-alert info detail-message">{actionMessage}</div>}
-        {uploadTask && (
-          <div className={`author-upload-task-card ${(uploadTask.status || 'queued').toString().toLowerCase()} detail-message`}>
-            <div>
-              <strong>Chapter background upload</strong>
-              <p>{uploadTask.error || uploadTask.message || 'Waiting for backend status...'}</p>
-            </div>
-            <div className="author-upload-task-meta">
-              <span>{formatUploadStatus(uploadTask.status)}</span>
-              <small>{uploadTask.progress ?? 0}%</small>
-            </div>
-          </div>
-        )}
 
         <section className="author-chapter-section-card">
           <div className="author-chapter-section-head">
@@ -722,13 +883,13 @@ function AuthorComicDetail() {
           </div>
 
           {(comic?.moderationStatus?.toUpperCase() === 'REJECTED' || chapters.some(c => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED')) && (
-            <div className="author-alert error" style={{ margin: '16px 24px', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', padding: '14px 18px', borderRadius: '8px' }}>
+            <div className="author-alert danger" style={{ margin: '16px 24px', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
               <div>
                 <strong>🚫 Submission Rejected:</strong> Your submission requires revisions. Please review the feedback below. You can also click <strong>Preview</strong> on the rejected chapter below to inspect page-specific pins if any.
               </div>
               {comic?.rejectionReason && (
-                <div style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.25)', borderRadius: '6px', borderLeft: '3px solid #ef4444', color: '#fff', fontSize: '14px', width: '100%', lineHeight: '1.5' }}>
-                  <div style={{ fontSize: '11px', color: '#fca5a5', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: '4px', letterSpacing: '0.5px' }}>Overall Moderator Feedback</div>
+                <div style={{ padding: '12px 16px', background: 'var(--author-upload-zone-bg)', borderRadius: '6px', borderLeft: '3px solid #ef4444', color: 'var(--author-text-primary)', fontSize: '14px', width: '100%', lineHeight: '1.5' }}>
+                  <div style={{ fontSize: '11px', color: '#ef4444', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: '4px', letterSpacing: '0.5px' }}>Overall Moderator Feedback</div>
                   {comic.rejectionReason}
                 </div>
               )}
@@ -751,7 +912,7 @@ function AuthorComicDetail() {
                     <th>Pages</th>
                     <th>Views</th>
                     <th>Status</th>
-                    <th>Actions</th>
+                    <th style={{ textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
 
@@ -760,6 +921,7 @@ function AuthorComicDetail() {
                     const status = chapter.status || chapter.moderationStatus
                     const statusValue = status?.toString().toUpperCase()
                     const canSubmit = statusValue === 'PREVIEW_READY' || statusValue === 'DRAFT'
+                    const isRejected = statusValue === 'REJECTED'
                     const chapterId = getChapterId(chapter)
                     const busy = actionLoadingId === chapterId
 
@@ -777,13 +939,24 @@ function AuthorComicDetail() {
                         </td>
                         <td>
                           <div className="author-table-actions">
-                            <button className="btn-table-action" onClick={() => handleOpenPreview(chapter)} disabled={busy}>
+                            <button className="btn-table-action preview" onClick={() => handleOpenPreview(chapter)} disabled={busy}>
                               {busy ? 'Loading...' : 'Preview'}
                             </button>
 
                             {canSubmit && (
-                              <button className="btn-table-action" onClick={() => handleSubmitForReview(chapter)} disabled={busy}>
+                              <button className="btn-table-action submit" onClick={() => handleSubmitForReview(chapter)} disabled={busy}>
                                 {busy ? 'Submitting...' : 'Submit Review'}
+                              </button>
+                            )}
+
+                            {isRejected && (
+                              <button
+                                className="btn-table-action resubmit"
+                                onClick={() => setResubmitChapter(chapter)}
+                                disabled={busy}
+                                title="Upload a new ZIP file to replace the rejected chapter"
+                              >
+                                {busy ? '...' : '↻ Re-upload'}
                               </button>
                             )}
 
@@ -807,7 +980,23 @@ function AuthorComicDetail() {
           comic={comic}
           onClose={() => setShowAddChapter(false)}
           onUploaded={handleChapterUploaded}
-          onOpenGuide={() => setShowUploadGuide(true)}
+          onOpenGuide={() => {
+            setShowAddChapter(false)
+            setShowUploadGuide(true)
+          }}
+        />
+      )}
+
+      {resubmitChapter && (
+        <ResubmitChapterModal
+          comic={comic}
+          chapter={resubmitChapter}
+          onClose={() => setResubmitChapter(null)}
+          onResubmitted={handleChapterResubmitted}
+          onOpenGuide={() => {
+            setResubmitChapter(null)
+            setShowUploadGuide(true)
+          }}
         />
       )}
 

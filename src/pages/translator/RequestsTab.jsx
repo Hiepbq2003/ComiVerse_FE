@@ -106,6 +106,51 @@ function RequestsTab({ joinRequests = [], onApprove, onReject }) {
                 "{req.text || req.message || 'No introductory message provided.'}"
               </div>
 
+              {/* Applicant Stats */}
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                marginBottom: '16px',
+                flexWrap: 'wrap'
+              }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.05)',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    color: isLight ? '#475569' : '#cbd5e1',
+                    border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.1)'
+                  }} title="Number of active project teams this user is currently in">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <path d="M3 15h6" />
+                      <path d="M3 18h6" />
+                    </svg>
+                    <span>Active Projects: <strong style={{color: ((req.activeProjectsCount || 0) > 3) ? '#f59e0b' : (isLight ? '#0f172a' : '#fff')}}>{req.activeProjectsCount || 0}</strong></span>
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.05)',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    color: isLight ? '#475569' : '#cbd5e1',
+                    border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.1)'
+                  }} title="Number of incomplete tasks assigned to this user across all teams">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 11 12 14 22 4"></polyline>
+                      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                    <span>Active Tasks: <strong style={{color: ((req.activeTasksCount || 0) > 10) ? '#ef4444' : ((req.activeTasksCount || 0) > 5 ? '#f59e0b' : (isLight ? '#0f172a' : '#fff'))}}>{req.activeTasksCount || 0}</strong></span>
+                  </div>
+                </div>
+
               {/* CV / Resume Attachment Link */}
               {cvLink ? (
                 <div className="request-cv-attachment" style={{
@@ -180,26 +225,6 @@ function RequestsTab({ joinRequests = [], onApprove, onReject }) {
                 </div>
               )}
 
-              {/* Roles Badges */}
-              <div className="request-role-tags">
-                {roleList.map((r, i) => (
-                  <span
-                    className="role-tag"
-                    key={i}
-                    style={{
-                      background: isLight ? '#f3e8ff' : 'rgba(168, 85, 247, 0.12)',
-                      color: isLight ? '#7e22ce' : '#c084fc',
-                      border: isLight ? '1px solid #e9d5ff' : '1px solid rgba(168, 85, 247, 0.3)',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      padding: '4px 12px',
-                      borderRadius: '6px'
-                    }}
-                  >
-                    {r}
-                  </span>
-                ))}
-              </div>
 
               {/* Actions */}
               <div className="request-actions-row">

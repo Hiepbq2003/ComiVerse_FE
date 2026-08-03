@@ -49,10 +49,6 @@ export const deleteComicApi = (id) => {
   return AxiosClient.delete(`/comics/${cleanComicId(id)}`);
 };
 
-export const searchComicsApi = (query) => {
-  return AxiosClient.get(`/comics/search?query=${encodeURIComponent(query)}`);
-};
-
 export const getExploreComicsApi = (params, config = {}) => {
   return AxiosClient.get('/comics/explore', { params, ...config });
 };

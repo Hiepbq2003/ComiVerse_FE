@@ -240,6 +240,8 @@ function ProjectTeams({
 
   // Assign Leader Modal states
   const [showAssignModal, setShowAssignModal] = useState(false)
+  const [showReassignConfirmModal, setShowReassignConfirmModal] = useState(false)
+  const [reassignTargetTeam, setReassignTargetTeam] = useState(null)
   const [assignTeamId, setAssignTeamId] = useState(null)
   const [leaderSearch, setLeaderSearch] = useState('')
   const [leaderSearchResults, setLeaderSearchResults] = useState([])
@@ -289,14 +291,21 @@ function ProjectTeams({
 
   const openAssignLeaderModal = (team) => {
     if (team.leaderId || team.leaderName) {
-      const isConfirmed = window.confirm(
-        `⚠️ WARNING: This team already has a Leader (${team.leaderName}).\n\nAssigning a new leader will revoke their permissions and might disrupt ongoing translations. Are you sure you want to Reassign the leader?`
-      );
-      if (!isConfirmed) return;
+      setReassignTargetTeam(team);
+      setShowReassignConfirmModal(true);
+      return;
     }
     setAssignTeamId(team.id)
     setLeaderSearch('')
     setShowAssignModal(true)
+  }
+
+  const handleConfirmReassign = () => {
+    if (!reassignTargetTeam) return;
+    setShowReassignConfirmModal(false);
+    setAssignTeamId(reassignTargetTeam.id);
+    setLeaderSearch('');
+    setShowAssignModal(true);
   }
 
   const sendLeaderNotification = (leaderId, leaderName, comicTitle, sourceLang, targetLang) => {
@@ -356,7 +365,7 @@ function ProjectTeams({
       setShowAssignModal(false)
     } catch (err) {
       console.error(err)
-      toast.error(err.response?.status === 409 ? 'Conflict: Leader was already assigned by another moderator or team was modified.' : 'Failed to assign the project leader.')
+      toast.error(err.response?.data?.message || (err.response?.status === 409 ? 'Conflict: Leader was already assigned by another moderator or team was modified.' : 'Failed to assign the project leader.'))
     }
   }
 
@@ -840,6 +849,50 @@ function ProjectTeams({
                   {createTeamStep === 1 ? 'Next →' : 'Create Team'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ⚠️ MODAL: REASSIGN LEADER CONFIRMATION ⚠️ */}
+      {showReassignConfirmModal && reassignTargetTeam && createPortal(
+        <div className="mod-modal-overlay">
+          <div className="mod-modal-card" style={{ maxWidth: '500px', width: '90%' }}>
+            <div className="mod-modal-header" style={{ borderBottom: 'none' }}>
+              <h3 style={{ color: reassignTargetTeam.inProgressTasksCount > 0 ? '#ef4444' : '#f59e0b' }}>
+                {reassignTargetTeam.inProgressTasksCount > 0 ? '🚫 Action Blocked' : '⚠️ Reassign Leader'}
+              </h3>
+              <button className="mod-modal-close-btn" onClick={() => setShowReassignConfirmModal(false)}>×</button>
+            </div>
+            
+            <div className="mod-modal-body">
+              {reassignTargetTeam.inProgressTasksCount > 0 ? (
+                <div>
+                  <p style={{ marginBottom: '16px' }}>
+                    Cannot reassign the leader because this team currently has <strong style={{ color: '#ef4444' }}>{reassignTargetTeam.inProgressTasksCount}</strong> in-progress task(s).
+                  </p>
+                  <p>All tasks must be completed or unassigned before changing leadership to prevent disruption.</p>
+                </div>
+              ) : (
+                <div>
+                  <p style={{ marginBottom: '16px' }}>
+                    This team already has a Leader (<strong>{reassignTargetTeam.leaderName}</strong>).
+                  </p>
+                  <p>Assigning a new leader will revoke their permissions and might disrupt ongoing translations. Are you sure you want to proceed?</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mod-modal-footer">
+              <button className="mod-btn review" onClick={() => setShowReassignConfirmModal(false)}>
+                {reassignTargetTeam.inProgressTasksCount > 0 ? 'Close' : 'Cancel'}
+              </button>
+              {reassignTargetTeam.inProgressTasksCount === 0 || !reassignTargetTeam.inProgressTasksCount ? (
+                <button className="mod-btn decline" style={{ backgroundColor: '#f59e0b', color: '#fff', border: 'none' }} onClick={handleConfirmReassign}>
+                  Confirm Reassign
+                </button>
+              ) : null}
             </div>
           </div>
         </div>,

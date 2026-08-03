@@ -1058,3 +1058,89 @@ html.light .detail-info-value {
 .translator-sidebar-brand .comiverse-full-logo {
   transform: translateX(-20px);
 }
+
+/* =========================================================================
+   WORKSPACE PREMIUM TOPBAR (Applied to all roles)
+   ========================================================================= */
+header[class$="-topbar"] {
+  background: rgba(19, 16, 30, 0.75) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1) !important;
+  z-index: 100 !important;
+}
+
+html.light header[class$="-topbar"] {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Upgrade Icon buttons (Theme Toggle, Notifications) */
+[class$="-topbar-right"] button:not([class*="logout"]):not([class*="profile"]):not(.pop-btn) {
+  background: rgba(168, 85, 247, 0.05) !important;
+  border: 1px solid rgba(168, 85, 247, 0.15) !important;
+  border-radius: 50% !important;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+[class$="-topbar-right"] button:not([class*="logout"]):not([class*="profile"]):not(.pop-btn):hover {
+  background: rgba(168, 85, 247, 0.15) !important;
+  transform: translateY(-2px) scale(1.05) !important;
+  border-color: rgba(168, 85, 247, 0.4) !important;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.2) !important;
+  color: #c084fc !important;
+}
+
+/* Upgrade Profile Buttons */
+[class*="-profile-btn"], [class*="-user-info"] {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 100px !important;
+  padding: 6px 16px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+html.light [class*="-profile-btn"], html.light [class*="-user-info"] {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+[class*="-profile-btn"]:hover, [class*="-user-info"]:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+html.light [class*="-profile-btn"]:hover, html.light [class*="-user-info"]:hover {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Upgrade Logout Buttons */
+[class*="logout"] {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: #ef4444 !important;
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+  border-radius: 100px !important;
+  padding: 6px 16px !important;
+  font-weight: 600 !important;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  cursor: pointer;
+}
+[class*="logout"]:hover {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.4) !important;
+}
+[class*="logout"]:hover svg {
+  stroke: #ffffff !important;
+}

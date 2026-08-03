@@ -16,8 +16,13 @@ import '../../assets/style/reader/library.css'
 function Library() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, user } = useAuth()
   const [loading, setLoading] = useState(true)
+
+  const userRole = typeof user?.role === 'string' 
+    ? user.role 
+    : (user?.role?.roleName || user?.roleName || 'READER');
+  const isReader = !userRole || userRole.toUpperCase() === 'READER' || userRole.toUpperCase() === 'USER';
 
   // Sub-tabs state
   const [activeTab, setActiveTab] = useState('Saved')
@@ -275,28 +280,30 @@ function Library() {
           </div>
 
           {/* ── BECOME A TRANSLATOR BANNER ─────────────── */}
-          <div className="lib-translator-banner">
-            <div className="lib-banner-left">
-              <div className="lib-banner-icon">文</div>
-              <div>
-                <h3 className="lib-banner-title">Become a Translator</h3>
-                <p className="lib-banner-desc">Join the translation community, earn income from your passion for comics</p>
+          {isReader && (
+            <div className="lib-translator-banner">
+              <div className="lib-banner-left">
+                <div className="lib-banner-icon">文</div>
+                <div>
+                  <h3 className="lib-banner-title">Become a Translator</h3>
+                  <p className="lib-banner-desc">Join the translation community, earn income from your passion for comics</p>
+                </div>
+              </div>
+              <div className="lib-banner-right">
+                <div className="lib-banner-stat">
+                  <span className="lib-banner-stat-label">Avg Income</span>
+                  <span className="lib-banner-stat-value">$100 - 250/mo</span>
+                </div>
+                <div className="lib-banner-stat">
+                  <span className="lib-banner-stat-label">Groups</span>
+                  <span className="lib-banner-stat-value">127 groups</span>
+                </div>
+                <button className="lib-banner-btn" onClick={() => navigate('/policy')}>
+                  Learn More →
+                </button>
               </div>
             </div>
-            <div className="lib-banner-right">
-              <div className="lib-banner-stat">
-                <span className="lib-banner-stat-label">Avg Income</span>
-                <span className="lib-banner-stat-value">$100 - 250/mo</span>
-              </div>
-              <div className="lib-banner-stat">
-                <span className="lib-banner-stat-label">Groups</span>
-                <span className="lib-banner-stat-value">127 groups</span>
-              </div>
-              <button className="lib-banner-btn" onClick={() => navigate('/policy')}>
-                Learn More →
-              </button>
-            </div>
-          </div>
+          )}
 
           {/* ── SUB-TABS ROW ─────────────────── */}
           <div className="lib-tabs-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>

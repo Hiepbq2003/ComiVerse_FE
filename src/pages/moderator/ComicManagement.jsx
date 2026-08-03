@@ -138,10 +138,20 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
 
       return Promise.all([pComic, pChaps]).then(([comicRes, chapsRes]) => {
         const data = comicRes && comicRes.data ? (comicRes.data.data || comicRes.data || {}) : {};
-        const chapsData = chapsRes && (chapsRes.data !== undefined) ? chapsRes.data : (chapsRes || null);
+        let chapsData = chapsRes && (chapsRes.data !== undefined) ? chapsRes.data : (chapsRes || null);
+        
+        if (Array.isArray(chapsData)) {
+          // Filter out PREVIEW_READY or DRAFT if fallback to Author API was used
+          chapsData = chapsData.filter(ch => {
+            const status = (ch.status || ch.moderationStatus || '').toUpperCase();
+            return !status || status === 'APPROVED' || status === 'PUBLISHED' || status === 'SUBMITTED_FOR_REVIEW' || status === 'REJECTED';
+          });
+        }
+        
         console.log(`[Hydration] comicId: ${comic.id}, title: ${comic.title}, chapsData:`, chapsData, `comic.chapterCount:`, comic.chapterCount);
         // Calculate total views from chapters list as smart fallback
         const chapterViews = Array.isArray(chapsData) ? chapsData.reduce((acc, c) => acc + (Number(c.views || c.viewCount || c.view) || 0), 0) : 0;
+
         
         const approvedChaps = Array.isArray(chapsData) ? chapsData.filter(c => {
           const s = (c.status || c.moderationStatus || '').toUpperCase();
@@ -610,7 +620,9 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                 </tr>
               ))
             ) : (
-              paginatedComics.map(comic => (
+              paginatedComics.map(comic => {
+                const hasPermission = isLanguageInModeratorScope(comic.language || comic.rawLanguage || comic.originalLanguage || comic.targetLanguage, getAuth()?.user);
+                return (
                 <tr key={comic.id}>
                   <td>
                     <div className="comic-cell-info">
@@ -687,11 +699,14 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                         label="🗑️ Archive" 
                         className="btn-archive"
                         onClick={() => { setComicToArchive(comic); setShowArchiveModal(true); }} 
+                        disabled={!hasPermission}
+                        title={!hasPermission ? "Out of scope" : "Archive this comic"}
                       />
                     </div>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

@@ -123,22 +123,27 @@
 }
 
 .btn-author-action {
-  padding: 8px 16px;
+  padding: 8px 18px;
   font-size: 13px;
-  font-weight: 500;
-  border-radius: 6px;
+  font-weight: 600;
+  border-radius: 500px;
   cursor: pointer;
   font-family: var(--author-font);
   transition: var(--author-transition);
   border: 1px solid var(--author-border);
-  background-color: #fff;
+  background-color: transparent;
   color: var(--author-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .btn-author-action:hover {
-  background-color: #f8fafc;
+  background-color: var(--author-hover-bg);
   color: var(--author-text-primary);
-  border-color: var(--author-text-light);
+  border-color: var(--author-border-hover);
+  transform: translateY(-1px);
 }
 
 .btn-author-action.primary {
@@ -390,45 +395,59 @@ html.light .btn-author-action:hover {
 .author-publication-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   width: fit-content;
-  min-height: 24px;
-  padding: 4px 10px;
-  border-radius: 6px;
+  min-height: 26px;
+  padding: 4px 12px;
+  border-radius: 500px;
   font-size: 12px;
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
 }
 
 .author-status-badge.approved {
-  background: #d1fae5;
-  color: #047857;
+  background: #10b981 !important;
+  color: #ffffff !important;
+  border: none !important;
 }
 
 .author-status-badge.pending {
-  background: #fef3c7;
-  color: #92400e;
+  background: #f59e0b !important;
+  color: #ffffff !important;
+  border: none !important;
 }
 
 .author-status-badge.hidden {
-  background: #e2e8f0;
-  color: #475569;
+  background: #64748b !important;
+  color: #ffffff !important;
+  border: none !important;
 }
 
 .author-status-badge.draft {
-  background: var(--status-draft-bg);
-  color: var(--status-draft);
+  background: #94a3b8 !important;
+  color: #ffffff !important;
+  border: none !important;
 }
 
 .author-status-badge.rejected {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  border: none !important;
 }
 
-.author-publication-badge.ongoing,
+.author-publication-badge.ongoing {
+  background: #3b82f6 !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
 .author-publication-badge.completed {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: #10b981 !important;
+  color: #ffffff !important;
+  border: none !important;
 }
 
 .author-publication-badge.hiatus {
@@ -654,33 +673,38 @@ html.light .btn-author-action:hover {
 .author-table-actions {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
 }
 
 .btn-table-action,
 .btn-table-icon {
   min-height: 32px;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
-  color: #27272a;
-  border-radius: 6px;
+  border: none;
+  background: var(--author-hover-bg);
+  color: var(--author-text-primary);
+  border-radius: 500px;
   font-family: var(--author-font);
   font-weight: 600;
+  font-size: 13px;
   cursor: pointer;
-}
-
-.btn-table-action {
-  padding: 6px 12px;
+  transition: var(--author-transition);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 16px;
+  white-space: nowrap;
 }
 
 .btn-table-icon {
-  width: 34px;
+  width: 32px;
+  padding: 0;
 }
 
 .btn-table-action:hover,
 .btn-table-icon:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  background: var(--author-border);
+  transform: translateY(-1px);
 }
 
 .author-empty-state {
@@ -1259,17 +1283,13 @@ html.light .btn-author-action:hover {
   border-color: rgba(168, 85, 247, 0.45);
 }
 
-.btn-author-action,
-.btn-table-action,
-.btn-table-icon {
+.btn-author-action {
   background: transparent;
   color: var(--author-text-secondary);
   border: 1px solid var(--author-border);
 }
 
-.btn-author-action:hover,
-.btn-table-action:hover,
-.btn-table-icon:hover {
+.btn-author-action:hover {
   background: var(--author-hover-bg);
   border-color: var(--author-border-hover);
   color: var(--author-text-primary);
@@ -1297,43 +1317,48 @@ html.light .btn-author-action:hover {
 .author-status-badge.approved,
 .author-mini-status.approved,
 .badge-status-payout.completed {
-  background: rgba(16, 185, 129, 0.12);
-  color: #6ee7b7;
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: #10b981 !important;
+  color: #ffffff !important;
+  border: none !important;
 }
 
 .author-status-badge.pending,
 .author-mini-status.pending,
 .badge-status-payout.processing {
-  background: rgba(249, 115, 22, 0.12);
-  color: #fdba74;
-  border: 1px solid rgba(249, 115, 22, 0.25);
+  background: #f59e0b !important;
+  color: #ffffff !important;
+  border: none !important;
 }
 
 .author-status-badge.hidden,
 .author-mini-status.hidden {
-  background: rgba(148, 163, 184, 0.10);
-  color: #cbd5e1;
-  border: 1px solid rgba(148, 163, 184, 0.20);
+  background: #64748b !important;
+  color: #ffffff !important;
+  border: none !important;
 }
 
 .author-status-badge.draft {
-  background: var(--status-draft-bg);
-  color: var(--status-draft);
-  border: 1px solid var(--status-draft);
+  background: #94a3b8 !important;
+  color: #ffffff !important;
+  border: none !important;
 }
 
 .author-status-badge.rejected {
-  background: rgba(239, 68, 68, 0.12);
-  color: #fca5a5;
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  border: none !important;
 }
 
-.author-publication-badge.ongoing,
+.author-publication-badge.ongoing {
+  background: #3b82f6 !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
 .author-publication-badge.completed {
-  background: rgba(59, 130, 246, 0.12);
-  color: #93c5fd;
-  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: #10b981 !important;
+  color: #ffffff !important;
+  border: none !important;
 }
 
 .author-publication-badge.hiatus,
@@ -1940,9 +1965,48 @@ html.light .btn-author-action:hover {
 
 .btn-author-action.danger,
 .btn-table-action.danger {
-  background: rgba(239, 68, 68, 0.14) !important;
-  border-color: rgba(248, 113, 113, 0.48) !important;
-  color: #fca5a5 !important;
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+.btn-author-action.danger:hover,
+.btn-table-action.danger:hover {
+  background: #dc2626 !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25) !important;
+}
+
+.btn-table-action.resubmit {
+  background: #f59e0b !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+.btn-table-action.resubmit:hover {
+  background: #d97706 !important;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25) !important;
+}
+
+.btn-table-action.submit {
+  background: var(--author-accent) !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+.btn-table-action.submit:hover {
+  background: var(--author-accent-hover) !important;
+  box-shadow: 0 4px 12px rgba(170, 59, 255, 0.25) !important;
+}
+
+.btn-table-action.preview {
+  background: #475569 !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+.btn-table-action.preview:hover {
+  background: #334155 !important;
+  box-shadow: 0 4px 12px rgba(71, 85, 105, 0.25) !important;
 }
 
 .author-alert {
@@ -1963,6 +2027,12 @@ html.light .btn-author-action:hover {
   background: rgba(217, 119, 6, 0.2) !important;
   border-color: rgba(251, 191, 36, 0.62) !important;
   color: #fef3c7 !important;
+}
+
+.author-alert.danger {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  color: #fca5a5 !important;
 }
 
 .author-form-error {
@@ -2031,9 +2101,13 @@ html.light .author-modal select {
 }
 
 html.light .btn-author-action {
-  background: #ffffff !important;
+  background: #f1f5f9 !important;
   color: #334155 !important;
-  border-color: #cbd5e1 !important;
+  border: none !important;
+}
+
+html.light .btn-author-action:hover {
+  background: #e2e8f0 !important;
 }
 
 html.light .btn-author-action.black,
@@ -2060,4 +2134,10 @@ html.light .author-form-error {
   background: #fef2f2 !important;
   border-color: #ef4444 !important;
   color: #991b1b !important;
+}
+
+html.light .author-alert.danger {
+  background: #fef2f2 !important;
+  border-color: #ef4444 !important;
+  color: #b91c1c !important;
 }

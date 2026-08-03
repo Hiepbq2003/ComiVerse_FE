@@ -344,6 +344,24 @@
   box-shadow: 0 6px 18px rgba(168, 85, 247, 0.5) !important;
 }
 
+.btn-delete-chap {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+  color: #ffffff !important;
+  border-radius: 500px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  padding: 6px 16px !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.btn-delete-chap:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.5) !important;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    CHAPTER READER INSPECTION MODAL (RAW VS TRANSLATED)
    ═══════════════════════════════════════════════════════════════════ */
