@@ -74,7 +74,7 @@ export const buildChapterZipFormData = async ({ chapterNumber, chapterTitle, fil
   const formData = new FormData()
   formData.append('chapterNumber', chapterNumber)
   formData.append('title', chapterTitle || '')
-  formData.append('zipFile', zipBlob, 'chapter.zip')
+  formData.append('zipFile', zipBlob, `Chapter ${chapterNumber}.zip`)
   
   return formData
 }
