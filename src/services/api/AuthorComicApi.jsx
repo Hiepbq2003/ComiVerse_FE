@@ -22,6 +22,10 @@ export const getAuthorDashboardMetricsApi = (period = 'WEEK') => {
   })
 }
 
+export const checkAuthorComicTitleExistsApi = (title) => {
+  return AxiosClient.get('/author/comics/title-exists', { params: { title } })
+}
+
 export const createAuthorComicApi = (payload) => {
   return AxiosClient.post('/author/comics', payload)
 }
@@ -34,15 +38,15 @@ export const submitAuthorComicReviewApi = (comicId) => {
   return AxiosClient.post(`/author/comics/${comicId}/submit-review`)
 }
 
-export const uploadAuthorChapterZipApi = (comicId, formData, onUploadProgress) => {
-  return AxiosClient.post(`/author/comics/${comicId}/chapters/upload-zip`, formData, {
+export const uploadAuthorChapterFolderApi = (comicId, formData) => {
+  return AxiosClient.post(`/author/comics/${comicId}/chapters/upload-folder`, formData, {
     timeout: 120000,
     onUploadProgress
   })
 }
 
 export const getAuthorChapterUploadStatusApi = (comicId, taskId) => {
-  return AxiosClient.get(`/author/comics/${comicId}/chapters/upload-zip/status/${taskId}`)
+  return AxiosClient.get(`/author/comics/${comicId}/chapters/upload-folder/status/${taskId}`)
 }
 
 export const getAuthorChapterPreviewApi = (comicId, chapterId) => {

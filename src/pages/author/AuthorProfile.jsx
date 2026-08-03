@@ -14,6 +14,7 @@ const emptyProfile = {
   avatarUrl: '',
   bio: '',
   note: '',
+  countryCode: 'VN',
 }
 
 const authorTypeOptions = [
@@ -50,6 +51,7 @@ function AuthorProfile() {
           avatarUrl: data?.avatarUrl || '',
           bio: data?.bio || '',
           note: data?.note || '',
+          countryCode: data?.countryCode || 'VN',
         })
       } catch (error) {
         toast.error(error.response?.data?.message || 'Cannot load author profile')
@@ -83,6 +85,7 @@ function AuthorProfile() {
       avatarUrl: profile.avatarUrl?.trim() || null,
       bio: profile.bio?.trim() || null,
       note: profile.note?.trim() || null,
+      countryCode: (profile.countryCode || 'VN').trim().toUpperCase(),
     }
 
     try {
@@ -128,6 +131,10 @@ function AuthorProfile() {
             <div>
               <span>Contact email</span>
               <strong>{profile.contactEmail || profile.email || 'Not set'}</strong>
+            </div>
+            <div>
+              <span>Payout country</span>
+              <strong>{profile.countryCode || 'VN'}</strong>
             </div>
           </div>
           <p className="author-profile-preview-bio">
@@ -205,6 +212,29 @@ function AuthorProfile() {
                     placeholder="Public/business contact email"
                     maxLength={255}
                   />
+                </div>
+
+
+                <div className="form-group-cell">
+                  <label>Country Code</label>
+                  <input
+                    className="form-control-premium"
+                    value={profile.countryCode || 'VN'}
+                    onChange={(e) => updateField('countryCode', e.target.value.toUpperCase())}
+                    placeholder="VN"
+                    maxLength={2}
+                    pattern="[A-Za-z]{2}"
+                    list="author-country-codes"
+                    title="Use a 2-letter ISO country code, for example VN, US, JP"
+                  />
+                  <datalist id="author-country-codes">
+                    <option value="VN">Vietnam</option>
+                    <option value="US">United States</option>
+                    <option value="GB">United Kingdom</option>
+                    <option value="JP">Japan</option>
+                    <option value="KR">South Korea</option>
+                  </datalist>
+                  <small>Admin maps this country code to the payout currency and manual sandbox conversion rate.</small>
                 </div>
 
                 <div className="form-group-cell full-width">
