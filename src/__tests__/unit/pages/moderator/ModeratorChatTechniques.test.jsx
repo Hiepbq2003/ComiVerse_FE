@@ -13,6 +13,13 @@ vi.mock('../../../../utils/Auth', () => ({
 vi.mock('../../../../services/api/ChatFlagApi', () => ({
   getFlaggedMessagesApi: vi.fn(),
   resolveFlagApi: vi.fn(),
+  getAllChatFlagsApi: vi.fn().mockResolvedValue({ data: [] }),
+  dismissChatFlagApi: vi.fn(),
+  deleteChatFlagApi: vi.fn(),
+}));
+
+vi.mock('../../../../services/api/BannedKeywordApi', () => ({
+  getBannedKeywordsApi: vi.fn().mockResolvedValue({ data: [] }),
 }));
 
 const renderChatMonitor = () => {
