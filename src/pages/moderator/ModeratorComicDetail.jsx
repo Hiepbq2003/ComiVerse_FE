@@ -461,14 +461,6 @@ const getChapterViews = (chap, comicObj = null, totalChapsCount = 1) => {
     return Number(views);
   }
 
-  const comicTotalViews = Number(comicObj?.viewCount || comicObj?.views || comicObj?.totalViews || comicObj?.viewsCount || 0);
-  if (comicTotalViews > 0) {
-    if (totalChapsCount <= 1) {
-      return comicTotalViews;
-    }
-    return Math.max(1, Math.round(comicTotalViews / totalChapsCount));
-  }
-
   return 0;
 };
 
