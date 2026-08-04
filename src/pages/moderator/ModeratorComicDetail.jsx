@@ -853,6 +853,10 @@ function ModeratorComicDetail() {
   }, [activeSelectedTeam, chapters, selectedViewLang])
 
   const hasScopePermission = comic ? isLanguageInModeratorScope(getAuthorRawLanguage(comic), getAuth()?.user) : false;
+  
+  const displayedChapters = selectedViewLang === 'raw' 
+    ? chapters 
+    : chapters.filter(chap => chapterTasks[chap.id]);
 
   return (
     <ModeratorLayout activeNav="comic-management">
@@ -1075,7 +1079,7 @@ function ModeratorComicDetail() {
             <div className="mod-chapters-section">
               <h3 className="mod-card-title">
                 <span>
-                  📖 Chapters Catalog ({chapters.length})
+                  📖 Chapters Catalog ({displayedChapters.length})
                   {selectedViewLang !== 'raw' && (
                     <span style={{ fontSize: '13px', fontWeight: 'normal', color: 'var(--mod-text-secondary)', marginLeft: '12px' }}>
                       Viewing Mode: {getLanguageFlag(selectedViewLang)} {selectedViewLang}
@@ -1084,9 +1088,15 @@ function ModeratorComicDetail() {
                 </span>
               </h3>
 
-              {chapters.length === 0 ? (
+              {fetchingTasks ? (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <div className="skeleton-dash-shimmer" style={{ width: '100%', height: '160px', borderRadius: '12px' }}></div>
+                </div>
+              ) : displayedChapters.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-                  No chapters uploaded for this comic yet.
+                  {selectedViewLang === 'raw' 
+                    ? 'No chapters uploaded for this comic yet.' 
+                    : 'No translated chapters found for this team.'}
                 </div>
               ) : (
                 <table className="mod-chapters-table">
@@ -1096,14 +1106,18 @@ function ModeratorComicDetail() {
                       <th>Title</th>
                       <th>Type</th>
                       <th>Uploaded Date</th>
-                      <th>Moderation</th>
+                      {selectedViewLang === 'raw' ? (
+                        <th>Moderation</th>
+                      ) : (
+                        <th>Publish Info</th>
+                      )}
                       {selectedViewLang !== 'raw' && <th>Translation Status</th>}
                       <th>Views</th>
                       <th style={{ textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {chapters.map((chap, index) => (
+                    {displayedChapters.map((chap, index) => (
                       <tr key={chap.id}>
                         <td>
                           <strong>Chapter {chap.chapterNumber}</strong>
@@ -1119,37 +1133,61 @@ function ModeratorComicDetail() {
                            (chap.updatedAt ? new Date(chap.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-')}
                         </td>
                         <td>
-                          {(chap.moderationStatus === 'PUBLISHED' || chap.moderationStatus === 'APPROVED') ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              <span style={{ fontSize: '12px', fontWeight: '700', color: '#10b981' }}>
-                                ✓ {chap.moderationStatus === 'PUBLISHED' ? 'Published' : 'Approved'}
-                              </span>
-                              <span style={{ fontSize: '11px', color: '#64748b' }}>
-                                  by: {chap.approvedBy || chap.moderatorName || 'Unknown'}
-                              </span>
-                              {chap.approvedAt && (
-                                <span style={{ fontSize: '11px', color: '#64748b' }}>
-                                  {new Date(chap.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {selectedViewLang === 'raw' ? (
+                            (chap.moderationStatus === 'PUBLISHED' || chap.moderationStatus === 'APPROVED') ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontSize: '12px', fontWeight: '700', color: '#10b981' }}>
+                                  ✓ {chap.moderationStatus === 'PUBLISHED' ? 'Published' : 'Approved'}
                                 </span>
-                              )}
-                            </div>
-                          ) : chap.moderationStatus === 'REJECTED' ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              <span style={{ fontSize: '12px', fontWeight: '700', color: '#ef4444' }}>
-                                ✗ Rejected
-                              </span>
-                              <span style={{ fontSize: '11px', color: '#64748b' }}>
-                                by: {chap.rejectedBy || 'Unknown'}
-                              </span>
-                            </div>
+                                <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                    by: {chap.approvedBy || chap.moderatorName || 'Unknown'}
+                                </span>
+                                {chap.approvedAt && (
+                                  <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                    {new Date(chap.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  </span>
+                                )}
+                              </div>
+                            ) : chap.moderationStatus === 'REJECTED' ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontSize: '12px', fontWeight: '700', color: '#ef4444' }}>
+                                  ✗ Rejected
+                                </span>
+                                <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                  by: {chap.rejectedBy || 'Unknown'}
+                                </span>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontSize: '11.5px', color: '#94a3b8', fontStyle: 'italic', fontWeight: '500' }}>
+                                  {chap.moderationStatus === 'PREVIEW_READY' ? 'Author Drafting' : 
+                                   (chap.moderationStatus === 'SUBMITTED_FOR_REVIEW' || chap.moderationStatus === 'PENDING_REVIEW' ? 'Pending Review' : 
+                                    (chap.moderationStatus || 'Pending'))}
+                                </span>
+                              </div>
+                            )
                           ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              <span style={{ fontSize: '11.5px', color: '#94a3b8', fontStyle: 'italic', fontWeight: '500' }}>
-                                {chap.moderationStatus === 'PREVIEW_READY' ? 'Author Drafting' : 
-                                 (chap.moderationStatus === 'SUBMITTED_FOR_REVIEW' || chap.moderationStatus === 'PENDING_REVIEW' ? 'Pending Review' : 
-                                  (chap.moderationStatus || 'Pending'))}
-                              </span>
-                            </div>
+                            (() => {
+                              const task = chapterTasks[chap.id];
+                              if (!task) return <span style={{ fontSize: '11px', color: '#94a3b8' }}>-</span>;
+                              
+                              const status = (task.status || '').toLowerCase();
+                              if (status === 'completed' || status === 'published') {
+                                return (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                      by: {activeSelectedTeam?.leaderName || 'Unknown'}
+                                    </span>
+                                    {task.updatedAt && (
+                                      <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                        {new Date(task.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              return <span style={{ fontSize: '11px', color: '#94a3b8' }}>-</span>;
+                            })()
                           )}
                         </td>
                         {selectedViewLang !== 'raw' && (
