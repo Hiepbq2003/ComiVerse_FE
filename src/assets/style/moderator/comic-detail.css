@@ -1919,27 +1919,29 @@ html.light .mod-edit-cancel-btn:hover {
 
 /* Revoke Button */
 .btn-revoke-chap {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%) !important;
+  color: #ffffff !important;
+  border-radius: 500px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  padding: 6px 16px !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
 .btn-revoke-chap:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.5);
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.15);
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 18px rgba(249, 115, 22, 0.5) !important;
 }
 
 .btn-revoke-chap:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
 }
