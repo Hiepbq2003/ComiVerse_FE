@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import ModeratorLayout from '../../components/layout/ModeratorLayout'
 import { getComicByIdApi, getAllComicsApi, updateComicApi, getComicsPageApi } from '../../services/api/ComicApi'
-import { getChaptersByComicIdApi, getChapterDetailApi, deleteChapterApi } from '../../services/api/ChapterApi'
+import { getChaptersByComicIdApi, getChapterDetailApi, deleteChapterApi, getTasksByChapterIdApi, revokeChapterTranslationApi } from '../../services/api/ChapterApi'
 import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
 import { getAllSubmissionsApi } from '../../services/api/SubmissionApi'
 import { getAllGenresApi } from '../../services/api/GenreApi'
@@ -524,6 +524,17 @@ function ModeratorComicDetail() {
   // Chapter inspector modal state
   const [inspectingChapter, setInspectingChapter] = useState(null)
   
+  // Translation catalog task state
+  const [chapterTasks, setChapterTasks] = useState({}) // chapterId -> task object
+  const [fetchingTasks, setFetchingTasks] = useState(false)
+
+  // Revoke modal state
+  const [revokeModalOpen, setRevokeModalOpen] = useState(false)
+  const [revokingChapter, setRevokingChapter] = useState(null)
+  const [revokingTask, setRevokingTask] = useState(null)
+  const [revokeReason, setRevokeReason] = useState('')
+  const [isRevoking, setIsRevoking] = useState(false)
+  
   // Edit Comic state
   const [isEditing, setIsEditing] = useState(false)
   const [editForm, setEditForm] = useState({})
@@ -726,6 +737,39 @@ function ModeratorComicDetail() {
     fetchComicAndChapters()
   }, [fetchComicAndChapters])
 
+  const handleRevokeTranslation = async () => {
+    if (!revokingTask || !revokeReason.trim()) {
+      toast.error('Please provide a reason for revoking the translation.')
+      return
+    }
+
+    setIsRevoking(true)
+    try {
+      await revokeChapterTranslationApi(revokingTask.id, revokeReason)
+      toast.success('Translation revoked successfully. Team leader notified.')
+      
+      // Update local state to show 'in_progress'
+      setChapterTasks(prev => ({
+        ...prev,
+        [revokingChapter.id]: {
+          ...prev[revokingChapter.id],
+          status: 'in_progress',
+          rejectionReason: revokeReason
+        }
+      }))
+      
+      setRevokeModalOpen(false)
+      setRevokeReason('')
+      setRevokingChapter(null)
+      setRevokingTask(null)
+    } catch (err) {
+      console.error(err)
+      toast.error(err?.response?.data?.message || 'Failed to revoke translation.')
+    } finally {
+      setIsRevoking(false)
+    }
+  }
+
   const handleDeleteChapterItem = async (chapterId) => {
     if (!window.confirm('Are you sure you want to delete this chapter?')) return
     try {
@@ -761,6 +805,52 @@ function ModeratorComicDetail() {
       t => t.targetLang && t.targetLang.toLowerCase() === selectedViewLang.toLowerCase()
     ) || null
   }, [selectedViewLang, assignedTeamsForComic])
+
+  // Fetch translation tasks when active team changes
+  useEffect(() => {
+    if (selectedViewLang === 'raw' || !activeSelectedTeam) {
+      setChapterTasks({})
+      return
+    }
+
+    let isMounted = true
+    const fetchTasks = async () => {
+      setFetchingTasks(true)
+      try {
+        const tasksMap = {}
+        // We could fetch by team ID if there was an endpoint that returned ALL tasks for a team.
+        // But since we created getTasksByChapterIdApi, and we only have a handful of chapters usually,
+        // we can fetch tasks for each chapter in parallel.
+        const promises = chapters.map(async (chap) => {
+          try {
+            const res = await getTasksByChapterIdApi(chap.id)
+            const chapterTaskData = res?.data?.data || res?.data || []
+            // Filter tasks that belong to the active team
+            const teamTask = chapterTaskData.find(t => String(t.projectTeamId) === String(activeSelectedTeam.id))
+            if (teamTask) {
+              tasksMap[chap.id] = teamTask
+            }
+          } catch (e) {
+            console.error(`Failed to fetch task for chapter ${chap.id}`, e)
+          }
+        })
+        
+        await Promise.all(promises)
+        
+        if (isMounted) {
+          setChapterTasks(tasksMap)
+        }
+      } catch (error) {
+        console.error("Failed to fetch chapter tasks", error)
+      } finally {
+        if (isMounted) setFetchingTasks(false)
+      }
+    }
+
+    fetchTasks()
+    
+    return () => { isMounted = false }
+  }, [activeSelectedTeam, chapters, selectedViewLang])
 
   const hasScopePermission = comic ? isLanguageInModeratorScope(getAuthorRawLanguage(comic), getAuth()?.user) : false;
 
@@ -1007,6 +1097,7 @@ function ModeratorComicDetail() {
                       <th>Type</th>
                       <th>Uploaded Date</th>
                       <th>Moderation</th>
+                      {selectedViewLang !== 'raw' && <th>Translation Status</th>}
                       <th>Views</th>
                       <th style={{ textAlign: 'right' }}>Actions</th>
                     </tr>
@@ -1061,6 +1152,40 @@ function ModeratorComicDetail() {
                             </div>
                           )}
                         </td>
+                        {selectedViewLang !== 'raw' && (
+                          <td>
+                            {fetchingTasks ? (
+                              <div className="skeleton-line skeleton-active short" style={{ height: '24px', margin: 0, width: '80px', borderRadius: '12px' }}></div>
+                            ) : (
+                              (() => {
+                                const task = chapterTasks[chap.id]
+                                if (!task) {
+                                  return <span className="mod-translation-status-badge no-task">❌ No Task</span>
+                                }
+                                
+                                const status = (task.status || '').toLowerCase()
+                                if (status === 'completed' || status === 'published') {
+                                  return <span className="mod-translation-status-badge completed">✅ Published</span>
+                                } else if (status === 'under_review' || status === 'pending_review') {
+                                  return <span className="mod-translation-status-badge under-review">👁️ Under Review</span>
+                                } else if (status === 'in_progress') {
+                                  return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <span className="mod-translation-status-badge in-progress">🔧 In Progress</span>
+                                      {task.rejectionReason && (
+                                        <span style={{ fontSize: '10px', color: '#ef4444', fontStyle: 'italic', maxWidth: '120px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.rejectionReason}>
+                                          Revoked: {task.rejectionReason}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )
+                                } else {
+                                  return <span className="mod-translation-status-badge backlog">⏳ Backlog</span>
+                                }
+                              })()
+                            )}
+                          </td>
+                        )}
                         <td>
                           {formatChapterViews(getChapterViews(chap, comic, chapters.length))}
                         </td>
@@ -1072,7 +1197,23 @@ function ModeratorComicDetail() {
                             >
                               👁️ Inspect Raw vs Translated
                             </button>
-                            {hasScopePermission && (
+
+                            {/* Revoke button */}
+                            {selectedViewLang !== 'raw' && chapterTasks[chap.id] && (chapterTasks[chap.id].status === 'completed' || chapterTasks[chap.id].status === 'published') && hasScopePermission && (
+                              <button
+                                className="btn-revoke-chap"
+                                onClick={() => {
+                                  setRevokingChapter(chap)
+                                  setRevokingTask(chapterTasks[chap.id])
+                                  setRevokeReason('')
+                                  setRevokeModalOpen(true)
+                                }}
+                              >
+                                ⚠️ Revoke
+                              </button>
+                            )}
+
+                            {hasScopePermission && selectedViewLang === 'raw' && (
                               <button
                                 className="btn-delete-chap"
                                 onClick={() => handleDeleteChapterItem(chap.id)}
@@ -1319,6 +1460,53 @@ function ModeratorComicDetail() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Revoke Translation Modal */}
+      {revokeModalOpen && revokingTask && revokingChapter && (
+        <div className="mod-edit-comic-modal-overlay fade-in" onClick={() => setRevokeModalOpen(false)}>
+          <div className="mod-edit-comic-modal" onClick={e => e.stopPropagation()}>
+            <div className="mod-edit-comic-modal-header">
+              <h3>⚠️ Revoke Translation</h3>
+              <button className="mod-edit-modal-close" onClick={() => setRevokeModalOpen(false)}>×</button>
+            </div>
+            <div className="mod-edit-comic-modal-body">
+              <p style={{ marginBottom: '16px', color: 'var(--mod-text-secondary)', fontSize: '14px', lineHeight: '1.5' }}>
+                You are about to revoke the <strong>{selectedViewLang}</strong> translation of <strong>{getChapterDisplayTitle(revokingChapter, revokingChapter.chapterNumber - 1)}</strong>. 
+                This will remove the translated version from the public reader and send the task back to the team for revision.
+              </p>
+              <div className="mod-edit-field-group">
+                <label className="mod-edit-field-label">Reason for Revocation (Required)</label>
+                <textarea
+                  className="mod-edit-field-input"
+                  style={{ minHeight: '100px', resize: 'vertical' }}
+                  placeholder="e.g., Poor translation quality, machine translation detected..."
+                  value={revokeReason}
+                  onChange={(e) => setRevokeReason(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="mod-edit-comic-modal-footer">
+              <button
+                type="button"
+                className="mod-edit-cancel-btn"
+                onClick={() => setRevokeModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-revoke-chap"
+                onClick={handleRevokeTranslation}
+                disabled={isRevoking || !revokeReason.trim()}
+                style={{ padding: '10px 24px', fontSize: '14px', borderRadius: '500px' }}
+              >
+                {isRevoking ? 'Revoking...' : 'Confirm Revoke'}
+              </button>
+            </div>
           </div>
         </div>
       )}
