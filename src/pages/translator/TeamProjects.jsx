@@ -617,10 +617,7 @@ function TeamProjects() {
       });
 
       setProjects(finalProjectsList)
-      // Save cache to sessionStorage for instant (<5ms) future loads
-      try {
-        sessionStorage.setItem('comiverse_teams_list_cache', JSON.stringify(finalProjectsList));
-      } catch (e) {}
+      setProjects(finalProjectsList)
     } catch (err) {
       console.error(err)
     } finally {
@@ -629,20 +626,7 @@ function TeamProjects() {
   }
 
   useEffect(() => {
-    let hasCache = false;
-    try {
-      const cached = sessionStorage.getItem('comiverse_teams_list_cache');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setProjects(parsed);
-          setLoadingProjects(false);
-          hasCache = true;
-        }
-      }
-    } catch (e) {}
-
-    fetchProjects(hasCache);
+    fetchProjects();
   }, [])
 
   const [searchTerm, setSearchTerm] = useState('')
@@ -728,34 +712,10 @@ function TeamProjects() {
     setTasks([])
     setTasksLoading(true)
 
-    const cacheKey = `comiverse_team_details_cache_${project.id}`;
-    let hasCache = false;
-
-    try {
-      const cached = sessionStorage.getItem(cacheKey);
-      if (cached) {
-        const c = JSON.parse(cached);
-        if (c && Array.isArray(c.members) && c.members.length > 0) {
-          setChapterOptions(c.chapterOptions || []);
-          setAnnouncements(c.announcements || []);
-          // NOTE: tasks are intentionally NOT restored from cache here.
-          // Tasks must always reflect the live database via the API call below,
-          // otherwise stale/failed-to-save tasks can "reappear" forever.
-          setJoinRequests(c.joinRequests || []);
-          setMembers(c.members || []);
-          setTeamMembersForAssign(c.teamMembersForAssign || c.members || []);
-          setLoadingWorkspace(false);
-          hasCache = true;
-        }
-      }
-    } catch (e) {}
-
-    if (!hasCache) {
-      setMembers([]);
-      setAnnouncements([]);
-      setJoinRequests([]);
-      setLoadingWorkspace(true);
-    }
+    setMembers([]);
+    setAnnouncements([]);
+    setJoinRequests([]);
+    setLoadingWorkspace(true);
 
     const leaderJoinDate = project.createdAt 
       ? new Date(project.createdAt).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
@@ -1007,17 +967,7 @@ function TeamProjects() {
       setSelectedDetails(updatedDetails);
       setProjects(prev => prev.map(p => p.id === project.id ? updatedDetails : p));
 
-      // Cache details to sessionStorage for instantaneous (<5ms) future opens
-      try {
-        sessionStorage.setItem(cacheKey, JSON.stringify({
-          chapterOptions: finalChapters,
-          announcements: mappedAnnouncements,
-          joinRequests: mappedRequests,
-          members: finalMembersList,
-          teamMembersForAssign: finalMembersList
-        }));
-      } catch (e) {}
-    } catch (err) {
+      } catch (err) {
       console.error(err)
     } finally {
       setLoadingWorkspace(false)
@@ -1126,7 +1076,6 @@ function TeamProjects() {
       const mappedUpdated = { ...selectedDetails, ...updated, team: updated.title || selectedDetails.team, title: updated.comicName || selectedDetails.title, isRecruiting: finalIsRecruiting }
       setProjects(prev => {
         const newList = prev.map(proj => (proj.id === selectedDetails.id ? mappedUpdated : proj));
-        try { sessionStorage.setItem('comiverse_teams_list_cache', JSON.stringify(newList)); } catch (e) {}
         return newList;
       })
       setSelectedDetails(mappedUpdated)
