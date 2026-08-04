@@ -175,28 +175,43 @@ function TaskAssigneeAvatar({ assigneeId, getAssigneeInitials }) {
 function TaskCard({ task, colId, comicName, onOpenTaskDetails, getAssigneeInitials }) {
   const { priority, cleanTitle } = parseTaskTitle(task.title, comicName)
   const isDone = colId === 'completed'
+  const isRevoked = Boolean(task.rejectionReason || task.isRevoked || task.status === 'REVOKED' || task.status === 'REVISION_NEEDED')
 
   return (
     <article
-      className={`task ${isDone ? 'task--completed' : ''}`}
+      className={`task ${isDone ? 'task--completed' : ''} ${isRevoked ? 'task--revoked' : ''}`}
       tabIndex="0"
       onClick={() => onOpenTaskDetails(task)}
     >
-      {isDone ? (
-        <div className="task__check">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 6 9 17l-5-5" />
-          </svg>
-          <span>Done</span>
-        </div>
-      ) : (
-        <div className={`task__priority task__priority--${priority.toLowerCase()}`}>
-          {priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase()}
-        </div>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '6px' }}>
+        {isDone ? (
+          <div className="task__check">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+            <span>Done</span>
+          </div>
+        ) : (
+          <div className={`task__priority task__priority--${priority.toLowerCase()}`}>
+            {priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase()}
+          </div>
+        )}
+
+        {isRevoked && (
+          <span className="task__revoked-tag" title={task.rejectionReason ? `Revoked Reason: ${task.rejectionReason}` : 'Translation Revoked'}>
+            ⚠️ REVOKED
+          </span>
+        )}
+      </div>
 
       <h3>{cleanTitle}</h3>
       <p className="task__desc">Task for {comicName}</p>
+
+      {isRevoked && task.rejectionReason && (
+        <div className="task__revocation-alert" title={task.rejectionReason}>
+          <span className="task__revocation-label">Reason:</span> {task.rejectionReason}
+        </div>
+      )}
 
       <footer className="task__footer">
         <TaskAssigneeAvatar assigneeId={task.assigneeId} getAssigneeInitials={getAssigneeInitials} />

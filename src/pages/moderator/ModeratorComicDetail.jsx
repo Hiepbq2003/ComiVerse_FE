@@ -1230,21 +1230,27 @@ function ModeratorComicDetail() {
                                 }
                                 
                                 const status = (task.status || '').toLowerCase()
+                                const isRevoked = Boolean(task.rejectionReason) || status === 'revoked' || status === 'rejected'
+
                                 if (status === 'completed' || status === 'published') {
                                   return <span className="mod-translation-status-badge completed">PUBLISHED</span>
                                 } else if (status === 'under_review' || status === 'pending_review' || status === 'in_review') {
                                   return <span className="mod-translation-status-badge under-review">UNDER REVIEW</span>
-                                } else if (status === 'in_progress' || status === 'translating' || status === 'assigned') {
+                                } else if (isRevoked) {
                                   return (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                      <span className="mod-translation-status-badge in-progress">IN PROGRESS</span>
+                                      <span className="mod-translation-status-badge revoked" title={task.rejectionReason ? `Revoked Reason: ${task.rejectionReason}` : 'Translation Revoked'}>
+                                        REVOKED
+                                      </span>
                                       {task.rejectionReason && (
                                         <span className="mod-revoke-reason-preview" title={task.rejectionReason}>
-                                          Revoked: {task.rejectionReason}
+                                          Reason: {task.rejectionReason}
                                         </span>
                                       )}
                                     </div>
                                   )
+                                } else if (status === 'in_progress' || status === 'translating' || status === 'assigned') {
+                                  return <span className="mod-translation-status-badge in-progress">IN PROGRESS</span>
                                 } else {
                                   return <span className="mod-translation-status-badge backlog">{(task.status || 'BACKLOG').toUpperCase()}</span>
                                 }

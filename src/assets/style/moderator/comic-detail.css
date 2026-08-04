@@ -1956,6 +1956,13 @@ html.light .comic-status-badge.hiatus {
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
+.mod-translation-status-badge.revoked {
+  background: rgba(239, 68, 68, 0.16);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  font-weight: 800;
+}
+
 /* Light Mode - Translation Status Badges (Anti-Glare, High Contrast, Perfectly Matched to Type) */
 html.light .mod-translation-status-badge.completed {
   background: #ecfdf5;
@@ -1985,6 +1992,13 @@ html.light .mod-translation-status-badge.no-task {
   background: #fef2f2;
   color: #b91c1c;
   border: 1px solid #fecaca;
+}
+
+html.light .mod-translation-status-badge.revoked {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  font-weight: 800;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
