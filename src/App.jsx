@@ -22,7 +22,8 @@ import SubscriptionManagement from './pages/admin/SubscriptionManagement'
 import AuthorDashboard from './pages/author/AuthorDashboard'
 import AuthorComics from './pages/author/AuthorComics'
 import AuthorComicDetail from './pages/author/AuthorComicDetail'
-import AuthorEarnings from './pages/author/AuthorEarnings'
+import AuthorRevenue from './pages/author/AuthorRevenue'
+import AuthorPayout from './pages/author/AuthorPayout'
 import AuthorSettings from './pages/author/AuthorSettings'
 import AuthorProfile from './pages/author/AuthorProfile'
 import AuthorChapterPreview from './pages/author/AuthorChapterPreview'
@@ -126,7 +127,9 @@ function App() {
                   <Route path="comics" element={<AuthorComics />} />
                   <Route path="comics/:id" element={<AuthorComicDetail />} />
                   <Route path="profile" element={<AuthorProfile />} />
-                  <Route path="earnings" element={<AuthorEarnings />} />
+                  <Route path="earnings" element={<Navigate to="../revenue" replace />} />
+                  <Route path="revenue" element={<AuthorRevenue />} />
+                  <Route path="payout" element={<AuthorPayout />} />
                   <Route path="settings" element={<AuthorSettings />} />
                 </Route>
                 <Route path="/author/comics/:comicId/preview/:chapterId" element={<AuthorChapterPreview />} />
