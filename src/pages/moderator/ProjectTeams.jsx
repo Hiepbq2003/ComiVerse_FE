@@ -508,11 +508,9 @@ function ProjectTeams({
                     <span className="stat-pill" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
                       ✅ {team.completedTasksCount || 0} done
                     </span>
-                    {team.inProgressTasksCount > 0 && (
-                      <span className="stat-pill" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                        ⏳ {team.inProgressTasksCount} ongoing
-                      </span>
-                    )}
+                    <span className="stat-pill" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                      ⏳ {team.inProgressTasksCount || 0} ongoing
+                    </span>
                   </div>
 
                   <div className="project-team-leader-section">
