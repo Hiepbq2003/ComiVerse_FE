@@ -1124,7 +1124,11 @@ function TeamProjects() {
         notes: selectedDetails.description || selectedDetails.notes || ''
       })
       const mappedUpdated = { ...selectedDetails, ...updated, team: updated.title || selectedDetails.team, title: updated.comicName || selectedDetails.title, isRecruiting: finalIsRecruiting }
-      setProjects(prev => prev.map(proj => (proj.id === selectedDetails.id ? mappedUpdated : proj)))
+      setProjects(prev => {
+        const newList = prev.map(proj => (proj.id === selectedDetails.id ? mappedUpdated : proj));
+        try { sessionStorage.setItem('comiverse_teams_list_cache', JSON.stringify(newList)); } catch (e) {}
+        return newList;
+      })
       setSelectedDetails(mappedUpdated)
       toast.success('Workspace details saved successfully!')
     } catch (err) {
