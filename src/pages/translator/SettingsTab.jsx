@@ -50,6 +50,7 @@ function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorks
               value={(selectedDetails.isRecruiting && spotsAvailable > 0) ? "true" : "false"}
               onChange={(e) => setSelectedDetails({ ...selectedDetails, isRecruiting: e.target.value === "true" })}
               disabled={spotsAvailable <= 0}
+              onWheel={(e) => e.target.blur()}
             >
               <option value="true">Open — recruiting new members</option>
               <option value="false">Closed — not accepting new members</option>
@@ -82,6 +83,7 @@ function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorks
               className="trans-form-input"
               value={selectedDetails.priority || 'Medium'}
               onChange={(e) => setSelectedDetails({ ...selectedDetails, priority: e.target.value })}
+              onWheel={(e) => e.target.blur()}
             >
               <option value="Urgent">🔥 Urgent (Recruiting Urgently)</option>
               <option value="High">🟠 High Priority</option>

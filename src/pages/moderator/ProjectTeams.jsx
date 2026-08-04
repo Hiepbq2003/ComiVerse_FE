@@ -509,7 +509,7 @@ function ProjectTeams({
                       ✅ {team.completedTasksCount || 0} done
                     </span>
                     <span className="stat-pill" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                      ⏳ {team.inProgressTasksCount || 0} ongoing
+                      ⏳ {team.inProgressTasksCount || 0} ongoing tasks
                     </span>
                   </div>
 
