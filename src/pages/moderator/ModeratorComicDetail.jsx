@@ -1152,8 +1152,8 @@ function ModeratorComicDetail() {
                         </td>
                         <td>{getChapterDisplayTitle(chap, index)}</td>
                         <td>
-                          <span className={`comic-status-badge ${chap.isPremium ? 'paused' : 'ongoing'}`} style={{ fontSize: '11px', padding: '2px 8px' }}>
-                            {chap.isPremium ? 'Premium' : 'Free'}
+                          <span className={`comic-status-badge ${chap.isPremium ? 'paused' : 'ongoing'}`}>
+                            {chap.isPremium ? 'PREMIUM' : 'FREE'}
                           </span>
                         </td>
                         <td>
@@ -1163,31 +1163,31 @@ function ModeratorComicDetail() {
                         <td>
                           {selectedViewLang === 'raw' ? (
                             (chap.moderationStatus === 'PUBLISHED' || chap.moderationStatus === 'APPROVED') ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <span style={{ fontSize: '12px', fontWeight: '700', color: '#10b981' }}>
+                              <div className="mod-meta-info-cell">
+                                <span className="mod-meta-status published">
                                   ✓ {chap.moderationStatus === 'PUBLISHED' ? 'Published' : 'Approved'}
                                 </span>
-                                <span style={{ fontSize: '12px', color: '#334155', fontWeight: '500' }}>
-                                    by: {chap.approvedBy || chap.moderatorName || 'Unknown'}
+                                <span className="mod-meta-author">
+                                  by: {chap.approvedBy || chap.moderatorName || 'Unknown'}
                                 </span>
                                 {chap.approvedAt && (
-                                  <span style={{ fontSize: '11px', color: '#475569' }}>
+                                  <span className="mod-meta-date">
                                     {new Date(chap.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                   </span>
                                 )}
                               </div>
                             ) : chap.moderationStatus === 'REJECTED' ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <span style={{ fontSize: '12px', fontWeight: '700', color: '#ef4444' }}>
+                              <div className="mod-meta-info-cell">
+                                <span className="mod-meta-status rejected">
                                   ✗ Rejected
                                 </span>
-                                <span style={{ fontSize: '12px', color: '#334155', fontWeight: '500' }}>
+                                <span className="mod-meta-author">
                                   by: {chap.rejectedBy || 'Unknown'}
                                 </span>
                               </div>
                             ) : (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <span style={{ fontSize: '12px', color: '#475569', fontStyle: 'italic', fontWeight: '600' }}>
+                              <div className="mod-meta-info-cell">
+                                <span className="mod-meta-status pending">
                                   {chap.moderationStatus === 'PREVIEW_READY' ? 'Author Drafting' : 
                                    (chap.moderationStatus === 'SUBMITTED_FOR_REVIEW' || chap.moderationStatus === 'PENDING_REVIEW' ? 'Pending Review' : 
                                     (chap.moderationStatus || 'Pending'))}
@@ -1197,56 +1197,56 @@ function ModeratorComicDetail() {
                           ) : (
                             (() => {
                               const task = chapterTasks[chap.id];
-                              if (!task) return <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>-</span>;
+                              if (!task) return <span className="mod-meta-empty">—</span>;
                               
                               const status = (task.status || '').toLowerCase();
                               if (status === 'completed' || status === 'published') {
                                 return (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                    <span style={{ fontSize: '12px', color: '#334155', fontWeight: '500' }}>
+                                  <div className="mod-meta-info-cell">
+                                    <span className="mod-meta-author">
                                       by: {activeSelectedTeam?.leaderName || 'Unknown'}
                                     </span>
                                     {task.updatedAt && (
-                                      <span style={{ fontSize: '11px', color: '#475569' }}>
+                                      <span className="mod-meta-date">
                                         {new Date(task.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                       </span>
                                     )}
                                   </div>
                                 );
                               }
-                              return <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>-</span>;
+                              return <span className="mod-meta-empty">—</span>;
                             })()
                           )}
                         </td>
                         {selectedViewLang !== 'raw' && (
                           <td>
                             {fetchingTasks ? (
-                              <div className="skeleton-line skeleton-active short" style={{ height: '24px', margin: 0, width: '80px', borderRadius: '12px' }}></div>
+                              <div className="skeleton-line skeleton-active short" style={{ height: '22px', margin: 0, width: '80px', borderRadius: '500px' }}></div>
                             ) : (
                               (() => {
                                 const task = chapterTasks[chap.id]
                                 if (!task) {
-                                  return <span className="mod-translation-status-badge no-task">❌ No Task</span>
+                                  return <span className="mod-translation-status-badge no-task">NO TASK</span>
                                 }
                                 
                                 const status = (task.status || '').toLowerCase()
                                 if (status === 'completed' || status === 'published') {
-                                  return <span className="mod-translation-status-badge completed">✅ Published</span>
-                                } else if (status === 'under_review' || status === 'pending_review') {
-                                  return <span className="mod-translation-status-badge under-review">👁️ Under Review</span>
-                                } else if (status === 'in_progress') {
+                                  return <span className="mod-translation-status-badge completed">PUBLISHED</span>
+                                } else if (status === 'under_review' || status === 'pending_review' || status === 'in_review') {
+                                  return <span className="mod-translation-status-badge under-review">UNDER REVIEW</span>
+                                } else if (status === 'in_progress' || status === 'translating' || status === 'assigned') {
                                   return (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      <span className="mod-translation-status-badge in-progress">🔧 In Progress</span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                      <span className="mod-translation-status-badge in-progress">IN PROGRESS</span>
                                       {task.rejectionReason && (
-                                        <span style={{ fontSize: '10px', color: '#ef4444', fontStyle: 'italic', maxWidth: '120px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.rejectionReason}>
+                                        <span className="mod-revoke-reason-preview" title={task.rejectionReason}>
                                           Revoked: {task.rejectionReason}
                                         </span>
                                       )}
                                     </div>
                                   )
                                 } else {
-                                  return <span className="mod-translation-status-badge backlog">⏳ Backlog</span>
+                                  return <span className="mod-translation-status-badge backlog">{(task.status || 'BACKLOG').toUpperCase()}</span>
                                 }
                               })()
                             )}
