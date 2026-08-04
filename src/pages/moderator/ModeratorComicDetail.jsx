@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import ModeratorLayout from '../../components/layout/ModeratorLayout'
 import { getComicByIdApi, getAllComicsApi, updateComicApi, getComicsPageApi } from '../../services/api/ComicApi'
-import { getChaptersByComicIdApi, getChapterDetailApi, deleteChapterApi, getTasksByChapterIdApi, revokeChapterTranslationApi } from '../../services/api/ChapterApi'
+import { getChaptersByComicIdApi, getChapterDetailApi, deleteChapterApi, getTasksByChapterIdApi, revokeChapterTranslationApi, getChapterTranslationsApi } from '../../services/api/ChapterApi'
 import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
 import { getAllSubmissionsApi } from '../../services/api/SubmissionApi'
 import { getAllGenresApi } from '../../services/api/GenreApi'
@@ -112,7 +112,7 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
         const response = await getChapterDetailApi(chapter.id)
         const data = response?.data?.data || response?.data || response
         const rawPages = data?.pages || data?.images || (Array.isArray(data) ? data : [])
-        const pageList = Array.isArray(rawPages)
+        let pageList = Array.isArray(rawPages)
           ? rawPages.map((item, idx) => {
               if (typeof item === 'string') {
                 return { pageNumber: idx + 1, imageUrl: item, url: item, translatedImageUrl: null }
@@ -125,6 +125,41 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
               }
             })
           : []
+
+        // Fetch translations if we are inspecting a translated language
+        if (displayTargetLang) {
+          try {
+            const transResponse = await getChapterTranslationsApi(chapter.id);
+            const transData = transResponse?.data?.data || transResponse?.data || transResponse || [];
+            if (Array.isArray(transData)) {
+              const matchedTranslation = transData.find(t => t.languageCode?.toLowerCase() === displayTargetLang.toLowerCase());
+              if (matchedTranslation && matchedTranslation.pagesBubbles) {
+                let parsedBubbles = [];
+                try {
+                  parsedBubbles = typeof matchedTranslation.pagesBubbles === 'string' 
+                    ? JSON.parse(matchedTranslation.pagesBubbles) 
+                    : matchedTranslation.pagesBubbles;
+                } catch (e) {
+                  console.error('Failed to parse pagesBubbles:', e);
+                }
+                
+                // Merge translated images into pageList
+                if (Array.isArray(parsedBubbles) && parsedBubbles.length > 0) {
+                  pageList = pageList.map(p => {
+                    const transPage = parsedBubbles.find(tp => Number(tp.pageNumber) === Number(p.pageNumber));
+                    if (transPage && transPage.imageUrl) {
+                      return { ...p, translatedImageUrl: transPage.imageUrl };
+                    }
+                    return p;
+                  });
+                }
+              }
+            }
+          } catch (transErr) {
+            console.error('Failed to load chapter translations:', transErr);
+          }
+        }
+
         if (isMounted) {
           setPages(pageList)
         }
@@ -149,7 +184,7 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
     }
     fetchPages()
     return () => { isMounted = false }
-  }, [chapter.id])
+  }, [chapter.id, displayTargetLang])
 
   const currentPage = pages[currentPageIndex] || null
 
