@@ -9,7 +9,9 @@ import { getComicsPageApi } from '../../services/api/ComicApi'
 import ChatWidget from '../chat/ChatWidget'
 import LogoIcon from '../common/LogoIcon'
 import SubscriptionPlanModal from '../common/SubscriptionPlanModal'
-import { Crown } from 'lucide-react'
+import { Crown, Download } from 'lucide-react'
+
+const COMIVERSE_APK_URL = 'https://pub-a7dc2066b937452cb00d7263b29ee9e5.r2.dev/comiverse-latest.apk'
 
 function HomeLayout({ children }) {
   const navigate = useNavigate()
@@ -622,6 +624,27 @@ function HomeLayout({ children }) {
                 <Link to="/terms" className="footer-link">Terms of Service</Link>
                 <Link to="/contact" className="footer-link">Contact Support</Link>
               </div>
+            </div>
+
+            <div className="footer-download-col">
+              <span className="footer-col-title">Get the app</span>
+              <a
+                className="footer-apk-badge"
+                href={COMIVERSE_APK_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                download="comiverse-latest.apk"
+                aria-label="Download the latest ComiVerse APK for Android"
+              >
+                <span className="footer-apk-icon" aria-hidden="true">
+                  <Download size={21} strokeWidth={2.2} />
+                </span>
+                <span className="footer-apk-copy">
+                  <span className="footer-apk-eyebrow">Download for</span>
+                  <strong>Android APK</strong>
+                </span>
+              </a>
+              <span className="footer-apk-note">Latest mobile release</span>
             </div>
           </div>
 
