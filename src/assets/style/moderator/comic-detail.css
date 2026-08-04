@@ -1879,9 +1879,9 @@ html.light .mod-edit-cancel-btn:hover {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
-  border-radius: 8px;
-  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 500px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.3px;
   white-space: nowrap;
