@@ -178,7 +178,7 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
                 </p>
                 <p className="trans-project-meta" style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <span style={{ color: '#cbd5e1', fontSize: '12.5px' }}>
-                    👥 Capacity: <strong>{proj.membersCount || 1} / {(Number(proj.maxMembers) || 5) + 1}</strong> members (1 Leader + {Number(proj.maxMembers) || 5} Members)
+                    👥 Capacity: <strong>{proj.membersCount || 1} / {(Number(proj.maxMembers) || 5) + 1}</strong> members
                   </span>
                   <span style={{ 
                     padding: '2px 10px', 
@@ -1090,8 +1090,16 @@ function TeamProjects() {
   const handleSaveWorkspaceSettings = async () => {
     if (!selectedDetails) return
 
+    // Calculate current capacity
+    const currentMembersCount = members.length || selectedDetails.membersCount || 1;
+    const totalCapacity = (Number(selectedDetails.maxMembers) || 5) + 1;
+    const isFull = currentMembersCount >= totalCapacity;
+    
+    // Force isRecruiting to false if team is at full capacity
+    const finalIsRecruiting = isFull ? false : selectedDetails.isRecruiting;
+
     // Save manual recruitment status choice to LocalStorage
-    localStorage.setItem(`comiverse_is_recruiting_${selectedDetails.id}`, String(selectedDetails.isRecruiting))
+    localStorage.setItem(`comiverse_is_recruiting_${selectedDetails.id}`, String(finalIsRecruiting))
 
     try {
       const updated = await updateProjectTeamApi(selectedDetails.id, {
@@ -1105,7 +1113,7 @@ function TeamProjects() {
         targetLang: selectedDetails.targetLang,
         priority: selectedDetails.priority,
         cover: selectedDetails.cover,
-        isRecruiting: selectedDetails.isRecruiting,
+        isRecruiting: finalIsRecruiting,
         maxMembers: Number(selectedDetails.maxMembers) || 5,
         leaderName: selectedDetails.leaderName,
         leaderInitials: selectedDetails.leaderInitials,
@@ -1115,7 +1123,7 @@ function TeamProjects() {
         assignedToMe: selectedDetails.assignedToMe,
         notes: selectedDetails.description || selectedDetails.notes || ''
       })
-      const mappedUpdated = { ...selectedDetails, ...updated, team: updated.title || selectedDetails.team, title: updated.comicName || selectedDetails.title, isRecruiting: selectedDetails.isRecruiting }
+      const mappedUpdated = { ...selectedDetails, ...updated, team: updated.title || selectedDetails.team, title: updated.comicName || selectedDetails.title, isRecruiting: finalIsRecruiting }
       setProjects(prev => prev.map(proj => (proj.id === selectedDetails.id ? mappedUpdated : proj)))
       setSelectedDetails(mappedUpdated)
       toast.success('Workspace details saved successfully!')
