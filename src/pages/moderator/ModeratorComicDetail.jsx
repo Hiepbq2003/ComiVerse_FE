@@ -824,7 +824,7 @@ function ModeratorComicDetail() {
         const promises = chapters.map(async (chap) => {
           try {
             const res = await getTasksByChapterIdApi(chap.id)
-            const chapterTaskData = res?.data?.data || res?.data || []
+            const chapterTaskData = Array.isArray(res) ? res : (res?.data?.data || res?.data || res || [])
             // Filter tasks that belong to the active team
             const teamTask = chapterTaskData.find(t => String(t.projectTeamId) === String(activeSelectedTeam.id))
             if (teamTask) {
@@ -1047,7 +1047,7 @@ function ModeratorComicDetail() {
                       </div>
                       <div>
                         <h4 className="mod-team-title-text">
-                          Project Team: {activeSelectedTeam.title}
+                          Project Team: {activeSelectedTeam.title} <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 'normal' }}>({activeSelectedTeam.id})</span>
                         </h4>
                         <div className="mod-team-leader-sub">
                           👑 Team Leader: <strong>{activeSelectedTeam.leaderName || 'Translator Leader'}</strong> • Target: <strong>{activeSelectedTeam.targetLang || selectedViewLang}</strong> • Status: <span className="comic-status-badge ongoing" style={{ fontSize: '11px', padding: '2px 8px' }}>{activeSelectedTeam.status || 'ACTIVE'}</span>
