@@ -12,10 +12,11 @@ function Revenue() {
   }
 
   return (
-    <div className="fade-in">
+    <div className="fade-in creator-finance-page">
       <div className="translator-page-header">
         <div className="translator-page-header-info">
-          <h1>Revenue Management</h1>
+          <span className="creator-page-eyebrow">Financial overview</span>
+          <h1>Revenue</h1>
           <p>Each completed team task assigned through assignee_id earns the configured task rate.</p>
         </div>
       </div>

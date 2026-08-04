@@ -12,10 +12,11 @@ function Payout() {
   }
 
   return (
-    <div className="fade-in">
+    <div className="fade-in creator-finance-page">
       <div className="translator-page-header">
         <div className="translator-page-header-info">
-          <h1>Payout Management</h1>
+          <span className="creator-page-eyebrow">Payments</span>
+          <h1>Payout</h1>
           <p>Request payment for completed team tasks assigned to you in a closed month through Stripe sandbox.</p>
         </div>
       </div>

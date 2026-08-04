@@ -54,3 +54,28 @@
 .payout-amount small { display: block; margin-top: 4px; color: #64748b; font-weight: 400; white-space: normal; }
 @media (max-width: 1200px) { .admin-payout-settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .admin-payout-currency-editor { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .admin-payout-settings-head { flex-direction: column; } .admin-payout-settings-grid, .admin-payout-currency-editor { grid-template-columns: 1fr; } }
+/* USD/EUR/CNY payout compatibility */
+.payout-summary-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.admin-payout-currency-editor {
+  grid-template-columns: minmax(280px, 1.8fr) 110px 180px 100px 140px;
+}
+.admin-payout-currency-editor select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 11px;
+  background: #fff;
+  color: #0f172a;
+  font-weight: 600;
+}
+.admin-payout-currency-editor select:focus {
+  outline: 2px solid rgba(37, 99, 235, .2);
+  border-color: #2563eb;
+}
+@media (max-width: 1250px) {
+  .payout-summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .payout-summary-grid { grid-template-columns: 1fr; }
+}

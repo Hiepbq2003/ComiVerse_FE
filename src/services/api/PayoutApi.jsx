@@ -1,16 +1,26 @@
 import AxiosClient from './AxiosClient'
 
 export const getCreatorPayoutOverviewApi = (month) => (
-  AxiosClient.get('/creator/payouts/overview', { params: month ? { month } : {} })
+  AxiosClient.get('/creator/payouts/overview', {
+    params: month ? { month } : {},
+  })
+)
+
+export const getCreatorPayoutCurrenciesApi = () => (
+  AxiosClient.get('/creator/payouts/currencies')
 )
 
 export const getCreatorPayoutAccountApi = () => (
   AxiosClient.get('/creator/payouts/account')
 )
 
-export const startCreatorPayoutOnboardingApi = (countryCode) => (
+export const startCreatorPayoutOnboardingApi = (
+  countryCode,
+  payoutCurrency,
+) => (
   AxiosClient.post('/creator/payouts/account/onboarding', {
     ...(countryCode ? { countryCode } : {}),
+    payoutCurrency,
   })
 )
 
@@ -21,11 +31,13 @@ export const syncCreatorPayoutAccountApi = () => (
 export const createCreatorPayoutRequestApi = (
   payoutMonth,
   requestedAmount,
+  payoutCurrency,
   note = '',
 ) => (
   AxiosClient.post('/creator/payouts/requests', {
     payoutMonth,
     requestedAmount,
+    payoutCurrency,
     note,
   })
 )
@@ -52,6 +64,10 @@ export const payAdminPayoutApi = (payoutId) => (
 
 export const getAdminPayoutSettingsApi = () => (
   AxiosClient.get('/admin/payouts/settings')
+)
+
+export const getAdminPayoutCurrenciesApi = () => (
+  AxiosClient.get('/admin/payouts/settings/currencies')
 )
 
 export const updateAdminPayoutSettingsApi = (payload) => (
