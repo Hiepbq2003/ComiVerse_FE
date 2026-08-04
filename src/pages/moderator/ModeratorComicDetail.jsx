@@ -1126,7 +1126,8 @@ function ModeratorComicDetail() {
                     : 'No translated chapters found for this team.'}
                 </div>
               ) : (
-                <table className="mod-chapters-table">
+                <div className="mod-table-responsive">
+                  <table className="mod-chapters-table">
                   <thead>
                     <tr>
                       <th>Chapter</th>
@@ -1291,7 +1292,8 @@ function ModeratorComicDetail() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                  </table>
+                </div>
               )}
             </div>
           </>

@@ -290,10 +290,15 @@
   justify-content: space-between;
 }
 
+.mod-table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 12px;
+}
 .mod-chapters-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 12px;
 }
 
 .mod-chapters-table th {
