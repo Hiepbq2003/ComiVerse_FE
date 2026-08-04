@@ -1534,22 +1534,32 @@ function ModeratorComicDetail() {
       {/* Revoke Translation Modal */}
       {revokeModalOpen && revokingTask && revokingChapter && (
         <div className="mod-edit-comic-modal-overlay fade-in" onClick={() => setRevokeModalOpen(false)}>
-          <div className="mod-edit-comic-modal" onClick={e => e.stopPropagation()}>
+          <div className="mod-edit-comic-modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '540px' }}>
             <div className="mod-edit-comic-modal-header">
-              <h3>⚠️ Revoke Translation</h3>
-              <button className="mod-edit-modal-close" onClick={() => setRevokeModalOpen(false)}>×</button>
+              <h2 className="mod-edit-comic-modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '20px' }}>⚠️</span> Revoke Translation
+              </h2>
+              <button className="mod-inspector-close-btn" onClick={() => setRevokeModalOpen(false)}>✕</button>
             </div>
             <div className="mod-edit-comic-modal-body">
-              <p style={{ marginBottom: '16px', color: 'var(--mod-text-secondary)', fontSize: '14px', lineHeight: '1.5' }}>
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                borderRadius: '12px',
+                padding: '14px 16px',
+                fontSize: '13.5px',
+                lineHeight: '1.6',
+                color: 'var(--mod-text-primary, #334155)'
+              }}>
                 You are about to revoke the <strong>{selectedViewLang}</strong> translation of <strong>{getChapterDisplayTitle(revokingChapter, revokingChapter.chapterNumber - 1)}</strong>. 
                 This will remove the translated version from the public reader and send the task back to the team for revision.
-              </p>
+              </div>
               <div className="mod-edit-field-group">
                 <label className="mod-edit-field-label">Reason for Revocation (Required)</label>
                 <textarea
                   className="mod-edit-field-input"
-                  style={{ minHeight: '100px', resize: 'vertical' }}
-                  placeholder="e.g., Poor translation quality, machine translation detected..."
+                  style={{ minHeight: '110px', resize: 'vertical', fontFamily: 'inherit' }}
+                  placeholder="e.g., Poor translation quality, machine translation detected, missing pages..."
                   value={revokeReason}
                   onChange={(e) => setRevokeReason(e.target.value)}
                   autoFocus
