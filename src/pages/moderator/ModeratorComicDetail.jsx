@@ -1167,11 +1167,11 @@ function ModeratorComicDetail() {
                                 <span style={{ fontSize: '12px', fontWeight: '700', color: '#10b981' }}>
                                   ✓ {chap.moderationStatus === 'PUBLISHED' ? 'Published' : 'Approved'}
                                 </span>
-                                <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                <span style={{ fontSize: '12px', color: '#334155', fontWeight: '500' }}>
                                     by: {chap.approvedBy || chap.moderatorName || 'Unknown'}
                                 </span>
                                 {chap.approvedAt && (
-                                  <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                  <span style={{ fontSize: '11px', color: '#475569' }}>
                                     {new Date(chap.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                   </span>
                                 )}
@@ -1181,13 +1181,13 @@ function ModeratorComicDetail() {
                                 <span style={{ fontSize: '12px', fontWeight: '700', color: '#ef4444' }}>
                                   ✗ Rejected
                                 </span>
-                                <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                <span style={{ fontSize: '12px', color: '#334155', fontWeight: '500' }}>
                                   by: {chap.rejectedBy || 'Unknown'}
                                 </span>
                               </div>
                             ) : (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <span style={{ fontSize: '11.5px', color: '#94a3b8', fontStyle: 'italic', fontWeight: '500' }}>
+                                <span style={{ fontSize: '12px', color: '#475569', fontStyle: 'italic', fontWeight: '600' }}>
                                   {chap.moderationStatus === 'PREVIEW_READY' ? 'Author Drafting' : 
                                    (chap.moderationStatus === 'SUBMITTED_FOR_REVIEW' || chap.moderationStatus === 'PENDING_REVIEW' ? 'Pending Review' : 
                                     (chap.moderationStatus || 'Pending'))}
@@ -1197,24 +1197,24 @@ function ModeratorComicDetail() {
                           ) : (
                             (() => {
                               const task = chapterTasks[chap.id];
-                              if (!task) return <span style={{ fontSize: '11px', color: '#94a3b8' }}>-</span>;
+                              if (!task) return <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>-</span>;
                               
                               const status = (task.status || '').toLowerCase();
                               if (status === 'completed' || status === 'published') {
                                 return (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                    <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                    <span style={{ fontSize: '12px', color: '#334155', fontWeight: '500' }}>
                                       by: {activeSelectedTeam?.leaderName || 'Unknown'}
                                     </span>
                                     {task.updatedAt && (
-                                      <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                      <span style={{ fontSize: '11px', color: '#475569' }}>
                                         {new Date(task.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                       </span>
                                     )}
                                   </div>
                                 );
                               }
-                              return <span style={{ fontSize: '11px', color: '#94a3b8' }}>-</span>;
+                              return <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>-</span>;
                             })()
                           )}
                         </td>
