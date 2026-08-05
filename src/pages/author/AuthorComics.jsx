@@ -13,7 +13,7 @@ import {
   uploadAuthorChapterFolderApi,
 } from '../../services/api/AuthorComicApi'
 import { uploadImageApi } from '../../services/api/UploadApi'
-import { buildChapterZipFormData, validateChapterFolder } from '../../utils/chapterFolderUpload'
+import { buildChapterFolderFormData, validateChapterFolder } from '../../utils/chapterFolderUpload'
 
 const GENRE_OPTIONS = [
   'Action', 'Adventure', 'Fantasy', 'Romance', 'Drama',
@@ -292,25 +292,35 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
     const result = validateChapterFolder(folderFiles)
     if (result.error) {
       setError(result.error)
+      toast.warning(result.error)
       return
     }
     if (!chapterNumber.trim()) {
-      setError('Chapter number is required.')
+      const message = 'Chapter number is required.'
+      setError(message)
+      toast.warning(message)
       return
     }
 
     setSubmitting(true)
     setError('')
     try {
+      toast.info('Uploading chapter folder, please wait...')
       const task = await uploadAuthorChapterFolderApi(
         getComicId(comic),
-        await buildChapterZipFormData({ chapterNumber, chapterTitle: title, files: result.files }),
+        await buildChapterFolderFormData({ chapterNumber, chapterTitle: title, files: result.files }),
       )
       toast.success('Chapter folder accepted for processing.')
       onUploaded(task, comic)
       onClose()
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Could not upload chapter folder.')
+      const message = err?.response?.data?.message
+        || (err?.response?.status === 409
+          ? `Chapter ${chapterNumber.trim()} already exists in this comic.`
+          : err?.message)
+        || 'Could not upload chapter folder.'
+      setError(message)
+      toast.error(message, { toastId: `chapter-upload-error-${getComicId(comic)}-${chapterNumber.trim()}` })
     } finally {
       setSubmitting(false)
     }
@@ -527,9 +537,14 @@ function AuthorComics() {
             ? { ...comic, chapterCount: Number(getChapterCount(comic)) + 1 }
             : comic))
           toast.success('Chapter preview is ready.')
+        } else {
+          const message = latest?.error || latest?.message || 'Upload processing failed.'
+          toast.error(message, { toastId: `chapter-upload-task-error-${taskId}` })
         }
       } catch (err) {
-        upsertUploadTask({ taskId, status: 'FAILED', error: err?.message || 'Could not check upload status.' })
+        const message = err?.response?.data?.message || err?.message || 'Could not check upload status.'
+        upsertUploadTask({ taskId, status: 'FAILED', error: message })
+        toast.error(message, { toastId: `chapter-upload-task-error-${taskId}` })
       }
     }
     window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
@@ -548,6 +563,10 @@ function AuthorComics() {
     if (!taskId || !comicId) return
     upsertUploadTask(task, { title: `Chapter upload · ${comic?.title || 'Comic'}`, comicId })
     pollChapterTask(comicId, taskId)
+  }
+
+  const dismissUploadTask = (taskId) => {
+    setUploadTasks((current) => current.filter((task) => getTaskId(task) !== taskId))
   }
 
   const handlePushReview = async (comic) => {
@@ -586,12 +605,35 @@ function AuthorComics() {
 
       {uploadTasks.length > 0 && (
         <div className="author-upload-task-list">
-          {uploadTasks.map((task) => (
-            <div className={`author-upload-task-card ${(task.status || 'queued').toString().toLowerCase()}`} key={getTaskId(task)}>
-              <div><strong>{task.title || 'Chapter upload'}</strong><p>{task.error || task.message || 'Waiting for backend status...'}</p></div>
-              <div className="author-upload-task-meta"><span>{formatUploadStatus(task.status)}</span><small>{task.progress ?? 0}%</small></div>
-            </div>
-          ))}
+          {uploadTasks.map((task) => {
+            const taskId = getTaskId(task)
+            const status = (task.status || 'queued').toString().toLowerCase()
+            const isPending = ['queued', 'processing'].includes(status)
+
+            return (
+              <div className={`author-upload-task-card ${status}`} key={taskId}>
+                <div className="author-upload-task-content">
+                  <strong>{task.title || 'Chapter upload'}</strong>
+                  <p>{task.error || task.message || 'Waiting for backend status...'}</p>
+                </div>
+                <div className="author-upload-task-actions">
+                  <div className="author-upload-task-meta">
+                    <span>{formatUploadStatus(task.status)}</span>
+                    {isPending && <span className="author-upload-spinner" role="status" aria-label="Uploading" />}
+                  </div>
+                  <button
+                    type="button"
+                    className="author-upload-task-dismiss"
+                    onClick={() => dismissUploadTask(taskId)}
+                    aria-label="Dismiss upload notification"
+                    title="Dismiss"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
 

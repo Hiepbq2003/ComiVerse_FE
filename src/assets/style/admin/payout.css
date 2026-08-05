@@ -79,3 +79,326 @@
 @media (max-width: 720px) {
   .payout-summary-grid { grid-template-columns: 1fr; }
 }
+
+/* Align payout management with the shared admin design system. */
+.admin-payout-screen {
+  color: var(--admin-text-primary);
+}
+
+.admin-payout-screen .admin-page-header {
+  align-items: flex-end;
+  gap: 24px;
+}
+
+.admin-payout-screen .admin-page-header > .btn-table-action {
+  min-height: 40px;
+  padding-inline: 16px;
+}
+
+.admin-payout-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 5px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-card-bg);
+}
+
+.admin-payout-view-tab {
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--admin-text-muted);
+  font-family: var(--admin-font);
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all var(--admin-transition);
+}
+
+.admin-payout-view-tab:hover {
+  background: var(--admin-hover-bg);
+  color: var(--admin-text-primary);
+}
+
+.admin-payout-view-tab.active {
+  border-color: rgba(168, 85, 247, 0.35);
+  background: var(--admin-active-bg);
+  color: var(--admin-purple);
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.08), 0 6px 18px rgba(168, 85, 247, 0.12);
+}
+
+.admin-payout-settings-page .admin-payout-settings {
+  margin-top: 8px;
+}
+
+.admin-payout-settings {
+  overflow: hidden;
+  padding: 22px;
+  border-color: var(--admin-border);
+  border-radius: 16px;
+  background: var(--admin-card-bg);
+  box-shadow: 0 14px 30px rgba(5, 2, 15, 0.1);
+}
+
+.admin-payout-settings-head h2,
+.admin-payout-currency-editor h3 {
+  color: var(--admin-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.admin-payout-settings-head p,
+.admin-payout-currency-editor p {
+  max-width: 760px;
+  color: var(--admin-text-muted);
+  line-height: 1.55;
+}
+
+.admin-payout-settings-grid {
+  gap: 16px;
+}
+
+.admin-payout-settings-grid label {
+  color: var(--admin-text-secondary);
+  letter-spacing: 0.01em;
+}
+
+.admin-payout-settings-grid input,
+.admin-payout-currency-editor input,
+.admin-payout-currency-editor select {
+  min-height: 42px;
+  border-color: var(--admin-border);
+  border-radius: 10px;
+  background: var(--admin-bg);
+  color: var(--admin-text-primary) !important;
+  -webkit-text-fill-color: var(--admin-text-primary);
+  font-family: var(--admin-font);
+  transition: border-color var(--admin-transition), box-shadow var(--admin-transition);
+}
+
+.admin-payout-settings-grid input:hover,
+.admin-payout-currency-editor input:hover,
+.admin-payout-currency-editor select:hover {
+  border-color: var(--admin-border-hover);
+}
+
+.admin-payout-settings-grid input:focus,
+.admin-payout-currency-editor input:focus,
+.admin-payout-currency-editor select:focus {
+  border-color: rgba(168, 85, 247, 0.6);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.11);
+}
+
+.admin-payout-settings-grid input:disabled,
+.admin-payout-currency-editor input:disabled {
+  background: var(--admin-hover-bg);
+  color: var(--admin-text-muted) !important;
+  -webkit-text-fill-color: var(--admin-text-muted);
+}
+
+.admin-payout-field-hint {
+  color: var(--admin-text-muted);
+}
+
+.admin-payout-currency-editor {
+  border-top-color: var(--admin-border);
+}
+
+.admin-payout-checkbox {
+  color: var(--admin-text-secondary);
+  font-weight: 650;
+}
+
+.admin-payout-checkbox input {
+  min-height: auto;
+  accent-color: var(--admin-purple);
+}
+
+.admin-payout-rate-list button {
+  padding: 8px 12px;
+  border-color: var(--admin-border);
+  background: var(--admin-bg);
+  color: var(--admin-text-secondary);
+  font-family: var(--admin-font);
+  transition: border-color var(--admin-transition), background var(--admin-transition), transform var(--admin-transition);
+}
+
+.admin-payout-rate-list button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(168, 85, 247, 0.45);
+  background: var(--admin-hover-bg);
+}
+
+.admin-payout-rate-list button strong {
+  color: var(--admin-text-primary);
+}
+
+.admin-payout-rate-list em {
+  color: var(--admin-green);
+}
+
+.payout-summary-grid {
+  gap: 16px;
+  margin: 20px 0 24px;
+}
+
+.payout-summary-card {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  padding: 18px;
+  border-color: var(--admin-border);
+  border-radius: 16px;
+  background: var(--admin-card-bg);
+  box-shadow: 0 12px 26px rgba(5, 2, 15, 0.09);
+  transition: transform var(--admin-transition), border-color var(--admin-transition);
+}
+
+.payout-summary-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--admin-purple);
+}
+
+.payout-summary-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--admin-border-hover);
+}
+
+.payout-summary-count {
+  color: var(--admin-text-primary);
+  font-size: clamp(24px, 2vw, 30px);
+  letter-spacing: -0.04em;
+}
+
+.payout-summary-total,
+.payout-reason,
+.admin-payout-details small,
+.payout-amount small {
+  color: var(--admin-text-muted);
+}
+
+.payout-summary-badge {
+  border: 1px solid transparent;
+  background: var(--admin-hover-bg);
+  color: var(--admin-text-secondary);
+  letter-spacing: 0.035em;
+}
+
+.payout-summary-badge--pending { border-color: rgba(234, 179, 8, 0.22); background: rgba(234, 179, 8, 0.1); color: var(--admin-yellow); }
+.payout-summary-badge--approved,
+.payout-summary-badge--processing { border-color: rgba(59, 130, 246, 0.22); background: rgba(59, 130, 246, 0.1); color: var(--admin-blue); }
+.payout-summary-badge--paid { border-color: rgba(16, 185, 129, 0.22); background: rgba(16, 185, 129, 0.1); color: var(--admin-green); }
+.payout-summary-badge--rejected,
+.payout-summary-badge--failed { border-color: rgba(239, 68, 68, 0.22); background: rgba(239, 68, 68, 0.1); color: var(--admin-red); }
+
+.payout-filter-tabs {
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-card-bg);
+}
+
+.payout-filter-tab {
+  padding: 8px 13px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--admin-text-muted);
+  font-family: var(--admin-font);
+  font-size: 12px;
+  font-weight: 700;
+  transition: all var(--admin-transition);
+}
+
+.payout-filter-tab:hover {
+  background: var(--admin-hover-bg);
+  color: var(--admin-text-primary);
+}
+
+.payout-filter-tab.active {
+  border-color: rgba(168, 85, 247, 0.26);
+  background: var(--admin-active-bg);
+  color: var(--admin-purple);
+  box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.08);
+}
+
+.admin-payout-screen .btn-table-action {
+  border-color: var(--admin-border);
+  background: transparent;
+  color: var(--admin-text-secondary);
+  font-family: var(--admin-font);
+  transition: all var(--admin-transition);
+}
+
+.admin-payout-screen .btn-table-action:hover:not(:disabled) {
+  border-color: var(--admin-border-hover);
+  background: var(--admin-hover-bg);
+  color: var(--admin-text-primary);
+}
+
+.admin-payout-screen .payout-approve { border-color: rgba(16, 185, 129, 0.35); color: var(--admin-green); }
+.admin-payout-screen .payout-reject { border-color: rgba(239, 68, 68, 0.35); color: var(--admin-red); }
+.admin-payout-screen .payout-mark-paid { border-color: rgba(168, 85, 247, 0.4); color: var(--admin-purple); }
+
+.admin-payout-error {
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.09);
+  color: var(--admin-red);
+}
+
+.admin-payout-table {
+  min-width: 1280px;
+}
+
+.admin-payout-table .cell-name,
+.admin-payout-table .payout-amount > span {
+  color: var(--admin-text-primary);
+}
+
+.payout-bank {
+  color: var(--admin-text-muted);
+}
+
+.status-badge.pending { color: var(--admin-yellow); }
+.status-badge.processing,
+.status-badge.approved { background: rgba(59, 130, 246, 0.1); color: var(--admin-blue); }
+.status-badge.paid { background: rgba(16, 185, 129, 0.1); color: var(--admin-green); }
+.status-badge.rejected,
+.status-badge.failed { background: rgba(239, 68, 68, 0.1); color: var(--admin-red); }
+.status-badge.pending::before,
+.status-badge.processing::before,
+.status-badge.rejected::before { background: currentColor; }
+
+@media (max-width: 720px) {
+  .admin-payout-screen .admin-page-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-payout-header-actions,
+  .admin-payout-header-actions .admin-payout-view-tab {
+    width: 100%;
+  }
+
+  .admin-payout-settings {
+    padding: 16px;
+  }
+
+  .payout-filter-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+
+  .payout-filter-tab {
+    flex: 0 0 auto;
+  }
+}

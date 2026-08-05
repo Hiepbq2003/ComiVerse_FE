@@ -39,22 +39,11 @@ export const submitAuthorComicReviewApi = (comicId) => {
 }
 
 
-export const uploadAuthorChapterFolderApi = (
-  comicId,
-  formData,
-  onUploadProgress = undefined
-) => {
-  return AxiosClient.post(
-    `/author/comics/${comicId}/chapters/upload-folder`,
-    formData,
-    {
-      timeout: 120000,
-      onUploadProgress:
-        typeof onUploadProgress === 'function'
-          ? onUploadProgress
-          : undefined
-    }
-  )
+export const uploadAuthorChapterFolderApi = (comicId, formData, onUploadProgress) => {
+  return AxiosClient.post(`/author/comics/${comicId}/chapters/upload-folder`, formData, {
+    timeout: 120000,
+    onUploadProgress
+  })
 }
 
 export const getAuthorChapterUploadStatusApi = (comicId, taskId) => {
@@ -81,8 +70,8 @@ export const deleteAuthorChapterApi = (comicId, chapterId) => {
   return AxiosClient.delete(`/author/comics/${comicId}/chapters/${chapterId}`)
 }
 
-export const replaceAuthorChapterZipApi = (comicId, chapterId, formData, onUploadProgress) => {
-  return AxiosClient.put(`/author/comics/${comicId}/chapters/${chapterId}/replace-zip`, formData, {
+export const replaceAuthorChapterFolderApi = (comicId, chapterId, formData, onUploadProgress) => {
+  return AxiosClient.put(`/author/comics/${comicId}/chapters/${chapterId}/replace-folder`, formData, {
     timeout: 120000,
     onUploadProgress
   })
