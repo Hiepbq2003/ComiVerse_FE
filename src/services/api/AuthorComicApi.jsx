@@ -38,6 +38,10 @@ export const submitAuthorComicReviewApi = (comicId) => {
   return AxiosClient.post(`/author/comics/${comicId}/submit-review`)
 }
 
+export const confirmModEditApi = (comicId) => {
+  return AxiosClient.put(`/author/comics/${comicId}/confirm-edit`)
+}
+
 export const uploadAuthorChapterFolderApi = (comicId, formData, onUploadProgress) => {
   return AxiosClient.post(`/author/comics/${comicId}/chapters/upload-zip`, formData, {
     timeout: 120000,
@@ -75,3 +79,8 @@ export const replaceAuthorChapterZipApi = (comicId, chapterId, formData, onUploa
     onUploadProgress
   })
 }
+
+export const submitAuthorComicAppealApi = (comicId, payload) => {
+  return AxiosClient.post(`/author/comics/${comicId}/appeal`, payload)
+}
+

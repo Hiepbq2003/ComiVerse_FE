@@ -43,6 +43,18 @@ function validateForm(form) {
     errors.facebookUrl = 'Please enter a valid URL (starting with http:// or https://).'
   }
 
+  if (!form.cvUrl.trim()) {
+    errors.cvUrl = 'Portfolio / CV Link is required.'
+  } else if (!/^https?:\/\/.+/.test(form.cvUrl.trim())) {
+    errors.cvUrl = 'Please enter a valid URL (starting with http:// or https://).'
+  }
+
+  if (!form.bio.trim()) {
+    errors.bio = 'Introduction is required.'
+  } else if (form.bio.trim().length < 20) {
+    errors.bio = 'Please provide a slightly longer introduction (at least 20 characters).'
+  }
+
   return errors
 }
 
@@ -184,7 +196,9 @@ function TranslatorRegister() {
     specializations: [],
     experienceYears: '',
     phoneNumber: '',
-    facebookUrl: ''
+    facebookUrl: '',
+    cvUrl: '',
+    bio: ''
   })
   const [errors, setErrors] = useState({})
   const [touched, setTouched] = useState({})
@@ -235,7 +249,9 @@ function TranslatorRegister() {
       specializations: true,
       experienceYears: true,
       phoneNumber: true,
-      facebookUrl: true
+      facebookUrl: true,
+      cvUrl: true,
+      bio: true
     })
 
     if (Object.keys(validationErrors).length > 0) {
@@ -249,7 +265,9 @@ function TranslatorRegister() {
         specializations: form.specializations,
         experiencedYears: Number(form.experienceYears),
         phone: form.phoneNumber.trim(),
-        facebookUrl: form.facebookUrl.trim()
+        facebookUrl: form.facebookUrl.trim(),
+        cvUrl: form.cvUrl.trim(),
+        bio: form.bio.trim()
       })
 
       if (user) {
@@ -409,6 +427,49 @@ function TranslatorRegister() {
                       onBlur={() => setTouched((t) => ({ ...t, facebookUrl: true }))}
                     />
                     {touched.facebookUrl && <FieldError message={errors.facebookUrl} />}
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="h4 mb-3 d-flex align-items-center" style={{ color: 'var(--trans-text-primary, #fff)' }}>
+                    <Link2 className="me-2" style={{ color: '#c084fc' }} /> Portfolio & Introduction *
+                  </h3>
+
+                  <div className="mb-3">
+                    <label className="form-label d-flex align-items-center" style={{ color: 'var(--trans-text-secondary, #cbd5e1)' }}>
+                      Portfolio / CV Link
+                    </label>
+                    <input
+                      type="url"
+                      className="trans-form-input"
+                      placeholder="e.g. Google Drive Link, Behance, etc."
+                      value={form.cvUrl}
+                      onChange={(e) => handleFieldChange('cvUrl', e.target.value)}
+                      onBlur={() => setTouched((t) => ({ ...t, cvUrl: true }))}
+                    />
+                    <small style={{ color: 'var(--trans-text-muted, #94a3b8)', fontSize: '12px' }}>
+                      This link will be sent to Team Leaders when you apply to their projects.
+                    </small>
+                    {touched.cvUrl && <FieldError message={errors.cvUrl} />}
+                  </div>
+
+                  <div>
+                    <label className="form-label d-flex align-items-center" style={{ color: 'var(--trans-text-secondary, #cbd5e1)' }}>
+                      Introduction / Bio
+                    </label>
+                    <textarea
+                      className="trans-form-input"
+                      placeholder="Briefly introduce yourself, your experience, and why teams should recruit you..."
+                      rows={4}
+                      value={form.bio}
+                      onChange={(e) => handleFieldChange('bio', e.target.value)}
+                      onBlur={() => setTouched((t) => ({ ...t, bio: true }))}
+                      style={{ resize: 'vertical' }}
+                    />
+                    <small style={{ color: 'var(--trans-text-muted, #94a3b8)', fontSize: '12px' }}>
+                      This bio will act as your cover letter when joining teams.
+                    </small>
+                    {touched.bio && <FieldError message={errors.bio} />}
                   </div>
                 </section>
               </div>

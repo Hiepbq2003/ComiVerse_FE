@@ -333,6 +333,21 @@
 }
 
 /* Light mode overrides for comic management components */
+html.light .mod-input,
+html.light .mod-select-field,
+html.light .comic-search-input {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+}
+
+html.light .mod-input:focus,
+html.light .mod-select-field:focus,
+html.light .comic-search-input:focus {
+  border-color: #7c3aed !important;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.1);
+}
+
 html.light .comic-table-card {
   background: #ffffff !important;
   border: 1px solid rgba(0, 0, 0, 0.08) !important;

@@ -758,7 +758,7 @@ function Forum() {
       toast.success('Reply posted!')
     } catch (err) {
       console.error('Failed to post forum reply:', err)
-      toast.error('Failed to post reply.')
+      toast.error(err.response?.data?.message || 'Failed to post reply.')
     } finally {
       setSubmitting(false)
     }

@@ -50,7 +50,13 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
           (c.author || '').toLowerCase().includes(searchLower) ||
           c.projectTeam.toLowerCase().includes(searchLower);
         
-        const matchesStatus = comicStatusFilter === 'All Status' || c.publicationStatus?.toUpperCase() === comicStatusFilter.toUpperCase();
+        // Exclude comics that are not yet published (i.e. still in Review Queue)
+        if (c.moderationStatus === 'REJECTED' || c.moderationStatus === 'SUBMITTED_FOR_REVIEW') {
+           return false;
+        }
+
+        const matchesStatus = comicStatusFilter === 'All Status' || 
+          c.publicationStatus?.toUpperCase() === comicStatusFilter.toUpperCase();
         const matchesGenre = comicGenreFilter === 'All Genres' || (c.genres || []).some(g => (typeof g === 'object' && g !== null ? g.name : g) === comicGenreFilter);
         const matchesAuthor = comicAuthorFilter === 'All Authors' || c.authorName === comicAuthorFilter || c.author === comicAuthorFilter;
         const matchesTeam = comicTeamFilter === 'All Project Teams' || c.projectTeam === comicTeamFilter;
@@ -233,7 +239,8 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
     author: '',
     publicationStatus: 'ONGOING',
     language: '',
-    genres: ''
+    genres: '',
+    reason: ''
   })
 
   // Translation Request modal states
@@ -403,7 +410,8 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
       author: comic.authorName || comic.author || '',
       publicationStatus: comic.publicationStatus || 'ONGOING',
       language: comic.language && comic.language !== 'Unknown' ? comic.language : '',
-      genres: comic.genres.map(g => typeof g === 'object' && g !== null ? g.name : g).join(', ')
+      genres: comic.genres.map(g => typeof g === 'object' && g !== null ? g.name : g).join(', '),
+      reason: ''
     })
   }
 
@@ -411,6 +419,10 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
     if (!editingComic) return
     if (!editComicForm.language.trim()) {
       toast.warn('Comic original language is required.')
+      return
+    }
+    if (!editComicForm.reason || !editComicForm.reason.trim()) {
+      toast.warn('Please provide a reason for the modification. This is required for transparency.')
       return
     }
     const inputGenreNames = editComicForm.genres.split(',').map(g => g.trim().toLowerCase()).filter(Boolean)
@@ -436,7 +448,8 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
       language: editComicForm.language.trim(),
       publicationStatus: editComicForm.publicationStatus?.toUpperCase(),
       status: editComicForm.publicationStatus?.toUpperCase(),
-      genreIds: matchedGenreIds
+      genreIds: matchedGenreIds,
+      rejectionReason: editComicForm.reason.trim()
     }
     handleSaveEditComic(editingComic.id, updatedData)
     setEditingComic(null)
@@ -682,9 +695,19 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                     </div>
                   </td>
                   <td>
-                    <span className={`comic-status-badge ${(comic.publicationStatus || 'ONGOING').toLowerCase()}`}>
-                      {comic.publicationStatus || 'ONGOING'}
-                    </span>
+                    {comic.moderationStatus === 'REJECTED' ? (
+                      <span className="comic-status-badge rejected" style={{ background: '#ef4444', color: '#fff', border: 'none' }}>
+                        REJECTED
+                      </span>
+                    ) : comic.moderationStatus === 'SUBMITTED_FOR_REVIEW' || comic.moderationStatus === 'PENDING' || comic.moderationStatus === 'PENDING_REVIEW' ? (
+                      <span className="comic-status-badge" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}>
+                        PENDING REVIEW
+                      </span>
+                    ) : (
+                      <span className={`comic-status-badge ${(comic.publicationStatus || 'ONGOING').toLowerCase()}`}>
+                        {comic.publicationStatus || 'ONGOING'}
+                      </span>
+                    )}
                   </td>
                   <td>
                     <div className="comic-actions-cell">
@@ -852,6 +875,29 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Reason for Modification (Required) */}
+            <div className="mod-form-group">
+              <label className="mod-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                Reason for Modification
+                <span style={{
+                  fontSize: '10px', fontWeight: '600', color: '#ef4444',
+                  background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px',
+                  letterSpacing: '0.5px'
+                }}>REQUIRED</span>
+              </label>
+              <textarea
+                className="mod-input"
+                rows={3}
+                value={editComicForm.reason || ''}
+                onChange={(e) => setEditComicForm({ ...editComicForm, reason: e.target.value })}
+                placeholder="e.g. Adjusted age rating to 18+ due to graphic violence in Chapter 3, Updated genres for better discoverability..."
+                style={{ resize: 'vertical', minHeight: '72px', fontFamily: 'inherit', lineHeight: '1.5' }}
+              />
+              <span style={{ fontSize: '11px', color: 'var(--mod-text-secondary, #64748b)', marginTop: '4px', display: 'block' }}>
+                This reason will be included in the notification sent to the Author.
+              </span>
             </div>
 
             <div className="mod-modal-footer" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>

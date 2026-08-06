@@ -316,7 +316,7 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
       setComments(prev => prev.filter(c => c.id !== tempId))
       setTotalComments(prev => Math.max(0, prev - 1))
       setCommentInput(text)
-      toast.error('Failed to post comment')
+      toast.error(err.response?.data?.message || 'Failed to post comment')
     } finally {
       setCommentSubmitting(false)
     }
@@ -383,7 +383,7 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
         ...prev,
         [parentId]: (prev[parentId] || []).filter(r => r.id !== tempId)
       }))
-      toast.error('Failed to post reply')
+      toast.error(err.response?.data?.message || 'Failed to post reply')
     } finally {
       setCommentSubmitting(false)
     }

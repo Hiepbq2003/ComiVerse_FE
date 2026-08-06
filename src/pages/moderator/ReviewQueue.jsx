@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import '../../assets/style/moderator/review-queue.css'
 import '../../assets/style/moderator/comic-detail.css'
 import ModernButton from '../../components/common/ModernButton'
@@ -73,7 +74,8 @@ const isSameChapterItem = (c, target) => {
 
 function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfirmReject, handleApproveAndCreateProject, handleChapterApprove, handleChapterReject }) {
   const { theme } = useTheme()
-  const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'approved' | 'rejected'
+  const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'approved' | 'rejected' | 'appealed'
   
   const [sortFilter, setSortFilter] = useState('Newest')
   const [searchQuery, setSearchQuery] = useState('')
@@ -562,7 +564,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
 
   // 1. High-Performance Memoized Tab Counts (Grouped by Comic)
   const tabCounts = useMemo(() => {
-    const counts = { pending: 0, approved: 0, rejected: 0 };
+    const counts = { pending: 0, approved: 0, rejected: 0, appealed: 0 };
     const authUser = getAuth()?.user;
 
     const scopedSubmissions = submissions.filter(item => 
@@ -581,14 +583,39 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
       counts[tabStatus] = uniqueKeys.size;
     });
 
+    const appealedComics = comics.filter(c => c.isAppealed || c.appealed || c.moderationStatus === 'APPEALED');
+    counts.appealed = appealedComics.length;
+
     return counts;
-  }, [submissions]);
+  }, [submissions, comics]);
 
   // 2. High-Performance Instant Query Filter & Sort
   const filteredItems = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
     const authUser = getAuth()?.user;
     
+    if (activeTab === 'appealed') {
+      return comics
+        .filter(c => c.isAppealed || c.appealed || c.moderationStatus === 'APPEALED')
+        .filter(c => {
+           if (!query) return true;
+           return (c.title?.toLowerCase().includes(query) || c.authorName?.toLowerCase().includes(query));
+        })
+        .map(c => ({
+          ...c,
+          status: 'appealed',
+          type: 'Comic Appeal',
+          submittedBy: c.authorName,
+          timestamp: c.updatedAt || c.createdAt || Date.now(),
+          isComicAppealItem: true
+        }))
+        .sort((a, b) => {
+          const timeA = new Date(a.timestamp || 0).getTime() || 0;
+          const timeB = new Date(b.timestamp || 0).getTime() || 0;
+          return sortFilter === 'Newest' ? timeB - timeA : timeA - timeB;
+        });
+    }
+
     return submissions
       .filter(item => isLanguageInModeratorScope(getSubmissionLanguage(item), authUser))
       .filter(item => item.status === activeTab)
@@ -606,7 +633,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
         const timeB = new Date(b.timestamp || b.submittedAt || b.createdAt || 0).getTime() || 0;
         return sortFilter === 'Newest' ? timeB - timeA : timeA - timeB;
       });
-  }, [submissions, activeTab, searchQuery, sortFilter]);
+  }, [submissions, comics, activeTab, searchQuery, sortFilter]);
 
   // 3. Smart Comic Grouping: Consolidate multiple chapter submissions of the same comic into 1 card
   const groupedItems = useMemo(() => {
@@ -1230,6 +1257,13 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
           Rejected
           <span className="moderator-tab-btn-badge rejected">{tabCounts.rejected}</span>
         </button>
+        <button 
+          className={`moderator-tab-btn ${activeTab === 'appealed' ? 'active' : ''}`}
+          onClick={() => setActiveTab('appealed')}
+        >
+          Appealed
+          <span className="moderator-tab-btn-badge appealed" style={{ background: '#f59e0b', color: '#fff' }}>{tabCounts.appealed}</span>
+        </button>
       </div>
 
       {/* Filter and Sort bar */}
@@ -1305,9 +1339,15 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                 <div className="submission-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <ModernButton 
                     variant={2} 
-                    label={item.status === 'pending' ? "👁 Review Content" : "👁 View Evidence"} 
+                    label={item.isComicAppealItem ? "📄 Review Appeal" : (item.status === 'pending' ? "👁 Review Content" : "👁 View Evidence")} 
                     className="btn-review"
-                    onClick={() => handleOpenReviewModal(item)} 
+                    onClick={() => {
+                      if (item.isComicAppealItem) {
+                        navigate(`/moderator/comic-management/${item.id}`);
+                      } else {
+                        handleOpenReviewModal(item);
+                      }
+                    }} 
                   />
 
                   {item.status === 'pending' && (

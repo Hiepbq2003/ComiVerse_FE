@@ -1246,7 +1246,7 @@ function TeamProjects() {
       }
     } catch (err) {
       console.error(err);
-      toast.error('Failed to post comment.');
+      toast.error(err.response?.data?.message || 'Failed to post comment.');
       return;
     }
 

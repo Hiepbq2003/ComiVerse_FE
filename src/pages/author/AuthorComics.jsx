@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 import '../../assets/style/author/comics.css'
 import '../../assets/style/author/upload-guide.css'
+import AuthorAppealModal from '../../components/author/AuthorAppealModal'
 import {
   checkAuthorComicTitleExistsApi,
   createAuthorComicApi,
@@ -61,6 +62,7 @@ const formatModerationStatus = (status) => {
   if (['APPROVED', 'PUBLISHED'].includes(value)) return '✓ Approved'
   if (['HIDDEN', 'UNPUBLISHED'].includes(value)) return '👁 Hidden'
   if (value === 'REJECTED') return '✕ Rejected'
+  if (value === 'APPEALED') return '⚖️ Appealed'
   if (value === 'NEEDS_CHANGES') return 'Needs Changes'
   if (value === 'DRAFT') return 'Draft'
   return '⏳ Pending Review'
@@ -71,6 +73,7 @@ const getModerationClass = (status) => {
   if (['APPROVED', 'PUBLISHED'].includes(value)) return 'approved'
   if (['HIDDEN', 'UNPUBLISHED'].includes(value)) return 'hidden'
   if (['REJECTED', 'NEEDS_CHANGES'].includes(value)) return 'rejected'
+  if (value === 'APPEALED') return 'appealed'
   if (value === 'DRAFT') return 'draft'
   return 'pending'
 }
@@ -378,6 +381,9 @@ function enrichComicWithModeratorOverrides(comic) {
   const hasPendingOverride = matchingOverrides.some(o => (o.status || '').toString().toUpperCase() === 'PENDING');
 
   let moderationStatus = comic.moderationStatus || comic.approvalStatus || 'DRAFT';
+  if (comic.isAppealed) {
+    moderationStatus = 'APPEALED';
+  }
 
   if (hasRejectedOverride) {
     moderationStatus = 'REJECTED';
@@ -395,11 +401,13 @@ function enrichComicWithModeratorOverrides(comic) {
 
 function AuthorComics() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [comics, setComics] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [chapterTarget, setChapterTarget] = useState(null)
+  const [appealTarget, setAppealTarget] = useState(null)
   const [uploadTasks, setUploadTasks] = useState([])
   const [activeTab, setActiveTab] = useState('all') // 'all' | 'rejected' | 'pending' | 'approved' | 'draft'
   const [searchQuery, setSearchQuery] = useState('')
@@ -501,6 +509,26 @@ function AuthorComics() {
     comicsLoadedRef.current = true
     loadComics()
   }, [])
+
+  useEffect(() => {
+    const isAppeal = searchParams.get('appeal') === 'true'
+    const appealComicId = searchParams.get('appealComicId')
+    if ((isAppeal || appealComicId) && comics.length > 0 && !appealTarget) {
+      const matched = appealComicId
+        ? comics.find((c) => (c.id || c.comicId) === appealComicId)
+        : comics[0]
+      if (matched) {
+        setAppealTarget(matched)
+        // Clear params immediately to prevent auto-reopen loop
+        setSearchParams((prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('appeal')
+          next.delete('appealComicId')
+          return next
+        }, { replace: true })
+      }
+    }
+  }, [comics, searchParams, appealTarget, setSearchParams])
 
   const upsertUploadTask = (task, extra = {}) => {
     const taskId = getTaskId(task)
@@ -682,6 +710,9 @@ function AuthorComics() {
           const cover = getComicCover(comic)
           const statusValue = (moderationStatus || 'DRAFT').toString().toUpperCase()
           const canPushReview = !['SUBMITTED_FOR_REVIEW', 'PUBLISHED', 'APPROVED'].includes(statusValue)
+          const isAppealable = ['REJECTED', 'CHANGES_REQUESTED', 'REVISION_REQUIRED'].includes(statusValue) || 
+            Boolean(comic.rejectionReason && comic.rejectionReason.trim()) || 
+            (comic.rejectedChapterCount > 0)
 
           return (
             <article className="author-comic-list-card" key={comicId || comic.title}>
@@ -712,6 +743,11 @@ function AuthorComics() {
               <div className="author-comic-card-actions">
                 <button className="btn-author-action black" onClick={() => navigate(`/author/comics/${comicId}`)}>View Details</button>
                 <button className="btn-author-action" onClick={() => setChapterTarget(comic)}>+ Add Chapter</button>
+                {isAppealable && (
+                  <button className="btn-author-action appeal" onClick={() => setAppealTarget(comic)} title="Appeal moderation decision">
+                    ⚖️ Appeal
+                  </button>
+                )}
                 {canPushReview && (
                   <button className="btn-author-action review" onClick={() => handlePushReview(comic)} disabled={reviewingId === comicId}>
                     {reviewingId === comicId ? 'Submitting...' : 'Push Review'}
@@ -725,6 +761,22 @@ function AuthorComics() {
 
       {showCreateModal && <CreateComicModal onClose={() => setShowCreateModal(false)} onCreated={handleCreated} />}
       {chapterTarget && <AddChapterModal comic={chapterTarget} onClose={() => setChapterTarget(null)} onUploaded={handleChapterUploaded} />}
+      {appealTarget && (
+        <AuthorAppealModal
+          comic={appealTarget}
+          onClose={() => {
+            setAppealTarget(null)
+            // Ensure URL params are cleared
+            setSearchParams((prev) => {
+              const next = new URLSearchParams(prev)
+              next.delete('appeal')
+              next.delete('appealComicId')
+              return next
+            }, { replace: true })
+          }}
+          onSubmitted={() => loadComics()}
+        />
+      )}
     </div>
   )
 }

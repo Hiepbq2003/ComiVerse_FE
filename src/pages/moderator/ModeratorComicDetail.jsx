@@ -3,7 +3,10 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import ModeratorLayout from '../../components/layout/ModeratorLayout'
 import { getComicByIdApi, getAllComicsApi, updateComicApi, getComicsPageApi } from '../../services/api/ComicApi'
-import { getChaptersByComicIdApi, getChapterDetailApi, deleteChapterApi, getTasksByChapterIdApi, revokeChapterTranslationApi, getChapterTranslationsApi } from '../../services/api/ChapterApi'
+import { getChaptersByComicIdApi, getChapterDetailApi, getTasksByChapterIdApi, revokeChapterTranslationApi, getChapterTranslationsApi } from '../../services/api/ChapterApi'
+import { getPendingAppealByTargetApi } from '../../services/api/AppealApi'
+import ModeratorTakedownModal from '../../components/moderator/ModeratorTakedownModal'
+import ResolveAppealModal from '../../components/common/ResolveAppealModal'
 import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
 import { getAllSubmissionsApi } from '../../services/api/SubmissionApi'
 import { getAllGenresApi } from '../../services/api/GenreApi'
@@ -15,6 +18,7 @@ import { useTheme } from '../../context/ThemeContext'
 import '../../assets/style/moderator/comic-detail.css'
 import { getAuth } from '../../utils/Auth'
 import { isLanguageInModeratorScope, getModeratorScope } from '../../utils/moderatorScope'
+import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 
 const getLanguageFlag = (lang) => {
   const n = (lang || '').toLowerCase().trim()
@@ -559,8 +563,14 @@ function ModeratorComicDetail() {
   const [revokeModalOpen, setRevokeModalOpen] = useState(false)
   const [revokingChapter, setRevokingChapter] = useState(null)
   const [revokingTask, setRevokingTask] = useState(null)
+  
+  const [takingDownChapter, setTakingDownChapter] = useState(null)
   const [revokeReason, setRevokeReason] = useState('')
   const [isRevoking, setIsRevoking] = useState(false)
+  
+  const [resolveModalOpen, setResolveModalOpen] = useState(false)
+  const [activeAppealTicket, setActiveAppealTicket] = useState(null)
+  const [isFetchingAppeal, setIsFetchingAppeal] = useState(false)
   
   // Edit Comic state
   const [isEditing, setIsEditing] = useState(false)
@@ -797,15 +807,30 @@ function ModeratorComicDetail() {
     }
   }
 
-  const handleDeleteChapterItem = async (chapterId) => {
-    if (!window.confirm('Are you sure you want to delete this chapter?')) return
+  const handleReviewAppealClick = async () => {
     try {
-      await deleteChapterApi(chapterId)
-      toast.success('Chapter deleted successfully!')
-      setChapters(prev => prev.filter(c => c.id !== chapterId))
+      setIsFetchingAppeal(true)
+      const res = await getPendingAppealByTargetApi(comic.id || comic.comicId)
+      if (res.data || res) {
+        setActiveAppealTicket(res.data || res)
+        setResolveModalOpen(true)
+      } else {
+        toast.error('No pending appeal found for this comic.')
+      }
     } catch (err) {
-      toast.error('Failed to delete chapter.')
+      toast.error('Failed to fetch appeal details.')
+    } finally {
+      setIsFetchingAppeal(false)
     }
+  }
+
+  const handleTakedownChapterItem = (chap) => {
+    setTakingDownChapter(chap)
+  }
+
+  const onTakedownSubmitted = (chapterId) => {
+    // Optionally update chapter list to reflect REJECTED status
+    setChapters(prev => prev.map(c => c.id === chapterId ? { ...c, moderationStatus: 'REJECTED' } : c))
   }
 
   // Filter project teams assigned to this comic
@@ -931,6 +956,29 @@ function ModeratorComicDetail() {
           </div>
         ) : (
           <>
+            {comic.isAppealed && comic.appealReason && (
+              <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '8px', padding: '16px', marginBottom: '24px', color: '#f59e0b' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
+                    <span>⚖️</span>
+                    <span>Author Appeal</span>
+                  </div>
+                  <ModernButton 
+                    variant="outline" 
+                    size="small" 
+                    onClick={handleReviewAppealClick}
+                    disabled={isFetchingAppeal}
+                    style={{ background: '#f59e0b', color: '#fff', border: 'none' }}
+                  >
+                    {isFetchingAppeal ? 'Loading...' : 'Review Appeal'}
+                  </ModernButton>
+                </div>
+                <div style={{ color: '#fbbf24', fontSize: '14px', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+                  {comic.appealReason}
+                </div>
+              </div>
+            )}
+
             {/* Comic Overview Card */}
             <div className="mod-comic-overview-card">
               <div className="mod-comic-cover-wrapper">
@@ -958,7 +1006,8 @@ function ModeratorComicDetail() {
                               language: comic.language || 'Unknown',
                               publicationStatus: comic.publicationStatus || 'ONGOING',
                               minimumAge: comic.minimumAge || 13,
-                              genres: comic.genres || []
+                              genres: comic.genres || [],
+                              reason: ''
                             })
                             setIsEditing(true)
                           }} 
@@ -973,8 +1022,18 @@ function ModeratorComicDetail() {
                     </span>
 
                     <span className={`mod-meta-pill mod-meta-pill--status-${(comic.publicationStatus || 'ONGOING').toLowerCase()}`}>
-                      Status: {comic.publicationStatus || 'ONGOING'}
+                      Pub: {comic.publicationStatus || 'ONGOING'}
                     </span>
+                    
+                    <span className="mod-meta-pill" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                      Mod: {(comic.moderationStatus || 'DRAFT').replace(/_/g, ' ')}
+                    </span>
+                    
+                    {(comic.isAppealed || comic.moderationStatus === 'APPEALED') && (
+                      <span className="mod-meta-pill" style={{ background: '#f59e0b', color: '#fff', border: 'none' }}>
+                        APPEALED
+                      </span>
+                    )}
 
                     <span className="mod-meta-pill" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
                       ⭐ Rating: <strong>{comic.ratingAverage !== undefined ? comic.ratingAverage.toFixed(1) : (comic.rating !== undefined ? comic.rating.toFixed(1) : '0.0')}</strong> <span style={{ color: '#64748b' }}>({comic.ratingCount || 0})</span>
@@ -1034,7 +1093,7 @@ function ModeratorComicDetail() {
                 </div>
 
                 <div style={{ fontSize: '13px', color: 'var(--mod-text-secondary)', display: 'flex', gap: '12px' }}>
-                  <span>Author: <strong style={{ color: 'var(--mod-text-primary)' }}>{formatSubmitterName(comic.authorName || comic.author || comic.submittedBy || comic.creatorName) || comic.authorName || comic.author || authUser?.fullName || 'Unknown Author'}</strong></span>
+                  <span>Author: <strong style={{ color: 'var(--mod-text-primary)' }}>{formatSubmitterName(comic.authorName || comic.author || comic.submittedBy || comic.creatorName) || comic.authorName || comic.author || 'Unknown Author'}</strong></span>
                 </div>
               </div>
             </div>
@@ -1288,9 +1347,10 @@ function ModeratorComicDetail() {
                             {hasScopePermission && selectedViewLang === 'raw' && (
                               <button
                                 className="btn-delete-chap"
-                                onClick={() => handleDeleteChapterItem(chap.id)}
+                                style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                onClick={() => handleTakedownChapterItem(chap)}
                               >
-                                🗑️ Delete
+                                ⚠️ Take Down
                               </button>
                             )}
                           </div>
@@ -1317,6 +1377,15 @@ function ModeratorComicDetail() {
           />
         )}
       </div>
+
+      {takingDownChapter && (
+        <ModeratorTakedownModal
+          chapter={takingDownChapter}
+          comic={comic}
+          onClose={() => setTakingDownChapter(null)}
+          onSubmitted={onTakedownSubmitted}
+        />
+      )}
 
       {/* Edit Comic Modal */}
       {isEditing && (
@@ -1388,16 +1457,10 @@ function ModeratorComicDetail() {
                   value={editForm.language || comic.language || 'Unknown'}
                   onChange={(e) => setEditForm({...editForm, language: e.target.value})}
                 >
-                  <option value="Vietnamese">Vietnamese</option>
-                  <option value="English">English</option>
-                  <option value="Japanese">Japanese</option>
-                  <option value="Korean">Korean</option>
-                  <option value="Chinese">Chinese</option>
-                  <option value="Spanish">Spanish</option>
-                  <option value="French">French</option>
-                  <option value="Thai">Thai</option>
-                  <option value="Indonesian">Indonesian</option>
-                  <option value="Unknown">Unknown</option>
+                  <option value="" disabled>Select language</option>
+                  {COMIC_LANGUAGE_OPTIONS.map((lang) => (
+                    <option key={lang} value={lang}>{lang}</option>
+                  ))}
                 </select>
               </div>
 
@@ -1473,6 +1536,29 @@ function ModeratorComicDetail() {
                 </div>
               </div>
 
+              {/* Reason for Modification (Required) */}
+              <div className="mod-edit-field-group">
+                <label className="mod-edit-field-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  Reason for Modification
+                  <span style={{
+                    fontSize: '10px', fontWeight: '600', color: '#ef4444',
+                    background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px',
+                    letterSpacing: '0.5px'
+                  }}>REQUIRED</span>
+                </label>
+                <textarea
+                  className="mod-edit-field-input"
+                  rows={3}
+                  value={editForm.reason || ''}
+                  onChange={(e) => setEditForm({...editForm, reason: e.target.value})}
+                  placeholder="e.g. Adjusted age rating to 18+ due to graphic violence in Chapter 3, Updated genres for better discoverability..."
+                  style={{ resize: 'vertical', minHeight: '72px', fontFamily: 'inherit', lineHeight: '1.5' }}
+                />
+                <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                  This reason will be included in the notification sent to the Author. Be specific and professional.
+                </span>
+              </div>
+
             </div>
 
             {/* Modal Footer */}
@@ -1489,6 +1575,11 @@ function ModeratorComicDetail() {
                 type="button"
                 className="btn-primary"
                 onClick={async () => {
+                  // Validate reason is provided
+                  if (!editForm.reason || !editForm.reason.trim()) {
+                    toast.warn('Please provide a reason for the modification. This is required for transparency.')
+                    return
+                  }
                   setIsSaving(true)
                   try {
                     const rawGenres = Array.isArray(editForm.genres) ? editForm.genres : (typeof editForm.genres === 'string' ? editForm.genres.split(',').map(g => g.trim()).filter(Boolean) : []);
@@ -1504,7 +1595,8 @@ function ModeratorComicDetail() {
                       publicationStatus: (editForm.publicationStatus || editForm.status || comic.publicationStatus || comic.status || 'ONGOING').toUpperCase(),
                       language: editForm.language || comic.language || 'Vietnamese',
                       minimumAge: editForm.minimumAge,
-                      genreIds: mappedGenreIds
+                      genreIds: mappedGenreIds,
+                      rejectionReason: editForm.reason.trim()
                     }
                     try {
                         let targetId = comic.id || id;
@@ -1593,6 +1685,18 @@ function ModeratorComicDetail() {
           </div>
         </div>
       )}
+
+      <ResolveAppealModal 
+        isOpen={resolveModalOpen}
+        onClose={() => {
+          setResolveModalOpen(false)
+          setActiveAppealTicket(null)
+        }}
+        ticket={activeAppealTicket}
+        onSuccess={() => {
+          fetchComicAndChapters()
+        }}
+      />
 
     </ModeratorLayout>
   )

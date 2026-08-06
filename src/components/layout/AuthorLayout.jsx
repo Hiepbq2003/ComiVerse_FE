@@ -40,6 +40,8 @@ function AuthorLayout({ children }) {
       if (action.unread) await markAsRead(action.id)
       if (action.actionUrl?.startsWith('/') && !action.actionUrl.startsWith('//')) {
         navigate(action.actionUrl)
+      } else if (action.triggerAppeal) {
+        navigate('/author/comics?appeal=true')
       }
     }
   }

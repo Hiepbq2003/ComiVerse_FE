@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 import '../../assets/style/author/comics.css'
 import '../../assets/style/author/upload-guide.css'
 import UploadGuideModal from '../../components/author/UploadGuideModal'
+import AuthorAppealModal from '../../components/author/AuthorAppealModal'
 import {
   deleteAuthorChapterApi,
   deleteAuthorComicApi,
@@ -18,6 +19,7 @@ import {
   updateAuthorComicApi,
   uploadAuthorChapterFolderApi,
   replaceAuthorChapterZipApi,
+  confirmModEditApi,
 } from '../../services/api/AuthorComicApi'
 import { buildChapterZipFormData, validateChapterFolder } from '../../utils/chapterFolderUpload'
 
@@ -482,10 +484,71 @@ function EditComicModal({ comic, onClose, onSaved }) {
   )
 }
 
+function ModEditReviewModal({ currentComic, onClose, onAppeal }) {
+  let oldComic = {}
+  try {
+    if (currentComic?.previousStateSnapshot) {
+      oldComic = JSON.parse(currentComic.previousStateSnapshot)
+    }
+  } catch (e) {
+    console.error('Failed to parse previous state snapshot', e)
+  }
+
+  return (
+    <div className="author-modal-backdrop" role="presentation">
+      <div className="author-modal author-chapter-modal" style={{ maxWidth: '800px', width: '90%' }}>
+        <div className="author-modal-head">
+          <div>
+            <h2>Moderator Edits</h2>
+            <p>Review the changes made by the moderator to your comic metadata.</p>
+          </div>
+          <button type="button" className="author-icon-btn ghost" onClick={onClose} aria-label="Close">A-</button>
+        </div>
+        
+        <div className="author-modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                <th style={{ padding: '12px 8px', width: '20%' }}>Field</th>
+                <th style={{ padding: '12px 8px', width: '40%', color: 'var(--text)' }}>Previous</th>
+                <th style={{ padding: '12px 8px', width: '40%', color: 'var(--accent)' }}>New (Current)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {['title', 'summary', 'language', 'minimumAge', 'publicationStatus'].map(key => {
+                const oldVal = oldComic[key]
+                const newVal = currentComic[key]
+                if (oldVal === newVal) return null;
+                
+                return (
+                  <tr key={key} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '12px 8px', fontWeight: 'bold' }}>{key}</td>
+                    <td style={{ padding: '12px 8px', color: 'var(--text)' }}>{String(oldVal || 'N/A')}</td>
+                    <td style={{ padding: '12px 8px', color: 'var(--accent)' }}>{String(newVal || 'N/A')}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="author-modal-actions" style={{ marginTop: '24px' }}>
+          <button type="button" className="author-secondary-btn" onClick={onClose}>Close</button>
+          <div style={{ flex: 1 }} />
+          <button type="button" className="author-primary-btn" onClick={() => { onClose(); onAppeal(); }}>
+            Appeal Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function AuthorComicDetail() {
   const { id } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [comic, setComic] = useState(null)
   const [chapters, setChapters] = useState([])
@@ -494,6 +557,9 @@ function AuthorComicDetail() {
   const [error, setError] = useState('')
   const [showAddChapter, setShowAddChapter] = useState(false)
   const [showEditComic, setShowEditComic] = useState(false)
+  const [showAppealModal, setShowAppealModal] = useState(false)
+  const [showModEditModal, setShowModEditModal] = useState(false)
+  const [confirmingModEdit, setConfirmingModEdit] = useState(false)
   const [resubmitChapter, setResubmitChapter] = useState(null)
   const [showUploadGuide, setShowUploadGuide] = useState(false)
   const [actionMessage, setActionMessage] = useState(location.state?.message || '')
@@ -536,6 +602,18 @@ function AuthorComicDetail() {
   useEffect(() => {
     loadDetail()
   }, [loadDetail])
+
+  useEffect(() => {
+    if (searchParams.get('appeal') === 'true' && comic) {
+      setShowAppealModal(true)
+      // Clear the URL param immediately so the modal won't reopen on re-render
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('appeal')
+        return next
+      }, { replace: true })
+    }
+  }, [comic, searchParams, setSearchParams])
 
   const summary = useMemo(() => ({
     chapters: metrics?.chapterCount ?? getChapterCount(comic),
@@ -611,6 +689,19 @@ function AuthorComicDetail() {
     }
 
     window.setTimeout(poll, UPLOAD_POLL_INTERVAL_MS)
+  }
+
+  const handleConfirmModEdit = async () => {
+    setConfirmingModEdit(true)
+    try {
+      await confirmModEditApi(getComicId(comic))
+      setComic(prev => ({ ...prev, isModEdited: false, previousStateSnapshot: null }))
+      toast.success('Moderator edits confirmed successfully.')
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err.message || 'Failed to confirm edits.')
+    } finally {
+      setConfirmingModEdit(false)
+    }
   }
 
   const handleChapterUploaded = (task) => {
@@ -803,6 +894,10 @@ function AuthorComicDetail() {
   const cover = getComicCover(comic)
   const genres = normalizeGenres(comic?.genres)
   const moderationStatus = comic?.moderationStatus || comic?.approvalStatus || 'DRAFT'
+  const isRejectedOrDisputed = ['REJECTED', 'CHANGES_REQUESTED', 'REVISION_REQUIRED'].includes(moderationStatus.toString().toUpperCase()) ||
+    Boolean(comic?.rejectionReason && comic.rejectionReason.trim()) ||
+    chapters.some((c) => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED') ||
+    searchParams.get('appeal') === 'true'
 
   return (
     <>
@@ -812,6 +907,22 @@ function AuthorComicDetail() {
           <span>/</span>
           <strong>{comic.title}</strong>
         </div>
+
+        {comic.isModEdited && (
+          <div className="author-alert warning" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+            <div>
+              <strong>Moderator Edit Notice:</strong> A moderator has updated your comic information. Please review the changes.
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button className="author-secondary-btn" onClick={() => setShowModEditModal(true)}>
+                View Changes
+              </button>
+              <button className="author-primary-btn" onClick={handleConfirmModEdit} disabled={confirmingModEdit}>
+                {confirmingModEdit ? 'Confirming...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        )}
 
         <section className="author-detail-hero">
           <div className="author-detail-cover">
@@ -824,6 +935,11 @@ function AuthorComicDetail() {
               <span className={`author-status-badge ${getStatusClass(moderationStatus)}`}>
                 {formatStatus(moderationStatus)}
               </span>
+              {isRejectedOrDisputed && (
+                <button className="btn-author-action appeal" onClick={() => setShowAppealModal(true)} title="Appeal moderation decision">
+                  ⚖️ Appeal
+                </button>
+              )}
               <button className="btn-author-action" onClick={() => setShowEditComic(true)}>Edit Info</button>
               {!['SUBMITTED_FOR_REVIEW', 'PUBLISHED', 'APPROVED'].includes(moderationStatus?.toString().toUpperCase()) && (
                 <button className="btn-author-action review" onClick={handleSubmitComicForReview} disabled={submittingComic}>
@@ -1009,6 +1125,34 @@ function AuthorComicDetail() {
       )}
 
       {showUploadGuide && <UploadGuideModal onClose={() => setShowUploadGuide(false)} />}
+
+      {showAppealModal && (
+        <AuthorAppealModal
+          comic={comic}
+          initialContext={comic?.rejectionReason || ''}
+          onClose={() => {
+            setShowAppealModal(false)
+            // Ensure URL param is cleared so modal won't auto-reopen
+            setSearchParams((prev) => {
+              const next = new URLSearchParams(prev)
+              next.delete('appeal')
+              return next
+            }, { replace: true })
+          }}
+          onSubmitted={() => {
+            loadDetail()
+            setComic(current => ({ ...current, isModEdited: false }))
+          }}
+        />
+      )}
+
+      {showModEditModal && (
+        <ModEditReviewModal
+          currentComic={comic}
+          onClose={() => setShowModEditModal(false)}
+          onAppeal={() => setShowAppealModal(true)}
+        />
+      )}
     </>
   )
 }
