@@ -2254,11 +2254,16 @@ async function fetchPagesForTask(taskId, signal) {
         } catch (e) {}
 
         return {
-          id: item?.id || `p-${taskId}-${idx + 1}`,
-          pageId: item?.id || `p-${taskId}-${idx + 1}`,
+          ...(typeof item === 'object' && item ? item : {}),
+          id: item?.pageId || item?.id || `p-${taskId}-${idx + 1}`,
+          pageId: item?.pageId || item?.id || `p-${taskId}-${idx + 1}`,
           pageNumber: item?.pageNumber || idx + 1,
           imageUrl: resolved,
-          bubbles: bubblesData
+          bubbles: bubblesData,
+          status: item?.status || 'TODO',
+          assignedTranslatorId: item?.assignedTranslatorId || null,
+          responsibilityFactor: item?.responsibilityFactor ?? 1,
+          completedAt: item?.completedAt || null
         };
       })
       .filter(Boolean);
@@ -2276,7 +2281,14 @@ async function fetchPagesForTask(taskId, signal) {
           finalPages = finalPages.map((p) => {
             const real = byPageNumber.get(p.pageNumber);
             if (!real?.pageId) return p;
-            return { ...p, id: real.pageId, pageId: real.pageId };
+            return {
+              ...p,
+              ...real,
+              id: real.pageId,
+              pageId: real.pageId,
+              imageUrl: p.imageUrl || resolveImageUrl(real.imageUrl),
+              bubbles: p.bubbles ?? real.bubbles
+            };
           });
         }
       } catch (e) {
@@ -2340,6 +2352,24 @@ async function saveBubblesForPage(pageId, payload, signal) {
     } catch (e) {}
     return false;
   }
+}
+
+async function updateTranslationPageStatus(pageId, status, signal) {
+  const res = await fetch(`${API_BASE}/translate-workspace/pages/${pageId}/status`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ status }),
+    signal,
+  });
+  if (!res.ok) {
+    let message = `Failed to update page status (${res.status})`;
+    try {
+      const payload = await res.json();
+      message = payload?.message || message;
+    } catch (e) {}
+    throw new Error(message);
+  }
+  return res.json();
 }
 
 async function submitTaskForReview(taskId, signal) {
@@ -3125,9 +3155,14 @@ export default function TranslateWorkspace() {
     return me?.role === "Group Leader";
   }, [teamMembers, currentUserId]);
 
-  // Nobody is allowed to edit until we've actually loaded the task and know
-  // who's assigned — default is read-only, not editable.
-  const canEdit = status === "ready" && (isProjectLeader || isAssignedToTask);
+  const currentPageAssigneeId = taskPages[currentPageIndex]?.assignedTranslatorId;
+  const isAssignedToCurrentPage = currentPageAssigneeId
+    ? isSameUser(currentPageAssigneeId, currentUserId)
+    : isAssignedToTask;
+
+  // After a handover, accepted pages remain read-only for the new translator.
+  // The Project Leader can still inspect or correct any page.
+  const canEdit = status === "ready" && (isProjectLeader || isAssignedToCurrentPage);
 
 
   const {
@@ -3761,11 +3796,27 @@ export default function TranslateWorkspace() {
     }
   }, [navigate, chapterData, taskId, persistCurrentPage]);
 
-  const handleSaveAndNext = useCallback(() => {
-
-    
-    goToPage(currentPageIndex + 1);
-  }, [goToPage, currentPageIndex]);
+  const handleSaveAndNext = useCallback(async () => {
+    if (!canEdit || !currentPageMeta?.pageId) return;
+    const saved = await persistCurrentPage();
+    if (saved === false) {
+      toast.error("Page could not be saved. It was not marked as completed.");
+      return;
+    }
+    try {
+      const updatedPage = await updateTranslationPageStatus(currentPageMeta.pageId, "DONE");
+      setTaskPages((prev) => prev.map((page) => (
+        String(page.pageId || page.id) === String(currentPageMeta.pageId)
+          ? { ...page, ...updatedPage, status: "DONE" }
+          : page
+      )));
+      if (currentPageIndex < images.length - 1) {
+        setCurrentPageIndex(currentPageIndex + 1);
+      }
+    } catch (err) {
+      toast.error(err?.message || "Failed to mark the page as completed.");
+    }
+  }, [canEdit, currentPageMeta, persistCurrentPage, currentPageIndex, images.length]);
 
   const handleSaveProgress = useCallback(() => {
     if (!canEdit) {
@@ -3798,6 +3849,12 @@ export default function TranslateWorkspace() {
         );
         return;
       }
+      const updatedPage = await updateTranslationPageStatus(currentPageMeta.pageId, "DONE");
+      setTaskPages((prev) => prev.map((page) => (
+        String(page.pageId || page.id) === String(currentPageMeta.pageId)
+          ? { ...page, ...updatedPage, status: "DONE" }
+          : page
+      )));
       await submitTaskForReview(taskId);
       navigate("/translator/project-teams", {
         state: { teamId: chapterData?.projectTeamId, tab: "tasks" },
@@ -3808,7 +3865,7 @@ export default function TranslateWorkspace() {
     } finally {
       setSending(false);
     }
-  }, [isLastPage, sending, canEdit, persistCurrentPage, taskId, navigate, chapterData]);
+  }, [isLastPage, sending, canEdit, persistCurrentPage, currentPageMeta, taskId, navigate, chapterData]);
 
   useEffect(() => {
     const onKeyDown = (e) => {

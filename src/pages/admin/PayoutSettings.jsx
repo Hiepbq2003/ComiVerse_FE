@@ -14,8 +14,8 @@ const UNIT_MAX = 1_000_000_000
 
 const SETTING_FIELDS = [
   { name: 'minimumPayoutUsd', label: 'Minimum payout (USD)', min: 0, max: MONEY_MAX, step: 0.01 },
-  { name: 'translatorTaskRateUsd', label: 'Translator / completed task (USD)', min: 0.01, max: MONEY_MAX, step: 0.01 },
-  { name: 'translatorMonthlyLimitUsd', label: 'Translator monthly limit (USD)', min: 0.01, max: MONEY_MAX, step: 0.01 },
+  { name: 'translatorTaskRateUsd', label: 'Default translator rate / page (USD)', min: 0.01, max: MONEY_MAX, step: 0.01 },
+  { name: 'translatorMonthlyLimitUsd', label: 'Legacy translator monthly limit (unused)', min: 0.01, max: MONEY_MAX, step: 0.01 },
   { name: 'authorViewsPerUnit', label: 'Author views per unit', min: 1, max: UNIT_MAX, step: 1, integer: true },
   { name: 'authorViewUnitRateUsd', label: 'Author reward / view unit (USD)', min: 0.01, max: MONEY_MAX, step: 0.01 },
   { name: 'authorFollowsPerUnit', label: 'Author follows per unit', min: 1, max: UNIT_MAX, step: 1, integer: true },
@@ -24,8 +24,8 @@ const SETTING_FIELDS = [
 ]
 
 const defaultSettings = {
-  minimumPayoutUsd: '2.00',
-  translatorTaskRateUsd: '2.00',
+  minimumPayoutUsd: '10.00',
+  translatorTaskRateUsd: '1.20',
   translatorMonthlyLimitUsd: '200.00',
   authorViewsPerUnit: '1000',
   authorViewUnitRateUsd: '40.00',
