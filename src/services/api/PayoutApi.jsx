@@ -1,7 +1,7 @@
 import AxiosClient from './AxiosClient'
 
 export const getCreatorPayoutOverviewApi = (month) => (
-  AxiosClient.get('/creator/payouts/overview', {
+  AxiosClient.get('/creator/payouts', {
     params: month ? { month } : {},
   })
 )

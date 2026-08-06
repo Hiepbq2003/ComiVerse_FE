@@ -546,3 +546,23 @@ html.light .detail-sidebar-info-card {
 html.light .info-item-val {
   color: #182235;
 }
+
+/* Light Mode Overrides for Stats Card & Action Buttons */
+html.light .detail-stats-card {
+  background: #ffffff !important;
+  border-color: rgba(99, 87, 78, 0.18) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+html.light .detail-stats-label {
+  color: #475569 !important;
+}
+
+html.light .detail-stats-value {
+  color: #182235 !important;
+}
+
+html.light .detail-stats-divider {
+  background: rgba(99, 87, 78, 0.15) !important;
+}
+

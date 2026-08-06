@@ -20,8 +20,9 @@ import {
   uploadAuthorChapterFolderApi,
   replaceAuthorChapterZipApi,
   confirmModEditApi,
+  replaceAuthorChapterFolderApi,
 } from '../../services/api/AuthorComicApi'
-import { buildChapterZipFormData, validateChapterFolder } from '../../utils/chapterFolderUpload'
+import { buildChapterFolderFormData, validateChapterFolder } from '../../utils/chapterFolderUpload'
 
 const normalizeArrayResponse = (payload) => {
   if (Array.isArray(payload)) return payload
@@ -63,17 +64,6 @@ const normalizePublicationStatusValue = (status) => {
   if (value === 'HIATUS') return 'HIATUS'
   if (value === 'CANCEL') return 'CANCEL'
   return 'ONGOING'
-}
-
-const validateChapterZip = (file) => {
-  if (!file) return 'Please select a chapter ZIP file.'
-
-  const fileName = (file.name || '').toLowerCase()
-  if (!fileName.endsWith('.zip')) {
-    return 'Replacement chapter file must use the .zip extension.'
-  }
-
-  return ''
 }
 
 const UPLOAD_POLL_INTERVAL_MS = 2500
@@ -127,7 +117,7 @@ const formatMoney = (value) => {
   return value
 }
 
-function ZipPackagingGuideMini({ onOpenGuide }) {
+function ChapterFolderGuideMini({ onOpenGuide }) {
   return (
     <div className="author-upload-guide-card compact">
       <strong>Chapter folder format</strong>
@@ -176,7 +166,7 @@ function AddChapterModal({ comic, onClose, onUploaded, onOpenGuide }) {
       toast.info('Uploading chapter folder, please wait...')
       const uploadTask = await uploadAuthorChapterFolderApi(
         getComicId(comic),
-        await buildChapterZipFormData({ chapterNumber, chapterTitle: title, files: result.files }),
+        buildChapterFolderFormData({ chapterNumber, chapterTitle: title, files: result.files }),
       )
       onUploaded(uploadTask)
       toast.success('Chapter folder accepted for processing.')
@@ -213,7 +203,7 @@ function AddChapterModal({ comic, onClose, onUploaded, onOpenGuide }) {
             <span>Example: Any Folder Name/01.jpg, Any Folder Name/02.jpg. Files are naturally sorted.</span>
           </div>
         </label>
-        <ZipPackagingGuideMini onOpenGuide={onOpenGuide} />
+        <ChapterFolderGuideMini onOpenGuide={onOpenGuide} />
         <div className="author-alert info">ℹ The chapter is created as preview first. Review pages before submitting to moderation.</div>
         {error && <div className="author-form-error">{error}</div>}
         <div className="author-modal-actions">
@@ -228,50 +218,78 @@ function AddChapterModal({ comic, onClose, onUploaded, onOpenGuide }) {
 function ResubmitChapterModal({ comic, chapter, onClose, onResubmitted, onOpenGuide }) {
   const chapterNumber = getChapterNumber(chapter) || ''
   const title = chapter?.title || ''
-  const [zipFile, setZipFile] = useState(null)
+  const [folderFiles, setFolderFiles] = useState([])
+  const [folderName, setFolderName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  const handleSubmit = (event) => {
+  const handleFolderChange = (event) => {
+    const result = validateChapterFolder(event.target.files)
+    setFolderFiles(result.files)
+    setFolderName(result.folderName)
+    setError(result.error)
+    if (result.error) toast.warning(result.error)
+  }
+
+  const handleSubmit = async (event) => {
     event.preventDefault()
 
-    const zipError = validateChapterZip(zipFile)
-    if (zipError) {
-      setError(zipError)
-      toast.warning(zipError)
+    const result = validateChapterFolder(folderFiles)
+    if (result.error) {
+      setError(result.error)
+      toast.warning(result.error)
       return
     }
 
     setSubmitting(true)
     setError('')
-
     const toastId = toast.loading(`Replacing Chapter ${chapterNumber}... 0%`)
-      
-    const formData = new FormData()
-    formData.append('zipFile', zipFile)
 
-    replaceAuthorChapterZipApi(
-      getComicId(comic),
-      getChapterId(chapter),
-      formData,
-      (progressEvent) => {
-        if (progressEvent.lengthComputable) {
-          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-          const text = progress === 100 ? 'Processing...' : `${progress}%`
-          toast.update(toastId, { render: `Replacing Chapter ${chapterNumber}... ${text}` })
-        }
-      }
-    ).then((response) => {
-      toast.update(toastId, { render: 'Chapter ZIP replaced successfully! Please review the preview before submitting.', type: 'success', isLoading: false, autoClose: 5000 })
+    try {
+      const response = await replaceAuthorChapterFolderApi(
+        getComicId(comic),
+        getChapterId(chapter),
+        buildChapterFolderFormData({
+          chapterNumber,
+          chapterTitle: title,
+          files: result.files,
+        }),
+        (progressEvent) => {
+          if (progressEvent.lengthComputable) {
+            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+            const progressText = progress === 100 ? 'Processing...' : `${progress}%`
+            toast.update(toastId, {
+              render: `Replacing Chapter ${chapterNumber}... ${progressText}`,
+            })
+          }
+        },
+      )
+
+      toast.update(toastId, {
+        render: 'Chapter folder replaced successfully. Review the preview before submitting.',
+        type: 'success',
+        isLoading: false,
+        autoClose: 5000,
+      })
+
       if (typeof onResubmitted === 'function') {
         onResubmitted(response)
       }
-    }).catch((err) => {
-      const message = err?.response?.data?.message || err?.message || 'Could not replace ZIP. Please check API/backend connection.'
-      toast.update(toastId, { render: message, type: 'error', isLoading: false, autoClose: 5000 })
-    })
-
-    onClose()
+      onClose()
+    } catch (err) {
+      const message = err?.response?.data?.message
+        || err?.message
+        || 'Could not replace chapter folder. Please check API/backend connection.'
+      setError(message)
+      toast.update(toastId, {
+        render: message,
+        type: 'error',
+        isLoading: false,
+        autoClose: 5000,
+      })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -284,64 +302,57 @@ function ResubmitChapterModal({ comic, chapter, onClose, onResubmitted, onOpenGu
           </div>
           <button type="button" className="author-icon-btn ghost" onClick={onClose} aria-label="Close">×</button>
         </div>
+
         <div className="author-modal-body">
           <div className="author-chapter-form-grid">
             <label className="author-form-label">
               Chapter #
-              <input
-                className="author-input"
-                type="text"
-                value={chapterNumber}
-                disabled
-              />
+              <input className="author-input" type="text" value={chapterNumber} disabled />
             </label>
 
             <label className="author-form-label">
               Chapter Title
-              <input
-                className="author-input"
-                value={title}
-                disabled
-              />
+              <input className="author-input" value={title} disabled />
             </label>
           </div>
 
           <label className="author-form-label">
-            Upload Replacement Pages (.zip) *
+            Upload replacement page folder *
             <div className="author-upload-zone file-picker-zone">
               <input
                 type="file"
-                accept=".zip,application/zip,application/x-zip-compressed"
-                onChange={(event) => {
-                  const file = event.target.files?.[0] || null
-                  setZipFile(file)
-                  const zipError = validateChapterZip(file)
-                  if (zipError) {
-                    setError(zipError)
-                    toast.warning(zipError)
-                  } else {
-                    setError('')
-                  }
-                }}
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                multiple
+                webkitdirectory=""
+                directory=""
+                onChange={handleFolderChange}
               />
               <div className="upload-zone-content">
                 <span className="upload-zone-icon">📁</span>
-                <strong>{zipFile ? zipFile.name : 'Click or drag ZIP file here'}</strong>
-                <p>Contains numbered image files (.jpg, .png)</p>
+                <strong>
+                  {folderFiles.length
+                    ? `${folderName || 'Selected folder'} · ${folderFiles.length} pages`
+                    : 'Select replacement chapter folder'}
+                </strong>
+                <p>Put numbered image files directly inside one folder.</p>
               </div>
             </div>
-            {error && <span className="author-form-error" style={{ display: 'block', marginTop: '8px' }}>{error}</span>}
+            {error && (
+              <span className="author-form-error" style={{ display: 'block', marginTop: '8px' }}>
+                {error}
+              </span>
+            )}
           </label>
 
           <div className="author-modal-actions">
             <button type="button" className="author-secondary-btn" onClick={onOpenGuide}>
-              View ZIP Guidelines
+              View Folder Guidelines
             </button>
             <div style={{ flex: 1 }} />
             <button type="button" className="author-secondary-btn" onClick={onClose} disabled={submitting}>
               Cancel
             </button>
-            <button type="submit" className="author-primary-btn" disabled={!zipFile || submitting}>
+            <button type="submit" className="author-primary-btn" disabled={!folderFiles.length || submitting}>
               {submitting ? 'Uploading...' : 'Replace & Continue'}
             </button>
           </div>
@@ -1070,7 +1081,7 @@ function AuthorComicDetail() {
                                 className="btn-table-action resubmit"
                                 onClick={() => setResubmitChapter(chapter)}
                                 disabled={busy}
-                                title="Upload a new ZIP file to replace the rejected chapter"
+                                title="Upload a new page folder to replace the rejected chapter"
                               >
                                 {busy ? '...' : '↻ Re-upload'}
                               </button>

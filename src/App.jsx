@@ -17,6 +17,7 @@ import BroadcastManagement from './pages/admin/BroadcastManagement'
 import StatisticsDashboard from './pages/admin/StatisticsDashboard'
 import RevenueManagement from './pages/admin/RevenueManagement'
 import PayoutManagement from './pages/admin/PayoutManagement'
+import PayoutSettings from './pages/admin/PayoutSettings'
 import AdminSystemSettings from './pages/admin/AdminSystemSettings'
 import SubscriptionManagement from './pages/admin/SubscriptionManagement'
 import AuthorDashboard from './pages/author/AuthorDashboard'
@@ -114,6 +115,8 @@ function App() {
                 <Route path="/admin/account-management" element={<AccountManagement />} />
                 <Route path="/admin/broadcast" element={<BroadcastManagement />} />
                 <Route path="/admin/payout" element={<PayoutManagement />} />
+                <Route path="/admin/payout/history" element={<PayoutManagement historyMode />} />
+                <Route path="/admin/payout/settings" element={<PayoutSettings />} />
                 <Route path="/admin/settings" element={<AdminSystemSettings />} />
                 <Route path="/admin/subscriptions" element={<SubscriptionManagement />} />
                 {/* Moderator */}

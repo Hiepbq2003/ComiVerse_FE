@@ -43,14 +43,14 @@ export const confirmModEditApi = (comicId) => {
 }
 
 export const uploadAuthorChapterFolderApi = (comicId, formData, onUploadProgress) => {
-  return AxiosClient.post(`/author/comics/${comicId}/chapters/upload-zip`, formData, {
+  return AxiosClient.post(`/author/comics/${comicId}/chapters/upload-folder`, formData, {
     timeout: 120000,
     onUploadProgress
   })
 }
 
 export const getAuthorChapterUploadStatusApi = (comicId, taskId) => {
-  return AxiosClient.get(`/author/comics/${comicId}/chapters/upload-zip/status/${taskId}`)
+  return AxiosClient.get(`/author/comics/${comicId}/chapters/upload-folder/status/${taskId}`)
 }
 
 export const getAuthorChapterPreviewApi = (comicId, chapterId) => {
@@ -73,8 +73,8 @@ export const deleteAuthorChapterApi = (comicId, chapterId) => {
   return AxiosClient.delete(`/author/comics/${comicId}/chapters/${chapterId}`)
 }
 
-export const replaceAuthorChapterZipApi = (comicId, chapterId, formData, onUploadProgress) => {
-  return AxiosClient.put(`/author/comics/${comicId}/chapters/${chapterId}/replace-zip`, formData, {
+export const replaceAuthorChapterFolderApi = (comicId, chapterId, formData, onUploadProgress) => {
+  return AxiosClient.put(`/author/comics/${comicId}/chapters/${chapterId}/replace-folder`, formData, {
     timeout: 120000,
     onUploadProgress
   })

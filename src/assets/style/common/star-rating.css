@@ -1,0 +1,171 @@
+/* ═══════════════════════════════════════════════════
+   STAR RATING COMPONENT — THEME-AWARE STYLESHEET
+   ═══════════════════════════════════════════════════ */
+
+.comic-star-rating-container {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+  backdrop-filter: blur(8px);
+}
+
+/* Light mode container */
+html.light .comic-star-rating-container {
+  background: #ffffff;
+  border: 1px solid rgba(99, 87, 78, 0.18);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+.star-rating-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.star-rating-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.star-rating-score-num {
+  font-size: 24px;
+  font-weight: 800;
+  color: #fbbf24;
+  font-family: var(--font-serif, Georgia, serif);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+html.light .star-rating-score-num {
+  color: #d97706; /* High-contrast vibrant amber in light mode */
+  text-shadow: none;
+}
+
+.star-rating-muted-text {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+html.light .star-rating-muted-text {
+  color: #475569; /* Slate-600 for sharp legibility in light mode */
+}
+
+.star-rating-badge-user {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  color: #c084fc;
+  font-weight: 600;
+}
+
+html.light .star-rating-badge-user {
+  background: rgba(147, 51, 234, 0.1);
+  border: 1px solid rgba(147, 51, 234, 0.25);
+  color: #7e22ce; /* High contrast purple in light mode */
+}
+
+.star-rating-stars-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.star-rating-stars-group {
+  display: flex;
+  gap: 4px;
+}
+
+.star-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 28px;
+  padding: 2px;
+  line-height: 1;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.star-button:disabled {
+  cursor: wait;
+}
+
+/* Dark mode star colors */
+.star-button.filled {
+  color: #fbbf24;
+  filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.4));
+}
+
+.star-button.empty {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.star-button.empty:hover {
+  color: #fef08a;
+}
+
+/* Light mode star colors */
+html.light .star-button.filled {
+  color: #d97706; /* Vibrant amber star in light mode */
+  filter: drop-shadow(0 0 2px rgba(217, 119, 6, 0.25));
+}
+
+html.light .star-button.empty {
+  color: #cbd5e1; /* Soft slate-300: clearly visible star outlines on light bg */
+}
+
+html.light .star-button.empty:hover {
+  color: #f59e0b;
+}
+
+.star-rating-hint-text {
+  font-size: 13px;
+  color: #cbd5e1;
+  font-style: italic;
+  margin-left: 6px;
+}
+
+html.light .star-rating-hint-text {
+  color: #475569; /* Slate-600 readable italic hint in light mode */
+}
+
+.star-rating-action-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.star-rating-remove-btn {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 2px 4px;
+  transition: color 0.2s ease;
+}
+
+.star-rating-remove-btn:hover {
+  color: #f87171;
+}
+
+html.light .star-rating-remove-btn {
+  color: #dc2626;
+}
+
+html.light .star-rating-remove-btn:hover {
+  color: #991b1b;
+}
