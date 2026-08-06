@@ -3,7 +3,10 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import ModeratorLayout from '../../components/layout/ModeratorLayout'
 import { getComicByIdApi, getAllComicsApi, updateComicApi, getComicsPageApi } from '../../services/api/ComicApi'
-import { getChaptersByComicIdApi, getChapterDetailApi, deleteChapterApi, getTasksByChapterIdApi, revokeChapterTranslationApi } from '../../services/api/ChapterApi'
+import { getChaptersByComicIdApi, getChapterDetailApi, getTasksByChapterIdApi, revokeChapterTranslationApi, getChapterTranslationsApi } from '../../services/api/ChapterApi'
+import { getPendingAppealByTargetApi } from '../../services/api/AppealApi'
+import ModeratorTakedownModal from '../../components/moderator/ModeratorTakedownModal'
+import ResolveAppealModal from '../../components/common/ResolveAppealModal'
 import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
 import { getAllSubmissionsApi } from '../../services/api/SubmissionApi'
 import { getAllGenresApi } from '../../services/api/GenreApi'
@@ -15,6 +18,7 @@ import { useTheme } from '../../context/ThemeContext'
 import '../../assets/style/moderator/comic-detail.css'
 import { getAuth } from '../../utils/Auth'
 import { isLanguageInModeratorScope, getModeratorScope } from '../../utils/moderatorScope'
+import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 
 const getLanguageFlag = (lang) => {
   const n = (lang || '').toLowerCase().trim()
@@ -112,7 +116,7 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
         const response = await getChapterDetailApi(chapter.id)
         const data = response?.data?.data || response?.data || response
         const rawPages = data?.pages || data?.images || (Array.isArray(data) ? data : [])
-        const pageList = Array.isArray(rawPages)
+        let pageList = Array.isArray(rawPages)
           ? rawPages.map((item, idx) => {
               if (typeof item === 'string') {
                 return { pageNumber: idx + 1, imageUrl: item, url: item, translatedImageUrl: null }
@@ -125,6 +129,41 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
               }
             })
           : []
+
+        // Fetch translations if we are inspecting a translated language
+        if (displayTargetLang) {
+          try {
+            const transResponse = await getChapterTranslationsApi(chapter.id);
+            const transData = transResponse?.data?.data || transResponse?.data || transResponse || [];
+            if (Array.isArray(transData)) {
+              const matchedTranslation = transData.find(t => t.languageCode?.toLowerCase() === displayTargetLang.toLowerCase());
+              if (matchedTranslation && matchedTranslation.pagesBubbles) {
+                let parsedBubbles = [];
+                try {
+                  parsedBubbles = typeof matchedTranslation.pagesBubbles === 'string' 
+                    ? JSON.parse(matchedTranslation.pagesBubbles) 
+                    : matchedTranslation.pagesBubbles;
+                } catch (e) {
+                  console.error('Failed to parse pagesBubbles:', e);
+                }
+                
+                // Merge translated images into pageList
+                if (Array.isArray(parsedBubbles) && parsedBubbles.length > 0) {
+                  pageList = pageList.map(p => {
+                    const transPage = parsedBubbles.find(tp => Number(tp.pageNumber) === Number(p.pageNumber));
+                    if (transPage && transPage.imageUrl) {
+                      return { ...p, translatedImageUrl: transPage.imageUrl };
+                    }
+                    return p;
+                  });
+                }
+              }
+            }
+          } catch (transErr) {
+            console.error('Failed to load chapter translations:', transErr);
+          }
+        }
+
         if (isMounted) {
           setPages(pageList)
         }
@@ -149,7 +188,7 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
     }
     fetchPages()
     return () => { isMounted = false }
-  }, [chapter.id])
+  }, [chapter.id, displayTargetLang])
 
   const currentPage = pages[currentPageIndex] || null
 
@@ -461,14 +500,6 @@ const getChapterViews = (chap, comicObj = null, totalChapsCount = 1) => {
     return Number(views);
   }
 
-  const comicTotalViews = Number(comicObj?.viewCount || comicObj?.views || comicObj?.totalViews || comicObj?.viewsCount || 0);
-  if (comicTotalViews > 0) {
-    if (totalChapsCount <= 1) {
-      return comicTotalViews;
-    }
-    return Math.max(1, Math.round(comicTotalViews / totalChapsCount));
-  }
-
   return 0;
 };
 
@@ -532,8 +563,14 @@ function ModeratorComicDetail() {
   const [revokeModalOpen, setRevokeModalOpen] = useState(false)
   const [revokingChapter, setRevokingChapter] = useState(null)
   const [revokingTask, setRevokingTask] = useState(null)
+  
+  const [takingDownChapter, setTakingDownChapter] = useState(null)
   const [revokeReason, setRevokeReason] = useState('')
   const [isRevoking, setIsRevoking] = useState(false)
+  
+  const [resolveModalOpen, setResolveModalOpen] = useState(false)
+  const [activeAppealTicket, setActiveAppealTicket] = useState(null)
+  const [isFetchingAppeal, setIsFetchingAppeal] = useState(false)
   
   // Edit Comic state
   const [isEditing, setIsEditing] = useState(false)
@@ -770,15 +807,30 @@ function ModeratorComicDetail() {
     }
   }
 
-  const handleDeleteChapterItem = async (chapterId) => {
-    if (!window.confirm('Are you sure you want to delete this chapter?')) return
+  const handleReviewAppealClick = async () => {
     try {
-      await deleteChapterApi(chapterId)
-      toast.success('Chapter deleted successfully!')
-      setChapters(prev => prev.filter(c => c.id !== chapterId))
+      setIsFetchingAppeal(true)
+      const res = await getPendingAppealByTargetApi(comic.id || comic.comicId)
+      if (res.data || res) {
+        setActiveAppealTicket(res.data || res)
+        setResolveModalOpen(true)
+      } else {
+        toast.error('No pending appeal found for this comic.')
+      }
     } catch (err) {
-      toast.error('Failed to delete chapter.')
+      toast.error('Failed to fetch appeal details.')
+    } finally {
+      setIsFetchingAppeal(false)
     }
+  }
+
+  const handleTakedownChapterItem = (chap) => {
+    setTakingDownChapter(chap)
+  }
+
+  const onTakedownSubmitted = (chapterId) => {
+    // Optionally update chapter list to reflect REJECTED status
+    setChapters(prev => prev.map(c => c.id === chapterId ? { ...c, moderationStatus: 'REJECTED' } : c))
   }
 
   // Filter project teams assigned to this comic
@@ -824,7 +876,7 @@ function ModeratorComicDetail() {
         const promises = chapters.map(async (chap) => {
           try {
             const res = await getTasksByChapterIdApi(chap.id)
-            const chapterTaskData = res?.data?.data || res?.data || []
+            const chapterTaskData = Array.isArray(res) ? res : (res?.data?.data || res?.data || res || [])
             // Filter tasks that belong to the active team
             const teamTask = chapterTaskData.find(t => String(t.projectTeamId) === String(activeSelectedTeam.id))
             if (teamTask) {
@@ -853,6 +905,10 @@ function ModeratorComicDetail() {
   }, [activeSelectedTeam, chapters, selectedViewLang])
 
   const hasScopePermission = comic ? isLanguageInModeratorScope(getAuthorRawLanguage(comic), getAuth()?.user) : false;
+  
+  const displayedChapters = selectedViewLang === 'raw' 
+    ? chapters 
+    : chapters.filter(chap => chapterTasks[chap.id]);
 
   return (
     <ModeratorLayout activeNav="comic-management">
@@ -900,6 +956,29 @@ function ModeratorComicDetail() {
           </div>
         ) : (
           <>
+            {comic.isAppealed && comic.appealReason && (
+              <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '8px', padding: '16px', marginBottom: '24px', color: '#f59e0b' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
+                    <span>⚖️</span>
+                    <span>Author Appeal</span>
+                  </div>
+                  <ModernButton 
+                    variant="outline" 
+                    size="small" 
+                    onClick={handleReviewAppealClick}
+                    disabled={isFetchingAppeal}
+                    style={{ background: '#f59e0b', color: '#fff', border: 'none' }}
+                  >
+                    {isFetchingAppeal ? 'Loading...' : 'Review Appeal'}
+                  </ModernButton>
+                </div>
+                <div style={{ color: '#fbbf24', fontSize: '14px', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+                  {comic.appealReason}
+                </div>
+              </div>
+            )}
+
             {/* Comic Overview Card */}
             <div className="mod-comic-overview-card">
               <div className="mod-comic-cover-wrapper">
@@ -927,7 +1006,8 @@ function ModeratorComicDetail() {
                               language: comic.language || 'Unknown',
                               publicationStatus: comic.publicationStatus || 'ONGOING',
                               minimumAge: comic.minimumAge || 13,
-                              genres: comic.genres || []
+                              genres: comic.genres || [],
+                              reason: ''
                             })
                             setIsEditing(true)
                           }} 
@@ -942,8 +1022,18 @@ function ModeratorComicDetail() {
                     </span>
 
                     <span className={`mod-meta-pill mod-meta-pill--status-${(comic.publicationStatus || 'ONGOING').toLowerCase()}`}>
-                      Status: {comic.publicationStatus || 'ONGOING'}
+                      Pub: {comic.publicationStatus || 'ONGOING'}
                     </span>
+                    
+                    <span className="mod-meta-pill" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                      Mod: {(comic.moderationStatus || 'DRAFT').replace(/_/g, ' ')}
+                    </span>
+                    
+                    {(comic.isAppealed || comic.moderationStatus === 'APPEALED') && (
+                      <span className="mod-meta-pill" style={{ background: '#f59e0b', color: '#fff', border: 'none' }}>
+                        APPEALED
+                      </span>
+                    )}
 
                     <span className="mod-meta-pill" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
                       ⭐ Rating: <strong>{comic.ratingAverage !== undefined ? comic.ratingAverage.toFixed(1) : (comic.rating !== undefined ? comic.rating.toFixed(1) : '0.0')}</strong> <span style={{ color: '#64748b' }}>({comic.ratingCount || 0})</span>
@@ -1003,7 +1093,7 @@ function ModeratorComicDetail() {
                 </div>
 
                 <div style={{ fontSize: '13px', color: 'var(--mod-text-secondary)', display: 'flex', gap: '12px' }}>
-                  <span>Author: <strong style={{ color: 'var(--mod-text-primary)' }}>{formatSubmitterName(comic.authorName || comic.author || comic.submittedBy || comic.creatorName) || comic.authorName || comic.author || authUser?.fullName || 'Unknown Author'}</strong></span>
+                  <span>Author: <strong style={{ color: 'var(--mod-text-primary)' }}>{formatSubmitterName(comic.authorName || comic.author || comic.submittedBy || comic.creatorName) || comic.authorName || comic.author || 'Unknown Author'}</strong></span>
                 </div>
               </div>
             </div>
@@ -1043,7 +1133,7 @@ function ModeratorComicDetail() {
                       </div>
                       <div>
                         <h4 className="mod-team-title-text">
-                          Project Team: {activeSelectedTeam.title}
+                          Project Team: {activeSelectedTeam.title} <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 'normal' }}>({activeSelectedTeam.id})</span>
                         </h4>
                         <div className="mod-team-leader-sub">
                           👑 Team Leader: <strong>{activeSelectedTeam.leaderName || 'Translator Leader'}</strong> • Target: <strong>{activeSelectedTeam.targetLang || selectedViewLang}</strong> • Status: <span className="comic-status-badge ongoing" style={{ fontSize: '11px', padding: '2px 8px' }}>{activeSelectedTeam.status || 'ACTIVE'}</span>
@@ -1075,7 +1165,7 @@ function ModeratorComicDetail() {
             <div className="mod-chapters-section">
               <h3 className="mod-card-title">
                 <span>
-                  📖 Chapters Catalog ({chapters.length})
+                  📖 Chapters Catalog ({displayedChapters.length})
                   {selectedViewLang !== 'raw' && (
                     <span style={{ fontSize: '13px', fontWeight: 'normal', color: 'var(--mod-text-secondary)', marginLeft: '12px' }}>
                       Viewing Mode: {getLanguageFlag(selectedViewLang)} {selectedViewLang}
@@ -1084,34 +1174,45 @@ function ModeratorComicDetail() {
                 </span>
               </h3>
 
-              {chapters.length === 0 ? (
+              {fetchingTasks ? (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <div className="skeleton-dash-shimmer" style={{ width: '100%', height: '160px', borderRadius: '12px' }}></div>
+                </div>
+              ) : displayedChapters.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-                  No chapters uploaded for this comic yet.
+                  {selectedViewLang === 'raw' 
+                    ? 'No chapters uploaded for this comic yet.' 
+                    : 'No translated chapters found for this team.'}
                 </div>
               ) : (
-                <table className="mod-chapters-table">
+                <div className="mod-table-responsive">
+                  <table className="mod-chapters-table">
                   <thead>
                     <tr>
                       <th>Chapter</th>
                       <th>Title</th>
                       <th>Type</th>
                       <th>Uploaded Date</th>
-                      <th>Moderation</th>
+                      {selectedViewLang === 'raw' ? (
+                        <th>Moderation</th>
+                      ) : (
+                        <th>Publish Info</th>
+                      )}
                       {selectedViewLang !== 'raw' && <th>Translation Status</th>}
                       <th>Views</th>
                       <th style={{ textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {chapters.map((chap, index) => (
+                    {displayedChapters.map((chap, index) => (
                       <tr key={chap.id}>
                         <td>
                           <strong>Chapter {chap.chapterNumber}</strong>
                         </td>
                         <td>{getChapterDisplayTitle(chap, index)}</td>
                         <td>
-                          <span className={`comic-status-badge ${chap.isPremium ? 'paused' : 'ongoing'}`} style={{ fontSize: '11px', padding: '2px 8px' }}>
-                            {chap.isPremium ? 'Premium' : 'Free'}
+                          <span className={`comic-status-badge ${chap.isPremium ? 'paused' : 'ongoing'}`}>
+                            {chap.isPremium ? 'PREMIUM' : 'FREE'}
                           </span>
                         </td>
                         <td>
@@ -1119,68 +1220,98 @@ function ModeratorComicDetail() {
                            (chap.updatedAt ? new Date(chap.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-')}
                         </td>
                         <td>
-                          {(chap.moderationStatus === 'PUBLISHED' || chap.moderationStatus === 'APPROVED') ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              <span style={{ fontSize: '12px', fontWeight: '700', color: '#10b981' }}>
-                                ✓ {chap.moderationStatus === 'PUBLISHED' ? 'Published' : 'Approved'}
-                              </span>
-                              <span style={{ fontSize: '11px', color: '#64748b' }}>
-                                  by: {chap.approvedBy || chap.moderatorName || 'Unknown'}
-                              </span>
-                              {chap.approvedAt && (
-                                <span style={{ fontSize: '11px', color: '#64748b' }}>
-                                  {new Date(chap.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {selectedViewLang === 'raw' ? (
+                            (chap.moderationStatus === 'PUBLISHED' || chap.moderationStatus === 'APPROVED') ? (
+                              <div className="mod-meta-info-cell">
+                                <span className="mod-meta-status published">
+                                  ✓ {chap.moderationStatus === 'PUBLISHED' ? 'Published' : 'Approved'}
                                 </span>
-                              )}
-                            </div>
-                          ) : chap.moderationStatus === 'REJECTED' ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              <span style={{ fontSize: '12px', fontWeight: '700', color: '#ef4444' }}>
-                                ✗ Rejected
-                              </span>
-                              <span style={{ fontSize: '11px', color: '#64748b' }}>
-                                by: {chap.rejectedBy || 'Unknown'}
-                              </span>
-                            </div>
+                                <span className="mod-meta-author">
+                                  by: {chap.approvedBy || chap.moderatorName || 'Unknown'}
+                                </span>
+                                {chap.approvedAt && (
+                                  <span className="mod-meta-date">
+                                    {new Date(chap.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  </span>
+                                )}
+                              </div>
+                            ) : chap.moderationStatus === 'REJECTED' ? (
+                              <div className="mod-meta-info-cell">
+                                <span className="mod-meta-status rejected">
+                                  ✗ Rejected
+                                </span>
+                                <span className="mod-meta-author">
+                                  by: {chap.rejectedBy || 'Unknown'}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="mod-meta-info-cell">
+                                <span className="mod-meta-status pending">
+                                  {chap.moderationStatus === 'PREVIEW_READY' ? 'Author Drafting' : 
+                                   (chap.moderationStatus === 'SUBMITTED_FOR_REVIEW' || chap.moderationStatus === 'PENDING_REVIEW' ? 'Pending Review' : 
+                                    (chap.moderationStatus || 'Pending'))}
+                                </span>
+                              </div>
+                            )
                           ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              <span style={{ fontSize: '11.5px', color: '#94a3b8', fontStyle: 'italic', fontWeight: '500' }}>
-                                {chap.moderationStatus === 'PREVIEW_READY' ? 'Author Drafting' : 
-                                 (chap.moderationStatus === 'SUBMITTED_FOR_REVIEW' || chap.moderationStatus === 'PENDING_REVIEW' ? 'Pending Review' : 
-                                  (chap.moderationStatus || 'Pending'))}
-                              </span>
-                            </div>
+                            (() => {
+                              const task = chapterTasks[chap.id];
+                              if (!task) return <span className="mod-meta-empty">—</span>;
+                              
+                              const status = (task.status || '').toLowerCase();
+                              if (status === 'completed' || status === 'published') {
+                                return (
+                                  <div className="mod-meta-info-cell">
+                                    <span className="mod-meta-author">
+                                      by: {activeSelectedTeam?.leaderName || 'Unknown'}
+                                    </span>
+                                    {task.updatedAt && (
+                                      <span className="mod-meta-date">
+                                        {new Date(task.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              return <span className="mod-meta-empty">—</span>;
+                            })()
                           )}
                         </td>
                         {selectedViewLang !== 'raw' && (
                           <td>
                             {fetchingTasks ? (
-                              <div className="skeleton-line skeleton-active short" style={{ height: '24px', margin: 0, width: '80px', borderRadius: '12px' }}></div>
+                              <div className="skeleton-line skeleton-active short" style={{ height: '22px', margin: 0, width: '80px', borderRadius: '500px' }}></div>
                             ) : (
                               (() => {
                                 const task = chapterTasks[chap.id]
                                 if (!task) {
-                                  return <span className="mod-translation-status-badge no-task">❌ No Task</span>
+                                  return <span className="mod-translation-status-badge no-task">NO TASK</span>
                                 }
                                 
                                 const status = (task.status || '').toLowerCase()
+                                const isRevoked = Boolean(task.rejectionReason) || status === 'revoked' || status === 'rejected'
+
                                 if (status === 'completed' || status === 'published') {
-                                  return <span className="mod-translation-status-badge completed">✅ Published</span>
-                                } else if (status === 'under_review' || status === 'pending_review') {
-                                  return <span className="mod-translation-status-badge under-review">👁️ Under Review</span>
-                                } else if (status === 'in_progress') {
+                                  return <span className="mod-translation-status-badge completed">PUBLISHED</span>
+                                } else if (status === 'under_review' || status === 'pending_review' || status === 'in_review') {
+                                  return <span className="mod-translation-status-badge under-review">UNDER REVIEW</span>
+                                } else if (isRevoked) {
                                   return (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      <span className="mod-translation-status-badge in-progress">🔧 In Progress</span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                      <span className="mod-translation-status-badge revoked" title={task.rejectionReason ? `Revoked Reason: ${task.rejectionReason}` : 'Translation Revoked'}>
+                                        REVOKED
+                                      </span>
                                       {task.rejectionReason && (
-                                        <span style={{ fontSize: '10px', color: '#ef4444', fontStyle: 'italic', maxWidth: '120px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.rejectionReason}>
-                                          Revoked: {task.rejectionReason}
+                                        <span className="mod-revoke-reason-preview" title={task.rejectionReason}>
+                                          Reason: {task.rejectionReason}
                                         </span>
                                       )}
                                     </div>
                                   )
+                                } else if (status === 'in_progress' || status === 'translating' || status === 'assigned') {
+                                  return <span className="mod-translation-status-badge in-progress">IN PROGRESS</span>
                                 } else {
-                                  return <span className="mod-translation-status-badge backlog">⏳ Backlog</span>
+                                  return <span className="mod-translation-status-badge backlog">{(task.status || 'BACKLOG').toUpperCase()}</span>
                                 }
                               })()
                             )}
@@ -1216,9 +1347,10 @@ function ModeratorComicDetail() {
                             {hasScopePermission && selectedViewLang === 'raw' && (
                               <button
                                 className="btn-delete-chap"
-                                onClick={() => handleDeleteChapterItem(chap.id)}
+                                style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                onClick={() => handleTakedownChapterItem(chap)}
                               >
-                                🗑️ Delete
+                                ⚠️ Take Down
                               </button>
                             )}
                           </div>
@@ -1226,7 +1358,8 @@ function ModeratorComicDetail() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                  </table>
+                </div>
               )}
             </div>
           </>
@@ -1244,6 +1377,15 @@ function ModeratorComicDetail() {
           />
         )}
       </div>
+
+      {takingDownChapter && (
+        <ModeratorTakedownModal
+          chapter={takingDownChapter}
+          comic={comic}
+          onClose={() => setTakingDownChapter(null)}
+          onSubmitted={onTakedownSubmitted}
+        />
+      )}
 
       {/* Edit Comic Modal */}
       {isEditing && (
@@ -1315,16 +1457,10 @@ function ModeratorComicDetail() {
                   value={editForm.language || comic.language || 'Unknown'}
                   onChange={(e) => setEditForm({...editForm, language: e.target.value})}
                 >
-                  <option value="Vietnamese">Vietnamese</option>
-                  <option value="English">English</option>
-                  <option value="Japanese">Japanese</option>
-                  <option value="Korean">Korean</option>
-                  <option value="Chinese">Chinese</option>
-                  <option value="Spanish">Spanish</option>
-                  <option value="French">French</option>
-                  <option value="Thai">Thai</option>
-                  <option value="Indonesian">Indonesian</option>
-                  <option value="Unknown">Unknown</option>
+                  <option value="" disabled>Select language</option>
+                  {COMIC_LANGUAGE_OPTIONS.map((lang) => (
+                    <option key={lang} value={lang}>{lang}</option>
+                  ))}
                 </select>
               </div>
 
@@ -1400,6 +1536,29 @@ function ModeratorComicDetail() {
                 </div>
               </div>
 
+              {/* Reason for Modification (Required) */}
+              <div className="mod-edit-field-group">
+                <label className="mod-edit-field-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  Reason for Modification
+                  <span style={{
+                    fontSize: '10px', fontWeight: '600', color: '#ef4444',
+                    background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px',
+                    letterSpacing: '0.5px'
+                  }}>REQUIRED</span>
+                </label>
+                <textarea
+                  className="mod-edit-field-input"
+                  rows={3}
+                  value={editForm.reason || ''}
+                  onChange={(e) => setEditForm({...editForm, reason: e.target.value})}
+                  placeholder="e.g. Adjusted age rating to 18+ due to graphic violence in Chapter 3, Updated genres for better discoverability..."
+                  style={{ resize: 'vertical', minHeight: '72px', fontFamily: 'inherit', lineHeight: '1.5' }}
+                />
+                <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                  This reason will be included in the notification sent to the Author. Be specific and professional.
+                </span>
+              </div>
+
             </div>
 
             {/* Modal Footer */}
@@ -1416,6 +1575,11 @@ function ModeratorComicDetail() {
                 type="button"
                 className="btn-primary"
                 onClick={async () => {
+                  // Validate reason is provided
+                  if (!editForm.reason || !editForm.reason.trim()) {
+                    toast.warn('Please provide a reason for the modification. This is required for transparency.')
+                    return
+                  }
                   setIsSaving(true)
                   try {
                     const rawGenres = Array.isArray(editForm.genres) ? editForm.genres : (typeof editForm.genres === 'string' ? editForm.genres.split(',').map(g => g.trim()).filter(Boolean) : []);
@@ -1431,7 +1595,8 @@ function ModeratorComicDetail() {
                       publicationStatus: (editForm.publicationStatus || editForm.status || comic.publicationStatus || comic.status || 'ONGOING').toUpperCase(),
                       language: editForm.language || comic.language || 'Vietnamese',
                       minimumAge: editForm.minimumAge,
-                      genreIds: mappedGenreIds
+                      genreIds: mappedGenreIds,
+                      rejectionReason: editForm.reason.trim()
                     }
                     try {
                         let targetId = comic.id || id;
@@ -1467,22 +1632,32 @@ function ModeratorComicDetail() {
       {/* Revoke Translation Modal */}
       {revokeModalOpen && revokingTask && revokingChapter && (
         <div className="mod-edit-comic-modal-overlay fade-in" onClick={() => setRevokeModalOpen(false)}>
-          <div className="mod-edit-comic-modal" onClick={e => e.stopPropagation()}>
+          <div className="mod-edit-comic-modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '540px' }}>
             <div className="mod-edit-comic-modal-header">
-              <h3>⚠️ Revoke Translation</h3>
-              <button className="mod-edit-modal-close" onClick={() => setRevokeModalOpen(false)}>×</button>
+              <h2 className="mod-edit-comic-modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '20px' }}>⚠️</span> Revoke Translation
+              </h2>
+              <button className="mod-inspector-close-btn" onClick={() => setRevokeModalOpen(false)}>✕</button>
             </div>
             <div className="mod-edit-comic-modal-body">
-              <p style={{ marginBottom: '16px', color: 'var(--mod-text-secondary)', fontSize: '14px', lineHeight: '1.5' }}>
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                borderRadius: '12px',
+                padding: '14px 16px',
+                fontSize: '13.5px',
+                lineHeight: '1.6',
+                color: 'var(--mod-text-primary, #334155)'
+              }}>
                 You are about to revoke the <strong>{selectedViewLang}</strong> translation of <strong>{getChapterDisplayTitle(revokingChapter, revokingChapter.chapterNumber - 1)}</strong>. 
                 This will remove the translated version from the public reader and send the task back to the team for revision.
-              </p>
+              </div>
               <div className="mod-edit-field-group">
                 <label className="mod-edit-field-label">Reason for Revocation (Required)</label>
                 <textarea
                   className="mod-edit-field-input"
-                  style={{ minHeight: '100px', resize: 'vertical' }}
-                  placeholder="e.g., Poor translation quality, machine translation detected..."
+                  style={{ minHeight: '110px', resize: 'vertical', fontFamily: 'inherit' }}
+                  placeholder="e.g., Poor translation quality, machine translation detected, missing pages..."
                   value={revokeReason}
                   onChange={(e) => setRevokeReason(e.target.value)}
                   autoFocus
@@ -1510,6 +1685,18 @@ function ModeratorComicDetail() {
           </div>
         </div>
       )}
+
+      <ResolveAppealModal 
+        isOpen={resolveModalOpen}
+        onClose={() => {
+          setResolveModalOpen(false)
+          setActiveAppealTicket(null)
+        }}
+        ticket={activeAppealTicket}
+        onSuccess={() => {
+          fetchComicAndChapters()
+        }}
+      />
 
     </ModeratorLayout>
   )

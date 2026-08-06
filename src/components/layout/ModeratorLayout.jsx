@@ -85,6 +85,12 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
             <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
           </svg>
         )
+      case 'appeal':
+        return (
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/>
+          </svg>
+        )
       case 'review':
         return (
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -210,7 +216,7 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
               <span>
                 Scope: {(() => {
                   const scope = getModeratorScope(user);
-                  const isGlobal = scope.length === 0 || scope.length >= 7 || scope.some(s => ['global', 'all', 'any', '*'].includes(s));
+                  const isGlobal = scope.length === 0 || scope.length >= 7 || scope.some(s => ['global', 'all', 'any', '*'].includes(s) || s.includes('all'));
                   return isGlobal ? 'All Languages' : scope.map(l => l.charAt(0).toUpperCase() + l.slice(1)).join(', ');
                 })()}
               </span>

@@ -7,3 +7,7 @@ export const registerTranslatorApi = (data) => {
 export const getMyTranslatorProfileApi = () => {
   return AxiosClient.get('/translator-registration/profile');
 };
+
+export const updateMyTranslatorProfileApi = (data) => {
+  return AxiosClient.put('/translator-registration/profile', data);
+};

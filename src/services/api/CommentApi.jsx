@@ -48,4 +48,10 @@ export const deleteChapterCommentApi = (id, config = {}) => {
   return AxiosClient.delete(`/comments/chapters/${id}`, config);
 };
 
+export const updateComicCommentApi = (id, data, config = {}) => {
+  return AxiosClient.put(`/comments/comics/${id}`, data, config);
+};
 
+export const updateChapterCommentApi = (id, data, config = {}) => {
+  return AxiosClient.put(`/comments/chapters/${id}`, data, config);
+};

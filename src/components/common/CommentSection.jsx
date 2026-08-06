@@ -13,7 +13,9 @@ import {
   getChapterCommentsApi,
   createChapterCommentApi,
   getChapterCommentByIdApi,
-  deleteChapterCommentApi
+  deleteChapterCommentApi,
+  updateComicCommentApi,
+  updateChapterCommentApi
 } from '../../services/api/CommentApi'
 import '../../assets/style/reader/comments.css'
 
@@ -62,6 +64,11 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
   // Highlight state for deep-linked comments
   const [highlightedCommentId, setHighlightedCommentId] = useState(null)
 
+  // Edit state
+  const [editingId, setEditingId] = useState(null)
+  const [editInput, setEditInput] = useState('')
+  const [editSubmitting, setEditSubmitting] = useState(false)
+
   // Dynamic API wrappers based on targetType ('comic' | 'chapter')
   const getCommentsApi = useCallback((id, parentId, page, size) => {
     return targetType === 'comic'
@@ -85,6 +92,12 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
     return targetType === 'comic'
       ? deleteComicCommentApi(commentId)
       : deleteChapterCommentApi(commentId)
+  }, [targetType])
+
+  const updateCommentApi = useCallback((commentId, payload) => {
+    return targetType === 'comic'
+      ? updateComicCommentApi(commentId, payload)
+      : updateChapterCommentApi(commentId, payload)
   }, [targetType])
 
   // Open popup confirm modal for comment deletion
@@ -118,6 +131,35 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
     } catch (err) {
       console.error('Failed to delete comment:', err)
       toast.error('Failed to delete comment. Please try again!')
+    }
+  }
+
+  const handleEditSubmit = async (e, commentId, parentId = null) => {
+    e.preventDefault()
+    if (!editInput.trim()) return
+
+    try {
+      setEditSubmitting(true)
+      const res = await updateCommentApi(commentId, { content: editInput.trim() })
+      const updatedComment = res?.data || res
+      
+      if (parentId) {
+        setRepliesMap(prev => {
+          const arr = prev[parentId] || []
+          return { ...prev, [parentId]: arr.map(c => c.id === commentId ? { ...c, content: updatedComment.content } : c) }
+        })
+      } else {
+        setComments(prev => prev.map(c => c.id === commentId ? { ...c, content: updatedComment.content } : c))
+      }
+      
+      setEditingId(null)
+      setEditInput('')
+      toast.success('Comment updated!')
+    } catch (err) {
+      console.error('Failed to update comment:', err)
+      toast.error('Failed to update comment.')
+    } finally {
+      setEditSubmitting(false)
     }
   }
 
@@ -316,7 +358,7 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
       setComments(prev => prev.filter(c => c.id !== tempId))
       setTotalComments(prev => Math.max(0, prev - 1))
       setCommentInput(text)
-      toast.error('Failed to post comment')
+      toast.error(err.response?.data?.message || 'Failed to post comment')
     } finally {
       setCommentSubmitting(false)
     }
@@ -383,7 +425,7 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
         ...prev,
         [parentId]: (prev[parentId] || []).filter(r => r.id !== tempId)
       }))
-      toast.error('Failed to post reply')
+      toast.error(err.response?.data?.message || 'Failed to post reply')
     } finally {
       setCommentSubmitting(false)
     }
@@ -475,53 +517,104 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
                         {formatTimeAgo(comment.createdAt)}
                       </span>
                     </div>
-                    <p className="comment-text">
-                      {comment.content}
-                    </p>
-                    
-                    <div className="comment-actions-bar">
-                      {user && (
-                        <button
-                          className={`comment-action-btn ${replyingToId === comment.id ? 'active' : ''}`}
-                          onClick={() => {
-                            if (replyingToId === comment.id) {
-                              setReplyingToId(null)
-                              setReplyMetadata(null)
-                              setReplyInput('')
-                            } else {
-                              setReplyingToId(comment.id)
-                              setReplyMetadata({
-                                parentId: comment.id,
-                                mentionId: comment.userId,
-                                mentionName: comment.userName
-                              })
-                              setReplyInput('')
-                            }
-                          }}
-                        >
-                          Reply
-                        </button>
-                      )}
-                      <button
-                        className={`comment-action-btn ${isExpanded ? 'active' : ''}`}
-                        onClick={() => handleToggleReplies(comment.id)}
-                      >
-                        💬 {isExpanded ? 'Hide Replies' : 'Replies'}
-                      </button>
+                    {editingId === comment.id ? (
+                      <div className="nested-reply-form-wrapper" style={{ marginTop: '10px' }}>
+                        <form onSubmit={(e) => handleEditSubmit(e, comment.id)} className="comment-form">
+                          <textarea
+                            rows="2"
+                            value={editInput}
+                            onChange={(e) => setEditInput(e.target.value)}
+                            disabled={editSubmitting}
+                            className="comment-textarea"
+                            autoFocus
+                          />
+                          <div className="comment-form-actions">
+                            <button
+                              type="button"
+                              className="btn-hero-outline"
+                              style={{ padding: '6px 14px', fontSize: '12px', border: '1px solid rgba(255,255,255,0.1)' }}
+                              onClick={() => {
+                                setEditingId(null)
+                                setEditInput('')
+                              }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              className="btn-home-primary"
+                              style={{ padding: '6px 16px', fontSize: '12px' }}
+                              disabled={editSubmitting || !editInput.trim()}
+                            >
+                              {editSubmitting ? 'Saving...' : 'Save'}
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="comment-text">
+                          {comment.content}
+                        </p>
+                        
+                        <div className="comment-actions-bar">
+                          {user && (
+                            <button
+                              className={`comment-action-btn ${replyingToId === comment.id ? 'active' : ''}`}
+                              onClick={() => {
+                                if (replyingToId === comment.id) {
+                                  setReplyingToId(null)
+                                  setReplyMetadata(null)
+                                  setReplyInput('')
+                                } else {
+                                  setReplyingToId(comment.id)
+                                  setReplyMetadata({
+                                    parentId: comment.id,
+                                    mentionId: comment.userId,
+                                    mentionName: comment.userName
+                                  })
+                                  setReplyInput('')
+                                }
+                              }}
+                            >
+                              Reply
+                            </button>
+                          )}
+                          <button
+                            className={`comment-action-btn ${isExpanded ? 'active' : ''}`}
+                            onClick={() => handleToggleReplies(comment.id)}
+                          >
+                            💬 {isExpanded ? 'Hide Replies' : 'Replies'}
+                          </button>
+                          
+                          {user && (user.id === comment.userId || user.userId === comment.userId || user.username === comment.userName) && (
+                            <button
+                              className="comment-action-btn"
+                              onClick={() => {
+                                setEditingId(comment.id)
+                                setEditInput(comment.content)
+                                setReplyingToId(null)
+                              }}
+                            >
+                              Edit
+                            </button>
+                          )}
 
-                      {user && (
-                        (user.id === comment.userId || user.userId === comment.userId || user.username === comment.userName || ['ADMIN', 'STAFF', 'MODERATOR'].includes((user.role || '').toUpperCase()))
-                      ) && (
-                        <button
-                          className="comment-action-btn"
-                          style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                          onClick={() => handleDeleteComment(comment.id)}
-                          title="Delete this comment"
-                        >
-                          <Trash2 size={13} /> Delete
-                        </button>
-                      )}
-                    </div>
+                          {user && (
+                            (user.id === comment.userId || user.userId === comment.userId || user.username === comment.userName || ['ADMIN', 'STAFF', 'MODERATOR'].includes((user.role || '').toUpperCase()))
+                          ) && (
+                            <button
+                              className="comment-action-btn"
+                              style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              onClick={() => handleDeleteComment(comment.id)}
+                              title="Delete this comment"
+                            >
+                              <Trash2 size={13} /> Delete
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -621,49 +714,99 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
                                 {formatTimeAgo(reply.createdAt)}
                               </span>
                             </div>
-                            <p className="comment-text" style={{ fontSize: '13.5px' }}>
-                              {reply.mentionName && (
-                                <span className="comment-mention-tag">@{reply.mentionName}</span>
-                              )}
-                              {reply.content}
-                            </p>
-                            
-                            <div className="comment-actions-bar">
-                              {user && (
-                                <button
-                                  className={`comment-action-btn ${replyingToId === reply.id ? 'active' : ''}`}
-                                  onClick={() => {
-                                    if (replyingToId === reply.id) {
-                                      setReplyingToId(null)
-                                      setReplyMetadata(null)
-                                      setReplyInput('')
-                                    } else {
-                                      setReplyingToId(reply.id)
-                                      setReplyMetadata({
-                                        parentId: comment.id,
-                                        mentionId: reply.userId,
-                                        mentionName: reply.userName
-                                      })
-                                      setReplyInput('')
-                                    }
-                                  }}
-                                >
-                                  Reply
-                                </button>
-                              )}
-                              {user && (
-                                (user.id === reply.userId || user.userId === reply.userId || user.username === reply.userName || ['ADMIN', 'STAFF', 'MODERATOR'].includes((user.role || '').toUpperCase()))
-                              ) && (
-                                <button
-                                  className="comment-action-btn"
-                                  style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                  onClick={() => handleDeleteComment(reply.id, comment.id)}
-                                  title="Delete this comment"
-                                >
-                                  <Trash2 size={13} /> Delete
-                                </button>
-                              )}
-                            </div>
+                            {editingId === reply.id ? (
+                              <div className="nested-reply-form-wrapper" style={{ marginTop: '10px' }}>
+                                <form onSubmit={(e) => handleEditSubmit(e, reply.id, comment.id)} className="comment-form">
+                                  <textarea
+                                    rows="2"
+                                    value={editInput}
+                                    onChange={(e) => setEditInput(e.target.value)}
+                                    disabled={editSubmitting}
+                                    className="comment-textarea"
+                                    autoFocus
+                                  />
+                                  <div className="comment-form-actions">
+                                    <button
+                                      type="button"
+                                      className="btn-hero-outline"
+                                      style={{ padding: '6px 14px', fontSize: '12px', border: '1px solid rgba(255,255,255,0.1)' }}
+                                      onClick={() => {
+                                        setEditingId(null)
+                                        setEditInput('')
+                                      }}
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      type="submit"
+                                      className="btn-home-primary"
+                                      style={{ padding: '6px 16px', fontSize: '12px' }}
+                                      disabled={editSubmitting || !editInput.trim()}
+                                    >
+                                      {editSubmitting ? 'Saving...' : 'Save'}
+                                    </button>
+                                  </div>
+                                </form>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="comment-text" style={{ fontSize: '13.5px' }}>
+                                  {reply.mentionName && (
+                                    <span className="comment-mention-tag">@{reply.mentionName}</span>
+                                  )}
+                                  {reply.content}
+                                </p>
+                                
+                                <div className="comment-actions-bar">
+                                  {user && (
+                                    <button
+                                      className={`comment-action-btn ${replyingToId === reply.id ? 'active' : ''}`}
+                                      onClick={() => {
+                                        if (replyingToId === reply.id) {
+                                          setReplyingToId(null)
+                                          setReplyMetadata(null)
+                                          setReplyInput('')
+                                        } else {
+                                          setReplyingToId(reply.id)
+                                          setReplyMetadata({
+                                            parentId: comment.id,
+                                            mentionId: reply.userId,
+                                            mentionName: reply.userName
+                                          })
+                                          setReplyInput('')
+                                        }
+                                      }}
+                                    >
+                                      Reply
+                                    </button>
+                                  )}
+                                  {user && (user.id === reply.userId || user.userId === reply.userId || user.username === reply.userName) && (
+                                    <button
+                                      className="comment-action-btn"
+                                      onClick={() => {
+                                        setEditingId(reply.id)
+                                        setEditInput(reply.content)
+                                        setReplyingToId(null)
+                                      }}
+                                    >
+                                      Edit
+                                    </button>
+                                  )}
+                                  {user && (
+                                    (user.id === reply.userId || user.userId === reply.userId || user.username === reply.userName || ['ADMIN', 'STAFF', 'MODERATOR'].includes((user.role || '').toUpperCase()))
+                                  ) && (
+                                    <button
+                                      className="comment-action-btn"
+                                      style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      onClick={() => handleDeleteComment(reply.id, comment.id)}
+                                      title="Delete this comment"
+                                    >
+                                      <Trash2 size={13} /> Delete
+                                    </button>
+                                  )}
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
 

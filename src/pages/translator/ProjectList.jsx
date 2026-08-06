@@ -5,6 +5,7 @@ import '../../assets/style/translator/project-list.css';
 import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi';
 import { createTeamRequestApi, getRequestsByNameApi } from '../../services/api/TeamWorkspaceApi';
 import { uploadFileApi } from '../../services/api/UploadApi';
+import { getMyTranslatorProfileApi } from '../../services/api/TranslatorApi';
 import { getAuth } from '../../utils/Auth';
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages';
 
@@ -22,6 +23,7 @@ function ProjectList() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [joinMessage, setJoinMessage] = useState('');
   const [cvFile, setCvFile] = useState(null);
+  const [translatorProfile, setTranslatorProfile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -72,6 +74,12 @@ function ProjectList() {
     } catch (e) {}
 
     fetchProjectsAndRequests(hasCache);
+
+    getMyTranslatorProfileApi()
+      .then(profile => {
+        if (profile) setTranslatorProfile(profile);
+      })
+      .catch(() => {});
   }, [userFullName]);
 
   // Optimized query filtering with useMemo
@@ -96,7 +104,7 @@ function ProjectList() {
 
       // 2. Target Language Filter
       if (selectedTargetLang !== 'ALL') {
-        const pLang = (p.targetLang || '').toLowerCase().trim();
+        const pLang = (p.targetLanguage || p.language || '').toLowerCase().trim();
         const selLang = selectedTargetLang.toLowerCase().trim();
         if (!pLang.includes(selLang)) return false;
       }
@@ -153,7 +161,18 @@ function ProjectList() {
 
   const handleApplyClick = (project) => {
     setSelectedProject(project);
-    setJoinMessage('');
+
+    // Auto-populate message from bio or default professional intro
+    if (translatorProfile?.bio && translatorProfile.bio.trim()) {
+      setJoinMessage(translatorProfile.bio.trim());
+    } else {
+      const specs = Array.isArray(translatorProfile?.specializations) && translatorProfile.specializations.length > 0
+        ? ` specializing in ${translatorProfile.specializations.join(', ')}`
+        : '';
+      const exp = translatorProfile?.experienceYears ? ` with ${translatorProfile.experienceYears} years of experience` : '';
+      setJoinMessage(`Hi! I would love to join your translation team for "${project.comicName || project.title}"${specs}${exp}. Ready to contribute!`);
+    }
+
     setCvFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     setShowJoinModal(true);
@@ -188,12 +207,15 @@ function ProjectList() {
         .toUpperCase()
         .substring(0, 2);
 
-      // Upload CV file if provided
-      let cvUrl = null;
+      // Upload CV file if a new file was chosen, otherwise fallback to attached Profile CV
+      let cvUrl = translatorProfile?.cvUrl || null;
+      let cvFileName = translatorProfile?.cvUrl ? 'Profile_Verified_CV.pdf' : null;
+
       if (cvFile) {
         try {
           const uploadResult = await uploadFileApi(cvFile);
           cvUrl = typeof uploadResult === 'string' ? uploadResult : uploadResult?.url || uploadResult?.fileUrl || null;
+          cvFileName = cvFile.name;
         } catch (uploadErr) {
           console.error('CV upload failed:', uploadErr);
           toast.error('Failed to upload CV file. Please try again.');
@@ -208,10 +230,10 @@ function ProjectList() {
         roles: 'Member',
         avatar: initials,
         cvUrl: cvUrl,
-        cvFileName: cvFile ? cvFile.name : null,
+        cvFileName: cvFileName,
       });
 
-      toast.success(`Application sent successfully for "${selectedProject.comicName || selectedProject.title}"!`);
+      toast.success(`Application sent successfully with your Translator Profile attached for "${selectedProject.comicName || selectedProject.title}"!`);
       setAppliedIds((prev) => [...prev, selectedProject.id]);
       setShowJoinModal(false);
       setSelectedProject(null);
@@ -544,7 +566,7 @@ function ProjectList() {
                   border: '1px solid rgba(255, 255, 255, 0.06)',
                   borderRadius: '8px',
                   padding: '12px 16px',
-                  marginBottom: '16px',
+                  marginBottom: '14px',
                 }}
               >
                 <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: 'var(--trans-text-secondary)' }}>Comic Project:</p>
@@ -554,7 +576,40 @@ function ProjectList() {
                 </p>
               </div>
 
-
+              {/* Translator Credentials & Profile Card (Auto Attached) */}
+              {translatorProfile && (
+                <div style={{
+                  background: 'rgba(168, 85, 247, 0.07)',
+                  border: '1px solid rgba(168, 85, 247, 0.25)',
+                  borderRadius: '8px',
+                  padding: '12px 14px',
+                  marginBottom: '16px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '700', color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      ✓ Verified Translator Profile
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#10b981', fontWeight: '600' }}>Auto-Attached</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', fontSize: '12px' }}>
+                    {Array.isArray(translatorProfile.specializations) && translatorProfile.specializations.length > 0 && (
+                      <span style={{ background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: '4px', color: '#e2e8f0' }}>
+                        🌐 {translatorProfile.specializations.join(', ')}
+                      </span>
+                    )}
+                    {translatorProfile.experienceYears !== undefined && (
+                      <span style={{ background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: '4px', color: '#e2e8f0' }}>
+                        ⏳ {translatorProfile.experienceYears} Years Experience
+                      </span>
+                    )}
+                    {(translatorProfile.phoneNumber || translatorProfile.phone) && (
+                      <span style={{ background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: '4px', color: '#e2e8f0' }}>
+                        📞 {translatorProfile.phoneNumber || translatorProfile.phone}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="trans-form-group" style={{ marginBottom: '16px' }}>
                 <label className="trans-form-label" style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>
@@ -562,57 +617,103 @@ function ProjectList() {
                 </label>
                 <textarea
                   className="trans-form-input textarea"
-                  style={{ width: '100%', height: '100px' }}
+                  style={{ width: '100%', height: '90px' }}
                   placeholder="Tell the group leader about your experience or why you want to join..."
                   value={joinMessage}
                   onChange={(e) => setJoinMessage(e.target.value)}
                 />
               </div>
 
-              {/* CV / Resume Upload */}
+              {/* CV / Resume Upload & Auto-Attached Document */}
               <div className="trans-form-group">
                 <label className="trans-form-label" style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>
-                  Attach CV / Resume <span style={{ color: '#c084fc', fontWeight: '500' }}>(PDF format strictly required — max 5MB)</span>
+                  Attached CV / Resume <span style={{ color: '#c084fc', fontWeight: '500' }}>(PDF strictly required — max 5MB)</span>
                 </label>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '12px',
-                  background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.12)',
-                  borderRadius: '8px', padding: '12px 16px', cursor: 'pointer',
-                  transition: 'border-color 0.2s'
-                }}
-                  onClick={() => fileInputRef.current?.click()}
-                  onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(168,85,247,0.5)'}
-                  onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                    <line x1="12" y1="18" x2="12" y2="12"/>
-                    <line x1="9" y1="15" x2="15" y2="15"/>
-                  </svg>
-                  <div style={{ flex: 1 }}>
-                    {cvFile ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ color: '#c084fc', fontSize: '13px', fontWeight: '600' }}>📄 {cvFile.name}</span>
-                        <span style={{ color: '#64748b', fontSize: '11px' }}>({(cvFile.size / 1024).toFixed(0)} KB)</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCvFile(null);
-                            if (fileInputRef.current) fileInputRef.current.value = '';
-                          }}
-                          style={{
-                            background: 'rgba(239,68,68,0.15)', border: 'none', color: '#ef4444',
-                            borderRadius: '4px', padding: '2px 6px', fontSize: '11px', cursor: 'pointer',
-                            marginLeft: 'auto'
-                          }}
-                        >✕ Remove</button>
-                      </div>
-                    ) : (
-                      <span style={{ color: '#64748b', fontSize: '13px' }}>Click to select a PDF file (.pdf)</span>
-                    )}
+
+                {cvFile ? (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.3)',
+                    borderRadius: '8px', padding: '10px 14px'
+                  }}>
+                    <span style={{ fontSize: '18px' }}>📄</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, color: '#c084fc', fontSize: '13px', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {cvFile.name}
+                      </p>
+                      <span style={{ color: '#94a3b8', fontSize: '11px' }}>({(cvFile.size / 1024).toFixed(0)} KB) — Newly selected</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCvFile(null);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }}
+                      style={{
+                        background: 'rgba(239,68,68,0.15)', border: 'none', color: '#ef4444',
+                        borderRadius: '4px', padding: '4px 8px', fontSize: '11px', cursor: 'pointer'
+                      }}
+                    >
+                      ✕ Remove
+                    </button>
                   </div>
-                </div>
+                ) : translatorProfile?.cvUrl ? (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)',
+                    borderRadius: '8px', padding: '10px 14px', gap: '10px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '18px' }}>📄</span>
+                      <div>
+                        <a
+                          href={translatorProfile.cvUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: '#34d399', fontSize: '13px', fontWeight: '600', textDecoration: 'underline' }}
+                        >
+                          Profile_Verified_CV.pdf ↗
+                        </a>
+                        <span style={{ display: 'block', fontSize: '11px', color: '#10b981' }}>✓ Automatically attached from your Profile</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        color: '#e2e8f0',
+                        borderRadius: '6px',
+                        padding: '4px 10px',
+                        fontSize: '11.5px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Upload New
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '12px',
+                    background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.12)',
+                    borderRadius: '8px', padding: '12px 16px', cursor: 'pointer',
+                    transition: 'border-color 0.2s'
+                  }}
+                    onClick={() => fileInputRef.current?.click()}
+                    onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(168,85,247,0.5)'}
+                    onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <line x1="12" y1="18" x2="12" y2="12"/>
+                      <line x1="9" y1="15" x2="15" y2="15"/>
+                    </svg>
+                    <span style={{ color: '#64748b', fontSize: '13px' }}>Click to select a PDF file (.pdf)</span>
+                  </div>
+                )}
+
                 <input
                   ref={fileInputRef}
                   type="file"

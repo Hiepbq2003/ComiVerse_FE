@@ -178,7 +178,7 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
                 </p>
                 <p className="trans-project-meta" style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <span style={{ color: '#cbd5e1', fontSize: '12.5px' }}>
-                    👥 Capacity: <strong>{proj.membersCount || 1} / {(Number(proj.maxMembers) || 5) + 1}</strong> members (1 Leader + {Number(proj.maxMembers) || 5} Members)
+                    👥 Capacity: <strong>{proj.membersCount || 1} / {(Number(proj.maxMembers) || 5) + 1}</strong> members
                   </span>
                   <span style={{ 
                     padding: '2px 10px', 
@@ -617,10 +617,7 @@ function TeamProjects() {
       });
 
       setProjects(finalProjectsList)
-      // Save cache to sessionStorage for instant (<5ms) future loads
-      try {
-        sessionStorage.setItem('comiverse_teams_list_cache', JSON.stringify(finalProjectsList));
-      } catch (e) {}
+      setProjects(finalProjectsList)
     } catch (err) {
       console.error(err)
     } finally {
@@ -629,20 +626,7 @@ function TeamProjects() {
   }
 
   useEffect(() => {
-    let hasCache = false;
-    try {
-      const cached = sessionStorage.getItem('comiverse_teams_list_cache');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setProjects(parsed);
-          setLoadingProjects(false);
-          hasCache = true;
-        }
-      }
-    } catch (e) {}
-
-    fetchProjects(hasCache);
+    fetchProjects();
   }, [])
 
   const [searchTerm, setSearchTerm] = useState('')
@@ -728,34 +712,10 @@ function TeamProjects() {
     setTasks([])
     setTasksLoading(true)
 
-    const cacheKey = `comiverse_team_details_cache_${project.id}`;
-    let hasCache = false;
-
-    try {
-      const cached = sessionStorage.getItem(cacheKey);
-      if (cached) {
-        const c = JSON.parse(cached);
-        if (c && Array.isArray(c.members) && c.members.length > 0) {
-          setChapterOptions(c.chapterOptions || []);
-          setAnnouncements(c.announcements || []);
-          // NOTE: tasks are intentionally NOT restored from cache here.
-          // Tasks must always reflect the live database via the API call below,
-          // otherwise stale/failed-to-save tasks can "reappear" forever.
-          setJoinRequests(c.joinRequests || []);
-          setMembers(c.members || []);
-          setTeamMembersForAssign(c.teamMembersForAssign || c.members || []);
-          setLoadingWorkspace(false);
-          hasCache = true;
-        }
-      }
-    } catch (e) {}
-
-    if (!hasCache) {
-      setMembers([]);
-      setAnnouncements([]);
-      setJoinRequests([]);
-      setLoadingWorkspace(true);
-    }
+    setMembers([]);
+    setAnnouncements([]);
+    setJoinRequests([]);
+    setLoadingWorkspace(true);
 
     const leaderJoinDate = project.createdAt 
       ? new Date(project.createdAt).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
@@ -1007,17 +967,7 @@ function TeamProjects() {
       setSelectedDetails(updatedDetails);
       setProjects(prev => prev.map(p => p.id === project.id ? updatedDetails : p));
 
-      // Cache details to sessionStorage for instantaneous (<5ms) future opens
-      try {
-        sessionStorage.setItem(cacheKey, JSON.stringify({
-          chapterOptions: finalChapters,
-          announcements: mappedAnnouncements,
-          joinRequests: mappedRequests,
-          members: finalMembersList,
-          teamMembersForAssign: finalMembersList
-        }));
-      } catch (e) {}
-    } catch (err) {
+      } catch (err) {
       console.error(err)
     } finally {
       setLoadingWorkspace(false)
@@ -1090,8 +1040,16 @@ function TeamProjects() {
   const handleSaveWorkspaceSettings = async () => {
     if (!selectedDetails) return
 
+    // Calculate current capacity
+    const currentMembersCount = members.length || selectedDetails.membersCount || 1;
+    const totalCapacity = (Number(selectedDetails.maxMembers) || 5) + 1;
+    const isFull = currentMembersCount >= totalCapacity;
+    
+    // Force isRecruiting to false if team is at full capacity
+    const finalIsRecruiting = isFull ? false : selectedDetails.isRecruiting;
+
     // Save manual recruitment status choice to LocalStorage
-    localStorage.setItem(`comiverse_is_recruiting_${selectedDetails.id}`, String(selectedDetails.isRecruiting))
+    localStorage.setItem(`comiverse_is_recruiting_${selectedDetails.id}`, String(finalIsRecruiting))
 
     try {
       const updated = await updateProjectTeamApi(selectedDetails.id, {
@@ -1105,7 +1063,7 @@ function TeamProjects() {
         targetLang: selectedDetails.targetLang,
         priority: selectedDetails.priority,
         cover: selectedDetails.cover,
-        isRecruiting: selectedDetails.isRecruiting,
+        isRecruiting: finalIsRecruiting,
         maxMembers: Number(selectedDetails.maxMembers) || 5,
         leaderName: selectedDetails.leaderName,
         leaderInitials: selectedDetails.leaderInitials,
@@ -1115,8 +1073,11 @@ function TeamProjects() {
         assignedToMe: selectedDetails.assignedToMe,
         notes: selectedDetails.description || selectedDetails.notes || ''
       })
-      const mappedUpdated = { ...selectedDetails, ...updated, team: updated.title || selectedDetails.team, title: updated.comicName || selectedDetails.title, isRecruiting: selectedDetails.isRecruiting }
-      setProjects(prev => prev.map(proj => (proj.id === selectedDetails.id ? mappedUpdated : proj)))
+      const mappedUpdated = { ...selectedDetails, ...updated, team: updated.title || selectedDetails.team, title: updated.comicName || selectedDetails.title, isRecruiting: finalIsRecruiting }
+      setProjects(prev => {
+        const newList = prev.map(proj => (proj.id === selectedDetails.id ? mappedUpdated : proj));
+        return newList;
+      })
       setSelectedDetails(mappedUpdated)
       toast.success('Workspace details saved successfully!')
     } catch (err) {
@@ -1285,7 +1246,7 @@ function TeamProjects() {
       }
     } catch (err) {
       console.error(err);
-      toast.error('Failed to post comment.');
+      toast.error(err.response?.data?.message || 'Failed to post comment.');
       return;
     }
 

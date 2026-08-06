@@ -47,12 +47,19 @@ function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorks
             <label className="trans-form-label">Recruitment Status</label>
             <select
               className="trans-form-input"
-              value={selectedDetails.isRecruiting ? "true" : "false"}
+              value={(selectedDetails.isRecruiting && spotsAvailable > 0) ? "true" : "false"}
               onChange={(e) => setSelectedDetails({ ...selectedDetails, isRecruiting: e.target.value === "true" })}
+              disabled={spotsAvailable <= 0}
+              onWheel={(e) => e.target.blur()}
             >
               <option value="true">Open — recruiting new members</option>
               <option value="false">Closed — not accepting new members</option>
             </select>
+            {spotsAvailable <= 0 && (
+              <span style={{ fontSize: '12px', color: '#f87171', display: 'block', marginTop: '6px' }}>
+                Team is at full capacity. Recruitment is automatically closed.
+              </span>
+            )}
           </div>
 
           <div className="trans-form-group" style={{ marginTop: '16px' }}>
@@ -66,7 +73,7 @@ function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorks
               onChange={(e) => setSelectedDetails({ ...selectedDetails, maxMembers: Math.max(1, Number(e.target.value) || 5) })}
             />
             <span style={{ fontSize: '12px', color: '#cbd5e1', display: 'block', marginTop: '6px' }}>
-              💡 Total Capacity: <strong>{totalCapacity}</strong> (1 Leader + {recruitedLimit} Members)
+              💡 Total Capacity: <strong>{totalCapacity}</strong>
             </span>
           </div>
 
@@ -76,6 +83,7 @@ function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorks
               className="trans-form-input"
               value={selectedDetails.priority || 'Medium'}
               onChange={(e) => setSelectedDetails({ ...selectedDetails, priority: e.target.value })}
+              onWheel={(e) => e.target.blur()}
             >
               <option value="Urgent">🔥 Urgent (Recruiting Urgently)</option>
               <option value="High">🟠 High Priority</option>
