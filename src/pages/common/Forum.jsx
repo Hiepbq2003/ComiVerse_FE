@@ -2,10 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getForumThreadsPageApi, deleteForumThreadApi, createForumThreadApi, getAllForumThreadsApi, updateForumThreadApi, getForumThreadByIdApi } from '../../services/api/ForumThreadApi'
-import { createForumCommentApi, getForumCommentsApi } from '../../services/api/ForumCommentApi'
+import { createForumCommentApi, getForumCommentsApi, toggleForumCommentLikeApi, updateForumCommentApi, deleteForumCommentApi } from '../../services/api/ForumCommentApi'
 import { getAuth } from '../../utils/Auth'
 import { toast } from 'react-toastify'
-import { ArrowLeft, Eye, Flag, Heart, Lock, MessageCircle, Plus, Search, Star, Trash2 } from 'lucide-react'
+import { ArrowLeft, Check, CornerDownRight, Edit3, Eye, Flag, Heart, Lock, MessageCircle, Plus, Search, Star, Trash2, X } from 'lucide-react'
 import '../../assets/style/reader/forum.css'
 
 const formatTimeAgo = (createdAtString) => {
@@ -634,7 +634,18 @@ function Forum() {
         setCommentsLoading(true)
         const comments = await getForumCommentsApi(selectedThread.id)
         if (!cancelled) {
-          setThreadComments((comments || []).map(normalizeForumComment))
+          const normalized = (comments || []).map(normalizeForumComment)
+          setThreadComments(normalized)
+          
+          // Populate liked comments from backend
+          const userLikedIds = comments
+            .filter(c => c.likedByCurrentUser || c.isLikedByCurrentUser)
+            .map(c => c.id)
+          
+          setLikedComments(prev => {
+            const others = prev.filter(id => !normalized.some(n => n.id === id))
+            return [...others, ...userLikedIds]
+          })
         }
       } catch (err) {
         console.error('Failed to load forum comments:', err)
@@ -727,6 +738,7 @@ function Forum() {
     if (submitting) return
     const editor = replyInputRef.current
     const htmlContent = editor ? editor.innerHTML : ''
+    const textContent = editor ? editor.textContent.trim() : ''
     if (!textContent && !forumReplyImage) {
       toast.warn('Please enter your reply or attach an image.')
       return
@@ -885,29 +897,117 @@ function Forum() {
   }
 
   // Toggle comment liked state
-  const handleToggleCommentLike = (commentId) => {
+  const handleToggleCommentLike = async (commentId) => {
+    // Check if user is logged in
+    const auth = getAuth()
+    if (!auth || !auth.user) {
+      toast.warn('Please log in to like comments.')
+      return
+    }
+
     const isAlreadyLiked = likedComments.includes(commentId)
     const nextLikedComments = isAlreadyLiked 
       ? likedComments.filter(id => id !== commentId)
       : [...likedComments, commentId]
     
+    // Optimistic UI update
     setLikedComments(nextLikedComments)
 
-    // Update likes count on selected thread comment object in localStorage
-    if (selectedThread) {
-      const stored = JSON.parse(localStorage.getItem(`comiverse_forum_comments_${selectedThread.id}`) || '[]')
-      const updated = stored.map(c => {
-        if (c.id === commentId) {
-          const count = c.likesCount || 0
-          return {
-            ...c,
-            likesCount: isAlreadyLiked ? Math.max(0, count - 1) : count + 1
-          }
+    setThreadComments(prev => prev.map(c => {
+      if (c.id === commentId) {
+        const count = c.likesCount || 0
+        return {
+          ...c,
+          likesCount: isAlreadyLiked ? Math.max(0, count - 1) : count + 1
         }
-        return c
-      })
-      localStorage.setItem(`comiverse_forum_comments_${selectedThread.id}`, JSON.stringify(updated))
-      setThreadComments(updated)
+      }
+      return c
+    }))
+
+    // Persist to backend
+    if (selectedThread) {
+      try {
+        await toggleForumCommentLikeApi(selectedThread.id, commentId)
+      } catch (err) {
+        console.error('Failed to toggle comment like:', err)
+        toast.error('Failed to update like status.')
+        
+        // Revert optimistic update
+        setLikedComments(isAlreadyLiked 
+          ? [...likedComments, commentId]
+          : likedComments.filter(id => id !== commentId)
+        )
+        
+        setThreadComments(prev => prev.map(c => {
+          if (c.id === commentId) {
+            const count = c.likesCount || 0
+            return {
+              ...c,
+              likesCount: isAlreadyLiked ? count + 1 : Math.max(0, count - 1)
+            }
+          }
+          return c
+        }))
+      }
+    }
+  }
+
+  // ─── Edit / Delete comment state and handlers ───
+  const [editingCommentId, setEditingCommentId] = useState(null)
+  const [editCommentContent, setEditCommentContent] = useState('')
+
+  const handleStartEditComment = (comment) => {
+    setEditingCommentId(comment.id)
+    // Strip HTML tags for plain-text editing
+    const div = document.createElement('div')
+    div.innerHTML = comment.content || ''
+    setEditCommentContent(div.textContent || div.innerText || '')
+  }
+
+  const handleCancelEditComment = () => {
+    setEditingCommentId(null)
+    setEditCommentContent('')
+  }
+
+  const handleSaveEditComment = async (commentId) => {
+    if (!editCommentContent.trim()) {
+      toast.warn('Comment content cannot be empty.')
+      return
+    }
+    if (!selectedThread) return
+    try {
+      setSubmitting(true)
+      const updated = await updateForumCommentApi(selectedThread.id, commentId, { content: editCommentContent.trim() })
+      setThreadComments(prev => prev.map(c => c.id === commentId ? { ...normalizeForumComment(updated), likesCount: c.likesCount } : c))
+      setEditingCommentId(null)
+      setEditCommentContent('')
+      toast.success('Comment updated successfully.')
+    } catch (err) {
+      console.error('Failed to update comment:', err)
+      toast.error(err.response?.data?.message || 'Failed to update comment.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDeleteComment = async (commentId) => {
+    if (!selectedThread) return
+    if (!window.confirm('Are you sure you want to delete this comment?')) return
+    try {
+      setSubmitting(true)
+      await deleteForumCommentApi(selectedThread.id, commentId)
+      setThreadComments(prev => prev.filter(c => c.id !== commentId))
+      // Update thread reply count
+      const nextRepliesCount = Math.max(0, (selectedThread.replies || 0) - 1)
+      setSelectedThread(prev => prev ? { ...prev, replies: nextRepliesCount } : null)
+      setThreads(prev => prev.map(t => t.id === selectedThread.id ? { ...t, replies: nextRepliesCount } : t))
+      setAllThreadsForCounts(prev => prev.map(t => t.id === selectedThread.id ? { ...t, replies: nextRepliesCount } : t))
+      toast.success('Comment deleted successfully.')
+    } catch (err) {
+      console.error('Failed to delete comment:', err)
+      toast.error(err.response?.data?.message || 'Failed to delete comment.')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -1174,19 +1274,56 @@ function Forum() {
                                 <span className="forum-comment-time">{formatTimeAgo(comment.timestamp)}</span>
                               </div>
                               
-                              <div className="forum-comment-body">
-                                {isHtmlContent(comment.content)
-                                  ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(comment.content) }} />
-                                  : renderFormattedContent(comment.content)
-                                }
-                              </div>
+                              
+                              {/* Comment body or edit form */}
+                              {editingCommentId === comment.id ? (
+                                <div className="forum-comment-edit-box">
+                                  <textarea
+                                    className="forum-comment-edit-textarea"
+                                    value={editCommentContent}
+                                    onChange={(e) => setEditCommentContent(e.target.value)}
+                                    rows={3}
+                                    placeholder="Edit your comment..."
+                                    autoFocus
+                                  />
+                                  <div className="forum-comment-edit-actions">
+                                    <button
+                                      type="button"
+                                      className="forum-comment-btn forum-comment-btn-cancel"
+                                      onClick={handleCancelEditComment}
+                                      disabled={submitting}
+                                    >
+                                      <X size={14} aria-hidden="true" />
+                                      <span>Cancel</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="forum-comment-btn forum-comment-btn-save"
+                                      onClick={() => handleSaveEditComment(comment.id)}
+                                      disabled={submitting}
+                                    >
+                                      <Check size={14} aria-hidden="true" />
+                                      <span>{submitting ? 'Saving...' : 'Save'}</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="forum-comment-body">
+                                  {isHtmlContent(comment.content)
+                                    ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(comment.content) }} />
+                                    : renderFormattedContent(comment.content)
+                                  }
+                                </div>
+                              )}
                               
                               <div className="forum-comment-actions">
                                 <button 
                                   className={`forum-card-action-btn ${isCommentLiked ? 'liked-active' : ''}`}
                                   onClick={() => handleToggleCommentLike(comment.id)}
+                                  title={isCommentLiked ? 'Unlike comment' : 'Like comment'}
                                 >
-                                  <Heart size={14} aria-hidden="true" /> {comment.likesCount || 0}
+                                  <Heart size={14} fill={isCommentLiked ? 'currentColor' : 'none'} aria-hidden="true" />
+                                  <span>{comment.likesCount || 0}</span>
                                 </button>
                                 {!selectedThread.isLocked && (
                                   <button 
@@ -1211,9 +1348,40 @@ function Forum() {
                                       }
                                     }}
                                   >
-                                    Reply
+                                    <CornerDownRight size={13} aria-hidden="true" />
+                                    <span>Reply</span>
                                   </button>
                                 )}
+                                {/* Edit & Delete buttons — for comment owner or moderator/admin */}
+                                {(() => {
+                                  const isOwner = currentUser && (
+                                    (comment.userId && currentUser.id && String(comment.userId) === String(currentUser.id)) ||
+                                    (comment.author && (comment.author === currentUser.fullName || comment.author === currentUser.username || comment.author === currentUser.email))
+                                  )
+                                  const canDelete = isOwner || isModerator
+                                  return (
+                                    <>
+                                      {isOwner && editingCommentId !== comment.id && (
+                                        <button
+                                          className="forum-card-action-btn forum-card-action-btn--edit"
+                                          onClick={() => handleStartEditComment(comment)}
+                                        >
+                                          <Edit3 size={13} aria-hidden="true" />
+                                          <span>Edit</span>
+                                        </button>
+                                      )}
+                                      {canDelete && (
+                                        <button
+                                          className="forum-card-action-btn forum-card-action-btn--delete"
+                                          onClick={() => handleDeleteComment(comment.id)}
+                                        >
+                                          <Trash2 size={13} aria-hidden="true" />
+                                          <span>Delete</span>
+                                        </button>
+                                      )}
+                                    </>
+                                  )
+                                })()}
                               </div>
                             </div>
                           )
@@ -1305,46 +1473,6 @@ function Forum() {
                             
                             {/* Formatting Toolbar */}
                             <div className="forum-editor-toolbar-stv">
-                              <button 
-                                type="button"
-                                className={`forum-toolbar-btn-stv ${activeFormats.bold ? 'active' : ''}`} 
-                                title="Bold (Ctrl+B)" 
-                                onClick={() => handleInsertFormat('bold')}
-                              >
-                                B
-                              </button>
-                              <button 
-                                type="button"
-                                className={`forum-toolbar-btn-stv ${activeFormats.italic ? 'active' : ''}`} 
-                                title="Italic (Ctrl+I)" 
-                                onClick={() => handleInsertFormat('italic')}
-                              >
-                                I
-                              </button>
-                              <button 
-                                type="button"
-                                className={`forum-toolbar-btn-stv ${activeFormats.quote ? 'active' : ''}`} 
-                                title="Quote Block" 
-                                onClick={() => handleInsertFormat('quote')}
-                              >
-                                ”
-                              </button>
-                              <button 
-                                type="button"
-                                className={`forum-toolbar-btn-stv ${activeFormats.code ? 'active' : ''}`} 
-                                title="Code Block" 
-                                onClick={() => handleInsertFormat('code')}
-                              >
-                                &lt;/&gt;
-                              </button>
-                              <button 
-                                type="button"
-                                className={`forum-toolbar-btn-stv ${activeFormats.link ? 'active' : ''}`} 
-                                title="Insert Link" 
-                                onClick={() => handleInsertFormat('link')}
-                              >
-                                🔗
-                              </button>
                               <button
                                 type="button"
                                 className="forum-toolbar-btn-stv"

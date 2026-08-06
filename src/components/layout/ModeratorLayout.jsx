@@ -216,7 +216,7 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
               <span>
                 Scope: {(() => {
                   const scope = getModeratorScope(user);
-                  const isGlobal = scope.length === 0 || scope.length >= 7 || scope.some(s => ['global', 'all', 'any', '*'].includes(s));
+                  const isGlobal = scope.length === 0 || scope.length >= 7 || scope.some(s => ['global', 'all', 'any', '*'].includes(s) || s.includes('all'));
                   return isGlobal ? 'All Languages' : scope.map(l => l.charAt(0).toUpperCase() + l.slice(1)).join(', ');
                 })()}
               </span>

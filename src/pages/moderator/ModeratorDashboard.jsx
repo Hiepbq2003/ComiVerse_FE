@@ -365,7 +365,7 @@ function ModeratorDashboard() {
           }
         }).filter(c => isLanguageInModeratorScope(c.language || c.rawLanguage || c.originalLanguage, authUser)),
         submissions
-      ).map(c => syncComicWithLocalOverride(c)).filter(c => !c.archived);
+      ).map(c => syncComicWithLocalOverride(c));
       setComics(deduplicateComics(mappedComics))
       
       let localTeams = [];
@@ -510,7 +510,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       setSubmissions(filteredSubmissions);
 
       const mappedComics = syncApprovedComics(
-        (comicsData || []).filter(c => c.moderationStatus === 'PUBLISHED').map(c => {
+        (comicsData || []).filter(c => c.moderationStatus === 'PUBLISHED' || c.moderationStatus === 'UNPUBLISHED').map(c => {
           const merged = syncComicWithLocalOverride(c);
           const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === merged.title.toLowerCase())
           const cCover = getComicCover(merged);
@@ -525,7 +525,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
           }
         }),
         filteredSubmissions
-      ).map(c => syncComicWithLocalOverride(c)).filter(c => !c.archived);
+      ).map(c => syncComicWithLocalOverride(c));
 
       console.log('[ModeratorDashboard] Data Hydration Summary:', {
         rawComicsData: comicsData,
@@ -1105,18 +1105,17 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     toast.success('Comic updated successfully.');
   }
 
-  const handleArchiveComic = async (id) => {
+  const handleSuspendComic = async (id) => {
     try {
-      await deleteComicApi(id)
+      await updateComicApi(id, { moderationStatus: 'UNPUBLISHED' })
     } catch (err) {
-      console.warn('[Moderator] Archive API error (likely Access Denied):', err?.response?.data?.message || err?.message)
+      console.warn('[Moderator] Suspend API error:', err?.message)
     }
     
     try {
       const existing = JSON.parse(localStorage.getItem('comiverse_local_comic_' + id) || '{}');
-      localStorage.setItem('comiverse_local_comic_' + id, JSON.stringify({ ...existing, archived: true }));
+      localStorage.setItem('comiverse_local_comic_' + id, JSON.stringify({ ...existing, moderationStatus: 'UNPUBLISHED', archived: false }));
       
-      // Also scrub from submissions override cache to completely banish it from UI
       const overrideRaw = localStorage.getItem('comiverse_moderator_submissions_override');
       if (overrideRaw) {
         let overrides = JSON.parse(overrideRaw);
@@ -1136,11 +1135,21 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
         });
         localStorage.setItem('comiverse_moderator_submissions', JSON.stringify(baseSubs));
       }
-    } catch(e) {}
+    } catch (e) { /* ignore */ }
 
-    // Always remove from UI regardless of backend result
-    setComics(prev => prev.filter(c => c.id !== id))
-    toast.success('Comic archived successfully.')
+    setComics(prev => prev.map(c => c.id === id || c.id === id.replace('comic-', '') ? { ...c, moderationStatus: 'UNPUBLISHED' } : c));
+    toast.success('Comic suspended successfully.');
+  }
+
+  const handleRestoreComic = async (id) => {
+    try {
+      await updateComicApi(id, { moderationStatus: 'PUBLISHED' })
+    } catch (err) {
+      console.warn('[Moderator] Restore API error:', err?.message)
+    }
+    
+    setComics(prev => prev.map(c => c.id === id || c.id === id.replace('comic-', '') ? { ...c, moderationStatus: 'PUBLISHED' } : c));
+    toast.success('Comic restored successfully.');
   }
 
   const handleTriggerAssignTeam = (comic) => {
@@ -1982,7 +1991,8 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               projectTeams={projectTeams}
               genres={genres}
               handleSaveEditComic={handleSaveEditComic} 
-              handleArchiveComic={handleArchiveComic} 
+              handleSuspendComic={handleSuspendComic} 
+              handleRestoreComic={handleRestoreComic}
               handleTriggerAssignTeam={handleTriggerAssignTeam} 
               fetchAllData={fetchComicsAndTeams}
             />

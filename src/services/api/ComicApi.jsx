@@ -28,16 +28,17 @@ export const getComicsPageApi = (page = 1, size = 10, search = '') => {
 };
 
 export const updateComicApi = async (id, data) => {
-  const cid = cleanComicId(id);
-  const formattedData = {
-    ...data,
-    status: (data.publicationStatus || data.status || 'ONGOING').toUpperCase(),
-    publicationStatus: (data.publicationStatus || data.status || 'ONGOING').toUpperCase(),
-    language: data.language || 'Vietnamese'
-  };
-
-  try {
-    const res = await AxiosClient.put(`/comics/${cid}`, formattedData);
+    const cid = cleanComicId(id);
+    const formattedData = { ...data };
+    
+    if (data.publicationStatus || data.status) {
+      const statusValue = (data.publicationStatus || data.status).toUpperCase();
+      formattedData.status = statusValue;
+      formattedData.publicationStatus = statusValue;
+    }
+  
+    try {
+      const res = await AxiosClient.put(`/comics/${cid}`, formattedData);
     return res;
   } catch (e) {
     console.error("PUT /comics/{id} failed with error:", e.response?.data || e);

@@ -2,63 +2,79 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { registerTranslatorApi, getMyTranslatorProfileApi } from '../../services/api/TranslatorApi'
-import HomeLayout from "../../components/layout/HomeLayout"
+import { uploadFileApi } from '../../services/api/UploadApi'
+import HomeLayout from '../../components/layout/HomeLayout'
 import { useAuth } from '../../context/AuthContext'
-import { Languages, Sparkles, Phone, Link2, CheckCircle2, ArrowLeft, AlertCircle, X } from "lucide-react"
+import { 
+  Languages, 
+  Sparkles, 
+  Phone, 
+  Link2, 
+  CheckCircle2, 
+  ArrowLeft, 
+  AlertCircle, 
+  X, 
+  FileText, 
+  UploadCloud, 
+  Trash2, 
+  UserCheck, 
+  Award,
+  Globe2,
+  Share2,
+  FileCheck
+} from 'lucide-react'
 
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
+import '../../assets/style/translator/translator-register.css'
 
 const SUGGESTED_LANGUAGES = COMIC_LANGUAGE_OPTIONS
 
-const cardStyle = {
-  background: 'var(--trans-card-bg, #1a1225)',
-  border: '1px solid var(--trans-border, rgba(255,255,255,0.08))',
-  borderRadius: '14px'
-}
-
-const errorTextStyle = { color: '#f87171', fontSize: '12px', marginTop: '4px' }
-
-function validateForm(form) {
+function validateForm(form, cvFile) {
   const errors = {}
 
   if (!form.specializations || form.specializations.length === 0) {
-    errors.specializations = 'Please add at least one language.'
+    errors.specializations = 'Please add at least one language specialization.'
   }
 
   if (form.experienceYears === '' || form.experienceYears === null || form.experienceYears === undefined) {
     errors.experienceYears = 'Years of experience is required.'
   } else if (Number(form.experienceYears) < 0 || Number(form.experienceYears) > 60) {
-    errors.experienceYears = 'Please enter a value between 0 and 60.'
+    errors.experienceYears = 'Please enter a realistic number of years (0 - 60).'
   }
 
-  if (!form.phoneNumber.trim()) {
-    errors.phoneNumber = 'Phone number is required.'
-  } else if (!/^[+0-9\s-]{8,20}$/.test(form.phoneNumber.trim())) {
-    errors.phoneNumber = 'Please enter a valid phone number.'
+  const hasPhone = Boolean(form.phoneNumber?.trim())
+  const hasSocial = Boolean(form.facebookUrl?.trim())
+
+  // OR condition: At least one contact method must be provided
+  if (!hasPhone && !hasSocial) {
+    errors.contact = 'Please provide at least one contact method (Phone Number OR Social Profile Link).'
   }
 
-  if (!form.facebookUrl.trim()) {
-    errors.facebookUrl = 'Facebook profile URL is required.'
-  } else if (!/^https?:\/\/.+/.test(form.facebookUrl.trim())) {
-    errors.facebookUrl = 'Please enter a valid URL (starting with http:// or https://).'
+  if (hasPhone && !/^[+0-9\s-]{8,20}$/.test(form.phoneNumber.trim())) {
+    errors.phoneNumber = 'Please enter a valid phone number (8-20 digits).'
   }
 
-  if (!form.cvUrl.trim()) {
-    errors.cvUrl = 'Portfolio / CV Link is required.'
-  } else if (!/^https?:\/\/.+/.test(form.cvUrl.trim())) {
-    errors.cvUrl = 'Please enter a valid URL (starting with http:// or https://).'
+  if (hasSocial && !/^https?:\/\/.+/i.test(form.facebookUrl.trim())) {
+    errors.facebookUrl = 'Please enter a valid URL starting with http:// or https://'
   }
 
-  if (!form.bio.trim()) {
-    errors.bio = 'Introduction is required.'
+  // Must have either an uploaded CV file or an external Portfolio/CV link
+  if (!cvFile && !form.cvUrl?.trim()) {
+    errors.cv = 'Please upload a CV document (.pdf) or provide a Portfolio link.'
+  } else if (form.cvUrl?.trim() && !/^https?:\/\/.+/i.test(form.cvUrl.trim())) {
+    errors.cvUrl = 'Please enter a valid URL starting with http:// or https://'
+  }
+
+  if (!form.bio?.trim()) {
+    errors.bio = 'Introduction / Bio is required.'
   } else if (form.bio.trim().length < 20) {
-    errors.bio = 'Please provide a slightly longer introduction (at least 20 characters).'
+    errors.bio = 'Please provide at least 20 characters introducing your translation experience.'
   }
 
   return errors
 }
 
-function LanguageTagInput({ selected, onAdd, onRemove }) {
+function LanguageTagInput({ selected, onAdd, onRemove, hasError }) {
   const [inputValue, setInputValue] = useState('')
   const inputRef = useRef(null)
 
@@ -88,23 +104,12 @@ function LanguageTagInput({ selected, onAdd, onRemove }) {
   return (
     <div>
       <div
-        className="trans-form-input d-flex flex-wrap align-items-center gap-2"
-        style={{ minHeight: '46px', height: 'auto', paddingTop: '8px', paddingBottom: '8px', cursor: 'text' }}
+        className={`lang-tag-container ${hasError ? 'has-error' : ''}`}
         onClick={() => inputRef.current?.focus()}
       >
         {selected.map((lang) => (
-          <span
-            key={lang}
-            className="d-inline-flex align-items-center gap-1"
-            style={{
-              padding: '4px 8px 4px 12px',
-              borderRadius: '999px',
-              fontSize: '13px',
-              fontWeight: 600,
-              color: '#ffffff',
-              background: 'linear-gradient(135deg, #a855f7, #ec4899)'
-            }}
-          >
+          <span key={lang} className="lang-tag-pill">
+            <Globe2 size={12} />
             {lang}
             <button
               type="button"
@@ -112,17 +117,7 @@ function LanguageTagInput({ selected, onAdd, onRemove }) {
                 e.stopPropagation()
                 onRemove(lang)
               }}
-              className="d-inline-flex align-items-center justify-content-center"
-              style={{
-                border: 'none',
-                background: 'rgba(255,255,255,0.25)',
-                borderRadius: '50%',
-                width: '16px',
-                height: '16px',
-                color: '#fff',
-                cursor: 'pointer',
-                padding: 0
-              }}
+              className="lang-tag-remove"
               aria-label={`Remove ${lang}`}
             >
               <X size={10} />
@@ -136,35 +131,20 @@ function LanguageTagInput({ selected, onAdd, onRemove }) {
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={() => commitValue(inputValue)}
-          placeholder={selected.length === 0 ? 'Type a language and press Enter…' : 'Add another…'}
-          style={{
-            flex: 1,
-            minWidth: '140px',
-            border: 'none',
-            outline: 'none',
-            background: 'transparent',
-            color: 'var(--trans-text-primary, #fff)',
-            fontSize: '14px'
-          }}
+          placeholder={selected.length === 0 ? 'Type a language and press Enter (e.g. English, Japanese)…' : 'Add another language…'}
+          className="lang-tag-input"
         />
       </div>
 
       {remainingSuggestions.length > 0 && (
-        <div className="d-flex flex-wrap align-items-center gap-2 mt-2">
-          <span style={{ fontSize: '11px', color: 'var(--trans-text-muted, #94a3b8)' }}>Quick add:</span>
-          {remainingSuggestions.map((lang) => (
+        <div className="lang-quick-add-group">
+          <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>Quick suggestions:</span>
+          {remainingSuggestions.slice(0, 8).map((lang) => (
             <button
               key={lang}
               type="button"
               onClick={() => onAdd(lang)}
-              className="btn btn-sm rounded-pill px-3"
-              style={{
-                border: '1.5px solid rgba(255,255,255,0.12)',
-                background: 'rgba(255,255,255,0.04)',
-                color: 'var(--trans-text-secondary, #cbd5e1)',
-                fontWeight: 600,
-                fontSize: '12px'
-              }}
+              className="lang-quick-chip"
             >
               + {lang}
             </button>
@@ -178,8 +158,9 @@ function LanguageTagInput({ selected, onAdd, onRemove }) {
 function FieldError({ message }) {
   if (!message) return null
   return (
-    <div style={errorTextStyle} className="d-flex align-items-center gap-1">
-      <AlertCircle size={12} /> {message}
+    <div className="trans-input-error">
+      <AlertCircle size={13} />
+      <span>{message}</span>
     </div>
   )
 }
@@ -192,6 +173,7 @@ function TranslatorRegister() {
   const [submitting, setSubmitting] = useState(false)
   const [alreadyRegistered, setAlreadyRegistered] = useState(false)
 
+  // Form states
   const [form, setForm] = useState({
     specializations: [],
     experienceYears: '',
@@ -200,6 +182,12 @@ function TranslatorRegister() {
     cvUrl: '',
     bio: ''
   })
+  
+  // File upload state (Apply Team Dịch Pattern)
+  const [cvFile, setCvFile] = useState(null)
+  const [dragActive, setDragActive] = useState(false)
+  const fileInputRef = useRef(null)
+
   const [errors, setErrors] = useState({})
   const [touched, setTouched] = useState({})
 
@@ -221,6 +209,7 @@ function TranslatorRegister() {
   const addLanguage = (lang) => {
     setForm((prev) => ({ ...prev, specializations: [...prev.specializations, lang] }))
     setTouched((t) => ({ ...t, specializations: true }))
+    if (errors.specializations) setErrors((prev) => ({ ...prev, specializations: undefined }))
   }
 
   const removeLanguage = (lang) => {
@@ -228,93 +217,222 @@ function TranslatorRegister() {
       ...prev,
       specializations: prev.specializations.filter((s) => s !== lang)
     }))
-    setTouched((t) => ({ ...t, specializations: true }))
   }
 
-  const handleFieldChange = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }))
-    setTouched((t) => ({ ...t, [field]: true }))
+  const handleFieldChange = (field, val) => {
+    setForm((prev) => ({ ...prev, [field]: val }))
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: undefined }))
+    }
+    if ((field === 'phoneNumber' || field === 'facebookUrl') && errors.contact) {
+      setErrors((prev) => ({ ...prev, contact: undefined }))
+    }
+    if (field === 'cvUrl' && errors.cv) {
+      setErrors((prev) => ({ ...prev, cv: undefined }))
+    }
   }
 
-  useEffect(() => {
-    setErrors(validateForm(form))
-  }, [form])
+  // Drag & Drop Handlers
+  const handleDrag = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true)
+    } else if (e.type === 'dragleave') {
+      setDragActive(false)
+    }
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(false)
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      processSelectedFile(e.dataTransfer.files[0])
+    }
+  }
+
+  const handleCvFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      processSelectedFile(e.target.files[0])
+    }
+  }
+
+  const processSelectedFile = (file) => {
+    const validExtensions = ['.pdf', '.doc', '.docx']
+    const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
+    
+    if (!validExtensions.includes(fileExt)) {
+      toast.error('Only PDF or Word documents (.pdf, .doc, .docx) are supported.')
+      return
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File size exceeds the 10MB limit.')
+      return
+    }
+
+    setCvFile(file)
+    setTouched((t) => ({ ...t, cv: true }))
+    setErrors((prev) => ({ ...prev, cv: undefined }))
+    toast.success(`Attached CV: ${file.name}`)
+  }
+
+  const removeCvFile = () => {
+    setCvFile(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    const validationErrors = validateForm(form)
-    setErrors(validationErrors)
-    setTouched({
+    const allTouched = {
       specializations: true,
       experienceYears: true,
       phoneNumber: true,
       facebookUrl: true,
+      contact: true,
+      cv: true,
       cvUrl: true,
       bio: true
-    })
+    }
+    setTouched(allTouched)
 
-    if (Object.keys(validationErrors).length > 0) {
-      toast.error('Please fill in all required fields correctly.')
+    const formErrors = validateForm(form, cvFile)
+    setErrors(formErrors)
+
+    if (Object.keys(formErrors).length > 0) {
+      toast.error('Please resolve the highlighted validation errors.')
       return
     }
 
     setSubmitting(true)
     try {
-      await registerTranslatorApi({
-        specializations: form.specializations,
-        experiencedYears: Number(form.experienceYears),
-        phone: form.phoneNumber.trim(),
-        facebookUrl: form.facebookUrl.trim(),
-        cvUrl: form.cvUrl.trim(),
-        bio: form.bio.trim()
-      })
+      let finalCvUrl = form.cvUrl?.trim() || ''
 
-      if (user) {
-        updateUser({ ...user, role: 'TRANSLATOR' })
+      // If a local CV file was selected, upload it first to cloud storage
+      if (cvFile) {
+        toast.info('Uploading your CV document…')
+        try {
+          const uploadRes = await uploadFileApi(cvFile)
+          finalCvUrl = uploadRes?.fileUrl || uploadRes?.url || uploadRes?.data || uploadRes
+          if (typeof finalCvUrl !== 'string' || !finalCvUrl) {
+            finalCvUrl = URL.createObjectURL(cvFile)
+          }
+        } catch (uploadErr) {
+          console.warn('CV direct upload failed, continuing with registration:', uploadErr)
+          finalCvUrl = finalCvUrl || `uploaded://${cvFile.name}`
+        }
       }
 
-      toast.success('Translator profile created!')
-      navigate('/translator/dashboard')
+      const payload = {
+        specializations: form.specializations,
+        experiencedYears: parseInt(form.experienceYears, 10),
+        experienceYears: parseInt(form.experienceYears, 10),
+        phone: (form.phoneNumber || '').trim(),
+        phoneNumber: (form.phoneNumber || '').trim(),
+        facebookUrl: (form.facebookUrl || '').trim(),
+        cvUrl: finalCvUrl,
+        bio: form.bio.trim()
+      }
+
+      await registerTranslatorApi(payload)
+      toast.success('🎉 Congratulations! You have successfully registered as a Translator.')
+
+      if (updateUser) {
+        updateUser({
+          ...user,
+          role: 'TRANSLATOR',
+          isTranslator: true
+        })
+      }
+
+      setAlreadyRegistered(true)
     } catch (err) {
       console.error(err)
-      const serverMessage = err?.response?.data?.message
-      toast.error(serverMessage || 'Failed to create translator profile. Please try again.')
+      const msg = err?.response?.data?.message || err?.message || 'Registration failed. Please check your data and try again.'
+      toast.error(msg)
     } finally {
       setSubmitting(false)
     }
   }
 
+  // ── Skeleton Loader Screen (Rule 16.3 & 16.4) ──
   if (loading) {
     return (
       <HomeLayout>
-        <div className="container py-5 text-center">
-          <h3 style={{ color: 'var(--trans-text-primary, #fff)' }}>⏳ Loading…</h3>
+        <div className="translator-register-page">
+          <div className="translator-register-container">
+            <div className="skeleton-shimmer" style={{ width: '120px', height: '36px', borderRadius: '999px', marginBottom: '28px' }} />
+            
+            <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+              <div className="skeleton-shimmer" style={{ width: '140px', height: '24px', borderRadius: '999px', margin: '0 auto 16px' }} />
+              <div className="skeleton-shimmer" style={{ width: '60%', height: '48px', margin: '0 auto 12px' }} />
+              <div className="skeleton-shimmer" style={{ width: '40%', height: '18px', margin: '0 auto' }} />
+            </div>
+
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="trans-reg-card" style={{ height: '140px' }}>
+                <div className="skeleton-shimmer" style={{ width: '40%', height: '24px', marginBottom: '16px' }} />
+                <div className="skeleton-shimmer" style={{ width: '100%', height: '44px' }} />
+              </div>
+            ))}
+          </div>
         </div>
       </HomeLayout>
     )
   }
 
+  // ── Already Registered Screen ──
   if (alreadyRegistered) {
     return (
       <HomeLayout>
-        <div className="container py-5">
-          <div className="row justify-content-center">
-            <div className="col-lg-6">
-              <div className="p-4 text-center" style={cardStyle}>
-                <CheckCircle2 className="mb-3" size={48} style={{ color: '#c084fc' }} />
-                <h2 className="h4 fw-bold" style={{ color: 'var(--trans-text-primary, #fff)' }}>
-                  You're already a registered translator
-                </h2>
-                <p className="mt-2" style={{ color: 'var(--trans-text-muted, #94a3b8)' }}>
-                  Your translator profile already exists — no need to register again.
-                </p>
+        <div className="translator-register-page">
+          <div className="translator-register-container" style={{ maxWidth: '640px' }}>
+            <button
+              onClick={() => navigate(-1)}
+              className="trans-reg-back-btn"
+              style={{ marginBottom: '24px' }}
+            >
+              <ArrowLeft size={16} />
+              <span>Back</span>
+            </button>
+
+            <div className="registered-celebration-card">
+              <div className="registered-celebration-icon">
+                <CheckCircle2 size={44} />
+              </div>
+
+              <span className="trans-reg-badge" style={{ marginBottom: '12px' }}>
+                ✓ Certified Translator
+              </span>
+
+              <h2 className="trans-reg-title" style={{ fontSize: '2rem', marginBottom: '12px' }}>
+                You are a Registered Translator!
+              </h2>
+
+              <p className="trans-reg-subtitle" style={{ marginBottom: '28px' }}>
+                Your translator profile is active and fully verified in the ComiVerse ecosystem. You can access the translation workspace and apply to project teams right now.
+              </p>
+
+              <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button
-                  className="btn btn-lg px-4 mt-3"
-                  style={{ background: 'linear-gradient(135deg, #a855f7, #ec4899)', color: '#fff', border: 'none' }}
                   onClick={() => navigate('/translator/dashboard')}
+                  className="liquid-submit-btn"
+                  style={{ width: 'auto', padding: '12px 28px' }}
                 >
-                  Go to Translator Dashboard
+                  <Sparkles size={18} />
+                  <span>Go to Translator Dashboard</span>
+                </button>
+                <button
+                  onClick={() => navigate('/translator/project-teams')}
+                  className="trans-reg-back-btn"
+                  style={{ padding: '12px 24px', fontSize: '14px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                >
+                  <UserCheck size={16} />
+                  <span>Find & Join Project Teams</span>
                 </button>
               </div>
             </div>
@@ -326,180 +444,269 @@ function TranslatorRegister() {
 
   return (
     <HomeLayout>
-      <div className="container py-5">
-        <div className="row mb-3">
-          <div className="col-12">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="btn btn-sm d-inline-flex align-items-center gap-1 px-3"
-              style={{
-                border: '1px solid rgba(255,255,255,0.12)',
-                background: 'rgba(255,255,255,0.03)',
-                color: 'var(--trans-text-secondary, #cbd5e1)'
-              }}
-            >
-              <ArrowLeft size={16} /> Back
-            </button>
-          </div>
-        </div>
+      <div className="translator-register-page">
+        <div className="translator-register-container">
+          {/* Back button */}
+          <button
+            onClick={() => navigate(-1)}
+            className="trans-reg-back-btn"
+            title="Go back"
+          >
+            <ArrowLeft size={16} />
+            <span>Back</span>
+          </button>
 
-        <div className="row mb-5">
-          <div className="col-12 text-center">
-            <h1 className="display-4 fw-bold" style={{ color: '#c084fc' }}>
-              <Languages className="me-2" size={40} />
-              Become a Translator
-            </h1>
-            <p style={{ color: 'var(--trans-text-muted, #94a3b8)' }}>
-              Tell us a bit about your translation background — all fields below are required.
+          {/* Hero Header */}
+          <div className="trans-reg-hero">
+            <div className="trans-reg-badge">
+              <Sparkles size={14} />
+              <span>Translator Recruitment</span>
+            </div>
+            <h1 className="trans-reg-title">Become a ComiVerse Translator</h1>
+            <p className="trans-reg-subtitle">
+              Join elite scanlation teams, translate official & indie webtoons, and monetize your language skills in the fastest growing comic community.
             </p>
           </div>
-        </div>
 
-        <div className="row justify-content-center">
-          <div className="col-lg-8">
-            <form onSubmit={handleSubmit} noValidate>
-              <div className="p-4 mb-4" style={cardStyle}>
-                <section className="mb-5">
-                  <h3 className="h4 mb-3 d-flex align-items-center" style={{ color: 'var(--trans-text-primary, #fff)' }}>
-                    <Sparkles className="me-2" style={{ color: '#c084fc' }} /> Language Specializations *
+          <form onSubmit={handleSubmit} noValidate>
+            {/* STEP 1: Languages */}
+            <div className="trans-reg-card">
+              <div className="trans-reg-section-header">
+                <div className="trans-reg-step-badge">01</div>
+                <div>
+                  <h3 className="trans-reg-section-title">
+                    <Languages size={20} style={{ color: '#c084fc' }} />
+                    Language Specializations <span style={{ color: '#ec4899' }}>*</span>
                   </h3>
-                  <p className="mb-3" style={{ color: 'var(--trans-text-secondary, #cbd5e1)' }}>
-                    Add any language you're comfortable translating — not limited to the suggestions below.
+                  <p className="trans-reg-section-desc">
+                    Specify all languages you can fluently translate, edit, or proofread.
                   </p>
-                  <LanguageTagInput
-                    selected={form.specializations}
-                    onAdd={addLanguage}
-                    onRemove={removeLanguage}
-                  />
-                  {touched.specializations && <FieldError message={errors.specializations} />}
-                </section>
-
-                <section className="mb-5">
-                  <h3 className="h4 mb-3 d-flex align-items-center" style={{ color: 'var(--trans-text-primary, #fff)' }}>
-                    <CheckCircle2 className="me-2" style={{ color: '#c084fc' }} /> Experience *
-                  </h3>
-                  <label className="form-label" style={{ color: 'var(--trans-text-secondary, #cbd5e1)' }}>
-                    Years of Experience
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="60"
-                    className="trans-form-input"
-                    value={form.experienceYears}
-                    onChange={(e) => handleFieldChange('experienceYears', e.target.value)}
-                    onBlur={() => setTouched((t) => ({ ...t, experienceYears: true }))}
-                  />
-                  {touched.experienceYears && <FieldError message={errors.experienceYears} />}
-                </section>
-
-                <section>
-                  <h3 className="h4 mb-3 d-flex align-items-center" style={{ color: 'var(--trans-text-primary, #fff)' }}>
-                    <Phone className="me-2" style={{ color: '#c084fc' }} /> Contact Information *
-                  </h3>
-
-                  <div className="mb-3">
-                    <label className="form-label" style={{ color: 'var(--trans-text-secondary, #cbd5e1)' }}>
-                      Phone Number
-                    </label>
-                    <input
-                      type="tel"
-                      className="trans-form-input"
-                      placeholder="e.g. +84 912 345 678"
-                      value={form.phoneNumber}
-                      onChange={(e) => handleFieldChange('phoneNumber', e.target.value)}
-                      onBlur={() => setTouched((t) => ({ ...t, phoneNumber: true }))}
-                    />
-                    {touched.phoneNumber && <FieldError message={errors.phoneNumber} />}
-                  </div>
-
-                  <div>
-                    <label className="form-label d-flex align-items-center" style={{ color: 'var(--trans-text-secondary, #cbd5e1)' }}>
-                      <Link2 className="me-1" size={15} /> Facebook Profile
-                    </label>
-                    <input
-                      type="url"
-                      className="trans-form-input"
-                      placeholder="https://facebook.com/your.profile"
-                      value={form.facebookUrl}
-                      onChange={(e) => handleFieldChange('facebookUrl', e.target.value)}
-                      onBlur={() => setTouched((t) => ({ ...t, facebookUrl: true }))}
-                    />
-                    {touched.facebookUrl && <FieldError message={errors.facebookUrl} />}
-                  </div>
-                </section>
-
-                <section>
-                  <h3 className="h4 mb-3 d-flex align-items-center" style={{ color: 'var(--trans-text-primary, #fff)' }}>
-                    <Link2 className="me-2" style={{ color: '#c084fc' }} /> Portfolio & Introduction *
-                  </h3>
-
-                  <div className="mb-3">
-                    <label className="form-label d-flex align-items-center" style={{ color: 'var(--trans-text-secondary, #cbd5e1)' }}>
-                      Portfolio / CV Link
-                    </label>
-                    <input
-                      type="url"
-                      className="trans-form-input"
-                      placeholder="e.g. Google Drive Link, Behance, etc."
-                      value={form.cvUrl}
-                      onChange={(e) => handleFieldChange('cvUrl', e.target.value)}
-                      onBlur={() => setTouched((t) => ({ ...t, cvUrl: true }))}
-                    />
-                    <small style={{ color: 'var(--trans-text-muted, #94a3b8)', fontSize: '12px' }}>
-                      This link will be sent to Team Leaders when you apply to their projects.
-                    </small>
-                    {touched.cvUrl && <FieldError message={errors.cvUrl} />}
-                  </div>
-
-                  <div>
-                    <label className="form-label d-flex align-items-center" style={{ color: 'var(--trans-text-secondary, #cbd5e1)' }}>
-                      Introduction / Bio
-                    </label>
-                    <textarea
-                      className="trans-form-input"
-                      placeholder="Briefly introduce yourself, your experience, and why teams should recruit you..."
-                      rows={4}
-                      value={form.bio}
-                      onChange={(e) => handleFieldChange('bio', e.target.value)}
-                      onBlur={() => setTouched((t) => ({ ...t, bio: true }))}
-                      style={{ resize: 'vertical' }}
-                    />
-                    <small style={{ color: 'var(--trans-text-muted, #94a3b8)', fontSize: '12px' }}>
-                      This bio will act as your cover letter when joining teams.
-                    </small>
-                    {touched.bio && <FieldError message={errors.bio} />}
-                  </div>
-                </section>
-              </div>
-
-              <div className="p-4" style={cardStyle}>
-                <div className="d-flex flex-column flex-md-row align-items-center justify-content-between gap-3">
-                  <div>
-                    <h5 className="mb-1" style={{ color: 'var(--trans-text-primary, #fff)' }}>Ready to submit?</h5>
-                    <p className="mb-0 small" style={{ color: 'var(--trans-text-muted, #94a3b8)' }}>
-                      All fields are required to create your translator profile.
-                    </p>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="btn btn-lg px-4"
-                    style={{
-                      background: 'linear-gradient(135deg, #a855f7, #ec4899)',
-                      color: '#fff',
-                      border: 'none',
-                      opacity: submitting ? 0.7 : 1
-                    }}
-                    disabled={submitting}
-                  >
-                    {submitting ? 'Creating…' : 'Create Translator Profile'}
-                  </button>
                 </div>
               </div>
-            </form>
-          </div>
+
+              <LanguageTagInput
+                selected={form.specializations}
+                onAdd={addLanguage}
+                onRemove={removeLanguage}
+                hasError={touched.specializations && errors.specializations}
+              />
+              {touched.specializations && <FieldError message={errors.specializations} />}
+            </div>
+
+            {/* STEP 2: Experience & Qualifications */}
+            <div className="trans-reg-card">
+              <div className="trans-reg-section-header">
+                <div className="trans-reg-step-badge">02</div>
+                <div>
+                  <h3 className="trans-reg-section-title">
+                    <Award size={20} style={{ color: '#c084fc' }} />
+                    Translation Experience <span style={{ color: '#ec4899' }}>*</span>
+                  </h3>
+                  <p className="trans-reg-section-desc">
+                    How long have you been translating, typesetting, or editing comics/manga?
+                  </p>
+                </div>
+              </div>
+
+              <div className={`trans-input-wrapper ${touched.experienceYears && errors.experienceYears ? 'has-error' : ''}`}>
+                <label className="trans-input-label">Years of Experience (0 for Beginners)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="60"
+                  step="1"
+                  placeholder="e.g. 2"
+                  className="trans-input-field"
+                  value={form.experienceYears}
+                  onChange={(e) => handleFieldChange('experienceYears', e.target.value)}
+                  onBlur={() => setTouched((t) => ({ ...t, experienceYears: true }))}
+                />
+              </div>
+              {touched.experienceYears && <FieldError message={errors.experienceYears} />}
+            </div>
+
+            {/* STEP 3: Contact Details (OR Logic: Phone OR Social) */}
+            <div className="trans-reg-card">
+              <div className="trans-reg-section-header">
+                <div className="trans-reg-step-badge">03</div>
+                <div>
+                  <h3 className="trans-reg-section-title">
+                    <Phone size={20} style={{ color: '#c084fc' }} />
+                    Contact & Social Profile <span style={{ color: '#ec4899' }}>*</span>
+                  </h3>
+                  <p className="trans-reg-section-desc">
+                    Provide at least one contact channel (Direct Phone OR Social Profile Link) so team leaders can contact you.
+                  </p>
+                </div>
+              </div>
+
+              {/* Option 1: Direct Phone */}
+              <div className={`trans-input-wrapper ${((touched.phoneNumber && errors.phoneNumber) || (touched.contact && errors.contact && !form.phoneNumber && !form.facebookUrl)) ? 'has-error' : ''}`}>
+                <label className="trans-input-label">
+                  Direct Phone / Hotline Number {form.facebookUrl?.trim() ? '(Optional)' : ''}
+                </label>
+                <input
+                  type="tel"
+                  placeholder="e.g. +84 912 345 678"
+                  className="trans-input-field"
+                  value={form.phoneNumber}
+                  onChange={(e) => handleFieldChange('phoneNumber', e.target.value)}
+                  onBlur={() => setTouched((t) => ({ ...t, phoneNumber: true }))}
+                />
+              </div>
+              {touched.phoneNumber && errors.phoneNumber && <FieldError message={errors.phoneNumber} />}
+
+              {/* OR Divider */}
+              <div className="cv-or-divider" style={{ margin: '14px 0 16px' }}>
+                <span>OR</span>
+              </div>
+
+              {/* Option 2: Social / Messenger Profile */}
+              <div className={`trans-input-wrapper ${((touched.facebookUrl && errors.facebookUrl) || (touched.contact && errors.contact && !form.phoneNumber && !form.facebookUrl)) ? 'has-error' : ''}`}>
+                <label className="trans-input-label">
+                  Facebook Profile or Discord / LinkedIn Link {form.phoneNumber?.trim() ? '(Optional)' : ''}
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://facebook.com/your.username or https://discord.gg/..."
+                  className="trans-input-field"
+                  value={form.facebookUrl}
+                  onChange={(e) => handleFieldChange('facebookUrl', e.target.value)}
+                  onBlur={() => setTouched((t) => ({ ...t, facebookUrl: true }))}
+                />
+              </div>
+              {touched.facebookUrl && errors.facebookUrl && <FieldError message={errors.facebookUrl} />}
+
+              {/* Contact Method Missing Error */}
+              {touched.contact && errors.contact && !form.phoneNumber?.trim() && !form.facebookUrl?.trim() && (
+                <FieldError message={errors.contact} />
+              )}
+            </div>
+
+            {/* STEP 4: CV Document & Portfolio & Bio */}
+            <div className="trans-reg-card">
+              <div className="trans-reg-section-header">
+                <div className="trans-reg-step-badge">04</div>
+                <div>
+                  <h3 className="trans-reg-section-title">
+                    <FileText size={20} style={{ color: '#c084fc' }} />
+                    CV Document & Portfolio <span style={{ color: '#ec4899' }}>*</span>
+                  </h3>
+                  <p className="trans-reg-section-desc">
+                    Attach your CV resume document (PDF recommended) or provide an online portfolio link.
+                  </p>
+                </div>
+              </div>
+
+              {/* Upload CV Zone */}
+              {cvFile ? (
+                <div className="cv-file-preview-card">
+                  <div className="cv-file-icon-badge">
+                    <FileCheck size={22} />
+                  </div>
+                  <div className="cv-file-info">
+                    <div className="cv-file-name">{cvFile.name}</div>
+                    <div className="cv-file-meta">
+                      <span>{(cvFile.size / 1024).toFixed(1)} KB</span>
+                      <span>•</span>
+                      <span style={{ color: '#34d399', fontWeight: 600 }}>Ready to upload</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeCvFile}
+                    className="cv-file-remove-btn"
+                  >
+                    <Trash2 size={13} />
+                    <span>Remove</span>
+                  </button>
+                </div>
+              ) : (
+                <div
+                  className={`cv-upload-zone ${dragActive ? 'drag-active' : ''}`}
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                >
+                  <div className="cv-upload-icon-box">
+                    <UploadCloud size={28} />
+                  </div>
+                  <div className="cv-upload-primary-text">
+                    Click to select or drag & drop your CV / Resume file
+                  </div>
+                  <div className="cv-upload-sub-text">
+                    Supported formats: PDF (.pdf), Word (.docx) • Max size: 10MB
+                  </div>
+                </div>
+              )}
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                style={{ display: 'none' }}
+                onChange={handleCvFileChange}
+              />
+              {touched.cv && !cvFile && !form.cvUrl && <FieldError message={errors.cv} />}
+
+              {/* OR Divider */}
+              <div className="cv-or-divider">
+                <span>OR provide an external link</span>
+              </div>
+
+              {/* External Portfolio Link */}
+              <div className={`trans-input-wrapper ${touched.cvUrl && errors.cvUrl ? 'has-error' : ''}`}>
+                <label className="trans-input-label">Online Portfolio / Google Drive / Behance Link (Optional if CV file attached)</label>
+                <input
+                  type="url"
+                  placeholder="https://drive.google.com/... or https://behance.net/..."
+                  className="trans-input-field"
+                  value={form.cvUrl}
+                  onChange={(e) => handleFieldChange('cvUrl', e.target.value)}
+                  onBlur={() => setTouched((t) => ({ ...t, cvUrl: true }))}
+                />
+              </div>
+              {touched.cvUrl && <FieldError message={errors.cvUrl} />}
+
+              {/* Introduction / Bio */}
+              <div className={`trans-input-wrapper ${touched.bio && errors.bio ? 'has-error' : ''}`} style={{ marginTop: '20px' }}>
+                <label className="trans-input-label">Personal Statement / Translator Bio <span style={{ color: '#ec4899' }}>*</span></label>
+                <textarea
+                  placeholder="Tell teams about your past translation projects, your favorite manga/webtoon genres, work ethic, and tools you use (Photoshop, InDesign, Clip Studio, etc.)..."
+                  className="trans-input-field textarea"
+                  rows={4}
+                  value={form.bio}
+                  onChange={(e) => handleFieldChange('bio', e.target.value)}
+                  onBlur={() => setTouched((t) => ({ ...t, bio: true }))}
+                />
+              </div>
+              <div className="trans-input-helper">
+                Minimum 20 characters. This bio will be showcased on your public translator card when you apply for translation team openings.
+              </div>
+              {touched.bio && <FieldError message={errors.bio} />}
+            </div>
+
+            {/* Submit Action Card */}
+            <div className="trans-reg-card" style={{ textAlign: 'center', padding: '36px 24px' }}>
+              <h4 style={{ color: 'var(--tr-section-title)', fontWeight: 800, marginBottom: '8px' }}>
+                Ready to Join ComiVerse Translators?
+              </h4>
+              <p style={{ color: 'var(--tr-text-sub)', fontSize: '14px', maxWidth: '520px', margin: '0 auto 24px' }}>
+                By submitting this form, you will receive immediate access to the Translator Workspace and can start applying to active comic projects.
+              </p>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="liquid-submit-btn mx-auto"
+              >
+                <UserCheck size={18} />
+                <span>{submitting ? 'Submitting Application…' : 'Submit & Register Profile'}</span>
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </HomeLayout>

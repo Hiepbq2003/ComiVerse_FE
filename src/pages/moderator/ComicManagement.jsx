@@ -16,7 +16,7 @@ import { getAuth } from '../../utils/Auth'
 import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 
-function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, handleArchiveComic, handleTriggerAssignTeam, fetchAllData }) {
+function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, handleSuspendComic, handleRestoreComic, handleTriggerAssignTeam, fetchAllData }) {
   const navigate = useNavigate()
 
   // Search & Filters local states
@@ -55,8 +55,13 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
            return false;
         }
 
+        let effectiveStatus = (c.publicationStatus || 'ONGOING').toUpperCase();
+        if (c.moderationStatus === 'UNPUBLISHED') {
+          effectiveStatus = 'SUSPENDED';
+        }
+
         const matchesStatus = comicStatusFilter === 'All Status' || 
-          c.publicationStatus?.toUpperCase() === comicStatusFilter.toUpperCase();
+          effectiveStatus === comicStatusFilter.toUpperCase();
         const matchesGenre = comicGenreFilter === 'All Genres' || (c.genres || []).some(g => (typeof g === 'object' && g !== null ? g.name : g) === comicGenreFilter);
         const matchesAuthor = comicAuthorFilter === 'All Authors' || c.authorName === comicAuthorFilter || c.author === comicAuthorFilter;
         const matchesTeam = comicTeamFilter === 'All Project Teams' || c.projectTeam === comicTeamFilter;
@@ -228,9 +233,10 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
     return () => { isMounted = false; };
   }, [paginatedComics]);
 
-  // Archive confirmation modal states
+  // Archive/Suspend confirmation modal states
   const [showArchiveModal, setShowArchiveModal] = useState(false)
   const [comicToArchive, setComicToArchive] = useState(null)
+  const [isRestoreMode, setIsRestoreMode] = useState(false)
 
   // Edit modal local states
   const [editingComic, setEditingComic] = useState(null)
@@ -465,7 +471,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
       </div>
 
       {/* Statistics overview cards row */}
-      <div className="mod-stats-cards-row" style={{ marginBottom: '24px', gridTemplateColumns: 'repeat(4, 1fr)' }}>
+      <div className="mod-stats-cards-row" style={{ marginBottom: '24px', gridTemplateColumns: 'repeat(5, 1fr)' }}>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <span className="stat-label">Total Comics</span>
@@ -473,7 +479,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               <path d="M0 20 Q 25 5, 50 15 T 100 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value">{comics.length}</span>
+          <span className="stat-value">{comics.filter(c => c.moderationStatus !== 'REJECTED' && c.moderationStatus !== 'SUBMITTED_FOR_REVIEW').length}</span>
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -482,7 +488,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               <path d="M0 25 C 20 25, 40 5, 60 10 C 80 15, 90 2, 100 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value active-count">{comics.filter(c => !c.publicationStatus || c.publicationStatus.toUpperCase() === 'ONGOING').length}</span>
+          <span className="stat-value active-count">{comics.filter(c => c.moderationStatus !== 'UNPUBLISHED' && (!c.publicationStatus || c.publicationStatus.toUpperCase() === 'ONGOING')).length}</span>
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -491,7 +497,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               <path d="M0 25 C 30 25, 50 20, 70 8 C 85 2, 95 10, 100 2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value" style={{ color: '#3b82f6' }}>{comics.filter(c => c.publicationStatus?.toUpperCase() === 'COMPLETED').length}</span>
+          <span className="stat-value" style={{ color: '#3b82f6' }}>{comics.filter(c => c.moderationStatus !== 'UNPUBLISHED' && c.publicationStatus?.toUpperCase() === 'COMPLETED').length}</span>
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -500,7 +506,16 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
               <path d="M0 10 C 20 10, 40 25, 60 20 C 80 15, 90 25, 100 25" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value paused-count">{comics.filter(c => c.publicationStatus?.toUpperCase() === 'HIATUS').length}</span>
+          <span className="stat-value paused-count">{comics.filter(c => c.moderationStatus !== 'UNPUBLISHED' && c.publicationStatus?.toUpperCase() === 'HIATUS').length}</span>
+        </div>
+        <div className="mod-stat-overview-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="stat-label">Suspended</span>
+            <svg viewBox="0 0 100 30" className="stat-sparkline" style={{ width: '50px', height: '18px', color: '#ef4444', opacity: 0.7 }}>
+              <path d="M0 15 C 20 25, 40 25, 60 15 C 80 5, 90 5, 100 15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </div>
+          <span className="stat-value" style={{ color: '#ef4444' }}>{comics.filter(c => c.moderationStatus === 'UNPUBLISHED').length}</span>
         </div>
       </div>
 
@@ -525,6 +540,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
             <option>Ongoing</option>
             <option>Hiatus</option>
             <option>Completed</option>
+            <option>Suspended</option>
           </select>
 
           <select 
@@ -703,6 +719,10 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                       <span className="comic-status-badge" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}>
                         PENDING REVIEW
                       </span>
+                    ) : comic.moderationStatus === 'UNPUBLISHED' ? (
+                      <span className="comic-status-badge rejected">
+                        SUSPENDED
+                      </span>
                     ) : (
                       <span className={`comic-status-badge ${(comic.publicationStatus || 'ONGOING').toLowerCase()}`}>
                         {comic.publicationStatus || 'ONGOING'}
@@ -717,14 +737,25 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                         className="btn-view"
                         onClick={() => navigate(`/moderator/comic/${comic.id}`, { state: { comic } })} 
                       />
-                      <ModernButton 
-                        variant={2} 
-                        label="🗑️ Archive" 
-                        className="btn-archive"
-                        onClick={() => { setComicToArchive(comic); setShowArchiveModal(true); }} 
-                        disabled={!hasPermission}
-                        title={!hasPermission ? "Out of scope" : "Archive this comic"}
-                      />
+                      {comic.moderationStatus === 'UNPUBLISHED' ? (
+                        <ModernButton 
+                          variant={2} 
+                          label="🔄 Restore" 
+                          className="btn-restore"
+                          onClick={() => { setComicToArchive(comic); setIsRestoreMode(true); setShowArchiveModal(true); }} 
+                          disabled={!hasPermission}
+                          title={!hasPermission ? "Out of scope" : "Restore this comic (Make visible to readers)"}
+                        />
+                      ) : (
+                        <ModernButton 
+                          variant={2} 
+                          label="⏸ Suspend" 
+                          className="btn-suspend"
+                          onClick={() => { setComicToArchive(comic); setIsRestoreMode(false); setShowArchiveModal(true); }} 
+                          disabled={!hasPermission}
+                          title={!hasPermission ? "Out of scope" : "Suspend this comic (Hide from readers)"}
+                        />
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -1216,21 +1247,38 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
         </div>,
         document.body
       )}
-      {/* ── MODAL: ARCHIVE COMIC CONFIRMATION ───────── */}
+      {/* 🛑 MODAL: SUSPEND/RESTORE COMIC CONFIRMATION 🛑🛑🛑🛑🛑🛑🛑🛑 */}
       {showArchiveModal && comicToArchive && createPortal(
         <div className="mod-modal-overlay" style={{ zIndex: 9999 }}>
           <div className="mod-modal-card" style={{ maxWidth: '420px', textAlign: 'center' }}>
             <div className="mod-modal-body" style={{ padding: '28px 20px' }}>
-              <div style={{ fontSize: '42px', marginBottom: '16px' }}>🗑️</div>
-              <h3 style={{ margin: '0 0 10px', fontSize: '18px', color: 'white' }}>Archive Comic</h3>
+              <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
+                {isRestoreMode ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="1 4 1 10 7 10"></polyline>
+                    <polyline points="23 20 23 14 17 14"></polyline>
+                    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="6" y="4" width="4" height="16"></rect>
+                    <rect x="14" y="4" width="4" height="16"></rect>
+                  </svg>
+                )}
+              </div>
+              <h3 style={{ margin: '0 0 10px', fontSize: '18px', color: 'white' }}>{isRestoreMode ? 'Restore Comic' : 'Suspend Comic'}</h3>
               <p style={{ margin: '0 0 24px', fontSize: '14px', color: 'var(--mod-text-secondary)', lineHeight: '1.5' }}>
-                Are you sure you want to archive the comic <strong style={{ color: 'white' }}>"{comicToArchive.title}"</strong>?
-                This will soft-delete the comic catalog entry.
+                {isRestoreMode ? (
+                  <>Are you sure you want to restore <strong style={{ color: 'white' }}>"{comicToArchive.title}"</strong>?<br/>This will publish the comic back to readers.</>
+                ) : (
+                  <>Are you sure you want to suspend <strong style={{ color: 'white' }}>"{comicToArchive.title}"</strong>?<br/>This will hide the comic from readers across the platform.</>
+                )}
               </p>
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', alignItems: 'center' }}>
                  <ModernButton 
-                   variant={5} 
+                   variant={2} 
                    label="Cancel" 
+                   className="btn-cancel"
                    onClick={() => {
                      setShowArchiveModal(false)
                      setComicToArchive(null)
@@ -1238,13 +1286,18 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
                  />
                  <ModernButton 
                    variant={2} 
-                   label="Archive" 
-                   className="btn-archive"
+                   label={isRestoreMode ? "Restore" : "Suspend"} 
+                   className={isRestoreMode ? "btn-restore" : "btn-suspend"}
                    onClick={() => {
-                     handleArchiveComic(comicToArchive.id)
+                     if (isRestoreMode) {
+                       handleRestoreComic(comicToArchive.id)
+                     } else {
+                       handleSuspendComic(comicToArchive.id)
+                     }
                      setShowArchiveModal(false)
                      setComicToArchive(null)
                    }} 
+                   
                  />
                </div>
             </div>

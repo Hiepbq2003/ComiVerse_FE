@@ -18,6 +18,16 @@ export function getModeratorScope(user) {
   return [];
 }
 
+export function isScopeGlobal(scope) {
+  if (!scope) return true;
+  if (scope.length === 0) return true;
+  if (scope.length >= 7) return true;
+  return scope.some(s => {
+    const lower = String(s).toLowerCase().trim();
+    return ['global', 'all', 'any', '*'].includes(lower) || lower.includes('all language');
+  });
+}
+
 /**
  * Checks whether a given comic or submission language falls within the moderator's assigned scope.
  * If moderator scope contains global/all/any/star, returns true.
@@ -25,7 +35,7 @@ export function getModeratorScope(user) {
  */
 export function isLanguageInModeratorScope(langStr, user) {
   const scope = getModeratorScope(user);
-  if (!scope || scope.length === 0 || scope.length >= 7 || scope.includes('global') || scope.includes('all') || scope.includes('any') || scope.includes('*')) {
+  if (isScopeGlobal(scope)) {
     return true;
   }
   if (!langStr) return false;

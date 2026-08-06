@@ -401,3 +401,19 @@ html.light .lang-checkbox-item.checked {
   border-color: #7c3aed !important;
   color: #7c3aed !important;
 }
+
+/* Suspend, Restore, Cancel Button Overrides for ModernButton variant 2 */
+.modern-btn-container .btn-suspend.btn-2, .modern-btn-container .btn-suspend.btn-2::before {
+  background: linear-gradient(110deg, #f97316 0%, #ef4444 55%, #b91c1c 100%) !important;
+  color: white !important;
+}
+
+.modern-btn-container .btn-restore.btn-2, .modern-btn-container .btn-restore.btn-2::before {
+  background: linear-gradient(110deg, #10b981 0%, #059669 55%, #047857 100%) !important;
+  color: white !important;
+}
+
+.modern-btn-container .btn-cancel.btn-2, .modern-btn-container .btn-cancel.btn-2::before {
+  background: linear-gradient(110deg, #9ca3af 0%, #6b7280 55%, #4b5563 100%) !important;
+  color: white !important;
+}
