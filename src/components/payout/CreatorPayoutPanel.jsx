@@ -308,7 +308,9 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
   )
 
   const maximumRequestAmount = Number(
-    overview?.monthlyWithdrawableAmount,
+    role === 'TRANSLATOR'
+      ? (overview?.availableBalanceAmount ?? overview?.monthlyWithdrawableAmount)
+      : overview?.monthlyWithdrawableAmount,
   ) || 0
   const minimumRequestAmount = Number(
     overview?.minimumPayoutAmount,
@@ -340,7 +342,7 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
     Math.max(
       0,
       maximumRequestAmount
-      / Math.max(1, Number(overview?.monthlyGrossAmount) || 0)
+      / Math.max(1, Number(role === 'TRANSLATOR' ? overview?.cumulativeEarnedAmount : overview?.monthlyGrossAmount) || 0)
       * 100,
     ),
   )
@@ -436,7 +438,7 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
 
       <div className="creator-payout-summary creator-payout-summary--five">
         <div className="creator-payout-card">
-          <span>Gross revenue</span>
+          <span>{role === 'TRANSLATOR' ? 'Selected-month settlement' : 'Gross revenue'}</span>
           <strong>{formatMoney(overview?.monthlyGrossAmount, currency)}</strong>
           <small>
             Base: {formatMoney(overview?.monthlyGrossAmountUsd, 'USD')}
@@ -445,7 +447,7 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
         <div className="creator-payout-card">
           <span>Maximum request</span>
           <strong>{formatMoney(maximumRequestAmount, currency)}</strong>
-          <small>Limited by role and month</small>
+          <small>{role === 'TRANSLATOR' ? 'Accumulated closed-month balance' : 'Limited by role and month'}</small>
         </div>
         <div className="creator-payout-card">
           <span>Pending</span>
@@ -458,8 +460,8 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
           <small>Completed Stripe transfers</small>
         </div>
         <div className="creator-payout-card">
-          <span>Monthly limit</span>
-          <strong>{formatMoney(overview?.monthlyLimitAmount, currency)}</strong>
+          <span>{role === 'TRANSLATOR' ? 'Current-month pending' : 'Monthly limit'}</span>
+          <strong>{formatMoney(role === 'TRANSLATOR' ? overview?.pendingCurrentMonthAmount : overview?.monthlyLimitAmount, currency)}</strong>
           <small>
             Minimum request: {formatMoney(minimumRequestAmount, currency)}
           </small>
@@ -479,7 +481,7 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
         <div className="creator-payout-visuals">
           <div className="creator-withdrawable-chart">
             <div className="creator-progress-heading">
-              <span>Withdrawable revenue</span>
+              <span>{role === 'TRANSLATOR' ? 'Available wallet balance' : 'Withdrawable revenue'}</span>
               <strong>{withdrawablePercent.toFixed(0)}%</strong>
             </div>
             <div className="creator-progress-track">
@@ -487,7 +489,7 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
             </div>
             <small>
               {formatMoney(maximumRequestAmount, currency)} of{' '}
-              {formatMoney(overview?.monthlyGrossAmount, currency)}
+              {formatMoney(role === 'TRANSLATOR' ? overview?.cumulativeEarnedAmount : overview?.monthlyGrossAmount, currency)}
             </small>
           </div>
           <div className="creator-status-chart">
