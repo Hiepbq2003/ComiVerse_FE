@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { rateComicApi, deleteComicRatingApi, getComicRatingApi } from '../../services/api/RatingApi';
 import ConfirmModal from './ConfirmModal';
+import '../../assets/style/common/star-rating.css';
 
 const STAR_LABELS = {
-  1: '1 - Rất tệ (Poor)',
-  2: '2 - Tệ (Fair)',
-  3: '3 - Bình thường (Good)',
-  4: '4 - Hay (Very Good)',
-  5: '5 - Tuyệt vời (Excellent)'
+  1: '1 - Poor',
+  2: '2 - Fair',
+  3: '3 - Good',
+  4: '4 - Very Good',
+  5: '5 - Excellent'
 };
 
 function StarRating({ comicId, user, initialRatingAverage = 0, initialRatingCount = 0, initialUserScore = null, onRatingChange }) {
@@ -133,51 +134,28 @@ function StarRating({ comicId, user, initialRatingAverage = 0, initialRatingCoun
   const activeDisplayScore = hoverScore || userScore || 0;
 
   return (
-    <div
-      className="comic-star-rating-container"
-      style={{
-        background: 'rgba(255, 255, 255, 0.02)',
-        border: '1px solid rgba(255, 255, 255, 0.06)',
-        borderRadius: '14px',
-        padding: '16px 20px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px',
-        maxWidth: '420px',
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)'
-      }}
-    >
+    <div className="comic-star-rating-container">
       {/* Top row: Summary */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-          <span style={{ fontSize: '24px', fontWeight: '800', color: '#fbbf24', fontFamily: 'var(--font-serif)' }}>
+      <div className="star-rating-header">
+        <div className="star-rating-summary">
+          <span className="star-rating-score-num">
             ⭐ {ratingAverage > 0 ? ratingAverage.toFixed(1) : '0.0'}
           </span>
-          <span style={{ fontSize: '13px', color: '#94a3b8' }}>
-            / 5 ({ratingCount} ratings)
+          <span className="star-rating-muted-text">
+            / 5 ({ratingCount} {ratingCount === 1 ? 'rating' : 'ratings'})
           </span>
         </div>
 
         {userScore && (
-          <span
-            style={{
-              fontSize: '12px',
-              padding: '3px 10px',
-              borderRadius: '20px',
-              background: 'rgba(168, 85, 247, 0.15)',
-              border: '1px solid rgba(168, 85, 247, 0.3)',
-              color: '#c084fc',
-              fontWeight: '600'
-            }}
-          >
+          <span className="star-rating-badge-user">
             Your rating: {userScore} ⭐
           </span>
         )}
       </div>
 
       {/* Stars Interactive Row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ display: 'flex', gap: '4px' }} onMouseLeave={() => setHoverScore(0)}>
+      <div className="star-rating-stars-row">
+        <div className="star-rating-stars-group" onMouseLeave={() => setHoverScore(0)}>
           {[1, 2, 3, 4, 5].map((starIndex) => {
             const isFilled = starIndex <= activeDisplayScore;
             return (
@@ -187,16 +165,9 @@ function StarRating({ comicId, user, initialRatingAverage = 0, initialRatingCoun
                 disabled={loading}
                 onClick={() => handleRate(starIndex)}
                 onMouseEnter={() => setHoverScore(starIndex)}
+                className={`star-button ${isFilled ? 'filled' : 'empty'}`}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: loading ? 'wait' : 'pointer',
-                  fontSize: '28px',
-                  padding: '2px',
-                  lineHeight: '1',
-                  transition: 'transform 0.15s ease, color 0.15s ease',
-                  transform: hoverScore === starIndex ? 'scale(1.25)' : 'scale(1)',
-                  color: isFilled ? '#fbbf24' : 'rgba(255, 255, 255, 0.2)'
+                  transform: hoverScore === starIndex ? 'scale(1.25)' : 'scale(1)'
                 }}
                 title={STAR_LABELS[starIndex]}
               >
@@ -207,30 +178,19 @@ function StarRating({ comicId, user, initialRatingAverage = 0, initialRatingCoun
         </div>
 
         {/* Hover label hint */}
-        <span style={{ fontSize: '13px', color: '#cbd5e1', fontStyle: 'italic', marginLeft: '6px' }}>
+        <span className="star-rating-hint-text">
           {hoverScore ? STAR_LABELS[hoverScore] : userScore ? `(Selected ${userScore} stars)` : '(Click star to rate)'}
         </span>
       </div>
 
       {/* Reset Rating Button */}
       {userScore && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2px' }}>
+        <div className="star-rating-action-row">
           <button
             type="button"
             disabled={loading}
             onClick={() => setShowConfirmModal(true)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#ef4444',
-              fontSize: '12px',
-              cursor: 'pointer',
-              textDecoration: 'underline',
-              padding: '2px 4px',
-              transition: 'color 0.2s ease'
-            }}
-            onMouseEnter={(e) => (e.target.style.color = '#f87171')}
-            onMouseLeave={(e) => (e.target.style.color = '#ef4444')}
+            className="star-rating-remove-btn"
           >
             Remove my rating
           </button>

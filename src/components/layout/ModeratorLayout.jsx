@@ -1,13 +1,16 @@
-import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { AIPopover } from '../common/AIPopover'
+import LogoIcon from '../common/LogoIcon'
 import '../../assets/style/moderator/moderator.css'
+import { getModeratorScope } from '../../utils/moderatorScope'
 
 function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBadges = {} }) {
   const navigate = useNavigate()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const { isLoggedIn, user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
@@ -82,6 +85,12 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
             <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
           </svg>
         )
+      case 'appeal':
+        return (
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/>
+          </svg>
+        )
       case 'review':
         return (
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -124,12 +133,19 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
   }
 
   return (
-    <div className="moderator-layout">
+    <div className={`moderator-layout ${isMobileMenuOpen ? 'mobile-menu-open' : ''}`}>
+      {/* Mobile Overlay */}
+      <div 
+        className={`moderator-mobile-overlay ${isMobileMenuOpen ? 'show' : ''}`}
+        onClick={() => setIsMobileMenuOpen(false)}
+      />
+
       {/* Sidebar */}
-      <aside className="moderator-sidebar">
-        <div className="moderator-sidebar-brand">
-          <h2>Moderator Panel</h2>
-          <span>Content Management</span>
+      <aside className={`moderator-sidebar ${isMobileMenuOpen ? 'open' : ''}`}>
+        <div className="moderator-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px' }}>
+          <Link to="/" style={{ display: 'block', textDecoration: 'none', marginLeft: '38px' }}>
+            <LogoIcon size={26} />
+          </Link>
         </div>
 
         <nav className="moderator-sidebar-nav">
@@ -143,6 +159,7 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
                 } else {
                   navigate('/moderator', { state: { activeNav: item.id } })
                 }
+                setIsMobileMenuOpen(false)
               }}
             >
               <span className="moderator-nav-label-group">
@@ -177,14 +194,32 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
         {/* Topbar */}
         <header className="moderator-topbar">
           <div className="moderator-topbar-left">
-            <span>Workspace:</span>
-            <span className="workspace-label">Moderator</span>
+            <button 
+              className="moderator-mobile-toggle"
+              onClick={() => setIsMobileMenuOpen(true)}
+            >
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
+            <span className="workspace-label-text">WORKSPACE</span>
+            <div className="workspace-tag" style={{ marginTop: 0, fontSize: '12px', padding: '6px 12px' }}>
+              Moderator
+            </div>
             <span 
               className="mod-lang-scope-badge"
               title="Authorized moderation languages"
             >
               <span>🌐</span>
-              <span>Scope: {Array.isArray(user?.assignedLanguages) && user.assignedLanguages.length > 0 ? user.assignedLanguages.join(', ') : 'Japanese, Korean'}</span>
+              <span>
+                Scope: {(() => {
+                  const scope = getModeratorScope(user);
+                  const isGlobal = scope.length === 0 || scope.length >= 7 || scope.some(s => ['global', 'all', 'any', '*'].includes(s) || s.includes('all'));
+                  return isGlobal ? 'All Languages' : scope.map(l => l.charAt(0).toUpperCase() + l.slice(1)).join(', ');
+                })()}
+              </span>
             </span>
           </div>
 

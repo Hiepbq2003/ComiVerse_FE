@@ -2,9 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getForumThreadsPageApi, deleteForumThreadApi, createForumThreadApi, getAllForumThreadsApi, updateForumThreadApi, getForumThreadByIdApi } from '../../services/api/ForumThreadApi'
-import { createForumCommentApi, getForumCommentsApi } from '../../services/api/ForumCommentApi'
+import { createForumCommentApi, getForumCommentsApi, toggleForumCommentLikeApi, updateForumCommentApi, deleteForumCommentApi } from '../../services/api/ForumCommentApi'
 import { getAuth } from '../../utils/Auth'
 import { toast } from 'react-toastify'
+import { ArrowLeft, Check, CornerDownRight, Edit3, Eye, Flag, Heart, Lock, MessageCircle, Plus, Search, Star, Trash2, X } from 'lucide-react'
 import '../../assets/style/reader/forum.css'
 
 const formatTimeAgo = (createdAtString) => {
@@ -546,7 +547,9 @@ function Forum() {
       }
     } catch (err) {
       console.error(err)
-      toast.error('Failed to load forum thread posts.')
+      toast.error('Failed to load forum thread posts.', {
+        toastId: 'forum-thread-list-load-error',
+      })
     } finally {
       setLoading(false)
     }
@@ -631,7 +634,18 @@ function Forum() {
         setCommentsLoading(true)
         const comments = await getForumCommentsApi(selectedThread.id)
         if (!cancelled) {
-          setThreadComments((comments || []).map(normalizeForumComment))
+          const normalized = (comments || []).map(normalizeForumComment)
+          setThreadComments(normalized)
+          
+          // Populate liked comments from backend
+          const userLikedIds = comments
+            .filter(c => c.likedByCurrentUser || c.isLikedByCurrentUser)
+            .map(c => c.id)
+          
+          setLikedComments(prev => {
+            const others = prev.filter(id => !normalized.some(n => n.id === id))
+            return [...others, ...userLikedIds]
+          })
         }
       } catch (err) {
         console.error('Failed to load forum comments:', err)
@@ -724,6 +738,7 @@ function Forum() {
     if (submitting) return
     const editor = replyInputRef.current
     const htmlContent = editor ? editor.innerHTML : ''
+    const textContent = editor ? editor.textContent.trim() : ''
     if (!textContent && !forumReplyImage) {
       toast.warn('Please enter your reply or attach an image.')
       return
@@ -755,7 +770,7 @@ function Forum() {
       toast.success('Reply posted!')
     } catch (err) {
       console.error('Failed to post forum reply:', err)
-      toast.error('Failed to post reply.')
+      toast.error(err.response?.data?.message || 'Failed to post reply.')
     } finally {
       setSubmitting(false)
     }
@@ -882,29 +897,117 @@ function Forum() {
   }
 
   // Toggle comment liked state
-  const handleToggleCommentLike = (commentId) => {
+  const handleToggleCommentLike = async (commentId) => {
+    // Check if user is logged in
+    const auth = getAuth()
+    if (!auth || !auth.user) {
+      toast.warn('Please log in to like comments.')
+      return
+    }
+
     const isAlreadyLiked = likedComments.includes(commentId)
     const nextLikedComments = isAlreadyLiked 
       ? likedComments.filter(id => id !== commentId)
       : [...likedComments, commentId]
     
+    // Optimistic UI update
     setLikedComments(nextLikedComments)
 
-    // Update likes count on selected thread comment object in localStorage
-    if (selectedThread) {
-      const stored = JSON.parse(localStorage.getItem(`comiverse_forum_comments_${selectedThread.id}`) || '[]')
-      const updated = stored.map(c => {
-        if (c.id === commentId) {
-          const count = c.likesCount || 0
-          return {
-            ...c,
-            likesCount: isAlreadyLiked ? Math.max(0, count - 1) : count + 1
-          }
+    setThreadComments(prev => prev.map(c => {
+      if (c.id === commentId) {
+        const count = c.likesCount || 0
+        return {
+          ...c,
+          likesCount: isAlreadyLiked ? Math.max(0, count - 1) : count + 1
         }
-        return c
-      })
-      localStorage.setItem(`comiverse_forum_comments_${selectedThread.id}`, JSON.stringify(updated))
-      setThreadComments(updated)
+      }
+      return c
+    }))
+
+    // Persist to backend
+    if (selectedThread) {
+      try {
+        await toggleForumCommentLikeApi(selectedThread.id, commentId)
+      } catch (err) {
+        console.error('Failed to toggle comment like:', err)
+        toast.error('Failed to update like status.')
+        
+        // Revert optimistic update
+        setLikedComments(isAlreadyLiked 
+          ? [...likedComments, commentId]
+          : likedComments.filter(id => id !== commentId)
+        )
+        
+        setThreadComments(prev => prev.map(c => {
+          if (c.id === commentId) {
+            const count = c.likesCount || 0
+            return {
+              ...c,
+              likesCount: isAlreadyLiked ? count + 1 : Math.max(0, count - 1)
+            }
+          }
+          return c
+        }))
+      }
+    }
+  }
+
+  // ─── Edit / Delete comment state and handlers ───
+  const [editingCommentId, setEditingCommentId] = useState(null)
+  const [editCommentContent, setEditCommentContent] = useState('')
+
+  const handleStartEditComment = (comment) => {
+    setEditingCommentId(comment.id)
+    // Strip HTML tags for plain-text editing
+    const div = document.createElement('div')
+    div.innerHTML = comment.content || ''
+    setEditCommentContent(div.textContent || div.innerText || '')
+  }
+
+  const handleCancelEditComment = () => {
+    setEditingCommentId(null)
+    setEditCommentContent('')
+  }
+
+  const handleSaveEditComment = async (commentId) => {
+    if (!editCommentContent.trim()) {
+      toast.warn('Comment content cannot be empty.')
+      return
+    }
+    if (!selectedThread) return
+    try {
+      setSubmitting(true)
+      const updated = await updateForumCommentApi(selectedThread.id, commentId, { content: editCommentContent.trim() })
+      setThreadComments(prev => prev.map(c => c.id === commentId ? { ...normalizeForumComment(updated), likesCount: c.likesCount } : c))
+      setEditingCommentId(null)
+      setEditCommentContent('')
+      toast.success('Comment updated successfully.')
+    } catch (err) {
+      console.error('Failed to update comment:', err)
+      toast.error(err.response?.data?.message || 'Failed to update comment.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDeleteComment = async (commentId) => {
+    if (!selectedThread) return
+    if (!window.confirm('Are you sure you want to delete this comment?')) return
+    try {
+      setSubmitting(true)
+      await deleteForumCommentApi(selectedThread.id, commentId)
+      setThreadComments(prev => prev.filter(c => c.id !== commentId))
+      // Update thread reply count
+      const nextRepliesCount = Math.max(0, (selectedThread.replies || 0) - 1)
+      setSelectedThread(prev => prev ? { ...prev, replies: nextRepliesCount } : null)
+      setThreads(prev => prev.map(t => t.id === selectedThread.id ? { ...t, replies: nextRepliesCount } : t))
+      setAllThreadsForCounts(prev => prev.map(t => t.id === selectedThread.id ? { ...t, replies: nextRepliesCount } : t))
+      toast.success('Comment deleted successfully.')
+    } catch (err) {
+      console.error('Failed to delete comment:', err)
+      toast.error(err.response?.data?.message || 'Failed to delete comment.')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -1041,32 +1144,35 @@ function Forum() {
 
   return (
     <HomeLayout>
-      <div className="home-sections-container" style={{ paddingTop: '40px' }}>
-        <div className="home-section">
+      <div className="home-sections-container forum-page-container">
+        <div className="home-section forum-page-section">
           {threadId && selectedThread ? (
             /* ── DETAILED THREAD FULL PAGE VIEW (STV STYLE - PAGE) ── */
-            <div style={{ display: 'flex', gap: '32px' }}>
+            <div className="forum-thread-detail-shell">
               {/* Left Column: Threads list sidebar */}
-              <aside style={{ width: '320px', flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.06)', paddingRight: '24px' }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '20px' }}>
+              <aside className="forum-thread-index">
+                <div className="forum-thread-index-heading">
                   <button 
+                    type="button"
                     className="forum-back-btn-stv" 
                     onClick={() => navigate('/forum')}
                   >
-                    ← Back
+                    <ArrowLeft size={16} aria-hidden="true" /> Back
                   </button>
-                  <h4 className="forum-sidebar-header-stv" style={{ fontSize: '13px', margin: 0, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <h4 className="forum-sidebar-header-stv">
                     Threads
                   </h4>
                 </div>
                 
                 {/* Scrollable list of other threads */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', paddingRight: '4px' }}>
+                <div className="forum-thread-index-list">
                   {allThreadsForCounts.map(otherThread => (
-                    <div 
+                    <button
+                      type="button"
                       key={otherThread.id}
                       onClick={() => navigate(`/forum/thread/${otherThread.id}`)}
                       className={`forum-sidebar-thread-card-stv ${String(otherThread.id) === String(threadId) ? 'active' : ''}`}
+                      aria-current={String(otherThread.id) === String(threadId) ? 'page' : undefined}
                     >
                       <ForumAvatar
                         avatarUrl={otherThread.avatarUrl || (otherThread.author === currentUser?.fullName || otherThread.author === currentUser?.username ? currentUser?.avatarUrl : null)}
@@ -1074,28 +1180,33 @@ function Forum() {
                         className="forum-card-avatar-stv"
                         style={{ background: getCategoryColor(otherThread.category), width: '28px', height: '28px', fontSize: '12px' }}
                       />
-                      <div style={{ flexGrow: 1, minWidth: 0 }}>
+                      <div className="forum-sidebar-thread-copy">
                         <div className="forum-sidebar-thread-title-stv">
                           {otherThread.title}
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', fontSize: '11px', color: '#64748b' }}>
+                        <div className="forum-sidebar-thread-meta">
                           <span>{otherThread.category || 'General'}</span>
-                          <span>💬 {otherThread.replies}</span>
+                          <span><MessageCircle size={12} aria-hidden="true" /> {otherThread.replies}</span>
                         </div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </aside>
-              <div style={{ flexGrow: 1, minWidth: 0 }}>
+              <div className="forum-thread-main">
                 {/* Colored Banner Header */}
-                <div className="forum-detail-banner-stv" style={{ borderRadius: '8px 8px 0 0' }}>
+                <div className="forum-detail-banner-stv">
                   <span className="forum-detail-banner-tag">{selectedThread.category || 'General'}</span>
                   <h3 className="forum-detail-banner-title">{selectedThread.title}</h3>
+                  <div className="forum-detail-banner-meta">
+                    <span>Started by <strong>{selectedThread.author}</strong></span>
+                    <span>{selectedThread.timeAgo || 'recently'}</span>
+                    <span><MessageCircle size={14} aria-hidden="true" /> {threadComments.length} replies</span>
+                  </div>
                 </div>
                 
                 {/* 2-Columns Body Layout */}
-                <div className="forum-detail-columns-stv" style={{ padding: '24px 0 0 0' }}>
+                <div className="forum-detail-columns-stv">
                   {/* Left Column: Post & Comments */}
                   <div className="forum-detail-left-stv">
                     {/* Original Post */}
@@ -1118,24 +1229,24 @@ function Forum() {
                       <div className="forum-post-content-stv">{renderFormattedContent(selectedThread.content)}</div>
                       
                       <div className="forum-post-likes-row">
-                        <span>👁️ {selectedThread.views} views</span>
+                        <span className="forum-inline-metric"><Eye size={15} aria-hidden="true" /> {selectedThread.views} views</span>
                         <button 
                           className={`forum-card-action-btn ${likedThreads.includes(selectedThread.id) ? 'liked-active' : ''}`}
                           onClick={() => handleToggleThreadLike(selectedThread)}
                           style={{ cursor: 'pointer' }}
                         >
-                          <span>❤️</span> {selectedThread.likes || 0} likes
+                          <Heart size={15} aria-hidden="true" /> {selectedThread.likes || 0} likes
                         </button>
                       </div>
                     </div>
 
                     {/* Comments / Discussion List */}
-                    <div className="forum-comments-section" style={{ borderTop: 'none', paddingTop: 0 }}>
-                      <h4 className="forum-comments-title" style={{ marginBottom: '12px' }}>
-                        💬 Comments ({threadComments.length})
+                    <div className="forum-comments-section forum-thread-comments">
+                      <h4 className="forum-comments-title">
+                        <MessageCircle size={24} aria-hidden="true" /> Comments <span>({threadComments.length})</span>
                       </h4>
 
-                      <div className="forum-comments-list" style={{ maxHeight: 'none' }}>
+                      <div className="forum-comments-list forum-thread-comments-list">
                         {commentsLoading && (
                           <p className="forum-comments-loading">Loading comments...</p>
                         )}
@@ -1163,19 +1274,56 @@ function Forum() {
                                 <span className="forum-comment-time">{formatTimeAgo(comment.timestamp)}</span>
                               </div>
                               
-                              <div className="forum-comment-body">
-                                {isHtmlContent(comment.content)
-                                  ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(comment.content) }} />
-                                  : renderFormattedContent(comment.content)
-                                }
-                              </div>
                               
-                              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                              {/* Comment body or edit form */}
+                              {editingCommentId === comment.id ? (
+                                <div className="forum-comment-edit-box">
+                                  <textarea
+                                    className="forum-comment-edit-textarea"
+                                    value={editCommentContent}
+                                    onChange={(e) => setEditCommentContent(e.target.value)}
+                                    rows={3}
+                                    placeholder="Edit your comment..."
+                                    autoFocus
+                                  />
+                                  <div className="forum-comment-edit-actions">
+                                    <button
+                                      type="button"
+                                      className="forum-comment-btn forum-comment-btn-cancel"
+                                      onClick={handleCancelEditComment}
+                                      disabled={submitting}
+                                    >
+                                      <X size={14} aria-hidden="true" />
+                                      <span>Cancel</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="forum-comment-btn forum-comment-btn-save"
+                                      onClick={() => handleSaveEditComment(comment.id)}
+                                      disabled={submitting}
+                                    >
+                                      <Check size={14} aria-hidden="true" />
+                                      <span>{submitting ? 'Saving...' : 'Save'}</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="forum-comment-body">
+                                  {isHtmlContent(comment.content)
+                                    ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(comment.content) }} />
+                                    : renderFormattedContent(comment.content)
+                                  }
+                                </div>
+                              )}
+                              
+                              <div className="forum-comment-actions">
                                 <button 
                                   className={`forum-card-action-btn ${isCommentLiked ? 'liked-active' : ''}`}
                                   onClick={() => handleToggleCommentLike(comment.id)}
+                                  title={isCommentLiked ? 'Unlike comment' : 'Like comment'}
                                 >
-                                  <span>❤️</span> {comment.likesCount || 0}
+                                  <Heart size={14} fill={isCommentLiked ? 'currentColor' : 'none'} aria-hidden="true" />
+                                  <span>{comment.likesCount || 0}</span>
                                 </button>
                                 {!selectedThread.isLocked && (
                                   <button 
@@ -1200,9 +1348,40 @@ function Forum() {
                                       }
                                     }}
                                   >
-                                    Reply
+                                    <CornerDownRight size={13} aria-hidden="true" />
+                                    <span>Reply</span>
                                   </button>
                                 )}
+                                {/* Edit & Delete buttons — for comment owner or moderator/admin */}
+                                {(() => {
+                                  const isOwner = currentUser && (
+                                    (comment.userId && currentUser.id && String(comment.userId) === String(currentUser.id)) ||
+                                    (comment.author && (comment.author === currentUser.fullName || comment.author === currentUser.username || comment.author === currentUser.email))
+                                  )
+                                  const canDelete = isOwner || isModerator
+                                  return (
+                                    <>
+                                      {isOwner && editingCommentId !== comment.id && (
+                                        <button
+                                          className="forum-card-action-btn forum-card-action-btn--edit"
+                                          onClick={() => handleStartEditComment(comment)}
+                                        >
+                                          <Edit3 size={13} aria-hidden="true" />
+                                          <span>Edit</span>
+                                        </button>
+                                      )}
+                                      {canDelete && (
+                                        <button
+                                          className="forum-card-action-btn forum-card-action-btn--delete"
+                                          onClick={() => handleDeleteComment(comment.id)}
+                                        >
+                                          <Trash2 size={13} aria-hidden="true" />
+                                          <span>Delete</span>
+                                        </button>
+                                      )}
+                                    </>
+                                  )
+                                })()}
                               </div>
                             </div>
                           )
@@ -1294,46 +1473,6 @@ function Forum() {
                             
                             {/* Formatting Toolbar */}
                             <div className="forum-editor-toolbar-stv">
-                              <button 
-                                type="button"
-                                className={`forum-toolbar-btn-stv ${activeFormats.bold ? 'active' : ''}`} 
-                                title="Bold (Ctrl+B)" 
-                                onClick={() => handleInsertFormat('bold')}
-                              >
-                                B
-                              </button>
-                              <button 
-                                type="button"
-                                className={`forum-toolbar-btn-stv ${activeFormats.italic ? 'active' : ''}`} 
-                                title="Italic (Ctrl+I)" 
-                                onClick={() => handleInsertFormat('italic')}
-                              >
-                                I
-                              </button>
-                              <button 
-                                type="button"
-                                className={`forum-toolbar-btn-stv ${activeFormats.quote ? 'active' : ''}`} 
-                                title="Quote Block" 
-                                onClick={() => handleInsertFormat('quote')}
-                              >
-                                ”
-                              </button>
-                              <button 
-                                type="button"
-                                className={`forum-toolbar-btn-stv ${activeFormats.code ? 'active' : ''}`} 
-                                title="Code Block" 
-                                onClick={() => handleInsertFormat('code')}
-                              >
-                                &lt;/&gt;
-                              </button>
-                              <button 
-                                type="button"
-                                className={`forum-toolbar-btn-stv ${activeFormats.link ? 'active' : ''}`} 
-                                title="Insert Link" 
-                                onClick={() => handleInsertFormat('link')}
-                              >
-                                🔗
-                              </button>
                               <button
                                 type="button"
                                 className="forum-toolbar-btn-stv"
@@ -1362,6 +1501,7 @@ function Forum() {
                     <div className="forum-sidebar-panel">
                       {/* Action buttons */}
                       <button 
+                        type="button"
                         className="forum-panel-btn primary"
                         disabled={selectedThread.isLocked}
                         onClick={() => {
@@ -1372,16 +1512,17 @@ function Forum() {
                         }}
                         style={{ opacity: selectedThread.isLocked ? 0.5 : 1, cursor: selectedThread.isLocked ? 'not-allowed' : 'pointer' }}
                       >
-                        {selectedThread.isLocked ? '🔒 Locked' : 'Reply'}
+                        {selectedThread.isLocked ? <><Lock size={16} aria-hidden="true" /> Locked</> : <><MessageCircle size={16} aria-hidden="true" /> Reply</>}
                       </button>
                       
                       {/* Follow dropdown setting */}
-                      <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                      <div className="forum-follow-control" onClick={(e) => e.stopPropagation()}>
                         <button 
+                          type="button"
                           className="forum-panel-btn follow" 
                           onClick={() => setShowDetailFollowDropdown(!showDetailFollowDropdown)}
                         >
-                          ⭐ {followedThreads.includes(selectedThread.id) ? 'Following' : 'Not Tracking'}
+                          <Star size={16} aria-hidden="true" /> {followedThreads.includes(selectedThread.id) ? 'Following' : 'Not Tracking'}
                         </button>
                         
                         {showDetailFollowDropdown && (
@@ -1420,10 +1561,11 @@ function Forum() {
                         if (isCreator) return null;
                         return (
                           <button 
+                            type="button"
                             className="forum-panel-btn report" 
                             onClick={() => handleTriggerReport(selectedThread)}
                           >
-                            🚩 Report Thread
+                            <Flag size={16} aria-hidden="true" /> Report Thread
                           </button>
                         );
                       })()}
@@ -1454,15 +1596,18 @@ function Forum() {
                             🔒 {selectedThread.isLocked ? 'Unlock Thread' : 'Lock Thread'}
                           </button>
                           <button 
-                            className="forum-panel-btn delete"
+                            className="forum-action-btn danger"
                             onClick={() => handleDeleteThreadDirect(selectedThread)}
                             style={{ 
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
                               background: 'rgba(239, 68, 68, 0.1)', 
                               color: '#f87171', 
                               border: '1px solid rgba(239, 68, 68, 0.2)' 
                             }}
                           >
-                            🗑️ Delete Thread
+                            <Trash2 size={14} /> Delete Thread
                           </button>
                         </div>
                       )}
@@ -1496,33 +1641,28 @@ function Forum() {
             /* ── NORMAL LIST LAYOUT ── */
             <>
               {/* Header */}
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                marginBottom: '28px',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                paddingBottom: '16px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
-                  <h2 className="section-title" style={{ margin: 0 }}>💬 Forum Discussions</h2>
-                  <span style={{ fontSize: '12.5px', color: '#64748b' }}>
-                    {totalElements} posts total
+              <div className="section-header forum-page-heading">
+                <div className="section-title-group">
+                  <h2 className="section-title">Forum Discussions</h2>
+                  <span className="section-subtitle">
+                    Share ideas and connect with the ComiVerse community
                   </span>
                 </div>
+                <span className="forum-total-posts">{totalElements} posts</span>
               </div>
 
-              <div style={{ display: 'flex', gap: '32px' }}>
+              <div className="forum-list-layout">
                 {/* ── LEFT SIDEBAR (STV STYLE) ───────── */}
-                <aside style={{ width: '240px', flexShrink: 0 }}>
+                <aside className="forum-list-sidebar">
                   <button 
+                    type="button"
                     className="forum-btn-create-stv" 
                     onClick={() => setShowNewPostModal(true)}
                   >
-                    <span>+</span> Create Discussion
+                    <Plus size={18} aria-hidden="true" /> Create Discussion
                   </button>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <div className="forum-category-list">
                     <div 
                       className={`forum-sidebar-item-stv ${selectedCategory === 'All' ? 'active' : ''}`}
                       onClick={() => setSelectedCategory('All')}
@@ -1561,53 +1701,36 @@ function Forum() {
                 </aside>
 
                 {/* ── RIGHT MAIN CONTENT AREA ────────────────── */}
-                <main style={{ flexGrow: 1, minWidth: 0 }}>
+                <main className="forum-list-main">
                   {/* Sorter tabs & Search input row */}
                   <div className="forum-search-row">
                     {/* Tabs */}
-                    <div style={{ display: 'flex', gap: '16px', borderBottom: '1px solid rgba(255,255,255,0.04)', flexGrow: 1, paddingBottom: '1px' }}>
+                    <div className="forum-sort-tabs" role="tablist" aria-label="Sort discussions">
                       {['All', 'Hot', 'New', 'Announcements'].map(tab => (
-                        <div
+                        <button
+                          type="button"
                           key={tab}
                           onClick={() => setActiveSortTab(tab)}
-                          style={{
-                            color: activeSortTab === tab ? 'white' : '#94a3b8',
-                            fontSize: '13.5px',
-                            fontWeight: '600',
-                            padding: '8px 4px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            borderBottom: '2px solid transparent',
-                            borderBottomColor: activeSortTab === tab ? '#a855f7' : 'transparent'
-                          }}
+                          className={`forum-sort-tab ${activeSortTab === tab ? 'active' : ''}`}
+                          role="tab"
+                          aria-selected={activeSortTab === tab}
                         >
                           {tab}
-                        </div>
+                        </button>
                       ))}
                     </div>
 
                     {/* Search posts inside thread list */}
-                    <div className="forum-search-input-wrapper" style={{ width: '240px', flexGrow: 0 }}>
+                    <div className="forum-search-input-wrapper forum-list-search">
                       <input 
                         type="text" 
                         placeholder="Search posts..." 
                         className="forum-search-field"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        style={{ padding: '8px 12px 8px 34px' }}
+                        aria-label="Search forum posts"
                       />
-                      <svg 
-                        viewBox="0 0 24 24" 
-                        width="14" 
-                        height="14" 
-                        fill="none" 
-                        stroke="#64748b" 
-                        strokeWidth="2.5" 
-                        style={{ position: 'absolute', left: '12px', top: '11px' }}
-                      >
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                      </svg>
+                      <Search className="forum-search-icon" size={15} aria-hidden="true" />
                     </div>
                   </div>
 
@@ -1731,7 +1854,7 @@ function Forum() {
                                             setActiveDropdownThreadId(null);
                                           }}
                                         >
-                                          <span>🗑️</span> Delete Thread
+                                          <Trash2 size={14} style={{ marginRight: '6px' }} /> Delete Thread
                                         </button>
                                       </>
                                     )}

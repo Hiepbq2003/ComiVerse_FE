@@ -35,7 +35,7 @@ const saveLocalKeywords = (keywords) => {
 let localKeywords = loadLocalKeywords();
 
 // Flag to indicate if backend has implemented /chat/banned-keywords endpoint
-const HAS_BACKEND_ENDPOINT = false;
+const HAS_BACKEND_ENDPOINT = true;
 
 /**
  * Helper: Converts Vietnamese Telex IME outputs back to original English keystrokes
@@ -174,19 +174,26 @@ export const checkBannedContent = (content) => {
  * Serves from local dictionary instantly to prevent 500 network errors until backend endpoint is deployed.
  */
 export const getBannedKeywordsApi = async () => {
+  let backendData = null;
   if (HAS_BACKEND_ENDPOINT) {
     try {
       const res = await AxiosClient.get('/chat/banned-keywords');
-      if (res?.data?.data && Array.isArray(res.data.data)) {
-        return res.data.data;
-      }
-      if (res?.data && Array.isArray(res.data)) {
-        return res.data;
+      if (Array.isArray(res)) {
+        backendData = res;
+      } else if (res?.data && Array.isArray(res.data)) {
+        backendData = res.data;
       }
     } catch (err) {
-      // Fallback
+      console.error('API Error in getBannedKeywordsApi:', err);
     }
   }
+
+  if (backendData) {
+    localKeywords = backendData;
+    saveLocalKeywords(localKeywords);
+    return backendData;
+  }
+  
   return [...localKeywords];
 };
 
@@ -194,24 +201,28 @@ export const getBannedKeywordsApi = async () => {
  * Add a new banned keyword to the dictionary.
  */
 export const addBannedKeywordApi = async (data) => {
+  let savedData = null;
   if (HAS_BACKEND_ENDPOINT) {
     try {
       const res = await AxiosClient.post('/chat/banned-keywords', data);
-      if (res?.data?.data) {
-        return res.data.data;
+      if (res?.data) {
+        savedData = res.data;
+      } else if (res) {
+        savedData = res;
       }
     } catch (err) {
-      // Fallback
+      console.error('API Error in addBannedKeywordApi:', err);
     }
   }
 
-  const newKw = {
+  const newKw = savedData || {
     id: `kw-${Date.now()}`,
     word: data.word.trim().toLowerCase(),
     category: data.category || 'General',
     severity: data.severity || 'HIGH',
     addedAt: new Date().toISOString().split('T')[0]
   };
+  
   localKeywords.unshift(newKw);
   saveLocalKeywords(localKeywords);
   return newKw;
@@ -225,7 +236,7 @@ export const deleteBannedKeywordApi = async (id) => {
     try {
       await AxiosClient.delete(`/chat/banned-keywords/${id}`);
     } catch (err) {
-      // Fallback
+      console.error('API Error in deleteBannedKeywordApi:', err);
     }
   }
 

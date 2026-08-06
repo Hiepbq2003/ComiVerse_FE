@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { toast } from 'react-toastify'
-import Swal from 'sweetalert2'
 import ModernPagination from './ModernPagination'
 import ConfirmModal from './ConfirmModal'
+import { Trash2 } from 'lucide-react'
 import {
   getComicCommentsApi,
   createComicCommentApi,
@@ -13,9 +13,24 @@ import {
   getChapterCommentsApi,
   createChapterCommentApi,
   getChapterCommentByIdApi,
-  deleteChapterCommentApi
+  deleteChapterCommentApi,
+  updateComicCommentApi,
+  updateChapterCommentApi
 } from '../../services/api/CommentApi'
 import '../../assets/style/reader/comments.css'
+
+// Global high-performance in-memory cache for instantaneous comment rendering (< 5ms)
+const commentsCache = new Map()
+const commentsMetaCache = new Map()
+
+export const clearCommentCache = (targetType, targetId) => {
+  for (const key of commentsCache.keys()) {
+    if (key.startsWith(`${targetType}_${targetId}`)) {
+      commentsCache.delete(key)
+      commentsMetaCache.delete(key)
+    }
+  }
+}
 
 function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) {
   const navigate = useNavigate()
@@ -49,6 +64,11 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
   // Highlight state for deep-linked comments
   const [highlightedCommentId, setHighlightedCommentId] = useState(null)
 
+  // Edit state
+  const [editingId, setEditingId] = useState(null)
+  const [editInput, setEditInput] = useState('')
+  const [editSubmitting, setEditSubmitting] = useState(false)
+
   // Dynamic API wrappers based on targetType ('comic' | 'chapter')
   const getCommentsApi = useCallback((id, parentId, page, size) => {
     return targetType === 'comic'
@@ -72,6 +92,12 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
     return targetType === 'comic'
       ? deleteComicCommentApi(commentId)
       : deleteChapterCommentApi(commentId)
+  }, [targetType])
+
+  const updateCommentApi = useCallback((commentId, payload) => {
+    return targetType === 'comic'
+      ? updateComicCommentApi(commentId, payload)
+      : updateChapterCommentApi(commentId, payload)
   }, [targetType])
 
   // Open popup confirm modal for comment deletion
@@ -108,14 +134,59 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
     }
   }
 
-  // Fetch top-level comments
+  const handleEditSubmit = async (e, commentId, parentId = null) => {
+    e.preventDefault()
+    if (!editInput.trim()) return
+
+    try {
+      setEditSubmitting(true)
+      const res = await updateCommentApi(commentId, { content: editInput.trim() })
+      const updatedComment = res?.data || res
+      
+      if (parentId) {
+        setRepliesMap(prev => {
+          const arr = prev[parentId] || []
+          return { ...prev, [parentId]: arr.map(c => c.id === commentId ? { ...c, content: updatedComment.content } : c) }
+        })
+      } else {
+        setComments(prev => prev.map(c => c.id === commentId ? { ...c, content: updatedComment.content } : c))
+      }
+      
+      setEditingId(null)
+      setEditInput('')
+      toast.success('Comment updated!')
+    } catch (err) {
+      console.error('Failed to update comment:', err)
+      toast.error('Failed to update comment.')
+    } finally {
+      setEditSubmitting(false)
+    }
+  }
+
+  // Fetch top-level comments with Stale-While-Revalidate Memory Cache
   const fetchComments = useCallback(async (page = 1, append = false) => {
     if (!targetId) return
-    try {
+    const cacheKey = `${targetType}_${targetId}_root_p${page}`
+
+    // 1. Instant Cache Hit (0ms delay)
+    if (commentsCache.has(cacheKey) && !append) {
+      const cachedList = commentsCache.get(cacheKey)
+      const cachedMeta = commentsMetaCache.get(cacheKey)
+      setComments(cachedList)
+      setCommentsMeta(cachedMeta)
+      setTotalComments(cachedMeta?.totalElements || cachedList.length)
+      setCommentsLoading(false)
+    } else if (!append) {
       setCommentsLoading(true)
+    }
+
+    try {
       const res = await getCommentsApi(targetId, '', page, 10)
       const list = res?.data || []
       const meta = res?.metadata || null
+
+      commentsCache.set(cacheKey, list)
+      commentsMetaCache.set(cacheKey, meta)
 
       if (append) {
         setComments(prev => [...prev, ...list])
@@ -123,7 +194,7 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
         setComments(list)
       }
       setCommentsMeta(meta)
-      setTotalComments(meta?.totalElements || 0)
+      setTotalComments(meta?.totalElements || list.length)
     } catch (err) {
       console.error(`Failed to load ${targetType} comments:`, err?.message || err)
     } finally {
@@ -245,22 +316,49 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
       return
     }
 
+    const text = commentInput.trim()
+    setCommentInput('')
+
+    // Instant Optimistic Comment (< 1ms UI update)
+    const tempId = `temp_${Date.now()}`
+    const optimisticComment = {
+      id: tempId,
+      content: text,
+      userId: user.id || user.userId,
+      userName: user.fullName || user.username || user.name || 'You',
+      userAvatar: user.avatarUrl || user.avatar || user.profilePicture || '',
+      createdAt: new Date().toISOString(),
+      isOptimistic: true,
+      replyCount: 0
+    }
+
+    setComments(prev => [optimisticComment, ...prev])
+    setTotalComments(prev => prev + 1)
+    clearCommentCache(targetType, targetId)
+
     try {
       setCommentSubmitting(true)
       const payload = {
         ...(targetType === 'comic' ? { comicId: targetId } : { chapterId: targetId }),
-        content: commentInput.trim(),
+        content: text,
         parentId: '',
         mentionId: ''
       }
-      await createCommentApi(payload)
-      setCommentInput('')
-      setCommentsPage(1)
-      fetchComments(1, false)
+      const res = await createCommentApi(payload)
+      const realComment = res?.data || res
+      if (realComment && realComment.id) {
+        setComments(prev => prev.map(c => c.id === tempId ? { ...realComment, isOptimistic: false } : c))
+      } else {
+        fetchComments(1, false)
+      }
       toast.success('Comment posted!')
     } catch (err) {
       console.error('Failed to post comment:', err)
-      toast.error('Failed to post comment')
+      // Revert optimistic comment on error
+      setComments(prev => prev.filter(c => c.id !== tempId))
+      setTotalComments(prev => Math.max(0, prev - 1))
+      setCommentInput(text)
+      toast.error(err.response?.data?.message || 'Failed to post comment')
     } finally {
       setCommentSubmitting(false)
     }
@@ -274,24 +372,60 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
       return
     }
 
+    const text = replyInput.trim()
+    const targetParentId = replyMetadata?.parentId || parentId
+    const mentionId = replyMetadata?.mentionId || ''
+    const mentionName = replyMetadata?.mentionName || ''
+
+    setReplyInput('')
+    setReplyingToId(null)
+    setReplyMetadata(null)
+    setExpandedRepliesMap(prev => ({ ...prev, [parentId]: true }))
+
+    // Instant Optimistic Reply (< 1ms UI update)
+    const tempId = `temp_reply_${Date.now()}`
+    const optimisticReply = {
+      id: tempId,
+      content: mentionName ? `@${mentionName} ${text}` : text,
+      userId: user.id || user.userId,
+      userName: user.fullName || user.username || user.name || 'You',
+      userAvatar: user.avatarUrl || user.avatar || user.profilePicture || '',
+      createdAt: new Date().toISOString(),
+      parentId: targetParentId,
+      isOptimistic: true
+    }
+
+    setRepliesMap(prev => ({
+      ...prev,
+      [parentId]: [...(prev[parentId] || []), optimisticReply]
+    }))
+
     try {
       setCommentSubmitting(true)
       const payload = {
         ...(targetType === 'comic' ? { comicId: targetId } : { chapterId: targetId }),
-        content: replyInput.trim(),
-        parentId: replyMetadata?.parentId || parentId,
-        mentionId: replyMetadata?.mentionId || ''
+        content: text,
+        parentId: targetParentId,
+        mentionId: mentionId
       }
-      await createCommentApi(payload)
-      setReplyInput('')
-      setReplyingToId(null)
-      setReplyMetadata(null)
-      setExpandedRepliesMap(prev => ({ ...prev, [parentId]: true }))
-      fetchReplies(parentId, 1)
+      const res = await createCommentApi(payload)
+      const realReply = res?.data || res
+      if (realReply && realReply.id) {
+        setRepliesMap(prev => ({
+          ...prev,
+          [parentId]: (prev[parentId] || []).map(r => r.id === tempId ? { ...realReply, isOptimistic: false } : r)
+        }))
+      } else {
+        fetchReplies(parentId, 1)
+      }
       toast.success('Reply posted!')
     } catch (err) {
       console.error('Failed to post reply:', err)
-      toast.error('Failed to post reply')
+      setRepliesMap(prev => ({
+        ...prev,
+        [parentId]: (prev[parentId] || []).filter(r => r.id !== tempId)
+      }))
+      toast.error(err.response?.data?.message || 'Failed to post reply')
     } finally {
       setCommentSubmitting(false)
     }
@@ -336,7 +470,19 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
 
       {/* Comments List */}
       <div className="comments-list">
-        {comments.length === 0 && !commentsLoading ? (
+        {commentsLoading && comments.length === 0 ? (
+          <div className="comments-skeleton-feed">
+            {[1, 2, 3].map((_, i) => (
+              <div key={i} className="comment-skeleton-card">
+                <div className="comment-skeleton-avatar shimmer" />
+                <div className="comment-skeleton-body">
+                  <div className="comment-skeleton-line short shimmer" />
+                  <div className="comment-skeleton-line long shimmer" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : comments.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', fontStyle: 'italic' }}>
             No comments yet. Be the first to share your thoughts!
           </div>
@@ -371,53 +517,104 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
                         {formatTimeAgo(comment.createdAt)}
                       </span>
                     </div>
-                    <p className="comment-text">
-                      {comment.content}
-                    </p>
-                    
-                    <div className="comment-actions-bar">
-                      {user && (
-                        <button
-                          className={`comment-action-btn ${replyingToId === comment.id ? 'active' : ''}`}
-                          onClick={() => {
-                            if (replyingToId === comment.id) {
-                              setReplyingToId(null)
-                              setReplyMetadata(null)
-                              setReplyInput('')
-                            } else {
-                              setReplyingToId(comment.id)
-                              setReplyMetadata({
-                                parentId: comment.id,
-                                mentionId: comment.userId,
-                                mentionName: comment.userName
-                              })
-                              setReplyInput('')
-                            }
-                          }}
-                        >
-                          Reply
-                        </button>
-                      )}
-                      <button
-                        className={`comment-action-btn ${isExpanded ? 'active' : ''}`}
-                        onClick={() => handleToggleReplies(comment.id)}
-                      >
-                        💬 {isExpanded ? 'Hide Replies' : 'Replies'}
-                      </button>
+                    {editingId === comment.id ? (
+                      <div className="nested-reply-form-wrapper" style={{ marginTop: '10px' }}>
+                        <form onSubmit={(e) => handleEditSubmit(e, comment.id)} className="comment-form">
+                          <textarea
+                            rows="2"
+                            value={editInput}
+                            onChange={(e) => setEditInput(e.target.value)}
+                            disabled={editSubmitting}
+                            className="comment-textarea"
+                            autoFocus
+                          />
+                          <div className="comment-form-actions">
+                            <button
+                              type="button"
+                              className="btn-hero-outline"
+                              style={{ padding: '6px 14px', fontSize: '12px', border: '1px solid rgba(255,255,255,0.1)' }}
+                              onClick={() => {
+                                setEditingId(null)
+                                setEditInput('')
+                              }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              className="btn-home-primary"
+                              style={{ padding: '6px 16px', fontSize: '12px' }}
+                              disabled={editSubmitting || !editInput.trim()}
+                            >
+                              {editSubmitting ? 'Saving...' : 'Save'}
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="comment-text">
+                          {comment.content}
+                        </p>
+                        
+                        <div className="comment-actions-bar">
+                          {user && (
+                            <button
+                              className={`comment-action-btn ${replyingToId === comment.id ? 'active' : ''}`}
+                              onClick={() => {
+                                if (replyingToId === comment.id) {
+                                  setReplyingToId(null)
+                                  setReplyMetadata(null)
+                                  setReplyInput('')
+                                } else {
+                                  setReplyingToId(comment.id)
+                                  setReplyMetadata({
+                                    parentId: comment.id,
+                                    mentionId: comment.userId,
+                                    mentionName: comment.userName
+                                  })
+                                  setReplyInput('')
+                                }
+                              }}
+                            >
+                              Reply
+                            </button>
+                          )}
+                          <button
+                            className={`comment-action-btn ${isExpanded ? 'active' : ''}`}
+                            onClick={() => handleToggleReplies(comment.id)}
+                          >
+                            💬 {isExpanded ? 'Hide Replies' : 'Replies'}
+                          </button>
+                          
+                          {user && (user.id === comment.userId || user.userId === comment.userId || user.username === comment.userName) && (
+                            <button
+                              className="comment-action-btn"
+                              onClick={() => {
+                                setEditingId(comment.id)
+                                setEditInput(comment.content)
+                                setReplyingToId(null)
+                              }}
+                            >
+                              Edit
+                            </button>
+                          )}
 
-                      {user && (
-                        (user.id === comment.userId || user.userId === comment.userId || user.username === comment.userName || ['ADMIN', 'STAFF', 'MODERATOR'].includes((user.role || '').toUpperCase()))
-                      ) && (
-                        <button
-                          className="comment-action-btn"
-                          style={{ color: '#ef4444' }}
-                          onClick={() => handleDeleteComment(comment.id)}
-                          title="Delete this comment"
-                        >
-                          🗑️ Delete
-                        </button>
-                      )}
-                    </div>
+                          {user && (
+                            (user.id === comment.userId || user.userId === comment.userId || user.username === comment.userName || ['ADMIN', 'STAFF', 'MODERATOR'].includes((user.role || '').toUpperCase()))
+                          ) && (
+                            <button
+                              className="comment-action-btn"
+                              style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              onClick={() => handleDeleteComment(comment.id)}
+                              title="Delete this comment"
+                            >
+                              <Trash2 size={13} /> Delete
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -517,49 +714,99 @@ function CommentSection({ targetType, targetId, user, targetCommentIdFromUrl }) 
                                 {formatTimeAgo(reply.createdAt)}
                               </span>
                             </div>
-                            <p className="comment-text" style={{ fontSize: '13.5px' }}>
-                              {reply.mentionName && (
-                                <span className="comment-mention-tag">@{reply.mentionName}</span>
-                              )}
-                              {reply.content}
-                            </p>
-                            
-                            <div className="comment-actions-bar">
-                              {user && (
-                                <button
-                                  className={`comment-action-btn ${replyingToId === reply.id ? 'active' : ''}`}
-                                  onClick={() => {
-                                    if (replyingToId === reply.id) {
-                                      setReplyingToId(null)
-                                      setReplyMetadata(null)
-                                      setReplyInput('')
-                                    } else {
-                                      setReplyingToId(reply.id)
-                                      setReplyMetadata({
-                                        parentId: comment.id,
-                                        mentionId: reply.userId,
-                                        mentionName: reply.userName
-                                      })
-                                      setReplyInput('')
-                                    }
-                                  }}
-                                >
-                                  Reply
-                                </button>
-                              )}
-                              {user && (
-                                (user.id === reply.userId || user.userId === reply.userId || user.username === reply.userName || ['ADMIN', 'STAFF', 'MODERATOR'].includes((user.role || '').toUpperCase()))
-                              ) && (
-                                <button
-                                  className="comment-action-btn"
-                                  style={{ color: '#ef4444' }}
-                                  onClick={() => handleDeleteComment(reply.id, comment.id)}
-                                  title="Delete this comment"
-                                >
-                                  🗑️ Delete
-                                </button>
-                              )}
-                            </div>
+                            {editingId === reply.id ? (
+                              <div className="nested-reply-form-wrapper" style={{ marginTop: '10px' }}>
+                                <form onSubmit={(e) => handleEditSubmit(e, reply.id, comment.id)} className="comment-form">
+                                  <textarea
+                                    rows="2"
+                                    value={editInput}
+                                    onChange={(e) => setEditInput(e.target.value)}
+                                    disabled={editSubmitting}
+                                    className="comment-textarea"
+                                    autoFocus
+                                  />
+                                  <div className="comment-form-actions">
+                                    <button
+                                      type="button"
+                                      className="btn-hero-outline"
+                                      style={{ padding: '6px 14px', fontSize: '12px', border: '1px solid rgba(255,255,255,0.1)' }}
+                                      onClick={() => {
+                                        setEditingId(null)
+                                        setEditInput('')
+                                      }}
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      type="submit"
+                                      className="btn-home-primary"
+                                      style={{ padding: '6px 16px', fontSize: '12px' }}
+                                      disabled={editSubmitting || !editInput.trim()}
+                                    >
+                                      {editSubmitting ? 'Saving...' : 'Save'}
+                                    </button>
+                                  </div>
+                                </form>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="comment-text" style={{ fontSize: '13.5px' }}>
+                                  {reply.mentionName && (
+                                    <span className="comment-mention-tag">@{reply.mentionName}</span>
+                                  )}
+                                  {reply.content}
+                                </p>
+                                
+                                <div className="comment-actions-bar">
+                                  {user && (
+                                    <button
+                                      className={`comment-action-btn ${replyingToId === reply.id ? 'active' : ''}`}
+                                      onClick={() => {
+                                        if (replyingToId === reply.id) {
+                                          setReplyingToId(null)
+                                          setReplyMetadata(null)
+                                          setReplyInput('')
+                                        } else {
+                                          setReplyingToId(reply.id)
+                                          setReplyMetadata({
+                                            parentId: comment.id,
+                                            mentionId: reply.userId,
+                                            mentionName: reply.userName
+                                          })
+                                          setReplyInput('')
+                                        }
+                                      }}
+                                    >
+                                      Reply
+                                    </button>
+                                  )}
+                                  {user && (user.id === reply.userId || user.userId === reply.userId || user.username === reply.userName) && (
+                                    <button
+                                      className="comment-action-btn"
+                                      onClick={() => {
+                                        setEditingId(reply.id)
+                                        setEditInput(reply.content)
+                                        setReplyingToId(null)
+                                      }}
+                                    >
+                                      Edit
+                                    </button>
+                                  )}
+                                  {user && (
+                                    (user.id === reply.userId || user.userId === reply.userId || user.username === reply.userName || ['ADMIN', 'STAFF', 'MODERATOR'].includes((user.role || '').toUpperCase()))
+                                  ) && (
+                                    <button
+                                      className="comment-action-btn"
+                                      style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      onClick={() => handleDeleteComment(reply.id, comment.id)}
+                                      title="Delete this comment"
+                                    >
+                                      <Trash2 size={13} /> Delete
+                                    </button>
+                                  )}
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
 

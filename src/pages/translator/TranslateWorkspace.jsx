@@ -16,7 +16,6 @@ import {
   Send,
   MessageSquare,
   BookMarked,
-  HelpCircle,
   Square,
   Pentagon,
   Minus,
@@ -27,14 +26,18 @@ import {
   ZoomOut,
   Loader2,
   AlertCircle,
+  RefreshCw,
+  Sparkles,
 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getAuth } from "../../utils/Auth";
 import { toast } from "react-toastify";
+import useWorkspaceSecurity from "../../hooks/useWorkspaceSecurity";
+import { useChat } from "../../hooks/useChat";
 import "../../assets/style/translator/translate-workspace.css";
+import { API_BASE_URL as API_BASE, resolveImageUrl } from "../../config/apiConfig";
 
-const API_BASE = "http://localhost:8081/api";
 const TOKEN_KEY = "token";
 const IS_DEV = process.env.NODE_ENV === "development";
 
@@ -95,49 +98,65 @@ function PageStatusDot({ status }) {
   );
 }
 
-function ChapterList({ chapters, open, onToggle, currentChapterId, currentPageIndex, onSelectPage }) {
+function ChapterList({ chapters, openChapterId, onToggleChapter, chapterPagesLoading, currentChapterId, currentPageIndex, onSelectPage }) {
   return (
     <>
-      {chapters.map((ch) => (
-        <div key={ch.chapterId}>
-          <button onClick={() => onToggle(ch.chapterId)} className="tw-chapter-row">
-            {open[ch.chapterId] ? (
-              <ChevronDown size={14} color="#6C6F86" />
-            ) : (
-              <ChevronRight size={14} color="#6C6F86" />
+      {chapters.map((ch) => {
+        const isCurrent = ch.chapterId === currentChapterId;
+        const isOpen = ch.chapterId === openChapterId;
+        const isLoadingPages = isOpen && !isCurrent && chapterPagesLoading === ch.taskId;
+        return (
+          <div key={ch.chapterId}>
+            <button
+              onClick={() => onToggleChapter(ch)}
+              className={`tw-chapter-row ${isCurrent ? "is-current" : ""}`}
+            >
+              {isOpen ? (
+                <ChevronDown size={14} color="#6C6F86" />
+              ) : (
+                <ChevronRight size={14} color="#6C6F86" />
+              )}
+              <BookMarked size={14} color="#6C6F86" />
+              <span className="tw-chapter-title">{ch.title}</span>
+              <span className="tw-chapter-progress tw-font-mono">{ch.progress}</span>
+            </button>
+            <div
+              className="tw-chapter-assignee"
+              style={{ fontSize: "10.5px", color: "#6C6F86", padding: "0 8px 6px 34px", display: "flex", alignItems: "center", gap: "4px" }}
+              title={ch.assigneeLabel}
+            >
+              👤 {ch.assigneeLabel}
+            </div>
+            {isOpen && isLoadingPages && (
+              <div style={{ padding: "6px 8px 6px 34px", fontSize: "11px", color: "#6C6F86" }}>Loading pages…</div>
             )}
-            <BookMarked size={14} color="#6C6F86" />
-            <span className="tw-chapter-title">{ch.title}</span>
-            <span className="tw-chapter-progress tw-font-mono">{ch.progress}</span>
-          </button>
-          {open[ch.chapterId] &&
-            (ch.pages || []).map((page) => {
-              const pageIndex = page.pageNumber - 1;
-              const isSameChapter = ch.chapterId === currentChapterId;
-              const isCurrent = isSameChapter && pageIndex === currentPageIndex;
-              const status = isCurrent ? "current" : page.status === "DONE" ? "done" : "todo";
-              return (
-                <button
-                  key={page.pageId}
-                  className={`tw-page-row ${isCurrent ? "current" : ""} ${isSameChapter ? "" : "is-disabled"}`}
-                  onClick={() => isSameChapter && onSelectPage(ch.chapterId, pageIndex)}
-                  disabled={!isSameChapter}
-                  title={isSameChapter ? undefined : "View only — you can't switch chapters from here"}
-                >
-                  <span className="tw-page-row-inner">
-                    <PageStatusDot status={status} />
-                    Page {page.pageNumber}
-                  </span>
-                </button>
-              );
-            })}
-        </div>
-      ))}
+            {isOpen &&
+              !isLoadingPages &&
+              (ch.pages || []).map((page) => {
+                const pageIndex = page.pageNumber - 1;
+                const isCurrentPage = isCurrent && pageIndex === currentPageIndex;
+                const status = isCurrentPage ? "current" : page.status === "DONE" ? "done" : "todo";
+                return (
+                  <button
+                    key={page.pageId}
+                    className={`tw-page-row ${isCurrentPage ? "current" : ""}`}
+                    onClick={() => onSelectPage(ch, pageIndex)}
+                  >
+                    <span className="tw-page-row-inner">
+                      <PageStatusDot status={status} />
+                      Page {page.pageNumber}
+                    </span>
+                  </button>
+                );
+              })}
+          </div>
+        );
+      })}
     </>
   );
 }
 
-function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend, sending, saveStatus }) {
+function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend, sending, saveStatus, canEdit = true }) {
   const badgeConfig = {
     saving: { icon: <Loader2 size={11} strokeWidth={3} className="tw-spin" />, label: "SAVING" },
     saved: { icon: <Check size={11} strokeWidth={3} />, label: "SAVED" },
@@ -163,10 +182,20 @@ function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend,
       </div>
 
       <div className="tw-header-right">
+        {!canEdit && (
+          <span className="tw-badge-saved tw-font-mono" title="You are not assigned to this task">
+            🔒 VIEW ONLY
+          </span>
+        )}
         <span className={`tw-badge-saved tw-font-mono is-${statusKey}`}>
           {badgeConfig.icon} {badgeConfig.label}
         </span>
-        <button className="tw-btn">
+        <button
+          className="tw-btn"
+          disabled={!canEdit}
+          title={canEdit ? undefined : "You don't have permission to edit this task"}
+          style={!canEdit ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+        >
           <Upload size={14} /> Upload
         </button>
         <button
@@ -456,7 +485,7 @@ function PageNav({
 
 const RESIZE_HANDLES = ["nw", "ne", "sw", "se"];
 
-function ShapeToolbar({ activeTool, onSetTool }) {
+function ShapeToolbar({ activeTool, onSetTool, canEdit = true }) {
   const tools = [
     { id: "rect", label: "Rectangle", Icon: Square },
     { id: "ellipse", label: "Oval", Icon: Circle },
@@ -468,9 +497,10 @@ function ShapeToolbar({ activeTool, onSetTool }) {
         <button
           key={t.id}
           type="button"
-          onClick={() => onSetTool(t.id)}
+          onClick={() => canEdit && onSetTool(t.id)}
+          disabled={!canEdit}
           className={`tw-btn-icon ${activeTool === t.id ? "active" : ""}`}
-          title={t.label}
+          title={canEdit ? t.label : "You don't have permission to edit this task"}
         >
           <t.Icon size={14} />
         </button>
@@ -484,6 +514,7 @@ function PageImage({
   currentPageIndex,
   canvasRef,
   imgRef,
+  bubbleRefs,
   drawing,
   selections,
   activeId,
@@ -598,6 +629,9 @@ function PageImage({
               return (
                 <polygon
                   key={sel.id}
+                  ref={(el) => {
+                    if (bubbleRefs) bubbleRefs.current[sel.id] = el;
+                  }}
                   points={sel.points.map((p) => `${p.x},${p.y}`).join(" ")}
                   fill={sel.textBgColor ?? "#ffffff"}
                   stroke={isActive ? "#16a34a" : "#f59e0b"}
@@ -682,6 +716,9 @@ function PageImage({
             return (
               <div
                 key={sel.id}
+                ref={(el) => {
+                  if (bubbleRefs) bubbleRefs.current[sel.id] = el;
+                }}
                 onMouseDown={(e) => {
                   if (isPickingZoomPoint) return;
                   e.stopPropagation();
@@ -857,6 +894,7 @@ function TranslateTabPanel({
   onDeleteArea,
   zoomScale,
   userFullName,
+  canEdit = true,
 }) {
   const hasActiveSelection = activeSelection != null;
   const translationValue = activeSelection?.translation ?? "";
@@ -877,10 +915,10 @@ function TranslateTabPanel({
             </button>
             <button
               type="button"
-              onClick={() => hasActiveSelection && onDeleteArea(activeSelection.id)}
-              disabled={!hasActiveSelection}
-              className={`tw-btn-icon tw-x-delete-btn ${hasActiveSelection ? "is-enabled" : ""}`}
-              title={hasActiveSelection ? "Delete the selected area" : "Select an area first"}
+              onClick={() => hasActiveSelection && canEdit && onDeleteArea(activeSelection.id)}
+              disabled={!hasActiveSelection || !canEdit}
+              className={`tw-btn-icon tw-x-delete-btn ${hasActiveSelection && canEdit ? "is-enabled" : ""}`}
+              title={!canEdit ? "You don't have permission to edit this task" : hasActiveSelection ? "Delete the selected area" : "Select an area first"}
             >
               <Trash2 size={14} />
             </button>
@@ -939,37 +977,686 @@ function TranslateTabPanel({
         </p>
         <textarea
           value={translationValue}
-          onChange={(e) => onChangeTranslation(e.target.value)}
+          onChange={(e) => canEdit && onChangeTranslation(e.target.value)}
           className="tw-textarea tw-x-translation-textarea"
           style={{
             "--text-align": textStyle.textAlign,
             "--font-weight": textStyle.fontWeight,
             "--font-style": textStyle.fontStyle,
           }}
-          placeholder={hasActiveSelection ? "Enter translation for this area..." : "Select an area first"}
-          disabled={!hasActiveSelection}
+          placeholder={
+            !canEdit
+              ? "View only — you're not assigned to this task"
+              : hasActiveSelection
+              ? "Enter translation for this area..."
+              : "Select an area first"
+          }
+          disabled={!hasActiveSelection || !canEdit}
+          readOnly={!canEdit}
         />
         <div className="tw-textarea-footer">
           <span>{translationValue.length} CHARS</span>
         </div>
       </div>
 
-      <button onClick={onSaveProgress} className="tw-save-next-btn">
+      <button
+        onClick={onSaveProgress}
+        className="tw-save-next-btn"
+        disabled={!canEdit}
+        title={canEdit ? undefined : "You don't have permission to edit this task"}
+        style={!canEdit ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+      >
         Save
       </button>
     </div>
   );
 }
 
-function GlossaryTabPanel() {
+async function fetchGlossaryTerms(comicId, signal) {
+  const res = await fetch(`${API_BASE}/glossary/comic/${comicId}`, {
+    headers: authHeaders(),
+    signal,
+  });
+  if (!res.ok) throw new Error(`Failed to load glossary (${res.status})`);
+  const json = await res.json();
+  return json?.data !== undefined ? json.data : json;
+}
+
+async function createGlossaryTermApi(comicId, term, signal) {
+  const res = await fetch(`${API_BASE}/glossary/comic/${comicId}`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(term),
+    signal,
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.message || `Failed to add term (${res.status})`);
+  return json?.data !== undefined ? json.data : json;
+}
+
+async function updateGlossaryTermApi(id, updates, signal) {
+  const res = await fetch(`${API_BASE}/glossary/${id}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(updates),
+    signal,
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.message || `Failed to update term (${res.status})`);
+  return json?.data !== undefined ? json.data : json;
+}
+
+async function deleteGlossaryTermApi(id, signal) {
+  const res = await fetch(`${API_BASE}/glossary/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+    signal,
+  });
+  if (!res.ok) {
+    const json = await res.json().catch(() => null);
+    throw new Error(json?.message || `Failed to delete term (${res.status})`);
+  }
+  return true;
+}
+
+async function fetchGlossarySuggestions(comicId, { pageId, imageUrl }, signal) {
+  const body = pageId ? { pageId } : { imageUrl };
+  const res = await fetch(`${API_BASE}/glossary/comic/${comicId}/suggest`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+    signal,
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.message || `Failed to scan page (${res.status})`);
+  const data = json?.data !== undefined ? json.data : json;
+  return {
+    extractedText: data?.extractedText || "",
+    suggestions: Array.isArray(data?.suggestions) ? data.suggestions : [],
+  };
+}
+
+const glossarySuggestionCache = new Map();
+
+function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
+  const [terms, setTerms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  const [search, setSearch] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
+  const [newSource, setNewSource] = useState("");
+  const [newTarget, setNewTarget] = useState("");
+  const [newNote, setNewNote] = useState("");
+  const [editId, setEditId] = useState(null);
+  const [deleteId, setDeleteId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const sourceInputRef = useRef(null);
+
+  const pageKey = pageId || imageUrl || null;
+  const [mode, setMode] = useState(pageKey ? "page" : "all");
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [suggestError, setSuggestError] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [extractedText, setExtractedText] = useState("");
+  const [showExtractedText, setShowExtractedText] = useState(false);
+
+  useEffect(() => {
+    if (!comicId) {
+      setTerms([]);
+      setLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    setLoading(true);
+    setLoadError(null);
+    fetchGlossaryTerms(comicId, controller.signal)
+      .then((data) => setTerms(Array.isArray(data) ? data : []))
+      .catch((err) => {
+        if (err.name !== "AbortError") setLoadError(err.message || "Failed to load glossary");
+      })
+      .finally(() => setLoading(false));
+    return () => controller.abort();
+  }, [comicId]);
+
+  const runSuggestScan = useCallback(
+    (forceRefresh = false) => {
+      if (!comicId || !pageKey) return;
+      const cacheKey = `${comicId}::${pageKey}`;
+      if (!forceRefresh && glossarySuggestionCache.has(cacheKey)) {
+        const cached = glossarySuggestionCache.get(cacheKey);
+        setSuggestions(cached.suggestions);
+        setExtractedText(cached.extractedText);
+        setSuggestError(null);
+        return () => {};
+      }
+      const controller = new AbortController();
+      setSuggestLoading(true);
+      setSuggestError(null);
+      fetchGlossarySuggestions(comicId, { pageId, imageUrl }, controller.signal)
+        .then((result) => {
+          glossarySuggestionCache.set(cacheKey, result);
+          setSuggestions(result.suggestions);
+          setExtractedText(result.extractedText);
+        })
+        .catch((err) => {
+          if (err.name !== "AbortError") setSuggestError(err.message || "Failed to scan this page");
+        })
+        .finally(() => setSuggestLoading(false));
+      return () => controller.abort();
+    },
+    [comicId, pageId, imageUrl, pageKey]
+  );
+
+  useEffect(() => {
+    if (mode !== "page") return;
+    const cleanup = runSuggestScan(false);
+    return cleanup;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, pageKey]);
+
+  useEffect(() => {
+    if (addOpen) setTimeout(() => sourceInputRef.current?.focus(), 50);
+  }, [addOpen]);
+
+  const displayedTerms = mode === "page" ? suggestions : terms;
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return displayedTerms;
+    const q = search.toLowerCase();
+    return displayedTerms.filter(
+      (t) =>
+        t.source.toLowerCase().includes(q) ||
+        t.target.toLowerCase().includes(q) ||
+        (t.note || "").toLowerCase().includes(q)
+    );
+  }, [displayedTerms, search]);
+
+  function syncTermEverywhere(updatedTerm) {
+    setTerms((prev) => prev.map((t) => (t.id === updatedTerm.id ? updatedTerm : t)));
+    setSuggestions((prev) => prev.map((t) => (t.id === updatedTerm.id ? { ...t, ...updatedTerm } : t)));
+  }
+
+  function removeTermEverywhere(id) {
+    setTerms((prev) => prev.filter((t) => t.id !== id));
+    setSuggestions((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  async function handleAdd() {
+    if (!newSource.trim() || !newTarget.trim() || saving) return;
+    setSaving(true);
+    try {
+      const created = await createGlossaryTermApi(comicId, {
+        source: newSource.trim(),
+        target: newTarget.trim(),
+        note: newNote.trim(),
+      });
+      setTerms((prev) => [created, ...prev]);
+      setNewSource("");
+      setNewTarget("");
+      setNewNote("");
+      setAddOpen(false);
+      toast.success("Glossary term added");
+    } catch (err) {
+      toast.error(err.message || "Failed to add term");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleUpdate(id) {
+    if (!newSource.trim() || !newTarget.trim() || saving) return;
+    setSaving(true);
+    try {
+      const updated = await updateGlossaryTermApi(id, {
+        source: newSource.trim(),
+        target: newTarget.trim(),
+        note: newNote.trim(),
+      });
+      syncTermEverywhere(updated);
+      setEditId(null);
+      setNewSource("");
+      setNewTarget("");
+      setNewNote("");
+      toast.success("Term updated");
+    } catch (err) {
+      toast.error(err.message || "Failed to update term");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function startEdit(term) {
+    setEditId(term.id);
+    setNewSource(term.source);
+    setNewTarget(term.target);
+    setNewNote(term.note || "");
+    setAddOpen(false);
+  }
+
+  function cancelEdit() {
+    setEditId(null);
+    setNewSource("");
+    setNewTarget("");
+    setNewNote("");
+  }
+
+  function confirmDelete(id) {
+    setDeleteId(id);
+  }
+
+  async function handleDelete() {
+    const id = deleteId;
+    setDeleteId(null);
+    const previousTerms = terms;
+    const previousSuggestions = suggestions;
+    removeTermEverywhere(id);
+    try {
+      await deleteGlossaryTermApi(id);
+      toast.success("Term removed");
+    } catch (err) {
+      setTerms(previousTerms);
+      setSuggestions(previousSuggestions);
+      toast.error(err.message || "Failed to delete term");
+    }
+  }
+
+  function handleExport() {
+    const blob = new Blob([JSON.stringify(terms, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `glossary_${comicId || "project"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  if (loading) {
+    return (
+      <div className="tw-tabpanel tw-x-glossary-panel">
+        <div className="tw-x-glossary-empty">
+          <Loader2 size={22} className="tw-spin" />
+          <p>Loading glossary…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="tw-tabpanel tw-x-glossary-panel">
+        <div className="tw-x-glossary-empty">
+          <AlertCircle size={28} strokeWidth={1.5} />
+          <p>Couldn't load the glossary.</p>
+          <span>{loadError}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="tw-tabpanel">
-      <p style={{ color: "#8286A0", margin: 0 }}>Project-wide glossary terms would list here.</p>
+    <div className="tw-tabpanel tw-x-glossary-panel">
+      <div style={{ display: "flex", gap: 6, padding: "0 0 10px" }}>
+        <button
+          type="button"
+          onClick={() => setMode("page")}
+          disabled={!pageKey}
+          title={pageKey ? "Only terms detected on this page" : "No page loaded yet"}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
+            fontSize: 12,
+            fontWeight: 600,
+            padding: "6px 10px",
+            borderRadius: 6,
+            border: "1px solid",
+            borderColor: mode === "page" ? "#a855f7" : "rgba(255,255,255,0.12)",
+            background: mode === "page" ? "rgba(168,85,247,0.18)" : "transparent",
+            color: mode === "page" ? "#c084fc" : "var(--trans-text-secondary, #9ca3af)",
+            cursor: pageKey ? "pointer" : "not-allowed",
+            opacity: pageKey ? 1 : 0.5,
+          }}
+        >
+          <Sparkles size={12} /> This Page
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("all")}
+          title="Every term in the project glossary"
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            padding: "6px 10px",
+            borderRadius: 6,
+            border: "1px solid",
+            borderColor: mode === "all" ? "#a855f7" : "rgba(255,255,255,0.12)",
+            background: mode === "all" ? "rgba(168,85,247,0.18)" : "transparent",
+            color: mode === "all" ? "#c084fc" : "var(--trans-text-secondary, #9ca3af)",
+            cursor: "pointer",
+          }}
+        >
+          All Terms
+        </button>
+      </div>
+
+      <div className="tw-x-glossary-header">
+        <span className="tw-x-glossary-count">
+          {mode === "page"
+            ? `${suggestions.length} match${suggestions.length !== 1 ? "es" : ""} on this page`
+            : `${terms.length} term${terms.length !== 1 ? "s" : ""}`}
+        </span>
+        <div className="tw-x-glossary-header-actions">
+          {mode === "page" && (
+            <button
+              type="button"
+              className="tw-btn tw-x-mini-btn"
+              onClick={() => runSuggestScan(true)}
+              disabled={suggestLoading || !pageKey}
+              title="Re-scan this page's text"
+            >
+              <RefreshCw size={12} className={suggestLoading ? "tw-spin" : ""} /> Rescan
+            </button>
+          )}
+          {mode === "all" && terms.length > 0 && (
+            <button
+              type="button"
+              className="tw-btn tw-x-mini-btn"
+              onClick={handleExport}
+              title="Export glossary as JSON"
+            >
+              Export
+            </button>
+          )}
+          <button
+            type="button"
+            className="tw-btn-primary tw-x-glossary-add-btn"
+            onClick={() => { setAddOpen((v) => !v); setEditId(null); cancelEdit(); }}
+            title="Add a new glossary term"
+          >
+            <Plus size={13} /> Add Term
+          </button>
+        </div>
+      </div>
+
+      {addOpen && (
+        <div className="tw-x-glossary-form">
+          <div className="tw-x-glossary-form-row">
+            <div className="tw-x-glossary-form-field">
+              <label className="tw-caption tw-x-caption-tight">ORIGINAL TERM</label>
+              <input
+                ref={sourceInputRef}
+                className="tw-x-glossary-input"
+                placeholder="e.g. 先輩"
+                value={newSource}
+                onChange={(e) => setNewSource(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && document.getElementById("glossary-target-input")?.focus()}
+              />
+            </div>
+            <div className="tw-x-glossary-form-field">
+              <label className="tw-caption tw-x-caption-tight">TRANSLATION</label>
+              <input
+                id="glossary-target-input"
+                className="tw-x-glossary-input"
+                placeholder="e.g. Senpai"
+                value={newTarget}
+                onChange={(e) => setNewTarget(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+              />
+            </div>
+          </div>
+          <div className="tw-x-glossary-form-field">
+            <label className="tw-caption tw-x-caption-tight">NOTE (optional)</label>
+            <input
+              className="tw-x-glossary-input"
+              placeholder="Context or usage note..."
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+            />
+          </div>
+          <div className="tw-x-glossary-form-actions">
+            <button
+              type="button"
+              className="tw-btn"
+              onClick={() => { setAddOpen(false); setNewSource(""); setNewTarget(""); setNewNote(""); }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="tw-btn-primary"
+              onClick={handleAdd}
+              disabled={!newSource.trim() || !newTarget.trim() || saving}
+            >
+              {saving ? <Loader2 size={13} className="tw-spin" /> : <Check size={13} />} Save Term
+            </button>
+          </div>
+        </div>
+      )}
+
+      {mode === "page" && suggestLoading && (
+        <div className="tw-x-glossary-empty">
+          <Loader2 size={22} className="tw-spin" />
+          <p>Reading text on this page…</p>
+          <span>Gemini is scanning the page image, this can take a few seconds.</span>
+        </div>
+      )}
+
+      {mode === "page" && !suggestLoading && suggestError && (
+        <div className="tw-x-glossary-empty">
+          <AlertCircle size={28} strokeWidth={1.5} />
+          <p>Couldn't scan this page.</p>
+          <span>{suggestError}</span>
+          <button type="button" className="tw-btn-primary" onClick={() => runSuggestScan(true)}>
+            <RefreshCw size={13} /> Try Again
+          </button>
+        </div>
+      )}
+
+      {mode === "page" && !suggestLoading && !suggestError && (
+        <>
+          {extractedText && (
+            <div style={{ marginBottom: 10 }}>
+              <button
+                type="button"
+                onClick={() => setShowExtractedText((v) => !v)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#9ca3af",
+                  fontSize: 11,
+                  cursor: "pointer",
+                  padding: 0,
+                  textDecoration: "underline",
+                }}
+              >
+                {showExtractedText ? "Hide" : "Show"} text Gemini read on this page
+              </button>
+              {showExtractedText && (
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "#c8c8d8",
+                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 6,
+                    padding: "8px 10px",
+                    marginTop: 6,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {extractedText}
+                </p>
+              )}
+            </div>
+          )}
+          {suggestions.length === 0 && (
+            <div className="tw-x-glossary-empty">
+              <BookMarked size={28} strokeWidth={1.5} />
+              <p>No glossary terms detected on this page.</p>
+              <span>None of the saved terms matched the text Gemini read here.</span>
+              <button type="button" className="tw-btn" onClick={() => setMode("all")}>
+                View All Terms
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {terms.length > 2 && (mode === "all" || suggestions.length > 2) && (
+        <div className="tw-x-glossary-search-wrap">
+          <input
+            className="tw-x-glossary-input tw-x-glossary-search"
+            placeholder="🔍  Search terms..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
+            <button type="button" className="tw-x-glossary-search-clear" onClick={() => setSearch("")}>✕</button>
+          )}
+        </div>
+      )}
+
+      {mode === "all" && terms.length === 0 && !addOpen && (
+        <div className="tw-x-glossary-empty">
+          <BookMarked size={28} strokeWidth={1.5} />
+          <p>No glossary terms yet.</p>
+          <span>Add recurring terms like character names, honorifics, or special phrases so the whole team translates them consistently.</span>
+          <button type="button" className="tw-btn-primary" onClick={() => setAddOpen(true)}>
+            <Plus size={13} /> Add First Term
+          </button>
+        </div>
+      )}
+
+      {displayedTerms.length > 0 && filtered.length === 0 && (
+        <div className="tw-x-glossary-empty" style={{ paddingTop: 16 }}>
+          <p style={{ fontSize: 13 }}>No terms match "{search}"</p>
+        </div>
+      )}
+
+      <div className="tw-x-glossary-list">
+        {filtered.map((term) => (
+          <div key={term.id} className={`tw-x-glossary-card ${editId === term.id ? "is-editing" : ""}`}>
+            {editId === term.id ? (
+              <div className="tw-x-glossary-form" style={{ margin: 0, padding: 0, border: "none", background: "none" }}>
+                <div className="tw-x-glossary-form-row">
+                  <div className="tw-x-glossary-form-field">
+                    <label className="tw-caption tw-x-caption-tight">ORIGINAL</label>
+                    <input
+                      className="tw-x-glossary-input"
+                      value={newSource}
+                      onChange={(e) => setNewSource(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="tw-x-glossary-form-field">
+                    <label className="tw-caption tw-x-caption-tight">TRANSLATION</label>
+                    <input
+                      className="tw-x-glossary-input"
+                      value={newTarget}
+                      onChange={(e) => setNewTarget(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="tw-x-glossary-form-field">
+                  <label className="tw-caption tw-x-caption-tight">NOTE</label>
+                  <input
+                    className="tw-x-glossary-input"
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                  />
+                </div>
+                <div className="tw-x-glossary-form-actions">
+                  <button type="button" className="tw-btn" onClick={cancelEdit}>Cancel</button>
+                  <button
+                    type="button"
+                    className="tw-btn-primary"
+                    onClick={() => handleUpdate(term.id)}
+                    disabled={!newSource.trim() || !newTarget.trim() || saving}
+                  >
+                    {saving ? <Loader2 size={13} className="tw-spin" /> : <Check size={13} />} Update
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="tw-x-glossary-card-body">
+                  <div className="tw-x-glossary-term-pair">
+                    <span className="tw-x-glossary-source">{term.source}</span>
+                    <span className="tw-x-glossary-arrow">→</span>
+                    <span className="tw-x-glossary-target">{term.target}</span>
+                  </div>
+                  {mode === "page" && term.matchedText && term.matchedText !== term.source && (
+                    <p className="tw-x-glossary-note">Matched as "{term.matchedText}"</p>
+                  )}
+                  {term.note && (
+                    <p className="tw-x-glossary-note">{term.note}</p>
+                  )}
+                </div>
+                <div className="tw-x-glossary-card-actions">
+                  <button
+                    type="button"
+                    className="tw-btn-icon tw-x-glossary-action-btn"
+                    title="Edit term"
+                    onClick={() => startEdit(term)}
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    type="button"
+                    className="tw-btn-icon tw-x-glossary-action-btn is-danger"
+                    title="Delete term"
+                    onClick={() => confirmDelete(term.id)}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {deleteId && (
+        <div className="tw-x-glossary-modal-backdrop">
+          <div className="tw-x-glossary-modal">
+            <p className="tw-x-glossary-modal-title">Delete term?</p>
+            <p className="tw-x-glossary-modal-body">
+              "<strong>{displayedTerms.find((t) => t.id === deleteId)?.source}</strong>" will be permanently removed.
+            </p>
+            <div className="tw-x-glossary-modal-actions">
+              <button type="button" className="tw-btn" onClick={() => setDeleteId(null)}>Cancel</button>
+              <button type="button" className="tw-btn-primary is-danger-btn" onClick={handleDelete}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function ChangeRequestsTabPanel({ comments, loading, resolveBubbleLabel }) {
+
+function ChangeRequestCard({ comment, resolveBubbleLabel, onSelectBubble }) {
+  const isClickable = comment.bubbleId != null && typeof onSelectBubble === "function";
+  return (
+    <div
+      className="tw-x-change-request-card"
+      onClick={isClickable ? () => onSelectBubble(comment.bubbleId) : undefined}
+      style={isClickable ? { cursor: "pointer" } : undefined}
+    >
+      <div className="tw-x-change-request-header">
+        <span className="tw-x-change-request-author">{comment.authorName}</span>
+        {comment.resolved && <span className="tw-x-change-request-resolved">Resolved</span>}
+      </div>
+      {comment.bubbleId && (
+        <span className="tw-x-change-request-bubble-tag">{resolveBubbleLabel(comment.bubbleId)}</span>
+      )}
+      <p className="tw-x-change-request-text">{comment.content}</p>
+    </div>
+  );
+}
+
+function ChangeRequestsTabPanel({ comments, loading, resolveBubbleLabel, onSelectBubble }) {
   if (loading) {
     return (
       <div className="tw-placeholder">
@@ -987,20 +1674,32 @@ function ChangeRequestsTabPanel({ comments, loading, resolveBubbleLabel }) {
     );
   }
 
+  const bubbleComments = comments.filter((c) => c.bubbleId);
+  const pageComments = comments.filter((c) => !c.bubbleId);
+
   return (
     <div className="tw-tabpanel">
-      {comments.map((c) => (
-        <div key={c.id} className="tw-x-change-request-card">
-          <div className="tw-x-change-request-header">
-            <span className="tw-x-change-request-author">{c.authorName}</span>
-            {c.resolved && <span className="tw-x-change-request-resolved">Resolved</span>}
-          </div>
-          {c.bubbleId && (
-            <span className="tw-x-change-request-bubble-tag">{resolveBubbleLabel(c.bubbleId)}</span>
-          )}
-          <p className="tw-x-change-request-text">{c.content}</p>
-        </div>
-      ))}
+      <p className="tw-x-change-request-section-label">
+        Bubble Reviews {bubbleComments.length > 0 ? `(${bubbleComments.length})` : ""}
+      </p>
+      {bubbleComments.length === 0 ? (
+        <p className="tw-x-change-request-empty">No bubble-specific reviews on this page.</p>
+      ) : (
+        bubbleComments.map((c) => (
+          <ChangeRequestCard key={c.id} comment={c} resolveBubbleLabel={resolveBubbleLabel} onSelectBubble={onSelectBubble} />
+        ))
+      )}
+
+      <p className="tw-x-change-request-section-label" style={{ marginTop: 16 }}>
+        Page-level Review {pageComments.length > 0 ? `(${pageComments.length})` : ""}
+      </p>
+      {pageComments.length === 0 ? (
+        <p className="tw-x-change-request-empty">No overall page review yet.</p>
+      ) : (
+        pageComments.map((c) => (
+          <ChangeRequestCard key={c.id} comment={c} resolveBubbleLabel={resolveBubbleLabel} onSelectBubble={onSelectBubble} />
+        ))
+      )}
     </div>
   );
 }
@@ -1027,9 +1726,16 @@ function TranslationSidePanel({
   changeRequestsLoading,
   resolveBubbleLabel,
   userFullName,
+  onSelectBubble,
+  comicId,
+  pageId,
+  canEdit = true,
+  projectTeamId,
 }) {
+  const [isMsgOpen, setIsMsgOpen] = useState(false);
+
   return (
-    <aside className="tw-rightpanel">
+    <aside className="tw-rightpanel" style={{ position: "relative" }}>
       <div className="tw-tabs">
         {TABS.map((t) => (
           <button key={t.id} onClick={() => onChangeTab(t.id)} className={`tw-tab ${activeTab === t.id ? "active" : ""}`}>
@@ -1056,23 +1762,149 @@ function TranslationSidePanel({
           onDeleteArea={onDeleteArea}
           zoomScale={zoomScale}
           userFullName={userFullName}
+          canEdit={canEdit}
         />
       )}
-      {activeTab === "glossary" && <GlossaryTabPanel />}
+      {activeTab === "glossary" && (
+        <GlossaryTabPanel comicId={comicId} pageId={pageId} imageUrl={currentImage} />
+      )}
       {activeTab === "changes" && (
         <ChangeRequestsTabPanel
           comments={changeRequests}
           loading={changeRequestsLoading}
           resolveBubbleLabel={resolveBubbleLabel}
+          onSelectBubble={onSelectBubble}
         />
       )}
 
-      <div className="tw-panel-footer">
-        <button className="tw-help-btn">
-          <HelpCircle size={14} />
+      <div className="tw-panel-footer" style={{ position: "relative" }}>
+        <button
+          className="tw-help-btn"
+          onClick={() => setIsMsgOpen((v) => !v)}
+          title="Team messages"
+        >
+          <MessageSquare size={14} />
         </button>
+        {isMsgOpen && (
+          <TeamMessagePopup
+            groupId={projectTeamId}
+            onClose={() => setIsMsgOpen(false)}
+          />
+        )}
       </div>
     </aside>
+  );
+}
+
+function TeamMessagePopup({ groupId, onClose }) {
+  const [inputValue, setInputValue] = useState("");
+  const {
+    messages,
+    hasMore,
+    isLoadingInitial,
+    isLoadingMore,
+    isSending,
+    currentUser,
+    scrollContainerRef,
+    isNearBottomRef,
+    fetchOlderMessages,
+    sendMessage,
+  } = useChat("GROUP", groupId);
+
+  const handleScroll = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    if (container.scrollTop < 30 && hasMore && !isLoadingMore && !isLoadingInitial) {
+      fetchOlderMessages();
+    }
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (isNearBottomRef) isNearBottomRef.current = distanceFromBottom < 80;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!inputValue.trim() || isSending) return;
+    const text = inputValue.trim();
+    setInputValue("");
+    try {
+      await sendMessage(text);
+    } catch (err) {
+      console.error("Failed to send group message:", err);
+    }
+  };
+
+  const isMyMessage = (msg) => {
+    if (!msg) return false;
+    if (msg.isMe) return true;
+    if (currentUser?.id && String(msg.senderId) === String(currentUser.id)) return true;
+    if (currentUser?.username && (msg.senderName === currentUser.username || msg.sender === currentUser.username)) return true;
+    if (currentUser?.fullName && (msg.senderName === currentUser.fullName || msg.sender === currentUser.fullName)) return true;
+    return false;
+  };
+  const getSenderName = (msg) => msg.senderName || msg.sender || msg.sender_name || "Someone";
+  const formatMsgTime = (msg) => {
+    if (msg.time) return msg.time;
+    if (msg.createdAt) {
+      const d = new Date(msg.createdAt);
+      if (!isNaN(d.getTime())) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+    return "";
+  };
+
+  return (
+    <div className="tw-msg-popup">
+      <div className="tw-msg-popup-header">
+        <span className="tw-msg-popup-title">
+          <MessageSquare size={14} /> Group Chat
+        </span>
+        <div className="tw-msg-popup-header-actions">
+          <span className="tw-msg-popup-badge">
+            <span className="tw-msg-popup-badge-dot" /> Live
+          </span>
+          <button type="button" onClick={onClose} title="Close" className="tw-msg-popup-close">
+            ×
+          </button>
+        </div>
+      </div>
+
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="tw-msg-popup-body">
+        {isLoadingMore && <div className="tw-msg-popup-loading-more">Loading older messages…</div>}
+        {isLoadingInitial ? (
+          <div className="tw-msg-popup-status">Loading messages…</div>
+        ) : messages.length === 0 ? (
+          <div className="tw-msg-popup-status">No messages yet — say hi to your team!</div>
+        ) : (
+          messages.map((m, idx) => {
+            const isMe = isMyMessage(m);
+            const content = m.content || m.text || "";
+            const time = formatMsgTime(m);
+            return (
+              <div key={m.id || idx} className={`tw-msg-row ${isMe ? "is-me" : ""}`}>
+                <div className="tw-msg-row-inner">
+                  {!isMe && <div className="tw-msg-sender">{getSenderName(m)}</div>}
+                  <div className="tw-msg-bubble">{content}</div>
+                  {time && <div className="tw-msg-time">{time}</div>}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit} className="tw-msg-popup-form">
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder="Type a message…"
+          disabled={isSending}
+          className="tw-msg-popup-input"
+        />
+        <button type="submit" disabled={!inputValue.trim() || isSending} className="tw-msg-popup-send">
+          <Send size={16} />
+        </button>
+      </form>
+    </div>
   );
 }
 
@@ -1094,7 +1926,7 @@ async function fetchJson(url, signal) {
   }
 
   if (IS_DEV) {
-    // eslint-disable-next-line no-console
+    
     console.log(`[fetchJson] ${url} →`, json);
   }
 
@@ -1122,16 +1954,6 @@ async function fetchChapterById(chapterId, signal) {
 
   return { ...chapter, comicTitle };
 }
-
-const resolveImageUrl = (url) => {
-  if (!url || typeof url !== 'string') return null;
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
-    return url;
-  }
-  const apiBase = import.meta.env.VITE_API_BASE_URL || '/api';
-  const backendHost = apiBase.startsWith('http') ? apiBase.replace(/\/api\/?$/, '') : 'http://localhost:8081';
-  return `${backendHost}${url.startsWith('/') ? '' : '/'}${url}`;
-};
 
 function getTaskFallbackData(taskId) {
   let foundTask = null;
@@ -1186,56 +2008,145 @@ function getTaskFallbackData(taskId) {
 async function fetchChapterForTask(taskId, signal) {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  // 1. Primary: get task from backend (only if taskId is a real UUID)
   if (UUID_RE.test(taskId)) {
-    try {
-      const task = await fetchJson(`${API_BASE}/team-workspace/tasks/${taskId}`, signal);
+    // Real backend task — let failures propagate as real errors instead of
+    // silently falling back to generic "Chapter 1 - Translation" demo data.
+    // Masking a failed load as fake-but-successful content is exactly what
+    // caused chapters to mysteriously "turn into Chapter 1" on switch.
+    const task = await fetchJson(`${API_BASE}/team-workspace/tasks/${taskId}`, signal);
 
-      const chapterId =
-        task?.chapter?.id ??
-        task?.chapterId ??
-        task?.chapter_id ??
-        task?.data?.chapterId ??
-        task?.task?.chapterId ??
-        (Array.isArray(task) ? task[0]?.chapterId : undefined);
+    const chapterId =
+      task?.chapter?.id ??
+      task?.chapterId ??
+      task?.chapter_id ??
+      task?.data?.chapterId ??
+      task?.task?.chapterId ??
+      (Array.isArray(task) ? task[0]?.chapterId : undefined);
 
-      if (chapterId && UUID_RE.test(chapterId)) {
-        try {
-          const chapterResult = await fetchChapterById(chapterId, signal);
-          return { ...chapterResult, projectTeamId: task?.projectTeamId ?? null };
-        } catch (chErr) { /* ignore */ }
-      }
-    } catch (err) { /* ignore */ }
+    const taskAssigneeId = task?.assigneeId ?? null;
+
+    if (!chapterId || !UUID_RE.test(chapterId)) {
+      throw new Error(`Task ${taskId} has no valid chapter linked (got chapterId: ${chapterId ?? "none"})`);
+    }
+
+    const chapterResult = await fetchChapterById(chapterId, signal);
+    return {
+      ...chapterResult,
+      projectTeamId: task?.projectTeamId ?? null,
+      taskAssigneeId,
+    };
   }
 
-  // 2. Fallback: get chapterId from localStorage, then fetch chapter detail from DB
+  // Only synthetic/local-only task IDs (never saved to the backend) fall back
+  // to the localStorage demo cache — this is its actual intended use case.
   const fallback = getTaskFallbackData(taskId);
+  const fallbackAssigneeId = fallback.task?.assigneeId ?? null;
   const chId = fallback.chapter?.id;
   if (chId && UUID_RE.test(chId)) {
-    try {
-      const chapterResult = await fetchChapterById(chId, signal);
-      return { ...chapterResult, projectTeamId: null };
-    } catch (chErr) { /* ignore */ }
+    const chapterResult = await fetchChapterById(chId, signal);
+    return {
+      ...chapterResult,
+      projectTeamId: null,
+      taskAssigneeId: fallbackAssigneeId,
+    };
   }
 
-  return fallback.chapter;
+  return { ...fallback.chapter, taskAssigneeId: fallbackAssigneeId };
+}
+
+// ChapterEntity has no `title` field — only `chapterNumber`. Every place that
+// displays a chapter's name must derive it, or it silently falls back to
+// whatever hardcoded default happens to be nearby (which is how the sidebar
+// ended up always showing "Chapter 1" regardless of which chapter was open).
+function deriveChapterTitle(chapter) {
+  if (!chapter) return null;
+  if (chapter.title) return chapter.title;
+  if (chapter.chapterNumber != null) return `Chapter ${chapter.chapterNumber}`;
+  return null;
+}
+
+// Strips a leading "[PRIORITY] [ComicName]" prefix off a task title, leaving
+// just the clean chapter/task name. Used whenever we have to fall back to a
+// task's raw title (e.g. when the chapter relation isn't populated) instead of
+// the real chapter title.
+function stripTaskTitlePrefix(title) {
+  if (!title) return title;
+  const match = String(title).match(/^\[(URGENT|HIGH|MEDIUM|LOW)\]\s*(?:\[([^\]]+)\])?\s*(.*)$/i);
+  return match ? match[3] || title : title;
+}
+
+// Fetches the other tasks (chapters) that belong to the same project team, so the
+// sidebar can offer chapter switching. GET /team-workspace/{teamId}/tasks
+async function fetchProjectTeamTasks(projectTeamId, signal) {
+  if (!projectTeamId) return [];
+  try {
+    const list = await fetchJson(`${API_BASE}/team-workspace/${projectTeamId}/tasks`, signal);
+    const arr = Array.isArray(list) ? list : list?.data || list?.content || [];
+    return arr.map((t) => ({
+      id: t?.id,
+      chapterId: t?.chapter?.id ?? t?.chapterId,
+      chapterNumber: t?.chapter?.chapterNumber ?? null,
+      title: deriveChapterTitle(t?.chapter) ?? stripTaskTitlePrefix(t?.title) ?? "Untitled chapter",
+      status: t?.status,
+      assigneeId: t?.assigneeId ?? null,
+    })).filter((t) => t.id);
+  } catch (err) {
+    return [];
+  }
+}
+
+// GET /team-workspace/{teamId}/members -> List<TeamMemberDto> { id, name, role, avatar, online, lastSeenAt }
+async function fetchTeamMembers(projectTeamId, signal) {
+  if (!projectTeamId) return [];
+  try {
+    const list = await fetchJson(`${API_BASE}/team-workspace/${projectTeamId}/members`, signal);
+    return Array.isArray(list) ? list : list?.data || list?.content || [];
+  } catch (err) {
+    return [];
+  }
+}
+
+// Does this single assigneeId belong to the given user?
+function isSameUser(assigneeId, userId) {
+  if (assigneeId == null || userId == null) return false;
+  return String(assigneeId) === String(userId);
+}
+
+// Look up a member's display name by id from the fetched team member list.
+function resolveMemberName(memberId, teamMembers) {
+  if (memberId == null) return null;
+  const member = (teamMembers || []).find((m) => String(m.id) === String(memberId));
+  return member?.name || null;
+}
+
+// Readable "who's assigned" label for the sidebar, resolved against the real team
+// member list. Falls back to a short id fragment only if the member list hasn't
+// loaded yet or the id isn't found (e.g. member removed from the team).
+function formatAssigneeLabel(assigneeId, teamMembers) {
+  if (assigneeId == null) return "Unassigned";
+  const name = resolveMemberName(assigneeId, teamMembers);
+  if (name) return name;
+  return `Assignee ${String(assigneeId).slice(0, 8)}`;
 }
 
 async function fetchPagesForTask(taskId, signal) {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   let rawPages = [];
 
-  // 1. Primary: try the translate-workspace API (only if taskId is a real UUID)
+  
   if (UUID_RE.test(taskId)) {
     try {
       const list = await fetchJson(`${API_BASE}/translate-workspace/${taskId}`, signal);
+      console.log('[DEBUG] /translate-workspace response:', list);
       if (Array.isArray(list) && list.length > 0) {
         rawPages = list;
       }
-    } catch (err) { /* ignore */ }
+    } catch (err) {
+      console.warn('[DEBUG] /translate-workspace fetch failed:', err);
+    }
   }
 
-  // 2. LocalStorage Task lookup -> Chapter ID or Comic Title lookup
+  
   const fallback = getTaskFallbackData(taskId);
   const foundTask = fallback.task;
   const chapterId = foundTask?.chapterId || fallback.chapter?.id;
@@ -1249,7 +2160,7 @@ async function fetchPagesForTask(taskId, signal) {
     }
   }
 
-  // 3. Direct fetch by Chapter ID if UUID
+  
   const uuidMatch = String(chapterId || '').match(UUID_RE);
   const realChapterId = uuidMatch ? uuidMatch[0] : null;
 
@@ -1258,10 +2169,10 @@ async function fetchPagesForTask(taskId, signal) {
       const data = await fetchJson(`${API_BASE}/chapters/detail/${realChapterId}`, signal);
       const pList = data?.pages || data?.images || (Array.isArray(data) ? data : []);
       if (Array.isArray(pList) && pList.length > 0) rawPages = pList;
-    } catch (e) { /* ignore */ }
+    } catch (e) {  }
   }
 
-  // 4. Smart Title Search Fallback - Parallel comic discovery
+  
   if (rawPages.length === 0) {
     try {
       const allComics = await fetchJson(`${API_BASE}/comics/all`, signal);
@@ -1275,7 +2186,7 @@ async function fetchPagesForTask(taskId, signal) {
       if (foundComic?.id) {
         let chapList = [];
 
-        // Parallel: chapters API + author chapters API
+        
         const chapResults = await Promise.allSettled([
           fetchJson(`${API_BASE}/chapters/comic/${foundComic.id}?includeAll=true`, signal),
           fetchJson(`${API_BASE}/author/comics/${foundComic.id}/chapters`, signal)
@@ -1302,7 +2213,7 @@ async function fetchPagesForTask(taskId, signal) {
               rawPages = matchedChap.images;
             }
 
-            // Parallel: detail + preview for matched chapter
+            
             if (rawPages.length === 0 && matchedChap.id) {
               const detailResults = await Promise.allSettled([
                 fetchJson(`${API_BASE}/chapters/detail/${matchedChap.id}`, signal),
@@ -1319,12 +2230,12 @@ async function fetchPagesForTask(taskId, signal) {
           }
         }
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {  }
   }
 
-  // Map & resolve real image URLs from DB
+  
   if (Array.isArray(rawPages) && rawPages.length > 0) {
-    return rawPages
+    let finalPages = rawPages
       .map((item, idx) => {
         const rawUrl = typeof item === 'string'
           ? item
@@ -1343,14 +2254,36 @@ async function fetchPagesForTask(taskId, signal) {
         } catch (e) {}
 
         return {
-          id: pageId,
-          pageId: pageId,
+          id: item?.id || `p-${taskId}-${idx + 1}`,
+          pageId: item?.id || `p-${taskId}-${idx + 1}`,
           pageNumber: item?.pageNumber || idx + 1,
           imageUrl: resolved,
           bubbles: bubblesData
         };
       })
       .filter(Boolean);
+
+
+    
+
+    
+    const needsRealPageIds = finalPages.some((p) => !UUID_RE.test(p.pageId));
+    if (needsRealPageIds && UUID_RE.test(taskId)) {
+      try {
+        const realPages = await fetchJson(`${API_BASE}/review-workspace/${taskId}`, signal);
+        if (Array.isArray(realPages) && realPages.length > 0) {
+          const byPageNumber = new Map(realPages.map((rp) => [rp.pageNumber, rp]));
+          finalPages = finalPages.map((p) => {
+            const real = byPageNumber.get(p.pageNumber);
+            if (!real?.pageId) return p;
+            return { ...p, id: real.pageId, pageId: real.pageId };
+          });
+        }
+      } catch (e) {
+        console.warn('[DEBUG] Could not backfill real pageIds from /review-workspace:', e);
+      }
+    }
+    return finalPages;
   }
 
   return [];
@@ -1358,11 +2291,17 @@ async function fetchPagesForTask(taskId, signal) {
 
 async function fetchPageChangeRequests(pageId, signal) {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!pageId || !UUID_RE.test(pageId)) return [];
+  console.log('[DEBUG] fetchPageChangeRequests pageId:', pageId, '| isUUID:', UUID_RE.test(pageId));
+  if (!pageId || !UUID_RE.test(pageId)) {
+    console.warn('[DEBUG] pageId không phải UUID, bỏ qua fetch comments');
+    return [];
+  }
   try {
     const list = await fetchJson(`${API_BASE}/review-workspace/pages/${pageId}/comments`, signal);
+    console.log('[DEBUG] comments API response:', list);
     return Array.isArray(list) ? list : [];
   } catch (e) {
+    console.error('[DEBUG] fetchPageChangeRequests error:', e);
     return [];
   }
 }
@@ -1370,10 +2309,14 @@ async function fetchPageChangeRequests(pageId, signal) {
 async function saveBubblesForPage(pageId, payload, signal) {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4,5}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!pageId || !UUID_RE.test(pageId)) {
+
+    
+
+    
     try {
       localStorage.setItem(`comiverse_bubbles_${pageId}`, JSON.stringify(payload));
     } catch (e) {}
-    return true;
+    return false;
   }
 
   try {
@@ -1387,14 +2330,15 @@ async function saveBubblesForPage(pageId, payload, signal) {
       try {
         localStorage.setItem(`comiverse_bubbles_${pageId}`, JSON.stringify(payload));
       } catch (e) {}
-      return true;
+      return false;
     }
     return true;
   } catch (err) {
+    if (err.name === "AbortError") throw err;
     try {
       localStorage.setItem(`comiverse_bubbles_${pageId}`, JSON.stringify(payload));
     } catch (e) {}
-    return true;
+    return false;
   }
 }
 
@@ -1413,6 +2357,27 @@ async function submitTaskForReview(taskId, signal) {
 function normalizeImages(chapterData) {
   const raw = chapterData?.images || [];
   return raw.map((item) => (typeof item === "string" ? item : item?.url)).filter(Boolean);
+}
+
+function clampSelectionToCanvas(selection, containerWidth, containerHeight) {
+  if (containerWidth <= 0 || containerHeight <= 0) return selection;
+
+  if (selection.shape === "polygon" && selection.points) {
+    return {
+      ...selection,
+      points: selection.points.map((p) => ({
+        x: Math.min(Math.max(p.x, 0), containerWidth),
+        y: Math.min(Math.max(p.y, 0), containerHeight),
+      })),
+    };
+  }
+
+  let { x, y, width, height } = selection;
+  width = Math.min(width, containerWidth);
+  height = Math.min(height, containerHeight);
+  x = Math.min(Math.max(x, 0), containerWidth - width);
+  y = Math.min(Math.max(y, 0), containerHeight - height);
+  return { ...selection, x, y, width, height };
 }
 
 function calculateRect(start, end) {
@@ -1562,6 +2527,26 @@ function measureCanvasSize(canvasRef) {
   };
 }
 
+function waitForValidCanvasSize(canvasRef, maxAttempts = 10) {
+  return new Promise((resolve) => {
+    let attempts = 0;
+    const check = () => {
+      const size = measureCanvasSize(canvasRef);
+      if (size.width > 0 && size.height > 0) {
+        resolve(size);
+        return;
+      }
+      attempts += 1;
+      if (attempts >= maxAttempts) {
+        resolve(size);
+        return;
+      }
+      requestAnimationFrame(check);
+    };
+    check();
+  });
+}
+
 function toPercent(value, size) {
   return size > 0 ? (value / size) * 100 : 0;
 }
@@ -1632,7 +2617,7 @@ function selectionsFromImagePercent(selections, canvasSize, naturalSize) {
   });
 }
 
-function useSelectionAreas() {
+function useSelectionAreas(canEdit = true) {
   const [selections, setSelections] = useState([]);
   const [drawing, setDrawing] = useState(null);
   const [activeId, setActiveId] = useState(null);
@@ -1650,6 +2635,7 @@ function useSelectionAreas() {
 
   const startPoint = useRef({ x: 0, y: 0 });
   const containerRef = useRef(null);
+  const bubbleRefs = useRef({});
 
   const getRelativePos = (e) => {
     const bounds = containerRef.current.getBoundingClientRect();
@@ -1662,6 +2648,12 @@ function useSelectionAreas() {
 
   const toggleZoomIn = () => setIsPickingZoomPoint((v) => !v);
   const cancelZoomPick = () => setIsPickingZoomPoint(false);
+
+  useEffect(() => {
+    if (activeId == null) return;
+    const el = bubbleRefs.current[activeId];
+    el?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+  }, [activeId]);
 
   const zoomOut = () => {
     setZoomScale((prev) => {
@@ -1688,6 +2680,7 @@ function useSelectionAreas() {
     }
 
     if (dragState.current) return;
+    if (!canEdit) return;
 
     const pos = getRelativePos(e);
 
@@ -1754,18 +2747,24 @@ function useSelectionAreas() {
     }
 
     if (drawing && drawing.width > 8 && drawing.height > 8) {
-      const newArea = {
-        id: generateId(),
-        shape: activeTool === "ellipse" ? "ellipse" : "rect",
-        textColor: "#000000",
-        textBgColor: "#ffffff",
-        fontSize: 13,
-        fontFamily: COMIC_FONT_LIBRARY[0].value,
-        isBold: false,
-        isItalic: false,
-        textAlign: "left",
-        ...drawing,
-      };
+      const containerWidth = containerRef.current?.offsetWidth ?? 0;
+      const containerHeight = containerRef.current?.offsetHeight ?? 0;
+      const newArea = clampSelectionToCanvas(
+        {
+          id: generateId(),
+          shape: activeTool === "ellipse" ? "ellipse" : "rect",
+          textColor: "#000000",
+          textBgColor: "#ffffff",
+          fontSize: 13,
+          fontFamily: COMIC_FONT_LIBRARY[0].value,
+          isBold: false,
+          isItalic: false,
+          textAlign: "left",
+          ...drawing,
+        },
+        containerWidth,
+        containerHeight
+      );
       setSelections((prev) => [...prev, newArea]);
       setActiveId(newArea.id);
       mergeOverlappingWith(newArea.id);
@@ -1774,6 +2773,7 @@ function useSelectionAreas() {
   };
 
   const finishPolygon = () => {
+    if (!canEdit) return;
     if (polygonDraft && polygonDraft.length >= 3) {
       const newArea = {
         id: generateId(),
@@ -1799,6 +2799,7 @@ function useSelectionAreas() {
   const selectArea = (id) => setActiveId(id);
 
   const deleteArea = (id) => {
+    if (!canEdit) return;
     setSelections((prev) => prev.filter((s) => s.id !== id));
     setActiveId((cur) => (cur === id ? null : cur));
   };
@@ -1826,14 +2827,17 @@ function useSelectionAreas() {
   };
 
   const updateTranslation = (id, translation) => {
+    if (!canEdit) return;
     setSelections((prev) => prev.map((s) => (s.id === id ? { ...s, translation } : s)));
   };
 
   const updateName = (id, name) => {
+    if (!canEdit) return;
     setSelections((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
   };
 
   const updateSelectionStyle = (id, patch) => {
+    if (!canEdit) return;
     setSelections((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   };
 
@@ -1858,6 +2862,7 @@ function useSelectionAreas() {
   };
 
   const startMove = (e, id) => {
+    if (!canEdit) return;
     const selection = selections.find((s) => s.id === id);
     if (!selection) return;
     dragState.current = {
@@ -1870,6 +2875,7 @@ function useSelectionAreas() {
   };
 
   const startResize = (e, id, handle) => {
+    if (!canEdit) return;
     const selection = selections.find((s) => s.id === id);
     if (!selection) {
       return;
@@ -1885,6 +2891,7 @@ function useSelectionAreas() {
   };
 
   const startVertexDrag = (e, id, vertexIndex) => {
+    if (!canEdit) return;
     const selection = selections.find((s) => s.id === id);
     if (!selection) {
       return;
@@ -1907,6 +2914,8 @@ function useSelectionAreas() {
     const pos = getRelativePos(e);
     const dx = pos.x - drag.startPos.x;
     const dy = pos.y - drag.startPos.y;
+    const containerWidth = containerRef.current?.offsetWidth ?? 0;
+    const containerHeight = containerRef.current?.offsetHeight ?? 0;
 
     setSelections((prev) =>
       prev.map((s) => {
@@ -1914,9 +2923,17 @@ function useSelectionAreas() {
 
         if (drag.mode === "move") {
           if (s.shape === "polygon") {
-            return { ...s, points: drag.original.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) };
+            return clampSelectionToCanvas(
+              { ...s, points: drag.original.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) },
+              containerWidth,
+              containerHeight
+            );
           }
-          return { ...s, x: drag.original.x + dx, y: drag.original.y + dy };
+          return clampSelectionToCanvas(
+            { ...s, x: drag.original.x + dx, y: drag.original.y + dy },
+            containerWidth,
+            containerHeight
+          );
         }
 
         if (drag.mode === "resize") {
@@ -1946,15 +2963,19 @@ function useSelectionAreas() {
             if (newW < 8) newW = 8;
             if (newH < 8) newH = 8;
 
-            return {
-              ...s,
-              points: scalePointsToNewBox(drag.original.points, origBox, {
-                x: newX,
-                y: newY,
-                width: newW,
-                height: newH,
-              }),
-            };
+            return clampSelectionToCanvas(
+              {
+                ...s,
+                points: scalePointsToNewBox(drag.original.points, origBox, {
+                  x: newX,
+                  y: newY,
+                  width: newW,
+                  height: newH,
+                }),
+              },
+              containerWidth,
+              containerHeight
+            );
           }
 
           let { x, y, width, height } = drag.original;
@@ -1979,14 +3000,14 @@ function useSelectionAreas() {
           if (width < 8) width = 8;
           if (height < 8) height = 8;
 
-          return { ...s, x, y, width, height };
+          return clampSelectionToCanvas({ ...s, x, y, width, height }, containerWidth, containerHeight);
         }
 
         if (drag.mode === "vertex") {
           const newPoints = drag.original.points.map((p, i) =>
             i === drag.vertexIndex ? { x: p.x + dx, y: p.y + dy } : p
           );
-          return { ...s, points: newPoints };
+          return clampSelectionToCanvas({ ...s, points: newPoints }, containerWidth, containerHeight);
         }
 
         return s;
@@ -1996,6 +3017,7 @@ function useSelectionAreas() {
 
   return {
     containerRef,
+    bubbleRefs,
     selections,
     drawing,
     activeId,
@@ -2030,8 +3052,14 @@ function useSelectionAreas() {
 }
 
 export default function TranslateWorkspace() {
+  useWorkspaceSecurity({
+    targetElementId: "secure-workspace",
+    onDevToolsOpen: () => toast.warning("Vui lòng không mở DevTools trên trang này."),
+  });
+
   const { taskId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isLoggedIn } = useAuth();
   const auth = getAuth();
   const authUser = auth?.user;
@@ -2047,7 +3075,6 @@ export default function TranslateWorkspace() {
 
   const [activeTab, setActiveTab] = useState("translate");
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
-  const [open, setOpen] = useState({});
   const pixelCanvasRef = useRef(null);
   if (!pixelCanvasRef.current && typeof document !== "undefined") {
     pixelCanvasRef.current = document.createElement("canvas");
@@ -2059,12 +3086,10 @@ export default function TranslateWorkspace() {
 
   const [imageNaturalSize, setImageNaturalSize] = useState(null);
 
-  // Real DOM node of the page <img>. persistBubbles() reads naturalWidth/
-  // naturalHeight straight off this element instead of trusting state/refs
-  // that get updated asynchronously via onLoad — that async update is exactly
-  // what caused the race condition (state could still reflect a previous
-  // page's image at the moment we needed to save). Reading the live DOM
-  // element right before navigating away is synchronous and can't race.
+
+  
+
+  
   const imgElRef = useRef(null);
 
   useEffect(() => {
@@ -2076,8 +3101,38 @@ export default function TranslateWorkspace() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [pickingColorFor]);
 
+  const currentUserId = authUser?.id ?? authUser?.userId ?? null;
+
+  const [teamMembers, setTeamMembers] = useState([]);
+
+  useEffect(() => {
+    const projectTeamId = chapterData?.projectTeamId;
+    if (!projectTeamId) {
+      setTeamMembers([]);
+      return;
+    }
+    const controller = new AbortController();
+    fetchTeamMembers(projectTeamId, controller.signal)
+      .then(setTeamMembers)
+      .catch(() => setTeamMembers([]));
+    return () => controller.abort();
+  }, [chapterData?.projectTeamId]);
+
+  const isAssignedToTask = isSameUser(chapterData?.taskAssigneeId, currentUserId);
+
+  const isProjectLeader = useMemo(() => {
+    const me = (teamMembers || []).find((m) => String(m.id) === String(currentUserId));
+    return me?.role === "Group Leader";
+  }, [teamMembers, currentUserId]);
+
+  // Nobody is allowed to edit until we've actually loaded the task and know
+  // who's assigned — default is read-only, not editable.
+  const canEdit = status === "ready" && (isProjectLeader || isAssignedToTask);
+
+
   const {
     containerRef: canvasRef,
+    bubbleRefs,
     selections,
     drawing,
     activeId,
@@ -2108,7 +3163,7 @@ export default function TranslateWorkspace() {
     zoomOut,
     resetZoom,
     cancelZoomPick,
-  } = useSelectionAreas(userFullName);
+  } = useSelectionAreas(canEdit);
 
   const applyPendingBubbles = useCallback(
     (naturalSize) => {
@@ -2130,27 +3185,28 @@ export default function TranslateWorkspace() {
 
         if (Array.isArray(selectionsToLoad) && selectionsToLoad.length > 0) {
           const canvasSize = measureCanvasSize(canvasRef);
-          const pxSelections = selectionsFromImagePercent(selectionsToLoad, canvasSize, naturalSize).map((s) => ({
-            isBold: legacyPageTextStyle?.isBold ?? false,
-            isItalic: legacyPageTextStyle?.isItalic ?? false,
-            textAlign: legacyPageTextStyle?.textAlign ?? "left",
-            ...s,
-          }));
+          const pxSelections = selectionsFromImagePercent(selectionsToLoad, canvasSize, naturalSize).map((s) => {
+            const clamped = clampSelectionToCanvas(s, canvasSize.width, canvasSize.height);
+            return {
+              isBold: legacyPageTextStyle?.isBold ?? false,
+              isItalic: legacyPageTextStyle?.isItalic ?? false,
+              textAlign: legacyPageTextStyle?.textAlign ?? "left",
+              ...clamped,
+            };
+          });
           loadSelections(pxSelections);
         }
       } catch (err) {
-        /* ignore parse error silently */
+        
       }
     },
     [canvasRef, loadSelections]
   );
 
   const handleImageLoad = (size, loadedSrc) => {
-    // Ignore late onLoad events firing for an image that is no longer the
-    // one currently displayed (e.g. user flipped pages before it finished
-    // loading). This only protects UI-facing state (crop preview, color
-    // picker) — it is NOT what guarantees save-time correctness anymore;
-    // persistBubbles() below reads the DOM directly instead.
+
+    
+
     if (loadedSrc && currentImage && loadedSrc !== currentImage) {
       return;
     }
@@ -2280,9 +3336,8 @@ export default function TranslateWorkspace() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeId, deleteArea]);
 
-  // Bold/Italic/Align now live on the active bubble itself, not on
-  // page-wide state — this just reflects the active selection's own values
-  // (for the toolbar's toggle states and the translation-editor preview).
+
+  
   const textStyle = useMemo(
     () => ({
       fontWeight: activeSelection?.isBold ? 700 : 400,
@@ -2292,13 +3347,23 @@ export default function TranslateWorkspace() {
     [activeSelection]
   );
 
+  const pendingTargetPageRef = useRef(null);
+  const consumePendingTargetIndex = (pages) => {
+    const target = pendingTargetPageRef.current;
+    if (target == null) return null;
+    pendingTargetPageRef.current = null;
+    const idx = pages.findIndex((p) => p.pageNumber === target);
+    if (idx !== -1) return idx;
+    return Math.max(0, Math.min(target - 1, pages.length - 1));
+  };
+
   useEffect(() => {
     if (!taskId) return;
 
     const controller = new AbortController();
     const cacheKey = `comiverse_ws_cache_${taskId}`;
 
-    // 0. Instant cache load from sessionStorage (<5ms)
+    
     let hasCache = false;
     try {
       const cached = sessionStorage.getItem(cacheKey);
@@ -2308,11 +3373,11 @@ export default function TranslateWorkspace() {
           setChapterData(cChapter);
           setTaskPages(cPages);
           setCurrentChapterId(cChapter.id);
-          setCurrentPageIndex(0);
+          const pendingIdx = consumePendingTargetIndex(cPages);
+          setCurrentPageIndex(pendingIdx != null ? pendingIdx : 0);
           setStatus("ready");
-          setOpen({ [cChapter.id]: true });
           hasCache = true;
-          // Preload first 3 images for instant rendering
+          
           cPages.slice(0, 3).forEach(p => {
             if (p.imageUrl) { const img = new Image(); img.src = p.imageUrl; }
           });
@@ -2333,17 +3398,36 @@ export default function TranslateWorkspace() {
         setChapterData(chapterResult);
         setTaskPages(pagesResult);
         setCurrentChapterId(chapterResult.id);
-        if (!hasCache) setCurrentPageIndex(0);
+        const pendingIdx = consumePendingTargetIndex(pagesResult);
+        if (pendingIdx != null) {
+          setCurrentPageIndex(pendingIdx);
+        } else if (!hasCache) {
+          setCurrentPageIndex(0);
+        } else {
+
+          
+
+          
+          setCurrentPageIndex((prevIndex) => {
+            const currentId = currentPageIdRef.current;
+            if (currentId) {
+              const freshIndex = pagesResult.findIndex(
+                (p) => p.pageId === currentId || p.id === currentId
+              );
+              if (freshIndex !== -1) return freshIndex;
+            }
+            return prevIndex < pagesResult.length ? prevIndex : 0;
+          });
+        }
         setStatus("ready");
-        setOpen({ [chapterResult.id]: true });
-        // Cache for instant future opens
+
         try {
           sessionStorage.setItem(cacheKey, JSON.stringify({
             chapter: chapterResult,
             pages: pagesResult
           }));
         } catch (e) {}
-        // Preload first 5 images
+        
         pagesResult.slice(0, 5).forEach(p => {
           if (p.imageUrl) { const img = new Image(); img.src = p.imageUrl; }
         });
@@ -2364,8 +3448,7 @@ export default function TranslateWorkspace() {
   const currentImage = images[currentPageIndex];
   const currentPageMeta = taskPages[currentPageIndex] ?? null;
 
-  // Auto-save draft to LocalStorage whenever bubbles change.
-  // Only depends on selections & pageId (stable string) — no function refs that change each render.
+
   const currentPageIdRef = useRef(null);
   useEffect(() => {
     currentPageIdRef.current = currentPageMeta?.pageId ?? null;
@@ -2385,10 +3468,10 @@ export default function TranslateWorkspace() {
       const percentSelections = selectionsToImagePercent(selections, canvasSize, naturalSize);
       localStorage.setItem(`comiverse_bubbles_${pageId}`, JSON.stringify({ selections: percentSelections }));
     } catch (e) {}
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  
   }, [selections]);
 
-  // Load saved bubbles when page changes. Depends only on pageId (stable string).
+  
   const clearSelectionsRef = useRef(clearSelections);
   const applyPendingBubblesRef = useRef(applyPendingBubbles);
   useEffect(() => { clearSelectionsRef.current = clearSelections; }, [clearSelections]);
@@ -2411,8 +3494,7 @@ export default function TranslateWorkspace() {
     if (imgEl && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0) {
       applyPendingBubblesRef.current({ width: imgEl.naturalWidth, height: imgEl.naturalHeight });
     }
-  // Only re-run when the page actually changes, NOT when function refs update
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [currentPageMeta?.pageId]);
 
   const [changeRequests, setChangeRequests] = useState([]);
@@ -2439,61 +3521,183 @@ export default function TranslateWorkspace() {
     return idx >= 0 ? `Bubble ${idx + 1}` : "Bubble (deleted)";
   }, []);
 
+  const [siblingTasks, setSiblingTasks] = useState([]);
+
+  useEffect(() => {
+    const projectTeamId = chapterData?.projectTeamId;
+    if (!projectTeamId) {
+      setSiblingTasks([]);
+      return;
+    }
+    const controller = new AbortController();
+    fetchProjectTeamTasks(projectTeamId, controller.signal)
+      .then(setSiblingTasks)
+      .catch(() => setSiblingTasks([]));
+    return () => controller.abort();
+  }, [chapterData?.projectTeamId]);
+
+  const [chapterPagesCache, setChapterPagesCache] = useState({});
+  const [chapterPagesLoadingId, setChapterPagesLoadingId] = useState(null);
+  const [openChapterId, setOpenChapterId] = useState(null);
+
+  // Whenever the actively-open task changes (a real switch happened), that
+  // chapter's row should be the one expanded by default.
+  useEffect(() => {
+    if (currentChapterId) setOpenChapterId(currentChapterId);
+  }, [currentChapterId]);
+
   const sidebarChapters = useMemo(() => {
     if (!chapterData && taskPages.length === 0) return [];
     const chapId = chapterData?.id || currentChapterId || 'ch-1';
-    const chapTitle = chapterData?.title || 'Chapter 1';
+    const chapTitle = deriveChapterTitle(chapterData) || 'Chapter';
     const doneCount = taskPages.filter((p) => p.status === "DONE").length;
-    return [
-      {
-        chapterId: chapId,
-        title: chapTitle,
-        progress: `${doneCount > 0 ? doneCount : (taskPages.length > 0 ? currentPageIndex + 1 : 0)}/${taskPages.length}`,
-        pages: taskPages.map((p, idx) => ({
-          ...p,
-          pageId: p.pageId || p.id || `p-${idx + 1}`,
-          pageNumber: p.pageNumber || idx + 1,
-          status: p.status === "DONE" ? "DONE" : (idx === currentPageIndex ? "current" : "todo")
-        })),
-      },
-    ];
-  }, [chapterData, currentChapterId, taskPages, currentPageIndex]);
+
+    const currentEntry = {
+      chapterId: chapId,
+      taskId,
+      chapterNumber: chapterData?.chapterNumber ?? null,
+      title: chapTitle,
+      progress: `${doneCount > 0 ? doneCount : (taskPages.length > 0 ? currentPageIndex + 1 : 0)}/${taskPages.length}`,
+      assigneeLabel: formatAssigneeLabel(chapterData?.taskAssigneeId, teamMembers),
+      pages: taskPages.map((p, idx) => ({
+        ...p,
+        pageId: p.pageId || p.id || `p-${idx + 1}`,
+        pageNumber: p.pageNumber || idx + 1,
+        status: p.status === "DONE" ? "DONE" : (idx === currentPageIndex ? "current" : "todo")
+      })),
+    };
+
+    const siblingEntries = (siblingTasks || [])
+      .filter((t) => String(t.id) !== String(taskId))
+      .map((t) => {
+        const cachedPages = chapterPagesCache[t.id];
+        return {
+          chapterId: t.chapterId || t.id,
+          taskId: t.id,
+          chapterNumber: t.chapterNumber ?? null,
+          title: t.title,
+          progress: t.status || '',
+          assigneeLabel: formatAssigneeLabel(t.assigneeId, teamMembers),
+          pages: (cachedPages || []).map((p, idx) => ({
+            ...p,
+            pageId: p.pageId || p.id || `p-${idx + 1}`,
+            pageNumber: p.pageNumber || idx + 1,
+            status: p.status === "DONE" ? "DONE" : "todo",
+          })),
+        };
+      });
+
+    // Keep a stable order by chapter number — switching the active chapter
+    // should never reshuffle the list (e.g. bump it to the top).
+    const orderKey = (entry) => {
+      if (entry.chapterNumber != null) {
+        const fromField = Number(entry.chapterNumber);
+        if (!Number.isNaN(fromField)) return fromField;
+      }
+      const match = String(entry.title || "").match(/(\d+)/);
+      return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+    };
+    return [currentEntry, ...siblingEntries].sort((a, b) => {
+      const diff = orderKey(a) - orderKey(b);
+      if (diff !== 0) return diff;
+      return String(a.title).localeCompare(String(b.title));
+    });
+  }, [chapterData, currentChapterId, taskPages, currentPageIndex, taskId, siblingTasks, teamMembers, chapterPagesCache]);
+
+  // Chapter row clicked: just expand/collapse locally — no navigation, no
+  // switching the active editing task. Lazily fetch that chapter's page list
+  // the first time it's expanded (skipped for the currently active chapter,
+  // which already has its real page list loaded).
+  const toggleChapterPreview = useCallback(
+    (entry) => {
+      setOpenChapterId((prev) => (prev === entry.chapterId ? null : entry.chapterId));
+      if (entry.taskId === taskId) return;
+      if (chapterPagesCache[entry.taskId]) return;
+      setChapterPagesLoadingId(entry.taskId);
+      fetchPagesForTask(entry.taskId)
+        .then((pages) => {
+          setChapterPagesCache((prev) => ({ ...prev, [entry.taskId]: pages || [] }));
+        })
+        .catch(() => {
+          setChapterPagesCache((prev) => ({ ...prev, [entry.taskId]: [] }));
+        })
+        .finally(() => {
+          setChapterPagesLoadingId((prev) => (prev === entry.taskId ? null : prev));
+        });
+    },
+    [taskId, chapterPagesCache]
+  );
+
+
+
+
+  
+
+  
+
+  
+  const resolveNaturalSize = (imgEl, expectedImageUrl) => {
+    const imgLoaded = !!imgEl && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0;
+    if (imgLoaded) {
+      return Promise.resolve({ width: imgEl.naturalWidth, height: imgEl.naturalHeight });
+    }
+    return new Promise((resolve) => {
+      if (!expectedImageUrl) {
+        resolve({ width: 1000, height: 1400 });
+        return;
+      }
+      const probe = new Image();
+      probe.onload = () => resolve({ width: probe.naturalWidth, height: probe.naturalHeight });
+      probe.onerror = () => resolve({ width: 1000, height: 1400 });
+      probe.src = expectedImageUrl;
+    });
+  };
 
   const persistBubbles = useCallback(
     (pageId, selectionsArray, expectedImageUrl) => {
       if (!pageId) return Promise.resolve(false);
-
-      const imgEl = imgElRef.current;
-      const imgLoaded = !!imgEl && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0;
-      const naturalSize = imgLoaded
-        ? { width: imgEl.naturalWidth, height: imgEl.naturalHeight }
-        : (imageNaturalSize || { width: 1000, height: 1400 });
+      if (!canEdit) return Promise.resolve(false);
 
       setSaveStatus("saving");
-      const canvasSize = measureCanvasSize(canvasRef);
-      const percentSelections = selectionsToImagePercent(selectionsArray, canvasSize, naturalSize);
-      const payload = { selections: percentSelections };
-      const bubblesJson = JSON.stringify(payload);
-      return saveBubblesForPage(pageId, payload).then((success) => {
-        if (!success) {
+
+      return Promise.all([
+        waitForValidCanvasSize(canvasRef),
+        resolveNaturalSize(imgElRef.current, expectedImageUrl),
+      ]).then(([canvasSize, naturalSize]) => {
+        if (canvasSize.width <= 0 || canvasSize.height <= 0) {
+
+          
+
+          console.error(
+            "[persistBubbles] Aborting save — canvas still has no valid size after waiting. Bubbles were NOT saved to avoid corrupting coordinates."
+          );
           setSaveStatus("unsaved");
           return false;
         }
-        setTaskPages((prev) => prev.map((p) => (p.pageId === pageId || p.id === pageId ? { ...p, bubbles: bubblesJson } : p)));
-        setSaveStatus("saved");
-        return true;
+        const percentSelections = selectionsToImagePercent(selectionsArray, canvasSize, naturalSize);
+        const payload = { selections: percentSelections };
+        const bubblesJson = JSON.stringify(payload);
+        return saveBubblesForPage(pageId, payload).then((success) => {
+          if (!success) {
+            setSaveStatus("unsaved");
+            return false;
+          }
+          setTaskPages((prev) =>
+            prev.map((p) => (p.pageId === pageId || p.id === pageId ? { ...p, bubbles: bubblesJson } : p))
+          );
+          setSaveStatus("saved");
+          return true;
+        });
       });
     },
-    [canvasRef, imageNaturalSize]
+    [canvasRef, canEdit]
   );
 
-  // Saves the page currently being viewed, using values that are guaranteed
-  // to still correspond to it (selectionsRef is a ref updated synchronously
-  // on every change, and currentImage/currentPageMeta come straight from
-  // render state for the page we're still on).
-  // Returns a Promise — callers that need the server to actually have the
-  // latest bubbles before doing something else (e.g. submit-for-review,
-  // which reads bubbles straight from the DB) MUST await this.
+
+  
+
+  
+  
   const persistCurrentPage = useCallback(() => {
     if (currentPageMeta?.pageId) {
       return persistBubbles(currentPageMeta.pageId, selectionsRef.current, currentImage);
@@ -2501,30 +3705,39 @@ export default function TranslateWorkspace() {
     return Promise.resolve(false);
   }, [currentPageMeta, currentImage, persistBubbles]);
 
+  const switchToTask = useCallback(
+    (entry, pageNumber = null) => {
+      if (!entry || !entry.taskId || String(entry.taskId) === String(taskId)) return;
+      pendingTargetPageRef.current = pageNumber;
+      persistCurrentPage();
+      const newPath = location.pathname.replace(String(taskId), String(entry.taskId));
+      navigate(newPath);
+    },
+    [taskId, location.pathname, navigate, persistCurrentPage]
+  );
+
+
   const goToPage = useCallback(
     (index) => {
       if (index < 0 || index >= images.length) return;
-      // Persist the outgoing page's bubbles BEFORE React re-renders the
-      // <img src> to the new page. At this exact point in time, imgElRef
-      // still points at the DOM node showing the CURRENT page's image, so
-      // reading its naturalWidth/naturalHeight here is guaranteed correct —
-      // there is no async callback in between that could swap it out.
+
+      
+
       persistCurrentPage();
       setCurrentPageIndex(index);
     },
     [images.length, persistCurrentPage]
   );
 
-  const toggleChapter = useCallback((id) => {
-    setOpen((o) => ({ ...o, [id]: !o[id] }));
-  }, []);
-
   const handleSelectPage = useCallback(
-    (chapterId, pageIndex) => {
-      if (chapterId !== currentChapterId) return;
-      goToPage(pageIndex);
+    (entry, pageIndex) => {
+      if (entry.chapterId === currentChapterId) {
+        goToPage(pageIndex);
+      } else {
+        switchToTask(entry, pageIndex + 1);
+      }
     },
-    [currentChapterId, goToPage]
+    [currentChapterId, goToPage, switchToTask]
   );
 
   const gotoProjectList = useCallback(() => {
@@ -2549,34 +3762,42 @@ export default function TranslateWorkspace() {
   }, [navigate, chapterData, taskId, persistCurrentPage]);
 
   const handleSaveAndNext = useCallback(() => {
-    // goToPage already persists the current page synchronously before
-    // switching, so there's no need to call persistCurrentPage separately
-    // here (that used to cause the exact double-call/race pattern).
+
+    
     goToPage(currentPageIndex + 1);
   }, [goToPage, currentPageIndex]);
 
   const handleSaveProgress = useCallback(() => {
+    if (!canEdit) {
+      toast.warning("You don't have permission to edit this task.");
+      return;
+    }
     persistCurrentPage().then((success) => {
       if (success !== false) {
         toast.success("Translation saved successfully!");
       }
     });
-  }, [persistCurrentPage]);
+  }, [persistCurrentPage, canEdit]);
 
   const isLastPage = images.length > 0 && currentPageIndex === images.length - 1;
 
   const handleSend = useCallback(async () => {
-    if (!isLastPage || sending) return;
+    if (!isLastPage || sending || !canEdit) return;
 
     setSending(true);
     try {
-      // MUST await this: submit-for-review reads `bubbles` straight from the
-      // DB on the backend to snapshot it into reviewBaselineBubbles. If we
-      // don't wait for the save PUT to land first, the two requests race —
-      // submit-for-review can reach the server and read the OLD bubbles
-      // before our save finishes, silently dropping the last edit from the
-      // review baseline (looks like "coordinates changed after Send").
-      await persistCurrentPage();
+
+      
+
+      
+      const saved = await persistCurrentPage();
+      if (saved === false) {
+        alert(
+          "Your latest changes on this page couldn't be saved to the server. " +
+            "Please check your connection and try Send again — submitting now would send the team an outdated version."
+        );
+        return;
+      }
       await submitTaskForReview(taskId);
       navigate("/translator/project-teams", {
         state: { teamId: chapterData?.projectTeamId, tab: "tasks" },
@@ -2587,7 +3808,7 @@ export default function TranslateWorkspace() {
     } finally {
       setSending(false);
     }
-  }, [isLastPage, sending, persistCurrentPage, taskId, navigate, chapterData]);
+  }, [isLastPage, sending, canEdit, persistCurrentPage, taskId, navigate, chapterData]);
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -2612,24 +3833,21 @@ export default function TranslateWorkspace() {
       applyPendingBubbles(null);
     }
 
-    // These are captured from THIS render, i.e. they describe the page being
-    // left, not whatever page we land on next.
+
     const pageIdBeingViewed = currentPageMeta?.pageId;
     const imageUrlBeingViewed = currentImage;
 
-    // Best-effort fallback only (e.g. route unmount without going through
-    // goToPage/persistCurrentPage). The primary save now always happens
-    // synchronously inside goToPage/persistCurrentPage BEFORE the page
-    // changes, so this cleanup is usually a safe no-op: by the time it runs,
-    // the DOM <img> has already switched to the next page's image, so
-    // persistBubbles' expectedImageUrl check will correctly skip it instead
-    // of saving corrupted coordinates.
+
+    
+
+    
+    
     return () => {
       if (pageIdBeingViewed) {
         persistBubbles(pageIdBeingViewed, selectionsRef.current, imageUrlBeingViewed);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [currentPageIndex, currentChapterId]);
 
   const applyPickedColor = (hex) => {
@@ -2674,10 +3892,11 @@ export default function TranslateWorkspace() {
     <div className="tw-root">
       <TranslateHeaderBar
         comicTitle={chapterData?.comicTitle}
-        chapterTitle={chapterData?.title}
+        chapterTitle={deriveChapterTitle(chapterData)}
         onBack={gotoProjectList}
         onSend={handleSend}
-        canSend={isLastPage}
+        canSend={isLastPage && canEdit}
+        canEdit={canEdit}
         sending={sending}
         saveStatus={saveStatus}
       />
@@ -2689,8 +3908,9 @@ export default function TranslateWorkspace() {
               <p className="tw-sidebar-label">PROJECT FILES</p>
               <ChapterList
                 chapters={sidebarChapters}
-                open={open}
-                onToggle={toggleChapter}
+                openChapterId={openChapterId}
+                onToggleChapter={toggleChapterPreview}
+                chapterPagesLoading={chapterPagesLoadingId}
                 currentChapterId={currentChapterId}
                 currentPageIndex={currentPageIndex}
                 onSelectPage={handleSelectPage}
@@ -2710,11 +3930,12 @@ export default function TranslateWorkspace() {
           </button>
         </div>
 
-        <main className="tw-x-main-content">
+        <main className="tw-x-main-content" id="secure-workspace">
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div className="tw-canvas-toolbar">
               <ShapeToolbar
                 activeTool={activeTool}
+                canEdit={canEdit}
                 onSetTool={(tool) => {
                   cancelZoomPick();
                   setActiveTool(tool);
@@ -2741,7 +3962,7 @@ export default function TranslateWorkspace() {
                 fontFamily={activeSelection?.fontFamily ?? COMIC_FONT_LIBRARY[0].value}
                 textColor={activeSelection?.textColor ?? "#000000"}
                 textBgColor={activeSelection?.textBgColor ?? "#ffffff"}
-                hasActiveSelection={activeSelection != null}
+                hasActiveSelection={activeSelection != null && canEdit}
                 onToggleBold={() =>
                   activeId != null && updateSelectionStyle(activeId, { isBold: !(activeSelection?.isBold) })
                 }
@@ -2771,6 +3992,7 @@ export default function TranslateWorkspace() {
             currentPageIndex={currentPageIndex}
             canvasRef={canvasRef}
             imgRef={imgElRef}
+            bubbleRefs={bubbleRefs}
             drawing={drawing}
             selections={selections}
             activeId={activeId}
@@ -2816,6 +4038,11 @@ export default function TranslateWorkspace() {
           changeRequestsLoading={changeRequestsLoading}
           resolveBubbleLabel={resolveBubbleLabel}
           userFullName={userFullName}
+          onSelectBubble={selectArea}
+          comicId={chapterData?.comicId}
+          pageId={currentPageMeta?.pageId}
+          canEdit={canEdit}
+          projectTeamId={chapterData?.projectTeamId}
         />
       </div>
     </div>

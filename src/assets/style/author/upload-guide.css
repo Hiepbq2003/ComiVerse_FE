@@ -115,6 +115,16 @@
   line-height: 1.45;
 }
 
+.author-upload-task-content {
+  min-width: 0;
+}
+
+.author-upload-task-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .author-upload-task-card.completed {
   border-left-color: #10b981;
 }
@@ -139,6 +149,40 @@
   white-space: nowrap;
 }
 
+.author-upload-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid color-mix(in srgb, var(--author-accent) 25%, transparent);
+  border-top-color: var(--author-accent);
+  border-radius: 50%;
+  animation: author-upload-spin 0.75s linear infinite;
+}
+
+.author-upload-task-dismiss {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--author-text-secondary);
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.author-upload-task-dismiss:hover {
+  background: rgba(148, 163, 184, 0.14);
+  color: var(--author-text-primary);
+}
+
+@keyframes author-upload-spin {
+  to { transform: rotate(360deg); }
+}
+
 .author-upload-task-meta span {
   color: var(--author-text-primary);
   font-size: 13px;
@@ -159,6 +203,11 @@
 
   .author-upload-task-meta {
     align-items: flex-start;
+  }
+
+  .author-upload-task-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 }
 

@@ -21,6 +21,26 @@
   --profile-blue: #3b82f6;
 }
 
+html.light {
+  --profile-bg: #f8fafc;
+  --profile-header-bg: #ffffff;
+  --profile-card-bg: #ffffff;
+  --profile-input-bg: #ffffff;
+  --profile-border: #e2e8f0;
+  --profile-border-hover: #9333ea;
+  --profile-text-primary: #0f172a;
+  --profile-text-secondary: #334155;
+  --profile-text-muted: #64748b;
+  
+  --profile-purple: #9333ea;
+  --profile-pink: #db2777;
+  --profile-green: #059669;
+  --profile-red: #dc2626;
+  --profile-orange: #ea580c;
+  --profile-cyan: #0891b2;
+  --profile-blue: #2563eb;
+}
+
 .profile-page-wrapper {
   background-color: var(--profile-bg);
   min-height: 100vh;
@@ -742,6 +762,39 @@
   cursor: not-allowed;
 }
 
+/* ── DATE OF BIRTH PICKER STYLING ──────────────────────────── */
+.profile-input-group input[type="date"] {
+  color-scheme: dark;
+  position: relative;
+  cursor: pointer;
+  background-color: var(--profile-input-bg);
+  color: var(--profile-text-primary);
+}
+
+.profile-input-group input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(0.8) sepia(1) saturate(4) hue-rotate(220deg);
+  opacity: 0.85;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.profile-input-group input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background: rgba(168, 85, 247, 0.25);
+  transform: scale(1.12);
+}
+
+.profile-input-group input[type="date"]::-webkit-datetime-edit-month-field:focus,
+.profile-input-group input[type="date"]::-webkit-datetime-edit-day-field:focus,
+.profile-input-group input[type="date"]::-webkit-datetime-edit-year-field:focus {
+  background-color: var(--profile-purple);
+  color: #ffffff;
+  border-radius: 3px;
+  outline: none;
+}
+
 .profile-email-container {
   position: relative;
   display: flex;
@@ -1123,4 +1176,249 @@ html.light .profile-input-readonly {
   border-color: #cbd5e1 !important;
   color: #64748b !important;
 }
+
+/* ═══════════════════════════════════════════════════════
+   TRANSLATOR PROFESSIONAL PROFILE SECTION (LIGHT & DARK MODES)
+   ═══════════════════════════════════════════════════════ */
+.profile-translator-section {
+  margin-top: 28px;
+  margin-bottom: 24px;
+  padding: 24px;
+  border-radius: 14px;
+  background: rgba(168, 85, 247, 0.05);
+  border: 1.5px solid rgba(168, 85, 247, 0.25);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.profile-translator-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(168, 85, 247, 0.15);
+}
+
+.profile-translator-icon-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(124, 58, 237, 0.3) 100%);
+  border: 1.5px solid rgba(168, 85, 247, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.profile-translator-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #d8b4fe;
+  letter-spacing: -0.2px;
+}
+
+.profile-translator-subtitle {
+  margin: 3px 0 0 0;
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+/* Language Specializations Container */
+.profile-specialization-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.profile-spec-btn {
+  padding: 8px 18px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  color: #cbd5e1;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+
+.profile-spec-btn:hover {
+  border-color: rgba(168, 85, 247, 0.5);
+  background: rgba(168, 85, 247, 0.12);
+  color: #f1f5f9;
+  transform: translateY(-1px);
+}
+
+.profile-spec-btn.selected {
+  border: 1.5px solid #a855f7;
+  background: rgba(168, 85, 247, 0.25);
+  color: #e9d5ff;
+  box-shadow: 0 2px 10px rgba(168, 85, 247, 0.25);
+}
+
+/* CV Document Card */
+.profile-cv-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1.5px dashed rgba(168, 85, 247, 0.4);
+  gap: 16px;
+  flex-wrap: wrap;
+  transition: all 0.25s ease;
+}
+
+.profile-cv-box:hover {
+  border-color: rgba(168, 85, 247, 0.7);
+  background: rgba(168, 85, 247, 0.04);
+}
+
+.profile-cv-doc-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.profile-cv-icon {
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-cv-link {
+  color: #c084fc;
+  font-weight: 700;
+  font-size: 14.5px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.2s;
+}
+
+.profile-cv-link:hover {
+  color: #e9d5ff;
+}
+
+.profile-cv-badge {
+  margin: 4px 0 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #34d399;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.profile-cv-upload-btn {
+  cursor: pointer;
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  color: #ffffff !important;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.profile-cv-upload-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(124, 58, 237, 0.45);
+  filter: brightness(1.1);
+}
+
+.profile-cv-empty-text {
+  font-size: 13.5px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* ── LIGHT MODE OVERRIDES FOR TRANSLATOR SECTION ── */
+html.light .profile-translator-section {
+  background: #ffffff !important;
+  border: 1.5px solid #e9d5ff !important;
+  box-shadow: 0 4px 24px rgba(147, 51, 234, 0.08) !important;
+}
+
+html.light .profile-translator-header {
+  border-bottom-color: #f3e8ff !important;
+}
+
+html.light .profile-translator-icon-wrap {
+  background: #f3e8ff !important;
+  border-color: #d8b4fe !important;
+}
+
+html.light .profile-translator-title {
+  color: #6b21a8 !important; /* Deep Rich Purple - 100% High Contrast */
+}
+
+html.light .profile-translator-subtitle {
+  color: #475569 !important; /* Slate 600 - Crisp and clear */
+}
+
+html.light .profile-spec-btn {
+  border: 1.5px solid #cbd5e1 !important;
+  background: #f8fafc !important;
+  color: #334155 !important; /* Deep Slate - sharp text */
+  font-weight: 600 !important;
+}
+
+html.light .profile-spec-btn:hover {
+  border-color: #9333ea !important;
+  background: #faf5ff !important;
+  color: #7e22ce !important;
+}
+
+html.light .profile-spec-btn.selected {
+  border: 2px solid #7c3aed !important;
+  background: #f3e8ff !important;
+  color: #6b21a8 !important; /* High contrast dark violet */
+  font-weight: 700 !important;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.15) !important;
+}
+
+html.light .profile-cv-box {
+  background: #fbfbfe !important;
+  border: 1.5px dashed #c084fc !important;
+  box-shadow: 0 2px 10px rgba(147, 51, 234, 0.04) !important;
+}
+
+html.light .profile-cv-box:hover {
+  background: #faf5ff !important;
+  border-color: #9333ea !important;
+}
+
+html.light .profile-cv-link {
+  color: #6b21a8 !important; /* Sharp readable violet */
+}
+
+html.light .profile-cv-link:hover {
+  color: #4c1d95 !important;
+}
+
+html.light .profile-cv-badge {
+  color: #047857 !important; /* Deep emerald green */
+}
+
+html.light .profile-cv-empty-text {
+  color: #64748b !important;
+}
+
 

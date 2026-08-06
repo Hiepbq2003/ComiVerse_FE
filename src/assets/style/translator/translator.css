@@ -8,7 +8,7 @@
 
   --trans-bg: radial-gradient(circle at 50% 50%, #150d2c 0%, #070511 70%, #030206 100%);
   --trans-sidebar-bg: rgba(10, 7, 20, 0.45);
-  --trans-topbar-bg: rgba(19, 16, 30, 0.4);
+  --trans-topbar-bg: #13101e;
   --trans-card-bg: rgba(255, 255, 255, 0.02);
   --trans-sidebar-text: #94a3b8;
   --trans-sidebar-active: #ffffff;
@@ -108,22 +108,27 @@ html.light .trans-form-input {
   border-bottom: 1.5px solid rgba(255, 255, 255, 0.14) !important;
 }
 
-.translator-sidebar-brand h2 {
-  font-size: 18px;
+.workspace-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 14px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
   font-weight: 700;
-  margin: 0;
-  background: linear-gradient(135deg, #c084fc, #ec4899);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(20, 184, 166, 0.15);
+  color: #2dd4bf;
+  border: 1px solid rgba(20, 184, 166, 0.3);
 }
 
-.translator-sidebar-brand span {
-  display: block;
+.workspace-prefix {
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.35);
-  letter-spacing: 0.5px;
-  margin-top: 4px;
+  font-weight: 700;
+  color: var(--trans-text-secondary);
 }
 
 .translator-sidebar-nav {
@@ -147,8 +152,8 @@ html.light .trans-form-input {
   text-decoration: none;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   width: 100%;
   box-sizing: border-box;
   text-align: left;
@@ -219,8 +224,6 @@ html.light .trans-form-input {
 .translator-topbar {
   height: var(--trans-topbar-h);
   background: var(--trans-topbar-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--trans-border);
   padding: 0 32px;
   display: flex;
@@ -2710,6 +2713,67 @@ html.dark .board__card {
   color: var(--priority-low);
 }
 
+/* ── Revoked / Revision Needed Task Styles ── */
+.task.task--revoked {
+  border-color: rgba(239, 68, 68, 0.45) !important;
+  background: rgba(239, 68, 68, 0.04) !important;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.25) !important;
+}
+
+.task.task--revoked:hover {
+  border-color: rgba(239, 68, 68, 0.8) !important;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.18) !important;
+}
+
+.task__revoked-tag {
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+html.light .task__revoked-tag {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.task__revocation-alert {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px dashed rgba(239, 68, 68, 0.35);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 0.72rem;
+  color: #f87171;
+  line-height: 1.35;
+  margin-top: 2px;
+  word-break: break-word;
+}
+
+html.light .task__revocation-alert {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.task__revocation-label {
+  font-weight: 700;
+  color: #ef4444;
+}
+
+html.light .task__revocation-label {
+  color: #dc2626;
+}
+
 /* ── Tags ── */
 .tags {
   display: flex;
@@ -2949,13 +3013,15 @@ html.light .translator-sidebar-brand {
   border-bottom: 1px solid var(--trans-border) !important;
 }
 
-html.light .translator-sidebar-brand span {
-  color: var(--trans-text-muted) !important;
+html.light .workspace-tag {
+  background: rgba(13, 148, 136, 0.1);
+  color: #0f766e;
+  border: 1px solid rgba(13, 148, 136, 0.25);
 }
 
 html.light .translator-nav-item {
   background: rgba(15, 23, 42, 0.02) !important;
-  border: 1px solid rgba(15, 23, 42, 0.05) !important;
+  border: 1px solid rgba(15, 23, 42, 0.16) !important;
   color: var(--trans-sidebar-text) !important;
 }
 
@@ -3257,6 +3323,7 @@ html.light .request-review-msg-box.empty {
   flex: 1 !important;
   padding: 16px !important;
   overflow-y: auto !important;
+  overflow-x: hidden !important;
   display: flex !important;
   flex-direction: column !important;
   gap: 14px !important;
@@ -3267,6 +3334,11 @@ html.light .request-review-msg-box.empty {
 
 .chat-messages-container::-webkit-scrollbar {
   width: 5px !important;
+  height: 0 !important;
+}
+
+.chat-messages-container::-webkit-scrollbar:horizontal {
+  display: none !important;
 }
 
 .chat-messages-container::-webkit-scrollbar-thumb {

@@ -8,7 +8,7 @@
 
   --mod-bg: radial-gradient(circle at 50% 50%, #150d2c 0%, #070511 70%, #030206 100%);
   --mod-sidebar-bg: rgba(10, 7, 20, 0.45);
-  --mod-topbar-bg: rgba(19, 16, 30, 0.4);
+  --mod-topbar-bg: #13101e;
   --mod-card-bg: rgba(255, 255, 255, 0.02);
   --mod-sidebar-text: #94a3b8;
   --mod-sidebar-active: #ffffff;
@@ -59,22 +59,27 @@
   border-bottom: 1.5px solid rgba(255, 255, 255, 0.14);
 }
 
-.moderator-sidebar-brand h2 {
-  font-size: 18px;
+.workspace-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 14px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
   font-weight: 700;
-  margin: 0;
-  background: linear-gradient(135deg, #c084fc, #ec4899);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.3);
 }
 
-.moderator-sidebar-brand span {
-  display: block;
+.workspace-prefix {
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.35);
-  letter-spacing: 0.5px;
-  margin-top: 4px;
+  font-weight: 700;
+  color: var(--mod-text-secondary);
 }
 
 .moderator-sidebar-nav {
@@ -98,8 +103,8 @@
   text-decoration: none;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   width: 100%;
   box-sizing: border-box;
   text-align: left;
@@ -195,8 +200,6 @@
 .moderator-topbar {
   height: var(--mod-topbar-h);
   background: var(--mod-topbar-bg) !important;
-  backdrop-filter: blur(20px) saturate(140%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
   padding: 0 24px;
   display: flex;
@@ -377,18 +380,63 @@ html.light .mod-lang-scope-badge {
 }
 
 .moderator-tab-btn-badge {
-  background: #e2e8f0;
-  color: var(--mod-text-secondary);
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 2px 8px;
   border-radius: 12px;
+  min-width: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.2s ease;
 }
 
+.moderator-tab-btn-badge.pending {
+  background: rgba(168, 85, 247, 0.25);
+  color: #f3e8ff;
+  border: 1px solid rgba(168, 85, 247, 0.45);
+}
+
+.moderator-tab-btn-badge.approved {
+  background: rgba(16, 185, 129, 0.25);
+  color: #d1fae5;
+  border: 1px solid rgba(16, 185, 129, 0.45);
+}
+
+.moderator-tab-btn-badge.rejected {
+  background: rgba(244, 63, 94, 0.25);
+  color: #ffe4e6;
+  border: 1px solid rgba(244, 63, 94, 0.45);
+}
+
 .moderator-tab-btn.active .moderator-tab-btn-badge {
-  background: #0f172a;
+  background: rgba(255, 255, 255, 0.25);
   color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.moderator-tab-btn.active .moderator-tab-btn-badge.pending {
+  background: #a855f7;
+  color: #ffffff;
+  border-color: #c084fc;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.5);
+}
+
+.moderator-tab-btn.active .moderator-tab-btn-badge.approved {
+  background: #10b981;
+  color: #ffffff;
+  border-color: #34d399;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+}
+
+.moderator-tab-btn.active .moderator-tab-btn-badge.rejected {
+  background: #f43f5e;
+  color: #ffffff;
+  border-color: #fb7185;
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.5);
 }
 
 /* ── SUB-TABS (QUEUE DIVISION) ───────────────────── */
@@ -1865,8 +1913,10 @@ html.light .moderator-topbar {
   border-bottom: 1px solid rgba(0, 0, 0, 0.04) !important;
 }
 
-html.light .moderator-sidebar-brand span {
-  color: rgb(2, 6, 13) !important;
+html.light .workspace-tag {
+  background: rgba(126, 34, 206, 0.1);
+  color: #7e22ce;
+  border: 1px solid rgba(126, 34, 206, 0.25);
 }
 
 html.light .mod-form-input,
@@ -2025,46 +2075,82 @@ html.light .leader-search-result-card+.leader-search-result-card {
   text-transform: none !important;
 }
 
-/* 2. Approve Button - Green Theme (Variant 2) */
+/* 2. Approve Button - Green Theme (Premium Liquid) */
 .modern-btn-container .btn-2.btn-approve,
 .modern-btn-container .btn-5.btn-approve {
-  background: #10b981 !important;
-  color: #ffffff !important;
   border: none !important;
-  outline: none !important;
+  color: #ffffff !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+  background: linear-gradient(110deg, #10b981 0%, #059669 55%, #047857 100%) !important;
+  box-shadow: 0 4px 15px -3px rgba(16, 185, 129, 0.4) !important;
+}
+
+.modern-btn-container .btn-2.btn-approve:hover,
+.modern-btn-container .btn-5.btn-approve:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(16, 185, 129, 0.6) !important;
 }
 
 .modern-btn-container .btn-2.btn-approve::before,
 .modern-btn-container .btn-5.btn-approve::before {
-  background: #059669 !important;
+  display: none !important;
 }
 
 html.light .modern-btn-container .btn-2.btn-approve,
 html.light .modern-btn-container .btn-5.btn-approve {
-  background: #059669 !important;
+  background: linear-gradient(110deg, #059669 0%, #047857 55%, #065f46 100%) !important;
+  color: #ffffff !important;
 }
 
-html.light .modern-btn-container .btn-2.btn-approve::before,
-html.light .modern-btn-container .btn-5.btn-approve::before {
-  background: #047857 !important;
+html.light .modern-btn-container .btn-2.btn-approve span,
+html.light .modern-btn-container .btn-5.btn-approve span {
+  color: #ffffff !important;
 }
 
-/* 3. Reject & Archive Buttons - Red Theme (Variant 2 / 5) */
+/* 3. Reject & Archive Buttons - Red Theme (Premium Liquid) */
 .modern-btn-container .btn-2.btn-reject,
 .modern-btn-container .btn-2.btn-archive,
 .modern-btn-container .btn-5.btn-reject,
 .modern-btn-container .btn-5.btn-archive {
-  background: #ef4444 !important;
-  color: #ffffff !important;
   border: none !important;
   outline: none !important;
+  color: #ffffff !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+  background: linear-gradient(110deg, #f43f5e 0%, #e11d48 55%, #be123c 100%) !important;
+  box-shadow: 0 4px 15px -3px rgba(225, 29, 72, 0.4) !important;
+}
+
+.modern-btn-container .btn-2.btn-reject:hover,
+.modern-btn-container .btn-2.btn-archive:hover,
+.modern-btn-container .btn-5.btn-reject:hover,
+.modern-btn-container .btn-5.btn-archive:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(225, 29, 72, 0.6) !important;
 }
 
 .modern-btn-container .btn-2.btn-reject::before,
 .modern-btn-container .btn-2.btn-archive::before,
 .modern-btn-container .btn-5.btn-reject::before,
 .modern-btn-container .btn-5.btn-archive::before {
-  background: #dc2626 !important;
+  display: none !important;
+}
+
+.modern-btn-container .btn-2.btn-approve span,
+.modern-btn-container .btn-5.btn-approve span,
+.modern-btn-container .btn-2.btn-reject span,
+.modern-btn-container .btn-2.btn-archive span,
+.modern-btn-container .btn-5.btn-reject span,
+.modern-btn-container .btn-5.btn-archive span {
+  color: #ffffff !important;
+  z-index: 10 !important;
+  position: relative !important;
+}
+
+html.light .modern-btn-container .btn-2.btn-reject span,
+html.light .modern-btn-container .btn-2.btn-archive span,
+html.light .modern-btn-container .btn-5.btn-reject span,
+html.light .modern-btn-container .btn-5.btn-archive span {
+  color: #ffffff !important;
 }
 
 html.light .modern-btn-container .btn-2.btn-reject,
@@ -2310,7 +2396,7 @@ html.light .moderator-sidebar-footer {
 
 html.light .moderator-nav-item {
   background: #f8fafc !important;
-  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid rgba(0, 0, 0, 0.16) !important;
   color: #475569 !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
 }
@@ -2372,12 +2458,41 @@ html.light .moderator-tab-btn.active {
 }
 
 html.light .moderator-tab-btn-badge {
-  background: rgba(0, 0, 0, 0.05) !important;
-  color: #475569 !important;
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: #334155 !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
 }
 
-html.light .moderator-tab-btn.active .moderator-tab-btn-badge {
+html.light .moderator-tab-btn-badge.pending {
+  background: rgba(124, 58, 237, 0.12) !important;
+  color: #6d28d9 !important;
+  border: 1px solid rgba(124, 58, 237, 0.25) !important;
+}
+
+html.light .moderator-tab-btn-badge.approved {
+  background: rgba(16, 185, 129, 0.12) !important;
+  color: #047857 !important;
+  border: 1px solid rgba(16, 185, 129, 0.25) !important;
+}
+
+html.light .moderator-tab-btn-badge.rejected {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: #b91c1c !important;
+  border: 1px solid rgba(239, 68, 68, 0.25) !important;
+}
+
+html.light .moderator-tab-btn.active .moderator-tab-btn-badge.pending {
   background: #7c3aed !important;
+  color: #ffffff !important;
+}
+
+html.light .moderator-tab-btn.active .moderator-tab-btn-badge.approved {
+  background: #059669 !important;
+  color: #ffffff !important;
+}
+
+html.light .moderator-tab-btn.active .moderator-tab-btn-badge.rejected {
+  background: #dc2626 !important;
   color: #ffffff !important;
 }
 
@@ -2756,4 +2871,154 @@ html.light .mod-btn.approve {
   background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%) !important;
   color: #ffffff !important;
   box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3) !important;
+}
+
+/* --- PREMIUM LIQUID MOTION HOVER EFFECTS (AGENT.MD TASTE) --- */
+@keyframes shimmer-sweep {
+  0% { left: -100%; }
+  100% { left: 200%; }
+}
+
+@keyframes liquid-drift {
+  0%, 100% { transform: translate3d(-4px, 0, 0) scale(1); }
+  50% { transform: translate3d(4px, -1px, 0) scale(1.02); }
+}
+
+.moderator-layout .modern-btn-container .btn-2,
+.moderator-layout .modern-btn-container .btn-5 {
+  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+  background-size: 200% auto !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+
+/* Disable the old ugly skew effect */
+.moderator-layout .modern-btn-container .btn-2::before,
+.moderator-layout .modern-btn-container .btn-5::before {
+  display: none !important;
+}
+
+/* Hover Transform & Background Drift */
+.moderator-layout .modern-btn-container .btn-2:hover,
+.moderator-layout .modern-btn-container .btn-5:hover {
+  background-position: right center !important;
+  animation: liquid-drift 3s infinite ease-in-out !important;
+}
+
+/* Shimmer Sweep Element */
+.moderator-layout .modern-btn-container .btn-2::after,
+.moderator-layout .modern-btn-container .btn-5::after {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: -100% !important;
+  width: 50% !important;
+  height: 100% !important;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent) !important;
+  transform: skewX(-20deg) !important;
+  z-index: 5 !important;
+  pointer-events: none;
+  transition: none !important;
+}
+
+.moderator-layout .modern-btn-container .btn-2:hover::after,
+.moderator-layout .modern-btn-container .btn-5:hover::after {
+  animation: shimmer-sweep 0.75s ease-in-out forwards !important;
+}
+
+/* Ensure text stays on top */
+.moderator-layout .modern-btn-container .btn-2 span,
+.moderator-layout .modern-btn-container .btn-5 span {
+  z-index: 10 !important;
+  position: relative !important;
+}
+
+/* ── RESPONSIVE DESIGN (MOBILE & TABLET) ────────────────────────────── */
+
+.moderator-mobile-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--mod-text-primary);
+  cursor: pointer;
+  padding: 4px;
+  margin-right: 12px;
+}
+
+html.light .moderator-mobile-toggle {
+  color: var(--mod-text-h);
+}
+
+.moderator-mobile-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 90;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.moderator-mobile-overlay.show {
+  display: block;
+  opacity: 1;
+}
+
+@media (max-width: 1024px) {
+  .moderator-mobile-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .moderator-sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .moderator-sidebar.open {
+    transform: translateX(0);
+  }
+  
+  .moderator-main {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  
+  .moderator-topbar {
+    width: 100% !important;
+    left: 0 !important;
+    padding: 0 16px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .moderator-topbar-right {
+    gap: 8px !important;
+  }
+  
+  .mod-profile-btn span {
+    display: none;
+  }
+  
+  .workspace-tag {
+    display: none;
+  }
+  
+  .mod-topbar-btn.logout span {
+    display: none;
+  }
+}
+
+.moderator-layout {
+  overflow-x: hidden;
+}
+
+.moderator-main {
+  overflow-x: hidden;
+  max-width: 100vw;
 }

@@ -94,18 +94,7 @@ function ModeratorLiveStream({ onFlagMessage, onWarnUser, onMuteUser, onBanUser,
           <h3>📡 Realtime Global Room Stream — Moderator View</h3>
           <p>Hover any message to reveal moderation actions. Flag, warn, mute, or ban users directly from the live stream.</p>
         </div>
-        <div className="cv-chat-metrics-bar" style={{ marginLeft: 'auto' }}>
-          <div className="cv-metric-pill highlight">
-            <span className="cv-metric-val">{visibleMessages.length}</span>
-            <span className="cv-metric-lbl">Messages</span>
-          </div>
-          <div className="cv-metric-pill">
-            <span className="cv-metric-val" style={{ color: isConnected ? '#22c55e' : '#ef4444' }}>
-              {isConnected ? '●' : '○'}
-            </span>
-            <span className="cv-metric-lbl">{isConnected ? 'Connected' : 'Offline'}</span>
-          </div>
-        </div>
+
       </div>
 
       {/* Live Message Stream */}
@@ -361,7 +350,7 @@ function ModeratorLiveStream({ onFlagMessage, onWarnUser, onMuteUser, onBanUser,
 }
 
 function ChatMonitor({ fetchAllData }) {
-  const [activeTab, setActiveTab] = useState('flags') // 'flags' | 'keywords' | 'live'
+  const [activeTab, setActiveTab] = useState('live') // 'flags' | 'keywords' | 'live'
   const [flagSubTab, setFlagSubTab] = useState('active') // 'active' | 'resolved'
   
   // Data states
@@ -425,7 +414,11 @@ function ChatMonitor({ fetchAllData }) {
       // Merge localFlags and serverFlags (local state takes priority for actioned status)
       const flagMap = new Map()
       serverFlags.forEach(f => flagMap.set(f.id, f))
-      localFlags.forEach(f => flagMap.set(f.id, { ...(flagMap.get(f.id) || {}), ...f }))
+      localFlags.forEach(f => {
+        if (flagMap.has(f.id) || (f.status && f.status !== 'pending')) {
+          flagMap.set(f.id, { ...(flagMap.get(f.id) || {}), ...f })
+        }
+      })
 
       const merged = Array.from(flagMap.values()).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
 
@@ -471,9 +464,7 @@ function ChatMonitor({ fetchAllData }) {
     }
     try {
       setSubmitting(true)
-      await warnChatFlagApi(id).catch((err) => {
-        console.warn('Backend warn API unavailable, applying optimistic local state:', err?.message || err)
-      })
+      await warnChatFlagApi(id) // Removed .catch swallow to handle 409 properly
 
       // Issue graduated warning strike & calculate penalty (1 warn -> 1h, 2 warns -> 5d, 3 warns -> BAN)
       const res = issueUserWarningStrike(user, 'Chat moderation violation')
@@ -493,7 +484,8 @@ function ChatMonitor({ fetchAllData }) {
       }
     } catch (err) {
       console.error(err)
-      toast.error('Failed to send warning!')
+      toast.error(err.response?.status === 409 ? 'Flag was already resolved by another moderator.' : 'Failed to send warning!')
+      fetchFlags() // Refresh data on concurrency error
     } finally {
       setSubmitting(false)
     }
@@ -504,9 +496,7 @@ function ChatMonitor({ fetchAllData }) {
     if (submitting) return
     try {
       setSubmitting(true)
-      await dismissChatFlagApi(id).catch((err) => {
-        console.warn('Backend dismiss API unavailable, applying optimistic local state:', err?.message || err)
-      })
+      await dismissChatFlagApi(id)
 
       updateFlagsState(prev => prev.map(f => f.id === id ? {
         ...f,
@@ -518,7 +508,8 @@ function ChatMonitor({ fetchAllData }) {
       toast.info('Flag dismissed & archived to Audit Log.')
     } catch (err) {
       console.error(err)
-      toast.error('Failed to dismiss flag.')
+      toast.error(err.response?.status === 409 ? 'Flag was already resolved by another moderator.' : 'Failed to dismiss flag.')
+      fetchFlags()
     } finally {
       setSubmitting(false)
     }
@@ -534,9 +525,7 @@ function ChatMonitor({ fetchAllData }) {
     if (window.confirm(`Are you sure you want to permanently ban chat access for user: ${user}?`)) {
       try {
         setSubmitting(true)
-        await deleteChatFlagApi(id).catch((err) => {
-          console.warn('Backend ban API unavailable, applying optimistic local state:', err?.message || err)
-        })
+        await deleteChatFlagApi(id)
 
         updateFlagsState(prev => prev.map(f => f.id === id ? {
           ...f,
@@ -557,7 +546,8 @@ function ChatMonitor({ fetchAllData }) {
         toast.success(`🚫 Chat access permanently banned for user ${user}. Moved to Audit Log.`)
       } catch (err) {
         console.error(err)
-        toast.error('Failed to ban user!')
+        toast.error(err.response?.status === 409 ? 'Flag was already resolved by another moderator.' : 'Failed to ban user!')
+        fetchFlags()
       } finally {
         setSubmitting(false)
       }
@@ -585,9 +575,7 @@ function ChatMonitor({ fetchAllData }) {
     if (!muteTarget || submitting) return
     try {
       setSubmitting(true)
-      await muteUserChatApi(muteTarget.userId, muteHours, muteReason).catch((err) => {
-        console.warn('Backend mute API unavailable, applying optimistic local state:', err?.message || err)
-      })
+      await muteUserChatApi(muteTarget.userId, muteHours, muteReason)
 
       const until = new Date(Date.now() + muteHours * 3600000).toISOString()
       const targetFlagId = muteTarget.flagId || `flag-${Date.now()}`
@@ -637,7 +625,8 @@ function ChatMonitor({ fetchAllData }) {
       setMuteTarget(null)
     } catch (err) {
       console.error(err)
-      toast.error('Failed to mute user!')
+      toast.error(err.response?.status === 409 ? 'User was already actioned by another moderator.' : 'Failed to mute user!')
+      fetchFlags()
     } finally {
       setSubmitting(false)
     }
@@ -741,10 +730,10 @@ function ChatMonitor({ fetchAllData }) {
       {/* Workspace Tabs */}
       <div className="cv-chat-tabs-header">
         <button
-          className={`cv-chat-tab-btn ${activeTab === 'flags' ? 'active' : ''}`}
-          onClick={() => setActiveTab('flags')}
+          className={`cv-chat-tab-btn ${activeTab === 'live' ? 'active' : ''}`}
+          onClick={() => setActiveTab('live')}
         >
-          🚩 Flagged Accounts & Violations ({pendingFlags.length})
+          📡 Live Stream Inspector
         </button>
         <button
           className={`cv-chat-tab-btn ${activeTab === 'keywords' ? 'active' : ''}`}
@@ -753,10 +742,10 @@ function ChatMonitor({ fetchAllData }) {
           🚫 Banned Keywords & Filter ({keywords.length})
         </button>
         <button
-          className={`cv-chat-tab-btn ${activeTab === 'live' ? 'active' : ''}`}
-          onClick={() => setActiveTab('live')}
+          className={`cv-chat-tab-btn ${activeTab === 'flags' ? 'active' : ''}`}
+          onClick={() => setActiveTab('flags')}
         >
-          📡 Live Stream Inspector
+          🚩 Flagged Accounts & Violations ({pendingFlags.length})
         </button>
       </div>
 

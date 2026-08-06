@@ -370,3 +370,79 @@ html.light .comments-load-more-btn:hover {
   scroll-margin-top: 120px;
 }
 
+/* Skeleton Shimmer Loading Patterns */
+.comments-skeleton-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.comment-skeleton-card {
+  display: flex;
+  gap: 16px;
+  padding: 18px 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
+}
+
+html.light .comment-skeleton-card {
+  background: #ffffff;
+  border-color: rgba(99, 87, 78, 0.08);
+}
+
+.comment-skeleton-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+html.light .comment-skeleton-avatar {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.comment-skeleton-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.comment-skeleton-line {
+  height: 14px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+html.light .comment-skeleton-line {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.comment-skeleton-line.short {
+  width: 30%;
+}
+
+.comment-skeleton-line.long {
+  width: 85%;
+}
+
+.shimmer {
+  animation: shimmerMove 1.5s infinite linear;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.12) 50%, rgba(255, 255, 255, 0.04) 100%);
+  background-size: 200% 100%;
+}
+
+html.light .shimmer {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.04) 0%, rgba(0, 0, 0, 0.09) 50%, rgba(0, 0, 0, 0.04) 100%);
+  background-size: 200% 100%;
+}
+
+@keyframes shimmerMove {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+

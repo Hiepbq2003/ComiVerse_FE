@@ -1,9 +1,17 @@
-/* ---------------------------------------------------------------------
-   Design tokens
-   Ink desk (dark chrome) + washi paper (light canvas, like a page on a
-   lightbox) + aizuri indigo (primary action) + shu vermillion (editorial
-   correction-mark red, used for "needs attention" / current-state signals).
---------------------------------------------------------------------- */
+.tw-x-change-request-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #8a8a99;
+  margin: 0 0 8px;
+}
+
+.tw-x-change-request-empty {
+  font-size: 13px;
+  color: #8286A0;
+  margin: 0 0 12px;
+}
 .tw-root {
   --ink-950: #12141c;
   --ink-900: #1b1e2b;
@@ -902,6 +910,7 @@
   text-align: var(--text-align, left);
   font-weight: var(--font-weight, 400);
   font-style: var(--font-style, normal);
+  z-index: 8; /* ➕ THÊM DÒNG NÀY — đảm bảo nằm trên SVG (z-index 6) và resize handle (z-index 7) */
 }
 .tw-x-inline-textarea.is-active { cursor: move; }
 .tw-x-inline-textarea.is-zoom-picking { cursor: zoom-in; }
@@ -1051,3 +1060,459 @@
 .tw-x-main-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
 .tw-x-toolbar-row2 { border-top: 1px solid var(--ink-line-soft, #242737); }
+
+/* ─── Glossary Panel ──────────────────────────────────────────────────────── */
+.tw-x-glossary-panel {
+  gap: 12px;
+}
+
+/* Header */
+.tw-x-glossary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tw-x-glossary-count {
+  font-size: 11px;
+  font-family: "IBM Plex Mono", monospace;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted-2);
+  text-transform: uppercase;
+}
+
+.tw-x-glossary-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tw-x-glossary-add-btn {
+  font-size: 13px;
+  padding: 5px 10px;
+}
+
+/* Add / edit form */
+.tw-x-glossary-form {
+  background: var(--ink-950);
+  border: 1px solid var(--ink-line);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tw-x-glossary-form-row {
+  display: flex;
+  gap: 8px;
+}
+
+.tw-x-glossary-form-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tw-x-glossary-input {
+  width: 100%;
+  background: var(--ink-900);
+  border: 1px solid var(--ink-line);
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: var(--ink-text);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.tw-x-glossary-input:focus {
+  border-color: var(--aizuri);
+  box-shadow: 0 0 0 2px rgba(84, 114, 176, 0.2);
+}
+
+.tw-x-glossary-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Search */
+.tw-x-glossary-search-wrap {
+  position: relative;
+}
+
+.tw-x-glossary-search {
+  padding-right: 28px;
+}
+
+.tw-x-glossary-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--ink-muted-2);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+  line-height: 1;
+}
+
+.tw-x-glossary-search-clear:hover {
+  color: var(--ink-text-2);
+}
+
+/* Empty state */
+.tw-x-glossary-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--ink-muted-2);
+}
+
+.tw-x-glossary-empty p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-text-2);
+}
+
+.tw-x-glossary-empty span {
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  line-height: 1.5;
+  max-width: 280px;
+}
+
+/* Term list */
+.tw-x-glossary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Term card */
+.tw-x-glossary-card {
+  background: var(--ink-950);
+  border: 1px solid var(--ink-line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  transition: border-color 0.15s;
+}
+
+.tw-x-glossary-card:hover {
+  border-color: #454863;
+}
+
+.tw-x-glossary-card.is-editing {
+  border-color: var(--aizuri);
+  background: rgba(84, 114, 176, 0.06);
+}
+
+.tw-x-glossary-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tw-x-glossary-term-pair {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tw-x-glossary-source {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-text-hi);
+}
+
+.tw-x-glossary-arrow {
+  color: var(--ink-muted-2);
+  font-size: 13px;
+}
+
+.tw-x-glossary-target {
+  font-size: 14px;
+  color: var(--aizuri-hover);
+  font-weight: 500;
+}
+
+.tw-x-glossary-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-muted);
+  line-height: 1.4;
+  font-style: italic;
+}
+
+.tw-x-glossary-card-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.tw-x-glossary-card:hover .tw-x-glossary-card-actions {
+  opacity: 1;
+}
+
+.tw-x-glossary-action-btn {
+  font-size: 13px;
+  padding: 4px;
+}
+
+.tw-x-glossary-action-btn.is-danger:hover {
+  background: rgba(220, 38, 38, 0.15);
+  color: #f87171;
+}
+
+/* Delete confirmation modal */
+.tw-x-glossary-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tw-x-glossary-modal {
+  background: var(--ink-900);
+  border: 1px solid var(--ink-line);
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 300px;
+  max-width: 380px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+.tw-x-glossary-modal-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-text-hi);
+}
+
+.tw-x-glossary-modal-body {
+  margin: 0 0 20px;
+  font-size: 13.5px;
+  color: var(--ink-text-2);
+  line-height: 1.5;
+}
+
+.tw-x-glossary-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.tw-btn-primary.is-danger-btn {
+  background: #dc2626;
+  color: #fff;
+}
+
+.tw-btn-primary.is-danger-btn:hover {
+  background: #b91c1c;
+}
+
+/* ─── Team Message Popup ──────────────────────────────────────────────────── */
+.tw-msg-popup {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  width: 300px;
+  height: 380px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--ink-900);
+  border: 1px solid var(--ink-line);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.tw-msg-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--ink-line-soft);
+  flex-shrink: 0;
+}
+
+.tw-msg-popup-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-text-hi);
+}
+
+.tw-msg-popup-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tw-msg-popup-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.12);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.tw-msg-popup-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34d399;
+  display: inline-block;
+}
+
+.tw-msg-popup-close {
+  background: transparent;
+  border: none;
+  color: var(--ink-muted-2);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.tw-msg-popup-close:hover {
+  color: var(--ink-text-2);
+}
+
+.tw-msg-popup-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tw-msg-popup-status {
+  font-size: 12px;
+  color: var(--ink-muted-2);
+  text-align: center;
+  margin-top: 16px;
+}
+
+.tw-msg-popup-loading-more {
+  font-size: 10.5px;
+  color: var(--ink-muted-2);
+  text-align: center;
+}
+
+.tw-msg-row {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.tw-msg-row.is-me {
+  justify-content: flex-end;
+}
+
+.tw-msg-row-inner {
+  max-width: 78%;
+}
+
+.tw-msg-sender {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--aizuri-hover);
+  margin-bottom: 2px;
+}
+
+.tw-msg-bubble {
+  padding: 6px 10px;
+  border-radius: 14px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  background: var(--ink-850);
+  color: var(--ink-text);
+}
+
+.tw-msg-row.is-me .tw-msg-bubble {
+  background: var(--aizuri);
+  color: var(--ink-950);
+}
+
+.tw-msg-time {
+  font-size: 9.5px;
+  color: var(--ink-muted-2);
+  margin-top: 2px;
+  text-align: left;
+}
+
+.tw-msg-row.is-me .tw-msg-time {
+  text-align: right;
+}
+
+.tw-msg-popup-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--ink-line-soft);
+  flex-shrink: 0;
+}
+
+.tw-msg-popup-input {
+  flex: 1;
+  background: var(--ink-950);
+  border: 1px solid var(--ink-line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  color: var(--ink-text);
+  outline: none;
+  font-family: inherit;
+}
+
+.tw-msg-popup-input:focus {
+  border-color: var(--aizuri);
+  box-shadow: 0 0 0 2px rgba(84, 114, 176, 0.2);
+}
+
+.tw-msg-popup-send {
+  background: transparent;
+  border: none;
+  color: var(--aizuri);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+}
+
+.tw-msg-popup-send:disabled {
+  color: var(--ink-muted-2);
+  cursor: not-allowed;
+}

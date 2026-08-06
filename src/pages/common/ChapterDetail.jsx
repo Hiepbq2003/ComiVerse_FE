@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
 import { getComicByIdApi } from '../../services/api/ComicApi'
@@ -9,8 +9,10 @@ import ComicPageCanvas from '../../components/common/ComicPageCanvas'
 import '../../assets/style/reader/chapter-detail.css'
 import '../../assets/style/reader/comments.css'
 import { isValidUuid } from '../../utils/uuid'
-import { getAuth } from '../../utils/Auth'
+import { useAuth } from '../../context/AuthContext'
 import CommentSection from '../../components/common/CommentSection'
+import SubscriptionPlanModal from '../../components/common/SubscriptionPlanModal'
+import ReadingLanguageSelector from '../../components/common/ReadingLanguageSelector'
 
 // pagesBubbles is a JSON string: [{ pageNumber, imageUrl, bubbles }, ...]
 // where `bubbles` is itself a JSON string ({"selections":[...]}) — same
@@ -55,9 +57,10 @@ function ChapterDetail() {
   const [isDevToolsOpen, setIsDevToolsOpen] = useState(false)
   const [translations, setTranslations] = useState([])
   const [selectedLanguage, setSelectedLanguage] = useState(searchParams.get('lang') || '')
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+  const closeSubscriptionModal = useCallback(() => setShowSubscriptionModal(false), [])
 
-  // User state
-  const [user, setUser] = useState(null)
+  const { user, refreshSubscription } = useAuth()
 
   const dropdownRef = useRef(null)
 
@@ -83,14 +86,6 @@ function ChapterDetail() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
   }, [chapterId])
-
-  // Get current user on mount
-  useEffect(() => {
-    const auth = getAuth()
-    if (auth && auth.user) {
-      setUser(auth.user)
-    }
-  }, [])
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -183,24 +178,55 @@ function ChapterDetail() {
     return `/comic/${comicId}/chapter/${targetChapterId}${langQuery}`
   }
 
+  const rawUserRole = typeof user?.role === 'string'
+    ? user.role
+    : (user?.role?.roleName || user?.roleName || '')
+  const hasInternalChapterAccess = ['ADMIN', 'MODERATOR', 'AUTHOR', 'TRANSLATOR', 'PROJECT_LEADER']
+    .includes(String(rawUserRole).trim().toUpperCase())
+
+  const openChapter = async (chapter) => {
+    if (!chapter) return
+
+    if (chapter.isPremium && !hasInternalChapterAccess) {
+      if (!user) {
+        toast.info('Please sign in and upgrade to Premium to read this chapter.')
+        navigate('/auth?mode=signin')
+        return
+      }
+
+      try {
+        const latestSubscription = await refreshSubscription()
+        if (!latestSubscription?.premiumActive) {
+          setShowSubscriptionModal(true)
+          return
+        }
+      } catch (error) {
+        console.error('Unable to verify Premium access:', error)
+        toast.error('Unable to verify your Premium subscription. Please try again.')
+        return
+      }
+    }
+
+    navigate(buildChapterUrl(chapter.id))
+  }
+
   const handleGoToPrevChapter = () => {
     if (hasPrevChapter) {
-      const prevChap = sortedChapters[currentChapterIndex - 1]
-      navigate(buildChapterUrl(prevChap.id))
+      openChapter(sortedChapters[currentChapterIndex - 1])
     }
   }
 
   const handleGoToNextChapter = () => {
     if (hasNextChapter) {
-      const nextChap = sortedChapters[currentChapterIndex + 1]
-      navigate(buildChapterUrl(nextChap.id))
+      openChapter(sortedChapters[currentChapterIndex + 1])
     }
   }
 
   const handleSelectChapter = (e) => {
     const targetId = e.target.value
-    if (targetId) {
-      navigate(buildChapterUrl(targetId))
+    const targetChapter = sortedChapters.find((chapter) => String(chapter.id) === String(targetId))
+    if (targetChapter) {
+      openChapter(targetChapter)
     }
   }
 
@@ -257,6 +283,13 @@ function ChapterDetail() {
   }
 
   const pages = currentChapter.images || []
+  // The backend decides access by returning chapter images only to authorized users.
+  // Do not trust a possibly stale local premium flag when rendering the lock state.
+  const isPremiumLocked = Boolean(
+    currentChapter.isPremium
+      && pages.length === 0
+      && !hasInternalChapterAccess
+  )
 
   // Only show languages that actually have data for THIS chapter — the
   // comic-level picker (ComicDetail) may list languages that some
@@ -266,13 +299,6 @@ function ChapterDetail() {
   const selectedBubblesByPageNumber = activeTranslation
     ? parseTranslationBubblesByPage(activeTranslation.pagesBubbles)
     : {}
-  console.log("[DEBUG translations]", {
-    selectedLanguage,
-    translations,
-    availableLanguagesForChapter,
-    activeTranslation,
-    selectedBubblesByPageNumber,
-  })
   const currentChapterNumberStr = currentChapter.chapterNumber || '?'
   const currentChapterTitleStr = currentChapter.title || `Chapter ${currentChapterNumberStr}`
   const comicTitleStr = comic?.title || 'Comic Series'
@@ -355,12 +381,13 @@ function ChapterDetail() {
                           key={ch.id}
                           className={`reader-chapter-dropdown-item ${isSelected ? 'selected' : ''}`}
                           onClick={() => {
-                            navigate(buildChapterUrl(ch.id))
+                            openChapter(ch)
                             setIsDropdownOpen(false)
                           }}
                         >
                           <span>
                             Ch. {ch.chapterNumber} {ch.title ? ` - ${ch.title}` : ''}
+                            {ch.isPremium ? '  🔒' : ''}
                           </span>
                           {isSelected && (
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="item-check-icon">
@@ -384,27 +411,13 @@ function ChapterDetail() {
               </button>
 
               {availableLanguagesForChapter.length > 0 && (
-                <select
-                  value={selectedLanguage}
-                  onChange={(e) => setSelectedLanguage(e.target.value)}
-                  title="Reading language"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.04)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '8px',
-                    padding: '6px 12px',
-                    color: 'white',
-                    fontSize: '13px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="" style={{ color: '#111', background: '#fff' }}>Original</option>
-                  {availableLanguagesForChapter.map((lang) => (
-                    <option key={lang} value={lang} style={{ color: '#111', background: '#fff' }}>
-                      {lang}
-                    </option>
-                  ))}
-                </select>
+                <ReadingLanguageSelector
+                  languages={availableLanguagesForChapter}
+                  selectedLanguage={selectedLanguage}
+                  onChange={setSelectedLanguage}
+                  compact={true}
+                  showLabel={false}
+                />
               )}
             </div>
           </div>
@@ -412,7 +425,37 @@ function ChapterDetail() {
 
         {/* Comic Pages Viewport */}
         <div className="chapter-pages-viewport" id="secure-comic-reader">
-          {pages.length === 0 ? (
+          {isPremiumLocked ? (
+            <div style={{
+              width: 'min(680px, calc(100% - 32px))',
+              margin: '72px auto',
+              padding: '48px 32px',
+              textAlign: 'center',
+              borderRadius: '20px',
+              background: 'linear-gradient(145deg, rgba(88, 28, 135, 0.34), rgba(15, 23, 42, 0.96))',
+              border: '1px solid rgba(192, 132, 252, 0.35)',
+              boxShadow: '0 24px 80px rgba(0, 0, 0, 0.36)'
+            }}>
+              <div style={{ fontSize: '54px', marginBottom: '16px' }}>🔒</div>
+              <h2 style={{ color: '#fff', margin: '0 0 12px' }}>Premium chapter</h2>
+              <p style={{ color: '#cbd5e1', lineHeight: 1.7, margin: '0 auto 24px', maxWidth: '500px' }}>
+                The opening chapters are free. Upgrade to an active Premium plan to unlock this chapter and every later Premium chapter.
+              </p>
+              <button
+                type="button"
+                className="btn-reader-action"
+                onClick={() => {
+                  if (!user) {
+                    navigate('/auth?mode=signin')
+                  } else {
+                    setShowSubscriptionModal(true)
+                  }
+                }}
+              >
+                Upgrade Premium
+              </button>
+            </div>
+          ) : pages.length === 0 ? (
             <div style={{ padding: '80px 20px', color: '#64748b', textAlign: 'center' }}>
               <p style={{ fontSize: '36px', margin: '0 0 16px' }}>📖</p>
               <p>This chapter contains no images yet.</p>
@@ -487,6 +530,11 @@ function ChapterDetail() {
         </div>
 
       </div>
+
+      <SubscriptionPlanModal
+        open={showSubscriptionModal}
+        onClose={closeSubscriptionModal}
+      />
     </HomeLayout>
   )
 }

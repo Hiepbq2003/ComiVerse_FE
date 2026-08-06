@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { toast } from "react-toastify";
+import useWorkspaceSecurity from "../../hooks/useWorkspaceSecurity";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -20,8 +22,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import "../../assets/style/translator/review-workspace.css";
+import { API_BASE_URL as API_BASE } from "../../config/apiConfig";
 
-const API_BASE = "http://localhost:8081/api";
 const TOKEN_KEY = "token";
 
 function authHeaders() {
@@ -159,7 +161,7 @@ function Avatar({ initials }) {
   return <div className="rvw-avatar">{initials}</div>;
 }
 
-function Bubble({ box, index, text, changed, selected, showText, fontSizePx, bgColor, textColor, shape, points, onClick }) {
+function Bubble({ id, box, index, text, changed, selected, showText, fontSizePx, bgColor, textColor, shape, points, onClick }) {
   const shapeClass = shape === "ellipse" ? "rvw-bubble--ellipse" : shape === "polygon" ? "rvw-bubble--polygon" : "";
 
   const clipPath =
@@ -172,6 +174,7 @@ function Bubble({ box, index, text, changed, selected, showText, fontSizePx, bgC
   return (
     <div
       onClick={onClick}
+      data-bubble-id={id}
       className={`rvw-bubble ${shapeClass} ${changed ? "rvw-bubble--changed" : ""} ${selected ? "rvw-bubble--selected" : ""} ${showText ? "rvw-bubble--text-only" : "rvw-bubble--outline-only"}`}
       style={{
         "--x": `${box.x}%`,
@@ -191,8 +194,32 @@ function Bubble({ box, index, text, changed, selected, showText, fontSizePx, bgC
   );
 }
 
-function CommentThread({ comment, onResolve, onDelete, onStartEdit, currentUserId, resolveBubbleLabel }) {
+function CommentThread({ comment, onResolve, onDelete, onUpdate, currentUserId, resolveBubbleLabel }) {
   const isOwner = comment.authorId === currentUserId;
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState(comment.content ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const startEdit = () => {
+    setDraft(comment.content ?? "");
+    setIsEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setDraft(comment.content ?? "");
+    setIsEditing(false);
+  };
+
+  const handleSave = async () => {
+    if (!draft.trim() || saving) return;
+    setSaving(true);
+    try {
+      await onUpdate(comment.id, draft.trim());
+      setIsEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="rvw-comment">
@@ -202,9 +229,9 @@ function CommentThread({ comment, onResolve, onDelete, onStartEdit, currentUserI
           <span className="rvw-comment-author">{comment.authorName}</span>
           <div className="rvw-comment-header-right">
             <span className="rvw-comment-time">{formatTime(comment.createdAt)}</span>
-            {isOwner && (
+            {isOwner && !isEditing && !comment.resolved && (
               <>
-                <button type="button" onClick={() => onStartEdit(comment)} className="rvw-delete-btn" title="Edit comment">
+                <button type="button" onClick={startEdit} className="rvw-delete-btn" title="Edit comment">
                   <Pencil size={12} />
                 </button>
                 <button type="button" onClick={() => onDelete(comment.id)} className="rvw-delete-btn" title="Delete comment">
@@ -212,34 +239,79 @@ function CommentThread({ comment, onResolve, onDelete, onStartEdit, currentUserI
                 </button>
               </>
             )}
+            {isOwner && !isEditing && comment.resolved && (
+              <button type="button" onClick={() => onDelete(comment.id)} className="rvw-delete-btn" title="Delete comment">
+                <Trash2 size={12} />
+              </button>
+            )}
           </div>
         </div>
 
-        {comment.bubbleId && <span className="rvw-comment-bubble-tag">{resolveBubbleLabel(comment.bubbleId)}</span>}
-
-        <p className="rvw-comment-text">{comment.content}</p>
-
-        {!comment.resolved && (
-          <button type="button" onClick={() => onResolve(comment.id)} className="rvw-resolve-btn">
-            <CheckCircle2 size={13} /> Resolve
-          </button>
+        {isEditing ? (
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSave();
+              }
+              if (e.key === "Escape") cancelEdit();
+            }}
+            rows={2}
+            autoFocus
+            className="rvw-comment-text rvw-comment-text--editable"
+          />
+        ) : (
+          <p className="rvw-comment-text">{comment.content}</p>
         )}
 
-        {comment.resolved && (
-          <span className="rvw-resolved-tag">
-            <CheckCircle2 size={12} /> Resolved
-          </span>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          {!isEditing && (
+            <button
+              type="button"
+              onClick={() => onResolve(comment.id)}
+              className={comment.resolved ? "rvw-resolved-tag rvw-resolved-tag--clickable" : "rvw-resolve-btn"}
+              title={comment.resolved ? "Click to mark as unresolved" : "Mark as resolved"}
+              style={
+                comment.resolved
+                  ? { border: "none", background: "transparent", font: "inherit", cursor: "pointer", padding: 0 }
+                  : undefined
+              }
+            >
+              <CheckCircle2 size={comment.resolved ? 12 : 13} /> {comment.resolved ? "Resolved" : "Resolve"}
+            </button>
+          )}
+
+          {isEditing && (
+            <>
+              <button type="button" onClick={handleSave} disabled={saving || !draft.trim()} className="rvw-resolve-btn">
+                {saving ? "Saving…" : "Save"}
+              </button>
+              <button type="button" onClick={cancelEdit} className="rvw-delete-btn" style={{ fontSize: "12px" }}>
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function SelectedBubblePreview({ index, translation, onClear }) {
+function SelectedBubblePreview({ index, translation, onClear, onPrev, onNext }) {
   return (
     <div className="rvw-selected-preview">
       <div className="rvw-selected-preview-header">
-        <span className="rvw-selected-preview-title">Bubble {index}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+          <button type="button" onClick={onPrev} className="rvw-selected-preview-close" title="Previous bubble">
+            <ChevronLeft size={14} />
+          </button>
+          <span className="rvw-selected-preview-title">Bubble {index}</span>
+          <button type="button" onClick={onNext} className="rvw-selected-preview-close" title="Next bubble">
+            <ChevronRight size={14} />
+          </button>
+        </div>
         <button type="button" onClick={onClear} className="rvw-selected-preview-close">
           <X size={13} />
         </button>
@@ -376,7 +448,6 @@ function BubbleOverlayPanel({
   onScroll,
   frameRef,
   zoomScale,
-  zoomOrigin,
   isPickingZoomPoint,
   onFrameMouseDown,
   imageUrl,
@@ -390,51 +461,91 @@ function BubbleOverlayPanel({
   selectedBubbleId,
   onSelectBubble,
 }) {
+  const imgRef = useRef(null);
+  const [imgSize, setImgSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const el = imgRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      setImgSize({ width: el.clientWidth, height: el.clientHeight });
+    };
+
+    if (el.complete) measure();
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    el.addEventListener("load", measure);
+
+    return () => {
+      observer.disconnect();
+      el.removeEventListener("load", measure);
+    };
+  }, [imageUrl]);
+
+  const hasSize = imgSize.width > 0 && imgSize.height > 0;
+
   return (
     <div ref={scrollRef} onScroll={onScroll} className="rvw-panel">
       <p className={`rvw-panel-label ${labelClassName}`}>{labelText}</p>
       <div
         ref={frameRef}
         onMouseDown={(e) => {
-          const handled = onFrameMouseDown(e, frameRef.current);
+          const handled = onFrameMouseDown(e, frameRef.current, scrollRef.current);
           if (handled) e.stopPropagation();
         }}
         className={`rvw-panel-frame ${isPickingZoomPoint ? "rvw-panel-frame--zoom-picking" : ""}`}
-        style={{
-          "--zoom-scale": zoomScale,
-          "--zoom-origin-x": `${zoomOrigin.x}%`,
-          "--zoom-origin-y": `${zoomOrigin.y}%`,
-        }}
+        style={{ "--zoom-scale": zoomScale }}
       >
         {imageUrl ? (
-          <img src={imageUrl} alt={`Page ${pageIndex + 1} ${labelText}`} className="rvw-panel-image" draggable={false} />
+          <div style={{ position: "relative" }}>
+            <img
+              ref={imgRef}
+              src={imageUrl}
+              alt={`Page ${pageIndex + 1} ${labelText}`}
+              className="rvw-panel-image"
+              draggable={false}
+              onLoad={() => {
+                const el = imgRef.current;
+                if (el) setImgSize({ width: el.clientWidth, height: el.clientHeight });
+              }}
+            />
+            {hasSize && !isPickingZoomPoint && (
+              <div
+                className="rvw-bubble-overlay"
+                style={{ position: "absolute", top: 0, left: 0, width: imgSize.width, height: imgSize.height }}
+              >
+                {selections.map((sel, i) => {
+                  const fontSizePx =
+                    showText && typeof sel.fontSize === "number" && frameHeight > 0
+                      ? (sel.fontSize / 100) * frameHeight
+                      : undefined;
+                  return (
+                    <Bubble
+                      key={sel.id}
+                      id={sel.id}
+                      box={getBoundingBox(sel)}
+                      index={i + 1}
+                      text={sel.translation || ""}
+                      changed={showText && changedFlags[i]}
+                      showText={showText}
+                      fontSizePx={fontSizePx}
+                      bgColor={sel.textBgColor}
+                      textColor={sel.textColor}
+                      shape={sel.shape}
+                      points={sel.points}
+                      selected={selectedBubbleId === sel.id}
+                      onClick={() => onSelectBubble(selectedBubbleId === sel.id ? null : sel.id)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
         ) : (
           <div className="rvw-panel-empty">No image for this page.</div>
         )}
-        {!isPickingZoomPoint &&
-          selections.map((sel, i) => {
-            const fontSizePx =
-              showText && typeof sel.fontSize === "number" && frameHeight > 0
-                ? (sel.fontSize / 100) * frameHeight
-                : undefined;
-            return (
-              <Bubble
-                key={sel.id}
-                box={getBoundingBox(sel)}
-                index={i + 1}
-                text={sel.translation || ""}
-                changed={showText && changedFlags[i]}
-                showText={showText}
-                fontSizePx={fontSizePx}
-                bgColor={sel.textBgColor}
-                textColor={sel.textColor}
-                shape={sel.shape}
-                points={sel.points}
-                selected={selectedBubbleId === sel.id}
-                onClick={() => onSelectBubble(selectedBubbleId === sel.id ? null : sel.id)}
-              />
-            );
-          })}
       </div>
     </div>
   );
@@ -447,18 +558,18 @@ function CommentsSidebar({
   commentsLoading,
   onResolve,
   onDelete,
-  onStartEdit,
+  onUpdate,
   currentUserId,
   resolveBubbleLabel,
   composeValue,
   onComposeChange,
   onPostComment,
-  editingComment,
-  onCancelEdit,
   selectedBubbleId,
   selectedBubbleIndex,
   selectedBubbleTranslation,
   onClearSelectedBubble,
+  onPrevBubble,
+  onNextBubble,
   bubbleAlreadyHasComment,
   generalComposeValue,
   onGeneralComposeChange,
@@ -473,58 +584,17 @@ function CommentsSidebar({
         <span className="rvw-sidebar-count">{totalCommentCount}</span>
       </div>
 
-      <div className="rvw-general-comments" style={{ borderBottom: "1px solid #212129" }}>
-        <p style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "#8a8a99", margin: "10px 16px 6px" }}>
-          Page-level review
-        </p>
-
-        {generalComments && generalComments.length > 0 && (
-          <div className="rvw-sidebar-list" style={{ flex: "0 0 auto", maxHeight: "220px" }}>
-            {generalComments.map((c) => (
-              <CommentThread
-                key={c.id}
-                comment={c}
-                onResolve={onResolve}
-                onDelete={onDelete}
-                onStartEdit={onStartEdit}
-                currentUserId={currentUserId}
-                resolveBubbleLabel={resolveBubbleLabel}
-              />
-            ))}
-          </div>
-        )}
-
-        {alreadyHasGeneralComment ? (
-          <p className="rvw-sidebar-empty" style={{ padding: "0 16px 12px" }}>
-            You already left a page-level review. Edit it above instead.
-          </p>
-        ) : (
-          <div className="rvw-composer-row" style={{ padding: "0 16px 12px" }}>
-            <input
-              value={generalComposeValue}
-              onChange={(e) => onGeneralComposeChange(e.target.value)}
-              placeholder="Overall feedback for this page..."
-              className="rvw-composer-input"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onPostGeneralComment();
-              }}
-            />
-            <button type="button" onClick={onPostGeneralComment} className="rvw-composer-send-btn">
-              <Send size={14} />
-            </button>
-          </div>
-        )}
-      </div>
-
       {selectedBubbleId != null && (
         <SelectedBubblePreview
           index={selectedBubbleIndex}
           translation={selectedBubbleTranslation}
           onClear={onClearSelectedBubble}
+          onPrev={onPrevBubble}
+          onNext={onNextBubble}
         />
       )}
 
-      <div className="rvw-sidebar-list">
+      <div>
         {commentsLoading && selectedBubbleId != null && (
           <p className="rvw-sidebar-empty">Loading comments…</p>
         )}
@@ -540,58 +610,88 @@ function CommentsSidebar({
             comment={c}
             onResolve={onResolve}
             onDelete={onDelete}
-            onStartEdit={onStartEdit}
+            onUpdate={onUpdate}
             currentUserId={currentUserId}
             resolveBubbleLabel={resolveBubbleLabel}
           />
         ))}
       </div>
 
-      <div className="rvw-composer">
-        {editingComment && (
-          <span className="rvw-composer-tag">
-            Editing comment
-            <button type="button" onClick={onCancelEdit} className="rvw-composer-tag-close">
-              <X size={11} />
+      {!bubbleAlreadyHasComment && (
+        <div className="rvw-composer">
+          {selectedBubbleId == null && (
+            <p className="rvw-sidebar-empty" style={{ padding: "0 0 8px" }}>
+              Select a bubble on the translated image to leave a comment.
+            </p>
+          )}
+          <div className="rvw-composer-row rvw-composer-row--wrap">
+            <textarea
+              value={composeValue}
+              onChange={(e) => onComposeChange(e.target.value)}
+              placeholder={selectedBubbleId != null ? `Comment on bubble ${selectedBubbleIndex}...` : "Select a bubble first..."}
+              className="rvw-composer-input rvw-composer-textarea"
+              rows={2}
+              disabled={selectedBubbleId == null}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  onPostComment();
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={onPostComment}
+              className="rvw-composer-send-btn"
+              disabled={selectedBubbleId == null}
+            >
+              <Send size={14} />
             </button>
-          </span>
-        )}
-        {!editingComment && selectedBubbleId == null && (
-          <p className="rvw-sidebar-empty" style={{ padding: "0 0 8px" }}>
-            Select a bubble on the translated image to leave a comment.
-          </p>
-        )}
-        {!editingComment && selectedBubbleId != null && bubbleAlreadyHasComment && (
-          <p className="rvw-sidebar-empty" style={{ padding: "0 0 8px" }}>
-            You already reviewed this bubble. Edit your comment above instead.
-          </p>
-        )}
-        <div className="rvw-composer-row">
-          <input
-            value={composeValue}
-            onChange={(e) => onComposeChange(e.target.value)}
-            placeholder={
-              editingComment
-                ? "Edit comment..."
-                : selectedBubbleId != null
-                ? `Comment on bubble ${selectedBubbleIndex}...`
-                : "Select a bubble first..."
-            }
-            className="rvw-composer-input"
-            disabled={!editingComment && (selectedBubbleId == null || bubbleAlreadyHasComment)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") onPostComment();
-            }}
-          />
-          <button
-            type="button"
-            onClick={onPostComment}
-            className="rvw-composer-send-btn"
-            disabled={!editingComment && (selectedBubbleId == null || bubbleAlreadyHasComment)}
-          >
-            <Send size={14} />
-          </button>
+          </div>
         </div>
+      )}
+
+      <div className="rvw-general-comments" style={{ borderTop: "1px solid #212129" }}>
+        <p style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "#8a8a99", margin: "10px 16px 6px" }}>
+          Page-level review
+        </p>
+
+        {generalComments && generalComments.length > 0 && (
+          <div style={{ flex: "0 0 auto", maxHeight: "220px" }}>
+            {generalComments.map((c) => (
+              <CommentThread
+                key={c.id}
+                comment={c}
+                onResolve={onResolve}
+                onDelete={onDelete}
+                onUpdate={onUpdate}
+                currentUserId={currentUserId}
+                resolveBubbleLabel={resolveBubbleLabel}
+              />
+            ))}
+          </div>
+        )}
+
+        {!alreadyHasGeneralComment && (
+          <div className="rvw-composer-row rvw-composer-row--wrap" style={{ padding: "0 16px 12px" }}>
+            <textarea
+              value={generalComposeValue}
+              onChange={(e) => onGeneralComposeChange(e.target.value)}
+              placeholder="Overall feedback for this page..."
+              className="rvw-composer-input rvw-composer-textarea"
+              rows={2}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  onPostGeneralComment();
+                }
+              }}
+            />
+            <button type="button" onClick={onPostGeneralComment} className="rvw-composer-send-btn">
+              <Send size={14} />
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   );
@@ -667,8 +767,9 @@ function useReviewZoom() {
   const ZOOM_MAX = 6;
 
   const [zoomScale, setZoomScale] = useState(1);
-  const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
   const [isPickingZoomPoint, setIsPickingZoomPoint] = useState(false);
+
+  const panelScrollRefs = useRef([]);
 
   const toggleZoomIn = () => setIsPickingZoomPoint((v) => !v);
   const cancelZoomPick = () => setIsPickingZoomPoint(false);
@@ -676,36 +777,49 @@ function useReviewZoom() {
   const zoomOut = () => {
     setZoomScale((prev) => {
       const next = Math.max(ZOOM_MIN, prev / ZOOM_STEP);
-      if (next === ZOOM_MIN) setZoomOrigin({ x: 50, y: 50 });
       return next;
     });
   };
 
   const resetZoom = () => {
     setZoomScale(1);
-    setZoomOrigin({ x: 50, y: 50 });
     setIsPickingZoomPoint(false);
+    panelScrollRefs.current.forEach((el) => {
+      if (el) { el.scrollTop = 0; el.scrollLeft = 0; }
+    });
   };
 
-  const handleFrameMouseDown = (e, frameEl) => {
+  const handleFrameMouseDown = (e, frameEl, scrollEl) => {
     if (!isPickingZoomPoint || !frameEl) return false;
     const bounds = frameEl.getBoundingClientRect();
-    const percentX = ((e.clientX - bounds.left) / bounds.width) * 100;
-    const percentY = ((e.clientY - bounds.top) / bounds.height) * 100;
-    setZoomOrigin({ x: percentX, y: percentY });
-    setZoomScale((prev) => Math.min(ZOOM_MAX, prev * ZOOM_STEP));
+    const fracX = (e.clientX - bounds.left) / bounds.width;
+    const fracY = (e.clientY - bounds.top) / bounds.height;
+
+    setZoomScale((prev) => {
+      const next = Math.min(ZOOM_MAX, prev * ZOOM_STEP);
+      requestAnimationFrame(() => {
+        panelScrollRefs.current.forEach((el) => {
+          if (!el) return;
+          const newFrameW = el.scrollWidth;
+          const newFrameH = el.scrollHeight;
+          el.scrollLeft = fracX * newFrameW - el.clientWidth / 2;
+          el.scrollTop  = fracY * newFrameH - el.clientHeight / 2;
+        });
+      });
+      return next;
+    });
     return true;
   };
 
   return {
     zoomScale,
-    zoomOrigin,
     isPickingZoomPoint,
     toggleZoomIn,
     cancelZoomPick,
     zoomOut,
     resetZoom,
     handleFrameMouseDown,
+    panelScrollRefs,
   };
 }
 
@@ -763,6 +877,11 @@ function usePageComments(pageId) {
 }
 
 export default function ReviewWorkspace() {
+  useWorkspaceSecurity({
+    targetElementId: "secure-workspace",
+    onDevToolsOpen: () => toast.warning("Vui lòng không mở DevTools trên trang này."),
+  });
+
   const { taskId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -778,7 +897,12 @@ export default function ReviewWorkspace() {
   const [composeValue, setComposeValue] = useState("");
   const [generalComposeValue, setGeneralComposeValue] = useState("");
   const [selectedBubbleId, setSelectedBubbleId] = useState(null);
-  const [editingComment, setEditingComment] = useState(null);
+
+  useEffect(() => {
+    if (selectedBubbleId == null) return;
+    const elements = document.querySelectorAll(`[data-bubble-id="${selectedBubbleId}"]`);
+    elements.forEach((el) => el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" }));
+  }, [selectedBubbleId]);
 
   const [syncScroll, setSyncScroll] = useState(true);
   const [deciding, setDeciding] = useState(false);
@@ -787,22 +911,27 @@ export default function ReviewWorkspace() {
 
   const {
     zoomScale,
-    zoomOrigin,
     isPickingZoomPoint,
     toggleZoomIn,
     cancelZoomPick,
     zoomOut,
     resetZoom,
     handleFrameMouseDown,
+    panelScrollRefs,
   } = useReviewZoom();
+
+  const setOriginalScrollRef = useCallback((el) => {
+    panelScrollRefs.current[0] = el;
+  }, [panelScrollRefs]);
+  const setTranslatedScrollRef = useCallback((el) => {
+    panelScrollRefs.current[1] = el;
+  }, [panelScrollRefs]);
 
   const originalFrameRef = useRef(null);
   const translatedFrameRef = useRef(null);
   const translatedFrameHeight = useElementHeight(translatedFrameRef);
 
   useEffect(() => {
-    setSelectedBubbleId(null);
-    setEditingComment(null);
     setComposeValue("");
     setGeneralComposeValue("");
   }, [currentPage?.pageId]);
@@ -832,6 +961,34 @@ export default function ReviewWorkspace() {
   const baselineSelections = useMemo(() => parseBubblesPayload(currentPage?.reviewBaselineBubbles), [currentPage]);
   const changedFlags = useMemo(() => computeChangedFlags(currentSelections, baselineSelections), [currentSelections, baselineSelections]);
   const changeCount = changedFlags.filter(Boolean).length;
+
+  useEffect(() => {
+    setSelectedBubbleId(currentSelections.length > 0 ? currentSelections[0].id : null);
+  }, [currentPage?.pageId]);
+
+  const goToBubble = (direction) => {
+    if (currentSelections.length === 0) return;
+    const currentIndex = currentSelections.findIndex((s) => s.id === selectedBubbleId);
+    let nextIndex;
+    if (currentIndex === -1) {
+      nextIndex = 0;
+    } else if (direction === "next") {
+      nextIndex = (currentIndex + 1) % currentSelections.length;
+    } else {
+      nextIndex = (currentIndex - 1 + currentSelections.length) % currentSelections.length;
+    }
+    setSelectedBubbleId(currentSelections[nextIndex].id);
+  };
+
+  useEffect(() => {
+    if (selectedBubbleId == null) return;
+    const scrollToBubble = (containerRef) => {
+      const el = containerRef.current?.querySelector(`[data-bubble-id="${selectedBubbleId}"]`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    };
+    scrollToBubble(translatedRef);
+    scrollToBubble(originalRef);
+  }, [selectedBubbleId, translatedRef, originalRef]);
 
   const resolveBubbleLabel = useCallback(
     (bubbleId) => {
@@ -866,26 +1023,12 @@ export default function ReviewWorkspace() {
   );
 
   const bubbleAlreadyHasComment = useMemo(() => {
-    if (selectedBubbleId == null || editingComment) return false;
+    if (selectedBubbleId == null) return false;
     return comments.some((c) => c.bubbleId === selectedBubbleId && c.authorId === currentUserId);
-  }, [selectedBubbleId, comments, editingComment, currentUserId]);
+  }, [selectedBubbleId, comments, currentUserId]);
 
   const handlePostComment = async () => {
-    if (!composeValue.trim() || !currentPage?.pageId) return;
-    if (!editingComment && selectedBubbleId == null) return;
-
-    if (editingComment) {
-      try {
-        const updated = await updateCommentApi(editingComment.id, composeValue.trim());
-        setComments((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-        setComposeValue("");
-        setEditingComment(null);
-      } catch (err) {
-        console.error("Failed to update comment:", err);
-        alert("Failed to update comment. Please try again.");
-      }
-      return;
-    }
+    if (!composeValue.trim() || !currentPage?.pageId || selectedBubbleId == null) return;
 
     try {
       const created = await postComment(currentPage.pageId, {
@@ -896,7 +1039,7 @@ export default function ReviewWorkspace() {
       setComposeValue("");
     } catch (err) {
       console.error("Failed to post comment:", err);
-      alert(err?.message || "Failed to post comment. Please try again.");
+      alert(err?.response?.data?.message || err?.message || "Failed to post comment. Please try again.");
     }
   };
 
@@ -911,19 +1054,18 @@ export default function ReviewWorkspace() {
       setGeneralComposeValue("");
     } catch (err) {
       console.error("Failed to post page-level comment:", err);
-      alert(err?.message || "Failed to post comment. Please try again.");
+      alert(err?.response?.data?.message || err?.message || "Failed to post comment. Please try again.");
     }
   };
 
-  const handleStartEdit = (comment) => {
-    setEditingComment(comment);
-    setComposeValue(comment.content);
-    setSelectedBubbleId(comment.bubbleId ?? null);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingComment(null);
-    setComposeValue("");
+  const handleUpdateComment = async (commentId, content) => {
+    try {
+      const updated = await updateCommentApi(commentId, content);
+      setComments((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    } catch (err) {
+      console.error("Failed to update comment:", err);
+      alert("Failed to update comment. Please try again.");
+    }
   };
 
   const handleDeleteComment = async (commentId) => {
@@ -931,10 +1073,6 @@ export default function ReviewWorkspace() {
     try {
       await deleteCommentApi(commentId);
       setComments((prev) => prev.filter((c) => c.id !== commentId));
-      if (editingComment?.id === commentId) {
-        setEditingComment(null);
-        setComposeValue("");
-      }
     } catch (err) {
       console.error("Failed to delete comment:", err);
       alert("Failed to delete comment. Please try again.");
@@ -944,7 +1082,7 @@ export default function ReviewWorkspace() {
   const handleResolve = async (commentId) => {
     try {
       await resolveComment(commentId);
-      setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, resolved: true } : c)));
+      setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, resolved: !c.resolved } : c)));
     } catch (err) {
       console.error("Failed to resolve comment:", err);
     }
@@ -960,37 +1098,26 @@ export default function ReviewWorkspace() {
     if (deciding) return;
     const isApprove = decision === "approved";
 
-    const result = await Swal.fire({
-      title: "Are you sure?",
-      text: isApprove
-        ? "This will approve the chapter and publish it."
-        : "This will send the chapter back to the translator for changes.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#3085d6",
-      cancelButtonColor: "#d33",
-      confirmButtonText: isApprove ? "Yes, approve it!" : "Yes, request changes!",
-    });
-    if (!result.isConfirmed) return;
+    const confirmMessage = isApprove
+      ? "Are you sure you want to approve this chapter and publish it?"
+      : "Are you sure you want to request changes and send this chapter back to the translator?";
+    
+    if (!window.confirm(confirmMessage)) return;
 
     setDeciding(true);
     try {
       await submitDecision(taskId, decision);
 
-      await Swal.fire({
-        title: isApprove ? "Approved!" : "Changes requested",
-        text: isApprove
-          ? "The chapter has been approved and published."
-          : "The translator has been notified to make changes.",
-        icon: "success",
-        timer: 1500,
-        showConfirmButton: false,
-      });
+      if (isApprove) {
+        toast.success("The chapter has been approved and published!");
+      } else {
+        toast.info("Changes requested. The translator has been notified.");
+      }
 
       goBackToProjectTeams();
     } catch (err) {
       console.error("Failed to submit decision:", err);
-      Swal.fire("Error", "Failed to submit your decision. Please try again.", "error");
+      toast.error("Failed to submit your decision. Please try again.");
     } finally {
       setDeciding(false);
     }
@@ -1028,13 +1155,15 @@ export default function ReviewWorkspace() {
         onRequestChanges={() => handleDecision("changes_requested")}
       />
 
-      <div className="rvw-body">
+      <div className="rvw-body" id="secure-workspace">
         <BubbleOverlayPanel
-          scrollRef={originalRef}
+          scrollRef={(el) => {
+            originalRef.current = el;
+            setOriginalScrollRef(el);
+          }}
           onScroll={handleScroll("original")}
           frameRef={originalFrameRef}
           zoomScale={zoomScale}
-          zoomOrigin={zoomOrigin}
           isPickingZoomPoint={isPickingZoomPoint}
           onFrameMouseDown={handleFrameMouseDown}
           imageUrl={currentPage?.imageUrl}
@@ -1051,11 +1180,13 @@ export default function ReviewWorkspace() {
         <div className="rvw-divider-h" />
 
         <BubbleOverlayPanel
-          scrollRef={translatedRef}
+          scrollRef={(el) => {
+            translatedRef.current = el;
+            setTranslatedScrollRef(el);
+          }}
           onScroll={handleScroll("translated")}
           frameRef={translatedFrameRef}
           zoomScale={zoomScale}
-          zoomOrigin={zoomOrigin}
           isPickingZoomPoint={isPickingZoomPoint}
           onFrameMouseDown={handleFrameMouseDown}
           imageUrl={currentPage?.imageUrl}
@@ -1078,18 +1209,18 @@ export default function ReviewWorkspace() {
         commentsLoading={commentsLoading}
         onResolve={handleResolve}
         onDelete={handleDeleteComment}
-        onStartEdit={handleStartEdit}
+        onUpdate={handleUpdateComment}
         currentUserId={currentUserId}
         resolveBubbleLabel={resolveBubbleLabel}
         composeValue={composeValue}
         onComposeChange={setComposeValue}
         onPostComment={handlePostComment}
-        editingComment={editingComment}
-        onCancelEdit={handleCancelEdit}
         selectedBubbleId={selectedBubbleId}
         selectedBubbleIndex={selectedBubbleIndex}
         selectedBubbleTranslation={selectedBubbleTranslation}
         onClearSelectedBubble={() => setSelectedBubbleId(null)}
+        onPrevBubble={() => goToBubble("prev")}
+        onNextBubble={() => goToBubble("next")}
         bubbleAlreadyHasComment={bubbleAlreadyHasComment}
         generalComposeValue={generalComposeValue}
         onGeneralComposeChange={setGeneralComposeValue}

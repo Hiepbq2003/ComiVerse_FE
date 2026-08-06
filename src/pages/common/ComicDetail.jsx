@@ -12,6 +12,9 @@ import { toast } from 'react-toastify'
 import { getReadChaptersByComicIdApi } from '../../services/api/ReadingHistoryApi'
 import CommentSection from '../../components/common/CommentSection'
 import StarRating from '../../components/common/StarRating'
+import ReadingLanguageSelector from '../../components/common/ReadingLanguageSelector'
+import { useAuth } from '../../context/AuthContext'
+import SubscriptionPlanModal from '../../components/common/SubscriptionPlanModal'
 
 // Import assets
 import comicAction from '../../assets/comic_action.png'
@@ -38,6 +41,9 @@ function ComicDetail() {
   const [readChapterIds, setReadChapterIds] = useState([])
   const [availableLanguages, setAvailableLanguages] = useState([])
   const [selectedLanguage, setSelectedLanguage] = useState('') // '' = original (no overlay)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+
+  const { user: authUser, isLoggedIn } = useAuth()
 
   // Spam prevention and state mapping refs
   const likeTimeoutRef = useRef(null)
@@ -245,9 +251,13 @@ function ComicDetail() {
   }, [targetCommentIdFromUrl])
 
   const handleReadChapter1 = () => {
-    if (chapters && chapters.length > 0) {
+    const filteredChapters = selectedLanguage 
+      ? chapters.filter(ch => ch.translatedLanguages && ch.translatedLanguages.includes(selectedLanguage))
+      : chapters;
+      
+    if (filteredChapters && filteredChapters.length > 0) {
       // Find the first chapter (sorting by chapter number ascending)
-      const sorted = [...chapters].sort((a, b) => Number(a.chapterNumber) - Number(b.chapterNumber))
+      const sorted = [...filteredChapters].sort((a, b) => Number(a.chapterNumber) - Number(b.chapterNumber))
       const firstChap = sorted[0]
       const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(selectedLanguage)}` : ''
       navigate(`/comic/${id}/chapter/${firstChap.id}${langQuery}`)
@@ -601,32 +611,11 @@ function ComicDetail() {
             {activeTab === 'chapters' && (
               <div>
                 {availableLanguages.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                    <label htmlFor="comic-reading-language" style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Reading Language
-                    </label>
-                    <select
-                      id="comic-reading-language"
-                      value={selectedLanguage}
-                      onChange={(e) => setSelectedLanguage(e.target.value)}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.04)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '8px',
-                        padding: '6px 12px',
-                        color: 'white',
-                        fontSize: '13px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value="" style={{ color: '#111', background: '#fff' }}>Original</option>
-                      {availableLanguages.map((lang) => (
-                        <option key={lang} value={lang} style={{ color: '#111', background: '#fff' }}>
-                          {lang}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <ReadingLanguageSelector
+                    languages={availableLanguages}
+                    selectedLanguage={selectedLanguage}
+                    onChange={setSelectedLanguage}
+                  />
                 )}
 
                 <div
@@ -640,54 +629,123 @@ function ComicDetail() {
                     paddingRight: '8px'
                   }}
                 >
-                {chapters.map((ch) => {
+                {chapters
+                  .filter(ch => !selectedLanguage || (ch.translatedLanguages && ch.translatedLanguages.includes(selectedLanguage)))
+                  .map((ch) => {
                   const chNumber = ch.chapterNumber || '0'
                   const chTitle = ch.title || `Chapter ${chNumber}`
                   const chViewsStr = formatViews(ch.viewCount || 0)
                   const chDateStr = formatTimeAgo(ch.createdAt)
 
                   const isRead = readChapterIds.includes(ch.id)
+                  const isPremium = Boolean(ch.isPremium === true || ch.isPremium === 'true' || ch.isPremium === 1)
 
                   return (
                     <div
                       key={ch.id || ch.chapterNumber}
-                      className={`detail-chapter-row ${isRead ? 'read' : ''}`}
+                      className={`detail-chapter-row ${isRead ? 'read' : ''} ${isPremium ? 'premium' : ''}`}
                       style={{
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        padding: '14px 20px',
-                        background: isRead ? 'rgba(168, 85, 247, 0.04)' : 'rgba(255, 255, 255, 0.02)',
-                        border: isRead ? '1px solid rgba(168, 85, 247, 0.25)' : '1px solid rgba(255, 255, 255, 0.04)',
+                        padding: '15.5px 20px',
+                        background: isRead
+                          ? 'rgba(168, 85, 247, 0.04)'
+                          : isPremium
+                          ? 'rgba(245, 158, 11, 0.05)'
+                          : 'rgba(255, 255, 255, 0.02)',
+                        border: isRead
+                          ? '1px solid rgba(168, 85, 247, 0.25)'
+                          : isPremium
+                          ? '1px solid rgba(245, 158, 11, 0.3)'
+                          : '1px solid rgba(255, 255, 255, 0.04)',
                         borderRadius: '10px',
                         cursor: 'pointer',
                         transition: 'all 0.2s'
                       }}
                       onClick={() => {
+                        if (isPremium) {
+                          const auth = getAuth()
+                          const activeUser = authUser || auth?.user || user
+                          const loggedIn = isLoggedIn || !!(auth && auth.user && auth.token)
+
+                          if (!loggedIn || !activeUser) {
+                            toast.info('Please sign in to read this Premium chapter.')
+                            navigate('/auth?mode=signin', { state: { from: location } })
+                            return
+                          }
+
+                          const roleStr = String(activeUser.role || activeUser.roleName || activeUser.role?.roleName || '').toUpperCase()
+                          const isVip = Boolean(
+                            activeUser.premiumActive ||
+                            activeUser.isVip ||
+                            activeUser.isPremium ||
+                            roleStr === 'ADMIN' ||
+                            roleStr === 'MODERATOR'
+                          )
+
+                          if (!isVip) {
+                            setShowSubscriptionModal(true)
+                            return
+                          }
+                        }
+
                         const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(selectedLanguage)}` : ''
                         navigate(`/comic/${id}/chapter/${ch.id}${langQuery}`)
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(168, 85, 247, 0.08)'
-                        e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.4)'
+                        e.currentTarget.style.background = isPremium
+                          ? 'rgba(245, 158, 11, 0.12)'
+                          : 'rgba(168, 85, 247, 0.08)'
+                        e.currentTarget.style.borderColor = isPremium
+                          ? 'rgba(245, 158, 11, 0.55)'
+                          : 'rgba(168, 85, 247, 0.4)'
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.background = isRead ? 'rgba(168, 85, 247, 0.04)' : 'rgba(255, 255, 255, 0.02)'
-                        e.currentTarget.style.borderColor = isRead ? 'rgba(168, 85, 247, 0.25)' : 'rgba(255, 255, 255, 0.04)'
+                        e.currentTarget.style.background = isRead
+                          ? 'rgba(168, 85, 247, 0.04)'
+                          : isPremium
+                          ? 'rgba(245, 158, 11, 0.05)'
+                          : 'rgba(255, 255, 255, 0.02)'
+                        e.currentTarget.style.borderColor = isRead
+                          ? 'rgba(168, 85, 247, 0.25)'
+                          : isPremium
+                          ? '1px solid rgba(245, 158, 11, 0.3)'
+                          : 'rgba(255, 255, 255, 0.04)'
                       }}
                     >
-                      <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span className="detail-chapter-title" style={{
                           fontWeight: '600',
                           color: isRead ? '#c084fc' : 'white',
-                          display: 'block',
                           fontSize: '14px'
                         }}>
                           {chTitle}
                         </span>
-                        <span style={{ fontSize: '11px', color: '#64748b' }}>Views: {chViewsStr}</span>
+
+                        {isPremium && (
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                            color: '#ffffff',
+                            padding: '2px 9px',
+                            borderRadius: '12px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            boxShadow: '0 2px 8px rgba(245, 158, 11, 0.35)',
+                            letterSpacing: '0.3px'
+                          }}>
+                            🔒 Premium
+                          </span>
+                        )}
                       </div>
-                      <span className="detail-chapter-date" style={{ fontSize: '12px', color: '#94a3b8' }}>{chDateStr}</span>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>Views: {chViewsStr}</span>
+                        <span className="detail-chapter-date" style={{ fontSize: '12px', color: '#94a3b8' }}>{chDateStr}</span>
+                      </div>
                     </div>
                   )
                 })}
@@ -751,6 +809,10 @@ function ComicDetail() {
 
         </div>
       </div>
+      <SubscriptionPlanModal
+        open={showSubscriptionModal}
+        onClose={() => setShowSubscriptionModal(false)}
+      />
     </HomeLayout>
   )
 }

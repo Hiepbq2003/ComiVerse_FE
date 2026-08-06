@@ -38,3 +38,7 @@ export const sendChatMessageApi = ({ chatType, groupId, content }) => {
     }
     return AxiosClient.post('/chat/messages', data);
 };
+
+export const deleteChatMessageApi = (messageId) => {
+    return AxiosClient.delete(`/chat/messages/${messageId}`);
+};

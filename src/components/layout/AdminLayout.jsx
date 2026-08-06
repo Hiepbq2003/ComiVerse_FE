@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { AIPopover } from '../common/AIPopover'
+import LogoIcon from '../common/LogoIcon'
 import '../../assets/style/admin/admin.css'
 
 function AdminLayout({ children, activeNav = 'account-management' }) {
@@ -65,7 +66,8 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
 
   const navItems = [
     { id: 'statistics', label: 'Statistics Dashboard', icon: 'chart', path: '/admin/statistics' },
-    { id: 'revenue', label: 'Revenue Management', icon: 'dollar', path: '/admin/revenue' },
+    { id: 'revenue', label: 'Payment Statistics', icon: 'dollar', path: '/admin/revenue' },
+    { id: 'subscriptions', label: 'Subscriptions & Payments', icon: 'credit-card', path: '/admin/subscriptions' },
     { id: 'account-management', label: 'Account Management', icon: 'users', path: '/admin/account-management' },
     { id: 'broadcast', label: 'Broadcast', icon: 'megaphone', path: '/admin/broadcast' },
     { id: 'payout', label: 'Payout Management', icon: 'wallet', path: '/admin/payout' },
@@ -84,6 +86,12 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
         return (
           <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+        )
+      case 'credit-card':
+        return (
+          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" />
           </svg>
         )
       case 'users':
@@ -119,9 +127,10 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
     <div className="admin-layout">
       {/* Sidebar */}
       <aside className="admin-sidebar">
-        <div className="admin-sidebar-brand">
-          <h2>Admin Portal</h2>
-          <span>System Administration</span>
+        <div className="admin-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px' }}>
+          <Link to="/" style={{ display: 'block', textDecoration: 'none', marginLeft: '38px' }}>
+            <LogoIcon size={26} />
+          </Link>
         </div>
 
         <nav className="admin-sidebar-nav">
@@ -158,8 +167,10 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
         {/* Top Bar */}
         <header className="admin-topbar">
           <div className="admin-topbar-left">
-            <span>Workspace:</span>
-            <span className="workspace-label">Admin</span>
+            <span className="workspace-prefix">Workspace</span>
+            <div className="workspace-tag" style={{ marginTop: 0, fontSize: '12px', padding: '6px 12px' }}>
+              System Admin
+            </div>
           </div>
 
           <div className="admin-topbar-right">

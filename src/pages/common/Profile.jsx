@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import HomeLayout from '../../components/layout/HomeLayout'
 import AdminLayout from '../../components/layout/AdminLayout'
 import ModeratorLayout from '../../components/layout/ModeratorLayout'
@@ -6,66 +6,152 @@ import TranslatorLayout from '../../components/layout/TranslatorLayout'
 import AuthorLayout from '../../components/layout/AuthorLayout'
 import '../../assets/style/reader/profile.css'
 import { useNavigate } from 'react-router-dom'
-import { changePasswordApi, updateProfileApi, uploadAvatarApi } from '../../services/api/AuthApi'
+import CustomDatePicker from '../../components/common/CustomDatePicker'
+import {
+  changePasswordApi,
+  getMeApi,
+  getUserInteractionCountsApi,
+  updateProfileApi,
+  uploadAvatarApi,
+} from '../../services/api/AuthApi'
 import { getUserRatingsApi } from '../../services/api/RatingApi'
+import {
+  getNotificationPreferencesApi,
+  updateNotificationPreferencesApi,
+} from '../../services/api/NotificationApi'
 import { toast } from 'react-toastify'
 import { useAuth } from '../../context/AuthContext'
-import { setAuth } from '../../utils/Auth'
+import { getAuth } from '../../utils/Auth'
+import { getMyProjectTeamsApi, getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
+import { getModeratorScope } from '../../utils/moderatorScope'
+import { getMyTranslatorProfileApi, updateMyTranslatorProfileApi } from '../../services/api/TranslatorApi'
+import { uploadFileApi } from '../../services/api/UploadApi'
+import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
+const COMMON_NOTIFICATION_OPTIONS = [
+  {
+    title: 'General Notifications',
+    options: [
+      { key: 'SYSTEM_BROADCASTS', label: 'System broadcasts', description: 'Platform announcements and maintenance updates sent by administrators.' },
+      { key: 'FORUM_ACTIVITY', label: 'Discussion replies', description: 'Replies to your forum, comic, and chapter comments, with a direct link to the discussion.' },
+    ],
+  },
+]
+
+const ROLE_NOTIFICATION_OPTIONS = {
+  MODERATOR: [{ title: 'Moderator Workspace', options: [
+    { key: 'REVIEW_QUEUE', label: 'Review queue', description: 'New comic and chapter submissions waiting for moderation.' },
+  ] }],
+
+  AUTHOR: [{ title: 'Author Hub', options: [
+    { key: 'SUBMISSION_STATUS', label: 'Submission status', description: 'Approval, rejection, and change requests for your submitted work.' },
+  ] }],
+  TRANSLATOR: [{ title: 'Translator Hub', options: [
+    { key: 'PROJECT_OPPORTUNITIES', label: 'Project opportunities', description: 'New translation projects available in the project pool.' },
+    { key: 'TEAM_UPDATES', label: 'Team updates', description: 'Project claims, team decisions, and workflow updates affecting you.' },
+  ] }],
+  PROJECT_LEADER: [{ title: 'Project Leader Workspace', options: [
+    { key: 'PROJECT_OPPORTUNITIES', label: 'Project opportunities', description: 'New translation projects available in the project pool.' },
+    { key: 'TEAM_UPDATES', label: 'Team updates', description: 'Project claims, team decisions, and workflow updates affecting you.' },
+    { key: 'TEAM_JOIN_REQUESTS', label: 'Team join requests', description: 'Applications from translators who want to join your project team.' },
+  ] }],
+}
 
 // ── ROLE-SPECIFIC STATISTICS COMPONENTS ────────────────────────────
 
-function ReaderStats() {
+function ReaderStats({ stats, loading }) {
+  if (loading) {
+    return (
+      <div className="profile-stats-list">
+        <div style={{ color: 'var(--profile-text-muted)', fontSize: '13px', textAlign: 'center', padding: '8px 0' }}>
+          Loading stats...
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="profile-stats-list">
       <div className="profile-stats-row">
+        <span>Comics liked</span>
+        <span className="profile-stats-value">{(stats?.likedCount ?? 0).toLocaleString()}</span>
+      </div>
+      <div className="profile-stats-row">
         <span>Comics saved</span>
-        <span className="profile-stats-value">24</span>
+        <span className="profile-stats-value">{(stats?.savedCount ?? 0).toLocaleString()}</span>
       </div>
       <div className="profile-stats-row">
-        <span>Chapters read</span>
-        <span className="profile-stats-value">1,482</span>
+        <span>Comics read</span>
+        <span className="profile-stats-value">{(stats?.readCount ?? 0).toLocaleString()}</span>
       </div>
       <div className="profile-stats-row">
-        <span>Comments</span>
-        <span className="profile-stats-value">63</span>
+        <span>Comics rated</span>
+        <span className="profile-stats-value">{(stats?.ratingCount ?? 0).toLocaleString()}</span>
       </div>
     </div>
   )
 }
 
-function TranslatorStats() {
+function TranslatorStats({ teams = [], loading = false }) {
+  if (loading) {
+    return (
+      <div className="profile-stats-list">
+        <div className="profile-stats-row"><span>Comics translated</span><span className="profile-stats-value">...</span></div>
+        <div className="profile-stats-row"><span>Chapters translated</span><span className="profile-stats-value">...</span></div>
+        <div className="profile-stats-row"><span>Group members</span><span className="profile-stats-value">...</span></div>
+      </div>
+    )
+  }
+
+  const uniqueComics = new Set(teams.map(t => (t.comicName || t.comic_name || t.title || '').toLowerCase().trim()).filter(Boolean)).size
+  const totalChapters = teams.reduce((acc, t) => acc + (Number(t.chaptersCount || t.chapters_count) || 0), 0)
+  const totalMembers = teams.reduce((acc, t) => acc + (Number(t.membersCount || t.members_count) || 1), 0)
+
   return (
     <div className="profile-stats-list">
       <div className="profile-stats-row">
         <span>Comics translated</span>
-        <span className="profile-stats-value">12</span>
+        <span className="profile-stats-value">{uniqueComics}</span>
       </div>
       <div className="profile-stats-row">
         <span>Chapters translated</span>
-        <span className="profile-stats-value">128</span>
+        <span className="profile-stats-value">{totalChapters}</span>
       </div>
       <div className="profile-stats-row">
         <span>Group members</span>
-        <span className="profile-stats-value">6</span>
+        <span className="profile-stats-value">{totalMembers}</span>
       </div>
     </div>
   )
 }
 
-function ProjectLeaderStats() {
+function ProjectLeaderStats({ teams = [], loading = false }) {
+  if (loading) {
+    return (
+      <div className="profile-stats-list">
+        <div className="profile-stats-row"><span>Projects led</span><span className="profile-stats-value">...</span></div>
+        <div className="profile-stats-row"><span>Active teams</span><span className="profile-stats-value">...</span></div>
+        <div className="profile-stats-row"><span>Chapters delivered</span><span className="profile-stats-value">...</span></div>
+      </div>
+    )
+  }
+
+  const projectsLed = teams.length
+  const activeTeams = teams.filter(t => (t.status || 'Active').toLowerCase() === 'active').length
+  const totalChaptersDelivered = teams.reduce((acc, t) => acc + (Number(t.chaptersCount || t.chapters_count) || 0), 0)
+
   return (
     <div className="profile-stats-list">
       <div className="profile-stats-row">
         <span>Projects led</span>
-        <span className="profile-stats-value">8</span>
+        <span className="profile-stats-value">{projectsLed}</span>
       </div>
       <div className="profile-stats-row">
         <span>Active teams</span>
-        <span className="profile-stats-value">4</span>
+        <span className="profile-stats-value">{activeTeams}</span>
       </div>
       <div className="profile-stats-row">
         <span>Chapters delivered</span>
-        <span className="profile-stats-value">196</span>
+        <span className="profile-stats-value">{totalChaptersDelivered}</span>
       </div>
     </div>
   )
@@ -75,16 +161,7 @@ function AuthorStats() {
   return (
     <div className="profile-stats-list">
       <div className="profile-stats-row">
-        <span>Comics published</span>
-        <span className="profile-stats-value">3</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Total views</span>
-        <span className="profile-stats-value">254K</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Subscribers</span>
-        <span className="profile-stats-value">15.2K</span>
+        <span className="profile-stats-value" style={{ fontSize: '14px', color: 'var(--text)' }}>No statistics available yet.</span>
       </div>
     </div>
   )
@@ -95,27 +172,21 @@ function ModeratorStats({ assignedLanguages = ['Japanese', 'Korean'] }) {
     ? assignedLanguages
     : ['Japanese', 'Korean'];
 
+  const isGlobal = langs.length >= 7 || langs.some(s => ['global', 'all', 'any', '*'].includes(String(s).toLowerCase()));
+
   return (
     <div className="profile-stats-list">
       <div className="profile-stats-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '6px' }}>
         <span>Assigned Scope</span>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-          {langs.map(l => (
-            <span key={l} className="profile-lang-chip">🌐 {l}</span>
-          ))}
+          {isGlobal ? (
+            <span className="profile-lang-chip">🌐 All Languages</span>
+          ) : (
+            langs.map(l => (
+              <span key={l} className="profile-lang-chip">🌐 {l}</span>
+            ))
+          )}
         </div>
-      </div>
-      <div className="profile-stats-row">
-        <span>Reports resolved</span>
-        <span className="profile-stats-value">412</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Comics checked</span>
-        <span className="profile-stats-value">84</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Banned users</span>
-        <span className="profile-stats-value">15</span>
       </div>
     </div>
   )
@@ -125,22 +196,14 @@ function AdminStats() {
   return (
     <div className="profile-stats-list">
       <div className="profile-stats-row">
-        <span>Total users managed</span>
-        <span className="profile-stats-value">15.2K</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Global logs audited</span>
-        <span className="profile-stats-value">2,450</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Settings updated</span>
-        <span className="profile-stats-value">38</span>
+        <span>Assigned Scope</span>
+        <span className="profile-stats-value">Full System</span>
       </div>
     </div>
   )
 }
 
-// ── MAIN PROFILE PAGE COMPONENT ────────────────────────────────────
+// Main profile page
 
 function Profile({ user: userProp }) {
   const navigate = useNavigate()
@@ -150,11 +213,88 @@ function Profile({ user: userProp }) {
   const user = userProp || authUser || getAuth()?.user || null
 
   const [activeTab, setActiveTab] = useState('info') // 'info' | 'password' | 'notifications' | 'ratings'
+  const [interactionCounts, setInteractionCounts] = useState({
+    likedCount: 0,
+    savedCount: 0,
+    readCount: 0,
+    ratingCount: 0
+  })
+  const [statsLoading, setStatsLoading] = useState(true)
+
+  useEffect(() => {
+    if (!user) {
+      setStatsLoading(false)
+      return
+    }
+    const fetchInteractionCounts = async () => {
+      try {
+        setStatsLoading(true)
+        const res = await getUserInteractionCountsApi()
+        if (res) {
+          setInteractionCounts({
+            likedCount: res.likedCount ?? 0,
+            savedCount: res.savedCount ?? 0,
+            readCount: res.readCount ?? 0,
+            ratingCount: res.ratingCount ?? 0
+          })
+        }
+      } catch (err) {
+        console.error('Failed to fetch user interaction counts:', err)
+      } finally {
+        setStatsLoading(false)
+      }
+    }
+    fetchInteractionCounts()
+  }, [user?.id, user?.userId])
+
+  const [projectTeams, setProjectTeams] = useState([])
+  const [projectTeamsLoading, setProjectTeamsLoading] = useState(true)
+
+  useEffect(() => {
+    if (!user) {
+      setProjectTeamsLoading(false)
+      return
+    }
+    const fetchTeams = async () => {
+      try {
+        setProjectTeamsLoading(true)
+        const [myRes, allRes] = await Promise.all([
+          getMyProjectTeamsApi().catch(() => []),
+          getAllProjectTeamsApi().catch(() => [])
+        ])
+        const myTeams = Array.isArray(myRes) ? myRes : (myRes?.content || myRes?.data || [])
+        const allTeams = Array.isArray(allRes) ? allRes : (allRes?.content || allRes?.data || [])
+
+        const map = new Map()
+        myTeams.forEach(t => { if (t && t.id) map.set(t.id, t) })
+
+        const curName = (user.fullName || user.username || user.name || '').toLowerCase().trim()
+        const curId = user.id || user.userId
+
+        allTeams.forEach(t => {
+          if (!t || !t.id) return
+          const lName = (t.leaderName || '').toLowerCase().trim()
+          const lId = t.leaderId || t.leader_id
+          if ((lId && lId === curId) || (lName && lName === curName)) {
+            map.set(t.id, t)
+          }
+        })
+
+        setProjectTeams(Array.from(map.values()))
+      } catch (err) {
+        console.error('Failed to fetch project teams for stats:', err)
+      } finally {
+        setProjectTeamsLoading(false)
+      }
+    }
+    fetchTeams()
+  }, [user?.id, user?.userId, user?.username, user?.fullName])
+
   const [userRatings, setUserRatings] = useState([])
   const [ratingsLoading, setRatingsLoading] = useState(false)
 
   useEffect(() => {
-    if (activeTab === 'ratings') {
+    if (user && activeTab === 'ratings') {
       const fetchRatings = async () => {
         try {
           setRatingsLoading(true)
@@ -169,7 +309,7 @@ function Profile({ user: userProp }) {
       }
       fetchRatings()
     }
-  }, [activeTab])
+  }, [activeTab, user?.id, user?.userId])
 
   const parseFullName = (fullName) => {
     if (!fullName) return { first: '', last: '' };
@@ -181,71 +321,185 @@ function Profile({ user: userProp }) {
   }
 
   const initialName = parseFullName(user?.fullName || '');
+  const roleName = user?.role || 'Reader'
+  const roleUpper = roleName.toUpperCase().replace(/[\s-]+/g, '_')
 
   // Form states for Basic Info
   const [firstName, setFirstName] = useState(initialName.first || '')
   const [lastName, setLastName] = useState(initialName.last || '')
   const [username, setUsername] = useState(user?.username || '')
   const [email, setEmail] = useState(user?.email || '')
-  const [dateOfBirth, setDateOfBirth] = useState('1999-05-15')
-  const [bio, setBio] = useState('')
+  const [dateOfBirth, setDateOfBirth] = useState(user?.dateOfBirth || '')
+  const [bio, setBio] = useState(user?.bio || '')
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || '')
   const [backgroundImageUrl, setBackgroundImageUrl] = useState(user?.backgroundImageUrl || '')
-  const [assignedLanguages, setAssignedLanguages] = useState(
-    Array.isArray(user?.assignedLanguages) && user.assignedLanguages.length > 0
-      ? user.assignedLanguages
-      : ['Japanese', 'Korean']
-  )
+  const [assignedLanguages, setAssignedLanguages] = useState(() => {
+    const rawScope = getModeratorScope(user);
+    return rawScope.map(lang => lang.charAt(0).toUpperCase() + lang.slice(1));
+  })
 
   // Password change states
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [profileSaving, setProfileSaving] = useState(false)
 
-  // Notification settings state
-  const NOTIF_SETTINGS_KEY = 'comiverse_notif_settings';
-  const defaultNotifSettings = {
-    systemBroadcasts: true,
-    emailDigest: true,
-    chatFlagAlerts: true,
-    reviewQueueReminders: true,
-    projectTeamUpdates: true,
-    submissionStatusAlerts: true,
-    earningsPayoutAlerts: true,
-    commentAlerts: true,
-    jobPoolAlerts: true,
-    taskAssignments: true,
-    milestonePayouts: true,
-    securityAuditAlerts: true,
-    revenueMilestoneAlerts: true,
-    appealAlerts: true
-  };
+  // Translator Profile states
+  const [translatorProfile, setTranslatorProfile] = useState(null)
+  const [transSpecializations, setTransSpecializations] = useState([])
+  const [transExp, setTransExp] = useState(0)
+  const [transPhone, setTransPhone] = useState('')
+  const [transFacebook, setTransFacebook] = useState('')
+  const [transCvUrl, setTransCvUrl] = useState('')
+  const [transBio, setTransBio] = useState('')
+  const [isTranslator, setIsTranslator] = useState(false)
+  const [cvUploading, setCvUploading] = useState(false)
 
-  const loadNotifSettings = () => {
+  const [notifSettings, setNotifSettings] = useState({})
+  const [availableNotifKeys, setAvailableNotifKeys] = useState([])
+  const [notifLoading, setNotifLoading] = useState(true)
+  const [notifSaving, setNotifSaving] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    getMeApi()
+      .then(serverProfile => {
+        if (cancelled) return
+        const name = parseFullName(serverProfile.fullName || '')
+        setFirstName(name.first)
+        setLastName(name.last)
+        setUsername(serverProfile.username || '')
+        setEmail(serverProfile.email || '')
+        setDateOfBirth(serverProfile.dateOfBirth || '')
+        setBio(serverProfile.bio || '')
+        setAvatarUrl(serverProfile.avatarUrl || '')
+        setBackgroundImageUrl(serverProfile.backgroundImageUrl || '')
+        updateUser({ ...user, ...serverProfile })
+      })
+      .catch(err => {
+        if (!cancelled) toast.error(err.response?.data?.message || 'Failed to load the latest profile information.')
+      })
+    return () => { cancelled = true }
+  }, [user?.id, user?.userId])
+
+  // Load Translator Profile
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    getMyTranslatorProfileApi()
+      .then(profile => {
+        if (cancelled || !profile) return
+        setTranslatorProfile(profile)
+        setIsTranslator(true)
+        if (Array.isArray(profile.specializations)) {
+          setTransSpecializations(profile.specializations)
+        }
+        setTransExp(profile.experienceYears ?? 0)
+        setTransPhone(profile.phoneNumber || profile.phone || '')
+        setTransFacebook(profile.facebookUrl || profile.facebook || '')
+        setTransCvUrl(profile.cvUrl || '')
+        setTransBio(profile.bio || '')
+      })
+      .catch(() => {
+        // Not a registered translator or profile not found
+      })
+    return () => { cancelled = true }
+  }, [user?.id, user?.userId, roleUpper])
+
+  const toggleSpecialization = (lang) => {
+    setTransSpecializations(prev =>
+      prev.includes(lang) ? prev.filter(l => l !== lang) : [...prev, lang]
+    )
+  }
+
+  const handleCvUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+    if (!isPdf) {
+      toast.warn('🚫 Invalid file format! Only PDF documents (.pdf) are accepted for CV uploads.')
+      e.target.value = ''
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.warn('File size must be under 5MB.')
+      e.target.value = ''
+      return
+    }
     try {
-      const saved = localStorage.getItem(NOTIF_SETTINGS_KEY);
-      if (saved) {
-        return { ...defaultNotifSettings, ...JSON.parse(saved) };
+      setCvUploading(true)
+      const uploadResult = await uploadFileApi(file)
+      const uploadedUrl = typeof uploadResult === 'string' ? uploadResult : uploadResult?.url || uploadResult?.fileUrl || null
+      if (uploadedUrl) {
+        setTransCvUrl(uploadedUrl)
+        toast.success('CV / Resume document uploaded successfully!')
       }
-    } catch (e) {}
-    return defaultNotifSettings;
-  };
+    } catch (err) {
+      console.error('CV upload error:', err)
+      toast.error('Failed to upload CV document.')
+    } finally {
+      setCvUploading(false)
+    }
+  }
 
-  const [notifSettings, setNotifSettings] = useState(loadNotifSettings);
+  useEffect(() => {
+    if (!user) {
+      setNotifLoading(false)
+      return
+    }
+    let cancelled = false
+    setNotifLoading(true)
+    getNotificationPreferencesApi()
+      .then(response => {
+        if (cancelled) return
+        setNotifSettings(response?.preferences || {})
+        setAvailableNotifKeys(response?.availableKeys || [])
+      })
+      .catch(err => {
+        if (!cancelled) toast.error(err.response?.data?.message || 'Failed to load notification preferences.')
+      })
+      .finally(() => {
+        if (!cancelled) setNotifLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [user?.id, user?.userId, roleUpper])
 
   const handleToggleNotifSetting = (key) => {
-    setNotifSettings(prev => {
-      const updated = { ...prev, [key]: !prev[key] };
-      localStorage.setItem(NOTIF_SETTINGS_KEY, JSON.stringify(updated));
-      return updated;
-    });
+    setNotifSettings(prev => ({ ...prev, [key]: !prev[key] }))
   };
 
-  const handleSaveNotifSettings = (e) => {
-    e.preventDefault();
-    localStorage.setItem(NOTIF_SETTINGS_KEY, JSON.stringify(notifSettings));
-    toast.success('🔔 Notification preferences saved successfully!');
+  const handleSaveNotifSettings = async (e) => {
+    e.preventDefault()
+    setNotifSaving(true)
+    try {
+      const response = await updateNotificationPreferencesApi(notifSettings)
+      setNotifSettings(response?.preferences || notifSettings)
+      setAvailableNotifKeys(response?.availableKeys || availableNotifKeys)
+      toast.success('Notification preferences saved successfully!')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save notification preferences.')
+    } finally {
+      setNotifSaving(false)
+    }
   };
+
+  const buildProfilePayload = (overrides = {}) => ({
+    fullName: `${firstName.trim()} ${lastName.trim()}`.trim(),
+    avatarUrl,
+    backgroundImageUrl,
+    dateOfBirth: dateOfBirth || null,
+    bio: bio.trim() || null,
+    ...overrides,
+  })
+
+  const applySavedProfile = (savedProfile) => {
+    setDateOfBirth(savedProfile.dateOfBirth || '')
+    setBio(savedProfile.bio || '')
+    setAvatarUrl(savedProfile.avatarUrl || '')
+    setBackgroundImageUrl(savedProfile.backgroundImageUrl || '')
+    updateUser({ ...user, ...savedProfile, assignedLanguages })
+  }
 
   if (!user) {
     return (
@@ -262,26 +516,35 @@ function Profile({ user: userProp }) {
     )
   }
 
-  const roleName = user?.role || 'Reader'
-  const roleUpper = roleName.toUpperCase().replace(/[\s-]+/g, '_')
-
   const handleSaveInfo = async (e) => {
     e.preventDefault()
-    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
+    setProfileSaving(true)
     try {
-      await updateProfileApi(fullName, avatarUrl, backgroundImageUrl)
-      const updatedUser = {
-        ...user,
-        fullName,
-        avatarUrl,
-        backgroundImageUrl,
-        assignedLanguages
+      const savedProfile = await updateProfileApi(buildProfilePayload())
+      applySavedProfile(savedProfile)
+
+      // Save Translator Profile if role is TRANSLATOR or has profile
+      if (roleUpper === 'TRANSLATOR' || isTranslator) {
+        try {
+          await updateMyTranslatorProfileApi({
+            specializations: transSpecializations,
+            experiencedYears: parseInt(transExp, 10) || 0,
+            phone: transPhone.trim(),
+            facebookUrl: transFacebook.trim(),
+            cvUrl: transCvUrl,
+            bio: transBio || bio,
+          })
+        } catch (transErr) {
+          console.error('Failed to sync translator profile:', transErr)
+        }
       }
-      updateUser(updatedUser)
-      toast.success('Basic Info changes saved successfully!')
+
+      toast.success('Basic Info and Translator profile updated successfully!')
     } catch (err) {
       const errMsg = err.response?.data?.message || 'Failed to save changes.'
       toast.error(errMsg)
+    } finally {
+      setProfileSaving(false)
     }
   }
 
@@ -301,16 +564,8 @@ function Profile({ user: userProp }) {
       
       setAvatarUrl(uploadedUrl);
       
-      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-      await updateProfileApi(fullName, uploadedUrl, backgroundImageUrl);
-      
-      const updatedUser = {
-        ...user,
-        fullName,
-        avatarUrl: uploadedUrl,
-        backgroundImageUrl
-      };
-      updateUser(updatedUser);
+      const savedProfile = await updateProfileApi(buildProfilePayload({ avatarUrl: uploadedUrl }));
+      applySavedProfile(savedProfile);
       
       toast.success('Avatar uploaded successfully!');
     } catch (err) {
@@ -335,15 +590,8 @@ function Profile({ user: userProp }) {
 
       setBackgroundImageUrl(uploadedUrl)
 
-      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
-      await updateProfileApi(fullName, avatarUrl, uploadedUrl)
-
-      updateUser({
-        ...user,
-        fullName,
-        avatarUrl,
-        backgroundImageUrl: uploadedUrl
-      })
+      const savedProfile = await updateProfileApi(buildProfilePayload({ backgroundImageUrl: uploadedUrl }))
+      applySavedProfile(savedProfile)
 
       toast.success('Profile background uploaded successfully!')
     } catch (err) {
@@ -382,16 +630,15 @@ function Profile({ user: userProp }) {
       case 'AUTHOR':
         return <AuthorStats />
       case 'MODERATOR':
-      case 'STAFF':
         return <ModeratorStats assignedLanguages={assignedLanguages} />
       case 'TRANSLATOR':
-        return <TranslatorStats />
+        return <TranslatorStats teams={projectTeams} loading={projectTeamsLoading} />
       case 'PROJECT_LEADER':
-        return <ProjectLeaderStats />
+        return <ProjectLeaderStats teams={projectTeams} loading={projectTeamsLoading} />
       case 'READER':
       case 'USER':
       default:
-        return <ReaderStats />
+        return <ReaderStats stats={interactionCounts} loading={statsLoading} />
     }
   }
 
@@ -403,7 +650,6 @@ function Profile({ user: userProp }) {
       case 'AUTHOR':
         return { label: 'Author', className: 'author', icon: '✍️' }
       case 'MODERATOR':
-      case 'STAFF':
         return { label: 'Moderator', className: 'moderator', icon: '⚖️' }
       case 'TRANSLATOR':
         return { label: 'Translator', className: 'translator', icon: '🌐' }
@@ -420,8 +666,27 @@ function Profile({ user: userProp }) {
   const displayUserName = `${firstName} ${lastName}`.trim() || user.fullName || 'Minh Khoa'
   const userInitials = displayUserName.substring(0, 2).toUpperCase()
 
-  const LayoutComponent = HomeLayout
+  let LayoutComponent = HomeLayout
   const layoutProps = {}
+
+  switch (roleUpper) {
+    case 'ADMIN':
+      LayoutComponent = AdminLayout
+      break
+    case 'AUTHOR':
+      LayoutComponent = AuthorLayout
+      break
+    case 'MODERATOR':
+      LayoutComponent = ModeratorLayout
+      break
+    case 'TRANSLATOR':
+    case 'PROJECT_LEADER':
+      LayoutComponent = TranslatorLayout
+      break
+    default:
+      LayoutComponent = HomeLayout
+      break
+  }
 
   return (
     <LayoutComponent {...layoutProps}>
@@ -621,11 +886,9 @@ function Profile({ user: userProp }) {
                 {/* Date of Birth */}
                 <div className="profile-input-group">
                   <label>Date of Birth</label>
-                  <input 
-                    type="date" 
+                  <CustomDatePicker 
                     value={dateOfBirth} 
-                    onChange={(e) => setDateOfBirth(e.target.value)} 
-                    required 
+                    onChange={(val) => setDateOfBirth(val)} 
                   />
                 </div>
 
@@ -657,8 +920,125 @@ function Profile({ user: userProp }) {
                   </div>
                 )}
 
-                <button type="submit" className="profile-save-btn">
-                  Save Changes
+                {/* Translator Specific: Professional Profile & CV (Auto-attached on Team Application) */}
+                {(roleUpper === 'TRANSLATOR' || isTranslator) && (
+                  <div className="profile-translator-section">
+                    <div className="profile-translator-header">
+                      <div className="profile-translator-icon-wrap">🌐</div>
+                      <div>
+                        <h4 className="profile-translator-title">
+                          Translator Professional Profile
+                        </h4>
+                        <p className="profile-translator-subtitle">
+                          This verified info is automatically attached when you apply to Comic Translation Teams.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Language Specializations */}
+                    <div className="profile-input-group" style={{ marginBottom: '18px' }}>
+                      <label>Language Specializations</label>
+                      <div className="profile-specialization-list">
+                        {COMIC_LANGUAGE_OPTIONS.map((lang) => {
+                          const selected = transSpecializations.includes(lang)
+                          return (
+                            <button
+                              key={lang}
+                              type="button"
+                              onClick={() => toggleSpecialization(lang)}
+                              className={`profile-spec-btn ${selected ? 'selected' : ''}`}
+                            >
+                              {selected ? '✓ ' : '+ '} {lang}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {transSpecializations.length === 0 && (
+                        <p style={{ color: '#f59e0b', fontSize: '12px', marginTop: '6px', fontWeight: '500' }}>Please select at least one language specialization.</p>
+                      )}
+                    </div>
+
+                    {/* Experience & Contact Grid */}
+                    <div className="profile-form-grid" style={{ marginBottom: '18px' }}>
+                      <div className="profile-input-group">
+                        <label>Years of Translation Experience</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="50"
+                          value={transExp}
+                          onChange={(e) => setTransExp(e.target.value)}
+                          placeholder="e.g. 2"
+                        />
+                      </div>
+
+                      <div className="profile-input-group">
+                        <label>Phone Number / Direct Contact</label>
+                        <input
+                          type="text"
+                          value={transPhone}
+                          onChange={(e) => setTransPhone(e.target.value)}
+                          placeholder="e.g. 0904034333"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="profile-input-group" style={{ marginBottom: '18px' }}>
+                      <label>Social / Portfolio URL (Facebook / Discord / LinkedIn)</label>
+                      <input
+                        type="url"
+                        value={transFacebook}
+                        onChange={(e) => setTransFacebook(e.target.value)}
+                        placeholder="https://facebook.com/... or discord handle"
+                      />
+                    </div>
+
+                    {/* CV / Resume Document */}
+                    <div className="profile-input-group" style={{ marginBottom: '8px' }}>
+                      <label>Attached CV / Portfolio Resume (PDF)</label>
+                      <div className="profile-cv-box">
+                        <div className="profile-cv-doc-info">
+                          <span className="profile-cv-icon">📄</span>
+                          <div>
+                            {transCvUrl ? (
+                              <>
+                                <a
+                                  href={transCvUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="profile-cv-link"
+                                >
+                                  View Uploaded CV Document (PDF) ↗
+                                </a>
+                                <p className="profile-cv-badge">✓ Active and ready to auto-attach for team applications</p>
+                              </>
+                            ) : (
+                              <span className="profile-cv-empty-text">No CV attached yet. Upload a PDF for 1-click team applications.</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <label
+                          htmlFor="profile-cv-file-input"
+                          className="profile-cv-upload-btn"
+                        >
+                          {cvUploading ? 'Uploading...' : transCvUrl ? 'Replace CV File' : 'Upload CV (PDF)'}
+                        </label>
+                        <input
+                          id="profile-cv-file-input"
+                          type="file"
+                          accept="application/pdf,.pdf"
+                          style={{ display: 'none' }}
+                          onChange={handleCvUpload}
+                          disabled={cvUploading}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <button type="submit" className="profile-save-btn" disabled={profileSaving}>
+                  {profileSaving ? 'Saving...' : 'Save Changes'}
                 </button>
               </form>
             </div>
@@ -705,264 +1085,50 @@ function Profile({ user: userProp }) {
                 </button>
               </form>
             </div>
-          ) : (
+          ) : activeTab === 'notifications' ? (
             <div className="fade-in">
               <h2 className="profile-content-title">Notification Settings</h2>
               <p className="profile-input-desc" style={{ marginBottom: '24px', fontSize: '13px' }}>
-                Customize which workspace alerts, email digests, and role notifications you receive.
+                Choose which in-app workflow notifications you receive for your current role.
               </p>
 
-              <form onSubmit={handleSaveNotifSettings}>
-                {/* 1. MODERATOR / STAFF */}
-                {(roleUpper === 'MODERATOR' || roleUpper === 'STAFF') && (
-                  <div className="profile-notif-group">
-                    <h3 className="profile-notif-group-title">🛡️ Moderator Workspace Alerts</h3>
-                    
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>🚨 High-Priority Chat Flag Alerts</strong>
-                        <p>Receive instant notifications when severe profanity or spam links are detected in live chat.</p>
+              {notifLoading ? (
+                <p className="profile-input-desc">Loading notification preferences...</p>
+              ) : (
+                <form onSubmit={handleSaveNotifSettings}>
+                  {[...(ROLE_NOTIFICATION_OPTIONS[roleUpper] || []), ...COMMON_NOTIFICATION_OPTIONS].map(section => {
+                    const options = section.options.filter(option => availableNotifKeys.includes(option.key))
+                    if (options.length === 0) return null
+                    return (
+                      <div className="profile-notif-group" key={section.title}>
+                        <h3 className="profile-notif-group-title">{section.title}</h3>
+                        {options.map(option => (
+                          <div className="profile-notif-item" key={option.key}>
+                            <div>
+                              <strong>{option.label}</strong>
+                              <p>{option.description}</p>
+                            </div>
+                            <label className="profile-switch">
+                              <input
+                                type="checkbox"
+                                checked={notifSettings[option.key] !== false}
+                                onChange={() => handleToggleNotifSetting(option.key)}
+                              />
+                              <span className="profile-slider" />
+                            </label>
+                          </div>
+                        ))}
                       </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.chatFlagAlerts}
-                          onChange={() => handleToggleNotifSetting('chatFlagAlerts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
+                    )
+                  })}
 
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>📋 Comic Review Queue Reminders</strong>
-                        <p>Alert when pending comic or chapter submissions exceed queue threshold.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.reviewQueueReminders}
-                          onChange={() => handleToggleNotifSetting('reviewQueueReminders')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>💬 Project Team & Group Updates</strong>
-                        <p>Notifications when translation teams submit chapters or request project reviews.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.projectTeamUpdates}
-                          onChange={() => handleToggleNotifSetting('projectTeamUpdates')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-                  </div>
-                )}
-
-                {/* 2. AUTHOR */}
-                {roleUpper === 'AUTHOR' && (
-                  <div className="profile-notif-group">
-                    <h3 className="profile-notif-group-title">✍️ Author Hub Alerts</h3>
-                    
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>📚 Submission Approval & Rejection Status</strong>
-                        <p>Get notified immediately when your submitted comics or chapters are reviewed by Moderators.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.submissionStatusAlerts}
-                          onChange={() => handleToggleNotifSetting('submissionStatusAlerts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>💰 Royalty Earnings & Coin Payout Confirmations</strong>
-                        <p>Receive alerts for monthly comic revenue payouts and coin tips from readers.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.earningsPayoutAlerts}
-                          onChange={() => handleToggleNotifSetting('earningsPayoutAlerts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>💬 New Reader Comments on Comics</strong>
-                        <p>Notify when readers post new comments or reviews on your published comics.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.commentAlerts}
-                          onChange={() => handleToggleNotifSetting('commentAlerts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. TRANSLATOR / PROJECT LEADER */}
-                {(roleUpper === 'TRANSLATOR' || roleUpper === 'PROJECT_LEADER') && (
-                  <div className="profile-notif-group">
-                    <h3 className="profile-notif-group-title">🌐 Translation Workspace Alerts</h3>
-                    
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>🎯 Job Pool & New Project Openings</strong>
-                        <p>Alert when new unclaimed translation projects matching your language scope become available.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.jobPoolAlerts}
-                          onChange={() => handleToggleNotifSetting('jobPoolAlerts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>👥 Team Task Assignments & Mentions</strong>
-                        <p>Notifications for new chapter assignments and team workspace chat mentions.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.taskAssignments}
-                          onChange={() => handleToggleNotifSetting('taskAssignments')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>💰 Milestone Payout Confirmations</strong>
-                        <p>Alert when completed translation milestones are approved and paid out.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.milestonePayouts}
-                          onChange={() => handleToggleNotifSetting('milestonePayouts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-                  </div>
-                )}
-
-                {/* 4. ADMIN */}
-                {roleUpper === 'ADMIN' && (
-                  <div className="profile-notif-group">
-                    <h3 className="profile-notif-group-title">🛡️ System Administration Alerts</h3>
-                    
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>🔒 Security Audit & Access Alerts</strong>
-                        <p>Instant notifications for critical system log events, admin role grants, and security alerts.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.securityAuditAlerts}
-                          onChange={() => handleToggleNotifSetting('securityAuditAlerts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>📊 Revenue Milestones & Payout Requests</strong>
-                        <p>Alert when platform revenue milestones are reached or large payouts require approval.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.revenueMilestoneAlerts}
-                          onChange={() => handleToggleNotifSetting('revenueMilestoneAlerts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-
-                    <div className="profile-notif-item">
-                      <div>
-                        <strong>👤 Account Appeals & Escalations</strong>
-                        <p>Notifications when banned users submit account unban appeals.</p>
-                      </div>
-                      <label className="profile-switch">
-                        <input
-                          type="checkbox"
-                          checked={!!notifSettings.appealAlerts}
-                          onChange={() => handleToggleNotifSetting('appealAlerts')}
-                        />
-                        <span className="profile-slider" />
-                      </label>
-                    </div>
-                  </div>
-                )}
-
-                {/* 5. GENERAL & EMAIL PREFERENCES */}
-                <div className="profile-notif-group">
-                  <h3 className="profile-notif-group-title">📢 General Platform & Email Preferences</h3>
-                  
-                  <div className="profile-notif-item">
-                    <div>
-                      <strong>📢 System Broadcasts & Platform News</strong>
-                      <p>Receive global platform updates, feature announcements, and maintenance news.</p>
-                    </div>
-                    <label className="profile-switch">
-                      <input
-                        type="checkbox"
-                        checked={!!notifSettings.systemBroadcasts}
-                        onChange={() => handleToggleNotifSetting('systemBroadcasts')}
-                      />
-                      <span className="profile-slider" />
-                    </label>
-                  </div>
-
-                  <div className="profile-notif-item">
-                    <div>
-                      <strong>📧 Daily / Weekly Activity Email Digest</strong>
-                      <p>Send a summary digest of activity and notifications directly to your email address.</p>
-                    </div>
-                    <label className="profile-switch">
-                      <input
-                        type="checkbox"
-                        checked={!!notifSettings.emailDigest}
-                        onChange={() => handleToggleNotifSetting('emailDigest')}
-                      />
-                      <span className="profile-slider" />
-                    </label>
-                  </div>
-                </div>
-
-                <button type="submit" className="profile-save-btn">
-                  Save Notification Preferences
-                </button>
-              </form>
+                  <button type="submit" className="profile-save-btn" disabled={notifSaving}>
+                    {notifSaving ? 'Saving...' : 'Save Notification Preferences'}
+                  </button>
+                </form>
+              )}
             </div>
-          )
-          } : activeTab === 'ratings' ? (
+          ) : activeTab === 'ratings' ? (
             <div className="fade-in">
               <h2 className="profile-content-title">My Rated Comics</h2>
               <p className="profile-input-desc" style={{ marginBottom: '24px', fontSize: '13px' }}>
@@ -1026,7 +1192,7 @@ function Profile({ user: userProp }) {
                 </div>
               )}
             </div>
-          ) : null
+          ) : null}
         </div>
       </div>
       </div>

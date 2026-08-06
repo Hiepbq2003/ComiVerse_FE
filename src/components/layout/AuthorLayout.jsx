@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { AIPopover } from '../common/AIPopover'
+import LogoIcon from '../common/LogoIcon'
 import '../../assets/style/author/author.css'
 
 function AuthorLayout({ children }) {
@@ -39,6 +40,8 @@ function AuthorLayout({ children }) {
       if (action.unread) await markAsRead(action.id)
       if (action.actionUrl?.startsWith('/') && !action.actionUrl.startsWith('//')) {
         navigate(action.actionUrl)
+      } else if (action.triggerAppeal) {
+        navigate('/author/comics?appeal=true')
       }
     }
   }
@@ -61,7 +64,8 @@ function AuthorLayout({ children }) {
   const navItems = [
     { id: 'overview', label: 'Overview', path: '/author/overview', icon: 'overview' },
     { id: 'comics', label: 'My Comics', path: '/author/comics', icon: 'comics' },
-    { id: 'earnings', label: 'Earnings & Revenue', path: '/author/earnings', icon: 'earnings' },
+    { id: 'revenue', label: 'Revenue', path: '/author/revenue', icon: 'revenue' },
+    { id: 'payout', label: 'Payout', path: '/author/payout', icon: 'payout' },
     { id: 'settings', label: 'Settings', path: '/author/settings', icon: 'settings' },
   ]
 
@@ -83,11 +87,18 @@ function AuthorLayout({ children }) {
             <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
           </svg>
         )
-      case 'earnings':
+      case 'revenue':
         return (
           <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="1" x2="12" y2="23" />
             <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+        )
+      case 'payout':
+        return (
+          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="5" width="20" height="14" rx="2" />
+            <path d="M2 10h20" /><path d="M16 15h2" />
           </svg>
         )
       case 'settings':
@@ -106,9 +117,10 @@ function AuthorLayout({ children }) {
     <div className="author-layout">
       {/* Sidebar */}
       <aside className="author-sidebar">
-        <div className="author-sidebar-brand">
-          <h2>Author Hub</h2>
-          <span>CREATIVE STUDIO</span>
+        <div className="author-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px' }}>
+          <Link to="/" style={{ display: 'block', textDecoration: 'none', marginLeft: '38px' }}>
+            <LogoIcon size={26} />
+          </Link>
         </div>
 
         <nav className="author-sidebar-nav">
@@ -139,8 +151,10 @@ function AuthorLayout({ children }) {
         {/* Topbar */}
         <header className="author-topbar">
           <div className="author-topbar-left">
-            <span>Workspace:</span>
-            <span className="workspace-label">Author</span>
+            <span className="workspace-prefix">Workspace</span>
+            <div className="workspace-tag" style={{ marginTop: 0, fontSize: '12px', padding: '6px 12px' }}>
+              Author Studio
+            </div>
           </div>
 
           <div className="author-topbar-right">

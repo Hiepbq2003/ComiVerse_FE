@@ -13,23 +13,8 @@ import '../../assets/style/common/ai-popover.css'
 import '../../assets/style/common/modern-pagination.css'
 import '../../assets/style/common/skeleton-loader.css'
 import '../../assets/style/admin/account-management.css'
-
-// Fallback mock data when API is not available
-const MOCK_ACCOUNTS = [
-  { id: 1, userId: 'USR-0001', fullName: 'John Doe', username: 'johndoe', email: 'john@gmail.com', role: 'Reader', status: 'Active', createdDate: '2023-01-15', lastActive: 'Today' },
-  { id: 2, userId: 'USR-0002', fullName: 'Spirit Group', username: 'spiritgroup', email: 'spirit@gmail.com', role: 'Translator', status: 'Active', createdDate: '2023-03-02', lastActive: '2 days ago' },
-  { id: 3, userId: 'USR-0003', fullName: 'Author X', username: 'authorx', email: 'authorx@gmail.com', role: 'Author', status: 'Active', createdDate: '2023-04-18', lastActive: 'Yesterday' },
-  { id: 4, userId: 'USR-0004', fullName: 'Mod Y', username: 'mody', email: 'mody@gmail.com', role: 'Moderator', status: 'Active', createdDate: '2023-05-10', lastActive: 'Today' },
-  { id: 13, userId: 'USR-0013', fullName: 'Project Lead', username: 'projectlead', email: 'lead@comiverse.com', role: 'Project Leader', status: 'Active', createdDate: '2023-05-21', lastActive: 'Today' },
-  { id: 5, userId: 'USR-0005', fullName: 'Sarah Chen', username: 'sarahchen', email: 'sarah@gmail.com', role: 'Reader', status: 'Active', createdDate: '2023-06-01', lastActive: '3 hours ago' },
-  { id: 6, userId: 'USR-0006', fullName: 'Dragon Scans', username: 'dragonscans', email: 'dragon@group.com', role: 'Translator', status: 'Banned', createdDate: '2023-07-22', lastActive: '1 month ago' },
-  { id: 7, userId: 'USR-0007', fullName: 'NoviceWriter', username: 'novicewriter', email: 'novice@mail.com', role: 'Author', status: 'Active', createdDate: '2023-08-05', lastActive: '5 days ago' },
-  { id: 8, userId: 'USR-0008', fullName: 'ContentMod', username: 'contentmod', email: 'cmod@site.com', role: 'Moderator', status: 'Active', createdDate: '2023-09-14', lastActive: 'Today' },
-  { id: 9, userId: 'USR-0009', fullName: 'MangaFan99', username: 'mangafan99', email: 'manga99@mail.com', role: 'Reader', status: 'Active', createdDate: '2023-10-03', lastActive: '1 hour ago' },
-  { id: 10, userId: 'USR-0010', fullName: 'TranslateHQ', username: 'translatehq', email: 'thq@group.com', role: 'Translator', status: 'Active', createdDate: '2023-11-11', lastActive: '4 days ago' },
-  { id: 11, userId: 'USR-0011', fullName: 'ProArtist', username: 'proartist', email: 'artist@mail.com', role: 'Author', status: 'Banned', createdDate: '2023-12-20', lastActive: '2 weeks ago' },
-  { id: 12, userId: 'USR-0012', fullName: 'SuperAdmin', username: 'superadmin', email: 'admin@comiverse.com', role: 'Admin', status: 'Active', createdDate: '2023-01-01', lastActive: 'Today' },
-]
+import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
+import { isScopeGlobal } from '../../utils/moderatorScope'
 
 const ITEMS_PER_PAGE = 10
 const ROLE_OPTIONS = [
@@ -65,12 +50,18 @@ const formatDate = (dateVal) => {
   }
 }
 
+const getDisplayLanguages = (acc) => {
+  if (Array.isArray(acc?.assignedLanguages) && acc.assignedLanguages.length > 0) {
+    return acc.assignedLanguages
+  }
+  return []
+}
+
 function AccountManagement() {
   const { theme } = useTheme()
   // Data states
   const [accounts, setAccounts] = useState([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isMockData, setIsMockData] = useState(false)
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('')
@@ -95,7 +86,7 @@ function AccountManagement() {
   const [confirmAction, setConfirmAction] = useState(null) // { type: 'ban'|'unban'|'reset-pw', account }
 
   // MODERATOR SPECIALIZATION LANGUAGES
-  const MODERATOR_LANGUAGES = ['Japanese', 'Korean', 'Chinese', 'English', 'Vietnamese', 'Spanish', 'French', 'German']
+  const MODERATOR_LANGUAGES = COMIC_LANGUAGE_OPTIONS
 
   // Edit user states
   const [showEditModal, setShowEditModal] = useState(false)
@@ -163,47 +154,18 @@ function AccountManagement() {
           lastActive: lActive ? formatDate(lActive) : 'Today',
           assignedLanguages: Array.isArray(acc.assignedLanguages) && acc.assignedLanguages.length > 0 
             ? acc.assignedLanguages 
-            : (normalizedRole.toLowerCase().includes('moderator') ? ['Japanese', 'Korean'] : [])
+            : (normalizedRole.toLowerCase().includes('moderator') ? getDisplayLanguages(acc) : [])
         }
       })
       setAccounts(normalized)
       setTotalPages(metadata.totalPages || 1)
       setTotalElements(metadata.totalElements || normalized.length)
-      setIsMockData(false)
     } catch (err) {
-      console.warn('API not available, using mock data:', err.message)
-      // Fallback local search/filter & slicing for Mock Data
-      const filteredMock = MOCK_ACCOUNTS.filter((account) => {
-        const name = (account.fullName || '').toLowerCase()
-        const email = (account.email || '').toLowerCase()
-        const uid = (account.userId || '').toLowerCase()
-        const uname = (account.username || '').toLowerCase()
-        const search = debouncedSearchTerm.toLowerCase()
-
-        const matchesSearch =
-          debouncedSearchTerm === '' || name.includes(search) || email.includes(search) || uid.includes(search) || uname.includes(search)
-
-        const matchesRole =
-          roleFilter === 'All Roles' ||
-          normalizeRoleValue(account.role) === normalizeRoleValue(roleFilter) ||
-          (roleFilter.toLowerCase() === 'moderator' && (account.role || '').toLowerCase() === 'staff') ||
-          (roleFilter.toLowerCase() === 'reader' && (account.role || '').toLowerCase() === 'user')
-
-        const matchesStatus =
-          statusFilter === 'All Status' || (account.status || '').toLowerCase() === statusFilter.toLowerCase()
-
-        return matchesSearch && matchesRole && matchesStatus
-      })
-
-      setTotalPages(Math.max(1, Math.ceil(filteredMock.length / ITEMS_PER_PAGE)))
-      setTotalElements(filteredMock.length)
-
-      const paginatedMock = filteredMock.slice(
-        (currentPage - 1) * ITEMS_PER_PAGE,
-        currentPage * ITEMS_PER_PAGE
-      )
-      setAccounts(paginatedMock)
-      setIsMockData(true)
+      console.error('Failed to fetch accounts:', err.message)
+      setAccounts([])
+      setTotalPages(1)
+      setTotalElements(0)
+      toast.error('Could not load accounts.')
     } finally {
       setIsLoading(false)
     }
@@ -248,6 +210,9 @@ function AccountManagement() {
         : [...current, lang]
       return { ...prev, assignedLanguages: updated }
     })
+    if (staffFormErrors.assignedLanguages) {
+      setStaffFormErrors(prev => ({ ...prev, assignedLanguages: null }))
+    }
   }
 
   const toggleEditLanguage = (lang) => {
@@ -258,6 +223,9 @@ function AccountManagement() {
         : [...current, lang]
       return { ...prev, assignedLanguages: updated }
     })
+    if (editFormErrors.assignedLanguages) {
+      setEditFormErrors(prev => ({ ...prev, assignedLanguages: null }))
+    }
   }
 
   const validateStaffForm = () => {
@@ -272,6 +240,10 @@ function AccountManagement() {
 
     if (!staffForm.email.trim()) errors.email = 'Email is required'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(staffForm.email)) errors.email = 'Invalid email format'
+
+    if (normalizeRoleValue(staffForm.role) === 'MODERATOR' && (!staffForm.assignedLanguages || staffForm.assignedLanguages.length === 0)) {
+      errors.assignedLanguages = 'Please select at least one moderation language.'
+    }
 
     setStaffFormErrors(errors)
     if (Object.keys(errors).length > 0) {
@@ -348,9 +320,7 @@ function AccountManagement() {
     setEditForm({
       fullName: account.fullName,
       role: normalizeRoleValue(account.role || 'READER'),
-      assignedLanguages: Array.isArray(account.assignedLanguages) && account.assignedLanguages.length > 0
-        ? account.assignedLanguages
-        : ['Japanese', 'Korean']
+      assignedLanguages: getDisplayLanguages(account)
     })
     setEditFormErrors({})
     setModalError(null)
@@ -377,6 +347,9 @@ function AccountManagement() {
     if (!editForm.fullName || !editForm.fullName.trim()) {
       errors.fullName = 'Full Name is required'
     }
+    if (normalizeRoleValue(editForm.role) === 'MODERATOR' && (!editForm.assignedLanguages || editForm.assignedLanguages.length === 0)) {
+      errors.assignedLanguages = 'Please select at least one moderation language.'
+    }
     if (Object.keys(errors).length > 0) {
       setEditFormErrors(errors)
       setModalError('Validation failed. Please correct the errors below.')
@@ -391,7 +364,7 @@ function AccountManagement() {
         fullName: editForm.fullName.trim(),
         role: editForm.role
       }
-      if (editForm.role === 'MODERATOR') {
+      if (normalizeRoleValue(editForm.role) === 'MODERATOR') {
         updatePayload.assignedLanguages = editForm.assignedLanguages || []
       }
 
@@ -405,7 +378,7 @@ function AccountManagement() {
                 ...a,
                 fullName: updatedUser.fullName || editForm.fullName,
                 role: formatRoleLabel(updatedUser.role || editForm.role),
-                assignedLanguages: editForm.role === 'MODERATOR' ? (editForm.assignedLanguages || editForm.assignedLanguages) : []
+                assignedLanguages: normalizeRoleValue(editForm.role) === 'MODERATOR' ? (editForm.assignedLanguages || []) : []
               }
             : a
         )
@@ -503,12 +476,6 @@ function AccountManagement() {
   return (
     <AdminLayout activeNav="account-management">
       <div className="admin-account-management-screen">
-      {/* Mock data indicator */}
-      {isMockData && !isLoading && (
-        <div className="admin-inline-alert admin-inline-alert--info">
-          ⓘ API is unavailable — displaying demo data. Connect the backend to see real accounts.
-        </div>
-      )}
 
       {/* Page Header */}
       <div className="admin-page-header">
@@ -516,7 +483,7 @@ function AccountManagement() {
           <h1>Account Management</h1>
           <p>{totalElements} account{totalElements !== 1 ? 's' : ''} found</p>
         </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div className="admin-account-management-actions">
           <AnimatedButton
             variant={3}
             label="+ Create User Account"
@@ -604,7 +571,11 @@ function AccountManagement() {
                     </span>
                     {normalizeRoleValue(account.role) === 'MODERATOR' && (
                       <div className="admin-lang-scope-tag" style={{ marginTop: '4px', fontSize: '11px', color: '#c084fc', fontWeight: '600' }}>
-                        🌐 {Array.isArray(account.assignedLanguages) && account.assignedLanguages.length > 0 ? account.assignedLanguages.join(', ') : 'Japanese, Korean'}
+                        🌐 {(() => {
+                          const langs = getDisplayLanguages(account);
+                          const isGlobal = isScopeGlobal(langs);
+                          return isGlobal ? 'All Languages' : langs.join(', ');
+                        })()}
                       </div>
                     )}
                   </td>
@@ -794,6 +765,38 @@ function AccountManagement() {
                     🌐 Assigned Moderation Languages <span className="required">*</span>
                   </label>
                   <div className="admin-lang-checkbox-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                    {(() => {
+                      const isAllSelected = (staffForm.assignedLanguages || []).length >= MODERATOR_LANGUAGES.length;
+                      return (
+                        <button
+                          type="button"
+                          className={`admin-lang-chip ${isAllSelected ? 'active' : ''}`}
+                          onClick={() => {
+                            if (isAllSelected) {
+                              setStaffForm(prev => ({ ...prev, assignedLanguages: [] }));
+                            } else {
+                              setStaffForm(prev => ({ ...prev, assignedLanguages: [...MODERATOR_LANGUAGES] }));
+                              if (staffFormErrors.assignedLanguages) {
+                                setStaffFormErrors(prev => ({ ...prev, assignedLanguages: null }));
+                              }
+                            }
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '20px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            border: isAllSelected ? '1.5px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.15)',
+                            background: isAllSelected ? 'rgba(168, 85, 247, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                            color: isAllSelected ? '#ffffff' : '#cbd5e1',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {isAllSelected ? '✓ All / Global' : 'All / Global'}
+                        </button>
+                      );
+                    })()}
                     {MODERATOR_LANGUAGES.map((lang) => {
                       const isChecked = (staffForm.assignedLanguages || []).includes(lang)
                       return (
@@ -819,6 +822,9 @@ function AccountManagement() {
                       )
                     })}
                   </div>
+                  {staffFormErrors.assignedLanguages && (
+                    <div className="admin-form-error" style={{ marginTop: '8px' }}>{staffFormErrors.assignedLanguages}</div>
+                  )}
                 </div>
               )}
 
@@ -882,7 +888,7 @@ function AccountManagement() {
                 <input
                   className="admin-form-input"
                   type="text"
-                  value={editingAccount.username}
+                  value={editingAccount?.username || ''}
                   disabled
                   style={{ opacity: 0.7, cursor: 'not-allowed' }}
                 />
@@ -893,7 +899,7 @@ function AccountManagement() {
                 <input
                   className="admin-form-input"
                   type="email"
-                  value={editingAccount.email}
+                  value={editingAccount?.email || ''}
                   disabled
                   style={{ opacity: 0.7, cursor: 'not-allowed' }}
                 />
@@ -937,6 +943,38 @@ function AccountManagement() {
                     🌐 Assigned Moderation Languages <span className="required">*</span>
                   </label>
                   <div className="admin-lang-checkbox-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                    {(() => {
+                      const isAllSelected = (editForm.assignedLanguages || []).length >= MODERATOR_LANGUAGES.length;
+                      return (
+                        <button
+                          type="button"
+                          className={`admin-lang-chip ${isAllSelected ? 'active' : ''}`}
+                          onClick={() => {
+                            if (isAllSelected) {
+                              setEditForm(prev => ({ ...prev, assignedLanguages: [] }));
+                            } else {
+                              setEditForm(prev => ({ ...prev, assignedLanguages: [...MODERATOR_LANGUAGES] }));
+                              if (editFormErrors.assignedLanguages) {
+                                setEditFormErrors(prev => ({ ...prev, assignedLanguages: null }));
+                              }
+                            }
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '20px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            border: isAllSelected ? '1.5px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.15)',
+                            background: isAllSelected ? 'rgba(168, 85, 247, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                            color: isAllSelected ? '#ffffff' : '#cbd5e1',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {isAllSelected ? '✓ All / Global' : 'All / Global'}
+                        </button>
+                      );
+                    })()}
                     {MODERATOR_LANGUAGES.map((lang) => {
                       const isChecked = (editForm.assignedLanguages || []).includes(lang)
                       return (
@@ -962,6 +1000,9 @@ function AccountManagement() {
                       )
                     })}
                   </div>
+                  {editFormErrors.assignedLanguages && (
+                    <div className="admin-form-error" style={{ marginTop: '8px' }}>{editFormErrors.assignedLanguages}</div>
+                  )}
                 </div>
               )}
             </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import '../../assets/style/reader/home.css'
 import { useAuth } from '../../context/AuthContext'
@@ -7,6 +7,11 @@ import { useNotification } from '../../context/NotificationContext'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { getComicsPageApi } from '../../services/api/ComicApi'
 import ChatWidget from '../chat/ChatWidget'
+import LogoIcon from '../common/LogoIcon'
+import SubscriptionPlanModal from '../common/SubscriptionPlanModal'
+import { Crown, Download } from 'lucide-react'
+
+const COMIVERSE_APK_URL = 'https://pub-a7dc2066b937452cb00d7263b29ee9e5.r2.dev/comiverse-latest.apk'
 
 function HomeLayout({ children }) {
   const navigate = useNavigate()
@@ -20,7 +25,10 @@ function HomeLayout({ children }) {
   const notificationRef = useRef(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showSignoutConfirm, setShowSignoutConfirm] = useState(false)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const userMenuRef = useRef(null)
+  const closeSubscriptionModal = useCallback(() => setShowSubscriptionModal(false), [])
+  const isReader = isLoggedIn && (user?.role || '').toUpperCase() === 'READER'
 
   // Click outside listener for notifications
   useEffect(() => {
@@ -188,13 +196,8 @@ function HomeLayout({ children }) {
       <header className={`home-header ${!isHeaderVisible ? 'hidden' : ''}`}>
         <div className="home-header-left">
           {/* Logo */}
-          <Link to="/" className="home-brand">
-            <div className="home-brand-logo-icon">
-              <svg viewBox="0 0 24 24" width="20" height="20">
-                <path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2zm-4 8H7v-2h6v2z" />
-              </svg>
-            </div>
-            <span className="home-brand-logo-text">ComiVerse</span>
+          <Link to="/" className="home-brand" style={{ display: 'flex', alignItems: 'center' }}>
+            <LogoIcon size={30} />
           </Link>
 
           {/* Nav Links */}
@@ -303,6 +306,18 @@ function HomeLayout({ children }) {
 
         {/* Auth Section */}
         <div className="home-header-right">
+          {isReader && (
+            <button
+              type="button"
+              className="home-premium-button"
+              onClick={() => setShowSubscriptionModal(true)}
+              aria-label="Open subscription plans"
+            >
+              <Crown size={16} />
+              <span>{user?.premiumActive ? 'Manage Premium' : 'Premium'}</span>
+            </button>
+          )}
+
           {/* Theme Toggle Button */}
           <button
             onClick={toggleTheme}
@@ -546,6 +561,8 @@ function HomeLayout({ children }) {
         {children}
       </main>
 
+      <SubscriptionPlanModal open={showSubscriptionModal} onClose={closeSubscriptionModal} />
+
       {showSignoutConfirm && (
         <div className="home-signout-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="home-signout-title">
           <div className="home-signout-modal">
@@ -571,13 +588,8 @@ function HomeLayout({ children }) {
         <div className="footer-inner">
           <div className="footer-top-row">
             <div className="footer-brand-col">
-              <Link to="/" className="home-brand">
-                <div className="home-brand-logo-icon">
-                  <svg viewBox="0 0 24 24" width="20" height="20">
-                    <path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2zm-4 8H7v-2h6v2z" />
-                  </svg>
-                </div>
-                <span className="home-brand-logo-text">ComiVerse</span>
+              <Link to="/" className="home-brand" style={{ display: 'flex', alignItems: 'center' }}>
+                <LogoIcon size={32} />
               </Link>
               <p className="footer-brand-tagline">
                 ComiVerse is a premium platform for comic creators and readers, bringing you over 1,000+ top-quality webcomics, manga, and manhwa.
@@ -612,6 +624,27 @@ function HomeLayout({ children }) {
                 <Link to="/terms" className="footer-link">Terms of Service</Link>
                 <Link to="/contact" className="footer-link">Contact Support</Link>
               </div>
+            </div>
+
+            <div className="footer-download-col">
+              <span className="footer-col-title">Get the app</span>
+              <a
+                className="footer-apk-badge"
+                href={COMIVERSE_APK_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                download="comiverse-latest.apk"
+                aria-label="Download the latest ComiVerse APK for Android"
+              >
+                <span className="footer-apk-icon" aria-hidden="true">
+                  <Download size={21} strokeWidth={2.2} />
+                </span>
+                <span className="footer-apk-copy">
+                  <span className="footer-apk-eyebrow">Download for</span>
+                  <strong>Android APK</strong>
+                </span>
+              </a>
+              <span className="footer-apk-note">Latest mobile release</span>
             </div>
           </div>
 

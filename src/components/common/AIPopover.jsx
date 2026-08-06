@@ -15,7 +15,22 @@ export const AIPopover = ({
   const [searchQuery, setSearchQuery] = useState(''); // for command palette
   const [formInput, setFormInput] = useState(''); // for form
   const [menuOpen, setMenuOpen] = useState(null); // for nested menu hover/click
+  const [visibleNotifs, setVisibleNotifs] = useState(20); // for notif pagination
+  const [appealedComics, setAppealedComics] = useState([]); // track appealed comics
   const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    if (variant !== 'notif') return;
+    const loadAppeals = () => {
+      try {
+        const existing = JSON.parse(localStorage.getItem('appealedComics') || '[]');
+        setAppealedComics(existing);
+      } catch (e) {}
+    };
+    loadAppeals();
+    window.addEventListener('appealStateChanged', loadAppeals);
+    return () => window.removeEventListener('appealStateChanged', loadAppeals);
+  }, [variant]);
 
   // Close popover when clicking outside
   useEffect(() => {
@@ -23,6 +38,7 @@ export const AIPopover = ({
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
         setIsOpen(false);
         setActivePanel('list');
+        setVisibleNotifs(20);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -33,6 +49,7 @@ export const AIPopover = ({
     setIsOpen(!isOpen);
     if (isOpen) {
       setActivePanel('list');
+      setVisibleNotifs(20);
     }
   };
 
@@ -368,8 +385,7 @@ export const AIPopover = ({
               {data.unreadCount > 0 && (
                 <button 
                   type="button" 
-                  className="pop-btn pop-btn--ghost" 
-                  style={{ fontSize: '11px', padding: '2px 6px', height: 'auto', minHeight: 'auto', border: '1px solid var(--border)' }}
+                  className="pop-btn pop-btn--mark-read" 
                   onClick={(e) => { e.stopPropagation(); onAction('markAllRead'); }}
                 >
                   Mark all as read
@@ -383,29 +399,80 @@ export const AIPopover = ({
                   <p style={{ margin: 0, fontSize: '12px' }}>You have no notifications</p>
                 </div>
               ) : (
-                notifications.map((n) => (
+                <>
+                {notifications.slice(0, visibleNotifs).map((n) => {
+                  const notifText = `${n.title || ''} ${n.message || n.msg || ''} ${n.type || ''}`.toLowerCase();
+                  const isApproved = /approved|accepted|published successfully/i.test(notifText);
+                  const isModeratorEdit = /updated by moderator|comic metadata updated|moderator edited/i.test(notifText);
+                  const isRejected = /rejected|changes requested|revision requested|disapproved/i.test(notifText);
+                  const isAppealQuery = Boolean(n.actionUrl && (n.actionUrl.includes('appeal=true') || n.actionUrl.includes('appealComicId=')));
+                  const isAppealable = (isAppealQuery || isModeratorEdit || isRejected) && !isApproved;
+
+                  return (
+                    <div 
+                      key={n.id} 
+                      className={`pop-notif__item ${n.unread ? 'pop-notif__item--unread' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const hasNavigation = Boolean(n.actionUrl && n.actionUrl.startsWith('/') && !n.actionUrl.startsWith('//'));
+                        if (hasNavigation) {
+                          setIsOpen(false);
+                        }
+                        onAction(n);
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <span className="pop-notif__dot"></span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p className="pop-notif__msg" style={{ margin: '0 0 4px' }}>
+                          {n.title ? <><strong>{n.title}</strong>: {n.message}</> : n.msg}
+                        </p>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px', gap: '8px' }}>
+                          <p className="pop-notif__time" style={{ margin: 0 }}>{n.time}</p>
+                          {isAppealable && (
+                            <button
+                              type="button"
+                              className="pop-notif__appeal-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsOpen(false);
+                                if (onAction) {
+                                  onAction({ ...n, triggerAppeal: true });
+                                }
+                              }}
+                              title="Appeal this moderation decision"
+                            >
+                              ⚖️ Appeal
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {notifications.length > visibleNotifs && (
                   <div 
-                    key={n.id} 
-                    className={`pop-notif__item ${n.unread ? 'pop-notif__item--unread' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      const hasNavigation = Boolean(n.actionUrl && n.actionUrl.startsWith('/') && !n.actionUrl.startsWith('//'));
-                      if (hasNavigation) {
-                        setIsOpen(false);
-                      }
-                      onAction(n);
+                      setVisibleNotifs(prev => prev + 20);
                     }}
-                    style={{ cursor: 'pointer' }}
+                    style={{
+                      padding: '12px',
+                      textAlign: 'center',
+                      borderTop: '1px solid rgba(148, 163, 184, 0.2)',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: '#3b82f6',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(148, 163, 184, 0.08)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
-                    <span className="pop-notif__dot"></span>
-                    <div>
-                      <p className="pop-notif__msg" style={{ margin: '0 0 4px' }}>
-                        {n.title ? <><strong>{n.title}</strong>: {n.message}</> : n.msg}
-                      </p>
-                      <p className="pop-notif__time" style={{ margin: 0 }}>{n.time}</p>
-                    </div>
+                    View more ({notifications.length - visibleNotifs} remaining)
                   </div>
-                ))
+                )}
+                </>
               )}
             </div>
           </>

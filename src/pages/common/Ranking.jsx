@@ -4,11 +4,6 @@ import HomeLayout from '../../components/layout/HomeLayout'
 import { getComicLeaderboardApi } from '../../services/api/ComicApi'
 import axios from 'axios'
 
-// Import assets
-import comicAction from '../../assets/comic_action.png'
-import comicAdventure from '../../assets/comic_adventure.png'
-import comicScifi from '../../assets/comic_scifi.png'
-
 
 function Ranking() {
   const navigate = useNavigate()
@@ -89,12 +84,7 @@ function Ranking() {
   )
 
   const getCoverImage = (comic) => {
-    if (comic.cover && typeof comic.cover === 'string') {
-      return comic.cover
-    }
-    const fallbacks = [comicAction, comicAdventure, comicScifi]
-    const idHash = typeof comic.id === 'string' ? comic.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : comic.id || 0
-    return fallbacks[idHash % 3] || comicAction
+    return comic.cover || comic.coverImage || comic.coverImageUrl || '';
   }
 
   const formatViews = (count) => {
@@ -219,24 +209,27 @@ function Ranking() {
                   <div
                     className="hot-featured-card"
                     onClick={() => navigate(`/comic/${featuredComic.id}`)}
-                    style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
                   >
-                    <div className="hot-featured-cover" style={{ flexGrow: 1, height: 'auto', minHeight: '340px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)' }}>
+                    <div className="hot-featured-cover">
                       {isEmoji(getCoverImage(featuredComic)) ? (
-                        <div style={{ fontSize: '10rem', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at center, rgba(168, 85, 247, 0.2) 0%, rgba(13, 9, 25, 0.98) 100%)' }}>{getCoverImage(featuredComic)}</div>
+                        <div style={{ fontSize: '8rem', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at center, rgba(168, 85, 247, 0.2) 0%, rgba(13, 9, 25, 0.98) 100%)' }}>
+                          {getCoverImage(featuredComic)}
+                        </div>
                       ) : (
-                        <img src={getCoverImage(featuredComic)} alt={featuredComic.title} style={{ height: '100%', width: '100%', objectFit: 'cover' }} />
+                        <img src={getCoverImage(featuredComic)} alt={featuredComic.title} />
                       )}
                       <div className="hot-rank-pill-featured">
                         <span>🏆</span> RANK #01
                       </div>
                     </div>
-                    <div className="hot-featured-info" style={{ background: 'linear-gradient(to bottom, #0d0919, #05030a)' }}>
-                      <h3 className="hot-featured-title" style={{ fontSize: '24px' }}>{featuredComic.title}</h3>
-                      <p className="hot-featured-tagline" style={{ fontSize: '14px', margin: '8px 0 20px' }}>{featuredComic.tagline || featuredComic.summary || 'An epic fantasy series on ComiVerse.'}</p>
+                    <div className="hot-featured-info">
+                      <div>
+                        <h3 className="hot-featured-title" title={featuredComic.title}>{featuredComic.title}</h3>
+                        <p className="hot-featured-tagline">{featuredComic.tagline || featuredComic.summary || 'An epic fantasy series on ComiVerse.'}</p>
+                      </div>
                       <div className="hot-featured-meta">
-                        <span style={{ color: '#ec4899', fontWeight: '700', fontSize: '14px' }}>{getPrimaryGenre(featuredComic)}</span>
-                        <span style={{ fontSize: '14px' }}>⭐ {getRating(featuredComic)}  •  👁️ {getViews(featuredComic)}  •  📖 {getChapters(featuredComic)} Ch.</span>
+                        <span style={{ color: '#ec4899', fontWeight: '700' }}>{getPrimaryGenre(featuredComic)}</span>
+                        <span>⭐ {getRating(featuredComic)} • 👁️ {getViews(featuredComic)} • 📖 {getChapters(featuredComic)} Ch.</span>
                       </div>
                     </div>
                   </div>
@@ -253,34 +246,33 @@ function Ranking() {
                       key={comic.id}
                       className="ranking-item"
                       onClick={() => navigate(`/comic/${comic.id}`)}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1, minWidth: 0 }}>
-                        <span className={`rank-number top-${rankNum}`} style={{ fontSize: '26px', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0 }}>
+                        <span className={`rank-number top-${rankNum}`}>
                           {formattedRankNum}
                         </span>
-                        <div className="rank-item-thumb" style={{ width: '52px', height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', overflow: 'hidden', flexShrink: 0 }}>
+                        <div className="rank-item-thumb">
                           {isEmoji(getCoverImage(comic)) ? (
-                            <div style={{ fontSize: '1.8rem' }}>{getCoverImage(comic)}</div>
+                            <div style={{ fontSize: '1.5rem' }}>{getCoverImage(comic)}</div>
                           ) : (
-                            <img src={getCoverImage(comic)} alt={comic.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <img src={getCoverImage(comic)} alt={comic.title} />
                           )}
                         </div>
                         <div className="rank-item-details">
-                          <h4 className="rank-item-title" style={{ fontSize: '16px' }}>{comic.title}</h4>
-                          <span className="rank-item-genre" style={{ fontSize: '12px' }}>{getPrimaryGenre(comic)}</span>
+                          <h4 className="rank-item-title" title={comic.title}>{comic.title}</h4>
+                          <span className="rank-item-genre">{getPrimaryGenre(comic)}</span>
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '30px', flexShrink: 0 }}>
-                        <div className="rank-item-meta" style={{ display: 'flex', gap: '20px', fontSize: '13px' }}>
-                          <div className="rank-item-meta-item" style={{ color: '#fbbf24' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexShrink: 0 }}>
+                        <div className="rank-item-meta">
+                          <div className="rank-item-meta-item" style={{ color: '#fbbf24', fontWeight: '600' }}>
                             <span>⭐</span> {getRating(comic)}
                           </div>
-                          <div className="rank-item-meta-item">
+                          <div className="rank-item-meta-item" style={{ color: '#cbd5e1' }}>
                             <span>👁️</span> {getViews(comic)}
                           </div>
-                          <div className="rank-item-meta-item">
+                          <div className="rank-item-meta-item" style={{ color: '#cbd5e1' }}>
                             <span>📖</span> {getChapters(comic)} Ch.
                           </div>
                         </div>

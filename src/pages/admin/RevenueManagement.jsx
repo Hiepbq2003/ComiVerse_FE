@@ -1,314 +1,500 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import {
+  AlertCircle,
+  ArrowRight,
+  BadgeCheck,
+  CircleDollarSign,
+  CreditCard,
+  Download,
+  RefreshCw,
+  RotateCcw,
+  Users
+} from 'lucide-react'
 import AdminLayout from '../../components/layout/AdminLayout'
-import { getPremiumPlansApi } from '../../services/api/PlanApi'
-import { getAllAccountsApi } from '../../services/api/AccountApi'
-import { getAllComicsApi } from '../../services/api/ComicApi'
-import { SkeletonLoader } from '../../components/common/SkeletonLoader'
-import { AnimatedButton } from '../../components/common/AnimatedButton'
+import {
+  getAdminPaymentLogsApi,
+  getAdminPaymentStatisticsApi
+} from '../../services/api/SubscriptionApi'
 import { exportToCsv } from '../../utils/exportToCsv'
 import '../../assets/style/admin/revenue.css'
 
-function RevenueIcon({ type }) {
-  const props = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }
-  switch (type) {
-    case 'dollar': return <svg {...props}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-    case 'trending': return <svg {...props}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-    case 'payout': return <svg {...props}><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-    case 'premium': return <svg {...props}><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-    default: return null
+const RANGE_OPTIONS = [
+  { value: 7, label: 'Last 7 days' },
+  { value: 30, label: 'Last 30 days' },
+  { value: 90, label: 'Last 90 days' },
+  { value: 365, label: 'Last 12 months' }
+]
+
+const STATUS_META = {
+  PAID: { label: 'Paid', color: '#10b981' },
+  PENDING: { label: 'Pending', color: '#f59e0b' },
+  FAILED: { label: 'Failed', color: '#ef4444' },
+  EXPIRED: { label: 'Expired', color: '#f97316' },
+  REFUNDED: { label: 'Refunded', color: '#3b82f6' }
+}
+
+const EMPTY_SUMMARY = {
+  totalTransactions: 0,
+  paidPayments: 0,
+  uniquePayingUsers: 0,
+  pendingPayments: 0,
+  failedPayments: 0,
+  expiredPayments: 0,
+  refundedPayments: 0,
+  grossRevenue: 0,
+  averageOrderValue: 0,
+  successRate: 0,
+  activeSubscriptions: 0,
+  revenueChangePercent: null,
+  paidPaymentsChangePercent: null
+}
+
+function formatMoney(value, currency = 'VND') {
+  const amount = Number(value || 0)
+  try {
+    return new Intl.NumberFormat(currency === 'VND' ? 'vi-VN' : 'en-US', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: currency === 'VND' ? 0 : 2
+    }).format(amount)
+  } catch {
+    return `${amount.toLocaleString()} ${currency}`
   }
 }
 
-function RevenueManagement() {
-  const [loading, setLoading] = useState(true)
-  const [revenueData, setRevenueData] = useState({
-    plans: [],
-    totalRevenue: 0,
-    netProfit: 0,
-    creatorPayouts: 0,
-    premiumSubscribers: 0,
-    recentTransactions: []
+function formatCompactMoney(value, currency = 'VND') {
+  const amount = Number(value || 0)
+  try {
+    return new Intl.NumberFormat(currency === 'VND' ? 'vi-VN' : 'en-US', {
+      notation: 'compact',
+      maximumFractionDigits: 1
+    }).format(amount)
+  } catch {
+    return amount.toLocaleString()
+  }
+}
+
+function formatDate(value) {
+  if (!value) return '—'
+  return new Date(value).toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
   })
+}
 
-  const fetchRevenueData = useCallback(async () => {
+function formatShortDate(value) {
+  if (!value) return ''
+  const [year, month, day] = String(value).split('-').map(Number)
+  return new Date(year, month - 1, day).toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short'
+  })
+}
+
+function formatPercent(value) {
+  return `${Number(value || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}%`
+}
+
+function deltaMeta(value, noun) {
+  if (value === null || value === undefined) {
+    return { text: 'No previous-period baseline', tone: 'neutral' }
+  }
+  const amount = Number(value)
+  if (amount === 0) return { text: `No change in ${noun}`, tone: 'neutral' }
+  return {
+    text: `${amount > 0 ? '+' : ''}${amount.toFixed(1)}% vs previous period`,
+    tone: amount > 0 ? 'positive' : 'negative'
+  }
+}
+
+function RevenueChart({ series, currency }) {
+  const width = 920
+  const height = 300
+  const padding = { left: 74, right: 22, top: 24, bottom: 48 }
+  const chartWidth = width - padding.left - padding.right
+  const chartHeight = height - padding.top - padding.bottom
+  const values = series.map((point) => Number(point.revenue || 0))
+  const maximum = Math.max(1, ...values)
+  const baseline = padding.top + chartHeight
+  const denominator = Math.max(series.length - 1, 1)
+
+  const coordinates = series.map((point, index) => ({
+    ...point,
+    x: padding.left + (index / denominator) * chartWidth,
+    y: padding.top + (1 - Number(point.revenue || 0) / maximum) * chartHeight
+  }))
+  const linePath = coordinates.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
+  const areaPath = coordinates.length
+    ? `M ${coordinates[0].x} ${baseline} ${coordinates.map((point) => `L ${point.x} ${point.y}`).join(' ')} L ${coordinates[coordinates.length - 1].x} ${baseline} Z`
+    : ''
+  const labelStep = Math.max(1, Math.ceil(series.length / 6))
+
+  return (
+    <div className="payment-revenue-chart" role="img" aria-label="Paid revenue trend">
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <linearGradient id="paymentRevenueGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#a855f7" stopOpacity="0.32" />
+            <stop offset="100%" stopColor="#a855f7" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+          const y = padding.top + (1 - ratio) * chartHeight
+          return (
+            <g key={ratio}>
+              <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} className="payment-chart-grid" />
+              <text x={padding.left - 12} y={y + 4} textAnchor="end" className="payment-chart-axis-label">
+                {formatCompactMoney(maximum * ratio, currency)}
+              </text>
+            </g>
+          )
+        })}
+
+        {areaPath && <path d={areaPath} fill="url(#paymentRevenueGradient)" />}
+        {linePath && <path d={linePath} className="payment-chart-line" />}
+
+        {coordinates.length <= 90 && coordinates.map((point) => (
+          <circle key={point.date} cx={point.x} cy={point.y} r="3.5" className="payment-chart-point">
+            <title>{formatShortDate(point.date)}: {formatMoney(point.revenue, currency)} · {point.paidPayments || 0} paid</title>
+          </circle>
+        ))}
+
+        {coordinates.map((point, index) => {
+          const visible = index === 0 || index === coordinates.length - 1 || index % labelStep === 0
+          if (!visible) return null
+          return (
+            <text key={`label-${point.date}`} x={point.x} y={height - 14} textAnchor="middle" className="payment-chart-axis-label">
+              {formatShortDate(point.date)}
+            </text>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
+function RevenueManagement() {
+  const [days, setDays] = useState(30)
+  const [currency, setCurrency] = useState('')
+  const [statistics, setStatistics] = useState(null)
+  const [recentPayments, setRecentPayments] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const loadStatistics = useCallback(async () => {
     setLoading(true)
-    try {
-      const results = await Promise.allSettled([
-        getPremiumPlansApi(),
-        getAllAccountsApi({ page: 1, size: 100 }),
-        getAllComicsApi()
-      ])
+    setError('')
 
-      const plansRes = results[0].status === 'fulfilled' ? results[0].value : null
-      const accountsRes = results[1].status === 'fulfilled' ? results[1].value : null
-      const comicsRes = results[2].status === 'fulfilled' ? results[2].value : null
+    const params = { days, zoneId: 'Asia/Ho_Chi_Minh' }
+    if (currency) params.currency = currency
 
-      // Plans processing
-      const plansList = Array.isArray(plansRes)
-        ? plansRes
-        : (Array.isArray(plansRes?.data) ? plansRes.data : [
-            { id: 1, planType: 'MONTHLY', name: 'Premium Monthly', price: 49000, durationMonths: 1, active: true },
-            { id: 2, planType: 'YEARLY', name: 'Premium Yearly', price: 390000, durationMonths: 12, active: true }
-          ])
+    const [statisticsResult, logsResult] = await Promise.allSettled([
+      getAdminPaymentStatisticsApi(params),
+      getAdminPaymentLogsApi({ page: 0, size: 6 })
+    ])
 
-      // Accounts & Subscribers calculation
-      const accountsList = Array.isArray(accountsRes)
-        ? accountsRes
-        : (Array.isArray(accountsRes?.data) ? accountsRes.data : [])
-
-      const totalUsers = accountsRes?.metadata?.totalElements || accountsList.length
-      const estimatedSubscribers = Math.max(Math.floor(totalUsers * 0.15), 1)
-
-      // Calculate total monthly revenue
-      const monthlyPlan = plansList.find(p => p.planType === 'MONTHLY') || { price: 49000 }
-      const totalRev = estimatedSubscribers * (monthlyPlan.price || 49000)
-      const creatorPayout = Math.floor(totalRev * 0.35)
-      const netProf = totalRev - creatorPayout
-
-      // Generate transaction audit log based on real accounts
-      const transactions = accountsList.slice(0, 6).map((acc, i) => {
-        const isSubscription = i % 2 === 0
-        return {
-          date: acc.createdDate || 'Today',
-          type: isSubscription ? `Premium Subscription — ${acc.fullName || acc.username}` : `Creator Royalty Payout — ${acc.fullName || acc.username}`,
-          amount: isSubscription ? `+ ${(49000).toLocaleString('en-US')}đ` : `- ${(1500000).toLocaleString('en-US')}đ`,
-          positive: isSubscription,
-          status: 'Success'
-        }
-      })
-
-      setRevenueData({
-        plans: plansList,
-        totalRevenue: totalRev,
-        netProfit: netProf,
-        creatorPayouts: creatorPayout,
-        premiumSubscribers: estimatedSubscribers,
-        recentTransactions: transactions
-      })
-    } catch (err) {
-      console.error('Failed to load revenue data from API:', err)
-    } finally {
+    if (statisticsResult.status === 'rejected') {
+      const requestError = statisticsResult.reason
+      setError(requestError?.response?.data?.message || requestError?.message || 'Unable to load payment statistics.')
       setLoading(false)
+      return
     }
-  }, [])
+
+    setStatistics(statisticsResult.value)
+    setRecentPayments(
+      logsResult.status === 'fulfilled' && Array.isArray(logsResult.value?.content)
+        ? logsResult.value.content
+        : []
+    )
+    setLoading(false)
+  }, [currency, days])
 
   useEffect(() => {
-    fetchRevenueData()
-  }, [fetchRevenueData])
+    loadStatistics()
+  }, [loadStatistics])
 
-  const revenueCards = [
-    { label: 'Estimated Monthly Revenue', value: `${revenueData.totalRevenue.toLocaleString('en-US')} đ`, change: 'Based on active plans', sub: 'Gross revenue', icon: 'dollar', color: 'purple' },
-    { label: 'Net Platform Profit', value: `${revenueData.netProfit.toLocaleString('en-US')} đ`, change: '65% net margin', sub: 'After payouts', icon: 'trending', color: 'green' },
-    { label: 'Creator & Team Payout Pool', value: `${revenueData.creatorPayouts.toLocaleString('en-US')} đ`, change: '35% royalty pool', sub: 'Reserved payout', icon: 'payout', color: 'blue' },
-    { label: 'Premium Subscribers', value: revenueData.premiumSubscribers.toLocaleString('en-US'), change: 'Active memberships', sub: 'Monetized accounts', icon: 'premium', color: 'orange' }
-  ]
+  const summary = statistics?.summary || EMPTY_SUMMARY
+  const selectedCurrency = statistics?.period?.currency || currency || 'VND'
+  const dailySeries = Array.isArray(statistics?.dailySeries) ? statistics.dailySeries : []
+  const statusBreakdown = Array.isArray(statistics?.statusBreakdown) ? statistics.statusBreakdown : []
+  const planBreakdown = Array.isArray(statistics?.planBreakdown) ? statistics.planBreakdown : []
+  const currencies = Array.isArray(statistics?.availableCurrencies) && statistics.availableCurrencies.length
+    ? statistics.availableCurrencies
+    : [selectedCurrency]
 
-  // Donut breakdown calculation
-  const donutR = 80
-  const donutCirc = 2 * Math.PI * donutR
-  const breakdown = [
-    { label: 'Monthly Subscriptions', pct: 65, color: '#a855f7' },
-    { label: 'Yearly Subscriptions', pct: 25, color: '#ec4899' },
-    { label: 'Creator Royalties Pool', pct: 10, color: '#10b981' }
-  ]
-  let donutOffset = 0
+  const revenueDelta = deltaMeta(summary.revenueChangePercent, 'revenue')
+  const paymentsDelta = deltaMeta(summary.paidPaymentsChangePercent, 'paid payments')
+
+  const cards = useMemo(() => [
+    {
+      label: 'Collected revenue',
+      value: formatMoney(summary.grossRevenue, selectedCurrency),
+      detail: revenueDelta.text,
+      tone: revenueDelta.tone,
+      icon: CircleDollarSign,
+      color: 'purple'
+    },
+    {
+      label: 'Paid payments',
+      value: Number(summary.paidPayments || 0).toLocaleString('en-US'),
+      detail: paymentsDelta.text,
+      tone: paymentsDelta.tone,
+      icon: BadgeCheck,
+      color: 'green'
+    },
+    {
+      label: 'Payment success rate',
+      value: formatPercent(summary.successRate),
+      detail: 'Pending attempts are excluded',
+      tone: 'neutral',
+      icon: CreditCard,
+      color: 'blue'
+    },
+    {
+      label: 'Active Premium',
+      value: Number(summary.activeSubscriptions || 0).toLocaleString('en-US'),
+      detail: 'Active and trialing subscriptions',
+      tone: 'neutral',
+      icon: Users,
+      color: 'orange'
+    }
+  ], [paymentsDelta, revenueDelta, selectedCurrency, summary])
 
   const handleExport = () => {
-    const headers = ['Financial Metric / Transaction', 'Value / Type', 'Status / Detail']
+    const period = statistics?.period
     const rows = [
-      ['Estimated Gross Revenue', `${revenueData.totalRevenue} đ`, 'Gross platform subscription revenue'],
-      ['Net Platform Profit', `${revenueData.netProfit} đ`, '65% Net margin'],
-      ['Creator & Team Payout Pool', `${revenueData.creatorPayouts} đ`, '35% Royalty allocation pool'],
-      ['Active Premium Subscribers', revenueData.premiumSubscribers, 'Monetized accounts'],
-      ...revenueData.plans.map(p => [`Plan: ${p.name || p.planType}`, `${p.price} đ`, `Duration: ${p.durationMonths || 1} month(s)`]),
-      ...revenueData.recentTransactions.map(t => [t.date, t.type, `${t.amount} (${t.status})`])
+      ['Summary', 'Collected revenue', summary.grossRevenue, summary.paidPayments, '', selectedCurrency],
+      ['Summary', 'Average order value', summary.averageOrderValue, '', '', selectedCurrency],
+      ['Summary', 'Success rate', '', summary.totalTransactions, summary.failedPayments, formatPercent(summary.successRate)],
+      ...dailySeries.map((point) => [
+        'Daily',
+        point.date,
+        point.revenue,
+        point.paidPayments,
+        Number(point.failedPayments || 0) + Number(point.expiredPayments || 0),
+        selectedCurrency
+      ])
     ]
-    exportToCsv('ComiVerse_Financial_Revenue_Report', headers, rows)
+    exportToCsv(
+      `ComiVerse_Payment_Statistics_${period?.from || ''}_${period?.to || ''}`,
+      ['Section', 'Date / Metric', 'Revenue', 'Paid payments', 'Failed / expired', 'Currency / Value'],
+      rows
+    )
   }
 
   return (
     <AdminLayout activeNav="revenue">
-      <div className="admin-page-header">
-        <div className="admin-page-header-info">
-          <h1>Revenue Management</h1>
-          <p className="stats-subtitle-green">Financial overview & subscription monetization settings</p>
-        </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <AnimatedButton
-            variant={3}
-            label={loading ? 'Refreshing...' : '🔄 Refresh Financials'}
-            tooltip="Reload API"
-            onClick={fetchRevenueData}
-            disabled={loading}
-          />
-          <AnimatedButton
-            variant={3}
-            label="📥 Export Report"
-            tooltip="Export CSV"
-            className="btn-excel"
-            onClick={handleExport}
-            disabled={loading}
-          />
-        </div>
-      </div>
-
-      {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <SkeletonLoader count={4} height="100px" />
-          <SkeletonLoader count={2} height="240px" />
-        </div>
-      ) : (
-        <>
-          {/* ── Stat Cards Grid ──────────────────────────── */}
-          <div className="stats-cards-grid stats-cards-grid--4">
-            {revenueCards.map((card, i) => (
-              <div key={i} className={`stats-card stats-card--${card.color}`}>
-                <div className="stats-card-top">
-                  <span className="stats-card-label">{card.label}</span>
-                  <span className={`stats-card-icon stats-card-icon--${card.color}`}>
-                    <RevenueIcon type={card.icon} />
-                  </span>
-                </div>
-                <div className="stats-card-value">{card.value}</div>
-                <div className="stats-card-change stats-card-change--up">
-                  {card.change} <span className="stats-card-sub">({card.sub})</span>
-                </div>
-              </div>
-            ))}
+      <div className="admin-revenue-screen">
+        <div className="admin-page-header payment-statistics-header">
+          <div className="admin-page-header-info">
+            <h1>Payment Statistics</h1>
+            <p>Verified Stripe payment performance and Premium subscription health</p>
           </div>
-
-          {/* ── Active Subscription Plans Configurator ────── */}
-          <div className="stats-chart-card">
-            <div className="stats-chart-header">
-              <div>
-                <h2 className="stats-chart-title">Active Premium Subscription Plans</h2>
-                <p className="stats-chart-subtitle">Configured plan pricing & duration from backend database</p>
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginTop: '16px' }}>
-              {revenueData.plans.map((plan, idx) => (
-                <div
-                  key={plan.id || idx}
-                  style={{
-                    background: 'var(--admin-card-bg)',
-                    border: '1px solid var(--admin-border)',
-                    borderRadius: 'var(--admin-radius-md)',
-                    padding: '20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justify: 'space-between'
-                  }}
-                >
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                      <span style={{ fontSize: '16px', fontWeight: '700', color: 'var(--admin-text-primary)' }}>
-                        {plan.name || plan.planType}
-                      </span>
-                      <span className="status-badge active">
-                        {plan.active !== false ? 'Active' : 'Inactive'}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '24px', fontWeight: '800', color: '#c084fc', marginBottom: '8px' }}>
-                      {(plan.price || 0).toLocaleString('en-US')} đ
-                      <span style={{ fontSize: '13px', color: 'var(--admin-text-muted)', fontWeight: '400' }}> / {plan.durationMonths || 1} mo</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ── Financial Breakdown Donut & Revenue Stream ────── */}
-          <div className="revenue-charts-row">
-            <div className="stats-chart-card stats-chart-card--wide">
-              <div className="stats-chart-header">
-                <div>
-                  <h2 className="stats-chart-title">Revenue Distribution Stream</h2>
-                  <p className="stats-chart-subtitle">Proportion of gross platform revenue allocations</p>
-                </div>
-              </div>
-              <div className="revenue-donut-legend" style={{ marginTop: '24px' }}>
-                {breakdown.map((seg) => (
-                  <div key={seg.label} className="revenue-donut-legend-item" style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span className="legend-dot" style={{ background: seg.color }} />
-                      <span className="revenue-donut-legend-label" style={{ fontSize: '14px' }}>{seg.label}</span>
-                    </div>
-                    <span className="revenue-donut-legend-pct" style={{ fontWeight: '700', color: seg.color }}>{seg.pct}%</span>
-                  </div>
+          <div className="payment-statistics-actions">
+            <label className="payment-filter-control">
+              <span>Period</span>
+              <select value={days} onChange={(event) => setDays(Number(event.target.value))} disabled={loading}>
+                {RANGE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
-              </div>
+              </select>
+            </label>
+            <label className="payment-filter-control">
+              <span>Currency</span>
+              <select
+                value={selectedCurrency}
+                onChange={(event) => setCurrency(event.target.value)}
+                disabled={loading || currencies.length <= 1}
+              >
+                {currencies.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+            <button type="button" className="admin-btn payment-action-btn" onClick={loadStatistics} disabled={loading}>
+              <RefreshCw size={16} className={loading ? 'spin' : ''} /> Refresh
+            </button>
+            <button type="button" className="admin-btn admin-btn--primary payment-action-btn" onClick={handleExport} disabled={loading || !statistics}>
+              <Download size={16} /> Export CSV
+            </button>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="payment-statistics-loading" aria-label="Loading payment statistics">
+            <div className="payment-loading-kpi-grid">
+              {[0, 1, 2, 3].map((item) => <div key={item} className="payment-loading-block payment-loading-kpi" />)}
+            </div>
+            <div className="payment-loading-block payment-loading-chart" />
+            <div className="payment-loading-panel-grid">
+              <div className="payment-loading-block payment-loading-panel" />
+              <div className="payment-loading-block payment-loading-panel" />
+            </div>
+          </div>
+        ) : error ? (
+          <section className="payment-statistics-error">
+            <AlertCircle size={30} />
+            <div>
+              <h2>Payment statistics are unavailable</h2>
+              <p>{error}</p>
+            </div>
+            <button type="button" className="admin-btn admin-btn--primary" onClick={loadStatistics}>Try again</button>
+          </section>
+        ) : (
+          <>
+            <div className="payment-period-banner">
+              <span>
+                Reporting <strong>{formatShortDate(statistics?.period?.from)} – {formatShortDate(statistics?.period?.to)}</strong>
+              </span>
+              <span>Time zone: {statistics?.period?.zoneId || 'Asia/Ho_Chi_Minh'}</span>
+              <span>Generated: {formatDate(statistics?.generatedAt)}</span>
             </div>
 
-            {/* Donut Chart Visual */}
-            <div className="stats-chart-card stats-chart-card--narrow">
-              <div className="stats-chart-header">
+            <div className="payment-kpi-grid">
+              {cards.map((card) => {
+                const Icon = card.icon
+                return (
+                  <article key={card.label} className={`payment-kpi-card payment-kpi-card--${card.color}`}>
+                    <div className="payment-kpi-top">
+                      <span>{card.label}</span>
+                      <span className="payment-kpi-icon"><Icon size={18} /></span>
+                    </div>
+                    <strong>{card.value}</strong>
+                    <small className={`payment-kpi-delta payment-kpi-delta--${card.tone}`}>{card.detail}</small>
+                  </article>
+                )
+              })}
+            </div>
+
+            <div className="payment-insight-strip">
+              <div><span>Average order</span><strong>{formatMoney(summary.averageOrderValue, selectedCurrency)}</strong></div>
+              <div><span>Unique paying readers</span><strong>{Number(summary.uniquePayingUsers || 0).toLocaleString('en-US')}</strong></div>
+              <div><span>Pending payments</span><strong>{Number(summary.pendingPayments || 0).toLocaleString('en-US')}</strong></div>
+              <div><span>Failed / expired</span><strong>{Number(summary.failedPayments || 0) + Number(summary.expiredPayments || 0)}</strong></div>
+            </div>
+
+            <section className="payment-panel payment-trend-panel">
+              <div className="payment-panel-header">
                 <div>
-                  <h2 className="stats-chart-title">Revenue Breakdown</h2>
-                  <p className="stats-chart-subtitle">Visual ratio breakdown</p>
+                  <h2>Collected revenue trend</h2>
+                  <p>Revenue is booked on the day a transaction reaches PAID</p>
+                </div>
+                <div className="payment-chart-legend">
+                  <span><i /> Paid revenue</span>
+                  <strong>{selectedCurrency}</strong>
                 </div>
               </div>
-              <div className="revenue-donut-wrapper">
-                <svg viewBox="0 0 200 200" className="revenue-donut-svg">
-                  {breakdown.map((seg) => {
-                    const dash = (seg.pct / 100) * donutCirc
-                    const gap = donutCirc - dash
-                    const currentOffset = donutOffset
-                    donutOffset += dash
+              <RevenueChart series={dailySeries} currency={selectedCurrency} />
+            </section>
+
+            <div className="payment-breakdown-grid">
+              <section className="payment-panel">
+                <div className="payment-panel-header">
+                  <div>
+                    <h2>Transaction status</h2>
+                    <p>{Number(summary.totalTransactions || 0).toLocaleString('en-US')} attempts created in this period</p>
+                  </div>
+                </div>
+                <div className="payment-status-list">
+                  {statusBreakdown.map((item) => {
+                    const meta = STATUS_META[item.status] || { label: item.status, color: '#94a3b8' }
                     return (
-                      <circle
-                        key={seg.label}
-                        cx="100" cy="100" r={donutR}
-                        fill="none"
-                        stroke={seg.color}
-                        strokeWidth="24"
-                        strokeDasharray={`${dash} ${gap}`}
-                        strokeDashoffset={-currentOffset}
-                        strokeLinecap="round"
-                        transform="rotate(-90 100 100)"
-                      />
+                      <div key={item.status} className="payment-status-row">
+                        <div className="payment-status-row-top">
+                          <span><i style={{ background: meta.color }} /> {meta.label}</span>
+                          <strong>{Number(item.count || 0).toLocaleString('en-US')} <small>{formatPercent(item.percentage)}</small></strong>
+                        </div>
+                        <div className="payment-progress-track">
+                          <div style={{ width: `${Math.max(0, Number(item.percentage || 0))}%`, background: meta.color }} />
+                        </div>
+                      </div>
                     )
                   })}
-                </svg>
-              </div>
-            </div>
-          </div>
+                </div>
+              </section>
 
-          {/* ── Recent Transactions Audit Log ─────────────────── */}
-          <div className="admin-data-table-wrapper" style={{ marginTop: 32 }}>
-            <div className="revenue-table-header" style={{ padding: '20px 24px' }}>
-              <h2 className="stats-chart-title">Recent Transactions & Audit Log</h2>
-              <span className="revenue-table-period">Live platform activity</span>
-            </div>
-            <table className="admin-data-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Transaction Description</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {revenueData.recentTransactions.length === 0 ? (
-                  <tr>
-                    <td colSpan="4" style={{ textAlign: 'center', padding: '24px' }}>No transactions recorded yet.</td>
-                  </tr>
+              <section className="payment-panel">
+                <div className="payment-panel-header">
+                  <div>
+                    <h2>Revenue by plan</h2>
+                    <p>Plan snapshot stored with each paid transaction</p>
+                  </div>
+                </div>
+                {planBreakdown.length === 0 ? (
+                  <div className="payment-empty-state">
+                    <CircleDollarSign size={28} />
+                    <span>No paid transactions in this period.</span>
+                  </div>
                 ) : (
-                  revenueData.recentTransactions.map((tx, i) => (
-                    <tr key={i}>
-                      <td>{tx.date}</td>
-                      <td>{tx.type}</td>
-                      <td className={tx.positive ? 'amount-positive' : 'amount-negative'}>{tx.amount}</td>
-                      <td><span className={`status-badge ${tx.status.toLowerCase()}`}>{tx.status}</span></td>
-                    </tr>
-                  ))
+                  <div className="payment-plan-list">
+                    {planBreakdown.map((plan) => (
+                      <div key={plan.planId || plan.planCode} className="payment-plan-row">
+                        <div className="payment-plan-copy">
+                          <span className="payment-plan-code">{plan.planCode}</span>
+                          <div>
+                            <strong>{plan.planName}</strong>
+                            <small>{Number(plan.paidPayments || 0).toLocaleString('en-US')} paid payments</small>
+                          </div>
+                        </div>
+                        <div className="payment-plan-value">
+                          <strong>{formatMoney(plan.revenue, selectedCurrency)}</strong>
+                          <span>{formatPercent(plan.revenueSharePercent)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+              </section>
+            </div>
+
+            <section className="payment-panel payment-recent-panel">
+              <div className="payment-panel-header">
+                <div>
+                  <h2>Recent payment activity</h2>
+                  <p>Latest transaction records across all statuses</p>
+                </div>
+                <Link to="/admin/subscriptions?tab=payments" className="payment-view-all">
+                  View all logs <ArrowRight size={15} />
+                </Link>
+              </div>
+              <div className="payment-table-scroll">
+                <table className="payment-recent-table">
+                  <thead>
+                    <tr>
+                      <th>Created</th>
+                      <th>Reader</th>
+                      <th>Plan</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentPayments.length === 0 ? (
+                      <tr><td colSpan="5" className="payment-table-empty">No payment records yet.</td></tr>
+                    ) : recentPayments.map((payment) => (
+                      <tr key={payment.id}>
+                        <td>{formatDate(payment.createdAt)}</td>
+                        <td><strong>{payment.userEmail || 'Unknown reader'}</strong></td>
+                        <td><span className="payment-plan-code">{payment.planCode}</span> {payment.planName}</td>
+                        <td className="payment-table-amount">{formatMoney(payment.amount, payment.currency)}</td>
+                        <td><span className={`payment-status-badge ${String(payment.status || '').toLowerCase()}`}>{payment.status}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <div className="payment-data-note">
+              <RotateCcw size={15} />
+              <span>Revenue uses verified PAID time; status counts use transaction creation time. Currency totals are kept separate and never converted.</span>
+            </div>
+          </>
+        )}
+      </div>
     </AdminLayout>
   )
 }

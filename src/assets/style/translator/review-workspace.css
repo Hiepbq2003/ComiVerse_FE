@@ -260,7 +260,7 @@
 .rvw-panel {
   flex: 1 1 50%;
   width: 50%;
-  overflow-y: auto;
+  overflow: auto;
   padding: 20px;
   box-sizing: border-box;
 }
@@ -283,22 +283,28 @@
 
 .rvw-panel-frame {
   position: relative;
-  width: 100%;
+  /* Width is driven by --zoom-scale set inline; JS still sets the CSS var
+     but we use it here for actual layout width instead of transform scale.
+     This lets the panel scroll naturally into the zoomed region and stops
+     bubbles from appearing oversized. */
+  width: calc(100% * var(--zoom-scale, 1));
+  min-width: 100%;
   margin: 0 auto;
   border: 1px solid #24242e;
   border-radius: 10px;
   overflow: hidden;
-  transform: scale(var(--zoom-scale, 1));
-  transform-origin: var(--zoom-origin-x, 50%) var(--zoom-origin-y, 50%);
   cursor: default;
+  /* No transform: scale here — that was the source of the oversized bubbles */
 }
 
 .rvw-panel-frame--zoom-picking {
   cursor: zoom-in;
 }
 
-.rvw-panel-image {
-  width: 100%;
+.rvw-panel-frame .rvw-panel-image {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
   display: block;
 }
 

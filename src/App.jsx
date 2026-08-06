@@ -17,13 +17,17 @@ import BroadcastManagement from './pages/admin/BroadcastManagement'
 import StatisticsDashboard from './pages/admin/StatisticsDashboard'
 import RevenueManagement from './pages/admin/RevenueManagement'
 import PayoutManagement from './pages/admin/PayoutManagement'
+import PayoutSettings from './pages/admin/PayoutSettings'
 import AdminSystemSettings from './pages/admin/AdminSystemSettings'
+import SubscriptionManagement from './pages/admin/SubscriptionManagement'
 import AuthorDashboard from './pages/author/AuthorDashboard'
 import AuthorComics from './pages/author/AuthorComics'
 import AuthorComicDetail from './pages/author/AuthorComicDetail'
-import AuthorEarnings from './pages/author/AuthorEarnings'
+import AuthorRevenue from './pages/author/AuthorRevenue'
+import AuthorPayout from './pages/author/AuthorPayout'
 import AuthorSettings from './pages/author/AuthorSettings'
 import AuthorProfile from './pages/author/AuthorProfile'
+import AuthorChapterPreview from './pages/author/AuthorChapterPreview'
 import ModeratorDashboard from './pages/moderator/ModeratorDashboard'
 import ModeratorComicDetail from './pages/moderator/ModeratorComicDetail'
 import TranslatorDashboard from './pages/translator/TranslatorDashboard'
@@ -32,6 +36,7 @@ import Policy from './pages/common/Policy'
 import About from './pages/common/About'
 import Terms from './pages/common/Terms'
 import Contact from './pages/common/Contact'
+import SubscriptionResult from './pages/common/SubscriptionResult'
 import TranslatorRegister from './pages/common/TranslatorRegister'
 import TranslateDashboard from './pages/translator/TranslatorDashboard'
 import TranslateWorkspace from './pages/translator/TranslateWorkspace'
@@ -102,13 +107,18 @@ function App() {
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/translator-register" element={<TranslatorRegister />} />
+                <Route path="/subscription/success" element={<SubscriptionResult />} />
+                <Route path="/subscription/cancel" element={<SubscriptionResult cancelled />} />
                 {/* Admin */}
                 <Route path="/admin/statistics" element={<StatisticsDashboard />} />
                 <Route path="/admin/revenue" element={<RevenueManagement />} />
                 <Route path="/admin/account-management" element={<AccountManagement />} />
                 <Route path="/admin/broadcast" element={<BroadcastManagement />} />
                 <Route path="/admin/payout" element={<PayoutManagement />} />
+                <Route path="/admin/payout/history" element={<PayoutManagement historyMode />} />
+                <Route path="/admin/payout/settings" element={<PayoutSettings />} />
                 <Route path="/admin/settings" element={<AdminSystemSettings />} />
+                <Route path="/admin/subscriptions" element={<SubscriptionManagement />} />
                 {/* Moderator */}
                 <Route path="/moderator" element={<ModeratorDashboard />} />
                 <Route path="/moderator/comic/:id" element={<ModeratorComicDetail />} />
@@ -120,9 +130,12 @@ function App() {
                   <Route path="comics" element={<AuthorComics />} />
                   <Route path="comics/:id" element={<AuthorComicDetail />} />
                   <Route path="profile" element={<AuthorProfile />} />
-                  <Route path="earnings" element={<AuthorEarnings />} />
+                  <Route path="earnings" element={<Navigate to="../revenue" replace />} />
+                  <Route path="revenue" element={<AuthorRevenue />} />
+                  <Route path="payout" element={<AuthorPayout />} />
                   <Route path="settings" element={<AuthorSettings />} />
                 </Route>
+                <Route path="/author/comics/:comicId/preview/:chapterId" element={<AuthorChapterPreview />} />
                 {/* Translator */}
                 <Route path="/translator" element={<TranslatorLayout />}>
                   

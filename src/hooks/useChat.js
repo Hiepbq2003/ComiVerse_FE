@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import stompService from '../services/websocket/StompService';
-import { getChatMessagesApi, sendChatMessageApi } from '../services/api/ChatApi';
-import { getTeamMessagesApi, createTeamMessageApi } from '../services/api/TeamWorkspaceApi';
+import { getChatMessagesApi, sendChatMessageApi, deleteChatMessageApi } from '../services/api/ChatApi';
+import { getTeamMessagesApi, createTeamMessageApi, deleteTeamMessageApi } from '../services/api/TeamWorkspaceApi';
 import { getAuth, getUserChatRestriction } from '../utils/Auth';
-import { checkBannedContent } from '../services/api/BannedKeywordApi';
+import { getBannedKeywordsApi, checkBannedContent } from '../services/api/BannedKeywordApi';
 import { toast } from 'react-toastify';
 
 const PAGE_SIZE = 10;
@@ -82,6 +82,9 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
         setChatType(initialChatType);
         setGroupId(initialGroupId);
         setMessages(loadCachedMessages(initialChatType, initialGroupId, userId));
+
+        // Fetch banned keywords to sync local cache with DB
+        getBannedKeywordsApi().catch(err => console.warn('Failed to sync banned keywords:', err));
     }, [initialChatType, initialGroupId, userId]);
 
     // Helper: Normalize messages array to always be chronological (oldest -> newest)
@@ -102,8 +105,11 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
             return;
         }
 
+        const currentAuth = getAuth();
+        const currentUserId = currentAuth?.user?.id || currentAuth?.user?.username || 'guest';
+
         // Load cached messages first so UI is never blank
-        const cached = loadCachedMessages(type, gId, userId);
+        const cached = loadCachedMessages(type, gId, currentUserId);
         if (cached.length > 0) {
             setMessages(cached);
         }
@@ -114,12 +120,17 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
         try {
             let items = [];
             try {
-                const res = await getChatMessagesApi({
-                    chatType: type,
-                    groupId: type === 'GROUP' ? gId : undefined,
-                    page: 1,
-                    limit: PAGE_SIZE,
-                }).catch(() => null);
+                let res;
+                if (type === 'TEAM' && gId) {
+                    res = await getTeamMessagesApi(gId).catch(() => []);
+                } else {
+                    res = await getChatMessagesApi({
+                        chatType: type,
+                        groupId: type === 'GROUP' ? gId : undefined,
+                        page: 1,
+                        limit: PAGE_SIZE,
+                    }).catch(() => null);
+                }
 
                 if (Array.isArray(res)) {
                     items = res;
@@ -127,21 +138,17 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
                     items = res.data;
                 } else if (res?.content && Array.isArray(res.content)) {
                     items = res.content;
-                } else if (type === 'GROUP' && gId) {
-                    const teamRes = await getTeamMessagesApi(gId).catch(() => []);
-                    items = Array.isArray(teamRes) ? teamRes : (teamRes?.data || []);
                 }
             } catch (primaryErr) {
                 console.warn('[useChat] Primary chat fetch unavailable, relying on local cache:', primaryErr);
             }
 
-            if (Array.isArray(items) && items.length > 0) {
-                setMessages((prev) => {
-                    const merged = mergeUniqueMessages(prev, items);
-                    const sorted = normalizeMessages(merged);
-                    saveCachedMessages(type, gId, userId, sorted);
-                    return sorted;
-                });
+            if (Array.isArray(items)) {
+                // REPLACE cached messages with server data (source of truth).
+                // This ensures deleted messages don't linger as ghosts from localStorage.
+                const sorted = normalizeMessages(items);
+                saveCachedMessages(type, gId, currentUserId, sorted);
+                setMessages(sorted);
                 setHasMore(items.length >= PAGE_SIZE);
             } else if (cached.length > 0) {
                 setMessages(cached);
@@ -152,7 +159,7 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
         } finally {
             setIsLoadingInitial(false);
         }
-    }, [userId]);
+    }, []);
 
     // 2. Fetch older messages (Prepend on scroll to top)
     const fetchOlderMessages = useCallback(async () => {
@@ -165,12 +172,20 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
         const nextPage = page + 1;
 
         try {
-            const res = await getChatMessagesApi({
-                chatType,
-                groupId: chatType === 'GROUP' ? groupId : undefined,
-                page: nextPage,
-                limit: OLDER_PAGE_SIZE,
-            });
+            let res;
+            if (chatType === 'TEAM' && groupId) {
+                // TeamMessage API currently doesn't support pagination, so we don't fetch older messages
+                setHasMore(false);
+                setIsLoadingMore(false);
+                return;
+            } else {
+                res = await getChatMessagesApi({
+                    chatType,
+                    groupId: chatType === 'GROUP' ? groupId : undefined,
+                    page: nextPage,
+                    limit: OLDER_PAGE_SIZE,
+                });
+            }
 
             let olderItems = [];
             if (Array.isArray(res)) {
@@ -233,8 +248,8 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
 
         setMessages((prevMessages) => {
             // Search if a temporary optimistic message exists with matching content
-            const tempIdx = prevMessages.findIndex(m => 
-                String(m.id).startsWith('temp-') && 
+            const tempIdx = prevMessages.findIndex(m =>
+                String(m.id).startsWith('temp-') &&
                 (m.content || m.text) === contentText
             );
 
@@ -248,10 +263,10 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
             }
 
             // Check if exact ID or duplicate message exists
-            const isDup = prevMessages.some((m) => 
-                m.id === safeMsg.id || 
-                ((m.content || m.text) === contentText && 
-                 Math.abs(new Date(m.createdAt || 0) - new Date(safeMsg.createdAt || 0)) < 4000)
+            const isDup = prevMessages.some((m) =>
+                m.id === safeMsg.id ||
+                ((m.content || m.text) === contentText &&
+                    Math.abs(new Date(m.createdAt || 0) - new Date(safeMsg.createdAt || 0)) < 4000)
             );
             if (isDup) return prevMessages;
 
@@ -277,9 +292,10 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
         if (!currentUser) return;
 
         // Determine subscription topic path based on active tab
-        const topic = chatType === 'GLOBAL' 
-            ? '/topic/chat/global' 
-            : (groupId ? `/topic/chat/group/${groupId}` : null);
+        const topic = chatType === 'GLOBAL'
+            ? '/topic/chat/global'
+            : (chatType === 'TEAM' && groupId ? `/topic/team-workspace/${groupId}`
+               : (groupId ? `/topic/chat/group/${groupId}` : null));
 
         // Fetch initial REST message history
         fetchInitialMessages(chatType, groupId);
@@ -307,6 +323,32 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
             cleanupDisconnect();
         };
     }, [chatType, groupId, currentUser?.id, fetchInitialMessages, handleIncomingMessage]);
+
+    const removeMessage = useCallback((msgId) => {
+        setMessages((prev) => {
+            const updated = prev.filter(m => m.id !== msgId);
+            saveCachedMessages(chatType, groupId, currentUser?.id, updated);
+            return updated;
+        });
+    }, [chatType, groupId, currentUser]);
+
+    const deleteMessage = useCallback(async (msgId) => {
+        try {
+            if (chatType === 'TEAM' && groupId) {
+                await deleteTeamMessageApi(groupId, msgId);
+            } else {
+                await deleteChatMessageApi(msgId);
+            }
+            removeMessage(msgId);
+            return true;
+        } catch (err) {
+            if (err?.response?.status === 404) {
+                removeMessage(msgId);
+                return true;
+            }
+            throw err;
+        }
+    }, [chatType, groupId, removeMessage]);
 
     // 5. Send Message Handler
     const sendMessage = useCallback(async (content, imageData = null) => {
@@ -371,7 +413,9 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
 
         try {
             // 1. Try sending via WebSocket STOMP (/app/chat/send)
-            if (stompService.isConnected()) {
+            // Note: For TEAM chat, we just use REST directly because TeamWorkspaceController doesn't have an @MessageMapping yet. 
+            // The REST call will broadcast it to /topic/team-workspace via SimpMessagingTemplate.
+            if (chatType !== 'TEAM' && stompService.isConnected()) {
                 const sentViaWs = stompService.publish('/app/chat/send', payload);
                 if (sentViaWs) {
                     setIsSending(false);
@@ -379,25 +423,22 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
                 }
             }
 
-            // 2. Fallback to REST API sendChatMessageApi or createTeamMessageApi
+            // 2. Fallback to REST API 
             try {
                 let sentMsg = null;
-                if (chatType === 'GROUP' && groupId) {
+                if (chatType === 'TEAM' && groupId) {
                     sentMsg = await createTeamMessageApi(groupId, {
                         sender: currentUser?.fullName || currentUser?.username || 'Member',
                         avatar: currentUser?.avatarUrl || null,
                         time: timeStr,
-                        text: trimmedContent,
-                        content: trimmedContent,
-                        imageUrl: imageData || undefined,
+                        text: trimmedContent
                     }).catch(() => null);
-                }
-
-                if (!sentMsg) {
+                } else {
                     sentMsg = await sendChatMessageApi(payload).catch(() => null);
                 }
 
                 if (sentMsg) {
+                    // Normalize TeamMessageEntity schema to our generic chat format if needed
                     handleIncomingMessage(sentMsg);
                 }
             } catch (restErr) {
@@ -432,6 +473,9 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
         switchTab,
         fetchOlderMessages,
         sendMessage,
+        removeMessage,
+        deleteMessage,
         setGroupId,
+        setMessages,
     };
 }

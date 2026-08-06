@@ -15,20 +15,11 @@ import {
 } from "lucide-react";
 import { getChapterDetailApi, getChaptersByComicIdApi } from "../../services/api/ChapterApi";
 import { getAuthorComicByIdApi, getAuthorComicChaptersApi, getAuthorChapterPreviewApi } from "../../services/api/AuthorComicApi";
-import { getComicByIdApi, searchComicsApi, getAllComicsApi } from "../../services/api/ComicApi";
+import { getComicByIdApi, getAllComicsApi } from "../../services/api/ComicApi";
 import { getAuth } from "../../utils/Auth";
+import CustomDatePicker from '../../components/common/CustomDatePicker';
+import { resolveImageUrl } from '../../config/apiConfig';
 import "../../assets/style/moderator/comic-detail.css";
-
-const resolveImageUrl = (url) => {
-  if (!url || typeof url !== 'string') return null;
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
-    return url;
-  }
-  const apiBase = import.meta.env.VITE_API_BASE_URL || '/api';
-  const backendHost = apiBase.startsWith('http') ? apiBase.replace(/\/api\/?$/, '') : 'http://localhost:8081';
-  return `${backendHost}${url.startsWith('/') ? '' : '/'}${url}`;
-};
-
 
 
 export function parseTaskTitle(title, fallbackComic) {
@@ -103,29 +94,56 @@ export function isUserAssignedToTask(t, teamMembers = [], authUser) {
   const currentUserName = (authUser.fullName || authUser.username || '').toLowerCase().trim();
   const currentUserId = authUser.id ? String(authUser.id) : null;
 
-  const assignees = t.assignees || t.assigneeIds || t.assignedMembers || [];
-  if (!Array.isArray(assignees) || assignees.length === 0) return false;
+  // Single-assignee model — matches backend's TeamTaskEntity.assigneeId (UUID).
+  const mId = t.assigneeId;
+  if (!mId) return false;
 
-  return assignees.some(mId => {
-    if (!mId) return false;
+  // 1. Direct ID match
+  if (currentUserId && String(mId) === currentUserId) return true;
 
+  // 2. Direct string name match (covers local/demo data where the id slot holds a name)
+  if (typeof mId === 'string') {
+    const s = mId.toLowerCase().trim();
+    if (s === currentUserName || (currentUserId && s === currentUserId)) return true;
+  }
+
+  // 3. Candidate lookup in team members list
+  const mem = teamMembers.find(m => String(m?.id) === String(mId));
+  if (mem) {
+    const mName = (mem.name || mem.fullName || mem.username || '').toLowerCase().trim();
+    if (mName === currentUserName || (currentUserId && String(mem.id) === currentUserId)) return true;
+  }
+
+  return false;
+}
+
+export function filterUnassignedChapters(chapterOptions, tasks) {
+  const assignedChapterIds = new Set(
+    (tasks || [])
+      .map(t => String(t?.chapterId || t?.chapter_id || ''))
+      .filter(Boolean)
+  );
+
+  return (chapterOptions || []).filter(ch => {
+    if (!ch) return false;
     // 1. Direct ID match
-    if (currentUserId && String(mId) === currentUserId) return true;
+    if (ch.id && assignedChapterIds.has(String(ch.id))) return false;
 
-    // 2. Direct string name match
-    if (typeof mId === 'string') {
-      const s = mId.toLowerCase().trim();
-      if (s === currentUserName || (currentUserId && s === currentUserId)) return true;
-    }
+    // 2. Title / Chapter number pattern match against existing tasks
+    const chTitleLower = (ch.title || '').toLowerCase();
+    const chNumMatch = chTitleLower.match(/chapter\s*(\d+)/i);
 
-    // 3. Candidate lookup in team members list
-    const mem = teamMembers.find(m => String(m?.id) === String(mId));
-    if (mem) {
-      const mName = (mem.name || mem.fullName || mem.username || '').toLowerCase().trim();
-      if (mName === currentUserName || (currentUserId && String(mem.id) === currentUserId)) return true;
-    }
+    const isTaskCreated = (tasks || []).some(t => {
+      if (!t || !t.title) return false;
+      const tLower = t.title.toLowerCase();
 
-    return false;
+      if (chTitleLower && tLower.includes(chTitleLower)) return true;
+      if (chNumMatch && tLower.includes(`chapter ${chNumMatch[1]}`)) return true;
+
+      return false;
+    });
+
+    return !isTaskCreated;
   });
 }
 
@@ -136,41 +154,20 @@ const COLUMN_LIST = [
   { id: 'completed', title: 'Completed', dotClass: 'column__dot--done' }
 ]
 
-function TaskAssigneeAvatars({ assigneeIds, getAssigneeInitials }) {
-  const ids = assigneeIds && assigneeIds.length > 0 ? assigneeIds : [null]
+function TaskAssigneeAvatar({ assigneeId, getAssigneeInitials }) {
   return (
     <div style={{ display: 'flex' }}>
-      {ids.slice(0, 3).map((memberId, i) => (
-        <div
-          key={memberId || i}
-          className="avatar avatar--fallback"
-          style={{
-            fontSize: '9px',
-            width: '22px',
-            height: '22px',
-            marginLeft: i > 0 ? '-6px' : 0,
-            border: '1.5px solid var(--trans-card-bg, #1a1225)',
-            zIndex: 3 - i
-          }}
-        >
-          {memberId ? getAssigneeInitials(memberId) : 'TL'}
-        </div>
-      ))}
-      {assigneeIds && assigneeIds.length > 3 && (
-        <div
-          className="avatar avatar--fallback"
-          style={{
-            fontSize: '9px',
-            width: '22px',
-            height: '22px',
-            marginLeft: '-6px',
-            border: '1.5px solid var(--trans-card-bg, #1a1225)',
-            background: '#475569'
-          }}
-        >
-          +{assigneeIds.length - 3}
-        </div>
-      )}
+      <div
+        className="avatar avatar--fallback"
+        style={{
+          fontSize: '9px',
+          width: '22px',
+          height: '22px',
+          border: '1.5px solid var(--trans-card-bg, #1a1225)'
+        }}
+      >
+        {assigneeId ? getAssigneeInitials(assigneeId) : 'TL'}
+      </div>
     </div>
   )
 }
@@ -178,31 +175,46 @@ function TaskAssigneeAvatars({ assigneeIds, getAssigneeInitials }) {
 function TaskCard({ task, colId, comicName, onOpenTaskDetails, getAssigneeInitials }) {
   const { priority, cleanTitle } = parseTaskTitle(task.title, comicName)
   const isDone = colId === 'completed'
+  const isRevoked = Boolean(task.rejectionReason || task.isRevoked || task.status === 'REVOKED' || task.status === 'REVISION_NEEDED')
 
   return (
     <article
-      className={`task ${isDone ? 'task--completed' : ''}`}
+      className={`task ${isDone ? 'task--completed' : ''} ${isRevoked ? 'task--revoked' : ''}`}
       tabIndex="0"
       onClick={() => onOpenTaskDetails(task)}
     >
-      {isDone ? (
-        <div className="task__check">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 6 9 17l-5-5" />
-          </svg>
-          <span>Done</span>
-        </div>
-      ) : (
-        <div className={`task__priority task__priority--${priority.toLowerCase()}`}>
-          {priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase()}
-        </div>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '6px' }}>
+        {isDone ? (
+          <div className="task__check">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+            <span>Done</span>
+          </div>
+        ) : (
+          <div className={`task__priority task__priority--${priority.toLowerCase()}`}>
+            {priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase()}
+          </div>
+        )}
+
+        {isRevoked && (
+          <span className="task__revoked-tag" title={task.rejectionReason ? `Revoked Reason: ${task.rejectionReason}` : 'Translation Revoked'}>
+            ⚠️ REVOKED
+          </span>
+        )}
+      </div>
 
       <h3>{cleanTitle}</h3>
       <p className="task__desc">Task for {comicName}</p>
 
+      {isRevoked && task.rejectionReason && (
+        <div className="task__revocation-alert" title={task.rejectionReason}>
+          <span className="task__revocation-label">Reason:</span> {task.rejectionReason}
+        </div>
+      )}
+
       <footer className="task__footer">
-        <TaskAssigneeAvatars assigneeIds={task.assigneeIds} getAssigneeInitials={getAssigneeInitials} />
+        <TaskAssigneeAvatar assigneeId={task.assigneeId} getAssigneeInitials={getAssigneeInitials} />
         <span className="task__date">📅 {task.dueDate}</span>
       </footer>
     </article>
@@ -223,7 +235,11 @@ function KanbanColumn({
   onToggleHighlight,
   onMoveAllToDone,
   onOpenTaskDetails,
-  getAssigneeInitials
+  getAssigneeInitials,
+  unassignedChapterOptions,
+  isCurrentLeader,
+  onCreateTaskClick,
+  onViewChapterClick
 }) {
   return (
     <div
@@ -234,7 +250,9 @@ function KanbanColumn({
         <div className="column__label">
           <div className={`column__dot ${col.dotClass}`}></div>
           <h2>{col.title}</h2>
-          <span className="column__count">{colTasks.length}</span>
+          <span className="column__count">
+            {colTasks.length + (col.id === 'backlog' && unassignedChapterOptions ? unassignedChapterOptions.length : 0)}
+          </span>
         </div>
         <div className={`column__add-wrap ${isDropdownOpen ? 'open' : ''}`}>
           <button
@@ -262,7 +280,7 @@ function KanbanColumn({
             <button type="button" className="dropdown__item" onClick={onToggleHighlight}>
               {isHighlighted ? 'Unhighlight' : 'Highlight column'}
             </button>
-            {col.id !== 'completed' && (
+            {isCurrentLeader && col.id !== 'completed' && (
               <button type="button" className="dropdown__item" onClick={onMoveAllToDone}>
                 Move all to Done
               </button>
@@ -272,6 +290,71 @@ function KanbanColumn({
       </div>
 
       <div className="task-list" style={{ opacity: isLocked ? 0.6 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>
+        {col.id === 'backlog' && unassignedChapterOptions && unassignedChapterOptions.map((ch, idx) => (
+          <div
+            key={`raw-ch-${ch.id || idx}`}
+            className="task-card task-card-item"
+            style={{
+              background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(99, 102, 241, 0.08))',
+              border: '1.5px dashed rgba(168, 85, 247, 0.4)',
+              padding: '14px',
+              borderRadius: '12px',
+              marginBottom: '12px',
+              transition: 'all 0.2s ease',
+              cursor: 'pointer',
+              position: 'relative'
+            }}
+            onClick={() => onViewChapterClick && onViewChapterClick(ch)}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span className="raw-chapter-badge">
+                📖 Raw Chapter
+              </span>
+              {ch.pagesCount > 0 && (
+                <span style={{ fontSize: '11px', color: 'var(--trans-text-secondary)', fontWeight: '600', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
+                  {ch.pagesCount} pages
+                </span>
+              )}
+            </div>
+
+            <h4 style={{ margin: '6px 0 8px', fontSize: '14px', fontWeight: '700', color: 'var(--trans-text-primary)', lineHeight: '1.4' }}>
+              {ch.title}
+            </h4>
+
+            <div className="backlog-card-footer">
+              <span className="ready-to-translate-text">
+                <div className="status-dot-pulse"></div>
+                Ready to Translate
+              </span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  className="trans-btn secondary"
+                  style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewChapterClick && onViewChapterClick(ch);
+                  }}
+                >
+                  👁️ View
+                </button>
+                {isCurrentLeader && (
+                  <button
+                    type="button"
+                    className="trans-btn primary"
+                    style={{ fontSize: '11px', padding: '4px 10px', background: 'linear-gradient(110deg, #a855f7 0%, #ec4899 100%)', border: 'none', color: '#fff', borderRadius: '6px', fontWeight: '700', boxShadow: '0 2px 8px rgba(168,85,247,0.3)' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCreateTaskClick && onCreateTaskClick({ chapterId: ch.id, title: ch.title });
+                    }}
+                  >
+                    + Task
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
         {colTasks.map(task => (
           <TaskCard
             key={task.id}
@@ -287,7 +370,7 @@ function KanbanColumn({
   )
 }
 
-function PausedTaskCard({ task, comicName, onResume }) {
+function PausedTaskCard({ task, comicName, onResume, canResume = false }) {
   const { priority, cleanTitle } = parseTaskTitle(task.title, comicName)
   return (
     <div className="paused-task-card task-card-item" style={{ opacity: 0.75 }}>
@@ -299,7 +382,9 @@ function PausedTaskCard({ task, comicName, onResume }) {
       <span style={{ fontSize: '11px', color: 'var(--trans-text-muted)' }}>Project: {task.project || comicName}</span>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
         <span style={{ fontSize: '11px', color: 'var(--trans-text-secondary)' }}>Due: {task.dueDate}</span>
-        <button className="trans-btn primary" style={{ fontSize: '9px', padding: '2px 8px' }} onClick={onResume}>Resume</button>
+        {canResume && (
+          <button className="trans-btn primary" style={{ fontSize: '9px', padding: '2px 8px' }} onClick={onResume}>Resume</button>
+        )}
       </div>
     </div>
   )
@@ -327,42 +412,13 @@ function TasksTab({
   members,
   isCurrentLeader,
   chapterOptions = [],
-  onOpenCreateTaskWithChapter
+  onOpenCreateTaskWithChapter,
+  onCreateTask
 }) {
   const [inspectingChapter, setInspectingChapter] = useState(null);
   const [isBacklogCollapsed, setIsBacklogCollapsed] = useState(false);
 
-  // Filter out chapters that already have a task created for them
-  const assignedChapterIds = new Set(
-    (tasks || [])
-      .map(t => String(t.chapterId || t.chapter_id || ''))
-      .filter(Boolean)
-  );
-
-  const unassignedChapterOptions = (chapterOptions || []).filter(ch => {
-    if (!ch) return false;
-    // 1. Direct ID match
-    if (ch.id && assignedChapterIds.has(String(ch.id))) return false;
-
-    // 2. Title / Chapter number pattern match against existing tasks
-    const chTitleLower = (ch.title || '').toLowerCase();
-    const chNumMatch = chTitleLower.match(/chapter\s*(\d+)/i);
-
-    const isTaskCreated = (tasks || []).some(t => {
-      if (!t || !t.title) return false;
-      const tLower = t.title.toLowerCase();
-
-      // Check if task title contains exact chapter title
-      if (chTitleLower && tLower.includes(chTitleLower)) return true;
-
-      // Check if task title contains "chapter X"
-      if (chNumMatch && tLower.includes(`chapter ${chNumMatch[1]}`)) return true;
-
-      return false;
-    });
-
-    return !isTaskCreated;
-  });
+  const unassignedChapterOptions = filterUnassignedChapters(chapterOptions, tasks);
 
   const auth = getAuth();
   const authUser = auth?.user;
@@ -372,108 +428,14 @@ function TasksTab({
     if (isCurrentLeader) return true;
     return isUserAssignedToTask(t, members, authUser);
   });
+  const visiblePausedTasks = (pausedTasks || []).filter(t => {
+    if (isCurrentLeader) return true;
+    return isUserAssignedToTask(t, members, authUser);
+  });
 
   return (
     <div className="board tasks-board-tab-container fade-in" style={{ padding: 0, background: 'transparent' }}>
       
-      {/* ── RAW MANUSCRIPT CHAPTERS BACKLOG ──────────────── */}
-      {unassignedChapterOptions.length > 0 && (
-        <div style={{
-          padding: '14px 20px',
-          borderRadius: '12px',
-          background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(99, 102, 241, 0.08))',
-          border: '1px solid rgba(168, 85, 247, 0.25)',
-          marginBottom: '20px'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => setIsBacklogCollapsed(prev => !prev)}>
-              <svg
-                xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                style={{ color: '#c084fc', transform: isBacklogCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
-              >
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'var(--trans-text-primary)' }}>
-                📖 Raw Manuscript Chapters Available ({unassignedChapterOptions.length})
-              </h4>
-              <span style={{ fontSize: '11px', color: '#c084fc', background: 'rgba(168, 85, 247, 0.15)', padding: '2px 8px', borderRadius: '6px' }}>
-                Ready to Translate
-              </span>
-            </div>
-
-            {isCurrentLeader && (
-              <button
-                type="button"
-                className="trans-btn primary"
-                onClick={() => onCreateTaskClick()}
-                style={{ fontSize: '11.5px', padding: '4px 10px', borderRadius: '6px' }}
-              >
-                <Plus size={13} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Create Task
-              </button>
-            )}
-          </div>
-
-          {!isBacklogCollapsed && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px', marginTop: '12px' }}>
-              {unassignedChapterOptions.map((ch, idx) => (
-                <div key={ch.id || idx} style={{
-                  padding: '12px 14px',
-                  borderRadius: '10px',
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  gap: '10px'
-                }}>
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
-                      <strong style={{ fontSize: '13px', color: 'var(--trans-text-primary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                        {ch.title}
-                      </strong>
-                      {ch.pagesCount > 0 && (
-                        <span style={{ fontSize: '10.5px', background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', padding: '2px 6px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
-                          {ch.pagesCount} pages
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="trans-btn secondary"
-                    onClick={() => setInspectingChapter(ch)}
-                    style={{ width: '100%', padding: '5px 0', fontSize: '11.5px', textAlign: 'center' }}
-                  >
-                    👁️ View Chapter
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Raw Chapter Manuscript Viewer & Review Mode Full-Screen Workspace */}
-      {inspectingChapter && (
-        <ChapterInspectModal
-          chapter={inspectingChapter}
-          onClose={() => setInspectingChapter(null)}
-          comicName={comicName}
-          comicId={comicId}
-          chapterOptions={chapterOptions}
-          teamMembersForAssign={members}
-          onCreateTask={(taskData) => {
-            if (onOpenCreateTaskWithChapter) {
-              onOpenCreateTaskWithChapter(taskData);
-            } else if (onCreateTaskClick) {
-              onCreateTaskClick(taskData);
-            }
-          }}
-        />
-      )}
-
       {/* ── KANBAN BOARD CARD ────────────────────────────── */}
       <div className="board__card">
         <div className="board__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--trans-border)' }}>
@@ -611,11 +573,16 @@ function TasksTab({
                   setOpenDropdownCol(null)
                 }}
                 onMoveAllToDone={() => {
+                  if (!isCurrentLeader) return;
                   onMoveAllToDone(col.id)
                   setOpenDropdownCol(null)
                 }}
                 onOpenTaskDetails={onOpenTaskDetails}
                 getAssigneeInitials={getAssigneeInitials}
+                unassignedChapterOptions={unassignedChapterOptions}
+                isCurrentLeader={isCurrentLeader}
+                onCreateTaskClick={onOpenCreateTaskWithChapter || onCreateTaskClick}
+                onViewChapterClick={(ch) => setInspectingChapter(ch)}
               />
             )
           })}
@@ -626,19 +593,52 @@ function TasksTab({
           paddingLeft: '24px', paddingRight: '24px', width: '100%', clear: 'both'
         }}>
           <h4 className="paused-tasks-title" style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--trans-text-primary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span>⏸</span> Paused ({pausedTasks.length})
+            <span>⏸</span> Paused ({visiblePausedTasks.length})
           </h4>
-          {pausedTasks.length === 0 ? (
+          {visiblePausedTasks.length === 0 ? (
             <p style={{ fontStyle: 'italic', color: 'var(--trans-text-muted)', fontSize: '13px', margin: 0 }}>No paused tasks.</p>
           ) : (
             <div className="paused-tasks-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-              {pausedTasks.map(task => (
-                <PausedTaskCard key={task.id} task={task} comicName={comicName} onResume={() => onMoveTask(task.id, 'backlog')} />
+              {visiblePausedTasks.map(task => (
+                <PausedTaskCard
+                  key={task.id}
+                  task={task}
+                  comicName={comicName}
+                  canResume={isCurrentLeader}
+                  onResume={() => onMoveTask(task.id, 'backlog')}
+                />
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {/* Raw Chapter Manuscript Viewer & Review Mode Full-Screen Workspace */}
+      {inspectingChapter && (
+        <ChapterInspectModal
+          chapter={inspectingChapter}
+          onClose={() => setInspectingChapter(null)}
+          comicName={comicName}
+          comicId={comicId}
+          chapterOptions={chapterOptions}
+          teamMembersForAssign={members}
+          tasks={tasks}
+          isCurrentLeader={isCurrentLeader}
+          onCreateTask={async (taskData) => {
+            if (!isCurrentLeader) return;
+            if (onCreateTask) {
+              await onCreateTask(taskData);
+              setInspectingChapter(null);
+            } else if (onOpenCreateTaskWithChapter) {
+              onOpenCreateTaskWithChapter(taskData);
+              setInspectingChapter(null);
+            } else if (onCreateTaskClick) {
+              onCreateTaskClick(taskData);
+              setInspectingChapter(null);
+            }
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -679,7 +679,7 @@ function PriorityPicker({ value, onChange }) {
   )
 }
 
-function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOptions = [], teamMembersForAssign = [], onCreateTask }) {
+function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOptions = [], teamMembersForAssign = [], tasks = [], onCreateTask, isCurrentLeader = false }) {
   const [loading, setLoading] = useState(true);
   const [pages, setPages] = useState([]);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'reader'
@@ -688,20 +688,21 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [inspectTaskData, setInspectTaskData] = useState({
     title: '',
-    column: 'backlog',
-    assignees: [],
+    column: 'in_progress',
+    assigneeId: null,
     dueDate: '',
     priority: 'High',
     chapterId: null
   });
 
   const handleOpenCreateTask = () => {
+    if (!isCurrentLeader) return;
     const chId = chapter?.id || null;
     const defaultTitle = `${chapter?.title || `Chapter ${chapter?.number || chapter?.chapterNumber || ''}`} - Translation & Proofreading`;
     setInspectTaskData({
       title: defaultTitle,
-      column: 'backlog',
-      assignees: [],
+      column: 'in_progress',
+      assigneeId: null,
       dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
       priority: 'High',
       chapterId: chId
@@ -898,7 +899,7 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
       }
 
       if (isMounted) {
-        setPages([]);
+        setPages(prev => prev.length > 0 ? prev : []);
         setLoading(false);
       }
     };
@@ -969,7 +970,7 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, flexWrap: 'wrap' }}>
-          {onCreateTask && (
+          {onCreateTask && isCurrentLeader && (
             <button
               type="button"
               className="mod-mode-tab active"
@@ -1348,6 +1349,7 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
             setNewTaskData={setInspectTaskData}
             chapterOptions={chapterOptions && chapterOptions.length > 0 ? chapterOptions : [chapter]}
             teamMembersForAssign={teamMembersForAssign}
+            tasks={tasks}
             onCancel={() => setShowCreateTaskModal(false)}
             onCreate={async () => {
               setShowCreateTaskModal(false);
@@ -1364,15 +1366,21 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
   );
 }
 
-function AssigneeChipPicker({ candidates, selectedIds, onToggle, emptyLabel, readOnly = false }) {
-  if (!Array.isArray(candidates) || candidates.length === 0) {
+function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, readOnly = false }) {
+  const assignableCandidates = (candidates || []).filter(m => {
+    const roleStr = String(m.role || '').toLowerCase().trim();
+    const isLeaderRole = m.isLeader || roleStr.includes('leader') || roleStr === 'group leader' || roleStr === 'project leader' || roleStr === 'team leader' || roleStr === 'project_leader' || roleStr === 'team_leader';
+    return !isLeaderRole;
+  });
+
+  if (!Array.isArray(assignableCandidates) || assignableCandidates.length === 0) {
     return <p style={{ fontSize: '12px', color: 'var(--trans-text-muted)', margin: 0 }}>{emptyLabel || 'No assignees available'}</p>
   }
   return (
     <div className="trans-assignees-picker" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '4px 0' }}>
-      {candidates.map((m) => {
+      {assignableCandidates.map((m) => {
         const memberId = m.id || m.userId;
-        const isSelected = (selectedIds || []).includes(memberId);
+        const isSelected = selectedId != null && String(selectedId) === String(memberId);
         const displayName = m.fullName || m.name || m.username || 'User';
         const initial = (m.avatar && m.avatar.length <= 3 ? m.avatar : displayName.charAt(0)).toUpperCase();
         const roleLabel = m.role || (m.isLeader ? 'Leader' : 'Member');
@@ -1382,7 +1390,7 @@ function AssigneeChipPicker({ candidates, selectedIds, onToggle, emptyLabel, rea
             key={memberId}
             type="button"
             className={`trans-assignee-chip${isSelected ? ' selected' : ''}`}
-            onClick={() => !readOnly && onToggle && onToggle(memberId, isSelected)}
+            onClick={() => !readOnly && onSelect && onSelect(isSelected ? null : memberId)}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -1452,28 +1460,23 @@ export function CreateTaskModal({
   setNewTaskData,
   chapterOptions,
   teamMembersForAssign,
+  tasks = [],
   onCancel,
   onCreate
 }) {
   const [submitted, setSubmitted] = useState(false)
 
+  const todayStr = new Date().toISOString().split('T')[0]
+  const availableChapterOptions = filterUnassignedChapters(chapterOptions, tasks)
+
   const errors = {
     title: !newTaskData.title.trim(),
     chapterId: !newTaskData.chapterId,
-    assignees: newTaskData.assignees.length === 0,
-    dueDate: !newTaskData.dueDate
+    assigneeId: !newTaskData.assigneeId,
+    dueDate: !newTaskData.dueDate || newTaskData.dueDate < todayStr
   }
   const showError = (field) => submitted && errors[field]
   const errorBorder = (field) => showError(field) ? { borderColor: '#ef4444' } : undefined
-
-  const toggleAssignee = (memberId, isSelected) => {
-    setNewTaskData({
-      ...newTaskData,
-      assignees: isSelected
-        ? newTaskData.assignees.filter(a => a !== memberId)
-        : [...newTaskData.assignees, memberId]
-    })
-  }
 
   const setQuickDueDate = (days) => {
     const d = new Date()
@@ -1524,20 +1527,20 @@ export function CreateTaskModal({
               value={newTaskData.chapterId || ''}
               onChange={(e) => {
                 const chId = e.target.value || null;
-                const foundCh = chapterOptions.find(c => String(c.id) === String(chId));
+                const foundCh = availableChapterOptions.find(c => String(c.id) === String(chId));
                 setNewTaskData(prev => ({
                   ...prev,
                   chapterId: chId,
                   title: (!prev.title.trim() && foundCh) ? `${foundCh.title} - Translation & Proofreading` : prev.title
                 }));
               }}
-              disabled={chapterOptions.length === 0}
+              disabled={availableChapterOptions.length === 0}
               style={{ ...errorBorder('chapterId') }}
             >
               <option value="">
-                {chapterOptions.length === 0 ? 'No chapters found for this project' : 'Select a chapter…'}
+                {availableChapterOptions.length === 0 ? 'No available chapters (all already have a task)' : 'Select a chapter…'}
               </option>
-              {chapterOptions.map((ch) => (
+              {availableChapterOptions.map((ch) => (
                 <option key={ch.id} value={ch.id}>
                   📖 {ch.title}{ch.pagesCount > 0 ? ` (${ch.pagesCount} pages)` : ''}
                 </option>
@@ -1554,15 +1557,15 @@ export function CreateTaskModal({
           </div>
 
           <div className="trans-form-group" style={{ marginTop: '14px' }}>
-            <label className="trans-form-label">Assignees *</label>
+            <label className="trans-form-label">Assignee *</label>
             <AssigneeChipPicker
               candidates={teamMembersForAssign}
-              selectedIds={newTaskData.assignees}
-              onToggle={toggleAssignee}
+              selectedId={newTaskData.assigneeId}
+              onSelect={(memberId) => setNewTaskData({ ...newTaskData, assigneeId: memberId })}
               emptyLabel="No team members found for this project."
             />
-            {showError('assignees') && (
-              <p style={{ color: '#ef4444', fontSize: '11px', margin: '6px 0 0' }}>Please assign at least one person</p>
+            {showError('assigneeId') && (
+              <p style={{ color: '#ef4444', fontSize: '11px', margin: '6px 0 0' }}>Please assign someone to this task</p>
             )}
           </div>
 
@@ -1571,33 +1574,23 @@ export function CreateTaskModal({
               <label className="trans-form-label" style={{ margin: 0 }}>
                 Due Date *
               </label>
-              {newTaskData.dueDate && (
-                <span style={{ fontSize: '11px', color: '#c084fc', fontWeight: '700' }}>
-                  📅 {new Date(newTaskData.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </span>
-              )}
             </div>
 
-            <input required
-              type="date"
-              className="trans-form-input"
-              min={new Date().toISOString().split('T')[0]}
-              style={{
-                cursor: 'pointer',
-                color: '#111',
-                background: '#fff',
-                fontWeight: '700',
-                fontSize: '13px',
-                padding: '8px 12px',
-                ...errorBorder('dueDate')
-              }}
+            <CustomDatePicker
               value={newTaskData.dueDate}
-              onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
-              onChange={(e) => setNewTaskData({ ...newTaskData, dueDate: e.target.value })}
+              onChange={(val) => {
+                if (val && val < todayStr) return;
+                setNewTaskData({ ...newTaskData, dueDate: val });
+              }}
+              placeholder="Select due date"
+              minDate={todayStr}
+              style={errorBorder('dueDate')}
             />
 
             {showError('dueDate') && (
-              <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>This field is required</p>
+              <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>
+                {!newTaskData.dueDate ? 'This field is required' : 'Due date cannot be in the past'}
+              </p>
             )}
           </div>
 
@@ -1657,7 +1650,9 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   const currentUserName = (auth?.user?.fullName || auth?.user?.username || '').toLowerCase().trim();
   const currentUserId = auth?.user?.id || auth?.user?.userId;
 
-  const isAssigned = (editTaskData.assignees || []).some(id => {
+  const isAssigned = (() => {
+    const id = editTaskData.assigneeId;
+    if (!id) return false;
     if (currentUserId && String(id) === String(currentUserId)) return true;
     if (typeof id === 'string' && id.toLowerCase().trim() === currentUserName) return true;
     const matchedMem = (teamMembersForAssign || []).find(m => String(m.id || m.userId) === String(id));
@@ -1666,13 +1661,13 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
       if (memName === currentUserName) return true;
     }
     return false;
-  });
+  })();
 
   const canAccessWorkspace = isProjectLeader || isAssigned;
 
   const errors = {
     title: !editTaskData.title.trim(),
-    assignees: (editTaskData.assignees || []).length === 0,
+    assigneeId: !editTaskData.assigneeId,
     dueDate: !editTaskData.dueDate
   }
   const showError = (field) => submitted && errors[field]
@@ -1682,14 +1677,9 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   const canReview = isProjectLeader && isUnderReview
   const isInProgress = editTaskData.status === 'in_progress'
 
-  const toggleAssignee = (memberId, isSelected) => {
+  const selectAssignee = (memberId) => {
     if (!isProjectLeader) return;
-    setEditTaskData({
-      ...editTaskData,
-      assignees: isSelected
-        ? editTaskData.assignees.filter(a => a !== memberId)
-        : [...(editTaskData.assignees || []), memberId]
-    })
+    setEditTaskData({ ...editTaskData, assigneeId: memberId })
   }
 
   const handleSaveClick = () => {
@@ -1772,28 +1762,27 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
               </div>
 
               <div className="trans-form-group">
-                <label className="trans-form-label">Assignees *</label>
-                <div style={showError('assignees') ? { border: '1px solid #ef4444', borderRadius: '12px', padding: '8px' } : undefined}>
+                <label className="trans-form-label">Assignee *</label>
+                <div style={showError('assigneeId') ? { border: '1px solid #ef4444', borderRadius: '12px', padding: '8px' } : undefined}>
                   <AssigneeChipPicker
                     candidates={teamMembersForAssign}
-                    selectedIds={editTaskData.assignees}
-                    onToggle={toggleAssignee}
+                    selectedId={editTaskData.assigneeId}
+                    onSelect={selectAssignee}
                     emptyLabel="No team members found for this project."
                   />
                 </div>
-                {showError('assignees') && (
-                  <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>At least one assignee is required</p>
+                {showError('assigneeId') && (
+                  <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>An assignee is required</p>
                 )}
               </div>
 
               <div className="trans-form-group">
                 <label className="trans-form-label">Due Date *</label>
-                <input
-                  type="date"
-                  className="trans-form-input"
-                  style={errorBorder('dueDate')}
+                <CustomDatePicker
                   value={editTaskData.dueDate}
-                  onChange={(e) => setEditTaskData({ ...editTaskData, dueDate: e.target.value })}
+                  onChange={(val) => setEditTaskData({ ...editTaskData, dueDate: val })}
+                  placeholder="Select due date"
+                  style={errorBorder('dueDate')}
                 />
                 {showError('dueDate') && (
                   <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Due date is required</p>
@@ -1838,12 +1827,12 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
               </div>
 
               <div className="trans-form-group">
-                <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assigned Members</label>
+                <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assigned Member</label>
                 <AssigneeChipPicker
                   candidates={teamMembersForAssign}
-                  selectedIds={editTaskData.assignees}
+                  selectedId={editTaskData.assigneeId}
                   readOnly={true}
-                  emptyLabel="No assigned members."
+                  emptyLabel="No assigned member."
                 />
               </div>
 

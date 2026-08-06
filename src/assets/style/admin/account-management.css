@@ -1,6 +1,58 @@
 /* Admin Account Management screen styles */
 
+.admin-account-management-screen {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-account-management-screen .admin-page-header {
+  gap: 24px;
+}
+
+.admin-account-management-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  max-width: 100%;
+}
+
+.admin-account-management-screen .admin-filters-bar,
+.admin-account-management-screen .admin-search-input-wrapper {
+  min-width: 0;
+}
+
+.admin-account-management-screen .admin-data-table {
+  min-width: 1180px;
+}
+
+.admin-account-management-screen .admin-lang-scope-tag {
+  max-width: 280px;
+  white-space: normal;
+  line-height: 1.35;
+}
+
 .admin-account-management-screen .role-badge.project-leader {
   min-width: 104px;
   justify-content: center;
+}
+
+@media (max-width: 900px) {
+  .admin-account-management-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 520px) {
+  .admin-account-management-actions,
+  .admin-account-management-actions .animated-btn-container {
+    width: 100%;
+  }
+
+  .admin-account-management-actions .btn {
+    width: 100%;
+  }
 }

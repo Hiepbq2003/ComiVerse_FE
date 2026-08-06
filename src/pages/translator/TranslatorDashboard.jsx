@@ -399,12 +399,6 @@ function TranslatorDashboard() {
             </div>
           </div>
           <div className="val">{overallStats.totalProjects} Teams</div>
-          <div className="sub">
-            <span style={{ color: '#10b981', fontWeight: '700' }}>● {overallStats.activeProjects} Active</span>
-            {overallStats.pendingProjects > 0 && (
-              <span style={{ color: '#f59e0b', marginLeft: '8px', fontWeight: '700' }}>● {overallStats.pendingProjects} Pending</span>
-            )}
-          </div>
         </div>
 
         {/* Stat Card 2: Translated Chapters */}
@@ -425,7 +419,7 @@ function TranslatorDashboard() {
       {/* Main 2-Column Grid */}
       <div className="dashboard-sections-grid">
         {/* Left Column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', height: '100%' }}>
           {/* Task Breakdown Card */}
           <div className="dashboard-card-theme">
             <div className="dashboard-card-header">
@@ -456,7 +450,7 @@ function TranslatorDashboard() {
           </div>
 
           {/* Active Assigned Projects List Card */}
-          <div className="dashboard-card-theme">
+          <div className="dashboard-card-theme" style={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
             <div className="dashboard-card-header">
               <h3>📁 Active Translation Channels & Workspaces</h3>
               <button
@@ -467,7 +461,7 @@ function TranslatorDashboard() {
               </button>
             </div>
 
-            <div className="dash-project-list">
+            <div className="dash-project-list" style={{ flexGrow: 1 }}>
               {filteredProjects.length === 0 ? (
                 <p style={{ color: 'var(--trans-text-secondary, #64748b)', fontSize: '14px', margin: 0, fontStyle: 'italic' }}>
                   No team projects match the selected filter.
@@ -547,12 +541,12 @@ function TranslatorDashboard() {
         </div>
 
         {/* Right Column: Active Team Tasks */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div className="dashboard-card-theme">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', height: '100%' }}>
+          <div className="dashboard-card-theme" style={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
             <div className="dashboard-card-header">
               <h3>⏱️ Active Team Tasks</h3>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flexGrow: 1 }}>
               {allActiveTasks.length === 0 ? (
                 <p style={{ color: 'var(--trans-text-secondary, #64748b)', fontSize: '13px', margin: 0, fontStyle: 'italic' }}>
                   No active tasks found.
