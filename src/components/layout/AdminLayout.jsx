@@ -66,7 +66,7 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
 
   const navItems = [
     { id: 'statistics', label: 'Statistics Dashboard', icon: 'chart', path: '/admin/statistics' },
-    { id: 'revenue', label: 'Revenue Management', icon: 'dollar', path: '/admin/revenue' },
+    { id: 'revenue', label: 'Payment Statistics', icon: 'dollar', path: '/admin/revenue' },
     { id: 'subscriptions', label: 'Subscriptions & Payments', icon: 'credit-card', path: '/admin/subscriptions' },
     { id: 'account-management', label: 'Account Management', icon: 'users', path: '/admin/account-management' },
     { id: 'broadcast', label: 'Broadcast', icon: 'megaphone', path: '/admin/broadcast' },

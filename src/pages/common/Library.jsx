@@ -6,6 +6,7 @@ import { getMyReadingHistoryApi, deleteReadingHistoryComicApi } from '../../serv
 import { getMySavesApi, toggleSaveStatusApi } from '../../services/api/SaveApi'
 import { getMyLikesApi, toggleLikeStatusApi } from '../../services/api/LikeApi'
 import { getUserRatingsApi, deleteComicRatingApi } from '../../services/api/RatingApi'
+import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
 import { useAuth } from '../../context/AuthContext'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { toast } from 'react-toastify'
@@ -16,8 +17,13 @@ import '../../assets/style/reader/library.css'
 function Library() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, user } = useAuth()
   const [loading, setLoading] = useState(true)
+
+  const userRole = typeof user?.role === 'string' 
+    ? user.role 
+    : (user?.role?.roleName || user?.roleName || 'READER');
+  const isReader = !userRole || userRole.toUpperCase() === 'READER' || userRole.toUpperCase() === 'USER';
 
   // Sub-tabs state
   const [activeTab, setActiveTab] = useState('Saved')
@@ -27,6 +33,7 @@ function Library() {
   const [likedList, setLikedList] = useState([])
   const [historyList, setHistoryList] = useState([])
   const [ratedList, setRatedList] = useState([])
+  const [groupsCount, setGroupsCount] = useState(0)
 
   // Unified Delete Confirmation Modal state
   const [deleteModal, setDeleteModal] = useState({
@@ -58,7 +65,7 @@ function Library() {
   const fetchLibraryData = async () => {
     try {
       setLoading(true)
-      const [historyData, savesData, likesData, ratingsData] = await Promise.all([
+      const [historyData, savesData, likesData, ratingsData, projectTeamsData] = await Promise.all([
         getMyReadingHistoryApi().catch(err => {
           console.error("Failed to fetch reading history:", err)
           return []
@@ -74,6 +81,10 @@ function Library() {
         getUserRatingsApi().catch(err => {
           console.error("Failed to fetch user ratings:", err)
           return []
+        }),
+        getAllProjectTeamsApi().catch(err => {
+          console.error("Failed to fetch project teams:", err)
+          return []
         })
       ])
       
@@ -81,6 +92,11 @@ function Library() {
       setSavedList(Array.isArray(savesData) ? savesData : [])
       setLikedList(Array.isArray(likesData) ? likesData : [])
       setRatedList(Array.isArray(ratingsData) ? ratingsData : (ratingsData?.data || []))
+
+      const teamsList = Array.isArray(projectTeamsData) 
+        ? projectTeamsData 
+        : (projectTeamsData?.data || [])
+      setGroupsCount(teamsList.length)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load library data.')
@@ -275,28 +291,32 @@ function Library() {
           </div>
 
           {/* ── BECOME A TRANSLATOR BANNER ─────────────── */}
-          <div className="lib-translator-banner">
-            <div className="lib-banner-left">
-              <div className="lib-banner-icon">文</div>
-              <div>
-                <h3 className="lib-banner-title">Become a Translator</h3>
-                <p className="lib-banner-desc">Join the translation community, earn income from your passion for comics</p>
+          {isReader && (
+            <div className="lib-translator-banner">
+              <div className="lib-banner-left">
+                <div className="lib-banner-icon">文</div>
+                <div>
+                  <h3 className="lib-banner-title">Become a Translator</h3>
+                  <p className="lib-banner-desc">Join the translation community, earn income from your passion for comics</p>
+                </div>
+              </div>
+              <div className="lib-banner-right">
+                <div className="lib-banner-stat">
+                  <span className="lib-banner-stat-label">Avg Income</span>
+                  <span className="lib-banner-stat-value">$100 - 250/mo</span>
+                </div>
+                <div className="lib-banner-stat">
+                  <span className="lib-banner-stat-label">Groups</span>
+                  <span className="lib-banner-stat-value">
+                    {groupsCount > 0 ? `${groupsCount} ${groupsCount === 1 ? 'group' : 'groups'}` : '0 groups'}
+                  </span>
+                </div>
+                <button className="lib-banner-btn" onClick={() => navigate('/translator-register')}>
+                  Learn More →
+                </button>
               </div>
             </div>
-            <div className="lib-banner-right">
-              <div className="lib-banner-stat">
-                <span className="lib-banner-stat-label">Avg Income</span>
-                <span className="lib-banner-stat-value">$100 - 250/mo</span>
-              </div>
-              <div className="lib-banner-stat">
-                <span className="lib-banner-stat-label">Groups</span>
-                <span className="lib-banner-stat-value">127 groups</span>
-              </div>
-              <button className="lib-banner-btn" onClick={() => navigate('/policy')}>
-                Learn More →
-              </button>
-            </div>
-          </div>
+          )}
 
           {/* ── SUB-TABS ROW ─────────────────── */}
           <div className="lib-tabs-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>

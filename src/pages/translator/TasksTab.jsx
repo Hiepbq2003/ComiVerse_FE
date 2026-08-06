@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { getChapterDetailApi, getChaptersByComicIdApi } from "../../services/api/ChapterApi";
 import { getAuthorComicByIdApi, getAuthorComicChaptersApi, getAuthorChapterPreviewApi } from "../../services/api/AuthorComicApi";
-import { getComicByIdApi, searchComicsApi, getAllComicsApi } from "../../services/api/ComicApi";
+import { getComicByIdApi, getAllComicsApi } from "../../services/api/ComicApi";
 import { getAuth } from "../../utils/Auth";
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { resolveImageUrl } from '../../config/apiConfig';
@@ -175,28 +175,43 @@ function TaskAssigneeAvatar({ assigneeId, getAssigneeInitials }) {
 function TaskCard({ task, colId, comicName, onOpenTaskDetails, getAssigneeInitials }) {
   const { priority, cleanTitle } = parseTaskTitle(task.title, comicName)
   const isDone = colId === 'completed'
+  const isRevoked = Boolean(task.rejectionReason || task.isRevoked || task.status === 'REVOKED' || task.status === 'REVISION_NEEDED')
 
   return (
     <article
-      className={`task ${isDone ? 'task--completed' : ''}`}
+      className={`task ${isDone ? 'task--completed' : ''} ${isRevoked ? 'task--revoked' : ''}`}
       tabIndex="0"
       onClick={() => onOpenTaskDetails(task)}
     >
-      {isDone ? (
-        <div className="task__check">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 6 9 17l-5-5" />
-          </svg>
-          <span>Done</span>
-        </div>
-      ) : (
-        <div className={`task__priority task__priority--${priority.toLowerCase()}`}>
-          {priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase()}
-        </div>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '6px' }}>
+        {isDone ? (
+          <div className="task__check">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+            <span>Done</span>
+          </div>
+        ) : (
+          <div className={`task__priority task__priority--${priority.toLowerCase()}`}>
+            {priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase()}
+          </div>
+        )}
+
+        {isRevoked && (
+          <span className="task__revoked-tag" title={task.rejectionReason ? `Revoked Reason: ${task.rejectionReason}` : 'Translation Revoked'}>
+            ⚠️ REVOKED
+          </span>
+        )}
+      </div>
 
       <h3>{cleanTitle}</h3>
       <p className="task__desc">Task for {comicName}</p>
+
+      {isRevoked && task.rejectionReason && (
+        <div className="task__revocation-alert" title={task.rejectionReason}>
+          <span className="task__revocation-label">Reason:</span> {task.rejectionReason}
+        </div>
+      )}
 
       <footer className="task__footer">
         <TaskAssigneeAvatar assigneeId={task.assigneeId} getAssigneeInitials={getAssigneeInitials} />
@@ -265,7 +280,7 @@ function KanbanColumn({
             <button type="button" className="dropdown__item" onClick={onToggleHighlight}>
               {isHighlighted ? 'Unhighlight' : 'Highlight column'}
             </button>
-            {col.id !== 'completed' && isCurrentLeader && (
+            {isCurrentLeader && col.id !== 'completed' && (
               <button type="button" className="dropdown__item" onClick={onMoveAllToDone}>
                 Move all to Done
               </button>
@@ -292,7 +307,7 @@ function KanbanColumn({
             onClick={() => onViewChapterClick && onViewChapterClick(ch)}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '11px', background: 'rgba(168, 85, 247, 0.25)', color: '#c084fc', padding: '3px 8px', borderRadius: '6px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <span className="raw-chapter-badge">
                 📖 Raw Chapter
               </span>
               {ch.pagesCount > 0 && (
@@ -306,9 +321,10 @@ function KanbanColumn({
               {ch.title}
             </h4>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-              <span style={{ fontSize: '11.5px', color: '#34d399', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                ● Ready to Translate
+            <div className="backlog-card-footer">
+              <span className="ready-to-translate-text">
+                <div className="status-dot-pulse"></div>
+                Ready to Translate
               </span>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <button
@@ -354,7 +370,7 @@ function KanbanColumn({
   )
 }
 
-function PausedTaskCard({ task, comicName, onResume }) {
+function PausedTaskCard({ task, comicName, onResume, canResume = false }) {
   const { priority, cleanTitle } = parseTaskTitle(task.title, comicName)
   return (
     <div className="paused-task-card task-card-item" style={{ opacity: 0.75 }}>
@@ -366,7 +382,9 @@ function PausedTaskCard({ task, comicName, onResume }) {
       <span style={{ fontSize: '11px', color: 'var(--trans-text-muted)' }}>Project: {task.project || comicName}</span>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
         <span style={{ fontSize: '11px', color: 'var(--trans-text-secondary)' }}>Due: {task.dueDate}</span>
-        <button className="trans-btn primary" style={{ fontSize: '9px', padding: '2px 8px' }} onClick={onResume}>Resume</button>
+        {canResume && (
+          <button className="trans-btn primary" style={{ fontSize: '9px', padding: '2px 8px' }} onClick={onResume}>Resume</button>
+        )}
       </div>
     </div>
   )
@@ -581,11 +599,8 @@ function TasksTab({
                   key={task.id}
                   task={task}
                   comicName={comicName}
-                  onResume={() => {
-                    const canResume = isCurrentLeader || isUserAssignedToTask(task, members, authUser);
-                    if (!canResume) return;
-                    onMoveTask(task.id, 'backlog');
-                  }}
+                  canResume={isCurrentLeader}
+                  onResume={() => onMoveTask(task.id, 'backlog')}
                 />
               ))}
             </div>

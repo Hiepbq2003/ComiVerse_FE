@@ -28,10 +28,10 @@ function UploadGuideModal({ onClose }) {
 
         <div className="author-upload-guide-content">
           <section className="author-section-card">
-            <h2 className="author-section-title">Required ZIP Structure</h2>
-            <p className="author-guide-lead">Each chapter is uploaded as one ZIP file. Page images must be located directly at the archive root.</p>
+            <h2 className="author-section-title">Required Folder Structure</h2>
+            <p className="author-guide-lead">Each chapter is uploaded as one selected folder. Page images must be located directly inside that folder.</p>
             <div className="author-code-card">
-              <pre>{`Chapter 2.zip
+              <pre>{`Chapter 2/
 ├── 01.jpg
 ├── 02.jpg
 ├── 03.jpg
@@ -42,7 +42,7 @@ function UploadGuideModal({ onClose }) {
               <div className="author-guide-box success">
                 <h3>Accepted</h3>
                 <ul>
-                  <li>Names such as <code>Chapter 1.zip</code>, <code>Chapter 1,5.zip</code>, or <code>Chapter 1.5.zip</code>.</li>
+                  <li>Any folder name is accepted. Enter the chapter number in the separate Chapter Number field.</li>
                   <li>Page files such as <code>01.jpg</code>, <code>02.png</code>, and <code>003.webp</code>.</li>
                   <li>JPG, JPEG, PNG, WEBP, and GIF images.</li>
                   <li>Duplicate source image names are handled safely.</li>
@@ -52,9 +52,9 @@ function UploadGuideModal({ onClose }) {
               <div className="author-guide-box danger">
                 <h3>Rejected</h3>
                 <ul>
-                  <li>Wrapper folders such as <code>Chapter 2/01.jpg</code>.</li>
-                  <li>Another archive nested inside the chapter ZIP.</li>
-                  <li>PDF, TXT, PSD, README, hidden files, or <code>__MACOSX</code>.</li>
+                  <li>Nested folders such as <code>Chapter 2/pages/01.jpg</code>.</li>
+                  <li>ZIP, RAR, PDF, TXT, PSD, README, or hidden files inside the chapter folder.</li>
+                  <li>Files from multiple folders in one chapter request.</li>
                   <li>Images larger than the backend upload limit.</li>
                 </ul>
               </div>
@@ -63,7 +63,7 @@ function UploadGuideModal({ onClose }) {
 
           <ol className="author-guide-steps">
             <li>Create the comic draft with its information and cover image.</li>
-            <li>Open Comic Detail and upload one chapter ZIP.</li>
+            <li>Open Comic Detail and select one chapter folder.</li>
             <li>Check the page order while the chapter is <strong>PREVIEW_READY</strong>.</li>
             <li>Submit the chapter, then press <strong>Push Review</strong> for the comic profile.</li>
           </ol>

@@ -16,6 +16,10 @@ export const deleteChapterApi = (chapterId) => {
   return AxiosClient.delete(`/chapters/${chapterId}`);
 };
 
+export const takedownChapterApi = (chapterId, reason) => {
+  return AxiosClient.post(`/chapters/${chapterId}/takedown`, { reason });
+};
+
 export const approveChapterDirectApi = (chapterId) => {
   return AxiosClient.put(`/chapters/${chapterId}/approve`);
 };
@@ -26,4 +30,12 @@ export const getChapterTranslationsApi = (chapterId) => {
  
 export const getComicTranslationLanguagesApi = (comicId) => {
   return AxiosClient.get(`/comics/${comicId}/translation-languages`);
+};
+
+export const getTasksByChapterIdApi = (chapterId) => {
+  return AxiosClient.get(`/team-workspace/tasks/by-chapter/${chapterId}`);
+};
+
+export const revokeChapterTranslationApi = (taskId, reason) => {
+  return AxiosClient.put(`/review-workspace/tasks/${taskId}/revoke`, { reason });
 };

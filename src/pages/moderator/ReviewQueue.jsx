@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import '../../assets/style/moderator/review-queue.css'
 import '../../assets/style/moderator/comic-detail.css'
 import ModernButton from '../../components/common/ModernButton'
@@ -73,12 +74,14 @@ const isSameChapterItem = (c, target) => {
 
 function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfirmReject, handleApproveAndCreateProject, handleChapterApprove, handleChapterReject }) {
   const { theme } = useTheme()
-  const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'approved' | 'rejected'
+  const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'approved' | 'rejected' | 'appealed'
   
   const [sortFilter, setSortFilter] = useState('Newest')
   const [searchQuery, setSearchQuery] = useState('')
 
   const [selectedReview, setSelectedReview] = useState(null)
+  const [simpleEvidenceView, setSimpleEvidenceView] = useState(null)
   const [selectedChapter, setSelectedChapter] = useState(null)
   const [previewTab, setPreviewTab] = useState('reader') // 'reader' | 'script' | 'chapters' | 'synopsis'
   const [pageIndex, setPageIndex] = useState(0)
@@ -160,18 +163,27 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
     return null;
   };
 
-  // Normalize a chapter object from the backend: map 'images' to 'pages'
   const normalizeChapter = (chap, idx) => {
     const pages = Array.isArray(chap.pages) && chap.pages.length > 0
       ? chap.pages
       : Array.isArray(chap.images) && chap.images.length > 0
         ? chap.images
         : [];
+        
+    const rawTitle = String(chap.title || chap.chapter || '');
+    let extractedNum = null;
+    if (rawTitle) {
+      const match = rawTitle.match(/chapter\s+(\d+)/i);
+      if (match) extractedNum = parseInt(match[1], 10);
+    }
+    
+    const computedNum = extractedNum || chap.chapterNumber || chap.number || idx + 1;
+
     return {
       ...chap,
       id: chap.id || `chap-${idx}-${Date.now()}`,
-      number: chap.chapterNumber || chap.number || idx + 1,
-      title: chap.title || chap.chapter || `Chapter ${chap.chapterNumber || chap.number || idx + 1}`,
+      number: computedNum,
+      title: rawTitle || `Chapter ${computedNum}`,
       pages,
       content: chap.content || null,
       words: chap.words || chap.wordCount || null,
@@ -232,14 +244,36 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
 
     let finalChaps = list;
     if (item.status === 'pending' || !item.status) {
-      finalChaps = list.filter(c => c.status !== 'approved' && c.status !== 'rejected');
+      finalChaps = list.filter(c => {
+        if (c.status === 'approved' || c.status === 'rejected') return false;
+        const modStatus = (c.moderationStatus || '').toUpperCase();
+        if (modStatus === 'PUBLISHED' || modStatus === 'REJECTED') return false;
+        return true;
+      });
     }
 
-    return finalChaps.map(c => ({
+    const sortedChaps = finalChaps.map(c => ({
       ...c,
       submissionId: c.submissionId || item.id || c.id,
       originalSubmissionItem: c.originalSubmissionItem || item
-    })).sort((a, b) => (Number(a.number) || 0) - (Number(b.number) || 0));
+    })).sort((a, b) => {
+      const numA = Number(a.number) || 0;
+      const numB = Number(b.number) || 0;
+      if (numA !== numB) return numA - numB;
+      return (a.timestamp || 0) - (b.timestamp || 0);
+    });
+
+    const usedNumbers = new Set();
+    sortedChaps.forEach(c => {
+      let num = Number(c.number) || 1;
+      while (usedNumbers.has(num)) {
+        num++;
+      }
+      c.number = num;
+      usedNumbers.add(num);
+    });
+
+    return sortedChaps.sort((a, b) => (Number(a.number) || 0) - (Number(b.number) || 0));
   };
 
   // Extract description/synopsis/summary safely from raw submission objects or matching comic
@@ -530,7 +564,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
 
   // 1. High-Performance Memoized Tab Counts (Grouped by Comic)
   const tabCounts = useMemo(() => {
-    const counts = { pending: 0, approved: 0, rejected: 0 };
+    const counts = { pending: 0, approved: 0, rejected: 0, appealed: 0 };
     const authUser = getAuth()?.user;
 
     const scopedSubmissions = submissions.filter(item => 
@@ -549,14 +583,39 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
       counts[tabStatus] = uniqueKeys.size;
     });
 
+    const appealedComics = comics.filter(c => c.isAppealed || c.appealed || c.moderationStatus === 'APPEALED');
+    counts.appealed = appealedComics.length;
+
     return counts;
-  }, [submissions]);
+  }, [submissions, comics]);
 
   // 2. High-Performance Instant Query Filter & Sort
   const filteredItems = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
     const authUser = getAuth()?.user;
     
+    if (activeTab === 'appealed') {
+      return comics
+        .filter(c => c.isAppealed || c.appealed || c.moderationStatus === 'APPEALED')
+        .filter(c => {
+           if (!query) return true;
+           return (c.title?.toLowerCase().includes(query) || c.authorName?.toLowerCase().includes(query));
+        })
+        .map(c => ({
+          ...c,
+          status: 'appealed',
+          type: 'Comic Appeal',
+          submittedBy: c.authorName,
+          timestamp: c.updatedAt || c.createdAt || Date.now(),
+          isComicAppealItem: true
+        }))
+        .sort((a, b) => {
+          const timeA = new Date(a.timestamp || 0).getTime() || 0;
+          const timeB = new Date(b.timestamp || 0).getTime() || 0;
+          return sortFilter === 'Newest' ? timeB - timeA : timeA - timeB;
+        });
+    }
+
     return submissions
       .filter(item => isLanguageInModeratorScope(getSubmissionLanguage(item), authUser))
       .filter(item => item.status === activeTab)
@@ -574,7 +633,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
         const timeB = new Date(b.timestamp || b.submittedAt || b.createdAt || 0).getTime() || 0;
         return sortFilter === 'Newest' ? timeB - timeA : timeA - timeB;
       });
-  }, [submissions, activeTab, searchQuery, sortFilter]);
+  }, [submissions, comics, activeTab, searchQuery, sortFilter]);
 
   // 3. Smart Comic Grouping: Consolidate multiple chapter submissions of the same comic into 1 card
   const groupedItems = useMemo(() => {
@@ -630,12 +689,27 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
       // Synchronize group.chapters with group.allChapters for 100% consistent badge count
       group.chapters = group.allChapters;
       
-      // Re-index chapter numbers for clean ordering if needed
-      group.allChapters.forEach((chap, idx) => {
-        if (!chap.number || chap.number === 1) {
-          chap.number = idx + 1;
-        }
+      // Sort chapters initially by their existing number and timestamp
+      group.allChapters.sort((a, b) => {
+        const numA = Number(a.number) || 0;
+        const numB = Number(b.number) || 0;
+        if (numA !== numB) return numA - numB;
+        return (a.timestamp || 0) - (b.timestamp || 0);
       });
+
+      // Resolve duplicate chapter numbers robustly
+      const usedNumbers = new Set();
+      group.allChapters.forEach(chap => {
+        let num = Number(chap.number) || 1;
+        while (usedNumbers.has(num)) {
+          num++;
+        }
+        chap.number = num;
+        usedNumbers.add(num);
+      });
+
+      // Re-sort just in case the resolution changed the logical order
+      group.allChapters.sort((a, b) => (Number(a.number) || 0) - (Number(b.number) || 0));
 
       // Enrich group root metadata from its subItems
       group.language = getSubmissionLanguage(group);
@@ -676,7 +750,8 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
       await handleApprove(targetSubId, targetSubItem || chapToApprove);
     }
 
-    const remainingChapters = (selectedReview.allChapters || []).filter(c => {
+    const currentPendingChapters = getSubmissionChapters(selectedReview);
+    const remainingChapters = currentPendingChapters.filter(c => {
       return !isSameChapterItem(c, chapToApprove);
     });
 
@@ -775,8 +850,9 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
     if (selectedReview && (selectedReview.allChapters || selectedReview.subItems)) {
       const targetObj = selectedReject.rejectChapterObj || selectedReject;
 
-      const remainingChapters = (selectedReview.allChapters || []).filter(c => {
-        return !isSameChapterItem(c, targetObj) && c !== selectedChapter;
+      const currentPendingChapters = getSubmissionChapters(selectedReview);
+      const remainingChapters = currentPendingChapters.filter(c => {
+        return !isSameChapterItem(c, targetObj);
       });
       const remainingSubItems = (selectedReview.subItems || []).filter(s => {
         return !isSameChapterItem(s, targetObj) && s !== selectedReject;
@@ -898,8 +974,16 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
       } catch {
         chaptersData = await getAuthorComicChaptersApi(comicId);
       }
-      const list = chaptersData?.data || chaptersData || [];
-      if (!Array.isArray(list) || list.length === 0) return [];
+      let list = chaptersData?.data || chaptersData || [];
+      if (!Array.isArray(list)) list = [];
+      
+      // Filter out PREVIEW_READY or DRAFT chapters since moderator should not see them
+      list = list.filter(ch => {
+        const status = (ch.status || ch.moderationStatus || '').toUpperCase();
+        return !status || status === 'APPROVED' || status === 'PUBLISHED' || status === 'SUBMITTED_FOR_REVIEW' || status === 'REJECTED';
+      });
+
+      if (list.length === 0) return [];
 
       if (!fetchDetails) {
         const shallowResult = list.map((ch, idx) => normalizeChapter(ch, idx));
@@ -983,6 +1067,11 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
   }, [paginatedItems]);
 
   const handleOpenReviewModal = async (item) => {
+    if (item.status !== 'pending') {
+      setSimpleEvidenceView(item);
+      return;
+    }
+
     setSelectedReview(item);
     setPageIndex(0);
     setFetchingChapters(true);
@@ -1042,22 +1131,40 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
     }
   };
 
+  const getReviewViewPages = (submission, chapter, docComments) => {
+    if (!submission) return [];
+    const chaps = (submission.allChapters && submission.allChapters.length > 0) 
+      ? [...submission.allChapters] 
+      : getSubmissionChapters(submission);
+    const active = chapter || chaps[0] || null;
+    const base = (active && Array.isArray(active.pages)) ? active.pages : [];
+    
+    let viewPages = base.map((url, idx) => ({ url, originalIdx: idx, pNum: idx + 1 }));
+    if (submission.status === 'rejected' || submission.status === 'approved') {
+       const comments = docComments[submission.id] || [];
+       const pinnedSet = new Set(comments.map(c => {
+         const match = c.targetKey?.match(/^page-(\d+)$/);
+         return match ? parseInt(match[1], 10) : null;
+       }).filter(n => n !== null));
+       
+       if (pinnedSet.size > 0) {
+         viewPages = viewPages.filter(p => pinnedSet.has(p.pNum));
+       }
+    }
+    return viewPages;
+  }
+
   // Accelerated Image Preloading Strategy
   useEffect(() => {
     if (!selectedReview || previewTab !== 'reader') return
-    const chaptersList = getSubmissionChapters(selectedReview)
-    const activeChap = selectedChapter || chaptersList[0] || null
-    const pages = (activeChap && Array.isArray(activeChap.pages)) ? activeChap.pages : []
+    const viewPages = getReviewViewPages(selectedReview, selectedChapter, docCommentsMap);
 
-    if (pages.length > 0) {
+    if (viewPages.length > 0) {
       const preloadIndices = [pageIndex, pageIndex + 1, pageIndex - 1, pageIndex + 2]
       preloadIndices.forEach(idx => {
-        if (idx >= 0 && idx < pages.length && pages[idx]) {
-          const rawUrl = typeof pages[idx] === 'string' ? pages[idx] : (pages[idx].imageUrl || pages[idx].url || pages[idx].pageUrl)
-          if (rawUrl && typeof rawUrl === 'string' && rawUrl.startsWith('http')) {
-            const img = new Image()
-            img.src = rawUrl
-          }
+        if (idx >= 0 && idx < viewPages.length && viewPages[idx]) {
+          const img = new Image()
+          img.src = viewPages[idx].url
         }
       })
     }
@@ -1069,12 +1176,10 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
     const handleKeyDown = (e) => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return
 
-      const chaptersList = getSubmissionChapters(selectedReview)
-      const activeChap = selectedChapter || chaptersList[0] || null
-      const pages = (activeChap && Array.isArray(activeChap.pages)) ? activeChap.pages : []
+      const viewPages = getReviewViewPages(selectedReview, selectedChapter, docCommentsMap);
 
       if (e.key === 'ArrowRight' || e.key === 'PageDown') {
-        if (pageIndex < pages.length - 1) {
+        if (pageIndex < viewPages.length - 1) {
           setPageIndex(prev => prev + 1)
         }
       } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
@@ -1152,6 +1257,13 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
           Rejected
           <span className="moderator-tab-btn-badge rejected">{tabCounts.rejected}</span>
         </button>
+        <button 
+          className={`moderator-tab-btn ${activeTab === 'appealed' ? 'active' : ''}`}
+          onClick={() => setActiveTab('appealed')}
+        >
+          Appealed
+          <span className="moderator-tab-btn-badge appealed" style={{ background: '#f59e0b', color: '#fff' }}>{tabCounts.appealed}</span>
+        </button>
       </div>
 
       {/* Filter and Sort bar */}
@@ -1227,9 +1339,15 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                 <div className="submission-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <ModernButton 
                     variant={2} 
-                    label="👁️ Review Content" 
+                    label={item.isComicAppealItem ? "📄 Review Appeal" : (item.status === 'pending' ? "👁 Review Content" : "👁 View Evidence")} 
                     className="btn-review"
-                    onClick={() => handleOpenReviewModal(item)} 
+                    onClick={() => {
+                      if (item.isComicAppealItem) {
+                        navigate(`/moderator/comic-management/${item.id}`);
+                      } else {
+                        handleOpenReviewModal(item);
+                      }
+                    }} 
                   />
 
                   {item.status === 'pending' && (
@@ -1272,10 +1390,9 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
         <div className={`mod-inspector-overlay fade-in ${theme === 'light' ? 'light-theme' : 'dark-theme'}`}>
           {/* Topbar Navigation & Review Actions */}
           {(() => {
-            const chaptersList = getSubmissionChapters(selectedReview);
-            const activeChap = selectedChapter || chaptersList[0] || null;
-            const pages = (activeChap && Array.isArray(activeChap.pages)) ? activeChap.pages : [];
+            const viewPages = getReviewViewPages(selectedReview, selectedChapter, docCommentsMap);
             const activeComments = docCommentsMap[selectedReview.id] || [];
+            const chaptersList = getSubmissionChapters(selectedReview);
 
             return (
               <div className="mod-inspector-topbar">
@@ -1298,7 +1415,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                     className={`mod-mode-tab ${previewTab === 'reader' ? 'active' : ''}`}
                     onClick={() => setPreviewTab('reader')}
                   >
-                    🖼️ Image Reader ({pages.length})
+                    🖼️ Image Reader ({viewPages.length})
                   </button>
                   <button
                     type="button"
@@ -1344,13 +1461,13 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
             {/* Left Content Area */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', position: 'relative' }}>
               {(() => {
+                const viewPages = getReviewViewPages(selectedReview, selectedChapter, docCommentsMap);
                 const chaptersList = getSubmissionChapters(selectedReview);
                 const activeChap = selectedChapter || chaptersList[0] || null;
-                const pages = (activeChap && Array.isArray(activeChap.pages)) ? activeChap.pages : [];
 
                 /* MODE 1: RAW IMAGE READER VIEW */
                 if (previewTab === 'reader') {
-                  if (pages.length === 0) {
+                  if (viewPages.length === 0) {
                     return (
                       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
                         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🖼️</div>
@@ -1371,9 +1488,9 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                     );
                   }
 
-                  const currentPageUrl = pages[pageIndex] || pages[0];
+                  const current = viewPages[pageIndex] || viewPages[0];
                   const pageComments = (docCommentsMap[selectedReview.id] || [])
-                    .filter(c => c.targetKey === `page-${pageIndex + 1}`);
+                    .filter(c => c.targetKey === `page-${current.pNum}`);
 
                   return (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', position: 'relative' }}>
@@ -1381,7 +1498,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                       <div className="mod-inspector-subbanner">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <span className="mod-pane-title--raw" style={{ fontWeight: '700' }}>
-                            🌐 Original Raw Manuscript — {activeChap ? activeChap.title : 'Chapter Page'} (Page {pageIndex + 1} of {pages.length})
+                            🌐 Original Raw Manuscript — {activeChap ? activeChap.title : 'Chapter Page'} (Page {pageIndex + 1} of {viewPages.length})
                           </span>
                           <span className="mod-inspector-subtitle" style={{ fontSize: '12px' }}>
                             💡 Click anywhere on image to drop a Google Docs style comment pin!
@@ -1418,23 +1535,19 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                         {readerLayout === 'single' ? (
                           <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', textAlign: 'center' }}>
                             <img
-                              src={currentPageUrl}
-                              alt={`Page ${pageIndex + 1}`}
+                              src={current.url}
+                              alt={`Page ${current.pNum}`}
                               decoding="async"
                               loading="eager"
                               onClick={(e) => {
-                                if (!isPinLocationMode) {
-                                  // Mode A: Normal Page View Mode — Select Page without modal popup!
-                                  return;
-                                }
-                                // Mode B: Pin Location Mode — Drop Coordinate Pin!
+                                if (!isPinLocationMode) return;
                                 const rect = e.currentTarget.getBoundingClientRect();
                                 const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
                                 const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
                                 setFieldCommentModalTarget({
                                   targetType: 'point',
-                                  targetKey: `page-${pageIndex + 1}`,
-                                  targetLabel: `Page ${pageIndex + 1}`,
+                                  targetKey: `page-${current.pNum}`,
+                                  targetLabel: `Page ${current.pNum}`,
                                   coords: { x, y }
                                 });
                               }}
@@ -1447,7 +1560,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                                 border: '1px solid rgba(148, 163, 184, 0.2)',
                                 cursor: isPinLocationMode ? 'crosshair' : 'pointer'
                               }}
-                              title={isPinLocationMode ? "Click to drop a location pin comment on this image" : `Page ${pageIndex + 1}`}
+                              title={isPinLocationMode ? "Click to drop a location pin comment on this image" : `Page ${current.pNum}`}
                             />
 
                             {/* Render Pinned Comment Markers over Image */}
@@ -1488,37 +1601,31 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                           </div>
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', width: '100%', maxWidth: '850px' }}>
-                            {pages.map((imgUrl, pIdx) => {
-                              const pNum = pIdx + 1;
+                            {viewPages.map((pageObj, pIdx) => {
                               const pComments = (docCommentsMap[selectedReview.id] || [])
-                                .filter(c => c.targetKey === `page-${pNum}`);
+                                .filter(c => c.targetKey === `page-${pageObj.pNum}`);
 
                               return (
-                                <div key={pIdx} id={`page-container-${pNum}`} style={{ width: '100%', textAlign: 'center', position: 'relative' }}>
+                                <div key={pIdx} id={`page-container-${pageObj.pNum}`} style={{ width: '100%', textAlign: 'center', position: 'relative' }}>
                                   <img
-                                    src={imgUrl}
-                                    alt={`Page ${pNum}`}
+                                    src={pageObj.url}
+                                    alt={`Page ${pageObj.pNum}`}
                                     decoding="async"
                                     loading="lazy"
                                     onClick={(e) => {
                                       if (selectedReview.status !== 'pending') return;
-                                      
                                       setPageIndex(pIdx);
-
                                       if (!isPinLocationMode) {
-                                        // Mode A: Normal Page View Mode — Select Page & Smooth Scroll without modal popup!
-                                        scrollToPageElement(pNum);
+                                        scrollToPageElement(pageObj.pNum);
                                         return;
                                       }
-
-                                      // Mode B: Pin Location Mode — Drop Coordinate Pin!
                                       const rect = e.currentTarget.getBoundingClientRect();
                                       const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
                                       const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
                                       setFieldCommentModalTarget({
                                         targetType: 'point',
-                                        targetKey: `page-${pNum}`,
-                                        targetLabel: `Page ${pNum}`,
+                                        targetKey: `page-${pageObj.pNum}`,
+                                        targetLabel: `Page ${pageObj.pNum}`,
                                         coords: { x, y }
                                       });
                                     }}
@@ -1531,7 +1638,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                                       border: '1px solid rgba(148, 163, 184, 0.2)',
                                       cursor: selectedReview.status === 'pending' ? (isPinLocationMode ? 'crosshair' : 'pointer') : 'default'
                                     }}
-                                    title={selectedReview.status === 'pending' ? (isPinLocationMode ? 'Click to drop a location pin comment on this image' : `Click to select Page ${pNum}`) : `Page ${pNum}`}
+                                    title={selectedReview.status === 'pending' ? (isPinLocationMode ? 'Click to drop a location pin comment on this image' : `Click to select Page ${pageObj.pNum}`) : `Page ${pageObj.pNum}`}
                                   />
 
                                   {/* Render Pinned Comment Markers over Image in Vertical Scroll Mode */}
@@ -1571,7 +1678,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                                   })}
 
                                   <span className="mod-inspector-subtitle" style={{ display: 'inline-block', marginTop: '6px', fontSize: '11.5px' }}>
-                                    Page {pNum} of {pages.length}
+                                    Page {pageObj.pNum} of {viewPages.length}
                                   </span>
                                 </div>
                               );
@@ -1589,7 +1696,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                             onClick={() => {
                               const targetP = Math.max(0, pageIndex - 1);
                               setPageIndex(targetP);
-                              if (readerLayout === 'vertical') scrollToPageElement(targetP + 1);
+                              if (readerLayout === 'vertical') scrollToPageElement(viewPages[targetP].pNum);
                             }}
                             disabled={pageIndex === 0}
                           >
@@ -1602,13 +1709,16 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                               className="mod-inspect-select"
                               value={pageIndex}
                               onChange={(e) => {
-                                const targetP = Number(e.target.value);
-                                setPageIndex(targetP);
-                                if (readerLayout === 'vertical') scrollToPageElement(targetP + 1);
+                                const targetIdx = Number(e.target.value);
+                                setPageIndex(targetIdx);
+                                if (readerLayout === 'vertical') {
+                                  const current = viewPages[targetIdx];
+                                  if (current) scrollToPageElement(current.pNum);
+                                }
                               }}
                             >
-                              {pages.map((_, pIdx) => (
-                                <option key={pIdx} value={pIdx}>{pIdx + 1} of {pages.length}</option>
+                              {viewPages.map((p, pOptionIdx) => (
+                                <option key={pOptionIdx} value={pOptionIdx}>Page {p.pNum} ({pOptionIdx + 1} of {viewPages.length})</option>
                               ))}
                             </select>
                           </div>
@@ -1617,11 +1727,11 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                             type="button"
                             className="mod-nav-arrow"
                             onClick={() => {
-                              const targetP = Math.min(pages.length - 1, pageIndex + 1);
+                              const targetP = Math.min(viewPages.length - 1, pageIndex + 1);
                               setPageIndex(targetP);
-                              if (readerLayout === 'vertical') scrollToPageElement(targetP + 1);
+                              if (readerLayout === 'vertical') scrollToPageElement(viewPages[targetP].pNum);
                             }}
-                            disabled={pageIndex >= pages.length - 1}
+                            disabled={pageIndex === viewPages.length - 1}
                           >
                             Next Page →
                           </button>
@@ -1700,7 +1810,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                                       }}
                                     >
                                       <td style={{ padding: '14px 18px', fontWeight: '800', color: rowTextColor }}>
-                                        Chapter {chap.number || idx + 1}
+                                        {chap.title && !chap.title.toLowerCase().startsWith('chapter') ? `Chapter ${chap.number || idx + 1} — ${chap.title}` : (chap.title || `Chapter ${chap.number || idx + 1}`)}
                                       </td>
                                       <td style={{ padding: '14px 18px', fontWeight: '600', color: rowTextColor }}>
                                         📄 {Array.isArray(chap.pages) ? chap.pages.length : (Array.isArray(chap.images) ? chap.images.length : 0)} Pages {chap.words ? `· ${chap.words}` : ''}
@@ -1715,7 +1825,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                                             label={isSelected ? '✓ Inspecting' : '👁️ View'}
                                             onClick={() => handleSelectChapterItem(chap)}
                                           />
-                                          {selectedReview.status === 'pending' && idx === 0 && (
+                                          {selectedReview.status === 'pending' && chap.status !== 'approved' && chap.status !== 'rejected' && (
                                             <>
                                               <ModernButton
                                                 variant={2}
@@ -2202,6 +2312,139 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
         document.body
       )}
 
+      {/* ── SIMPLE EVIDENCE VIEW MODAL ────────── */}
+      {simpleEvidenceView && createPortal(
+        <div className="mod-modal-overlay mod-inspector-high-priority" style={{ 
+          zIndex: 999999, 
+          backdropFilter: 'blur(16px)', 
+          WebkitBackdropFilter: 'blur(16px)',
+          backgroundColor: theme === 'light' ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.7)',
+          animation: 'fadeIn 0.3s ease-out'
+        }}>
+          <div style={{ 
+            maxWidth: '480px', 
+            width: '90%', 
+            borderRadius: '24px', 
+            background: theme === 'light' 
+              ? 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.85) 100%)' 
+              : 'linear-gradient(135deg, rgba(30,27,75,0.95) 0%, rgba(15,23,42,0.85) 100%)',
+            boxShadow: theme === 'light' 
+              ? '0 20px 40px -10px rgba(124,58,237,0.15), 0 0 0 1px rgba(255,255,255,0.5) inset' 
+              : '0 25px 50px -12px rgba(0,0,0,0.8), 0 0 0 1px rgba(124,58,237,0.3) inset',
+            border: theme === 'light' ? '1px solid rgba(124,58,237,0.1)' : '1px solid rgba(139,92,246,0.2)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            transform: 'scale(1)',
+            animation: 'slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}>
+            
+            {/* Top decorative gradient bar */}
+            <div style={{ height: '6px', width: '100%', background: 'linear-gradient(90deg, #a855f7 0%, #ec4899 50%, #ff6b35 100%)' }} />
+
+            <div style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <h3 style={{ 
+                  margin: 0, 
+                  fontSize: '22px', 
+                  fontWeight: '800', 
+                  background: 'linear-gradient(90deg, #9333ea, #db2777)', 
+                  WebkitBackgroundClip: 'text', 
+                  WebkitTextFillColor: 'transparent',
+                  letterSpacing: '-0.5px'
+                }}>
+                  Submission Evidence
+                </h3>
+                <span style={{ fontSize: '14px', color: theme === 'light' ? '#64748b' : '#94a3b8', fontWeight: '500' }}>
+                  {simpleEvidenceView.title || simpleEvidenceView.comicName}
+                </span>
+              </div>
+              <button 
+                onClick={() => setSimpleEvidenceView(null)}
+                style={{
+                  background: theme === 'light' ? 'rgba(15,23,42,0.05)' : 'rgba(255,255,255,0.1)',
+                  border: 'none',
+                  width: '32px', height: '32px',
+                  borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: theme === 'light' ? '#64748b' : '#94a3b8',
+                  transition: 'all 0.2s',
+                }}
+                onMouseOver={(e) => { e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.color = '#fff'; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = theme === 'light' ? 'rgba(15,23,42,0.05)' : 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = theme === 'light' ? '#64748b' : '#94a3b8'; }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+            
+            <div style={{ padding: '0 32px 32px 32px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+              
+              {/* Image Section */}
+              <div style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
+                <div style={{ 
+                  position: 'absolute', 
+                  width: '140px', height: '140px', 
+                  background: '#a855f7', 
+                  filter: 'blur(50px)', 
+                  opacity: theme === 'light' ? 0.15 : 0.25, 
+                  borderRadius: '50%', 
+                  top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                  zIndex: 0
+                }} />
+                <img 
+                  src={simpleEvidenceView.cover || simpleEvidenceView.coverImageUrl || '/assets/default_cover.jpg'} 
+                  alt="Cover" 
+                  style={{ 
+                    width: '130px', height: '180px', 
+                    objectFit: 'cover', 
+                    borderRadius: '12px', 
+                    border: theme === 'light' ? '1px solid rgba(0,0,0,0.05)' : '1px solid rgba(255,255,255,0.1)',
+                    boxShadow: theme === 'light' ? '0 15px 35px -5px rgba(0,0,0,0.15)' : '0 15px 35px -5px rgba(0,0,0,0.5)',
+                    position: 'relative',
+                    zIndex: 1,
+                    transition: 'transform 0.3s ease'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05) translateY(-5px)'}
+                  onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1) translateY(0)'}
+                />
+              </div>
+              
+              {/* Reason Section */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: simpleEvidenceView.status === 'rejected' ? '#ef4444' : '#10b981', boxShadow: `0 0 10px ${simpleEvidenceView.status === 'rejected' ? '#ef4444' : '#10b981'}` }} />
+                  <h4 style={{ margin: 0, fontSize: '13px', color: theme === 'light' ? '#334155' : '#e2e8f0', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '700' }}>
+                    {simpleEvidenceView.status === 'rejected' ? 'Rejection Reason' : 'Status Reason'}
+                  </h4>
+                </div>
+                
+                <div className="glass-input-wrapper" style={{
+                  padding: '18px 20px', 
+                  background: theme === 'light' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.2)',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                  borderRadius: '12px', 
+                  border: theme === 'light' ? '1px solid rgba(148,163,184,0.2)' : '1px solid rgba(148,163,184,0.1)', 
+                  fontSize: '14.5px', 
+                  lineHeight: '1.7', 
+                  color: theme === 'light' ? '#1e293b' : '#f8fafc',
+                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)',
+                  whiteSpace: 'pre-wrap',
+                  maxHeight: '200px',
+                  overflowY: 'auto'
+                }}>
+                  {simpleEvidenceView.rejectionReason || simpleEvidenceView.notes || 'No specific reason provided.'}
+                </div>
+              </div>
+              
+            </div>
+            
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* ── MODAL: REJECTION REMARKS (UPGRADED WITH PAGE THUMBNAILS & PINNED COMMENTS REPORT) ───────────────── */}
       {selectedReject && createPortal(
         <div className="mod-modal-overlay mod-inspector-high-priority" style={{ zIndex: 999999 }}>
@@ -2238,95 +2481,14 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                 );
               })()}
 
-              {/* Detailed Pinned Comments Preview Report with Page Thumbnails */}
-              {(() => {
-                const comicId = selectedReject.parentReviewId || selectedReject.id;
-                const comments = docCommentsMap[comicId] || selectedReject.notes || [];
-                const chaptersList = getSubmissionChapters(selectedReject);
-                const firstChap = selectedChapter || chaptersList[0] || null;
-                const pages = (firstChap && Array.isArray(firstChap.pages)) ? firstChap.pages : [];
-
-                if (comments.length === 0) return null;
-
-                return (
-                  <div style={{ padding: '14px', borderRadius: '12px', background: theme === 'light' ? '#f8fafc' : 'rgba(255,255,255,0.03)', border: '1px solid rgba(148,163,184,0.15)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', color: '#7c3aed' }}>
-                        📋 Inspection Feedback Report ({comments.length} Pinned Items)
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
-                      {comments.map((c, idx) => {
-                        let pageThumb = null;
-                        if (c.targetKey && c.targetKey.startsWith('page-')) {
-                          const pNum = parseInt(c.targetKey.replace('page-', ''), 10);
-                          if (!isNaN(pNum) && pages[pNum - 1]) {
-                            pageThumb = pages[pNum - 1];
-                          }
-                        }
-
-                        return (
-                          <div key={c.id || idx} style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '8px 12px', borderRadius: '8px', background: theme === 'light' ? '#ffffff' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(148,163,184,0.15)' }}>
-                            {pageThumb ? (
-                              <img
-                                src={pageThumb}
-                                alt={c.targetLabel}
-                                style={{ width: '42px', height: '56px', objectFit: 'cover', borderRadius: '4px', border: '1px solid rgba(148,163,184,0.2)', flexShrink: 0 }}
-                              />
-                            ) : (
-                              <div style={{ width: '42px', height: '56px', borderRadius: '4px', background: 'rgba(124,58,237,0.1)', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>
-                                📌
-                              </div>
-                            )}
-
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                {renderCommentBadge(c, idx + 1)}
-                                {c.targetKey && c.targetKey.startsWith('page-') && (
-                                  <button
-                                    type="button"
-                                    style={{
-                                      padding: '3px 8px',
-                                      fontSize: '11px',
-                                      fontWeight: '700',
-                                      borderRadius: '6px',
-                                      border: '1px solid rgba(124,58,237,0.3)',
-                                      background: 'rgba(124,58,237,0.1)',
-                                      color: '#a855f7',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      transition: 'all 0.2s ease'
-                                    }}
-                                    onClick={() => handleJumpToPageFromReport(selectedReject, c)}
-                                    title="Jump directly to this page in inspector to re-check"
-                                  >
-                                    👁️ View Page {parseInt(c.targetKey.replace('page-', ''), 10)}
-                                  </button>
-                                )}
-                              </div>
-                              <p style={{ margin: 0, fontSize: '12.5px', whiteSpace: 'pre-wrap', color: theme === 'light' ? '#0f172a' : '#f1f5f9' }}>
-                                {c.text}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
-
               {/* Editable Rejection Reason Area */}
               <div>
                 <label style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--mod-text-secondary)', display: 'block', marginBottom: '6px' }}>
-                  Rejection Message / Overall Remarks (Optional if pins attached)
+                  Rejection Message / Overall Remarks (Required)
                 </label>
                 <textarea
                   className="rejection-reason-textarea"
-                  placeholder="Type optional overall rejection remarks or specific revision instructions for the author..."
+                  placeholder="Type overall rejection remarks or specific revision instructions for the author..."
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   style={{ width: '100%', minHeight: '110px', padding: '12px', borderRadius: '8px', fontSize: '13.5px', outline: 'none' }}
@@ -2341,20 +2503,13 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                 className="btn-cancel"
                 onClick={() => setSelectedReject(null)} 
               />
-              {(() => {
-                const comicId = selectedReject ? (selectedReject.parentReviewId || selectedReject.id) : null;
-                const comments = selectedReject ? (docCommentsMap[comicId] || selectedReject.notes || []) : [];
-                const isFormDisabled = !rejectionReason.trim() && comments.length === 0;
-                return (
-                  <ModernButton 
-                    variant={2} 
-                    label="✗ Confirm & Send Rejection" 
-                    className="btn-reject"
-                    onClick={onConfirmRejectClick}
-                    disabled={isFormDisabled}
-                  />
-                );
-              })()}
+              <ModernButton 
+                variant={2} 
+                label="✗ Confirm & Send Rejection" 
+                className="btn-reject"
+                onClick={onConfirmRejectClick}
+                disabled={!rejectionReason.trim()}
+              />
             </div>
           </div>
         </div>,

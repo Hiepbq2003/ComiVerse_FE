@@ -30,6 +30,17 @@ const normalizePage = (page, idx) => {
 
 const cleanTargetLabel = (label) => (label || '').replace(/\s*\(\d+%\s*,\s*\d+%\)/g, '').trim()
 
+const formatStatus = (status) => {
+  const value = (status || '').toString().toUpperCase()
+  if (value === 'APPROVED' || value === 'PUBLISHED') return '✓ Approved'
+  if (value === 'HIDDEN' || value === 'UNPUBLISHED') return '🔒 Hidden'
+  if (value === 'REJECTED') return '✕ Rejected'
+  if (value === 'DRAFT') return 'Draft'
+  if (value === 'PREVIEW_READY') return 'Preview Ready'
+  if (value === 'SUBMITTED_FOR_REVIEW' || value === 'PENDING') return '⏳ Pending'
+  return value || 'N/A'
+}
+
 /* ────────────────── rejection data resolver ──────────────── */
 
 function resolveRejectionInfo(preview, comicId) {
@@ -39,6 +50,11 @@ function resolveRejectionInfo(preview, comicId) {
 
   let reason = preview?.rejectionReason || preview?.rejection_reason || preview?.rejectionNote || preview?.reason || preview?.notes || ''
   let docComments = []
+
+  // If chapter is explicitly in a pre-submission or pending state, do not load old rejections.
+  if (['DRAFT', 'PREVIEW_READY', 'SUBMITTED_FOR_REVIEW', 'PENDING'].includes(statusStr)) {
+    return { isRejected: false, reason: '', docComments: [] }
+  }
 
   try {
     const rawOverrides = localStorage.getItem('comiverse_moderator_submissions_override')
@@ -73,12 +89,6 @@ function resolveRejectionInfo(preview, comicId) {
           docComments = [...docComments, ...(commentsMap[key] || [])]
         }
       })
-
-      if (docComments.length === 0) {
-        Object.values(commentsMap).forEach(arr => {
-          if (Array.isArray(arr)) docComments.push(...arr)
-        })
-      }
     }
   } catch (e) { /* ignore */ }
 
@@ -584,7 +594,7 @@ export default function AuthorChapterPreview() {
                         fontSize: '13.5px', display: 'block', marginTop: '4px',
                         color: isRejected ? '#ef4444' : '#10b981'
                       }}>
-                        {isRejected ? '✕ Rejected' : (String(preview?.status || '').toUpperCase() || 'N/A')}
+                        {isRejected ? '✕ Rejected' : formatStatus(preview?.status || preview?.moderationStatus)}
                       </strong>
                     </div>
 
@@ -705,7 +715,7 @@ export default function AuthorChapterPreview() {
                 fontSize: '12px', textAlign: 'center', lineHeight: '1.5'
               }}>
                 🔒 Submission is <strong style={{ color: isRejected ? '#ef4444' : '#7c3aed' }}>
-                  {isRejected ? 'REJECTED' : String(preview?.status || 'SUBMITTED').toUpperCase()}
+                  {isRejected ? 'REJECTED' : formatStatus(preview?.status || preview?.moderationStatus).toUpperCase()}
                 </strong> — Comments & Inspection Notes are frozen in read-only mode.
               </div>
 

@@ -1039,7 +1039,7 @@ export default function ReviewWorkspace() {
       setComposeValue("");
     } catch (err) {
       console.error("Failed to post comment:", err);
-      alert(err?.message || "Failed to post comment. Please try again.");
+      alert(err?.response?.data?.message || err?.message || "Failed to post comment. Please try again.");
     }
   };
 
@@ -1054,7 +1054,7 @@ export default function ReviewWorkspace() {
       setGeneralComposeValue("");
     } catch (err) {
       console.error("Failed to post page-level comment:", err);
-      alert(err?.message || "Failed to post comment. Please try again.");
+      alert(err?.response?.data?.message || err?.message || "Failed to post comment. Please try again.");
     }
   };
 

@@ -17,12 +17,14 @@ import BroadcastManagement from './pages/admin/BroadcastManagement'
 import StatisticsDashboard from './pages/admin/StatisticsDashboard'
 import RevenueManagement from './pages/admin/RevenueManagement'
 import PayoutManagement from './pages/admin/PayoutManagement'
+import PayoutSettings from './pages/admin/PayoutSettings'
 import AdminSystemSettings from './pages/admin/AdminSystemSettings'
 import SubscriptionManagement from './pages/admin/SubscriptionManagement'
 import AuthorDashboard from './pages/author/AuthorDashboard'
 import AuthorComics from './pages/author/AuthorComics'
 import AuthorComicDetail from './pages/author/AuthorComicDetail'
-import AuthorEarnings from './pages/author/AuthorEarnings'
+import AuthorRevenue from './pages/author/AuthorRevenue'
+import AuthorPayout from './pages/author/AuthorPayout'
 import AuthorSettings from './pages/author/AuthorSettings'
 import AuthorProfile from './pages/author/AuthorProfile'
 import AuthorChapterPreview from './pages/author/AuthorChapterPreview'
@@ -113,6 +115,8 @@ function App() {
                 <Route path="/admin/account-management" element={<AccountManagement />} />
                 <Route path="/admin/broadcast" element={<BroadcastManagement />} />
                 <Route path="/admin/payout" element={<PayoutManagement />} />
+                <Route path="/admin/payout/history" element={<PayoutManagement historyMode />} />
+                <Route path="/admin/payout/settings" element={<PayoutSettings />} />
                 <Route path="/admin/settings" element={<AdminSystemSettings />} />
                 <Route path="/admin/subscriptions" element={<SubscriptionManagement />} />
                 {/* Moderator */}
@@ -126,7 +130,9 @@ function App() {
                   <Route path="comics" element={<AuthorComics />} />
                   <Route path="comics/:id" element={<AuthorComicDetail />} />
                   <Route path="profile" element={<AuthorProfile />} />
-                  <Route path="earnings" element={<AuthorEarnings />} />
+                  <Route path="earnings" element={<Navigate to="../revenue" replace />} />
+                  <Route path="revenue" element={<AuthorRevenue />} />
+                  <Route path="payout" element={<AuthorPayout />} />
                   <Route path="settings" element={<AuthorSettings />} />
                 </Route>
                 <Route path="/author/comics/:comicId/preview/:chapterId" element={<AuthorChapterPreview />} />

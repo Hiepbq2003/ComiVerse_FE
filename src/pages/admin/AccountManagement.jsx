@@ -14,6 +14,7 @@ import '../../assets/style/common/modern-pagination.css'
 import '../../assets/style/common/skeleton-loader.css'
 import '../../assets/style/admin/account-management.css'
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
+import { isScopeGlobal } from '../../utils/moderatorScope'
 
 const ITEMS_PER_PAGE = 10
 const ROLE_OPTIONS = [
@@ -572,7 +573,7 @@ function AccountManagement() {
                       <div className="admin-lang-scope-tag" style={{ marginTop: '4px', fontSize: '11px', color: '#c084fc', fontWeight: '600' }}>
                         🌐 {(() => {
                           const langs = getDisplayLanguages(account);
-                          const isGlobal = langs.length >= 7 || langs.some(s => ['global', 'all', 'any', '*'].includes(String(s).toLowerCase()));
+                          const isGlobal = isScopeGlobal(langs);
                           return isGlobal ? 'All Languages' : langs.join(', ');
                         })()}
                       </div>

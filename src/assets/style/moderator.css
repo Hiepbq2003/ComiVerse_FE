@@ -1,0 +1,14 @@
+.btn-archive:disabled, .btn-primary:disabled { opacity: 0.4 !important; cursor: not-allowed !important; filter: grayscale(100%) !important; }
+
+/* Suspend & Restore Button Overrides for ModernButton variant 2 */
+  background: #f59e0b !important;
+  color: white !important;
+}
+  background: #d97706 !important;
+}
+
+  background: #10b981 !important;
+  color: white !important;
+}
+  background: #059669 !important;
+}

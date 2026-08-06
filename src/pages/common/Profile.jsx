@@ -24,6 +24,9 @@ import { useAuth } from '../../context/AuthContext'
 import { getAuth } from '../../utils/Auth'
 import { getMyProjectTeamsApi, getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
 import { getModeratorScope } from '../../utils/moderatorScope'
+import { getMyTranslatorProfileApi, updateMyTranslatorProfileApi } from '../../services/api/TranslatorApi'
+import { uploadFileApi } from '../../services/api/UploadApi'
+import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 const COMMON_NOTIFICATION_OPTIONS = [
   {
     title: 'General Notifications',
@@ -341,6 +344,17 @@ function Profile({ user: userProp }) {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [profileSaving, setProfileSaving] = useState(false)
 
+  // Translator Profile states
+  const [translatorProfile, setTranslatorProfile] = useState(null)
+  const [transSpecializations, setTransSpecializations] = useState([])
+  const [transExp, setTransExp] = useState(0)
+  const [transPhone, setTransPhone] = useState('')
+  const [transFacebook, setTransFacebook] = useState('')
+  const [transCvUrl, setTransCvUrl] = useState('')
+  const [transBio, setTransBio] = useState('')
+  const [isTranslator, setIsTranslator] = useState(false)
+  const [cvUploading, setCvUploading] = useState(false)
+
   const [notifSettings, setNotifSettings] = useState({})
   const [availableNotifKeys, setAvailableNotifKeys] = useState([])
   const [notifLoading, setNotifLoading] = useState(true)
@@ -368,6 +382,66 @@ function Profile({ user: userProp }) {
       })
     return () => { cancelled = true }
   }, [user?.id, user?.userId])
+
+  // Load Translator Profile
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    getMyTranslatorProfileApi()
+      .then(profile => {
+        if (cancelled || !profile) return
+        setTranslatorProfile(profile)
+        setIsTranslator(true)
+        if (Array.isArray(profile.specializations)) {
+          setTransSpecializations(profile.specializations)
+        }
+        setTransExp(profile.experienceYears ?? 0)
+        setTransPhone(profile.phoneNumber || profile.phone || '')
+        setTransFacebook(profile.facebookUrl || profile.facebook || '')
+        setTransCvUrl(profile.cvUrl || '')
+        setTransBio(profile.bio || '')
+      })
+      .catch(() => {
+        // Not a registered translator or profile not found
+      })
+    return () => { cancelled = true }
+  }, [user?.id, user?.userId, roleUpper])
+
+  const toggleSpecialization = (lang) => {
+    setTransSpecializations(prev =>
+      prev.includes(lang) ? prev.filter(l => l !== lang) : [...prev, lang]
+    )
+  }
+
+  const handleCvUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+    if (!isPdf) {
+      toast.warn('🚫 Invalid file format! Only PDF documents (.pdf) are accepted for CV uploads.')
+      e.target.value = ''
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.warn('File size must be under 5MB.')
+      e.target.value = ''
+      return
+    }
+    try {
+      setCvUploading(true)
+      const uploadResult = await uploadFileApi(file)
+      const uploadedUrl = typeof uploadResult === 'string' ? uploadResult : uploadResult?.url || uploadResult?.fileUrl || null
+      if (uploadedUrl) {
+        setTransCvUrl(uploadedUrl)
+        toast.success('CV / Resume document uploaded successfully!')
+      }
+    } catch (err) {
+      console.error('CV upload error:', err)
+      toast.error('Failed to upload CV document.')
+    } finally {
+      setCvUploading(false)
+    }
+  }
 
   useEffect(() => {
     if (!user) {
@@ -448,7 +522,24 @@ function Profile({ user: userProp }) {
     try {
       const savedProfile = await updateProfileApi(buildProfilePayload())
       applySavedProfile(savedProfile)
-      toast.success('Basic Info changes saved successfully!')
+
+      // Save Translator Profile if role is TRANSLATOR or has profile
+      if (roleUpper === 'TRANSLATOR' || isTranslator) {
+        try {
+          await updateMyTranslatorProfileApi({
+            specializations: transSpecializations,
+            experiencedYears: parseInt(transExp, 10) || 0,
+            phone: transPhone.trim(),
+            facebookUrl: transFacebook.trim(),
+            cvUrl: transCvUrl,
+            bio: transBio || bio,
+          })
+        } catch (transErr) {
+          console.error('Failed to sync translator profile:', transErr)
+        }
+      }
+
+      toast.success('Basic Info and Translator profile updated successfully!')
     } catch (err) {
       const errMsg = err.response?.data?.message || 'Failed to save changes.'
       toast.error(errMsg)
@@ -826,6 +917,123 @@ function Profile({ user: userProp }) {
                     <p className="profile-input-desc">
                       Moderation tasks, chat monitoring, and comic review queues will be filtered based on your assigned language scope.
                     </p>
+                  </div>
+                )}
+
+                {/* Translator Specific: Professional Profile & CV (Auto-attached on Team Application) */}
+                {(roleUpper === 'TRANSLATOR' || isTranslator) && (
+                  <div className="profile-translator-section">
+                    <div className="profile-translator-header">
+                      <div className="profile-translator-icon-wrap">🌐</div>
+                      <div>
+                        <h4 className="profile-translator-title">
+                          Translator Professional Profile
+                        </h4>
+                        <p className="profile-translator-subtitle">
+                          This verified info is automatically attached when you apply to Comic Translation Teams.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Language Specializations */}
+                    <div className="profile-input-group" style={{ marginBottom: '18px' }}>
+                      <label>Language Specializations</label>
+                      <div className="profile-specialization-list">
+                        {COMIC_LANGUAGE_OPTIONS.map((lang) => {
+                          const selected = transSpecializations.includes(lang)
+                          return (
+                            <button
+                              key={lang}
+                              type="button"
+                              onClick={() => toggleSpecialization(lang)}
+                              className={`profile-spec-btn ${selected ? 'selected' : ''}`}
+                            >
+                              {selected ? '✓ ' : '+ '} {lang}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {transSpecializations.length === 0 && (
+                        <p style={{ color: '#f59e0b', fontSize: '12px', marginTop: '6px', fontWeight: '500' }}>Please select at least one language specialization.</p>
+                      )}
+                    </div>
+
+                    {/* Experience & Contact Grid */}
+                    <div className="profile-form-grid" style={{ marginBottom: '18px' }}>
+                      <div className="profile-input-group">
+                        <label>Years of Translation Experience</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="50"
+                          value={transExp}
+                          onChange={(e) => setTransExp(e.target.value)}
+                          placeholder="e.g. 2"
+                        />
+                      </div>
+
+                      <div className="profile-input-group">
+                        <label>Phone Number / Direct Contact</label>
+                        <input
+                          type="text"
+                          value={transPhone}
+                          onChange={(e) => setTransPhone(e.target.value)}
+                          placeholder="e.g. 0904034333"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="profile-input-group" style={{ marginBottom: '18px' }}>
+                      <label>Social / Portfolio URL (Facebook / Discord / LinkedIn)</label>
+                      <input
+                        type="url"
+                        value={transFacebook}
+                        onChange={(e) => setTransFacebook(e.target.value)}
+                        placeholder="https://facebook.com/... or discord handle"
+                      />
+                    </div>
+
+                    {/* CV / Resume Document */}
+                    <div className="profile-input-group" style={{ marginBottom: '8px' }}>
+                      <label>Attached CV / Portfolio Resume (PDF)</label>
+                      <div className="profile-cv-box">
+                        <div className="profile-cv-doc-info">
+                          <span className="profile-cv-icon">📄</span>
+                          <div>
+                            {transCvUrl ? (
+                              <>
+                                <a
+                                  href={transCvUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="profile-cv-link"
+                                >
+                                  View Uploaded CV Document (PDF) ↗
+                                </a>
+                                <p className="profile-cv-badge">✓ Active and ready to auto-attach for team applications</p>
+                              </>
+                            ) : (
+                              <span className="profile-cv-empty-text">No CV attached yet. Upload a PDF for 1-click team applications.</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <label
+                          htmlFor="profile-cv-file-input"
+                          className="profile-cv-upload-btn"
+                        >
+                          {cvUploading ? 'Uploading...' : transCvUrl ? 'Replace CV File' : 'Upload CV (PDF)'}
+                        </label>
+                        <input
+                          id="profile-cv-file-input"
+                          type="file"
+                          accept="application/pdf,.pdf"
+                          style={{ display: 'none' }}
+                          onChange={handleCvUpload}
+                          disabled={cvUploading}
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
 

@@ -45,7 +45,9 @@ function formatDate(value) {
 }
 
 function SubscriptionManagement() {
-  const [tab, setTab] = useState('plans')
+  const [tab, setTab] = useState(() => (
+    new URLSearchParams(window.location.search).get('tab') === 'payments' ? 'payments' : 'plans'
+  ))
   const [plans, setPlans] = useState([])
   const [plansLoading, setPlansLoading] = useState(true)
   const [formOpen, setFormOpen] = useState(false)

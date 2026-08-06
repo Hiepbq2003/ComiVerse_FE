@@ -16,8 +16,14 @@ export const getAuthorComicMetricsApi = (comicId) => {
   return AxiosClient.get(`/author/comics/${comicId}/metrics`)
 }
 
-export const getAuthorDashboardMetricsApi = (months = 12) => {
-  return AxiosClient.get('/author/dashboard/metrics', { params: { months } })
+export const getAuthorDashboardMetricsApi = (period = 'WEEK') => {
+  return AxiosClient.get('/author/dashboard/metrics', {
+    params: { period }
+  })
+}
+
+export const checkAuthorComicTitleExistsApi = (title) => {
+  return AxiosClient.get('/author/comics/title-exists', { params: { title } })
 }
 
 export const createAuthorComicApi = (payload) => {
@@ -32,14 +38,19 @@ export const submitAuthorComicReviewApi = (comicId) => {
   return AxiosClient.post(`/author/comics/${comicId}/submit-review`)
 }
 
-export const uploadAuthorChapterZipApi = (comicId, formData) => {
-  return AxiosClient.post(`/author/comics/${comicId}/chapters/upload-zip`, formData, {
+export const confirmModEditApi = (comicId) => {
+  return AxiosClient.put(`/author/comics/${comicId}/confirm-edit`)
+}
+
+export const uploadAuthorChapterFolderApi = (comicId, formData, onUploadProgress) => {
+  return AxiosClient.post(`/author/comics/${comicId}/chapters/upload-folder`, formData, {
     timeout: 120000,
+    onUploadProgress
   })
 }
 
 export const getAuthorChapterUploadStatusApi = (comicId, taskId) => {
-  return AxiosClient.get(`/author/comics/${comicId}/chapters/upload-zip/status/${taskId}`)
+  return AxiosClient.get(`/author/comics/${comicId}/chapters/upload-folder/status/${taskId}`)
 }
 
 export const getAuthorChapterPreviewApi = (comicId, chapterId) => {
@@ -61,3 +72,15 @@ export const updateAuthorChapterApi = (comicId, chapterId, payload) => {
 export const deleteAuthorChapterApi = (comicId, chapterId) => {
   return AxiosClient.delete(`/author/comics/${comicId}/chapters/${chapterId}`)
 }
+
+export const replaceAuthorChapterFolderApi = (comicId, chapterId, formData, onUploadProgress) => {
+  return AxiosClient.put(`/author/comics/${comicId}/chapters/${chapterId}/replace-folder`, formData, {
+    timeout: 120000,
+    onUploadProgress
+  })
+}
+
+export const submitAuthorComicAppealApi = (comicId, payload) => {
+  return AxiosClient.post(`/author/comics/${comicId}/appeal`, payload)
+}
+

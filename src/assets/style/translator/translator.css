@@ -2713,6 +2713,67 @@ html.dark .board__card {
   color: var(--priority-low);
 }
 
+/* ── Revoked / Revision Needed Task Styles ── */
+.task.task--revoked {
+  border-color: rgba(239, 68, 68, 0.45) !important;
+  background: rgba(239, 68, 68, 0.04) !important;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.25) !important;
+}
+
+.task.task--revoked:hover {
+  border-color: rgba(239, 68, 68, 0.8) !important;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.18) !important;
+}
+
+.task__revoked-tag {
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+html.light .task__revoked-tag {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.task__revocation-alert {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px dashed rgba(239, 68, 68, 0.35);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 0.72rem;
+  color: #f87171;
+  line-height: 1.35;
+  margin-top: 2px;
+  word-break: break-word;
+}
+
+html.light .task__revocation-alert {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.task__revocation-label {
+  font-weight: 700;
+  color: #ef4444;
+}
+
+html.light .task__revocation-label {
+  color: #dc2626;
+}
+
 /* ── Tags ── */
 .tags {
   display: flex;

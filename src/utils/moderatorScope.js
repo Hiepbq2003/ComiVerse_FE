@@ -9,13 +9,23 @@ export function getModeratorScope(user) {
     const auth = getAuth();
     user = auth?.user;
   }
-  if (!user) return ['japanese', 'korean'];
+  if (!user) return [];
 
   if (Array.isArray(user.assignedLanguages) && user.assignedLanguages.length > 0) {
     return user.assignedLanguages.map(l => String(l).toLowerCase().trim());
   }
 
-  return ['japanese', 'korean'];
+  return [];
+}
+
+export function isScopeGlobal(scope) {
+  if (!scope) return true;
+  if (scope.length === 0) return true;
+  if (scope.length >= 7) return true;
+  return scope.some(s => {
+    const lower = String(s).toLowerCase().trim();
+    return ['global', 'all', 'any', '*'].includes(lower) || lower.includes('all language');
+  });
 }
 
 /**
@@ -25,7 +35,7 @@ export function getModeratorScope(user) {
  */
 export function isLanguageInModeratorScope(langStr, user) {
   const scope = getModeratorScope(user);
-  if (!scope || scope.length === 0 || scope.length >= 7 || scope.includes('global') || scope.includes('all') || scope.includes('any') || scope.includes('*')) {
+  if (isScopeGlobal(scope)) {
     return true;
   }
   if (!langStr) return false;
