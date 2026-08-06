@@ -405,19 +405,10 @@ function TasksTab({
   const auth = getAuth();
   const authUser = auth?.user;
 
-  // Leader sees ALL tasks in project. Members ONLY see tasks they are assigned to.
-  const visibleTasks = (tasks || []).filter(t => {
-    if (isCurrentLeader) return true;
-    return isUserAssignedToTask(t, members, authUser);
-  });
-
-  // Same rule applies to paused tasks — a member must never see or be able to
-  // resume a paused task that isn't assigned to them, regardless of what the
-  // parent component passes down.
-  const visiblePausedTasks = (pausedTasks || []).filter(t => {
-    if (isCurrentLeader) return true;
-    return isUserAssignedToTask(t, members, authUser);
-  });
+  // All tasks in the project are visible to all members of the project team.
+  // Non-assigned members can view any task workspace in Read-Only mode.
+  const visibleTasks = tasks || [];
+  const visiblePausedTasks = pausedTasks || [];
 
   return (
     <div className="board tasks-board-tab-container fade-in" style={{ padding: 0, background: 'transparent' }}>
@@ -1652,7 +1643,8 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
     return false;
   })();
 
-  const canAccessWorkspace = isProjectLeader || isAssigned;
+  const isEditableByMember = isProjectLeader || isAssigned;
+  const canAccessWorkspace = true;
 
   const errors = {
     title: !editTaskData.title.trim(),
@@ -1679,7 +1671,6 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   }
 
   const handleOpenWorkspaceClick = () => {
-    if (!canAccessWorkspace) return;
     if (onContinue) onContinue()
   }
 
@@ -1695,7 +1686,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
     <div className="trans-modal-overlay">
       <div className="trans-modal-card">
         <div className="trans-modal-header">
-          <h3>{isProjectLeader ? 'Edit Task Details' : 'Task Information'}</h3>
+          <h3>{isProjectLeader ? 'Edit Task Details' : (isEditableByMember ? 'Task Information' : 'Task Information (Read Only)')}</h3>
           <button className="trans-modal-close-btn" onClick={onCancel}>×</button>
         </div>
         <div className="trans-modal-body">
@@ -1728,11 +1719,10 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                   value={getNormalizedStatusKey(editTaskData.status)}
                   onChange={(e) => setEditTaskData({ ...editTaskData, status: e.target.value })}
                 >
-                  {getAllowedStatusOptions(editTaskData.status).map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
+                  <option value="backlog">⚪ Backlog</option>
+                  <option value="in_progress">🟠 In Progress</option>
+                  <option value="under_review">🟣 Under Review</option>
+                  <option value="completed">🟢 Completed</option>
                 </select>
               </div>
 
@@ -1752,16 +1742,14 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
 
               <div className="trans-form-group">
                 <label className="trans-form-label">Assignee *</label>
-                <div style={showError('assigneeId') ? { border: '1px solid #ef4444', borderRadius: '12px', padding: '8px' } : undefined}>
-                  <AssigneeChipPicker
-                    candidates={teamMembersForAssign}
-                    selectedId={editTaskData.assigneeId}
-                    onSelect={selectAssignee}
-                    emptyLabel="No team members found for this project."
-                  />
-                </div>
+                <AssigneeChipPicker
+                  candidates={teamMembersForAssign}
+                  selectedId={editTaskData.assigneeId}
+                  onSelect={selectAssignee}
+                  error={showError('assigneeId')}
+                />
                 {showError('assigneeId') && (
-                  <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>An assignee is required</p>
+                  <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Assignee is required</p>
                 )}
               </div>
 
@@ -1832,9 +1820,9 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                 </div>
               </div>
 
-              {!canAccessWorkspace && (
-                <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)', color: '#ef4444', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  🔒 <strong>Restricted Access:</strong> You are not assigned to this task. Only assigned members and Group Leaders can access this translation workspace.
+              {!isEditableByMember && (
+                <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.25)', color: '#60a5fa', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ℹ️ <strong>Read-Only Mode:</strong> You are not assigned to this task. You can view the task workspace in read-only mode.
                 </div>
               )}
             </div>
@@ -1859,10 +1847,10 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
             </button>
           )}
 
-          {/* Open Workspace — ONLY IF ASSIGNED OR PROJECT LEADER */}
-          {canAccessWorkspace && !isUnderReview && (
-            <button className="trans-btn primary" onClick={handleOpenWorkspaceClick} title="Open translate workspace">
-              <StepForward />Open Workspace
+          {/* Open Workspace — ALLOW FOR ALL MEMBERS */}
+          {!isUnderReview && (
+            <button className="trans-btn primary" onClick={handleOpenWorkspaceClick} title={isEditableByMember ? "Open translate workspace" : "View translate workspace in read-only mode"}>
+              <StepForward />{isEditableByMember ? 'Open Workspace' : 'View Workspace (Read Only)'}
             </button>
           )}
 

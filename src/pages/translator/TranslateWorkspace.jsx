@@ -98,6 +98,40 @@ function PageStatusDot({ status }) {
   );
 }
 
+function UserInitialsAvatar({ name, size = 20 }) {
+  if (!name) return null;
+  const initials = name.split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash % 360);
+  const bgColor = `hsl(${hue}, 60%, 40%)`;
+  return (
+    <span
+      className="tw-user-avatar-badge"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: `${size}px`,
+        height: `${size}px`,
+        borderRadius: '50%',
+        backgroundColor: bgColor,
+        color: '#fff',
+        fontSize: `${Math.max(9, size * 0.45)}px`,
+        fontWeight: 600,
+        marginLeft: 'auto',
+        flexShrink: 0,
+        opacity: 0.9,
+      }}
+      title={`Translated by: ${name}`}
+    >
+      {initials}
+    </span>
+  );
+}
+
 function ChapterList({ chapters, openChapterId, onToggleChapter, chapterPagesLoading, currentChapterId, currentPageIndex, onSelectPage }) {
   return (
     <>
@@ -141,11 +175,15 @@ function ChapterList({ chapters, openChapterId, onToggleChapter, chapterPagesLoa
                     key={page.pageId}
                     className={`tw-page-row ${isCurrentPage ? "current" : ""}`}
                     onClick={() => onSelectPage(ch, pageIndex)}
+                    style={{ display: 'flex', alignItems: 'center', width: '100%', paddingRight: '12px' }}
                   >
-                    <span className="tw-page-row-inner">
+                    <span className="tw-page-row-inner" style={{ flex: 1, display: 'flex', alignItems: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <PageStatusDot status={status} />
                       Page {page.pageNumber}
                     </span>
+                    {page.translatorLabel && page.translatorLabel !== "Unassigned" && page.translatorLabel !== "Unknown Member" && (
+                      <UserInitialsAvatar name={page.translatorLabel} size={18} />
+                    )}
                   </button>
                 );
               })}
@@ -156,7 +194,7 @@ function ChapterList({ chapters, openChapterId, onToggleChapter, chapterPagesLoa
   );
 }
 
-function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend, sending, saveStatus, canEdit = true }) {
+function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend, sending, saveStatus, canEdit = true, isPageTranslatedByOther = false }) {
   const badgeConfig = {
     saving: { icon: <Loader2 size={11} strokeWidth={3} className="tw-spin" />, label: "SAVING" },
     saved: { icon: <Check size={11} strokeWidth={3} />, label: "SAVED" },
@@ -183,8 +221,12 @@ function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend,
 
       <div className="tw-header-right">
         {!canEdit && (
-          <span className="tw-badge-saved tw-font-mono" title="You are not assigned to this task">
-            🔒 VIEW ONLY
+          <span
+            className="tw-badge-saved tw-font-mono"
+            style={isPageTranslatedByOther ? { background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)' } : undefined}
+            title={isPageTranslatedByOther ? "This page was translated by a previous member and is read-only" : "You are not assigned to this task"}
+          >
+            🔒 {isPageTranslatedByOther ? "PREVIOUS MEMBER TRANSLATED (READ ONLY)" : "VIEW ONLY"}
           </span>
         )}
         <span className={`tw-badge-saved tw-font-mono is-${statusKey}`}>
@@ -926,29 +968,7 @@ function TranslateTabPanel({
         </div>
       )}
 
-      {hasActiveSelection && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            fontSize: "11px",
-            color: "#94a3b8",
-            margin: "8px 0 12px 0",
-            background: "rgba(255, 255, 255, 0.04)",
-            padding: "6px 12px",
-            borderRadius: "6px",
-            border: "1px solid rgba(255, 255, 255, 0.08)",
-          }}
-        >
-          <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-            👤 <strong style={{ color: "#e2e8f0" }}>{activeSelection.createdByName || userFullName || "Translator"}</strong>
-          </span>
-          <span style={{ color: "#64748b" }}>
-            🕒 {formatBubbleTime(activeSelection.updatedAt)}
-          </span>
-        </div>
-      )}
+
 
       <div className="tw-translation-block tw-x-block-spaced">
         <p className="tw-caption tw-x-caption-tight">
@@ -1957,21 +1977,25 @@ async function fetchChapterById(chapterId, signal) {
 
 function getTaskFallbackData(taskId) {
   let foundTask = null;
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith('comiverse_tasks_')) {
-      try {
-        const tasks = JSON.parse(localStorage.getItem(key));
-        if (Array.isArray(tasks)) {
-          const match = tasks.find(t => String(t.id) === String(taskId) || String(t._id) === String(taskId));
-          if (match) {
-            foundTask = match;
-            break;
-          }
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.length === 'number') {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('comiverse_tasks_')) {
+          try {
+            const tasks = JSON.parse(localStorage.getItem(key));
+            if (Array.isArray(tasks)) {
+              const match = tasks.find(t => String(t.id) === String(taskId) || String(t._id) === String(taskId));
+              if (match) {
+                foundTask = match;
+                break;
+              }
+            }
+          } catch (e) {}
         }
-      } catch (e) {}
+      }
     }
-  }
+  } catch (e) {}
 
   const rawTitle = foundTask?.title || 'Chapter 1 - Translation';
   const cleanTitleMatch = rawTitle.match(/^\[(URGENT|HIGH|MEDIUM|LOW)\]\s*(?:\[([^\]]+)\])?\s*(.*)$/i);
@@ -2112,6 +2136,36 @@ function isSameUser(assigneeId, userId) {
   return String(assigneeId) === String(userId);
 }
 
+function isSameTranslatorUser(translatorId, userId, userName, teamMembers = []) {
+  if (!translatorId) return false;
+
+  const target = String(translatorId).toLowerCase().trim();
+  const uId = userId ? String(userId).toLowerCase().trim() : '';
+  const uName = userName ? String(userName).toLowerCase().trim() : '';
+
+  if (uId && target === uId) return true;
+  if (uName && target === uName) return true;
+
+  if (teamMembers && teamMembers.length > 0) {
+    const matchedMem = teamMembers.find(m => {
+      if (!m) return false;
+      const memId = m.id ? String(m.id).toLowerCase().trim() : '';
+      const memName = (m.name || m.fullName || m.username || '').toLowerCase().trim();
+      return (memId && target === memId) || (memName && target === memName);
+    });
+
+    if (matchedMem) {
+      const memId = matchedMem.id ? String(matchedMem.id).toLowerCase().trim() : '';
+      const memName = (matchedMem.name || matchedMem.fullName || matchedMem.username || '').toLowerCase().trim();
+      if ((uId && memId === uId) || (uName && memName === uName)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 // Look up a member's display name by id from the fetched team member list.
 function resolveMemberName(memberId, teamMembers) {
   if (memberId == null) return null;
@@ -2244,21 +2298,44 @@ async function fetchPagesForTask(taskId, signal) {
         const resolved = resolveImageUrl(rawUrl);
         if (!resolved) return null;
 
-        const pageId = item?.id || `p-${taskId}-${idx + 1}`;
+        // BE (ChapterPageDTO) returns `pageId`, not `id` — always try pageId first
+        const pageId = item?.pageId || item?.id || `p-${taskId}-${idx + 1}`;
         let bubblesData = item?.bubbles || [];
+        let localTranslatedBy = null;
+
+        // ── 1. Try to recover translatedBy from the bubbles JSON string stored in BE
+        //    (for pages translated before the DB column was added, the attribution
+        //     lives only inside the `bubbles` string as { selections:[…], translatedBy:"…" })
+        const rawBubbles = item?.bubbles;
+        if (rawBubbles && typeof rawBubbles === 'string' && !localTranslatedBy) {
+          try {
+            const parsedBubbles = JSON.parse(rawBubbles);
+            if (parsedBubbles?.translatedBy) localTranslatedBy = parsedBubbles.translatedBy;
+          } catch (e) {}
+        }
+
+        // ── 2. Also check localStorage (covers current session edits not yet saved to BE)
         try {
           const localSaved = localStorage.getItem(`comiverse_bubbles_${pageId}`);
           if (localSaved) {
+            const parsed = JSON.parse(localSaved);
             bubblesData = localSaved;
+            // localStorage wins over BE bubbles for translator attribution
+            if (parsed?.translatedBy) localTranslatedBy = parsed.translatedBy;
           }
         } catch (e) {}
 
         return {
-          id: item?.id || `p-${taskId}-${idx + 1}`,
-          pageId: item?.id || `p-${taskId}-${idx + 1}`,
+          id: item?.pageId || item?.id || `p-${taskId}-${idx + 1}`,
+          pageId: item?.pageId || item?.id || `p-${taskId}-${idx + 1}`,
           pageNumber: item?.pageNumber || idx + 1,
           imageUrl: resolved,
-          bubbles: bubblesData
+          bubbles: bubblesData,
+          // Preserve translator attribution fields — critical for per-page edit permission
+          translatedBy: item?.translatedBy || item?.translatorId || item?.completedBy || localTranslatedBy || null,
+          translatorId: item?.translatorId || item?.translatedBy || localTranslatedBy || null,
+          completedBy: item?.completedBy || null,
+          status: item?.status || null,
         };
       })
       .filter(Boolean);
@@ -2323,7 +2400,7 @@ async function saveBubblesForPage(pageId, payload, signal) {
     const res = await fetch(`${API_BASE}/translate-workspace/pages/${pageId}/bubbles`, {
       method: "PUT",
       headers: authHeaders(),
-      body: JSON.stringify({ bubbles: JSON.stringify(payload) }),
+      body: JSON.stringify({ bubbles: JSON.stringify(payload), translatedBy: payload.translatedBy ?? null }),
       signal,
     });
     if (!res.ok) {
@@ -2624,6 +2701,11 @@ function useSelectionAreas(canEdit = true) {
   const [activeTool, setActiveTool] = useState("rect");
   const [polygonDraft, setPolygonDraft] = useState(null);
 
+  // Use a ref so event-handler closures always read the LATEST canEdit value,
+  // not the stale one captured at hook-creation time.
+  const canEditRef = useRef(canEdit);
+  useEffect(() => { canEditRef.current = canEdit; }, [canEdit]);
+
   const [zoomScale, setZoomScale] = useState(1);
   const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
   const [isPickingZoomPoint, setIsPickingZoomPoint] = useState(false);
@@ -2680,7 +2762,7 @@ function useSelectionAreas(canEdit = true) {
     }
 
     if (dragState.current) return;
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
 
     const pos = getRelativePos(e);
 
@@ -2773,7 +2855,7 @@ function useSelectionAreas(canEdit = true) {
   };
 
   const finishPolygon = () => {
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
     if (polygonDraft && polygonDraft.length >= 3) {
       const newArea = {
         id: generateId(),
@@ -2799,7 +2881,7 @@ function useSelectionAreas(canEdit = true) {
   const selectArea = (id) => setActiveId(id);
 
   const deleteArea = (id) => {
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
     setSelections((prev) => prev.filter((s) => s.id !== id));
     setActiveId((cur) => (cur === id ? null : cur));
   };
@@ -2827,17 +2909,17 @@ function useSelectionAreas(canEdit = true) {
   };
 
   const updateTranslation = (id, translation) => {
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
     setSelections((prev) => prev.map((s) => (s.id === id ? { ...s, translation } : s)));
   };
 
   const updateName = (id, name) => {
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
     setSelections((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
   };
 
   const updateSelectionStyle = (id, patch) => {
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
     setSelections((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   };
 
@@ -2862,7 +2944,7 @@ function useSelectionAreas(canEdit = true) {
   };
 
   const startMove = (e, id) => {
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
     const selection = selections.find((s) => s.id === id);
     if (!selection) return;
     dragState.current = {
@@ -2875,7 +2957,7 @@ function useSelectionAreas(canEdit = true) {
   };
 
   const startResize = (e, id, handle) => {
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
     const selection = selections.find((s) => s.id === id);
     if (!selection) {
       return;
@@ -2891,7 +2973,7 @@ function useSelectionAreas(canEdit = true) {
   };
 
   const startVertexDrag = (e, id, vertexIndex) => {
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
     const selection = selections.find((s) => s.id === id);
     if (!selection) {
       return;
@@ -3118,16 +3200,75 @@ export default function TranslateWorkspace() {
     return () => controller.abort();
   }, [chapterData?.projectTeamId]);
 
-  const isAssignedToTask = isSameUser(chapterData?.taskAssigneeId, currentUserId);
+  const isAssignedToTask = useMemo(() => {
+    return isSameUser(chapterData?.taskAssigneeId, currentUserId) ||
+           isSameTranslatorUser(chapterData?.taskAssigneeId, currentUserId, userFullName, teamMembers);
+  }, [chapterData?.taskAssigneeId, currentUserId, userFullName, teamMembers]);
 
   const isProjectLeader = useMemo(() => {
     const me = (teamMembers || []).find((m) => String(m.id) === String(currentUserId));
     return me?.role === "Group Leader";
   }, [teamMembers, currentUserId]);
 
-  // Nobody is allowed to edit until we've actually loaded the task and know
-  // who's assigned — default is read-only, not editable.
-  const canEdit = status === "ready" && (isProjectLeader || isAssignedToTask);
+  const canEditTask = status === "ready" && (isProjectLeader || isAssignedToTask);
+
+  const currentPageMeta = taskPages[currentPageIndex] ?? null;
+
+  // Debug: log team members to see who is who
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      console.log("[DEBUG] teamMembers:", teamMembers.map(m => ({ id: m.id, userId: m.userId, name: m.userFullName || m.username, role: m.role })));
+      console.log("[DEBUG] taskAssigneeId:", chapterData?.taskAssigneeId);
+      console.log("[DEBUG] currentUserId:", currentUserId);
+    }
+  }, [teamMembers, chapterData?.taskAssigneeId, currentUserId]);
+
+  const isPageTranslatedByMe = useMemo(() => {
+    if (!currentPageMeta) return false;
+    const pageTranslator = currentPageMeta?.translatedBy || currentPageMeta?.translatorId || currentPageMeta?.completedBy;
+    return isSameTranslatorUser(pageTranslator, currentUserId, userFullName, teamMembers);
+  }, [currentPageMeta, currentUserId, userFullName, teamMembers]);
+
+  const isPageTranslatedByOther = useMemo(() => {
+    if (!currentPageMeta) return false;
+    const pageTranslator = currentPageMeta?.translatedBy || currentPageMeta?.translatorId || currentPageMeta?.completedBy;
+    if (pageTranslator && !isSameTranslatorUser(pageTranslator, currentUserId, userFullName, teamMembers)) {
+      return true;
+    }
+    return false;
+  }, [currentPageMeta, currentUserId, userFullName, teamMembers]);
+
+  // Granular per-page edit permission:
+  // 1. Group Leader can edit any page.
+  // 2. A translator can ALWAYS edit pages that they personally translated (isPageTranslatedByMe).
+  // 3. For pages NOT YET translated, only the CURRENT task assignee can translate/edit them.
+  const canEdit = useMemo(() => {
+    if (status !== "ready" || (!currentUserId && !userFullName)) return false;
+    if (isProjectLeader) return true;
+
+    const pageTranslator = currentPageMeta?.translatedBy || currentPageMeta?.translatorId || currentPageMeta?.completedBy;
+
+    // Debug: log the key values so we can trace permission issues
+    if (process.env.NODE_ENV === "development") {
+      console.group(`[canEdit] Page ${currentPageMeta?.pageNumber ?? "?"}`);
+      console.log("currentUserId :", currentUserId);
+      console.log("userFullName  :", userFullName);
+      console.log("pageTranslator:", pageTranslator);
+      console.log("isPageTranslatedByMe:", isPageTranslatedByMe);
+      console.log("isAssignedToTask    :", isAssignedToTask);
+      console.log("isProjectLeader     :", isProjectLeader);
+      console.groupEnd();
+    }
+
+    // If this specific page has a recorded translator, only that translator can edit it:
+    if (pageTranslator) {
+      return isPageTranslatedByMe;
+    }
+
+    // If this page is not yet translated by anyone, only current assignee can translate it:
+    return isAssignedToTask;
+  }, [status, currentUserId, userFullName, isProjectLeader, currentPageMeta, isPageTranslatedByMe, isAssignedToTask]);
+
 
 
   const {
@@ -3194,6 +3335,8 @@ export default function TranslateWorkspace() {
               ...clamped,
             };
           });
+          // Prevent the selections change from triggering "unsaved" status
+          isLoadingPageRef.current = true;
           loadSelections(pxSelections);
         }
       } catch (err) {
@@ -3310,16 +3453,15 @@ export default function TranslateWorkspace() {
     selectionsRef.current = selections;
   }, [selections]);
 
-  const [saveStatus, setSaveStatus] = useState("unsaved");
+  const [saveStatus, setSaveStatus] = useState("saved");
+  const saveStatusRef = useRef(saveStatus);
+  useEffect(() => {
+    saveStatusRef.current = saveStatus;
+  }, [saveStatus]);
+
   const [sending, setSending] = useState(false);
   const isLoadingPageRef = useRef(false);
-  useEffect(() => {
-    if (isLoadingPageRef.current) {
-      isLoadingPageRef.current = false;
-      return;
-    }
-    setSaveStatus("unsaved");
-  }, [selections]);
+
 
   const activeSelection = selections.find((s) => s.id === activeId) ?? null;
   const activeSelectionIndex = selections.findIndex((s) => s.id === activeId);
@@ -3369,7 +3511,9 @@ export default function TranslateWorkspace() {
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) {
         const { chapter: cChapter, pages: cPages } = JSON.parse(cached);
-        if (cChapter && Array.isArray(cPages) && cPages.length > 0) {
+        // Invalidate cache if pages don't have translatedBy info (stale cache from old code)
+        const cacheHasTranslatorInfo = Array.isArray(cPages) && cPages.some(p => p.translatedBy != null);
+        if (cChapter && Array.isArray(cPages) && cPages.length > 0 && cacheHasTranslatorInfo) {
           setChapterData(cChapter);
           setTaskPages(cPages);
           setCurrentChapterId(cChapter.id);
@@ -3381,6 +3525,9 @@ export default function TranslateWorkspace() {
           cPages.slice(0, 3).forEach(p => {
             if (p.imageUrl) { const img = new Image(); img.src = p.imageUrl; }
           });
+        } else {
+          // Clear stale cache without translator info
+          sessionStorage.removeItem(cacheKey);
         }
       }
     } catch (e) {}
@@ -3446,7 +3593,6 @@ export default function TranslateWorkspace() {
 
   const images = useMemo(() => taskPages.map((p) => p.imageUrl).filter(Boolean), [taskPages]);
   const currentImage = images[currentPageIndex];
-  const currentPageMeta = taskPages[currentPageIndex] ?? null;
 
 
   const currentPageIdRef = useRef(null);
@@ -3455,7 +3601,10 @@ export default function TranslateWorkspace() {
   }, [currentPageMeta?.pageId]);
 
   useEffect(() => {
-    if (isLoadingPageRef.current) return;
+    if (isLoadingPageRef.current) {
+      isLoadingPageRef.current = false;
+      return;
+    }
     setSaveStatus("unsaved");
     const pageId = currentPageIdRef.current;
     if (!pageId) return;
@@ -3466,7 +3615,9 @@ export default function TranslateWorkspace() {
         : { width: 1000, height: 1400 };
       const canvasSize = measureCanvasSize(canvasRef);
       const percentSelections = selectionsToImagePercent(selections, canvasSize, naturalSize);
-      localStorage.setItem(`comiverse_bubbles_${pageId}`, JSON.stringify({ selections: percentSelections }));
+      // Include translatedBy so attribution survives page refresh / navigation
+      const savedTranslatedBy = currentPageMeta?.translatedBy || currentUserId || null;
+      localStorage.setItem(`comiverse_bubbles_${pageId}`, JSON.stringify({ selections: percentSelections, translatedBy: savedTranslatedBy }));
     } catch (e) {}
   
   }, [selections]);
@@ -3563,7 +3714,8 @@ export default function TranslateWorkspace() {
         ...p,
         pageId: p.pageId || p.id || `p-${idx + 1}`,
         pageNumber: p.pageNumber || idx + 1,
-        status: p.status === "DONE" ? "DONE" : (idx === currentPageIndex ? "current" : "todo")
+        status: p.status === "DONE" ? "DONE" : (idx === currentPageIndex ? "current" : "todo"),
+        translatorLabel: formatAssigneeLabel(p.translatedBy || p.translatorId || p.completedBy, teamMembers)
       })),
     };
 
@@ -3583,6 +3735,7 @@ export default function TranslateWorkspace() {
             pageId: p.pageId || p.id || `p-${idx + 1}`,
             pageNumber: p.pageNumber || idx + 1,
             status: p.status === "DONE" ? "DONE" : "todo",
+            translatorLabel: formatAssigneeLabel(p.translatedBy || p.translatorId || p.completedBy, teamMembers)
           })),
         };
       });
@@ -3657,6 +3810,7 @@ export default function TranslateWorkspace() {
     (pageId, selectionsArray, expectedImageUrl) => {
       if (!pageId) return Promise.resolve(false);
       if (!canEdit) return Promise.resolve(false);
+      if (saveStatusRef.current === "saved") return Promise.resolve(true);
 
       setSaveStatus("saving");
 
@@ -3675,7 +3829,8 @@ export default function TranslateWorkspace() {
           return false;
         }
         const percentSelections = selectionsToImagePercent(selectionsArray, canvasSize, naturalSize);
-        const payload = { selections: percentSelections };
+        const activeUserId = currentUserId || getAuth()?.user?.id || getAuth()?.user?.userId;
+        const payload = { selections: percentSelections, translatedBy: activeUserId };
         const bubblesJson = JSON.stringify(payload);
         return saveBubblesForPage(pageId, payload).then((success) => {
           if (!success) {
@@ -3683,7 +3838,7 @@ export default function TranslateWorkspace() {
             return false;
           }
           setTaskPages((prev) =>
-            prev.map((p) => (p.pageId === pageId || p.id === pageId ? { ...p, bubbles: bubblesJson } : p))
+            prev.map((p) => (p.pageId === pageId || p.id === pageId ? { ...p, bubbles: bubblesJson, translatedBy: activeUserId || p.translatedBy, status: 'DONE' } : p))
           );
           setSaveStatus("saved");
           return true;
@@ -3895,8 +4050,9 @@ export default function TranslateWorkspace() {
         chapterTitle={deriveChapterTitle(chapterData)}
         onBack={gotoProjectList}
         onSend={handleSend}
-        canSend={isLastPage && canEdit}
+        canSend={isLastPage && canEditTask}
         canEdit={canEdit}
+        isPageTranslatedByOther={isPageTranslatedByOther}
         sending={sending}
         saveStatus={saveStatus}
       />

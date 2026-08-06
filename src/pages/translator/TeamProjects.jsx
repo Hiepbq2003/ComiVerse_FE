@@ -771,7 +771,7 @@ function TeamProjects() {
       status: 'Offline',
       online: false,
       joinDate: '01/15/2024',
-      contributions: `${project.chaptersCount || 0} chapters`,
+      contributions: '0 pages',
       avatar: project.leaderInitials || 'TL'
     };
 
@@ -1346,7 +1346,7 @@ function TeamProjects() {
       status: 'Offline',
       online: false,
       joinDate: new Date().toLocaleDateString('en-US'),
-      contributions: '0 chapters',
+      contributions: '0 pages',
       avatar: (reqName || 'M').split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2)
     }
 

@@ -17,7 +17,7 @@ export function mapTeamMember(m, leaderName) {
     online,
     lastSeenAt: m?.lastSeenAt || null,
     joinDate: m?.joinDate || '—',
-    contributions: m?.contributions || '0 chapters',
+    contributions: m?.contributions || '0 pages',
     avatar: m?.avatar || String(name).split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2)
   }
 }
@@ -42,14 +42,28 @@ export function formatMemberPresence(member, now = Date.now()) {
   return `Offline · ${elapsedDays}d ago`
 }
 
+export function getTaskPageCount(t) {
+  if (!t) return 0
+  if (typeof t.pagesCount === 'number' && t.pagesCount > 0) return t.pagesCount
+  if (typeof t.pageCount === 'number' && t.pageCount > 0) return t.pageCount
+  if (Array.isArray(t.pages) && t.pages.length > 0) return t.pages.length
+  if (Array.isArray(t.images) && t.images.length > 0) return t.images.length
+  if (t.chapter) {
+    if (typeof t.chapter.pagesCount === 'number' && t.chapter.pagesCount > 0) return t.chapter.pagesCount
+    if (typeof t.chapter.pageCount === 'number' && t.chapter.pageCount > 0) return t.chapter.pageCount
+    if (Array.isArray(t.chapter.pages) && t.chapter.pages.length > 0) return t.chapter.pages.length
+    if (Array.isArray(t.chapter.images) && t.chapter.images.length > 0) return t.chapter.images.length
+  }
+  return 24
+}
+
 // A task counts as "published" once its translation work is fully done —
 // i.e. status reached "completed" in the kanban pipeline (backlog -> in_progress
-// -> under_review -> completed). Every task's chapter is already a PUBLISHED
-// chapter by the time a task can be created for it, so "completed task" is the
-// meaningful signal for a member's contribution count.
+// -> under_review -> completed). Contribution is calculated based on the total number of
+// completed/published pages for each member.
 function isPublishedTaskStatus(status) {
   const s = String(status || '').toLowerCase().trim()
-  return s === 'completed' || s === 'done'
+  return s === 'completed' || s === 'done' || s === 'published'
 }
 
 function MembersTab({
@@ -145,7 +159,7 @@ function MembersTab({
           status: 'Offline',
           online: false,
           joinDate: '01/15/2024',
-          contributions: '0 chapters',
+          contributions: '0 pages',
           avatar: leaderInitials
         };
 
@@ -225,23 +239,63 @@ function MembersTab({
     return () => window.removeEventListener('scroll', handleClose, true)
   }, [activeDropdownMemberId])
 
-  // Count completed ("published") tasks per member, matched by their real
-  // backend id against each task's single assigneeId.
+  // Count completed ("published") translated pages per member.
+  // Supports granular per-page translator tracking (page.translatedBy / page.translatorId / task.pageContributions),
+  // so if Member A translated pages 1..5 before quitting/reassignment, those 5 pages stay credited to Member A,
+  // while Member B gets credited for pages translated by Member B.
   const contributionCounts = useMemo(() => {
     const counts = new Map()
+
     ;(tasks || []).forEach(t => {
-      if (!t || !t.assigneeId) return
-      if (!isPublishedTaskStatus(t.status)) return
-      const key = String(t.assigneeId)
-      counts.set(key, (counts.get(key) || 0) + 1)
+      if (!t) return
+
+      let recordedPagesForTask = false
+
+      // 1. Check if task has explicit pageContributions map: e.g. { "user-1": 5, "user-2": 15 }
+      if (t.pageContributions && typeof t.pageContributions === 'object') {
+        Object.entries(t.pageContributions).forEach(([userId, pageCount]) => {
+          if (userId && typeof pageCount === 'number' && pageCount > 0) {
+            recordedPagesForTask = true
+            const key = String(userId)
+            counts.set(key, (counts.get(key) || 0) + pageCount)
+          }
+        })
+      }
+
+      // 2. Check if task has pages with individual translatedBy/translatorId info
+      if (!recordedPagesForTask && Array.isArray(t.pages) && t.pages.length > 0) {
+        const pagesWithTranslator = t.pages.filter(p => p && (p.translatedBy || p.translatorId || p.completedBy))
+        if (pagesWithTranslator.length > 0) {
+          recordedPagesForTask = true
+          t.pages.forEach(p => {
+            if (!p) return
+            const pStatus = String(p.status || '').toUpperCase()
+            const isDone = pStatus === 'DONE' || isPublishedTaskStatus(t.status)
+            if (isDone) {
+              const uId = String(p.translatedBy || p.translatorId || p.completedBy || t.assigneeId || '')
+              if (uId) {
+                counts.set(uId, (counts.get(uId) || 0) + 1)
+              }
+            }
+          })
+        }
+      }
+
+      // 3. Fallback: Credit all pages of completed task to task.assigneeId if no per-page record exists
+      if (!recordedPagesForTask && t.assigneeId && isPublishedTaskStatus(t.status)) {
+        const key = String(t.assigneeId)
+        const pageCount = getTaskPageCount(t)
+        counts.set(key, (counts.get(key) || 0) + pageCount)
+      }
     })
+
     return counts
   }, [tasks])
 
   const membersWithContributions = useMemo(() => {
     return members.map(m => {
       const count = contributionCounts.get(String(m.id)) || 0
-      return { ...m, contributions: `${count} chapter${count !== 1 ? 's' : ''}` }
+      return { ...m, contributions: `${count} page${count !== 1 ? 's' : ''}` }
     })
   }, [members, contributionCounts])
 
@@ -398,7 +452,7 @@ function MembersTab({
             <option value="all">🏆 Contribution: All</option>
             <option value="desc">🏆 Contribution: High to Low</option>
             <option value="asc">🏆 Contribution: Low to High</option>
-            <option value="active">🏆 Contribution: Active (&gt; 0 chapters)</option>
+            <option value="active">🏆 Contribution: Active (&gt; 0 pages)</option>
           </select>
         </div>
 
