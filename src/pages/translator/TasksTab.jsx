@@ -175,7 +175,7 @@ function TaskAssigneeAvatar({ assigneeId, getAssigneeInitials }) {
 function TaskCard({ task, colId, comicName, onOpenTaskDetails, getAssigneeInitials }) {
   const { priority, cleanTitle } = parseTaskTitle(task.title, comicName)
   const isDone = colId === 'completed'
-  const isRevoked = Boolean(task.rejectionReason || task.isRevoked || task.status === 'REVOKED' || task.status === 'REVISION_NEEDED')
+  const isRevoked = !isDone && Boolean(task.rejectionReason || task.isRevoked || task.status === 'REVOKED' || task.status === 'REVISION_NEEDED')
 
   return (
     <article

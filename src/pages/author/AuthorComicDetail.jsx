@@ -18,7 +18,6 @@ import {
   submitAuthorComicReviewApi,
   updateAuthorComicApi,
   uploadAuthorChapterFolderApi,
-  replaceAuthorChapterZipApi,
   confirmModEditApi,
   replaceAuthorChapterFolderApi,
 } from '../../services/api/AuthorComicApi'

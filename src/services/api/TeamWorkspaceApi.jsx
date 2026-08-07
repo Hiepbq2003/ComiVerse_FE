@@ -12,6 +12,10 @@ export const likeTeamAnnouncementApi = async (id) => {
   return AxiosClient.put(`/team-workspace/announcements/${id}/like`)
 }
 
+export const updateTeamAnnouncementApi = async (id, payload) => {
+  return AxiosClient.put(`/team-workspace/announcements/${id}`, payload)
+}
+
 export const deleteTeamAnnouncementApi = async (id) => {
   return AxiosClient.delete(`/team-workspace/announcements/${id}`)
 }
@@ -32,6 +36,14 @@ export const likeTeamPostCommentApi = async (id) => {
   return AxiosClient.put(`/team-workspace/comments/${id}/like`)
 }
 
+export const updateTeamPostCommentApi = async (id, content) => {
+  return AxiosClient.put(`/team-workspace/comments/${id}`, { content })
+}
+
+export const deleteTeamPostCommentApi = async (id) => {
+  return AxiosClient.delete(`/team-workspace/comments/${id}`)
+}
+
 export const getTeamMessagesApi = async (teamId) => {
   return AxiosClient.get(`/team-workspace/${teamId}/messages`)
 }
@@ -44,8 +56,8 @@ export const deleteTeamMessageApi = async (teamId, messageId) => {
   return AxiosClient.delete(`/team-workspace/${teamId}/messages/${messageId}`)
 }
 
-export const warnTeamMemberApi = async (teamId, memberName) => {
-  return AxiosClient.post(`/team-workspace/${teamId}/messages/warn`, { memberName })
+export const warnTeamMemberApi = async (teamId, memberName, reason = '', memberId = null) => {
+  return AxiosClient.post(`/team-workspace/${teamId}/messages/warn`, { memberName, reason, memberId })
 }
 
 export const getTeamTasksApi = async (teamId) => {

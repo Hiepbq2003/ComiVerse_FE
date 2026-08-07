@@ -97,8 +97,12 @@ import {
   createTeamAnnouncementApi,
   likeTeamAnnouncementApi,
   pinTeamAnnouncementApi,
+  updateTeamAnnouncementApi,
   createTeamPostCommentApi,
   likeTeamPostCommentApi,
+  updateTeamPostCommentApi,
+  deleteTeamPostCommentApi,
+  getTeamPostCommentsApi,
   getTeamTasksApi,
   getTeamMembersApi,
   getTeamChaptersApi,
@@ -365,8 +369,11 @@ function WorkspaceDetailView({
   onLikePost,
   onTogglePinPost,
   onDeletePost,
+  onEditPost,
   onAddComment,
   onLikeComment,
+  onEditComment,
+  onDeleteComment,
   comicName,
   tasks,
   activeTasks,
@@ -429,8 +436,11 @@ function WorkspaceDetailView({
           onLikePost={onLikePost}
           onTogglePinPost={onTogglePinPost}
           onDeletePost={onDeletePost}
+          onEditPost={onEditPost}
           onAddComment={onAddComment}
           onLikeComment={onLikeComment}
+          onEditComment={onEditComment}
+          onDeleteComment={onDeleteComment}
         />
       )}
 
@@ -869,7 +879,7 @@ function TeamProjects() {
       } catch (e) {}
 
       const now = Date.now();
-      const mappedAnnouncements = (annList || []).map((p, idx) => {
+      const mappedAnnouncements = await Promise.all((annList || []).map(async (p, idx) => {
         let ts = 0;
         const rawTime = p.createdAt || p.time || p.timestamp;
         if (rawTime && rawTime !== 'Just now') {
@@ -888,19 +898,34 @@ function TeamProjects() {
           if (savedCmt) savedComments = JSON.parse(savedCmt);
         } catch (e) {}
 
+        let backendComments = [];
+        try {
+          if (p.id && typeof p.id === 'string' && !p.id.startsWith('temp-')) {
+            const cRes = await getTeamPostCommentsApi(p.id);
+            backendComments = Array.isArray(cRes) ? cRes : (cRes?.data || []);
+          }
+        } catch (e) {}
+
         const combinedCommentsMap = new Map();
         (p.comments || []).forEach(c => { if (c && c.id) combinedCommentsMap.set(c.id, c); });
+        backendComments.forEach(c => { if (c && c.id) combinedCommentsMap.set(c.id, c); });
         savedComments.forEach(c => { if (c && c.id) combinedCommentsMap.set(c.id, c); });
+
+        const finalComments = Array.from(combinedCommentsMap.values()).map(c => ({
+          ...c,
+          isEdited: Boolean(c.isEdited || c.edited)
+        }));
 
         return {
           ...p,
           timestamp: ts,
           createdAt: p.createdAt || new Date(ts).toISOString(),
           isPinned: Boolean(p.isPinned || savedPinnedIds.includes(p.id)),
+          isEdited: Boolean(p.isEdited || p.edited),
           attachedImage: p.imageUrl || p.attachedImage || null,
-          comments: Array.from(combinedCommentsMap.values())
+          comments: finalComments
         };
-      });
+      }));
       setAnnouncements(mappedAnnouncements)
       
       // Tasks always come straight from the API — no localStorage merge.
@@ -1218,6 +1243,24 @@ function TeamProjects() {
     }
   }
 
+  const handleEditPost = async (postId, newContent) => {
+    if (!newContent || !newContent.trim()) {
+      toast.error('Post content cannot be empty.')
+      return
+    }
+    const cleanContent = newContent.trim()
+    setAnnouncements(prev => prev.map(p => p.id === postId ? { ...p, content: cleanContent, isEdited: true } : p))
+    toast.success('Post updated successfully!')
+
+    try {
+      if (typeof postId === 'string' && !postId.startsWith('temp-')) {
+        await updateTeamAnnouncementApi(postId, { content: cleanContent })
+      }
+    } catch (err) {
+      console.error('Failed to update post on server:', err)
+    }
+  }
+
   const handleAddComment = async (postId, commentText, replyTarget = null) => {
     if (!commentText || !commentText.trim()) return
     const nowIso = new Date().toISOString()
@@ -1296,6 +1339,84 @@ function TeamProjects() {
         return post
       })
     })
+
+    // Also fire backend like asynchronously
+    try {
+      if (typeof commentId === 'string' && !commentId.startsWith('cmt-')) {
+        likeTeamPostCommentApi(commentId)
+      }
+    } catch (e) {}
+  }
+
+  const handleEditComment = async (postId, commentId, newContent) => {
+    if (!newContent || !newContent.trim()) {
+      toast.error('Comment content cannot be empty.')
+      return
+    }
+    const cleanContent = newContent.trim()
+
+    // 1. Optimistic UI update
+    setAnnouncements(prev => {
+      return prev.map(post => {
+        if (post.id === postId) {
+          const updatedComments = (post.comments || []).map(cmt => {
+            if (cmt.id === commentId) {
+              return { ...cmt, text: cleanContent, content: cleanContent, isEdited: true }
+            }
+            return cmt
+          })
+          if (selectedDetails?.id) {
+            const cmtKey = `comiverse_announcement_comments_${selectedDetails.id}_${postId}`
+            try {
+              localStorage.setItem(cmtKey, JSON.stringify(updatedComments))
+            } catch (e) { console.warn(e) }
+          }
+          return { ...post, comments: updatedComments }
+        }
+        return post
+      })
+    })
+
+    toast.success('Comment updated successfully!')
+
+    // 2. Call backend if valid ID
+    try {
+      if (typeof commentId === 'string' && !commentId.startsWith('cmt-')) {
+        await updateTeamPostCommentApi(commentId, cleanContent)
+      }
+    } catch (err) {
+      console.error('Failed to update comment on backend:', err)
+    }
+  }
+
+  const handleDeleteComment = async (postId, commentId) => {
+    // 1. Optimistic UI update
+    setAnnouncements(prev => {
+      return prev.map(post => {
+        if (post.id === postId) {
+          const updatedComments = (post.comments || []).filter(cmt => cmt.id !== commentId)
+          if (selectedDetails?.id) {
+            const cmtKey = `comiverse_announcement_comments_${selectedDetails.id}_${postId}`
+            try {
+              localStorage.setItem(cmtKey, JSON.stringify(updatedComments))
+            } catch (e) { console.warn(e) }
+          }
+          return { ...post, comments: updatedComments }
+        }
+        return post
+      })
+    })
+
+    toast.info('Comment deleted.')
+
+    // 2. Call backend if valid ID
+    try {
+      if (typeof commentId === 'string' && !commentId.startsWith('cmt-')) {
+        await deleteTeamPostCommentApi(commentId)
+      }
+    } catch (err) {
+      console.error('Failed to delete comment on backend:', err)
+    }
   }
 
   const handleLeaveTeam = (teamId) => {
@@ -1667,8 +1788,11 @@ function TeamProjects() {
         onLikePost={handleLikePost}
         onTogglePinPost={handleTogglePinPost}
         onDeletePost={handleDeletePost}
+        onEditPost={handleEditPost}
         onAddComment={handleAddComment}
         onLikeComment={handleLikeComment}
+        onEditComment={handleEditComment}
+        onDeleteComment={handleDeleteComment}
         comicName={comicName}
         tasks={tasks}
         activeTasks={activeTasks}

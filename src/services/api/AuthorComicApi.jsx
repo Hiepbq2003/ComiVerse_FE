@@ -80,7 +80,11 @@ export const replaceAuthorChapterFolderApi = (comicId, chapterId, formData, onUp
   })
 }
 
+// Backward-compatible alias
+export const replaceAuthorChapterZipApi = replaceAuthorChapterFolderApi
+
 export const submitAuthorComicAppealApi = (comicId, payload) => {
   return AxiosClient.post(`/author/comics/${comicId}/appeal`, payload)
 }
+
 
