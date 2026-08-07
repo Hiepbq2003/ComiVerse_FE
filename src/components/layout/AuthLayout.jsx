@@ -55,7 +55,16 @@ function AuthLayout({ children, alert, isWide }) {
       )}
 
       {/* Right Pane - Dynamic Authentication Forms */}
-      <div className="right-form-pane" style={isWide ? { flex: 1, width: '100%', minHeight: '100vh' } : {}}>
+      <div className="right-form-pane" style={isWide ? { flex: 1, width: '100%', minHeight: '100vh', position: 'relative' } : { position: 'relative' }}>
+        
+        <Link to="/" className="auth-back-btn" aria-label="Back to Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span style={{ marginLeft: '6px', fontWeight: '600' }}>Home</span>
+        </Link>
+
         {/* Toast Alert Banner */}
         {alert && alert.message && (
           <div className={`alert-banner ${alert.type}`}>

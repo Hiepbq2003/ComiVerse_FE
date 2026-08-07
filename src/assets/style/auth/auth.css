@@ -1613,3 +1613,37 @@ html.light .glass-input-wrapper .custom-datepicker-icon,
   color: rgba(255, 255, 255, 0.6) !important;
 }
 
+/* ── BACK BUTTON ────────────────────────────── */
+.auth-back-btn {
+  position: absolute;
+  top: 32px;
+  left: 32px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--auth-text-muted);
+  text-decoration: none;
+  padding: 8px 12px;
+  border-radius: var(--auth-radius-sm);
+  transition: var(--auth-transition);
+  background: rgba(255, 255, 255, 0.03);
+  z-index: 50;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.auth-back-btn:hover {
+  color: var(--auth-text-primary);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.auth-back-btn svg {
+  display: block;
+  margin-top: -1px;
+}
+
+@media (max-width: 768px) {
+  .auth-back-btn {
+    top: 20px;
+    left: 20px;
+  }
+}
