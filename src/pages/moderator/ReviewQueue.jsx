@@ -1067,7 +1067,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
   }, [paginatedItems]);
 
   const handleOpenReviewModal = async (item) => {
-    if (item.status !== 'pending') {
+    if (item.status === 'rejected') {
       setSimpleEvidenceView(item);
       return;
     }
@@ -1140,7 +1140,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
     const base = (active && Array.isArray(active.pages)) ? active.pages : [];
     
     let viewPages = base.map((url, idx) => ({ url, originalIdx: idx, pNum: idx + 1 }));
-    if (submission.status === 'rejected' || submission.status === 'approved') {
+    if (submission.status === 'rejected') {
        const comments = docComments[submission.id] || [];
        const pinnedSet = new Set(comments.map(c => {
          const match = c.targetKey?.match(/^page-(\d+)$/);
@@ -1339,7 +1339,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                 <div className="submission-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <ModernButton 
                     variant={2} 
-                    label={item.isComicAppealItem ? "📄 Review Appeal" : (item.status === 'pending' ? "👁 Review Content" : "👁 View Evidence")} 
+                    label={item.isComicAppealItem ? "📄 Review Appeal" : (item.status === 'rejected' ? "👁 View Evidence" : "👁 View Content")} 
                     className="btn-review"
                     onClick={() => {
                       if (item.isComicAppealItem) {
