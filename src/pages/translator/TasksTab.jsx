@@ -56,8 +56,8 @@ export function getAllowedStatusOptions(currentStatusStr) {
     { value: 'backlog', label: 'Backlog' },
     { value: 'in_progress', label: 'In Progress' },
     { value: 'under_review', label: 'Under Review' },
-    { value: 'completed', label: 'Completed' },
-    { value: 'paused', label: 'Paused' }
+    { value: 'paused', label: 'Paused' },
+    ...(currentKey === 'completed' ? [{ value: 'completed', label: 'Completed (approved)' }] : [])
   ]
 
   if (currentKey === 'paused') {
@@ -1570,6 +1570,22 @@ export function CreateTaskModal({
           </div>
 
           <div className="trans-form-group" style={{ marginTop: '14px' }}>
+            <label className="trans-form-label">Total chapter reward (USD)</label>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              className="trans-form-input"
+              placeholder="Leave empty to use page count × Admin page rate"
+              value={newTaskData.chapterRewardUsd ?? ''}
+              onChange={(e) => setNewTaskData({ ...newTaskData, chapterRewardUsd: e.target.value })}
+            />
+            <p style={{ color: 'var(--trans-text-muted)', fontSize: '11px', margin: '5px 0 0', lineHeight: 1.45 }}>
+              The system divides this fixed chapter reward by the total number of pages. Earnings are locked until the whole chapter is approved.
+            </p>
+          </div>
+
+          <div className="trans-form-group" style={{ marginTop: '14px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
               <label className="trans-form-label" style={{ margin: 0 }}>
                 Due Date *
@@ -1665,10 +1681,17 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
 
   const canAccessWorkspace = isProjectLeader || isAssigned;
 
+  const assigneeChanged = String(editTaskData.originalAssigneeId || '') !== String(editTaskData.assigneeId || '')
+  const parsedFactor = Number(editTaskData.handoverFactor)
+
   const errors = {
     title: !editTaskData.title.trim(),
     assigneeId: !editTaskData.assigneeId,
-    dueDate: !editTaskData.dueDate
+    dueDate: !editTaskData.dueDate,
+    chapterRewardUsd: editTaskData.chapterRewardUsd !== '' && editTaskData.chapterRewardUsd != null
+      && (!Number.isFinite(Number(editTaskData.chapterRewardUsd)) || Number(editTaskData.chapterRewardUsd) <= 0),
+    handoverReason: assigneeChanged && !String(editTaskData.handoverReason || '').trim(),
+    handoverFactor: assigneeChanged && (!Number.isFinite(parsedFactor) || parsedFactor < 0 || parsedFactor > 1)
   }
   const showError = (field) => submitted && errors[field]
   const errorBorder = (field) => showError(field) ? { borderColor: '#ef4444' } : undefined
@@ -1775,6 +1798,76 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                   <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>An assignee is required</p>
                 )}
               </div>
+
+              <div className="trans-form-group">
+                <label className="trans-form-label">Total chapter reward (USD)</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  className="trans-form-input"
+                  style={errorBorder('chapterRewardUsd')}
+                  value={editTaskData.chapterRewardUsd ?? ''}
+                  onChange={(e) => setEditTaskData({ ...editTaskData, chapterRewardUsd: e.target.value })}
+                  disabled={Boolean(editTaskData.settledAt)}
+                />
+                {showError('chapterRewardUsd') && (
+                  <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Chapter reward must be greater than zero</p>
+                )}
+                <p style={{ color: 'var(--trans-text-muted)', fontSize: '11px', margin: '5px 0 0', lineHeight: 1.45 }}>
+                  Page rate = chapter reward ÷ total pages. This snapshot is locked after chapter approval.
+                </p>
+              </div>
+
+              {assigneeChanged && (
+                <div style={{ margin: '2px 0 14px', padding: '14px', borderRadius: '12px', border: '1px solid rgba(245, 158, 11, 0.35)', background: 'rgba(245, 158, 11, 0.08)' }}>
+                  <h4 style={{ margin: '0 0 6px', color: '#fbbf24', fontSize: '13px' }}>Task handover</h4>
+                  <p style={{ margin: '0 0 12px', color: 'var(--trans-text-muted)', fontSize: '11.5px', lineHeight: 1.5 }}>
+                    Enter the pages accepted for the previous translator. Those pages keep their ownership and coefficient K; all remaining pages move to the new translator.
+                    {Number(editTaskData.totalPages) > 0 ? ` This task has ${editTaskData.totalPages} pages.` : ''}
+                  </p>
+                  <div className="trans-form-group">
+                    <label className="trans-form-label">Accepted pages of previous translator</label>
+                    <input
+                      type="text"
+                      className="trans-form-input"
+                      placeholder="Example: 1-6, 8"
+                      value={editTaskData.handoverCompletedPages || ''}
+                      onChange={(e) => setEditTaskData({ ...editTaskData, handoverCompletedPages: e.target.value })}
+                    />
+                  </div>
+                  <div className="trans-form-group" style={{ marginTop: '12px' }}>
+                    <label className="trans-form-label">Responsibility coefficient K *</label>
+                    <select
+                      className="trans-form-input"
+                      style={errorBorder('handoverFactor')}
+                      value={editTaskData.handoverFactor ?? '1.0'}
+                      onChange={(e) => setEditTaskData({ ...editTaskData, handoverFactor: e.target.value })}
+                    >
+                      <option value="1.0">1.0 — Proper handover</option>
+                      <option value="0.9">0.9 — Incomplete handover</option>
+                      <option value="0.8">0.8 — Abandoned task</option>
+                    </select>
+                    {showError('handoverFactor') && (
+                      <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>K must be from 0 to 1</p>
+                    )}
+                  </div>
+                  <div className="trans-form-group" style={{ marginTop: '12px' }}>
+                    <label className="trans-form-label">Handover reason *</label>
+                    <textarea
+                      className="trans-form-input"
+                      rows={3}
+                      style={errorBorder('handoverReason')}
+                      placeholder="Explain why this task is reassigned"
+                      value={editTaskData.handoverReason || ''}
+                      onChange={(e) => setEditTaskData({ ...editTaskData, handoverReason: e.target.value })}
+                    />
+                    {showError('handoverReason') && (
+                      <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>A reason is required when changing assignee</p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="trans-form-group">
                 <label className="trans-form-label">Due Date *</label>

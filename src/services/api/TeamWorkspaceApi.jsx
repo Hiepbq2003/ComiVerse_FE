@@ -103,7 +103,8 @@ export const createTeamTaskApi = async (teamId, task) => {
     status: task.status || 'backlog',
     dueDate: task.dueDate || new Date().toISOString().split('T')[0],
     chapterId: chapterId,
-    ...(assigneeId ? { assigneeId } : {})
+    ...(assigneeId ? { assigneeId } : {}),
+    ...(Number(task?.chapterRewardUsd) > 0 ? { chapterRewardUsd: Number(task.chapterRewardUsd) } : {})
   }
 
   try {
@@ -112,6 +113,13 @@ export const createTeamTaskApi = async (teamId, task) => {
     console.warn(`[TeamWorkspaceApi] createTeamTaskApi notice for team ${teamId}:`, err?.response?.data?.message || err?.message || err)
     return null
   }
+}
+
+export const handoverTeamTaskApi = async (id, payload) => {
+  if (!isUuid(id)) {
+    return { success: true, message: 'Local task handed over' }
+  }
+  return AxiosClient.put(`/team-workspace/tasks/${id}/handover`, payload)
 }
 
 export const updateTeamTaskApi = async (id, updates) => {

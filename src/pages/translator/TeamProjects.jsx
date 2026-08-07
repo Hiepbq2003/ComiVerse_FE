@@ -108,6 +108,7 @@ import {
   getTeamChaptersApi,
   createTeamTaskApi,
   updateTeamTaskApi,
+  handoverTeamTaskApi,
   getTeamRequestsApi,
   decideTeamRequestApi,
   deleteTeamAnnouncementApi,
@@ -120,6 +121,22 @@ import MembersTab from './MembersTab'
 import RequestsTab from './RequestsTab'
 import TasksTab, { CreateTaskModal, EditTaskModal, parseTaskTitle, getTaskColumn } from './TasksTab'
 import SettingsTab from './SettingsTab'
+
+function parseCompletedPageNumbers(value) {
+  const result = new Set()
+  String(value || '').split(',').map(part => part.trim()).filter(Boolean).forEach((part) => {
+    const range = part.match(/^(\d+)\s*-\s*(\d+)$/)
+    if (range) {
+      const start = Number(range[1])
+      const end = Number(range[2])
+      for (let page = Math.min(start, end); page <= Math.max(start, end); page += 1) result.add(page)
+      return
+    }
+    const page = Number(part)
+    if (Number.isInteger(page) && page > 0) result.add(page)
+  })
+  return [...result].sort((a, b) => a - b)
+}
 
 function getTimeAgo(date) {
   const seconds = Math.floor((new Date() - date) / 1000)
@@ -660,7 +677,7 @@ function TeamProjects() {
   const [openDropdownCol, setOpenDropdownCol] = useState(null)
   const [selectedTask, setSelectedTask] = useState(null)
   const [editTaskData, setEditTaskData] = useState({
-    title: '', status: 'backlog', priority: 'Medium', assigneeId: null, dueDate: ''
+    title: '', status: 'backlog', priority: 'Medium', assigneeId: null, originalAssigneeId: null, dueDate: '', chapterRewardUsd: '', handoverCompletedPages: '', handoverFactor: '1.00', handoverReason: '', totalPages: 0
   })
 
   const [members, setMembers] = useState([])
@@ -669,7 +686,7 @@ function TeamProjects() {
   const [memberSearch, setMemberSearch] = useState('')
   const [showCreateTask, setShowCreateTask] = useState(false)
   const [newTaskData, setNewTaskData] = useState({
-    title: '', column: 'backlog', assigneeId: null, dueDate: '', priority: 'Medium', chapterId: null
+    title: '', column: 'backlog', assigneeId: null, dueDate: '', priority: 'Medium', chapterId: null, chapterRewardUsd: ''
   })
 
   const getAssigneeInitials = (memberId) => {
@@ -686,7 +703,8 @@ function TeamProjects() {
       assigneeId: null,
       dueDate: '',
       priority: 'Medium',
-      chapterId: chId
+      chapterId: chId,
+      chapterRewardUsd: ''
     })
     setShowCreateTask(true)
   }
@@ -1572,6 +1590,7 @@ function TeamProjects() {
       assigneeId: data.assigneeId,
       chapterId: data.chapterId,
       dueDate: dueDateVal,
+      chapterRewardUsd: Number(data.chapterRewardUsd) > 0 ? Number(data.chapterRewardUsd) : undefined,
       createdAt: new Date().toISOString()
     }
 
@@ -1583,7 +1602,8 @@ function TeamProjects() {
         status: data.column || 'backlog',
         assigneeId: data.assigneeId,
         chapterId: data.chapterId,
-        dueDate: dueDateVal
+        dueDate: dueDateVal,
+        chapterRewardUsd: Number(data.chapterRewardUsd) > 0 ? Number(data.chapterRewardUsd) : undefined
       })
       taskToSave = (created && (created.id || created.title)) ? { ...newTaskObj, ...created } : newTaskObj
     } catch (err) {
@@ -1596,7 +1616,7 @@ function TeamProjects() {
     setTasks(updatedTasks)
 
     if (!customData) {
-      setNewTaskData({ title: '', column: 'backlog', assigneeId: null, dueDate: '', priority: 'Medium', chapterId: null })
+      setNewTaskData({ title: '', column: 'backlog', assigneeId: null, dueDate: '', priority: 'Medium', chapterId: null, chapterRewardUsd: '' })
       setShowCreateTask(false)
     }
     toast.success('Task created successfully!')
@@ -1605,6 +1625,10 @@ function TeamProjects() {
   const handleMoveTask = async (id, newCol) => {
     if (!isLeaderMatch(selectedDetails?.leaderName)) {
       toast.error('Only the Project Leader can change task status.')
+      return
+    }
+    if (getNormalizedStatusKey(newCol) === 'completed') {
+      toast.info('A task becomes Completed only after every page is DONE and the chapter is approved in Review.')
       return
     }
     const previousTasks = tasks
@@ -1630,7 +1654,13 @@ function TeamProjects() {
       status: getTaskColumn(task),
       priority: priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase(),
       assigneeId: task.assigneeId || null,
+      originalAssigneeId: task.assigneeId || null,
       dueDate: task.dueDate || '',
+      chapterRewardUsd: task.chapterRewardUsd ?? '',
+      handoverCompletedPages: '',
+      handoverFactor: '1.00',
+      handoverReason: '',
+      totalPages: Number(task.totalPages || 0),
       taskId: task.id || task._id || task.taskId || task.TaskID || 'KHONG-TIM-THAY-ID'
     })
   }
@@ -1658,15 +1688,31 @@ function TeamProjects() {
     setTasks(updatedTasks)
 
     try {
+      const assigneeChanged = String(editTaskData.originalAssigneeId || '') !== String(editTaskData.assigneeId || '')
       await updateTeamTaskApi(targetId, {
         title: formattedTitle,
         status: editTaskData.status,
-        assigneeId: editTaskData.assigneeId,
-        dueDate: editTaskData.dueDate
+        assigneeId: assigneeChanged ? editTaskData.originalAssigneeId : editTaskData.assigneeId,
+        dueDate: editTaskData.dueDate,
+        ...(Number(editTaskData.chapterRewardUsd) > 0
+          ? { chapterRewardUsd: Number(editTaskData.chapterRewardUsd) }
+          : {})
       })
+
+      if (assigneeChanged) {
+        if (!String(editTaskData.handoverReason || '').trim()) {
+          throw new Error('A handover reason is required when changing the assignee.')
+        }
+        await handoverTeamTaskApi(targetId, {
+          newAssigneeId: editTaskData.assigneeId,
+          completedPageNumbers: parseCompletedPageNumbers(editTaskData.handoverCompletedPages),
+          responsibilityFactor: Number(editTaskData.handoverFactor || 1),
+          reason: String(editTaskData.handoverReason).trim()
+        })
+      }
     } catch (err) {
       console.error('Backend updateTeamTaskApi error, reverting edit:', err)
-      toast.error('Failed to save task changes. Please try again.')
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to save task changes. Please try again.')
       setTasks(previousTasks)
       return
     }
@@ -1675,31 +1721,12 @@ function TeamProjects() {
     setSelectedTask(null)
   }
 
-  const handleMoveAllToDone = async (colId) => {
+  const handleMoveAllToDone = async () => {
     if (!isLeaderMatch(selectedDetails?.leaderName)) {
-      toast.error('Only the Project Leader can mark tasks as completed.')
+      toast.error('Only the Project Leader can manage team tasks.')
       return
     }
-    const targets = tasks.filter(t => getTaskColumn(t) === colId)
-    if (targets.length === 0) return
-
-    const previousTasks = tasks
-    const updatedTasks = tasks.map(t => getTaskColumn(t) === colId ? { ...t, status: 'completed' } : t)
-    setTasks(updatedTasks)
-
-    toast.success(`Moved all tasks from ${colId} to Completed!`)
-
-    try {
-      await Promise.all(targets.map(t => updateTeamTaskApi(t.id, {
-        status: 'completed',
-        dueDate: t.dueDate,
-        assigneeId: t.assigneeId
-      })))
-    } catch (err) {
-      console.error('Backend move all tasks error, reverting:', err)
-      toast.error('Failed to move some tasks. Please try again.')
-      setTasks(previousTasks)
-    }
+    toast.info('Bulk completion is disabled. Each chapter must finish every page and pass Project Leader review before payment settlement.')
   }
 
   const isLeaderMatch = (leaderName) => {
