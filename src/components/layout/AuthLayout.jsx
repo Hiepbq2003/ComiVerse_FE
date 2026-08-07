@@ -2,6 +2,7 @@ import comicAction from '../../assets/comic_action.png'
 import comicAdventure from '../../assets/comic_adventure.png'
 import comicScifi from '../../assets/comic_scifi.png'
 import LogoIcon from '../common/LogoIcon'
+import { Link } from 'react-router-dom'
 import '../../assets/style/auth/auth.css'
 
 function AuthLayout({ children, alert, isWide }) {
@@ -11,7 +12,9 @@ function AuthLayout({ children, alert, isWide }) {
       {!isWide && (
         <div className="left-branding-pane">
           <div className="brand-header">
-            <LogoIcon size={36} />
+            <Link to="/" style={{ textDecoration: 'none' }}>
+              <LogoIcon size={36} />
+            </Link>
           </div>
 
           {/* Floating Comic Cards Showcase */}
