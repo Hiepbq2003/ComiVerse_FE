@@ -72,12 +72,67 @@ const isSameChapterItem = (c, target) => {
   return false;
 };
 
+const CustomSortDropdown = ({ value, onChange }) => {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const dropdownRef = React.useRef(null);
+
+  const options = [
+    { value: 'date_desc', label: 'Newest First' },
+    { value: 'date_asc', label: 'Oldest First' },
+    { value: 'title_asc', label: 'Title (A-Z)' },
+    { value: 'title_desc', label: 'Title (Z-A)' },
+    { value: 'author_asc', label: 'Author (A-Z)' },
+    { value: 'author_desc', label: 'Author (Z-A)' },
+  ];
+
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => o.value === value) || options[0];
+
+  return (
+    <div className="mod-custom-dropdown" ref={dropdownRef}>
+      <button 
+        className={`mod-dropdown-btn ${isOpen ? 'active' : ''}`}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span>{selectedOption.label}</span>
+        <span style={{ marginLeft: '4px', opacity: 0.5, fontSize: '10px' }}>▼</span>
+      </button>
+      
+      {isOpen && (
+        <div className="mod-dropdown-menu">
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              className={`mod-dropdown-option ${value === opt.value ? 'selected' : ''}`}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+            >
+              <span>{opt.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfirmReject, handleApproveAndCreateProject, handleChapterApprove, handleChapterReject }) {
   const { theme } = useTheme()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'approved' | 'rejected' | 'appealed'
   
-  const [sortFilter, setSortFilter] = useState('Newest')
+  const [sortFilter, setSortFilter] = useState('date_desc')
   const [searchQuery, setSearchQuery] = useState('')
 
   const [selectedReview, setSelectedReview] = useState(null)
@@ -610,9 +665,18 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
           isComicAppealItem: true
         }))
         .sort((a, b) => {
+          if (sortFilter === 'title_asc') {
+            return (a.title || '').localeCompare(b.title || '');
+          } else if (sortFilter === 'title_desc') {
+            return (b.title || '').localeCompare(a.title || '');
+          } else if (sortFilter === 'author_asc') {
+            return (a.submittedBy || '').localeCompare(b.submittedBy || '');
+          } else if (sortFilter === 'author_desc') {
+            return (b.submittedBy || '').localeCompare(a.submittedBy || '');
+          }
           const timeA = new Date(a.timestamp || 0).getTime() || 0;
           const timeB = new Date(b.timestamp || 0).getTime() || 0;
-          return sortFilter === 'Newest' ? timeB - timeA : timeA - timeB;
+          return sortFilter === 'date_asc' ? timeA - timeB : timeB - timeA;
         });
     }
 
@@ -629,9 +693,18 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
         );
       })
       .sort((a, b) => {
+        if (sortFilter === 'title_asc') {
+          return (a.title || '').localeCompare(b.title || '');
+        } else if (sortFilter === 'title_desc') {
+          return (b.title || '').localeCompare(a.title || '');
+        } else if (sortFilter === 'author_asc') {
+          return (a.submittedBy || '').localeCompare(b.submittedBy || '');
+        } else if (sortFilter === 'author_desc') {
+          return (b.submittedBy || '').localeCompare(a.submittedBy || '');
+        }
         const timeA = new Date(a.timestamp || a.submittedAt || a.createdAt || 0).getTime() || 0;
         const timeB = new Date(b.timestamp || b.submittedAt || b.createdAt || 0).getTime() || 0;
-        return sortFilter === 'Newest' ? timeB - timeA : timeA - timeB;
+        return sortFilter === 'date_asc' ? timeA - timeB : timeB - timeA;
       });
   }, [submissions, comics, activeTab, searchQuery, sortFilter]);
 
@@ -1268,23 +1341,21 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
 
       {/* Filter and Sort bar */}
       <div className="moderator-filter-bar" style={{ display: 'flex', gap: '12px', alignItems: 'center', width: '100%', flexWrap: 'wrap', marginBottom: '20px' }}>
-        <input 
-          type="text"
-          className="moderator-select"
-          placeholder="Search raw comics by title, author name, or email..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{ flex: 1, minWidth: '240px', outline: 'none' }}
-        />
+        <div className="mod-search-wrapper">
+          <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input 
+            type="text"
+            className="mod-search-input"
+            placeholder="Search comics by title, author name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
 
-        <select 
-          className="moderator-select"
-          value={sortFilter}
-          onChange={(e) => setSortFilter(e.target.value)}
-        >
-          <option>Newest</option>
-          <option>Oldest</option>
-        </select>
+        <CustomSortDropdown value={sortFilter} onChange={setSortFilter} />
       </div>
 
       {/* Submissions List Grid */}

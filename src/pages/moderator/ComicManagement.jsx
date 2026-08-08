@@ -15,6 +15,54 @@ import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
 import { getAuth } from '../../utils/Auth'
 import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
+import React from 'react'
+
+const CustomDropdown = ({ value, onChange, options, minWidth = '160px' }) => {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const dropdownRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => o.value === value) || { value, label: value };
+
+  return (
+    <div className="mod-custom-dropdown" ref={dropdownRef} style={{ minWidth, flex: 1 }}>
+      <button 
+        className={`mod-dropdown-btn ${isOpen ? 'active' : ''}`}
+        onClick={() => setIsOpen(!isOpen)}
+        style={{ width: '100%', justifyContent: 'space-between', padding: '0 12px' }}
+      >
+        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedOption.label}</span>
+        <span style={{ marginLeft: '8px', opacity: 0.5, fontSize: '10px', flexShrink: 0 }}>▼</span>
+      </button>
+      
+      {isOpen && (
+        <div className="mod-dropdown-menu">
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              className={`mod-dropdown-option ${value === opt.value ? 'selected' : ''}`}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+            >
+              <span>{opt.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, handleSuspendComic, handleRestoreComic, handleTriggerAssignTeam, fetchAllData }) {
   const navigate = useNavigate()
@@ -520,92 +568,84 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
       </div>
 
       <div className="comic-search-filter-row">
-        <div className="comic-search-input-wrapper">
+        <div className="mod-search-wrapper" style={{ width: '100%', maxWidth: 'none' }}>
+          <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
           <input 
             type="text" 
-            className="comic-search-input" 
+            className="mod-search-input" 
             placeholder="Search comics, authors, project teams..." 
             value={comicSearch}
             onChange={(e) => setComicSearch(e.target.value)}
           />
         </div>
         
-        <div className="comic-filters-group">
-          <select 
-            className="moderator-select"
-            value={comicStatusFilter}
-            onChange={(e) => setComicStatusFilter(e.target.value)}
-          >
-            <option>All Status</option>
-            <option>Ongoing</option>
-            <option>Hiatus</option>
-            <option>Completed</option>
-            <option>Suspended</option>
-          </select>
-
-          <select 
-            className="moderator-select"
-            value={comicGenreFilter}
-            onChange={(e) => setComicGenreFilter(e.target.value)}
-          >
-            <option>All Genres</option>
-            {genres && genres.map((g) => (
-              <option key={g.id} value={g.name}>{g.name}</option>
-            ))}
-          </select>
-
-          <select 
-            className="moderator-select"
-            value={comicAuthorFilter}
-            onChange={(e) => setComicAuthorFilter(e.target.value)}
-          >
-            <option>All Authors</option>
-            {Array.from(new Set(comics.map(c => c.authorName || c.author).filter(Boolean))).map((author, idx) => (
-              <option key={idx} value={author}>{author}</option>
-            ))}
-          </select>
-
-          <select 
-            className="moderator-select"
-            value={comicTeamFilter}
-            onChange={(e) => setComicTeamFilter(e.target.value)}
-          >
-            <option>All Project Teams</option>
-            {Array.from(new Set(comics.map(c => c.projectTeam).filter(t => t !== '-'))).map((team, idx) => (
-              <option key={idx} value={team}>{team}</option>
-            ))}
-          </select>
-
-          <select 
-            className="moderator-select"
-            value={viewsSort}
-            onChange={(e) => setViewsSort(e.target.value)}
-          >
-            <option>All Views</option>
-            <option>Most Viewed</option>
-            <option>Least Viewed</option>
-          </select>
-
-          <select 
-            className="moderator-select"
-            value={comicTimeFilter}
-            onChange={(e) => setComicTimeFilter(e.target.value)}
-          >
-            <option>All Time</option>
-            <option>Updated Today</option>
-            <option>Updated Last 7 Days</option>
-            <option>Updated Last 30 Days</option>
-          </select>
-
-          <select 
-            className="moderator-select"
-            value={chapterUpdateSort}
-            onChange={(e) => setChapterUpdateSort(e.target.value)}
-          >
-            <option>Sort by Update Time</option>
-            <option>Newest Chapters First</option>
-            <option>Oldest Chapters First</option>
-          </select>
+        <div className="comic-filters-group" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <CustomDropdown 
+            value={comicStatusFilter} 
+            onChange={setComicStatusFilter} 
+            options={[
+              {value: 'All Status', label: 'All Status'}, 
+              {value: 'Ongoing', label: 'Ongoing'}, 
+              {value: 'Hiatus', label: 'Hiatus'}, 
+              {value: 'Completed', label: 'Completed'}, 
+              {value: 'Suspended', label: 'Suspended'}
+            ]} 
+          />
+          <CustomDropdown 
+            value={comicGenreFilter} 
+            onChange={setComicGenreFilter} 
+            options={[
+              {value: 'All Genres', label: 'All Genres'}, 
+              ...(genres || []).map(g => ({ value: g.name, label: g.name }))
+            ]} 
+          />
+          <CustomDropdown 
+            value={comicAuthorFilter} 
+            onChange={setComicAuthorFilter} 
+            options={[
+              {value: 'All Authors', label: 'All Authors'}, 
+              ...Array.from(new Set(comics.map(c => c.authorName || c.author).filter(Boolean))).map(author => ({ value: author, label: author }))
+            ]} 
+          />
+          <CustomDropdown 
+            value={comicTeamFilter} 
+            onChange={setComicTeamFilter} 
+            options={[
+              {value: 'All Project Teams', label: 'All Project Teams'}, 
+              ...Array.from(new Set(comics.map(c => c.projectTeam).filter(t => t !== '-'))).map(team => ({ value: team, label: team }))
+            ]} 
+          />
+          <CustomDropdown 
+            value={viewsSort} 
+            onChange={setViewsSort} 
+            options={[
+              {value: 'All Views', label: 'All Views'}, 
+              {value: 'Most Viewed', label: 'Most Viewed'}, 
+              {value: 'Least Viewed', label: 'Least Viewed'}
+            ]} 
+          />
+          <CustomDropdown 
+            value={comicTimeFilter} 
+            onChange={setComicTimeFilter} 
+            options={[
+              {value: 'All Time', label: 'All Time'}, 
+              {value: 'Updated Today', label: 'Updated Today'}, 
+              {value: 'Updated Last 7 Days', label: 'Updated Last 7 Days'}, 
+              {value: 'Updated Last 30 Days', label: 'Updated Last 30 Days'}
+            ]} 
+          />
+          <CustomDropdown 
+            value={chapterUpdateSort} 
+            onChange={setChapterUpdateSort} 
+            options={[
+              {value: 'Sort by Update Time', label: 'Sort by Update Time'}, 
+              {value: 'Newest Chapters First', label: 'Newest Chapters First'}, 
+              {value: 'Oldest Chapters First', label: 'Oldest Chapters First'}
+            ]} 
+          />
         </div>
       </div>
 
