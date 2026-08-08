@@ -18,9 +18,9 @@ export function getModeratorScope(user) {
   return [];
 }
 
-export function isScopeGlobal(scope) {
-  if (!scope) return true;
-  if (scope.length === 0) return true;
+export function isScopeGlobal(scope, user) {
+  if (user?.role?.toUpperCase() === 'ADMIN') return true;
+  if (!scope || scope.length === 0) return false;
   if (scope.length >= 7) return true;
   return scope.some(s => {
     const lower = String(s).toLowerCase().trim();
@@ -35,7 +35,7 @@ export function isScopeGlobal(scope) {
  */
 export function isLanguageInModeratorScope(langStr, user) {
   const scope = getModeratorScope(user);
-  if (isScopeGlobal(scope)) {
+  if (isScopeGlobal(scope, user)) {
     return true;
   }
   if (!langStr) return false;
