@@ -13,6 +13,8 @@ import { useAuth } from '../../context/AuthContext'
 import CommentSection from '../../components/common/CommentSection'
 import SubscriptionPlanModal from '../../components/common/SubscriptionPlanModal'
 import ReadingLanguageSelector from '../../components/common/ReadingLanguageSelector'
+import ReportSubmitModal from '../../components/report/ReportSubmitModal'
+import { Flag } from 'lucide-react'
 
 // pagesBubbles is a JSON string: [{ pageNumber, imageUrl, bubbles }, ...]
 // where `bubbles` is itself a JSON string ({"selections":[...]}) — same
@@ -58,6 +60,7 @@ function ChapterDetail() {
   const [translations, setTranslations] = useState([])
   const [selectedLanguage, setSelectedLanguage] = useState(searchParams.get('lang') || '')
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+  const [showReportModal, setShowReportModal] = useState(false)
   const closeSubscriptionModal = useCallback(() => setShowSubscriptionModal(false), [])
 
   const { user, refreshSubscription } = useAuth()
@@ -419,6 +422,21 @@ function ChapterDetail() {
                   showLabel={false}
                 />
               )}
+
+              <button
+                className="btn-reader-nav"
+                onClick={() => setShowReportModal(true)}
+                title="Report issue with this chapter or translation"
+                style={{
+                  color: '#f87171',
+                  borderColor: 'rgba(239, 68, 68, 0.35)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Flag size={14} /> Report
+              </button>
             </div>
           </div>
         </div>
@@ -534,6 +552,18 @@ function ChapterDetail() {
       <SubscriptionPlanModal
         open={showSubscriptionModal}
         onClose={closeSubscriptionModal}
+      />
+      <ReportSubmitModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        targetType={selectedLanguage ? 'CHAPTER_TRANSLATIONS' : 'CHAPTER'}
+        targetId={
+          selectedLanguage
+            ? (activeTranslation?.id || activeTranslation?.translationId || activeTranslation?.chapterTranslationId || activeTranslation?._id || chapterId)
+            : chapterId
+        }
+        targetTitle={`${comic?.title || 'Comic'} - ${currentChapter?.title || `Chapter ${currentChapter?.chapterNumber || ''}`}${selectedLanguage ? ` (${selectedLanguage.toUpperCase()} Translation)` : ''}`}
+        chapterNumber={currentChapter?.chapterNumber}
       />
     </HomeLayout>
   )
