@@ -27,6 +27,10 @@ export const approveChapterDirectApi = (chapterId) => {
 export const getChapterTranslationsApi = (chapterId) => {
   return AxiosClient.get(`/chapters/${chapterId}/translations`);
 };
+
+export const getChapterTranslationByIdApi = (translationId) => {
+  return AxiosClient.get(`/chapters/translations/${translationId}`);
+};
  
 export const getComicTranslationLanguagesApi = (comicId) => {
   return AxiosClient.get(`/comics/${comicId}/translation-languages`);
