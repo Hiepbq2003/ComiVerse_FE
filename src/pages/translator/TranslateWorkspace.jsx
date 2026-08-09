@@ -2328,16 +2328,11 @@ async function fetchPagesForTask(taskId, signal) {
         } catch (e) {}
 
         return {
-          id: item?.pageId || item?.id || `p-${taskId}-${idx + 1}`,
-          pageId: item?.pageId || item?.id || `p-${taskId}-${idx + 1}`,
+          id: item?.id || `p-${taskId}-${idx + 1}`,
+          pageId: item?.id || `p-${taskId}-${idx + 1}`,
           pageNumber: item?.pageNumber || idx + 1,
           imageUrl: resolved,
-          bubbles: bubblesData,
-          // Preserve translator attribution fields — critical for per-page edit permission
-          translatedBy: item?.translatedBy || item?.translatorId || item?.completedBy || localTranslatedBy || null,
-          translatorId: item?.translatorId || item?.translatedBy || localTranslatedBy || null,
-          completedBy: item?.completedBy || null,
-          status: item?.status || null,
+          bubbles: bubblesData
         };
       })
       .filter(Boolean);
@@ -2355,7 +2350,14 @@ async function fetchPagesForTask(taskId, signal) {
           finalPages = finalPages.map((p) => {
             const real = byPageNumber.get(p.pageNumber);
             if (!real?.pageId) return p;
-            return { ...p, id: real.pageId, pageId: real.pageId };
+            return {
+              ...p,
+              ...real,
+              id: real.pageId,
+              pageId: real.pageId,
+              imageUrl: p.imageUrl || resolveImageUrl(real.imageUrl),
+              bubbles: p.bubbles ?? real.bubbles
+            };
           });
         }
       } catch (e) {
@@ -2419,6 +2421,24 @@ async function saveBubblesForPage(pageId, payload, signal) {
     } catch (e) {}
     return false;
   }
+}
+
+async function updateTranslationPageStatus(pageId, status, signal) {
+  const res = await fetch(`${API_BASE}/translate-workspace/pages/${pageId}/status`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ status }),
+    signal,
+  });
+  if (!res.ok) {
+    let message = `Failed to update page status (${res.status})`;
+    try {
+      const payload = await res.json();
+      message = payload?.message || message;
+    } catch (e) {}
+    throw new Error(message);
+  }
+  return res.json();
 }
 
 async function submitTaskForReview(taskId, signal) {
@@ -3212,65 +3232,9 @@ export default function TranslateWorkspace() {
     return me?.role === "Group Leader";
   }, [teamMembers, currentUserId]);
 
-  const canEditTask = status === "ready" && (isProjectLeader || isAssignedToTask);
-
-  const currentPageMeta = taskPages[currentPageIndex] ?? null;
-
-  // Debug: log team members to see who is who
-  useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
-      console.log("[DEBUG] teamMembers:", teamMembers.map(m => ({ id: m.id, userId: m.userId, name: m.userFullName || m.username, role: m.role })));
-      console.log("[DEBUG] taskAssigneeId:", chapterData?.taskAssigneeId);
-      console.log("[DEBUG] currentUserId:", currentUserId);
-    }
-  }, [teamMembers, chapterData?.taskAssigneeId, currentUserId]);
-
-  const isPageTranslatedByMe = useMemo(() => {
-    if (!currentPageMeta) return false;
-    const pageTranslator = currentPageMeta?.translatedBy || currentPageMeta?.translatorId || currentPageMeta?.completedBy;
-    return isSameTranslatorUser(pageTranslator, currentUserId, userFullName, teamMembers);
-  }, [currentPageMeta, currentUserId, userFullName, teamMembers]);
-
-  const isPageTranslatedByOther = useMemo(() => {
-    if (!currentPageMeta) return false;
-    const pageTranslator = currentPageMeta?.translatedBy || currentPageMeta?.translatorId || currentPageMeta?.completedBy;
-    if (pageTranslator && !isSameTranslatorUser(pageTranslator, currentUserId, userFullName, teamMembers)) {
-      return true;
-    }
-    return false;
-  }, [currentPageMeta, currentUserId, userFullName, teamMembers]);
-
-  // Granular per-page edit permission:
-  // 1. Group Leader can edit any page.
-  // 2. A translator can ALWAYS edit pages that they personally translated (isPageTranslatedByMe).
-  // 3. For pages NOT YET translated, only the CURRENT task assignee can translate/edit them.
-  const canEdit = useMemo(() => {
-    if (status !== "ready" || (!currentUserId && !userFullName)) return false;
-    if (isProjectLeader) return true;
-
-    const pageTranslator = currentPageMeta?.translatedBy || currentPageMeta?.translatorId || currentPageMeta?.completedBy;
-
-    // Debug: log the key values so we can trace permission issues
-    if (process.env.NODE_ENV === "development") {
-      console.group(`[canEdit] Page ${currentPageMeta?.pageNumber ?? "?"}`);
-      console.log("currentUserId :", currentUserId);
-      console.log("userFullName  :", userFullName);
-      console.log("pageTranslator:", pageTranslator);
-      console.log("isPageTranslatedByMe:", isPageTranslatedByMe);
-      console.log("isAssignedToTask    :", isAssignedToTask);
-      console.log("isProjectLeader     :", isProjectLeader);
-      console.groupEnd();
-    }
-
-    // If this specific page has a recorded translator, only that translator can edit it:
-    if (pageTranslator) {
-      return isPageTranslatedByMe;
-    }
-
-    // If this page is not yet translated by anyone, only current assignee can translate it:
-    return isAssignedToTask;
-  }, [status, currentUserId, userFullName, isProjectLeader, currentPageMeta, isPageTranslatedByMe, isAssignedToTask]);
-
+  // Nobody is allowed to edit until we've actually loaded the task and know
+  // who's assigned — default is read-only, not editable.
+  const canEdit = status === "ready" && (isProjectLeader || isAssignedToTask);
 
 
   const {
@@ -3926,11 +3890,27 @@ export default function TranslateWorkspace() {
     }
   }, [navigate, chapterData, taskId, persistCurrentPage]);
 
-  const handleSaveAndNext = useCallback(() => {
-
-    
-    goToPage(currentPageIndex + 1);
-  }, [goToPage, currentPageIndex]);
+  const handleSaveAndNext = useCallback(async () => {
+    if (!canEdit || !currentPageMeta?.pageId) return;
+    const saved = await persistCurrentPage();
+    if (saved === false) {
+      toast.error("Page could not be saved. It was not marked as completed.");
+      return;
+    }
+    try {
+      const updatedPage = await updateTranslationPageStatus(currentPageMeta.pageId, "DONE");
+      setTaskPages((prev) => prev.map((page) => (
+        String(page.pageId || page.id) === String(currentPageMeta.pageId)
+          ? { ...page, ...updatedPage, status: "DONE" }
+          : page
+      )));
+      if (currentPageIndex < images.length - 1) {
+        setCurrentPageIndex(currentPageIndex + 1);
+      }
+    } catch (err) {
+      toast.error(err?.message || "Failed to mark the page as completed.");
+    }
+  }, [canEdit, currentPageMeta, persistCurrentPage, currentPageIndex, images.length]);
 
   const handleSaveProgress = useCallback(() => {
     if (!canEdit) {
@@ -3963,6 +3943,12 @@ export default function TranslateWorkspace() {
         );
         return;
       }
+      const updatedPage = await updateTranslationPageStatus(currentPageMeta.pageId, "DONE");
+      setTaskPages((prev) => prev.map((page) => (
+        String(page.pageId || page.id) === String(currentPageMeta.pageId)
+          ? { ...page, ...updatedPage, status: "DONE" }
+          : page
+      )));
       await submitTaskForReview(taskId);
       navigate("/translator/project-teams", {
         state: { teamId: chapterData?.projectTeamId, tab: "tasks" },
@@ -3973,7 +3959,7 @@ export default function TranslateWorkspace() {
     } finally {
       setSending(false);
     }
-  }, [isLastPage, sending, canEdit, persistCurrentPage, taskId, navigate, chapterData]);
+  }, [isLastPage, sending, canEdit, persistCurrentPage, currentPageMeta, taskId, navigate, chapterData]);
 
   useEffect(() => {
     const onKeyDown = (e) => {

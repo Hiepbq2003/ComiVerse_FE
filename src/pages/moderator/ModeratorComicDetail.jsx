@@ -994,13 +994,11 @@ function ModeratorComicDetail() {
                   <div className="mod-comic-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h1 className="mod-comic-title">{comic.title}</h1>
                     {hasScopePermission && (
-                      <div title={!hasScopePermission ? "Out of scope" : ""}>
+                      <div>
                         <ModernButton 
                           variant={2} 
                           label="✏️ Edit Info" 
-                          disabled={!hasScopePermission}
                           onClick={() => {
-                            if (!hasScopePermission) return;
                             setEditForm({
                               title: comic.title,
                               language: comic.language || 'Unknown',

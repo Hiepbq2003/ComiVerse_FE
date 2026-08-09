@@ -69,6 +69,7 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
     { id: 'revenue', label: 'Payment Statistics', icon: 'dollar', path: '/admin/revenue' },
     { id: 'subscriptions', label: 'Subscriptions & Payments', icon: 'credit-card', path: '/admin/subscriptions' },
     { id: 'account-management', label: 'Account Management', icon: 'users', path: '/admin/account-management' },
+    { id: 'report-categories', label: 'Report Categories', icon: 'categories', path: '/admin/report-categories' },
     { id: 'broadcast', label: 'Broadcast', icon: 'megaphone', path: '/admin/broadcast' },
     { id: 'payout', label: 'Payout Management', icon: 'wallet', path: '/admin/payout' },
     { id: 'settings', label: 'System Settings', icon: 'settings', path: '/admin/settings' },
@@ -92,6 +93,14 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
         return (
           <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" />
+          </svg>
+        )
+      case 'categories':
+        return (
+          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            <line x1="12" y1="11" x2="12" y2="17"/>
+            <line x1="9" y1="14" x2="15" y2="14"/>
           </svg>
         )
       case 'users':
