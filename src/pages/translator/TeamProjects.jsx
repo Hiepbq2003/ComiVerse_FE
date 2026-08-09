@@ -728,7 +728,8 @@ function TeamProjects() {
       status: 'Offline',
       online: false,
       joinDate: leaderJoinDate,
-      contributions: '0 pages',
+      contributions: 0,
+      revoked: 0,
       avatar: project.leaderInitials || 'TL'
     };
 
@@ -1340,7 +1341,16 @@ function TeamProjects() {
       return
     }
 
-    // 1. Optimistically update local UI states instantly (<5ms)
+    try {
+      await decideTeamRequestApi(reqId, 'approved')
+    } catch (err) {
+      console.error('[TeamProjects] Backend decide team request error:', err)
+      const errorMsg = err.response?.data?.message || 'Failed to approve request.'
+      toast.error(errorMsg)
+      return // Abort UI update if backend validation fails
+    }
+
+    // 1. Update local UI states instantly
     setJoinRequests(prev => prev.filter(req => req.id !== reqId))
 
     const newMem = {
@@ -1350,7 +1360,8 @@ function TeamProjects() {
       status: 'Offline',
       online: false,
       joinDate: new Date().toLocaleDateString('en-US'),
-      contributions: '0 pages',
+      contributions: 0,
+      revoked: 0,
       avatar: (reqName || 'M').split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2)
     }
 
@@ -1393,13 +1404,6 @@ function TeamProjects() {
     }
 
     toast.success(`🎉 Approved ${reqName} and added to project members!`)
-
-    // 2. Fire backend query asynchronously in background
-    try {
-      await decideTeamRequestApi(reqId, 'approved')
-    } catch (err) {
-      console.error('[TeamProjects] Backend decide team request error:', err)
-    }
   }
 
   const handleRejectRequest = async (id, name) => {

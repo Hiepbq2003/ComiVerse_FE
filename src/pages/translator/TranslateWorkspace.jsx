@@ -181,8 +181,18 @@ function ChapterList({ chapters, openChapterId, onToggleChapter, chapterPagesLoa
                       <PageStatusDot status={status} />
                       Page {page.pageNumber}
                     </span>
-                    {page.translatorLabel && page.translatorLabel !== "Unassigned" && page.translatorLabel !== "Unknown Member" && (
-                      <UserInitialsAvatar name={page.translatorLabel} size={18} />
+                    {page.contributorLabels && page.contributorLabels.length > 0 ? (
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        {page.contributorLabels.map((label, i) => (
+                          label !== "Unassigned" && label !== "Unknown Member" && (
+                            <UserInitialsAvatar key={i} name={label} size={18} />
+                          )
+                        ))}
+                      </div>
+                    ) : (
+                      page.translatorLabel && page.translatorLabel !== "Unassigned" && page.translatorLabel !== "Unknown Member" && (
+                        <UserInitialsAvatar name={page.translatorLabel} size={18} />
+                      )
                     )}
                   </button>
                 );
@@ -615,6 +625,7 @@ function PageImage({
       >
         {currentImage ? (
           <img
+            name = "page-image"
             ref={imgRef}
             src={currentImage}
             alt={`Page ${currentPageIndex + 1}`}
@@ -1032,8 +1043,8 @@ function TranslateTabPanel({
   );
 }
 
-async function fetchGlossaryTerms(comicId, signal) {
-  const res = await fetch(`${API_BASE}/glossary/comic/${comicId}`, {
+async function fetchGlossaryTerms(projectId, signal) {
+  const res = await fetch(`${API_BASE}/glossary/project/${projectId}`, {
     headers: authHeaders(),
     signal,
   });
@@ -1042,8 +1053,8 @@ async function fetchGlossaryTerms(comicId, signal) {
   return json?.data !== undefined ? json.data : json;
 }
 
-async function createGlossaryTermApi(comicId, term, signal) {
-  const res = await fetch(`${API_BASE}/glossary/comic/${comicId}`, {
+async function createGlossaryTermApi(projectId, term, signal) {
+  const res = await fetch(`${API_BASE}/glossary/project/${projectId}`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(term),
@@ -1079,9 +1090,9 @@ async function deleteGlossaryTermApi(id, signal) {
   return true;
 }
 
-async function fetchGlossarySuggestions(comicId, { pageId, imageUrl }, signal) {
+async function fetchGlossarySuggestions(projectId, { pageId, imageUrl }, signal) {
   const body = pageId ? { pageId } : { imageUrl };
-  const res = await fetch(`${API_BASE}/glossary/comic/${comicId}/suggest`, {
+  const res = await fetch(`${API_BASE}/glossary/project/${projectId}/suggest`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(body),
@@ -1098,7 +1109,7 @@ async function fetchGlossarySuggestions(comicId, { pageId, imageUrl }, signal) {
 
 const glossarySuggestionCache = new Map();
 
-function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
+function GlossaryTabPanel({ projectId, pageId, imageUrl }) {
   const [terms, setTerms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -1121,7 +1132,7 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
   const [showExtractedText, setShowExtractedText] = useState(false);
 
   useEffect(() => {
-    if (!comicId) {
+    if (!projectId) {
       setTerms([]);
       setLoading(false);
       return;
@@ -1129,19 +1140,19 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
     const controller = new AbortController();
     setLoading(true);
     setLoadError(null);
-    fetchGlossaryTerms(comicId, controller.signal)
+    fetchGlossaryTerms(projectId, controller.signal)
       .then((data) => setTerms(Array.isArray(data) ? data : []))
       .catch((err) => {
         if (err.name !== "AbortError") setLoadError(err.message || "Failed to load glossary");
       })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [comicId]);
+  }, [projectId]);
 
   const runSuggestScan = useCallback(
     (forceRefresh = false) => {
-      if (!comicId || !pageKey) return;
-      const cacheKey = `${comicId}::${pageKey}`;
+      if (!projectId || !pageKey) return;
+      const cacheKey = `${projectId}::${pageKey}`;
       if (!forceRefresh && glossarySuggestionCache.has(cacheKey)) {
         const cached = glossarySuggestionCache.get(cacheKey);
         setSuggestions(cached.suggestions);
@@ -1152,7 +1163,7 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
       const controller = new AbortController();
       setSuggestLoading(true);
       setSuggestError(null);
-      fetchGlossarySuggestions(comicId, { pageId, imageUrl }, controller.signal)
+      fetchGlossarySuggestions(projectId, { pageId, imageUrl }, controller.signal)
         .then((result) => {
           glossarySuggestionCache.set(cacheKey, result);
           setSuggestions(result.suggestions);
@@ -1164,7 +1175,7 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
         .finally(() => setSuggestLoading(false));
       return () => controller.abort();
     },
-    [comicId, pageId, imageUrl, pageKey]
+    [projectId, pageId, imageUrl, pageKey]
   );
 
   useEffect(() => {
@@ -1205,7 +1216,7 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
     if (!newSource.trim() || !newTarget.trim() || saving) return;
     setSaving(true);
     try {
-      const created = await createGlossaryTermApi(comicId, {
+      const created = await createGlossaryTermApi(projectId, {
         source: newSource.trim(),
         target: newTarget.trim(),
         note: newNote.trim(),
@@ -1285,7 +1296,7 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `glossary_${comicId || "project"}.json`;
+    a.download = `glossary_${projectId || "project"}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -1377,16 +1388,7 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
               <RefreshCw size={12} className={suggestLoading ? "tw-spin" : ""} /> Rescan
             </button>
           )}
-          {mode === "all" && terms.length > 0 && (
-            <button
-              type="button"
-              className="tw-btn tw-x-mini-btn"
-              onClick={handleExport}
-              title="Export glossary as JSON"
-            >
-              Export
-            </button>
-          )}
+
           <button
             type="button"
             className="tw-btn-primary tw-x-glossary-add-btn"
@@ -1747,7 +1749,7 @@ function TranslationSidePanel({
   resolveBubbleLabel,
   userFullName,
   onSelectBubble,
-  comicId,
+  projectId,
   pageId,
   canEdit = true,
   projectTeamId,
@@ -1786,7 +1788,7 @@ function TranslationSidePanel({
         />
       )}
       {activeTab === "glossary" && (
-        <GlossaryTabPanel comicId={comicId} pageId={pageId} imageUrl={currentImage} />
+        <GlossaryTabPanel projectId={projectId} pageId={pageId} imageUrl={currentImage} />
       )}
       {activeTab === "changes" && (
         <ChangeRequestsTabPanel
@@ -2191,12 +2193,12 @@ async function fetchPagesForTask(taskId, signal) {
   if (UUID_RE.test(taskId)) {
     try {
       const list = await fetchJson(`${API_BASE}/translate-workspace/${taskId}`, signal);
-      console.log('[DEBUG] /translate-workspace response:', list);
+      //console.log('[DEBUG] /translate-workspace response:', list);
       if (Array.isArray(list) && list.length > 0) {
         rawPages = list;
       }
     } catch (err) {
-      console.warn('[DEBUG] /translate-workspace fetch failed:', err);
+      //console.warn('[DEBUG] /translate-workspace fetch failed:', err);
     }
   }
 
@@ -3715,7 +3717,11 @@ export default function TranslateWorkspace() {
         pageId: p.pageId || p.id || `p-${idx + 1}`,
         pageNumber: p.pageNumber || idx + 1,
         status: p.status === "DONE" ? "DONE" : (idx === currentPageIndex ? "current" : "todo"),
-        translatorLabel: formatAssigneeLabel(p.translatedBy || p.translatorId || p.completedBy, teamMembers)
+        translatorLabel: formatAssigneeLabel(p.translatedBy || p.translatorId || p.completedBy, teamMembers),
+        contributorLabels: Array.from(new Set([
+          p.translatedBy || p.translatorId || p.completedBy, 
+          p.status === "DONE" ? chapterData?.taskAssigneeId : null
+        ].filter(Boolean))).map(id => formatAssigneeLabel(id, teamMembers))
       })),
     };
 
@@ -3735,7 +3741,11 @@ export default function TranslateWorkspace() {
             pageId: p.pageId || p.id || `p-${idx + 1}`,
             pageNumber: p.pageNumber || idx + 1,
             status: p.status === "DONE" ? "DONE" : "todo",
-            translatorLabel: formatAssigneeLabel(p.translatedBy || p.translatorId || p.completedBy, teamMembers)
+            translatorLabel: formatAssigneeLabel(p.translatedBy || p.translatorId || p.completedBy, teamMembers),
+            contributorLabels: Array.from(new Set([
+              p.translatedBy || p.translatorId || p.completedBy, 
+              p.status === "DONE" ? t.assigneeId : null
+            ].filter(Boolean))).map(id => formatAssigneeLabel(id, teamMembers))
           })),
         };
       });
@@ -4195,7 +4205,7 @@ export default function TranslateWorkspace() {
           resolveBubbleLabel={resolveBubbleLabel}
           userFullName={userFullName}
           onSelectBubble={selectArea}
-          comicId={chapterData?.comicId}
+          projectId={chapterData?.projectTeamId}
           pageId={currentPageMeta?.pageId}
           canEdit={canEdit}
           projectTeamId={chapterData?.projectTeamId}

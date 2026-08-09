@@ -123,7 +123,7 @@ function RequestsTab({ joinRequests = [], onApprove, onReject }) {
                     fontSize: '12.5px',
                     color: isLight ? '#475569' : '#cbd5e1',
                     border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.1)'
-                  }} title="Number of active project teams this user is currently in">
+                  }} title={req.activeProjectNames && req.activeProjectNames.length > 0 ? `Active projects:\n• ${req.activeProjectNames.join('\n• ')}` : "No active projects"}>
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4" />
                       <polyline points="14 2 14 8 20 8" />
@@ -142,7 +142,7 @@ function RequestsTab({ joinRequests = [], onApprove, onReject }) {
                     fontSize: '12.5px',
                     color: isLight ? '#475569' : '#cbd5e1',
                     border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.1)'
-                  }} title="Number of incomplete tasks assigned to this user across all teams">
+                  }} title={req.activeTaskNames && req.activeTaskNames.length > 0 ? `Active tasks:\n• ${req.activeTaskNames.join('\n• ')}` : "No active tasks"}>
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="9 11 12 14 22 4"></polyline>
                       <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
