@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import '../../assets/style/moderator/review-queue.css'
 import '../../assets/style/moderator/comic-detail.css'
 import ModernButton from '../../components/common/ModernButton'
@@ -8,6 +8,11 @@ import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import ModernPagination from '../../components/common/ModernPagination'
 import { getChaptersByComicIdApi, getChapterDetailApi } from '../../services/api/ChapterApi'
 import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
+import ReviewAppealModal from '../../components/moderator/ReviewAppealModal'
+import { 
+  getPendingAppealByTargetApi, 
+  getPendingAppealsQueueApi 
+} from '../../services/api/AppealApi'
 import { useTheme } from '../../context/ThemeContext'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import { getAuth } from '../../utils/Auth'
@@ -127,10 +132,27 @@ const CustomSortDropdown = ({ value, onChange }) => {
   );
 };
 
-function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfirmReject, handleApproveAndCreateProject, handleChapterApprove, handleChapterReject }) {
+function ReviewQueue({ loading = false, submissions = [], comics = [], handleApprove, handleConfirmReject, handleApproveAndCreateProject, handleChapterApprove, handleChapterReject }) {
   const { theme } = useTheme()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'approved' | 'rejected' | 'appealed'
+  const location = useLocation()
+  
+  // Initialize tab from URL query param if available
+  const initialTab = useMemo(() => {
+    const params = new URLSearchParams(location.search)
+    const t = params.get('tab')
+    return ['pending', 'approved', 'rejected', 'appealed'].includes(t) ? t : 'pending'
+  }, [location.search])
+  
+  const [activeTab, setActiveTab] = useState(initialTab) // 'pending' | 'approved' | 'rejected' | 'appealed'
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const t = params.get('tab')
+    if (t && ['pending', 'approved', 'rejected', 'appealed'].includes(t) && t !== activeTab) {
+      setActiveTab(t)
+    }
+  }, [location.search])
   
   const [sortFilter, setSortFilter] = useState('date_desc')
   const [searchQuery, setSearchQuery] = useState('')
@@ -195,6 +217,9 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 5
   
+  const [isAppealModalOpen, setIsAppealModalOpen] = useState(false)
+  const [selectedAppealComic, setSelectedAppealComic] = useState(null)
+
   const [isHydrating, setIsHydrating] = useState(false)
   const [hydratedItems, setHydratedItems] = useState([])
 
@@ -1360,7 +1385,18 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
 
       {/* Submissions List Grid */}
       <div className="moderator-cards-list">
-        {filteredItems.length === 0 ? (
+        {loading ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px', marginTop: '24px' }}>
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="mod-sub-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px' }}>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '140px', borderRadius: '12px 12px 0 0', margin: '-24px -24px 16px -24px' }}></div>
+                <div className="skeleton-line skeleton-shimmer" style={{ width: '80%', height: '20px', marginBottom: '8px' }}></div>
+                <div className="skeleton-line skeleton-shimmer" style={{ width: '60%', height: '16px', marginBottom: '16px' }}></div>
+                <div className="skeleton-line skeleton-shimmer" style={{ width: '100%', height: '36px', borderRadius: '8px' }}></div>
+              </div>
+            ))}
+          </div>
+        ) : filteredItems.length === 0 ? (
           <div className="moderator-empty-state">
             <h3>No submissions found</h3>
             <p>There are no raw comic submissions matching your active filters.</p>
@@ -1401,7 +1437,7 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                 <div className="submission-extra" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
                   <span className="submission-extra-item">⏱️ {formatTimeAgo(item.timestamp || item.submittedAt || item.createdAt)}</span>
                   <span className="submission-extra-item" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '2px 8px', borderRadius: '6px', fontWeight: '800', fontSize: '11.5px' }}>
-                    📚 {getSubmissionChapters(item).length} {getSubmissionChapters(item).length === 1 ? 'Chapter' : 'Chapters'}
+                    📚 {item.isComicAppealItem ? (item.chapterCount || item.chapters || 0) : getSubmissionChapters(item).length} {item.isComicAppealItem ? ((item.chapterCount || item.chapters || 0) === 1 ? 'Chapter' : 'Chapters') : (getSubmissionChapters(item).length === 1 ? 'Chapter' : 'Chapters')}
                   </span>
                 </div>
               </div>
@@ -1414,7 +1450,8 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
                     className="btn-review"
                     onClick={() => {
                       if (item.isComicAppealItem) {
-                        navigate(`/moderator/comic-management/${item.id}`);
+                        setSelectedAppealComic(item);
+                        setIsAppealModalOpen(true);
                       } else {
                         handleOpenReviewModal(item);
                       }
@@ -2586,6 +2623,17 @@ function ReviewQueue({ submissions = [], comics = [], handleApprove, handleConfi
         </div>,
         document.body
       )}
+      <ReviewAppealModal
+        isOpen={isAppealModalOpen}
+        onClose={() => {
+          setIsAppealModalOpen(false)
+          setSelectedAppealComic(null)
+        }}
+        comic={selectedAppealComic}
+        onSuccess={() => {
+          fetchData(activeTab, getTabSearchQuery(activeTab), pagination[activeTab].page)
+        }}
+      />
     </div>
   )
 }

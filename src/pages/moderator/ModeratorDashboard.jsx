@@ -77,15 +77,32 @@ function ModeratorDashboard() {
   const location = useLocation()
   const navigate = useNavigate()
   const [activeNav, setActiveNav] = useState(() => {
-    return location.state?.activeNav || 'dashboard'
+    const params = new URLSearchParams(location.search)
+    return params.get('nav') || location.state?.activeNav || 'dashboard'
   })
 
   // Sync activeNav changes back to history state so F5 preserves the current tab
   useEffect(() => {
-    if (location.state?.activeNav !== activeNav) {
+    const params = new URLSearchParams(location.search)
+    const navFromUrl = params.get('nav')
+    if (navFromUrl && navFromUrl !== activeNav) {
+      setActiveNav(navFromUrl)
+    } else if (location.state?.activeNav && location.state?.activeNav !== activeNav && !navFromUrl) {
+      setActiveNav(location.state.activeNav)
+    }
+  }, [location.search, location.state])
+
+  // Sync activeNav changes to URL without reloading
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get('nav') !== activeNav) {
+      // Keep other query params intact (like tab) when updating nav
+      if (activeNav) params.set('nav', activeNav)
+      navigate(`${location.pathname}?${params.toString()}`, { replace: true, state: { ...location.state, activeNav } })
+    } else if (location.state?.activeNav !== activeNav) {
       navigate(location.pathname, { replace: true, state: { ...location.state, activeNav } })
     }
-  }, [activeNav, navigate, location.pathname, location.state])
+  }, [activeNav, navigate, location.pathname, location.state, location.search])
   const [hoveredPoint, setHoveredPoint] = useState(null)
   const [pinnedPoint, setPinnedPoint] = useState(null)
   const [hoveredGenre, setHoveredGenre] = useState(null)
@@ -99,7 +116,8 @@ function ModeratorDashboard() {
   const [genres, setGenres] = useState([])
   const [forumThreads, setForumThreads] = useState([])
   const [chatFlags, setChatFlags] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loadingPhase1, setLoadingPhase1] = useState(true)
+  const [loadingPhase2, setLoadingPhase2] = useState(true)
 
   // Creation Team Modal Shared triggers
   const [showCreateTeamModal, setShowCreateTeamModal] = useState(false)
@@ -432,32 +450,25 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
   ]).catch(() => fallbackValue);
 };
 
-  const fetchAllData = async () => {
+  const fetchAllData = () => {
     // If data is already present, refresh silently in background without showing full screen loader
     if (comics.length === 0 && submissions.length === 0) {
-      setLoading(true);
+      setLoadingPhase1(true);
+      setLoadingPhase2(true);
     }
-    try {
-      // Phase 1: Core Dashboard Data (Comics, Teams, Submissions, Genres) with 2s max timeout
-      const [comicsData, teamsData, submissionsData, genresData, leaderboardData] = await Promise.all([
-        withTimeout(getAllComicsApi(), []),
-        withTimeout(getAllProjectTeamsApi(), []),
-        withTimeout(getAllSubmissionsApi(), []),
-        withTimeout(getAllGenresApi(), []),
-        withTimeout(getComicLeaderboardApi({ timeframe: 'month' }), [])
-      ]);
-
+    
+    // Phase 1: Core Dashboard Data (Comics, Teams, Submissions, Genres) with 2s max timeout
+    Promise.all([
+      withTimeout(getAllComicsApi(), []),
+      withTimeout(getAllProjectTeamsApi(), []),
+      withTimeout(getAllSubmissionsApi(), []),
+      withTimeout(getAllGenresApi(), []),
+      withTimeout(getComicLeaderboardApi({ timeframe: 'month' }), [])
+    ]).then(([comicsData, teamsData, submissionsData, genresData, leaderboardData]) => {
       const authUser = getAuth()?.user;
       setTopComics(leaderboardData?.data || leaderboardData?.content || leaderboardData || []);
       
-      const mergedSubmissionsData = [...(submissionsData || [])].filter(s => {
-        // If we can map the submission to a comic, filter out comics with 0 chapters
-        const comic = (comicsData || []).find(c => String(c.id) === String(s.comicId));
-        if (comic && (!comic.chapterCount || comic.chapterCount <= 0)) {
-          return false;
-        }
-        return true;
-      });
+      const mergedSubmissionsData = [...(submissionsData || [])];
 
       const enrichedRawSubmissions = mergedSubmissionsData.map(s => {
         const titleClean = (s.title || s.comicTitle || '').toLowerCase().trim();
@@ -508,7 +519,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       const filteredSubmissions = syncSubmissionsWithLocalOverride(
         enrichedRawSubmissions.filter(s => isLanguageInModeratorScope(s.language || s.rawLanguage || s.targetLanguage || s.targetLang || s.originalLanguage, authUser))
       );
-      
       setSubmissions(filteredSubmissions);
 
       const mappedComics = syncApprovedComics(
@@ -529,15 +539,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
         filteredSubmissions
       ).map(c => syncComicWithLocalOverride(c));
 
-      console.log('[ModeratorDashboard] Data Hydration Summary:', {
-        rawComicsData: comicsData,
-        rawComicsCount: comicsData?.length || 0,
-        submissionsCount: submissionsData?.length || 0,
-        filteredSubmissionsCount: filteredSubmissions?.length || 0,
-        mappedComicsCount: mappedComics?.length || 0,
-        moderatorScope: getModeratorScope(authUser)
-      });
-
       setComics(deduplicateComics(mappedComics));
       let localTeams = [];
       try {
@@ -556,24 +557,25 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       });
       setProjectTeams(Array.from(mergedTeamsMap.values()));
       setGenres(genresData?.data || (Array.isArray(genresData) ? genresData : []));
+    }).catch(err => {
+      console.error(err);
+      toast.error('Failed to retrieve core data from server.');
+    }).finally(() => {
+      setLoadingPhase1(false);
+    });
 
-      // Release screen loading indicator immediately after Stage 1 (~50ms)
-      setLoading(false);
-
-      // Phase 2: Secondary Background Data (Forum threads & Chat flags) with timeout
-      const [forumData, chatData] = await Promise.all([
-        withTimeout(getAllForumThreadsApi(), []),
-        withTimeout(getAllChatFlagsApi(), [])
-      ]);
-
+    // Phase 2: Secondary Background Data (Forum threads & Chat flags) with timeout
+    Promise.all([
+      withTimeout(getAllForumThreadsApi(), []),
+      withTimeout(getAllChatFlagsApi(), [])
+    ]).then(([forumData, chatData]) => {
       setForumThreads(forumData || []);
       setChatFlags(chatData || []);
-    } catch (err) {
+    }).catch(err => {
       console.error(err);
-      toast.error('Failed to retrieve control panel data from server.');
-    } finally {
-      setLoading(false);
-    }
+    }).finally(() => {
+      setLoadingPhase2(false);
+    });
   }
 
   const getNavBadges = () => {
@@ -1300,12 +1302,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
   return (
     <ModeratorLayout activeNav={activeNav} onNavChange={setActiveNav} navBadges={getNavBadges()}>
-      {loading ? (
-        <div className="moderator-empty-state">
-          <p>Loading dashboard metrics...</p>
-        </div>
-      ) : (
-        <>
+      <>
           {/* VIEW: DASHBOARD */}
           {activeNav === 'dashboard' && (
             <div 
@@ -1322,7 +1319,11 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 <div className="mod-welcome-text">
                   <h1>Welcome back, Moderator!</h1>
                   <p>
-                    System is running smoothly. There are currently <strong>{submissions.filter(s => s.status === 'pending').length}</strong> reviews pending and <strong>{forumThreads.filter(t => t.isReported).length}</strong> open forum reports.
+                    {loadingPhase1 ? (
+                      <span className="skeleton-line skeleton-shimmer" style={{ width: '300px', display: 'inline-block', margin: 0 }}></span>
+                    ) : (
+                      <>System is running smoothly. There are currently <strong>{submissions.filter(s => s.status === 'pending').length}</strong> reviews pending and <strong>{forumThreads.filter(t => t.isReported).length}</strong> open forum reports.</>
+                    )}
                   </p>
                 </div>
               </div>
@@ -1337,7 +1338,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                   </div>
                   <div className="mod-core-body">
                     <div className="mod-core-value-group">
-                      <div className="mod-core-value">{submissions.filter(s => s.status === 'pending').length}</div>
+                      <div className="mod-core-value">
+                        {loadingPhase1 ? <div className="skeleton-line skeleton-shimmer" style={{ width: '60px', height: '32px', margin: 0 }}></div> : submissions.filter(s => s.status === 'pending').length}
+                      </div>
                       <span className="mod-core-trend">Awaiting review queue</span>
                     </div>
                     {/* SVG Sparkline */}
@@ -1355,7 +1358,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                   </div>
                   <div className="mod-core-body">
                     <div className="mod-core-value-group">
-                      <div className="mod-core-value">{comics.length}</div>
+                      <div className="mod-core-value">
+                        {loadingPhase1 ? <div className="skeleton-line skeleton-shimmer" style={{ width: '60px', height: '32px', margin: 0 }}></div> : comics.length}
+                      </div>
                       <span className="mod-core-trend">Titles in system</span>
                     </div>
                     {/* SVG Sparkline */}
@@ -1373,7 +1378,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                   </div>
                   <div className="mod-core-body">
                     <div className="mod-core-value-group">
-                      <div className="mod-core-value">{projectTeams.filter(t => t.status?.toUpperCase() === 'ACTIVE').length}</div>
+                      <div className="mod-core-value">
+                        {loadingPhase1 ? <div className="skeleton-line skeleton-shimmer" style={{ width: '60px', height: '32px', margin: 0 }}></div> : projectTeams.filter(t => t.status?.toUpperCase() === 'ACTIVE').length}
+                      </div>
                       <span className="mod-core-trend">Groups translating</span>
                     </div>
                     {/* SVG Sparkline */}
@@ -1391,7 +1398,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                   </div>
                   <div className="mod-core-body">
                     <div className="mod-core-value-group">
-                      <div className="mod-core-value">{chatFlags.length}</div>
+                      <div className="mod-core-value">
+                        {loadingPhase2 ? <div className="skeleton-line skeleton-shimmer" style={{ width: '60px', height: '32px', margin: 0 }}></div> : chatFlags.length}
+                      </div>
                       <span className="mod-core-trend">Reported messages</span>
                     </div>
                     {/* SVG Sparkline */}
@@ -1407,7 +1416,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 <div className="mod-sec-card">
                   <span className="mod-sec-icon-circle">🏢</span>
                   <div className="mod-sec-details">
-                    <span className="mod-sec-value">{projectTeams.length}</span>
+                    <span className="mod-sec-value">
+                      {loadingPhase1 ? <div className="skeleton-line skeleton-shimmer" style={{ width: '40px', height: '24px', margin: 0 }}></div> : projectTeams.length}
+                    </span>
                     <span className="mod-sec-title">Project Teams</span>
                   </div>
                 </div>
@@ -1415,7 +1426,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 <div className="mod-sec-card">
                   <span className="mod-sec-icon-circle">📖</span>
                   <div className="mod-sec-details">
-                    <span className="mod-sec-value">{comics.reduce((acc, c) => acc + (c.chapterCount || 0), 0)}</span>
+                    <span className="mod-sec-value">
+                      {loadingPhase1 ? <div className="skeleton-line skeleton-shimmer" style={{ width: '40px', height: '24px', margin: 0 }}></div> : comics.reduce((acc, c) => acc + (c.chapterCount || 0), 0)}
+                    </span>
                     <span className="mod-sec-title">Total Chapters</span>
                   </div>
                 </div>
@@ -1423,7 +1436,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 <div className="mod-sec-card">
                   <span className="mod-sec-icon-circle">📈</span>
                   <div className="mod-sec-details">
-                    <span className="mod-sec-value">{comics.filter(c => c.publicationStatus?.toUpperCase() === 'ONGOING').length}</span>
+                    <span className="mod-sec-value">
+                      {loadingPhase1 ? <div className="skeleton-line skeleton-shimmer" style={{ width: '40px', height: '24px', margin: 0 }}></div> : comics.filter(c => c.publicationStatus?.toUpperCase() === 'ONGOING').length}
+                    </span>
                     <span className="mod-sec-title">Ongoing</span>
                   </div>
                 </div>
@@ -1431,7 +1446,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 <div className="mod-sec-card">
                   <span className="mod-sec-icon-circle">🏁</span>
                   <div className="mod-sec-details">
-                    <span className="mod-sec-value">{comics.filter(c => c.publicationStatus?.toUpperCase() === 'COMPLETED').length}</span>
+                    <span className="mod-sec-value">
+                      {loadingPhase1 ? <div className="skeleton-line skeleton-shimmer" style={{ width: '40px', height: '24px', margin: 0 }}></div> : comics.filter(c => c.publicationStatus?.toUpperCase() === 'COMPLETED').length}
+                    </span>
                     <span className="mod-sec-title">Completed</span>
                   </div>
                 </div>
@@ -1439,7 +1456,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 <div className="mod-sec-card">
                   <span className="mod-sec-icon-circle">🚩</span>
                   <div className="mod-sec-details">
-                    <span className="mod-sec-value">{forumThreads.filter(t => t.isReported).length}</span>
+                    <span className="mod-sec-value">
+                      {loadingPhase2 ? <div className="skeleton-line skeleton-shimmer" style={{ width: '40px', height: '24px', margin: 0 }}></div> : forumThreads.filter(t => t.isReported).length}
+                    </span>
                     <span className="mod-sec-title">Open Reports</span>
                   </div>
                 </div>
@@ -1448,7 +1467,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                   <span className="mod-sec-icon-circle">✨</span>
                   <div className="mod-sec-details">
                     <span className="mod-sec-value">
-                      {(() => {
+                      {loadingPhase1 ? <div className="skeleton-line skeleton-shimmer" style={{ width: '40px', height: '24px', margin: 0 }}></div> : (() => {
                         try {
                           const todayStr = new Date().toDateString();
                           return submissions.filter(s => s.status === 'approved' && s.timestamp && new Date(s.timestamp).toDateString() === todayStr).length;
@@ -1976,6 +1995,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
           {/* VIEW: REVIEW QUEUE */}
           {activeNav === 'review-queue' && (
             <ReviewQueue 
+              loading={loadingPhase1}
               submissions={submissions} 
               comics={comics}
               handleApprove={handleApprove} 
@@ -1989,6 +2009,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
           {/* VIEW: COMIC MANAGEMENT */}
           {activeNav === 'comic-management' && (
             <ComicManagement 
+              loading={loadingPhase1}
               comics={comics} 
               projectTeams={projectTeams}
               genres={genres}
@@ -2002,12 +2023,13 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
           {/* VIEW: GENRE MANAGEMENT */}
           {activeNav === 'genre-management' && (
-            <GenreManagement comics={comics} />
+            <GenreManagement loading={loadingPhase1} comics={comics} />
           )}
 
           {/* VIEW: PROJECT TEAMS */}
           {activeNav === 'project-teams' && (
             <ProjectTeams 
+              loading={loadingPhase1}
               projectTeams={projectTeams}
               setProjectTeams={setProjectTeams}
               genres={genres}
@@ -2035,12 +2057,12 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
           {/* VIEW: CHAT MONITOR */}
           {activeNav === 'chat-monitor' && (
-            <ChatMonitor fetchAllData={fetchChatFlagsData} />
+            <ChatMonitor loading={loadingPhase2} fetchAllData={fetchChatFlagsData} />
           )}
 
           {/* VIEW: FORUM */}
           {activeNav === 'forum' && (
-            <ForumModeration fetchAllData={fetchForumThreadsData} />
+            <ForumModeration loading={loadingPhase2} fetchAllData={fetchForumThreadsData} />
           )}
 
           {/* VIEW: VIOLATION REPORTS */}
@@ -2053,7 +2075,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
             <ReportCategories roleScope="MODERATOR" />
           )}
         </>
-      )}
     </ModeratorLayout>
   )
 }
