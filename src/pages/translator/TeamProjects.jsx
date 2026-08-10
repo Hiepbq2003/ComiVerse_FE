@@ -374,9 +374,12 @@ function WorkspaceDetailView({
   onMembersLoaded,
   onLeaveTeam,
   onRemoveMember,
+  bannedUsers,
+  onUnbanUser,
   joinRequests,
   onApproveRequest,
   onRejectRequest,
+  onBanUser,
   showUploadForm,
   setShowUploadForm,
   uploadData,
@@ -476,6 +479,8 @@ function WorkspaceDetailView({
           onMembersLoaded={onMembersLoaded}
           onLeaveTeam={onLeaveTeam}
           onRemoveMember={onRemoveMember}
+          bannedUsers={bannedUsers}
+          onUnbanUser={onUnbanUser}
         />
       )}
 
