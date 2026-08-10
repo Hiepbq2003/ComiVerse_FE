@@ -204,7 +204,21 @@ function ChapterList({ chapters, openChapterId, onToggleChapter, chapterPagesLoa
   );
 }
 
-function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend, sending, saveStatus, canEdit = true, isPageTranslatedByOther = false }) {
+function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend, sending, saveStatus, canEdit = true, isPageTranslatedByOther = false, onUpload, isUploading = false }) {
+  const uploadInputRef = useRef(null);
+
+  const handleUploadClick = () => {
+    if (!canEdit || isUploading) return;
+    uploadInputRef.current?.click();
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    onUpload?.(file);
+    // Reset input so the same file can be picked again next time
+    e.target.value = "";
+  };
   const badgeConfig = {
     saving: { icon: <Loader2 size={11} strokeWidth={3} className="tw-spin" />, label: "SAVING" },
     saved: { icon: <Check size={11} strokeWidth={3} />, label: "SAVED" },
@@ -242,13 +256,28 @@ function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend,
         <span className={`tw-badge-saved tw-font-mono is-${statusKey}`}>
           {badgeConfig.icon} {badgeConfig.label}
         </span>
+        <input
+          ref={uploadInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={handleFileChange}
+        />
         <button
           className="tw-btn"
-          disabled={!canEdit}
-          title={canEdit ? undefined : "You don't have permission to edit this task"}
-          style={!canEdit ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+          disabled={!canEdit || isUploading}
+          onClick={handleUploadClick}
+          title={
+            !canEdit
+              ? "You don't have permission to edit this task"
+              : isUploading
+              ? "Uploading…"
+              : "Replace the current page image"
+          }
+          style={(!canEdit || isUploading) ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
         >
-          <Upload size={14} /> Upload
+          {isUploading ? <Loader2 size={14} className="tw-spin" /> : <Upload size={14} />}
+          {isUploading ? "Uploading…" : "Upload"}
         </button>
         <button
           className="tw-btn-primary"
@@ -2423,6 +2452,33 @@ async function saveBubblesForPage(pageId, payload, signal) {
   }
 }
 
+async function uploadImageToCloudinary(file, signal) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`${API_BASE}/upload/image`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+    signal,
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok || !json?.success) throw new Error(json?.message || `Upload failed (${res.status})`);
+  return json.data; // Cloudinary URL string
+}
+
+async function replacePageImage(pageId, imageUrl, signal) {
+  const res = await fetch(`${API_BASE}/translate-workspace/pages/${pageId}/image`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ imageUrl }),
+    signal,
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.message || `Failed to update page image (${res.status})`);
+  return json?.data !== undefined ? json.data : json;
+}
+
 async function updateTranslationPageStatus(pageId, status, signal) {
   const res = await fetch(`${API_BASE}/translate-workspace/pages/${pageId}/status`, {
     method: "PUT",
@@ -3426,6 +3482,7 @@ export default function TranslateWorkspace() {
   }, [saveStatus]);
 
   const [sending, setSending] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const isLoadingPageRef = useRef(false);
 
 
@@ -3559,6 +3616,7 @@ export default function TranslateWorkspace() {
 
   const images = useMemo(() => taskPages.map((p) => p.imageUrl).filter(Boolean), [taskPages]);
   const currentImage = images[currentPageIndex];
+  const currentPageMeta = taskPages[currentPageIndex] ?? null;
 
 
   const currentPageIdRef = useRef(null);
@@ -3926,6 +3984,38 @@ export default function TranslateWorkspace() {
 
   const isLastPage = images.length > 0 && currentPageIndex === images.length - 1;
 
+  const handleUploadImage = useCallback(async (file) => {
+    const pageId = currentPageMeta?.pageId;
+    if (!pageId) {
+      toast.error("No page loaded — cannot upload image.");
+      return;
+    }
+    if (!canEdit) {
+      toast.warning("You don't have permission to edit this task.");
+      return;
+    }
+    setIsUploading(true);
+    try {
+      const cloudinaryUrl = await uploadImageToCloudinary(file);
+      await replacePageImage(pageId, cloudinaryUrl);
+      // Update local state so canvas shows new image immediately
+      setTaskPages((prev) =>
+        prev.map((p) =>
+          (p.pageId === pageId || p.id === pageId)
+            ? { ...p, imageUrl: cloudinaryUrl }
+            : p
+        )
+      );
+      // Also invalidate session cache so re-load reflects new image
+      try { sessionStorage.removeItem(`comiverse_ws_cache_${taskId}`); } catch (e) {}
+      toast.success("Page image replaced successfully!");
+    } catch (err) {
+      toast.error(err?.message || "Failed to upload image.");
+    } finally {
+      setIsUploading(false);
+    }
+  }, [currentPageMeta, canEdit, taskId]);
+
   const handleSend = useCallback(async () => {
     if (!isLastPage || sending || !canEdit) return;
 
@@ -4039,6 +4129,19 @@ export default function TranslateWorkspace() {
     return <div className="tw-root tw-loading">Loading error: {error}</div>;
   }
 
+  // canEditTask = same permission gate as canEdit (task-level write access)
+  const canEditTask = canEdit;
+
+  // isPageTranslatedByOther: true when the current page was translated by a
+  // different user (read-only for the current viewer).
+  const isPageTranslatedByOther = !canEdit && (() => {
+    if (!currentPageMeta) return false;
+    const translatedById = currentPageMeta.translatedBy ?? currentPageMeta.assignedTranslatorId ?? currentPageMeta.completedBy ?? null;
+    if (!translatedById) return false;
+    if (currentUserId && String(translatedById) === String(currentUserId)) return false;
+    return true;
+  })();
+
   return (
     <div className="tw-root">
       <TranslateHeaderBar
@@ -4051,6 +4154,8 @@ export default function TranslateWorkspace() {
         isPageTranslatedByOther={isPageTranslatedByOther}
         sending={sending}
         saveStatus={saveStatus}
+        onUpload={handleUploadImage}
+        isUploading={isUploading}
       />
 
       <div className="tw-body">

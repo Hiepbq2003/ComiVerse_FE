@@ -699,7 +699,7 @@ function TeamProjects() {
     const defaultTitle = (chap && typeof chap === 'object' && chap.title) ? `${chap.title} - Translation & Proofreading` : '';
     setNewTaskData({
       title: defaultTitle,
-      column: chId ? 'in_progress' : 'backlog',
+      column: 'backlog',
       assigneeId: null,
       dueDate: '',
       priority: 'Medium',
@@ -1587,10 +1587,12 @@ function TeamProjects() {
     const formattedTitle = cleanTitle.startsWith('[') ? cleanTitle : `[${(data.priority || 'MEDIUM').toUpperCase()}] [${comicName}] ${cleanTitle}`
     const dueDateVal = data.dueDate || new Date().toISOString().split('T')[0]
 
+    const initialStatus = data.column || 'backlog';
+
     const newTaskObj = {
       id: `task-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       title: formattedTitle,
-      status: data.column || 'backlog',
+      status: initialStatus,
       assigneeId: data.assigneeId,
       chapterId: data.chapterId,
       dueDate: dueDateVal,
@@ -1603,7 +1605,7 @@ function TeamProjects() {
     try {
       const created = await createTeamTaskApi(selectedDetails.id, {
         title: formattedTitle,
-        status: data.column || 'backlog',
+        status: initialStatus,
         assigneeId: data.assigneeId,
         chapterId: data.chapterId,
         dueDate: dueDateVal,
@@ -1679,10 +1681,11 @@ function TeamProjects() {
     const formattedTitle = `[${(editTaskData.priority || 'MEDIUM').toUpperCase()}] [${editTaskData.comic || comicFallback}] ${editTaskData.title.trim()}`
 
     const targetId = selectedTask.id || selectedTask._id || selectedTask.taskId
+    const nextStatus = (editTaskData.status === 'backlog') ? 'in_progress' : editTaskData.status
     const updatedTaskObj = {
       ...selectedTask,
       title: formattedTitle,
-      status: editTaskData.status,
+      status: nextStatus,
       assigneeId: editTaskData.assigneeId,
       dueDate: editTaskData.dueDate
     }
@@ -1695,7 +1698,7 @@ function TeamProjects() {
       const assigneeChanged = String(editTaskData.originalAssigneeId || '') !== String(editTaskData.assigneeId || '')
       await updateTeamTaskApi(targetId, {
         title: formattedTitle,
-        status: editTaskData.status,
+        status: nextStatus,
         assigneeId: assigneeChanged ? editTaskData.originalAssigneeId : editTaskData.assigneeId,
         dueDate: editTaskData.dueDate,
         ...(Number(editTaskData.chapterRewardUsd) > 0

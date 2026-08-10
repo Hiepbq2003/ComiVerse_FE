@@ -251,7 +251,7 @@ function KanbanColumn({
           <div className={`column__dot ${col.dotClass}`}></div>
           <h2>{col.title}</h2>
           <span className="column__count">
-            {colTasks.length + (col.id === 'backlog' && unassignedChapterOptions ? unassignedChapterOptions.length : 0)}
+            {colTasks.length}
           </span>
         </div>
         <div className={`column__add-wrap ${isDropdownOpen ? 'open' : ''}`}>
@@ -290,71 +290,6 @@ function KanbanColumn({
       </div>
 
       <div className="task-list" style={{ opacity: isLocked ? 0.6 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>
-        {col.id === 'backlog' && unassignedChapterOptions && unassignedChapterOptions.map((ch, idx) => (
-          <div
-            key={`raw-ch-${ch.id || idx}`}
-            className="task-card task-card-item"
-            style={{
-              background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(99, 102, 241, 0.08))',
-              border: '1.5px dashed rgba(168, 85, 247, 0.4)',
-              padding: '14px',
-              borderRadius: '12px',
-              marginBottom: '12px',
-              transition: 'all 0.2s ease',
-              cursor: 'pointer',
-              position: 'relative'
-            }}
-            onClick={() => onViewChapterClick && onViewChapterClick(ch)}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span className="raw-chapter-badge">
-                📖 Raw Chapter
-              </span>
-              {ch.pagesCount > 0 && (
-                <span style={{ fontSize: '11px', color: 'var(--trans-text-secondary)', fontWeight: '600', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
-                  {ch.pagesCount} pages
-                </span>
-              )}
-            </div>
-
-            <h4 style={{ margin: '6px 0 8px', fontSize: '14px', fontWeight: '700', color: 'var(--trans-text-primary)', lineHeight: '1.4' }}>
-              {ch.title}
-            </h4>
-
-            <div className="backlog-card-footer">
-              <span className="ready-to-translate-text">
-                <div className="status-dot-pulse"></div>
-                Ready to Translate
-              </span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  type="button"
-                  className="trans-btn secondary"
-                  style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px' }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onViewChapterClick && onViewChapterClick(ch);
-                  }}
-                >
-                  👁️ View
-                </button>
-                {isCurrentLeader && (
-                  <button
-                    type="button"
-                    className="trans-btn primary"
-                    style={{ fontSize: '11px', padding: '4px 10px', background: 'linear-gradient(110deg, #a855f7 0%, #ec4899 100%)', border: 'none', color: '#fff', borderRadius: '6px', fontWeight: '700', boxShadow: '0 2px 8px rgba(168,85,247,0.3)' }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onCreateTaskClick && onCreateTaskClick({ chapterId: ch.id, title: ch.title });
-                    }}
-                  >
-                    + Task
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
         {colTasks.map(task => (
           <TaskCard
             key={task.id}
@@ -696,7 +631,7 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
     const defaultTitle = `${chapter?.title || `Chapter ${chapter?.number || chapter?.chapterNumber || ''}`} - Translation & Proofreading`;
     setInspectTaskData({
       title: defaultTitle,
-      column: 'in_progress',
+      column: 'backlog',
       assigneeId: null,
       dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
       priority: 'High',
@@ -1460,6 +1395,7 @@ export function CreateTaskModal({
   onCreate
 }) {
   const [submitted, setSubmitted] = useState(false)
+  const [inspectingChapter, setInspectingChapter] = useState(null)
 
   const todayStr = new Date().toISOString().split('T')[0]
   const availableChapterOptions = filterUnassignedChapters(chapterOptions, tasks)
@@ -1517,30 +1453,68 @@ export function CreateTaskModal({
 
           <div className="trans-form-group" style={{ marginTop: '14px' }}>
             <label className="trans-form-label">Chapter *</label>
-            <select required
-              className="trans-form-input"
-              value={newTaskData.chapterId || ''}
-              onChange={(e) => {
-                const chId = e.target.value || null;
-                const foundCh = availableChapterOptions.find(c => String(c.id) === String(chId));
-                setNewTaskData(prev => ({
-                  ...prev,
-                  chapterId: chId,
-                  title: (!prev.title.trim() && foundCh) ? `${foundCh.title} - Translation & Proofreading` : prev.title
-                }));
-              }}
-              disabled={availableChapterOptions.length === 0}
-              style={{ ...errorBorder('chapterId') }}
-            >
-              <option value="">
-                {availableChapterOptions.length === 0 ? 'No available chapters (all already have a task)' : 'Select a chapter…'}
-              </option>
-              {availableChapterOptions.map((ch) => (
-                <option key={ch.id} value={ch.id}>
-                  📖 {ch.title}{ch.pagesCount > 0 ? ` (${ch.pagesCount} pages)` : ''}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <select required
+                className="trans-form-input"
+                style={{ flex: 1, ...errorBorder('chapterId') }}
+                value={newTaskData.chapterId || ''}
+                onChange={(e) => {
+                  const chId = e.target.value || null;
+                  const foundCh = availableChapterOptions.find(c => String(c.id) === String(chId));
+                  setNewTaskData(prev => ({
+                    ...prev,
+                    chapterId: chId,
+                    title: (!prev.title.trim() && foundCh) ? `${foundCh.title} - Translation & Proofreading` : prev.title
+                  }));
+                }}
+                disabled={availableChapterOptions.length === 0}
+              >
+                <option value="">
+                  {availableChapterOptions.length === 0 ? 'No available chapters (all already have a task)' : 'Select a chapter…'}
                 </option>
-              ))}
-            </select>
+                {availableChapterOptions.map((ch) => (
+                  <option key={ch.id} value={ch.id}>
+                    📖 {ch.title}{ch.pagesCount > 0 ? ` (${ch.pagesCount} pages)` : ''}
+                  </option>
+                ))}
+              </select>
+
+              {/* 👁️ Nút xem chapter trước khi tạo task */}
+              {newTaskData.chapterId && (() => {
+                const selectedCh = availableChapterOptions.find(c => String(c.id) === String(newTaskData.chapterId));
+                return selectedCh ? (
+                  <button
+                    type="button"
+                    title="Preview this chapter before creating a task"
+                    onClick={() => setInspectingChapter(selectedCh)}
+                    style={{
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '10px',
+                      border: '1px solid rgba(168, 85, 247, 0.35)',
+                      background: 'rgba(168, 85, 247, 0.1)',
+                      color: '#a855f7',
+                      cursor: 'pointer',
+                      transition: 'all 0.18s ease',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'rgba(168, 85, 247, 0.22)';
+                      e.currentTarget.style.borderColor = '#a855f7';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'rgba(168, 85, 247, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.35)';
+                    }}
+                  >
+                    <Eye size={16} />
+                  </button>
+                ) : null;
+              })()}
+            </div>
             {showError('chapterId') && (
               <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Please select a chapter</p>
             )}
@@ -1649,6 +1623,17 @@ export function CreateTaskModal({
           </button>
         </div>
       </div>
+
+      {inspectingChapter && (
+        <ChapterInspectModal
+          chapter={inspectingChapter}
+          onClose={() => setInspectingChapter(null)}
+          comicName={comicName}
+          chapterOptions={chapterOptions}
+          teamMembersForAssign={teamMembersForAssign}
+          tasks={tasks}
+        />
+      )}
     </div>
   )
 }

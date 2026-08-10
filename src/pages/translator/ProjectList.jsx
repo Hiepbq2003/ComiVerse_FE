@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Filter, BookOpen, Users, Calendar, User } from 'lucide-react';
+import { Search, Filter, BookOpen, Users, Calendar, User, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import '../../assets/style/translator/project-list.css';
-import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi';
+import { getAllProjectTeamsApi, getMyProjectTeamsApi } from '../../services/api/ProjectTeamApi';
 import { createTeamRequestApi, getRequestsByNameApi } from '../../services/api/TeamWorkspaceApi';
 import { uploadFileApi } from '../../services/api/UploadApi';
 import { getMyTranslatorProfileApi } from '../../services/api/TranslatorApi';
 import { getAuth } from '../../utils/Auth';
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages';
+
+const MAX_ACTIVE_PROJECTS = 5;
 
 function ProjectList() {
   const [projects, setProjects] = useState([]);
@@ -26,6 +28,7 @@ function ProjectList() {
   const [translatorProfile, setTranslatorProfile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
+  const [activeProjectsCount, setActiveProjectsCount] = useState(0);
 
   // Load auth details
   const auth = getAuth();
@@ -78,6 +81,17 @@ function ProjectList() {
     getMyTranslatorProfileApi()
       .then(profile => {
         if (profile) setTranslatorProfile(profile);
+      })
+      .catch(() => {});
+
+    // Load số projects đang active để kiểm tra giới hạn
+    getMyProjectTeamsApi()
+      .then(myProjects => {
+        const projList = Array.isArray(myProjects) ? myProjects : [];
+        const activeCount = projList.filter(
+          p => p.status && p.status.toUpperCase() !== 'COMPLETED'
+        ).length;
+        setActiveProjectsCount(activeCount);
       })
       .catch(() => {});
   }, [userFullName]);
@@ -159,7 +173,13 @@ function ProjectList() {
     return filteredProjects.slice(startIdx, startIdx + ITEMS_PER_PAGE);
   }, [filteredProjects, currentPage]);
 
+  const atProjectLimit = activeProjectsCount >= MAX_ACTIVE_PROJECTS;
+
   const handleApplyClick = (project) => {
+    if (atProjectLimit) {
+      toast.warn(`Bạn đang tham gia ${activeProjectsCount} dự án cùng lúc (tối đa ${MAX_ACTIVE_PROJECTS}). Hãy hoàn thành hoặc rời khỏi một dự án trước.`);
+      return;
+    }
     setSelectedProject(project);
 
     // Auto-populate message from bio or default professional intro
@@ -290,6 +310,30 @@ function ProjectList() {
         </p>
       </div>
 
+      {/* Banner cảnh báo giới hạn dự án */}
+      {atProjectLimit && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          background: 'rgba(234, 179, 8, 0.1)',
+          border: '1px solid rgba(234, 179, 8, 0.35)',
+          borderRadius: '10px',
+          padding: '14px 20px',
+          marginBottom: '20px',
+        }}>
+          <AlertCircle size={20} style={{ color: '#eab308', flexShrink: 0 }} />
+          <div>
+            <p style={{ margin: 0, fontWeight: '700', fontSize: '14px', color: '#fde047' }}>
+              Bạn đang xử lý tối đa {MAX_ACTIVE_PROJECTS} công việc cùng lúc
+            </p>
+            <p style={{ margin: '3px 0 0 0', fontSize: '12.5px', color: '#ca8a04' }}>
+              Hoàn thành các công việc hiện tại (dịch/nộp bài) để tiếp tục đăng ký dự án mới.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Toolbar & Filters (1 row) */}
       <div style={{
         display: 'grid',
@@ -361,10 +405,19 @@ function ProjectList() {
       <div className="available-projects-grid">
         {paginatedProjects.map((project) => {
           const alreadyApplied = appliedIds.includes(project.id);
-          
+
           const recruitedCount = Math.max(1, project.membersCount || 0);
           const limit = Number(project.maxMembers) || 5;
           const spotsLeft = Math.max(0, limit - recruitedCount);
+
+          const isDisabled = alreadyApplied || spotsLeft === 0 || atProjectLimit;
+          const btnLabel = alreadyApplied
+            ? 'Applied ✓'
+            : spotsLeft === 0
+            ? 'Team Full'
+            : atProjectLimit
+            ? '⛔ Project Limit Reached'
+            : 'Apply to Join';
 
           return (
             <div key={project.id} className="available-project-card">
@@ -396,14 +449,14 @@ function ProjectList() {
                     Available: <strong>{spotsLeft}</strong> translator{spotsLeft !== 1 ? 's' : ''} needed
                   </li>
                   <li className="project-details-item">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" 
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
                       stroke={project.priority === 'Urgent' ? '#ef4444' : '#a855f7'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                       <polygon points="12 2 2 7 12 12 22 7 12 2" />
                       <polyline points="2 17 12 22 22 17" />
                       <polyline points="2 12 12 17 22 12" />
                     </svg>
-                    Urgency: <strong style={{ 
-                      color: project.priority === 'Urgent' ? '#ef4444' : (project.priority === 'High' ? '#f97316' : 'var(--trans-text-secondary)') 
+                    Urgency: <strong style={{
+                      color: project.priority === 'Urgent' ? '#ef4444' : (project.priority === 'High' ? '#f97316' : 'var(--trans-text-secondary)')
                     }}>
                       {project.priority === 'Urgent' ? '🔥 URGENTLY Recruiting' : project.priority || 'Medium'}
                     </strong>
@@ -414,10 +467,17 @@ function ProjectList() {
               <div style={{ marginTop: '24px' }}>
                 <button
                   className="available-project-apply-btn"
-                  disabled={alreadyApplied || spotsLeft === 0}
+                  disabled={isDisabled}
                   onClick={() => handleApplyClick(project)}
+                  style={atProjectLimit && !alreadyApplied && spotsLeft > 0 ? {
+                    opacity: 0.55,
+                    cursor: 'not-allowed',
+                    background: 'rgba(234, 179, 8, 0.12)',
+                    borderColor: 'rgba(234, 179, 8, 0.35)',
+                    color: '#eab308',
+                  } : {}}
                 >
-                  {alreadyApplied ? 'Applied ✓' : spotsLeft === 0 ? 'Team Full' : 'Apply to Join'}
+                  {btnLabel}
                 </button>
               </div>
             </div>
