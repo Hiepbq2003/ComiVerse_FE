@@ -8,6 +8,8 @@ import GenreManagement from './GenreManagement'
 import ProjectTeams from './ProjectTeams'
 import ChatMonitor from './ChatMonitor'
 import ForumModeration from './ForumModeration'
+import ModeratorReports from './ModeratorReports'
+import ReportCategories from './ReportCategories'
 import { getAllComicsApi, updateComicApi, deleteComicApi, getComicLeaderboardApi } from '../../services/api/ComicApi'
 import { getAllProjectTeamsApi, createProjectTeamApi, deleteProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getAllSubmissionsApi, approveSubmissionApi, rejectSubmissionApi } from '../../services/api/SubmissionApi'
@@ -2039,6 +2041,16 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
           {/* VIEW: FORUM */}
           {activeNav === 'forum' && (
             <ForumModeration fetchAllData={fetchForumThreadsData} />
+          )}
+
+          {/* VIEW: VIOLATION REPORTS */}
+          {activeNav === 'reports' && (
+            <ModeratorReports />
+          )}
+
+          {/* VIEW: REPORT CATEGORIES */}
+          {activeNav === 'report-categories' && (
+            <ReportCategories roleScope="MODERATOR" />
           )}
         </>
       )}

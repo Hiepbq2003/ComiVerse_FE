@@ -15,6 +15,8 @@ import StarRating from '../../components/common/StarRating'
 import ReadingLanguageSelector from '../../components/common/ReadingLanguageSelector'
 import { useAuth } from '../../context/AuthContext'
 import SubscriptionPlanModal from '../../components/common/SubscriptionPlanModal'
+import ReportSubmitModal from '../../components/report/ReportSubmitModal'
+import { Flag } from 'lucide-react'
 
 // Import assets
 import comicAction from '../../assets/comic_action.png'
@@ -42,6 +44,7 @@ function ComicDetail() {
   const [availableLanguages, setAvailableLanguages] = useState([])
   const [selectedLanguage, setSelectedLanguage] = useState('') // '' = original (no overlay)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+  const [showReportModal, setShowReportModal] = useState(false)
 
   const { user: authUser, isLoggedIn } = useAuth()
 
@@ -524,6 +527,22 @@ function ComicDetail() {
               >
                 {isLiked ? '❤️ Liked' : '🤍 Like'}
               </button>
+              <button
+                onClick={() => setShowReportModal(true)}
+                className="btn-hero-outline detail-action-btn"
+                style={{
+                  padding: '12px 20px',
+                  fontSize: '15px',
+                  borderColor: 'rgba(239, 68, 68, 0.3)',
+                  color: '#f87171',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+                title="Report issues with this comic or upload"
+              >
+                <Flag size={16} /> Report
+              </button>
             </div>
 
             {/* Interactive Star Rating */}
@@ -812,6 +831,13 @@ function ComicDetail() {
       <SubscriptionPlanModal
         open={showSubscriptionModal}
         onClose={() => setShowSubscriptionModal(false)}
+      />
+      <ReportSubmitModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        targetType="COMIC"
+        targetId={id}
+        targetTitle={comic?.title || 'Comic Series'}
       />
     </HomeLayout>
   )
