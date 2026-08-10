@@ -1122,7 +1122,10 @@ function Profile({ user: userProp }) {
                               <input
                                 type="checkbox"
                                 checked={notifSettings[option.key] !== false}
-                                onChange={() => handleToggleNotifSetting(option.key)}
+                                onChange={() => setNotifSettings(prev => ({
+                                  ...prev,
+                                  [option.key]: !(prev[option.key] !== false)
+                                }))}
                               />
                               <span className="profile-slider" />
                             </label>
