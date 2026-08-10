@@ -469,10 +469,15 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       setTopComics(leaderboardData?.data || leaderboardData?.content || leaderboardData || []);
       
       const mergedSubmissionsData = [...(submissionsData || [])].filter(s => {
-        const comic = (comicsData || []).find(c => String(c.id) === String(s.comicId));
-        if (comic) {
-          const totalChapters = (comic.chapterCount || 0) + (comic.pendingChapterCount || 0);
-          if (totalChapters <= 0) return false;
+        const type = (s.submissionType || s.type || 'NEW_COMIC').toUpperCase();
+        if (type === 'NEW_COMIC') {
+          const comic = (comicsData || []).find(c => String(c.id) === String(s.comicId));
+          if (comic && comic.chapterCount && comic.chapterCount > 0) return true;
+          const hasChapterSubmissions = (submissionsData || []).some(sub => 
+            String(sub.comicId) === String(s.comicId) && 
+            (sub.submissionType || sub.type || '').toUpperCase() === 'NEW_CHAPTER'
+          );
+          if (!hasChapterSubmissions) return false;
         }
         return true;
       });
