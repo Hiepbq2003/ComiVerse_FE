@@ -46,14 +46,31 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
     }
   }
 
-  const formattedNotifications = notifications.map(n => ({
-    id: n.id,
-    unread: !n.isRead,
-    title: n.title || 'Notification',
-    message: n.message || '',
-    actionUrl: n.actionUrl,
-    time: formatTimeAgo(n.createdAt)
-  }))
+  const formattedNotifications = notifications.map(n => {
+    let url = n.actionUrl;
+    const titleLower = String(n.title).toLowerCase();
+    
+    if (!url) {
+      if (titleLower.includes('appeal')) {
+        url = '/moderator?nav=review-queue&tab=appealed';
+      } else if (titleLower.includes('report')) {
+        url = '/moderator?nav=reports';
+      } else if (titleLower.includes('team')) {
+        url = '/moderator?nav=project-teams';
+      } else if (titleLower.includes('comic')) {
+        url = '/moderator?nav=comic-management';
+      }
+    }
+
+    return {
+      id: n.id,
+      unread: !n.isRead,
+      title: n.title || 'Notification',
+      message: n.message || '',
+      actionUrl: url,
+      time: formatTimeAgo(n.createdAt)
+    }
+  })
 
   useEffect(() => {
     if (!isLoggedIn || !user ||
