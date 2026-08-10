@@ -468,7 +468,14 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       const authUser = getAuth()?.user;
       setTopComics(leaderboardData?.data || leaderboardData?.content || leaderboardData || []);
       
-      const mergedSubmissionsData = [...(submissionsData || [])];
+      const mergedSubmissionsData = [...(submissionsData || [])].filter(s => {
+        const comic = (comicsData || []).find(c => String(c.id) === String(s.comicId));
+        if (comic) {
+          const totalChapters = (comic.chapterCount || 0) + (comic.pendingChapterCount || 0);
+          if (totalChapters <= 0) return false;
+        }
+        return true;
+      });
 
       const enrichedRawSubmissions = mergedSubmissionsData.map(s => {
         const titleClean = (s.title || s.comicTitle || '').toLowerCase().trim();
