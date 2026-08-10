@@ -469,17 +469,25 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       setTopComics(leaderboardData?.data || leaderboardData?.content || leaderboardData || []);
       
       const mergedSubmissionsData = [...(submissionsData || [])].filter(s => {
-        const type = (s.submissionType || s.type || 'NEW_COMIC').toUpperCase();
-        if (type === 'NEW_COMIC') {
-          const comic = (comicsData || []).find(c => String(c.id) === String(s.comicId));
-          if (comic && comic.chapterCount && comic.chapterCount > 0) return true;
-          const hasChapterSubmissions = (submissionsData || []).some(sub => 
-            String(sub.comicId) === String(s.comicId) && 
-            (sub.submissionType || sub.type || '').toUpperCase() === 'NEW_CHAPTER'
-          );
-          if (!hasChapterSubmissions) return false;
-        }
-        return true;
+        // Determine if this submission is a chapter submission
+        const chapTitle = String(s.chapter || s.chapterTitle || '').trim().toLowerCase();
+        const isChapterSub = chapTitle && !['raw draft', 'comic profile', 'chapter comic profile', 'none'].includes(chapTitle) || (s.chapterNumber && s.chapterNumber > 0);
+        
+        // Always show chapter submissions
+        if (isChapterSub) return true;
+
+        // For comic profile submissions (not chapters), only show if it has published chapters 
+        // OR if there is at least one chapter submission for this comic
+        const comic = (comicsData || []).find(c => String(c.id) === String(s.comicId));
+        if (comic && comic.chapterCount && comic.chapterCount > 0) return true;
+        
+        const hasChapterSubmissions = (submissionsData || []).some(sub => {
+          if (String(sub.comicId) !== String(s.comicId)) return false;
+          const subChapTitle = String(sub.chapter || sub.chapterTitle || '').trim().toLowerCase();
+          return subChapTitle && !['raw draft', 'comic profile', 'chapter comic profile', 'none'].includes(subChapTitle) || (sub.chapterNumber && sub.chapterNumber > 0);
+        });
+        
+        return hasChapterSubmissions;
       });
 
       const enrichedRawSubmissions = mergedSubmissionsData.map(s => {
