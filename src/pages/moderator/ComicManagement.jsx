@@ -64,7 +64,7 @@ const CustomDropdown = ({ value, onChange, options, minWidth = '160px' }) => {
   );
 };
 
-function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, handleSuspendComic, handleRestoreComic, handleTriggerAssignTeam, fetchAllData }) {
+function ComicManagement({ loading = false, comics, projectTeams, genres, handleSaveEditComic, handleSuspendComic, handleRestoreComic, handleTriggerAssignTeam, fetchAllData }) {
   const navigate = useNavigate()
 
   // Search & Filters local states
@@ -663,7 +663,7 @@ function ComicManagement({ comics, projectTeams, genres, handleSaveEditComic, ha
             </tr>
           </thead>
           <tbody>
-            {isHydratingList ? (
+            {(loading || isHydratingList) ? (
               [...Array(Math.min(ITEMS_PER_PAGE, filteredAndSortedComics.length || ITEMS_PER_PAGE))].map((_, i) => (
                 <tr key={i} className="skeleton-row">
                   <td>
