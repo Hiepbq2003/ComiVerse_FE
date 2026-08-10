@@ -67,6 +67,8 @@ function MembersTab({
   onMembersLoaded,
   onLeaveTeam,
   onRemoveMember,
+  bannedUsers = [],
+  onUnbanUser
 }) {
   const [members, setMembers] = useState(parentMembers)
   const [loading, setLoading] = useState(parentMembers.length === 0)
@@ -537,6 +539,55 @@ function MembersTab({
                 onPageChange={setCurrentPage}
                 variant="pills"
               />
+            </div>
+          )}
+
+          {/* Banned Users Section for Leaders */}
+          {isCurrentLeader && bannedUsers && bannedUsers.length > 0 && (
+            <div style={{ marginTop: '32px', paddingTop: '24px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <h4 style={{ color: '#ef4444', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '20px' }}>🚫</span> Banned Users
+              </h4>
+              <div className="members-table-wrapper" style={{ opacity: 0.85 }}>
+                <table className="members-table">
+                  <thead>
+                    <tr>
+                      <th>User ID</th>
+                      <th>Reason</th>
+                      <th>Date Banned</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bannedUsers.map((ban, idx) => (
+                      <tr key={ban.id || idx}>
+                        <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>{ban.userId}</td>
+                        <td style={{ color: '#94a3b8', fontStyle: 'italic', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {ban.reason}
+                        </td>
+                        <td className="member-join-date">
+                          {ban.createdAt ? new Date(ban.createdAt).toLocaleDateString() : 'Unknown'}
+                        </td>
+                        <td className="member-actions-cell">
+                          <button
+                            className="trans-btn secondary"
+                            onClick={() => onUnbanUser && onUnbanUser(ban.userId, 'User')}
+                            style={{
+                              padding: '6px 12px',
+                              background: 'rgba(16, 185, 129, 0.05)',
+                              color: '#10b981',
+                              borderColor: 'rgba(16, 185, 129, 0.3)',
+                              fontSize: '12px'
+                            }}
+                          >
+                            Unban
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </>

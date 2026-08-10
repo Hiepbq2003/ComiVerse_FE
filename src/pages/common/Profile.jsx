@@ -32,7 +32,8 @@ const COMMON_NOTIFICATION_OPTIONS = [
     title: 'General Notifications',
     options: [
       { key: 'SYSTEM_BROADCASTS', label: 'System broadcasts', description: 'Platform announcements and maintenance updates sent by administrators.' },
-      { key: 'FORUM_ACTIVITY', label: 'Discussion replies', description: 'Replies to your forum, comic, and chapter comments, with a direct link to the discussion.' },
+      { key: 'COMMENT_REPLIES', label: 'Comment replies', description: 'Direct replies to your comic and chapter comments.' },
+      { key: 'FORUM_ACTIVITY', label: 'Discussion replies', description: 'Replies to your forum threads and community discussion posts.' },
     ],
   },
 ]
@@ -473,7 +474,12 @@ function Profile({ user: userProp }) {
     e.preventDefault()
     setNotifSaving(true)
     try {
-      const response = await updateNotificationPreferencesApi(notifSettings)
+      const payload = availableNotifKeys && availableNotifKeys.length > 0
+        ? Object.fromEntries(
+            Object.entries(notifSettings).filter(([k]) => availableNotifKeys.includes(k))
+          )
+        : notifSettings
+      const response = await updateNotificationPreferencesApi(payload)
       setNotifSettings(response?.preferences || notifSettings)
       setAvailableNotifKeys(response?.availableKeys || availableNotifKeys)
       toast.success('Notification preferences saved successfully!')
@@ -704,16 +710,20 @@ function Profile({ user: userProp }) {
       </div>
 
       <section
-        className="profile-cover-section"
+        className={`profile-cover-section ${backgroundImageUrl ? 'has-custom-bg' : ''}`}
         style={backgroundImageUrl ? { backgroundImage: `url(${backgroundImageUrl})` } : undefined}
       >
+        {!backgroundImageUrl && <div className="profile-cover-ambient-mesh" />}
         <div className="profile-cover-overlay">
-          <div>
-            <span className="profile-cover-kicker">Profile background</span>
-            <h2>{displayUserName}</h2>
+          <div className="profile-cover-badge-wrap">
+            <span className="profile-cover-kicker">✨ Profile Background</span>
           </div>
           <label className="profile-cover-upload-btn" htmlFor="profile-background-input">
-            Upload background
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+            <span>Upload background</span>
           </label>
           <input
             id="profile-background-input"

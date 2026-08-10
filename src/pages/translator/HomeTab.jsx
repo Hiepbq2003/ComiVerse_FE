@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import TeamGroupChat from '../../components/chat/TeamGroupChat'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { toast } from 'react-toastify'
+import { getAuth } from '../../utils/Auth'
 
 function HomeTab({
   selectedDetails,
@@ -18,8 +19,11 @@ function HomeTab({
   onLikePost,
   onTogglePinPost,
   onDeletePost,
+  onEditPost,
   onAddComment,
   onLikeComment,
+  onEditComment,
+  onDeleteComment,
 }) {
   const [visibleCount, setVisibleCount] = useState(5)
   const [attachedImage, setAttachedImage] = useState(null)
@@ -56,10 +60,6 @@ function HomeTab({
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  const handleFormatText = (prefix, suffix) => {
-    setNewPostText((prev) => `${prev}${prefix}text${suffix}`)
-  }
-
   const handleFormPostSubmit = () => {
     if (!newPostText.trim() && !selectedImageFile) return
     onPostAnnouncement(newPostText, selectedImageFile)
@@ -76,6 +76,35 @@ function HomeTab({
   }
 
   const [replyingCommentTarget, setReplyingCommentTarget] = useState({})
+  const [editingComment, setEditingComment] = useState(null) // { postId, commentId, text }
+  const [editingPostId, setEditingPostId] = useState(null)
+  const [editingPostText, setEditingPostText] = useState('')
+
+  const auth = getAuth()
+  const currentFullName = auth?.user?.fullName || auth?.user?.name || ''
+  const currentUsername = auth?.user?.username || ''
+  const currentUserInitials = currentFullName
+    ? currentFullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+    : (currentUsername ? currentUsername.substring(0, 2).toUpperCase() : 'LE')
+
+  const isOwnComment = (cmt) => {
+    if (!cmt || !cmt.author) return false
+    const authorLower = cmt.author.toLowerCase().trim()
+    const nameLower = currentFullName.toLowerCase().trim()
+    const userLower = currentUsername.toLowerCase().trim()
+    return (nameLower && authorLower === nameLower) || (userLower && authorLower === userLower)
+  }
+
+  const isPostAuthor = (post) => {
+    if (!post || !post.author) return false
+    const authorLower = post.author.toLowerCase().trim()
+    const nameLower = currentFullName.toLowerCase().trim()
+    const userLower = currentUsername.toLowerCase().trim()
+    return (nameLower && authorLower === nameLower) || (userLower && authorLower === userLower)
+  }
+
+  const canEditPost = (post) => isPostAuthor(post) || isCurrentLeader
+  const canDeletePost = (post) => isPostAuthor(post) || isCurrentLeader
 
   const handleSetReplyTarget = (postId, cmt) => {
     setReplyingCommentTarget((prev) => ({ ...prev, [postId]: cmt }))
@@ -100,6 +129,28 @@ function HomeTab({
 
     setCommentInputs((prev) => ({ ...prev, [postId]: '' }))
     setReplyingCommentTarget((prev) => ({ ...prev, [postId]: null }))
+  }
+
+  const handleSaveEditComment = () => {
+    if (!editingComment || !editingComment.text.trim()) {
+      toast.error('Comment cannot be empty.')
+      return
+    }
+    if (onEditComment) {
+      onEditComment(editingComment.postId, editingComment.commentId, editingComment.text.trim())
+    }
+    setEditingComment(null)
+  }
+
+  const handleSaveEditPost = (postId) => {
+    if (!editingPostText.trim()) {
+      toast.error('Post content cannot be empty.')
+      return
+    }
+    if (onEditPost) {
+      onEditPost(postId, editingPostText.trim())
+    }
+    setEditingPostId(null)
   }
 
   // Helper for human-readable relative date formatting
@@ -151,12 +202,18 @@ function HomeTab({
       <div className="workspace-feed-column">
         <div style={{ marginBottom: '20px' }}>
           {!showUploadForm ? (
-            <button className="trans-btn primary" onClick={() => setShowUploadForm(true)}>
-              + Upload New Translated Chapter
+            <button className="upload-chapter-hero-btn" onClick={() => setShowUploadForm(true)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              <span>Upload New Translated Chapter</span>
             </button>
           ) : (
-            <div style={{ border: '1px solid var(--trans-border)', padding: '16px', borderRadius: '12px', background: '#ffffff', marginBottom: '20px' }}>
-              <h4 style={{ margin: '0 0 12px', color: 'var(--trans-text-primary)' }}>Upload Chapter Draft</h4>
+            <div className="upload-chapter-form-card">
+              <h4 style={{ margin: '0 0 14px', fontSize: '16px', fontWeight: '700', color: 'var(--trans-text-primary)' }}>
+                Upload Translated Chapter Draft
+              </h4>
               <div className="trans-form-group">
                 <label className="trans-form-label">Chapter Title / Number</label>
                 <input
@@ -168,7 +225,7 @@ function HomeTab({
                 />
               </div>
               <div className="trans-form-group">
-                <label className="trans-form-label">Word Count</label>
+                <label className="trans-form-label">Estimated Word Count</label>
                 <input
                   type="number"
                   className="trans-form-input"
@@ -180,15 +237,16 @@ function HomeTab({
                 <label className="trans-form-label">Translation Text Content</label>
                 <textarea
                   className="trans-form-input textarea"
-                  placeholder="Paste translated chapter contents here..."
+                  placeholder="Paste translated chapter script or text contents here..."
                   value={uploadData.chapterContent}
                   onChange={(e) => setUploadData({ ...uploadData, chapterContent: e.target.value })}
+                  style={{ minHeight: '120px' }}
                 />
               </div>
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
                 <button className="trans-btn secondary" onClick={() => setShowUploadForm(false)}>Cancel</button>
-                <button className="trans-btn primary" onClick={onUploadChapter} disabled={!uploadData.chapterTitle.trim()}>
-                  Submit Draft
+                <button className="upload-chapter-hero-btn submit-btn" onClick={onUploadChapter} disabled={!uploadData.chapterTitle.trim()}>
+                  Submit Draft for Review
                 </button>
               </div>
             </div>
@@ -197,11 +255,13 @@ function HomeTab({
 
         {isCurrentLeader && (
           <div className="post-creation-card">
-            <div className="post-user-avatar">YS</div>
+            <div className="post-user-avatar leader-glow">
+              {currentUserInitials}
+            </div>
             <div className="post-creation-input-wrapper">
             <textarea
               className="post-textarea"
-              placeholder="Post an announcement, update, or share with the group..."
+              placeholder="Post an announcement, update, or share notes with your translation team..."
               value={newPostText}
               onChange={(e) => setNewPostText(e.target.value)}
             />
@@ -211,7 +271,7 @@ function HomeTab({
                 <img
                   src={attachedImage}
                   alt="Attachment Preview"
-                  style={{ maxHeight: '180px', borderRadius: '8px', border: '1px solid rgba(168, 85, 247, 0.3)' }}
+                  style={{ maxHeight: '180px', borderRadius: '10px', border: '1px solid rgba(168, 85, 247, 0.35)', boxShadow: '0 4px 14px rgba(0,0,0,0.15)' }}
                 />
                 <button
                   type="button"
@@ -220,7 +280,7 @@ function HomeTab({
                     position: 'absolute',
                     top: '6px',
                     right: '6px',
-                    background: 'rgba(0, 0, 0, 0.7)',
+                    background: 'rgba(0, 0, 0, 0.75)',
                     color: '#fff',
                     border: 'none',
                     borderRadius: '50%',
@@ -228,6 +288,10 @@ function HomeTab({
                     height: '24px',
                     cursor: 'pointer',
                     fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '12px'
                   }}
                   title="Remove Image"
                 >
@@ -245,42 +309,28 @@ function HomeTab({
             />
 
             <div className="post-creation-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <button
                   type="button"
-                  className="trans-btn secondary"
-                  onClick={() => handleFormatText('**', '**')}
-                  style={{ padding: '4px 10px', fontSize: '12px', fontWeight: 'bold' }}
-                  title="Bold Text"
-                >
-                  B
-                </button>
-                <button
-                  type="button"
-                  className="trans-btn secondary"
-                  onClick={() => handleFormatText('*', '*')}
-                  style={{ padding: '4px 10px', fontSize: '12px', fontStyle: 'italic' }}
-                  title="Italic Text"
-                >
-                  I
-                </button>
-                <button
-                  type="button"
-                  className="trans-btn secondary"
+                  className="post-attach-btn"
                   onClick={() => fileInputRef.current?.click()}
-                  style={{ padding: '4px 10px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
                   title="Attach Image"
                 >
-                  📷 Image
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                  </svg>
+                  <span>Attach Image</span>
                 </button>
               </div>
 
               <button
-                className="trans-btn primary"
+                className="post-publish-btn"
                 onClick={handleFormPostSubmit}
                 disabled={!newPostText.trim() && !attachedImage}
               >
-                Post
+                Publish Announcement
               </button>
             </div>
           </div>
@@ -315,18 +365,74 @@ function HomeTab({
                     </div>
                   </div>
                   <div className="post-body">
-                    {post.content}
-                    {post.attachedImage && (
-                      <div style={{ marginTop: '12px' }}>
-                        <img
-                          src={post.attachedImage}
-                          alt="Post Attachment"
-                          style={{ maxWidth: '100%', maxHeight: '350px', borderRadius: '10px', border: '1px solid var(--trans-border)' }}
+                    {editingPostId === post.id ? (
+                      <div className="post-edit-box" style={{ marginTop: '8px' }}>
+                        <textarea
+                          className="trans-form-input textarea"
+                          style={{
+                            minHeight: '75px',
+                            fontSize: '13px',
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            width: '100%',
+                            resize: 'vertical',
+                            marginBottom: '8px'
+                          }}
+                          value={editingPostText}
+                          onChange={(e) => setEditingPostText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                              e.preventDefault()
+                              handleSaveEditPost(post.id)
+                            } else if (e.key === 'Escape') {
+                              setEditingPostId(null)
+                            }
+                          }}
+                          autoFocus
                         />
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            className="trans-btn secondary"
+                            style={{ padding: '4px 10px', fontSize: '11.5px', borderRadius: '6px' }}
+                            onClick={() => setEditingPostId(null)}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className="trans-btn primary"
+                            style={{ padding: '4px 14px', fontSize: '11.5px', borderRadius: '6px' }}
+                            onClick={() => handleSaveEditPost(post.id)}
+                            disabled={!editingPostText.trim()}
+                          >
+                            Save Changes
+                          </button>
+                        </div>
                       </div>
+                    ) : (
+                      <>
+                        <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                          {post.content}
+                          {(post.isEdited || post.edited) && (
+                            <span style={{ fontSize: '10.5px', color: 'var(--trans-text-muted)', marginLeft: '6px', fontStyle: 'italic' }}>
+                              (edited)
+                            </span>
+                          )}
+                        </p>
+                        {post.attachedImage && (
+                          <div style={{ marginTop: '12px' }}>
+                            <img
+                              src={post.attachedImage}
+                              alt="Post Attachment"
+                              style={{ maxWidth: '100%', maxHeight: '350px', borderRadius: '10px', border: '1px solid var(--trans-border)' }}
+                            />
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
-                  <div className="post-footer-actions" style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '12px' }}>
+                  <div className="post-footer-actions" style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '12px', flexWrap: 'wrap' }}>
                     <button className="post-action-btn" onClick={() => onLikePost(post.id)}>
                       👍 {post.likes || 0} likes
                     </button>
@@ -334,18 +440,35 @@ function HomeTab({
                       💬 Comments ({commentsList.length})
                     </button>
                     {isCurrentLeader && (
-                      <>
-                        <button className={`post-action-btn pin-btn ${post.isPinned ? 'active' : ''}`} onClick={() => onTogglePinPost(post.id)}>
-                          📌 {post.isPinned ? 'Unpin Post' : 'Pin Post'}
-                        </button>
-                        <button className="post-action-btn delete-btn" style={{ color: '#ef4444' }} onClick={() => {
+                      <button className={`post-action-btn pin-btn ${post.isPinned ? 'active' : ''}`} onClick={() => onTogglePinPost(post.id)}>
+                        📌 {post.isPinned ? 'Unpin Post' : 'Pin Post'}
+                      </button>
+                    )}
+                    {canEditPost(post) && (
+                      <button
+                        className="post-action-btn edit-btn"
+                        onClick={() => {
+                          setEditingPostId(post.id)
+                          setEditingPostText(post.content || '')
+                        }}
+                        title="Edit this post"
+                      >
+                        ✏️ Edit Post
+                      </button>
+                    )}
+                    {canDeletePost(post) && (
+                      <button
+                        className="post-action-btn delete-btn"
+                        style={{ color: '#ef4444' }}
+                        onClick={() => {
                           if (window.confirm("Are you sure you want to delete this post?")) {
                             onDeletePost && onDeletePost(post.id);
                           }
-                        }}>
-                          🗑️ Delete Post
-                        </button>
-                      </>
+                        }}
+                        title="Delete this post"
+                      >
+                        🗑️ Delete Post
+                      </button>
                     )}
                   </div>
 
@@ -358,38 +481,134 @@ function HomeTab({
                             No replies yet. Be the first to comment!
                           </p>
                         ) : (
-                          commentsList.map((cmt, cIdx) => (
-                            <div key={cmt.id || `cmt-${cIdx}`} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                              <div className="post-user-avatar" style={{ width: '28px', height: '28px', fontSize: '10px', flexShrink: 0 }}>
-                                {cmt.avatar || 'M'}
-                              </div>
-                              <div style={{ flex: 1, background: 'rgba(255, 255, 255, 0.03)', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--trans-border)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                  <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--trans-text-primary)' }}>{cmt.author}</span>
-                                  <span style={{ fontSize: '10px', color: 'var(--trans-text-muted)' }}>{formatTimeAgo(cmt.createdAt || cmt.timestamp)}</span>
+                          commentsList.map((cmt, cIdx) => {
+                            const isEditing = editingComment?.commentId === cmt.id
+                            const isOwn = isOwnComment(cmt)
+                            const canDelete = isOwn || isCurrentLeader
+
+                            return (
+                              <div key={cmt.id || `cmt-${cIdx}`} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                                <div className="post-user-avatar" style={{ width: '28px', height: '28px', fontSize: '10px', flexShrink: 0 }}>
+                                  {cmt.avatar || 'M'}
                                 </div>
-                                <p style={{ fontSize: '12.5px', color: 'var(--trans-text-primary)', margin: 0, whiteSpace: 'pre-wrap' }}>{cmt.text || cmt.content}</p>
-                                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '6px', paddingTop: '4px', borderTop: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                                  <button
-                                    type="button"
-                                    className="post-action-btn"
-                                    style={{ fontSize: '11px', padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
-                                    onClick={() => onLikeComment && onLikeComment(post.id, cmt.id)}
-                                  >
-                                    👍 {cmt.likes || 0}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="post-action-btn"
-                                    style={{ fontSize: '11px', padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
-                                    onClick={() => handleSetReplyTarget(post.id, cmt)}
-                                  >
-                                    ↪ Reply
-                                  </button>
+                                <div style={{ flex: 1, background: 'rgba(255, 255, 255, 0.03)', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--trans-border)' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--trans-text-primary)' }}>{cmt.author}</span>
+                                      {isOwn && (
+                                        <span style={{ fontSize: '9px', background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
+                                          You
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span style={{ fontSize: '10px', color: 'var(--trans-text-muted)' }}>{formatTimeAgo(cmt.createdAt || cmt.timestamp || cmt.time)}</span>
+                                  </div>
+
+                                  {isEditing ? (
+                                    <div className="comment-edit-box" style={{ marginTop: '6px' }}>
+                                      <textarea
+                                        className="trans-form-input textarea"
+                                        style={{
+                                          minHeight: '56px',
+                                          fontSize: '12.5px',
+                                          padding: '6px 10px',
+                                          borderRadius: '6px',
+                                          width: '100%',
+                                          resize: 'vertical',
+                                          marginBottom: '6px'
+                                        }}
+                                        value={editingComment.text}
+                                        onChange={(e) => setEditingComment({ ...editingComment, text: e.target.value })}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault()
+                                            handleSaveEditComment()
+                                          } else if (e.key === 'Escape') {
+                                            setEditingComment(null)
+                                          }
+                                        }}
+                                        autoFocus
+                                      />
+                                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                                        <button
+                                          type="button"
+                                          className="trans-btn secondary"
+                                          style={{ padding: '3px 8px', fontSize: '11px', borderRadius: '4px' }}
+                                          onClick={() => setEditingComment(null)}
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="trans-btn primary"
+                                          style={{ padding: '3px 10px', fontSize: '11px', borderRadius: '4px' }}
+                                          onClick={handleSaveEditComment}
+                                          disabled={!editingComment.text.trim()}
+                                        >
+                                          Save
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <p style={{ fontSize: '12.5px', color: 'var(--trans-text-primary)', margin: 0, whiteSpace: 'pre-wrap' }}>
+                                        {cmt.text || cmt.content}
+                                        {(cmt.isEdited || cmt.edited) && (
+                                          <span style={{ fontSize: '10px', color: 'var(--trans-text-muted)', marginLeft: '6px', fontStyle: 'italic' }}>
+                                            (edited)
+                                          </span>
+                                        )}
+                                      </p>
+                                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '6px', paddingTop: '4px', borderTop: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                                        <button
+                                          type="button"
+                                          className="post-action-btn"
+                                          style={{ fontSize: '11px', padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                          onClick={() => onLikeComment && onLikeComment(post.id, cmt.id)}
+                                        >
+                                          👍 {cmt.likes || 0}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="post-action-btn"
+                                          style={{ fontSize: '11px', padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                          onClick={() => handleSetReplyTarget(post.id, cmt)}
+                                        >
+                                          ↪ Reply
+                                        </button>
+                                        {isOwn && (
+                                          <button
+                                            type="button"
+                                            className="post-action-btn"
+                                            style={{ fontSize: '11px', padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: '3px', color: 'var(--trans-text-muted)' }}
+                                            onClick={() => setEditingComment({ postId: post.id, commentId: cmt.id, text: cmt.text || cmt.content || '' })}
+                                            title="Edit your comment"
+                                          >
+                                            ✏️ Edit
+                                          </button>
+                                        )}
+                                        {canDelete && (
+                                          <button
+                                            type="button"
+                                            className="post-action-btn delete-btn"
+                                            style={{ fontSize: '11px', padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#ef4444' }}
+                                            onClick={() => {
+                                              if (window.confirm('Are you sure you want to delete this comment?')) {
+                                                onDeleteComment && onDeleteComment(post.id, cmt.id)
+                                              }
+                                            }}
+                                            title="Delete comment"
+                                          >
+                                            🗑️ Delete
+                                          </button>
+                                        )}
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
                               </div>
-                            </div>
-                          ))
+                            )
+                          })
                         )}
                       </div>
 

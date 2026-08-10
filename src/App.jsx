@@ -45,6 +45,11 @@ import TeamProjects from './pages/translator/TeamProjects'
 import ProjectList from './pages/translator/ProjectList'
 import TranslatorRevenue from './pages/translator/Revenue'
 import TranslatorPayout from './pages/translator/Payout'
+import LeaderReports from './pages/translator/LeaderReports'
+import ModeratorReports from './pages/moderator/ModeratorReports'
+import ReportCategories from './pages/moderator/ReportCategories'
+import ModeratorLayout from './components/layout/ModeratorLayout'
+import AdminLayout from './components/layout/AdminLayout'
 import { SkeletonLoaderShowcase } from './components/common/SkeletonLoaderShowcase'
 import { AIPopoverShowcase } from './components/common/AIPopoverShowcase'
 import { HeaderProfileDropdownShowcase } from './components/common/HeaderProfileDropdownShowcase'
@@ -119,9 +124,15 @@ function App() {
                 <Route path="/admin/payout/settings" element={<PayoutSettings />} />
                 <Route path="/admin/settings" element={<AdminSystemSettings />} />
                 <Route path="/admin/subscriptions" element={<SubscriptionManagement />} />
+                <Route path="/admin/report-categories" element={<AdminLayout activeNav="report-categories"><ReportCategories roleScope="ALL" /></AdminLayout>} />
                 {/* Moderator */}
                 <Route path="/moderator" element={<ModeratorDashboard />} />
                 <Route path="/moderator/comic/:id" element={<ModeratorComicDetail />} />
+                <Route path="/moderator/reports" element={<ModeratorLayout activeNav="reports"><ModeratorReports /></ModeratorLayout>} />
+                <Route path="/moderator/report-categories" element={<ModeratorLayout activeNav="report-categories"><ReportCategories roleScope="MODERATOR" /></ModeratorLayout>} />
+                
+                {/* Leader Reports */}
+                <Route path="/leader/reports" element={<TranslatorLayout><LeaderReports /></TranslatorLayout>} />
 
                 {/* Author - persistent layout prevents sidebar/topbar remount flicker */}
                 <Route path="/author" element={<AuthorLayout />}>
@@ -141,6 +152,7 @@ function App() {
                   
                   <Route path="project-list" element={<ProjectList />} />
                   <Route path="project-teams" element={<TeamProjects />} />
+                  <Route path="reports" element={<LeaderReports />} />
                   <Route path="revenue" element={<TranslatorRevenue />} />
                   <Route path="payout" element={<TranslatorPayout />} />
                   <Route path="dashboard" element={<TranslatorDashboard />} />

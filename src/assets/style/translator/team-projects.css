@@ -344,6 +344,26 @@
   text-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
 }
 
+.post-action-btn.edit-btn:hover {
+  color: #60a5fa !important;
+}
+
+.post-action-btn.delete-btn:hover {
+  color: #ef4444 !important;
+}
+
+.comment-edit-box textarea {
+  border: 1px solid rgba(168, 85, 247, 0.4) !important;
+  background: rgba(15, 10, 26, 0.8) !important;
+  color: var(--trans-text-primary, #ffffff) !important;
+}
+
+html.light .comment-edit-box textarea {
+  background: #ffffff !important;
+  border: 1px solid rgba(147, 51, 234, 0.4) !important;
+  color: #0f172a !important;
+}
+
 /* Light mode overrides */
 html.light .feed-post-card {
   background: #ffffff !important;
