@@ -148,3 +148,25 @@ export const createTeamRequestApi = async (teamId, request) => {
 export const getRequestsByNameApi = async (name) => {
   return AxiosClient.get('/team-workspace/requests/by-name', { params: { name } })
 }
+
+// ── Upgraded Join Flow APIs ──
+
+export const cancelTeamRequestApi = async (requestId) => {
+  return AxiosClient.put(`/team-workspace/requests/${requestId}/cancel`)
+}
+
+export const getMyApplicationStatusApi = async () => {
+  return AxiosClient.get('/team-workspace/my-application-status')
+}
+
+export const banUserFromTeamApi = async (teamId, userId, reason) => {
+  return AxiosClient.post(`/team-workspace/${teamId}/ban/${userId}`, { reason })
+}
+
+export const unbanUserFromTeamApi = async (teamId, userId) => {
+  return AxiosClient.delete(`/team-workspace/${teamId}/ban/${userId}`)
+}
+
+export const getBannedUsersApi = async (teamId) => {
+  return AxiosClient.get(`/team-workspace/${teamId}/bans`)
+}

@@ -3,7 +3,7 @@ import { Search, Filter, BookOpen, Users, Calendar, User, AlertCircle } from 'lu
 import { toast } from 'react-toastify';
 import '../../assets/style/translator/project-list.css';
 import { getAllProjectTeamsApi, getMyProjectTeamsApi } from '../../services/api/ProjectTeamApi';
-import { createTeamRequestApi, getRequestsByNameApi } from '../../services/api/TeamWorkspaceApi';
+import { createTeamRequestApi, getRequestsByNameApi, cancelTeamRequestApi, getMyApplicationStatusApi } from '../../services/api/TeamWorkspaceApi';
 import { uploadFileApi } from '../../services/api/UploadApi';
 import { getMyTranslatorProfileApi } from '../../services/api/TranslatorApi';
 import { getAuth } from '../../utils/Auth';
@@ -21,14 +21,19 @@ function ProjectList() {
   const ITEMS_PER_PAGE = 6;
 
   const [appliedIds, setAppliedIds] = useState([]);
+  const [appliedRequestMap, setAppliedRequestMap] = useState({}); // teamId -> requestId
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [joinMessage, setJoinMessage] = useState('');
   const [cvFile, setCvFile] = useState(null);
   const [translatorProfile, setTranslatorProfile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [cancelling, setCancelling] = useState(null); // teamId being cancelled
   const fileInputRef = useRef(null);
   const [activeProjectsCount, setActiveProjectsCount] = useState(0);
+
+  // Application status (slot counter + cooldown)
+  const [appStatus, setAppStatus] = useState(null);
 
   // Load auth details
   const auth = getAuth();
@@ -38,15 +43,29 @@ function ProjectList() {
   const fetchProjectsAndRequests = async (silent = false) => {
     try {
       if (!silent && projects.length === 0) setLoading(true);
-      const [projectsData, requestsData] = await Promise.all([
+      const [projectsData, requestsData, statusData] = await Promise.all([
         getAllProjectTeamsApi(),
-        getRequestsByNameApi(userFullName).catch(() => [])
+        getRequestsByNameApi(userFullName).catch(() => []),
+        getMyApplicationStatusApi().catch(() => null)
       ]);
       const projList = Array.isArray(projectsData) ? projectsData : [];
-      const appIds = Array.isArray(requestsData) ? requestsData.map(req => req.projectTeamId) : [];
+      const requestsList = Array.isArray(requestsData) ? requestsData : [];
+      const appIds = requestsList
+        .filter(req => !req.status || req.status === 'PENDING')
+        .map(req => req.projectTeamId);
+
+      // Build teamId -> requestId map for cancel functionality
+      const reqMap = {};
+      requestsList.forEach(req => {
+        if (!req.status || req.status === 'PENDING') {
+          reqMap[req.projectTeamId] = req.id;
+        }
+      });
 
       setProjects(projList);
       setAppliedIds(appIds);
+      setAppliedRequestMap(reqMap);
+      if (statusData) setAppStatus(statusData);
 
       try {
         sessionStorage.setItem('comiverse_available_projects_cache', JSON.stringify({
@@ -218,6 +237,13 @@ function ProjectList() {
   const handleSendJoinRequest = async () => {
     if (!selectedProject) return;
     if (uploading) return;
+
+    // Client-side slot check
+    if (appStatus && appStatus.availableSlots <= 0) {
+      toast.error(`You have reached the maximum of ${appStatus.maxSlots} active teams/applications.`);
+      return;
+    }
+
     try {
       setUploading(true);
       const initials = userFullName
@@ -243,7 +269,7 @@ function ProjectList() {
         }
       }
 
-      await createTeamRequestApi(selectedProject.id, {
+      const result = await createTeamRequestApi(selectedProject.id, {
         name: userFullName,
         time: new Date().toISOString(),
         text: joinMessage.trim(),
@@ -253,17 +279,49 @@ function ProjectList() {
         cvFileName: cvFileName,
       });
 
-      toast.success(`Application sent successfully with your Translator Profile attached for "${selectedProject.comicName || selectedProject.title}"!`);
+      toast.success(`Application sent successfully for "${selectedProject.comicName || selectedProject.title}"!`);
       setAppliedIds((prev) => [...prev, selectedProject.id]);
+      if (result?.id) {
+        setAppliedRequestMap(prev => ({ ...prev, [selectedProject.id]: result.id }));
+      }
       setShowJoinModal(false);
       setSelectedProject(null);
       setCvFile(null);
+
+      // Refresh application status
+      getMyApplicationStatusApi().then(s => { if (s) setAppStatus(s) }).catch(() => {});
     } catch (err) {
       console.error(err);
       const errMsg = err.response?.data?.message || 'Failed to send application.';
       toast.error(errMsg);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleCancelApplication = async (projectId) => {
+    const requestId = appliedRequestMap[projectId];
+    if (!requestId) {
+      toast.error('Could not find your pending application to cancel.');
+      return;
+    }
+    try {
+      setCancelling(projectId);
+      await cancelTeamRequestApi(requestId);
+      toast.success('Application cancelled. You are on a 12-hour cooldown.');
+      setAppliedIds(prev => prev.filter(id => id !== projectId));
+      setAppliedRequestMap(prev => {
+        const copy = { ...prev };
+        delete copy[projectId];
+        return copy;
+      });
+      // Refresh application status
+      getMyApplicationStatusApi().then(s => { if (s) setAppStatus(s) }).catch(() => {});
+    } catch (err) {
+      const errMsg = err.response?.data?.message || 'Failed to cancel application.';
+      toast.error(errMsg);
+    } finally {
+      setCancelling(null);
     }
   };
 
@@ -310,8 +368,52 @@ function ProjectList() {
         </p>
       </div>
 
-      {/* Banner cảnh báo giới hạn dự án */}
-      {atProjectLimit && (
+      {/* Slot Counter & Cooldown Banner */}
+      {appStatus ? (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+          marginBottom: '16px',
+          padding: '14px 20px',
+          borderRadius: '12px',
+          background: appStatus.availableSlots <= 0
+            ? 'rgba(239, 68, 68, 0.08)'
+            : appStatus.availableSlots <= 2
+              ? 'rgba(245, 158, 11, 0.08)'
+              : 'rgba(16, 185, 129, 0.06)',
+          border: `1px solid ${appStatus.availableSlots <= 0 ? 'rgba(239, 68, 68, 0.2)' : appStatus.availableSlots <= 2 ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.15)'}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '20px' }}>{appStatus.availableSlots <= 0 ? '🚫' : appStatus.availableSlots <= 2 ? '⚠️' : '✅'}</span>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--trans-text-primary)' }}>
+                Application Slots: <span style={{ color: appStatus.availableSlots <= 0 ? '#ef4444' : appStatus.availableSlots <= 2 ? '#f59e0b' : '#10b981' }}>{appStatus.availableSlots}</span> / {appStatus.maxSlots} available
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--trans-text-secondary)', marginTop: '2px' }}>
+                {appStatus.joinedTeams} team{appStatus.joinedTeams !== 1 ? 's' : ''} joined · {appStatus.pendingApplications} pending application{appStatus.pendingApplications !== 1 ? 's' : ''}
+              </div>
+            </div>
+          </div>
+          {appStatus.cooldownUntil && appStatus.cooldownUntil !== '' && new Date(appStatus.cooldownUntil) > new Date() && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 14px',
+              borderRadius: '8px',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#ef4444'
+            }}>
+              ⏳ Cooldown ({appStatus.cooldownType === 'CANCEL' ? 'Cancel' : appStatus.cooldownType === 'LEAVE' ? 'Leave' : appStatus.cooldownType}): expires {new Date(appStatus.cooldownUntil).toLocaleString()}
+            </div>
+          )}
+        </div>
+      ) : atProjectLimit && (
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -464,21 +566,50 @@ function ProjectList() {
                 </ul>
               </div>
 
-              <div style={{ marginTop: '24px' }}>
-                <button
-                  className="available-project-apply-btn"
-                  disabled={isDisabled}
-                  onClick={() => handleApplyClick(project)}
-                  style={atProjectLimit && !alreadyApplied && spotsLeft > 0 ? {
-                    opacity: 0.55,
-                    cursor: 'not-allowed',
-                    background: 'rgba(234, 179, 8, 0.12)',
-                    borderColor: 'rgba(234, 179, 8, 0.35)',
-                    color: '#eab308',
-                  } : {}}
-                >
-                  {btnLabel}
-                </button>
+              <div style={{ marginTop: '24px', display: 'flex', gap: '8px' }}>
+                {alreadyApplied ? (
+                  <>
+                    <button
+                      className="available-project-apply-btn"
+                      disabled
+                      style={{ flex: 1, opacity: 0.7, cursor: 'not-allowed' }}
+                    >
+                      Applied ✓
+                    </button>
+                    <button
+                      className="available-project-apply-btn"
+                      onClick={() => handleCancelApplication(project.id)}
+                      disabled={cancelling === project.id}
+                      style={{
+                        flex: 'none',
+                        width: 'auto',
+                        padding: '10px 18px',
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        color: '#ef4444',
+                        fontSize: '13px',
+                        fontWeight: '600'
+                      }}
+                    >
+                      {cancelling === project.id ? 'Cancelling...' : '✕ Cancel'}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="available-project-apply-btn"
+                    disabled={spotsLeft === 0 || atProjectLimit || (appStatus && appStatus.availableSlots <= 0) || (appStatus && appStatus.cooldownUntil && new Date(appStatus.cooldownUntil) > new Date())}
+                    onClick={() => handleApplyClick(project)}
+                    style={{ flex: 1 }}
+                  >
+                    {spotsLeft === 0 
+                      ? 'Team Full' 
+                      : (appStatus && appStatus.availableSlots <= 0) || atProjectLimit
+                      ? 'Max Teams Reached' 
+                      : (appStatus && appStatus.cooldownUntil && new Date(appStatus.cooldownUntil) > new Date()) 
+                      ? '⏳ On Cooldown' 
+                      : 'Apply to Join'}
+                  </button>
+                )}
               </div>
             </div>
           );

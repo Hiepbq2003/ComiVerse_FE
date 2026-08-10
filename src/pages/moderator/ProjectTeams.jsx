@@ -24,6 +24,7 @@ const ALL_TARGET_LANGUAGES = COMIC_LANGUAGE_OPTIONS.map(lang => ({
 }))
 
 function ProjectTeams({
+  loading = false,
   projectTeams,
   setProjectTeams,
   comics = [],
@@ -462,7 +463,18 @@ function ProjectTeams({
         </div>
       </div>
 
-      {projectTeams.length === 0 ? (
+      {loading ? (
+        <div className="project-team-cards-grid" style={{ marginTop: '24px' }}>
+          {[1, 2, 3].map(i => (
+            <div key={i} className="project-team-grid-card">
+              <div className="skeleton-line skeleton-shimmer" style={{ height: '48px', width: '100%', marginBottom: '16px' }}></div>
+              <div className="skeleton-line skeleton-shimmer" style={{ height: '24px', width: '60%', marginBottom: '8px' }}></div>
+              <div className="skeleton-line skeleton-shimmer" style={{ height: '24px', width: '80%', marginBottom: '16px' }}></div>
+              <div className="skeleton-line skeleton-shimmer" style={{ height: '64px', width: '100%', borderRadius: '8px' }}></div>
+            </div>
+          ))}
+        </div>
+      ) : projectTeams.length === 0 ? (
         <div className="project-team-cards-list" style={{ marginTop: '24px' }}>
           <div className="moderator-empty-state">
             <h3>No translation project teams</h3>

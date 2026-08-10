@@ -91,9 +91,24 @@ const getStatusClass = (status) => {
   const value = (status || '').toString().toUpperCase()
   if (value === 'APPROVED' || value === 'PUBLISHED') return 'approved'
   if (value === 'HIDDEN' || value === 'UNPUBLISHED') return 'hidden'
-  if (value === 'REJECTED') return 'rejected'
-  if (value === 'DRAFT' || value === 'PREVIEW_READY') return 'draft'
+  if (value === 'APPEALED') return 'appealed'
+  if (value === 'DRAFT') return 'draft'
   return 'pending'
+}
+
+const formatPublicationStatus = (status) => {
+  const value = (status || 'ONGOING').toString().toUpperCase()
+  if (value === 'HIATUS') return 'On Hiatus'
+  if (['COMPLETED', 'COMPLETE'].includes(value)) return 'Completed'
+  if (value === 'CANCEL') return 'Cancelled'
+  return 'Ongoing'
+}
+
+const getPublicationClass = (status) => {
+  const value = (status || 'ONGOING').toString().toUpperCase()
+  if (['COMPLETED', 'COMPLETE'].includes(value)) return 'completed'
+  if (value === 'HIATUS') return 'hiatus'
+  return 'ongoing'
 }
 
 const formatDate = (value) => {
@@ -186,7 +201,8 @@ function AddChapterModal({ comic, onClose, onUploaded, onOpenGuide }) {
           <div><h2>Add Chapter</h2><p>{comic.title}</p></div>
           <button type="button" className="author-icon-btn ghost" onClick={onClose} aria-label="Close">×</button>
         </div>
-        <div className="author-chapter-form-grid">
+        <div className="author-modal-body">
+          <div className="author-chapter-form-grid">
           <label className="author-form-label">Chapter # *
             <input className="author-input" type="text" value={chapterNumber} onChange={(event) => setChapterNumber(event.target.value)} placeholder="1 or 1,5" />
           </label>
@@ -205,6 +221,7 @@ function AddChapterModal({ comic, onClose, onUploaded, onOpenGuide }) {
         <ChapterFolderGuideMini onOpenGuide={onOpenGuide} />
         <div className="author-alert info">ℹ The chapter is created as preview first. Review pages before submitting to moderation.</div>
         {error && <div className="author-form-error">{error}</div>}
+        </div>
         <div className="author-modal-actions">
           <button type="button" className="btn-author-action" onClick={onClose} disabled={submitting}>Cancel</button>
           <button type="submit" className="btn-author-action black" disabled={submitting}>{submitting ? 'Sending folder...' : 'Upload Folder'}</button>
@@ -342,19 +359,19 @@ function ResubmitChapterModal({ comic, chapter, onClose, onResubmitted, onOpenGu
               </span>
             )}
           </label>
+        </div>
 
-          <div className="author-modal-actions">
-            <button type="button" className="author-secondary-btn" onClick={onOpenGuide}>
-              View Folder Guidelines
-            </button>
-            <div style={{ flex: 1 }} />
-            <button type="button" className="author-secondary-btn" onClick={onClose} disabled={submitting}>
-              Cancel
-            </button>
-            <button type="submit" className="author-primary-btn" disabled={!folderFiles.length || submitting}>
-              {submitting ? 'Uploading...' : 'Replace & Continue'}
-            </button>
-          </div>
+        <div className="author-modal-actions">
+          <button type="button" className="author-secondary-btn" onClick={onOpenGuide}>
+            View Folder Guidelines
+          </button>
+          <div style={{ flex: 1 }} />
+          <button type="button" className="author-secondary-btn" onClick={onClose} disabled={submitting}>
+            Cancel
+          </button>
+          <button type="submit" className="author-primary-btn" disabled={!folderFiles.length || submitting}>
+            {submitting ? 'Uploading...' : 'Replace & Continue'}
+          </button>
         </div>
       </form>
     </div>
@@ -431,7 +448,8 @@ function EditComicModal({ comic, onClose, onSaved }) {
           <button type="button" className="author-icon-btn ghost" onClick={onClose} aria-label="Close">×</button>
         </div>
 
-        <div className="author-chapter-form-grid">
+        <div className="author-modal-body">
+          <div className="author-chapter-form-grid">
           <label className="author-form-label">
             Title *
             <input className="author-input" value={form.title} onChange={(event) => updateField('title', event.target.value)} />
@@ -481,7 +499,8 @@ function EditComicModal({ comic, onClose, onSaved }) {
           Changes are saved to the comic. Use Push Review manually when the comic and at least one chapter are ready.
         </div>
 
-        {error && <div className="author-form-error">{error}</div>}
+          {error && <div className="author-form-error">{error}</div>}
+        </div>
 
         <div className="author-modal-actions">
           <button type="button" className="btn-author-action" onClick={onClose} disabled={saving}>Cancel</button>
@@ -944,6 +963,9 @@ function AuthorComicDetail() {
               <h1>{comic.title}</h1>
               <span className={`author-status-badge ${getStatusClass(moderationStatus)}`}>
                 {formatStatus(moderationStatus)}
+              </span>
+              <span className={`author-publication-badge ${getPublicationClass(comic.publicationStatus)}`}>
+                {formatPublicationStatus(comic.publicationStatus)}
               </span>
               {isRejectedOrDisputed && (
                 <button className="btn-author-action appeal" onClick={() => setShowAppealModal(true)} title="Appeal moderation decision">

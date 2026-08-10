@@ -349,7 +349,7 @@ function ModeratorLiveStream({ onFlagMessage, onWarnUser, onMuteUser, onBanUser,
   )
 }
 
-function ChatMonitor({ fetchAllData }) {
+function ChatMonitor({ loading = false, fetchAllData }) {
   const [activeTab, setActiveTab] = useState('live') // 'flags' | 'keywords' | 'live'
   const [flagSubTab, setFlagSubTab] = useState('active') // 'active' | 'resolved'
   
@@ -771,7 +771,7 @@ function ChatMonitor({ fetchAllData }) {
           </div>
 
           {flagSubTab === 'active' ? (
-            loadingFlags ? (
+            (loading || loadingFlags) ? (
               <div style={{ padding: '24px 0' }}>
                 <SkeletonLoader type="staggered" count={3} />
               </div>

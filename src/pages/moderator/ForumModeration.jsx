@@ -50,10 +50,10 @@ const formatTimeAgo = (createdAtString) => {
   return `${days} days ago`
 }
 
-function ForumModeration({ fetchAllData }) {
+function ForumModeration({ loading: parentLoading = false, fetchAllData }) {
   const [activeTab, setActiveTab] = useState('threads') // 'threads' | 'reports' | 'categories'
   const [threads, setThreads] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [localLoading, setLocalLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   
   // Local state for dynamically added custom categories (persisted in localStorage)
@@ -83,7 +83,7 @@ function ForumModeration({ fetchAllData }) {
 
   const fetchThreads = async () => {
     try {
-      setLoading(true)
+      setLocalLoading(true)
       const data = await getAllForumThreadsApi()
       
       // Ensure all fields have defaults to prevent null checks
@@ -101,7 +101,7 @@ function ForumModeration({ fetchAllData }) {
       console.error(err)
       toast.error('Failed to load forum threads!')
     } finally {
-      setLoading(false)
+      setLocalLoading(false)
     }
   }
 
@@ -396,9 +396,11 @@ function ForumModeration({ fetchAllData }) {
             </div>
           </div>
 
-          {loading ? (
-            <div className="moderator-empty-state">
-              <p>Loading forum threads...</p>
+          {(parentLoading || localLoading) ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {[1, 2, 3].map(i => (
+                <div key={i} className="skeleton-line skeleton-shimmer" style={{ height: '80px', width: '100%', borderRadius: '12px' }}></div>
+              ))}
             </div>
           ) : filteredThreads.length === 0 ? (
             <div className="moderator-empty-state">
