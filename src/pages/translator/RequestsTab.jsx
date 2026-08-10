@@ -3,7 +3,7 @@
 // =============================================================================
 import { useTheme } from '../../context/ThemeContext';
 
-function RequestsTab({ joinRequests = [], onApprove, onReject }) {
+function RequestsTab({ joinRequests = [], onApprove, onReject, onBan }) {
   const { theme } = useTheme();
   const isLight = theme === 'light';
 
@@ -227,7 +227,7 @@ function RequestsTab({ joinRequests = [], onApprove, onReject }) {
 
 
               {/* Actions */}
-              <div className="request-actions-row">
+              <div className="request-actions-row" style={{ display: 'flex', gap: '8px' }}>
                 <button className="trans-btn primary" onClick={() => onApprove(req.id, req.name, req)} style={{ padding: '8px 20px', fontWeight: '700' }}>
                   ✓ Approve
                 </button>
@@ -237,11 +237,23 @@ function RequestsTab({ joinRequests = [], onApprove, onReject }) {
                   style={{
                     padding: '8px 20px',
                     background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.05)',
-                    color: isLight ? '#dc2626' : '#f87171',
-                    borderColor: isLight ? '#fca5a5' : 'rgba(239, 68, 68, 0.3)'
+                    color: isLight ? '#f59e0b' : '#fbbf24',
+                    borderColor: isLight ? '#fde68a' : 'rgba(245, 158, 11, 0.3)'
                   }}
                 >
                   ✕ Reject
+                </button>
+                <button
+                  className="trans-btn secondary"
+                  onClick={() => onBan && onBan(req.requesterId, req.name, req.id)}
+                  style={{
+                    padding: '8px 20px',
+                    background: isLight ? '#fef2f2' : 'rgba(239, 68, 68, 0.05)',
+                    color: isLight ? '#dc2626' : '#ef4444',
+                    borderColor: isLight ? '#fca5a5' : 'rgba(239, 68, 68, 0.3)'
+                  }}
+                >
+                  🚫 Ban
                 </button>
               </div>
             </div>

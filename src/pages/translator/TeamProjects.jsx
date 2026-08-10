@@ -113,6 +113,9 @@ import {
   decideTeamRequestApi,
   deleteTeamAnnouncementApi,
   removeTeamMemberApi,
+  banUserFromTeamApi,
+  unbanUserFromTeamApi,
+  getBannedUsersApi
 } from '../../services/api/TeamWorkspaceApi'
 import { toast } from 'react-toastify'
 
@@ -477,7 +480,7 @@ function WorkspaceDetailView({
       )}
 
       {workspaceTab === 'requests' && (
-        <RequestsTab joinRequests={joinRequests} onApprove={onApproveRequest} onReject={onRejectRequest} />
+        <RequestsTab joinRequests={joinRequests} onApprove={onApproveRequest} onReject={onRejectRequest} onBan={onBanUser} />
       )}
 
       {workspaceTab === 'tasks' && (
@@ -682,6 +685,7 @@ function TeamProjects() {
 
   const [members, setMembers] = useState([])
   const [teamMembersForAssign, setTeamMembersForAssign] = useState([])
+  const [bannedUsers, setBannedUsers] = useState([])
   const [chapterOptions, setChapterOptions] = useState([])
   const [memberSearch, setMemberSearch] = useState('')
   const [showCreateTask, setShowCreateTask] = useState(false)
@@ -769,14 +773,15 @@ function TeamProjects() {
     } catch (e) { /* ignore */ }
 
     try {
-      const [annList, taskList, reqList, teamMembersList] = await Promise.all([
+      const [annList, taskList, reqList, teamMembersList, bannedUsersList] = await Promise.all([
         getTeamAnnouncementsApi(project.id),
         getTeamTasksApi(project.id),
         getTeamRequestsApi(project.id),
         getTeamMembersApi(project.id).catch((err) => {
           console.error('Could not load real team members for assignee picker:', err)
           return []
-        })
+        }),
+        getBannedUsersApi(project.id).catch(() => [])
       ])
 
       const rawComicTitle = project.comicName || project.title || 'Comic';
@@ -981,6 +986,9 @@ function TeamProjects() {
       const finalMembersList = Array.from(combinedMap.values());
       setMembers(finalMembersList);
       setTeamMembersForAssign(finalMembersList);
+      
+      const parsedBans = Array.isArray(bannedUsersList) ? bannedUsersList : (bannedUsersList?.data || []);
+      setBannedUsers(parsedBans);
 
       const realCount = finalMembersList.length;
       const maxCap = (Number(project.maxMembers) || 5) + 1;
@@ -1562,6 +1570,43 @@ function TeamProjects() {
     }
   }
 
+  const handleBanUser = async (userId, name, requestId) => {
+    if (!userId) {
+      toast.error('Cannot ban user: Missing user ID.')
+      return
+    }
+    const reason = window.prompt(`Ban ${name} from applying to this team?\n\nReason:`, 'Spam applications / Not a good fit')
+    if (reason === null) return // Cancelled
+
+    if (requestId) {
+      setJoinRequests(prev => prev.filter(req => req.id !== requestId))
+    }
+
+    try {
+      await banUserFromTeamApi(selectedDetails.id, userId, reason)
+      toast.success(`${name} has been banned from this team.`)
+      // Refresh bans
+      getBannedUsersApi(selectedDetails.id).then(res => {
+        setBannedUsers(Array.isArray(res) ? res : res?.data || [])
+      }).catch(console.error)
+    } catch (err) {
+      console.error(err)
+      toast.error(err.response?.data?.message || 'Failed to ban user.')
+    }
+  }
+
+  const handleUnbanUser = async (userId, name) => {
+    if (!window.confirm(`Unban ${name}? They will be able to apply to the team again.`)) return
+    try {
+      await unbanUserFromTeamApi(selectedDetails.id, userId)
+      toast.success(`${name} has been unbanned.`)
+      setBannedUsers(prev => prev.filter(b => b.userId !== userId))
+    } catch (err) {
+      console.error(err)
+      toast.error(err.response?.data?.message || 'Failed to unban user.')
+    }
+  }
+
   const handleCreateTask = async (customData = null) => {
     if (!isLeaderMatch(selectedDetails?.leaderName)) {
       toast.error('Only the Project Leader can create or assign team tasks.')
@@ -1800,9 +1845,12 @@ function TeamProjects() {
         onMembersLoaded={setMembers}
         onLeaveTeam={handleLeaveTeam}
         onRemoveMember={handleRemoveMember}
+        bannedUsers={bannedUsers}
+        onUnbanUser={handleUnbanUser}
         joinRequests={joinRequests}
         onApproveRequest={handleApproveRequest}
         onRejectRequest={handleRejectRequest}
+        onBanUser={handleBanUser}
         showUploadForm={showUploadForm}
         setShowUploadForm={setShowUploadForm}
         uploadData={uploadData}
