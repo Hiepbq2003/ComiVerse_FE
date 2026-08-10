@@ -1617,7 +1617,8 @@ html.light .glass-input-wrapper .custom-datepicker-icon,
 .auth-back-btn {
   position: absolute;
   top: 32px;
-  left: 32px;
+  right: 32px;
+  left: auto;
   display: inline-flex;
   align-items: center;
   color: var(--auth-text-muted);
@@ -1644,6 +1645,7 @@ html.light .glass-input-wrapper .custom-datepicker-icon,
 @media (max-width: 768px) {
   .auth-back-btn {
     top: 20px;
-    left: 20px;
+    right: 20px;
+    left: auto;
   }
 }
