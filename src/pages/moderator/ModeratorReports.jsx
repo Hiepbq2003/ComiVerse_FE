@@ -100,11 +100,11 @@ export default function ModeratorReports() {
   const rejectedCount = reports.filter(r => r.status === 'REJECTED').length;
 
   return (
-    <div className="rep-container">
+    <div className="fade-in">
       {/* ── HEADER ── */}
-      <div className="rep-header">
-        <div className="rep-title-group">
-          <h1>Violation Reports Management (Moderator)</h1>
+      <div className="moderator-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1>Violation Reports Management</h1>
           <p>Inspect corrupt imagery, broken chapters, unauthorized ads, duplicate titles, and community standards violations.</p>
         </div>
 
