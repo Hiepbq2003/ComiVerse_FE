@@ -111,10 +111,10 @@ export default function ReportCategories({ roleScope = 'ALL' }) {
   });
 
   return (
-    <div className="rep-container">
+    <div className="fade-in">
       {/* ── HEADER ── */}
-      <div className="rep-header">
-        <div className="rep-title-group">
+      <div className="moderator-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
           <h1>Report Categories Management</h1>
           <p>Configure issue categories for Comic series, Chapter images, and Translations with active status switches and role delegations.</p>
         </div>
