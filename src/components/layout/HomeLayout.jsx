@@ -9,6 +9,11 @@ import { getComicsPageApi } from '../../services/api/ComicApi'
 import ChatWidget from '../chat/ChatWidget'
 import LogoIcon from '../common/LogoIcon'
 import SubscriptionPlanModal from '../common/SubscriptionPlanModal'
+import AndroidIcon from '../common/AndroidIcon'
+import AppleIcon from '../common/AppleIcon'
+import DiscordIcon from '../common/DiscordIcon'
+import XIcon from '../common/XIcon'
+import FacebookIcon from '../common/FacebookIcon'
 import { Crown, Download } from 'lucide-react'
 
 const COMIVERSE_APK_URL = 'https://pub-a7dc2066b937452cb00d7263b29ee9e5.r2.dev/comiverse-latest.apk'
@@ -628,38 +633,54 @@ function HomeLayout({ children }) {
 
             <div className="footer-download-col">
               <span className="footer-col-title">Get the app</span>
-              <a
-                className="footer-apk-badge"
-                href={COMIVERSE_APK_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                download="comiverse-latest.apk"
-                aria-label="Download the latest ComiVerse APK for Android"
-              >
-                <span className="footer-apk-icon" aria-hidden="true">
-                  <Download size={21} strokeWidth={2.2} />
-                </span>
-                <span className="footer-apk-copy">
-                  <span className="footer-apk-eyebrow">Download for</span>
-                  <strong>Android APK</strong>
-                </span>
-              </a>
-              <span className="footer-apk-note">Latest mobile release</span>
+              <div className="footer-app-badges">
+                <a
+                  className="footer-app-badge footer-app-badge--android"
+                  href={COMIVERSE_APK_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download="comiverse-latest.apk"
+                  aria-label="Download the latest ComiVerse APK for Android"
+                >
+                  <span className="footer-app-badge-icon" aria-hidden="true">
+                    <AndroidIcon size={21} />
+                  </span>
+                  <span className="footer-app-badge-copy">
+                    <span className="footer-app-badge-eyebrow">Download for</span>
+                    <strong>Android APK</strong>
+                  </span>
+                </a>
+
+                <Link
+                  className="footer-app-badge footer-app-badge--ios"
+                  to="/download/ios"
+                  aria-label="Open the ComiVerse installation guide for iPhone"
+                >
+                  <span className="footer-app-badge-icon" aria-hidden="true">
+                    <AppleIcon size={21} />
+                  </span>
+                  <span className="footer-app-badge-copy">
+                    <span className="footer-app-badge-eyebrow">Install on</span>
+                    <strong>iPhone / iOS</strong>
+                  </span>
+                </Link>
+              </div>
+              <span className="footer-app-note">Android direct download · iOS setup guide</span>
             </div>
           </div>
 
           <div className="footer-bottom-row">
             <span>© {new Date().getFullYear()} ComiVerse. All rights reserved.</span>
             <div className="footer-socials">
-              <div className="social-icon-btn" title="Discord">
-                <span style={{ fontSize: '16px' }}>💬</span>
-              </div>
-              <div className="social-icon-btn" title="Twitter">
-                <span style={{ fontSize: '16px' }}>🐦</span>
-              </div>
-              <div className="social-icon-btn" title="Facebook">
-                <span style={{ fontSize: '16px' }}>📘</span>
-              </div>
+              <a href="https://discord.gg/comiverse" target="_blank" rel="noopener noreferrer" className="social-icon-btn" title="Discord">
+                <DiscordIcon size={20} />
+              </a>
+              <a href="https://x.com/comiverse" target="_blank" rel="noopener noreferrer" className="social-icon-btn" title="X (Twitter)">
+                <XIcon size={20} />
+              </a>
+              <a href="https://facebook.com/comiverse" target="_blank" rel="noopener noreferrer" className="social-icon-btn" title="Facebook">
+                <FacebookIcon size={20} />
+              </a>
             </div>
           </div>
         </div>

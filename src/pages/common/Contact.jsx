@@ -27,11 +27,11 @@ const Contact = () => {
 
   const inputStyle = {
     width: '100%',
-    background: 'rgba(255, 255, 255, 0.03)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
+    background: 'var(--profile-input-bg, rgba(255, 255, 255, 0.03))',
+    border: '1px solid var(--profile-border, rgba(255, 255, 255, 0.08))',
     borderRadius: '10px',
     padding: '12px 16px',
-    color: 'white',
+    color: 'var(--profile-text-primary, white)',
     fontSize: '14px',
     fontFamily: 'var(--font-sans)',
     outline: 'none',
@@ -43,7 +43,7 @@ const Contact = () => {
     display: 'block',
     fontSize: '13px',
     fontWeight: '600',
-    color: '#94a3b8',
+    color: 'var(--profile-text-secondary, #94a3b8)',
     marginBottom: '6px'
   };
 
@@ -71,13 +71,13 @@ const Contact = () => {
           <h1 style={{
             fontSize: '36px',
             fontWeight: '700',
-            color: 'white',
+            color: 'var(--profile-text-primary, white)',
             margin: '0 0 12px',
             fontFamily: 'var(--font-serif)'
           }}>
             Contact Support
           </h1>
-          <p style={{ color: '#94a3b8', fontSize: '16px', lineHeight: '1.7', maxWidth: '500px', margin: '0 auto' }}>
+          <p style={{ color: 'var(--profile-text-secondary, #94a3b8)', fontSize: '16px', lineHeight: '1.7', maxWidth: '500px', margin: '0 auto' }}>
             Have a question or need help? We're here for you. Send us a message and we'll respond as soon as possible.
           </p>
         </div>
@@ -91,30 +91,30 @@ const Contact = () => {
           {/* Contact Info */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid rgba(255, 255, 255, 0.06)',
+              background: 'var(--profile-card-bg, rgba(255, 255, 255, 0.02))',
+              border: '1px solid var(--profile-border, rgba(255, 255, 255, 0.06))',
               borderRadius: '16px',
               padding: '24px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                 <Mail size={20} color="#a855f7" />
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '14px', color: 'white' }}>Email</h4>
-                  <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>support@comiverse.com</p>
+                  <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--profile-text-primary, white)' }}>Email</h4>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--profile-text-secondary, #94a3b8)' }}>support@comiverse.com</p>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                 <Phone size={20} color="#ec4899" />
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '14px', color: 'white' }}>Phone</h4>
-                  <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>+84 123 456 789</p>
+                  <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--profile-text-primary, white)' }}>Phone</h4>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--profile-text-secondary, #94a3b8)' }}>+84 123 456 789</p>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <MapPin size={20} color="#fbbf24" />
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '14px', color: 'white' }}>Office</h4>
-                  <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>FPT University, Hoa Lac, Hanoi</p>
+                  <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--profile-text-primary, white)' }}>Office</h4>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--profile-text-secondary, #94a3b8)' }}>FPT University, Hoa Lac, Hanoi</p>
                 </div>
               </div>
             </div>
@@ -125,17 +125,16 @@ const Contact = () => {
               borderRadius: '16px',
               padding: '24px'
             }}>
-              <h4 style={{ margin: '0 0 8px', fontSize: '15px', color: 'white' }}>Response Time</h4>
-              <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', lineHeight: '1.6' }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: '15px', color: 'var(--profile-text-primary, white)' }}>Response Time</h4>
+              <p style={{ margin: 0, fontSize: '13px', color: 'var(--profile-text-secondary, #94a3b8)', lineHeight: '1.6' }}>
                 We typically respond within 24 hours during business days. For urgent issues, please include "URGENT" in your subject line.
               </p>
             </div>
           </div>
 
-          {/* Contact Form */}
           <form onSubmit={handleSubmit} style={{
-            background: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
+            background: 'var(--profile-card-bg, rgba(255, 255, 255, 0.02))',
+            border: '1px solid var(--profile-border, rgba(255, 255, 255, 0.06))',
             borderRadius: '16px',
             padding: '28px 32px'
           }}>

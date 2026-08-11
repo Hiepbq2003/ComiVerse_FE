@@ -4,8 +4,8 @@ import { Scale, AlertTriangle, FileText, UserCheck, ShieldCheck } from "lucide-r
 
 const Terms = () => {
   const sectionStyle = {
-    background: 'rgba(255, 255, 255, 0.02)',
-    border: '1px solid rgba(255, 255, 255, 0.06)',
+    background: 'var(--profile-card-bg, rgba(255, 255, 255, 0.02))',
+    border: '1px solid var(--profile-border, rgba(255, 255, 255, 0.06))',
     borderRadius: '16px',
     padding: '28px 32px',
     marginBottom: '20px'
@@ -14,7 +14,7 @@ const Terms = () => {
   const headingStyle = {
     fontSize: '18px',
     fontWeight: '600',
-    color: 'white',
+    color: 'var(--profile-text-primary, white)',
     margin: '0 0 12px',
     display: 'flex',
     alignItems: 'center',
@@ -22,7 +22,7 @@ const Terms = () => {
   };
 
   const textStyle = {
-    color: '#cbd5e1',
+    color: 'var(--profile-text-secondary, #cbd5e1)',
     fontSize: '15px',
     lineHeight: '1.8',
     margin: 0
@@ -52,13 +52,13 @@ const Terms = () => {
           <h1 style={{
             fontSize: '36px',
             fontWeight: '700',
-            color: 'white',
+            color: 'var(--profile-text-primary, white)',
             margin: '0 0 12px',
             fontFamily: 'var(--font-serif)'
           }}>
             Terms of Service
           </h1>
-          <p style={{ color: '#94a3b8', fontSize: '14px' }}>Last updated: July 2026</p>
+          <p style={{ color: 'var(--profile-text-secondary, #94a3b8)', fontSize: '14px' }}>Last updated: July 2026</p>
         </div>
 
         {/* Sections */}
@@ -114,7 +114,7 @@ const Terms = () => {
           padding: '28px 32px',
           textAlign: 'center'
         }}>
-          <p style={{ color: '#94a3b8', fontSize: '14px', margin: '0 0 4px' }}>
+          <p style={{ color: 'var(--profile-text-secondary, #94a3b8)', fontSize: '14px', margin: '0 0 4px' }}>
             If you have any questions about these Terms, please
           </p>
           <a href="/contact" style={{ color: '#a855f7', textDecoration: 'none', fontWeight: '600', fontSize: '14px' }}>
