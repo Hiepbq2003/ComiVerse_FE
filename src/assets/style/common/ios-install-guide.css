@@ -1,0 +1,789 @@
+.ios-guide-page {
+  --ios-guide-surface: rgba(255, 255, 255, 0.035);
+  --ios-guide-surface-strong: rgba(255, 255, 255, 0.06);
+  --ios-guide-border: rgba(255, 255, 255, 0.09);
+  --ios-guide-text: #cbd5e1;
+  --ios-guide-muted: #94a3b8;
+  --ios-guide-heading: #ffffff;
+  width: min(1320px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 64px 0 96px;
+}
+
+.ios-guide-hero {
+  position: relative;
+  min-height: 360px;
+  padding: clamp(32px, 5vw, 64px);
+  border: 1px solid rgba(168, 85, 247, 0.24);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 82% 28%, rgba(236, 72, 153, 0.22), transparent 28%),
+    radial-gradient(circle at 64% 80%, rgba(99, 102, 241, 0.18), transparent 35%),
+    linear-gradient(145deg, #161023 0%, #0b0712 72%);
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: center;
+  gap: 48px;
+}
+
+.ios-guide-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 38px 38px;
+  mask-image: linear-gradient(to right, transparent 15%, black 100%);
+}
+
+.ios-guide-hero-copy,
+.ios-guide-hero-art {
+  position: relative;
+  z-index: 1;
+}
+
+.ios-guide-kicker {
+  width: fit-content;
+  margin-bottom: 18px;
+  padding: 8px 12px;
+  border: 1px solid rgba(192, 132, 252, 0.32);
+  border-radius: 999px;
+  background: rgba(168, 85, 247, 0.12);
+  color: #d8b4fe;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.ios-guide-hero h1 {
+  max-width: 720px;
+  margin: 0;
+  color: var(--ios-guide-heading);
+  font-family: var(--font-serif);
+  font-size: clamp(40px, 5vw, 66px);
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+}
+
+.ios-guide-hero-copy > p {
+  max-width: 720px;
+  margin: 22px 0 0;
+  color: var(--ios-guide-text);
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.ios-guide-tags {
+  margin-top: 26px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.ios-guide-tags span {
+  padding: 8px 11px;
+  border: 1px solid var(--ios-guide-border);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #e2e8f0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ios-guide-hero-art {
+  display: flex;
+  justify-content: center;
+}
+
+.ios-guide-phone {
+  position: relative;
+  width: 216px;
+  height: 432px;
+  border: 12px solid #e2e8f0;
+  border-radius: 48px;
+  background: #ffffff;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.35), inset 0 0 0 2px rgba(255, 255, 255, 0.8);
+  transform: rotate(6deg);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.ios-guide-phone::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 65px;
+  height: 18px;
+  border-radius: 20px;
+  background: #1a1522;
+  z-index: 20;
+}
+
+
+.ios-guide-layout {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: start;
+  gap: 28px;
+}
+
+.ios-guide-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.ios-guide-section,
+.ios-guide-summary-card {
+  border: 1px solid var(--ios-guide-border);
+  border-radius: 20px;
+  background: var(--ios-guide-surface);
+}
+
+.ios-guide-section {
+  padding: clamp(24px, 4vw, 38px);
+}
+
+.ios-guide-section-heading {
+  margin-bottom: 26px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ios-guide-step-number {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  box-shadow: 0 9px 24px rgba(168, 85, 247, 0.25);
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.ios-guide-section-label {
+  color: #c084fc;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ios-guide-section h2,
+.ios-guide-summary h2 {
+  margin: 3px 0 0;
+  color: var(--ios-guide-heading);
+  font-size: 23px;
+  line-height: 1.25;
+}
+
+.ios-guide-checklist,
+.ios-guide-detail-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ios-guide-checklist li,
+.ios-guide-detail-list li {
+  color: var(--ios-guide-text);
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.ios-guide-checklist li > svg {
+  margin-top: 3px;
+  color: #34d399;
+  flex: 0 0 auto;
+}
+
+.ios-guide-detail-list li > svg {
+  margin-top: 3px;
+  color: #c084fc;
+  flex: 0 0 auto;
+}
+
+.ios-guide-resource-grid {
+  margin-top: 25px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ios-guide-resource {
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid var(--ios-guide-border);
+  border-radius: 13px;
+  background: var(--ios-guide-surface-strong);
+  color: var(--ios-guide-heading);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.ios-guide-resource:hover {
+  color: var(--ios-guide-heading);
+  border-color: rgba(168, 85, 247, 0.55);
+  background: rgba(168, 85, 247, 0.1);
+  transform: translateY(-2px);
+}
+
+.ios-guide-resource > span:nth-child(2) {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.ios-guide-resource-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(168, 85, 247, 0.14);
+  color: #c084fc;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.ios-guide-resource small,
+.ios-guide-ipa-button small {
+  color: var(--ios-guide-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.ios-guide-resource strong {
+  margin-top: 3px;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ios-guide-resource > svg {
+  color: var(--ios-guide-muted);
+  flex: 0 0 auto;
+}
+
+.ios-guide-source-note {
+  margin: 14px 0 0;
+  color: var(--ios-guide-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ios-guide-source-note a {
+  color: #c084fc;
+}
+
+.ios-guide-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+}
+
+.ios-guide-action-grid article {
+  padding: 22px;
+  border: 1px solid var(--ios-guide-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.ios-guide-action-grid article > svg {
+  margin-bottom: 12px;
+  color: #c084fc;
+}
+
+.ios-guide-action-grid h3 {
+  margin: 0 0 7px;
+  color: var(--ios-guide-heading);
+  font-size: 16px;
+}
+
+.ios-guide-action-grid p,
+.ios-guide-paragraph {
+  margin: 0;
+  color: var(--ios-guide-text);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.ios-guide-notice {
+  margin-top: 18px;
+  padding: 17px 18px;
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 13px;
+  background: rgba(168, 85, 247, 0.075);
+  color: #c4b5fd;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ios-guide-page > .ios-guide-notice {
+  margin-top: 20px;
+}
+
+.ios-guide-notice > svg {
+  margin-top: 1px;
+  flex: 0 0 auto;
+}
+
+.ios-guide-notice strong {
+  color: var(--ios-guide-heading);
+  font-size: 14px;
+}
+
+.ios-guide-notice p {
+  margin: 3px 0 0;
+  color: var(--ios-guide-text);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.ios-guide-notice--warning {
+  border-color: rgba(245, 158, 11, 0.24);
+  background: rgba(245, 158, 11, 0.08);
+  color: #fbbf24;
+}
+
+.ios-guide-notice--security,
+.ios-guide-notice--success {
+  border-color: rgba(52, 211, 153, 0.24);
+  background: rgba(16, 185, 129, 0.075);
+  color: #34d399;
+}
+
+.ios-guide-notice--info {
+  border-color: rgba(56, 189, 248, 0.23);
+  background: rgba(14, 165, 233, 0.07);
+  color: #38bdf8;
+}
+
+.ios-guide-ipa-button {
+  width: fit-content;
+  max-width: 100%;
+  padding: 13px 18px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  box-shadow: 0 10px 28px rgba(168, 85, 247, 0.24);
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ios-guide-ipa-button:hover {
+  color: white;
+  box-shadow: 0 14px 34px rgba(168, 85, 247, 0.34);
+  transform: translateY(-2px);
+}
+
+.ios-guide-ipa-button span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ios-guide-ipa-button small {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.ios-guide-ipa-button strong {
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+
+.ios-guide-flow {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(7, auto);
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ios-guide-flow > div {
+  min-height: 84px;
+  padding: 12px;
+  border: 1px solid var(--ios-guide-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--ios-guide-text);
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.ios-guide-flow > div > svg {
+  color: #c084fc;
+}
+
+.ios-guide-flow-arrow {
+  color: #64748b;
+  font-weight: 800;
+}
+
+.ios-guide-settings-path {
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ios-guide-settings-path span {
+  padding: 8px 11px;
+  border: 1px solid var(--ios-guide-border);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ios-guide-text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.ios-guide-settings-path span:not(:last-child)::after {
+  content: '›';
+  margin-left: 15px;
+  color: #a855f7;
+}
+
+.ios-guide-summary {
+  position: sticky;
+  top: 94px;
+}
+
+.ios-guide-summary-card {
+  padding: 25px;
+}
+
+.ios-guide-summary-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f8fafc, #ddd6fe);
+  color: #17111f;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ios-guide-summary ol {
+  margin: 22px 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.ios-guide-summary li {
+  color: var(--ios-guide-text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ios-guide-summary li span {
+  width: 25px;
+  height: 25px;
+  border-radius: 8px;
+  background: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ios-guide-summary > div > a {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  border-radius: 10px;
+  background: rgba(168, 85, 247, 0.1);
+  color: #d8b4fe;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-sizing: border-box;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ios-guide-summary > div > a:hover {
+  background: rgba(168, 85, 247, 0.17);
+  color: #ffffff;
+}
+
+.ios-guide-summary > div > p {
+  margin: 12px 0 0;
+  color: var(--ios-guide-muted);
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+html.light .ios-guide-page {
+  --ios-guide-surface: rgba(255, 255, 255, 0.88);
+  --ios-guide-surface-strong: #ffffff;
+  --ios-guide-border: rgba(15, 23, 42, 0.1);
+  --ios-guide-text: #475569;
+  --ios-guide-muted: #64748b;
+  --ios-guide-heading: #0f172a;
+}
+
+html.light .ios-guide-hero {
+  background:
+    radial-gradient(circle at 82% 28%, rgba(236, 72, 153, 0.17), transparent 28%),
+    radial-gradient(circle at 64% 80%, rgba(99, 102, 241, 0.13), transparent 35%),
+    linear-gradient(145deg, #ffffff 0%, #f5f3ff 72%);
+  box-shadow: 0 24px 60px rgba(76, 29, 149, 0.1);
+}
+
+html.light .ios-guide-tags span,
+html.light .ios-guide-action-grid article,
+html.light .ios-guide-flow > div,
+html.light .ios-guide-settings-path span {
+  background: rgba(255, 255, 255, 0.72);
+  color: #475569;
+}
+
+html.light .ios-guide-section,
+html.light .ios-guide-summary-card {
+  box-shadow: 0 14px 38px rgba(15, 23, 42, 0.05);
+}
+
+@media (max-width: 1100px) {
+  .ios-guide-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .ios-guide-summary {
+    position: static;
+    order: -1;
+  }
+
+  .ios-guide-summary-card {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 16px;
+  }
+
+  .ios-guide-summary-card h2 {
+    align-self: center;
+  }
+
+  .ios-guide-summary-card ol,
+  .ios-guide-summary-card > a,
+  .ios-guide-summary-card > p {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 820px) {
+  .ios-guide-page {
+    width: min(100% - 32px, 1320px);
+    padding: 32px 0 72px;
+  }
+
+  .ios-guide-hero {
+    min-height: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .ios-guide-hero-art {
+    display: none;
+  }
+
+  .ios-guide-resource-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ios-guide-flow {
+    grid-template-columns: 1fr;
+  }
+
+  .ios-guide-flow-arrow {
+    transform: rotate(90deg);
+    justify-self: center;
+  }
+}
+
+@media (max-width: 560px) {
+  .ios-guide-page {
+    width: min(100% - 24px, 1320px);
+  }
+
+  .ios-guide-hero,
+  .ios-guide-section,
+  .ios-guide-summary-card {
+    border-radius: 17px;
+  }
+
+  .ios-guide-hero {
+    padding: 28px 22px;
+  }
+
+  .ios-guide-hero h1 {
+    font-size: 37px;
+  }
+
+  .ios-guide-action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ios-guide-section-heading {
+    align-items: flex-start;
+  }
+
+  .ios-guide-section h2,
+  .ios-guide-summary h2 {
+    font-size:19px;
+  }
+}
+
+.ios-guide-phone {
+  position: relative;
+  width: 176px;
+  height: 336px;
+  border: 8px solid #1a1522;
+  border-radius: 40px;
+  background: #110e17;
+  box-shadow: 0 30px 54px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  transform: rotate(6deg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.ios-guide-phone::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 52px;
+  height: 13px;
+  border-radius: 20px;
+  background: #1a1522;
+}
+
+.ios-guide-phone strong {
+  font-size: 20px;
+  letter-spacing: -0.5px;
+  margin-top: 4px;
+}
+
+.ios-guide-phone span {
+  font-size: 13px;
+  color: #a855f7;
+  font-weight: 500;
+  letter-spacing: 1px;
+}
+
+/* ===================================================
+   LIGHT THEME – phone is always dark (it's a screen)
+   Fix text colors on the page itself
+   =================================================== */
+html.light .ios-guide-section h2,
+html.light .ios-guide-summary h2 {
+  color: #0f172a;
+}
+
+html.light .ios-guide-checklist li,
+html.light .ios-guide-detail-list li,
+html.light .ios-guide-action-grid p,
+html.light .ios-guide-paragraph {
+  color: #334155;
+}
+
+html.light .ios-guide-action-grid h3 {
+  color: #0f172a;
+}
+
+html.light .ios-guide-summary li {
+  color: #334155;
+}
+
+html.light .ios-guide-notice--warning {
+  color: #92400e;
+}
+
+html.light .ios-guide-notice--warning p {
+  color: #78350f;
+}
+
+html.light .ios-guide-notice p {
+  color: #334155;
+}
+
+html.light .ios-guide-notice strong {
+  color: #0f172a;
+}
+
+html.light .ios-guide-source-note {
+  color: #64748b;
+}
+
+/* Light Theme overrides for the Phone mockup itself */
+html.light .ios-guide-phone {
+  border-color: #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 30px 54px rgba(0, 0, 0, 0.15), inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+html.light .ios-guide-phone::before {
+  background: #0f172a;
+}

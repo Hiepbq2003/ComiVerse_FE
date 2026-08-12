@@ -36,6 +36,7 @@ import Policy from './pages/common/Policy'
 import About from './pages/common/About'
 import Terms from './pages/common/Terms'
 import Contact from './pages/common/Contact'
+import IosInstallGuide from './pages/common/IosInstallGuide'
 import SubscriptionResult from './pages/common/SubscriptionResult'
 import TranslatorRegister from './pages/common/TranslatorRegister'
 import TranslateDashboard from './pages/translator/TranslatorDashboard'
@@ -111,6 +112,7 @@ function App() {
                 <Route path="/about" element={<About />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/contact" element={<Contact />} />
+                <Route path="/download/ios" element={<IosInstallGuide />} />
                 <Route path="/translator-register" element={<TranslatorRegister />} />
                 <Route path="/subscription/success" element={<SubscriptionResult />} />
                 <Route path="/subscription/cancel" element={<SubscriptionResult cancelled />} />

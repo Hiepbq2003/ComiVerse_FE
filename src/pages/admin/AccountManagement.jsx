@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { toast } from 'react-toastify'
 import AdminLayout from '../../components/layout/AdminLayout'
-import { getAllAccountsApi, registerStaffApi, banUserApi, unbanUserApi, resetUserPasswordApi, updateUserApi } from '../../services/api/AccountApi'
+import { getAllAccountsApi, registerStaffApi, banUserApi, unbanUserApi, resetUserPasswordApi, updateUserApi, approveAuthorLicenseApi, rejectAuthorLicenseApi, reopenAuthorLicenseApi } from '../../services/api/AccountApi'
 import ModernButton from '../../components/common/ModernButton'
 import AnimatedButton from '../../components/common/AnimatedButton'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
@@ -154,7 +154,14 @@ function AccountManagement() {
           lastActive: lActive ? formatDate(lActive) : 'Today',
           assignedLanguages: Array.isArray(acc.assignedLanguages) && acc.assignedLanguages.length > 0 
             ? acc.assignedLanguages 
-            : (normalizedRole.toLowerCase().includes('moderator') ? getDisplayLanguages(acc) : [])
+            : (normalizedRole.toLowerCase().includes('moderator') ? getDisplayLanguages(acc) : []),
+          authorId: acc.authorId || null,
+          authorLicenseStatus: acc.authorLicenseStatus || null,
+          licenseUrl: acc.licenseUrl || null,
+          licenseOriginalFilename: acc.licenseOriginalFilename || null,
+          licenseDeadlineAt: acc.licenseDeadlineAt || null,
+          licenseUploadedAt: acc.licenseUploadedAt || null,
+          licenseRejectionReason: acc.licenseRejectionReason || null,
         }
       })
       setAccounts(normalized)
@@ -269,28 +276,13 @@ function AccountManagement() {
         payload.assignedLanguages = staffForm.assignedLanguages || []
       }
 
-      const result = await registerStaffApi(payload)
-      // Add to local list
-      const displayRole = formatRoleLabel(result?.role || staffForm.role)
-      
-      const newAccount = {
-        id: result?.userId || result?.id || Date.now(),
-        userId: result?.userId || `USR-${String(result?.id || Date.now()).padStart(4, '0')}`,
-        fullName: result?.fullName || staffForm.fullName,
-        username: result?.username || staffForm.username,
-        email: result?.email || staffForm.email,
-        role: displayRole,
-        status: 'Active',
-        createdDate: new Date().toISOString().split('T')[0],
-        lastActive: 'Just now',
-        assignedLanguages: staffForm.role === 'MODERATOR' ? (staffForm.assignedLanguages || []) : []
-      }
-      setAccounts((prev) => [newAccount, ...prev])
+      await registerStaffApi(payload)
       setShowCreateModal(false)
       setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'READER', assignedLanguages: ['Japanese', 'Korean'] })
       setStaffFormErrors({})
       setModalError(null)
-      showAlert('success', `Account "${newAccount.fullName}" created successfully!`)
+      showAlert('success', `Account "${staffForm.fullName}" created successfully!${normalizeRoleValue(staffForm.role) === 'AUTHOR' ? ' Author license status: PENDING LICENSE (7-day PDF upload deadline).' : ''}`)
+      await fetchAccounts()
     } catch (err) {
       let errorMsg = 'Failed to create account. Please try again.'
       const validationErrors = err.response?.data?.errors
@@ -401,6 +393,53 @@ function AccountManagement() {
   const handleResetPasswordFromEdit = () => {
     if (!editingAccount) return
     openConfirm('reset-pw', editingAccount)
+  }
+
+  // ── AUTHOR LICENSE REVIEW ─────────────────────────
+  const handleApproveAuthorLicense = async (account) => {
+    if (!account?.authorId) return
+    if (!window.confirm(`Verify license for ${account.fullName}? This will activate comic publishing and Author payout.`)) return
+    setActionLoadingId(account.id)
+    try {
+      await approveAuthorLicenseApi(account.authorId)
+      showAlert('success', `License verified. ${account.fullName} is now ACTIVE.`)
+      await fetchAccounts()
+    } catch (err) {
+      showAlert('error', err.response?.data?.message || 'Failed to approve Author license.')
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  const handleRejectAuthorLicense = async (account) => {
+    if (!account?.authorId) return
+    const reason = window.prompt('Reason for rejection (Author gets a new 7-day PDF upload deadline):', '')
+    if (reason === null) return
+    setActionLoadingId(account.id)
+    try {
+      await rejectAuthorLicenseApi(account.authorId, { reason: reason.trim() || null, deadlineDays: 7 })
+      showAlert('warning', `License rejected. ${account.fullName} can upload a replacement PDF within 7 days.`)
+      await fetchAccounts()
+    } catch (err) {
+      showAlert('error', err.response?.data?.message || 'Failed to reject Author license.')
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  const handleReopenAuthorLicense = async (account) => {
+    if (!account?.authorId) return
+    if (!window.confirm(`Give ${account.fullName} a new 7-day license upload deadline?`)) return
+    setActionLoadingId(account.id)
+    try {
+      await reopenAuthorLicenseApi(account.authorId, { deadlineDays: 7 })
+      showAlert('success', 'New 7-day PDF upload deadline assigned.')
+      await fetchAccounts()
+    } catch (err) {
+      showAlert('error', err.response?.data?.message || 'Failed to reopen Author license upload.')
+    } finally {
+      setActionLoadingId(null)
+    }
   }
 
   // ── BAN / UNBAN ───────────────────────────────────
@@ -578,6 +617,11 @@ function AccountManagement() {
                         })()}
                       </div>
                     )}
+                    {normalizeRoleValue(account.role) === 'AUTHOR' && account.authorLicenseStatus && (
+                      <div style={{ marginTop: '5px', fontSize: '11px', fontWeight: '700', color: account.authorLicenseStatus === 'ACTIVE' ? '#22c55e' : '#f59e0b' }}>
+                        License: {account.authorLicenseStatus.replace(/_/g, ' ')}
+                      </div>
+                    )}
                   </td>
                   <td>
                     <span className={`status-badge ${(account.status || '').toLowerCase()}`}>
@@ -603,6 +647,28 @@ function AccountManagement() {
                             </svg>
                             <span>Edit</span>
                           </button>
+
+                          {normalizeRoleValue(account.role) === 'AUTHOR' && account.authorLicenseStatus === 'PENDING_VERIFICATION' && (
+                            <>
+                              {account.licenseUrl && (
+                                <a className="btn-action-sm btn-action-sm--edit" href={account.licenseUrl} target="_blank" rel="noreferrer">
+                                  <span>PDF</span>
+                                </a>
+                              )}
+                              <button type="button" className="btn-action-sm btn-action-sm--unban" onClick={() => handleApproveAuthorLicense(account)}>
+                                <span>Verify</span>
+                              </button>
+                              <button type="button" className="btn-action-sm btn-action-sm--ban" onClick={() => handleRejectAuthorLicense(account)}>
+                                <span>Reject</span>
+                              </button>
+                            </>
+                          )}
+
+                          {normalizeRoleValue(account.role) === 'AUTHOR' && ['EXPIRED', 'AUTHOR_DISABLED'].includes(account.authorLicenseStatus) && (
+                            <button type="button" className="btn-action-sm btn-action-sm--unban" onClick={() => handleReopenAuthorLicense(account)}>
+                              <span>New Deadline</span>
+                            </button>
+                          )}
 
                           {(account.status || '').toLowerCase() === 'banned' ? (
                             <button
