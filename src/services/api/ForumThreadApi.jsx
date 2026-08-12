@@ -24,3 +24,11 @@ export const getForumThreadByIdApi = (id) => {
   return AxiosClient.get(`/forum-threads/${id}`);
 };
 
+export const incrementForumThreadViewApi = (id) => {
+  return AxiosClient.post(`/forum-threads/${id}/view`)
+}
+
+export const reportForumThreadApi = (id, reason) => {
+  return AxiosClient.post(`/forum-threads/${id}/report`, { reason })
+}
+
