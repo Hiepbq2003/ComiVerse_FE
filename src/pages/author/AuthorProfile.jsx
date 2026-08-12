@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'react-toastify'
 import '../../assets/style/author/profile.css'
-import { getAuthorProfileApi, saveAuthorProfileApi } from '../../services/api/AuthorProfileApi'
+import { getAuthorProfileApi, saveAuthorProfileApi, uploadAuthorLicenseApi } from '../../services/api/AuthorProfileApi'
 
 const emptyProfile = {
   username: '',
@@ -15,6 +15,16 @@ const emptyProfile = {
   bio: '',
   note: '',
   countryCode: 'VN',
+  licenseStatus: 'ACTIVE',
+  licenseUrl: '',
+  licenseOriginalFilename: '',
+  licenseDeadlineAt: null,
+  licenseUploadedAt: null,
+  licenseVerifiedAt: null,
+  licenseRejectionReason: '',
+  canUploadLicense: false,
+  canPublishComic: true,
+  canRequestAuthorPayout: true,
 }
 
 const authorTypeOptions = [
@@ -28,6 +38,8 @@ function AuthorProfile() {
   const [profile, setProfile] = useState(emptyProfile)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [licenseFile, setLicenseFile] = useState(null)
+  const [uploadingLicense, setUploadingLicense] = useState(false)
 
   const previewName = useMemo(() => {
     return profile.displayName || profile.fullName || profile.username || 'Author'
@@ -100,11 +112,131 @@ function AuthorProfile() {
     }
   }
 
+  const handleLicenseUpload = async () => {
+    if (!licenseFile) {
+      toast.error('Please select a PDF license file')
+      return
+    }
+
+    const fileName = (licenseFile.name || '').toLowerCase()
+    if (!fileName.endsWith('.pdf') || licenseFile.type !== 'application/pdf') {
+      toast.error('Only PDF license files are accepted')
+      return
+    }
+    if (licenseFile.size > 10 * 1024 * 1024) {
+      toast.error('License PDF must not exceed 10 MB')
+      return
+    }
+
+    try {
+      setUploadingLicense(true)
+      const result = await uploadAuthorLicenseApi(licenseFile)
+      setProfile((prev) => ({
+        ...prev,
+        licenseStatus: result?.status || 'PENDING_VERIFICATION',
+        licenseUrl: result?.licenseUrl || prev.licenseUrl,
+        licenseOriginalFilename: result?.licenseOriginalFilename || licenseFile.name,
+        licenseDeadlineAt: result?.licenseDeadlineAt || prev.licenseDeadlineAt,
+        licenseUploadedAt: result?.licenseUploadedAt || new Date().toISOString(),
+        licenseVerifiedAt: result?.licenseVerifiedAt || null,
+        licenseRejectionReason: result?.licenseRejectionReason || '',
+        canUploadLicense: Boolean(result?.canUploadLicense),
+        canPublishComic: Boolean(result?.canPublishComic),
+        canRequestAuthorPayout: Boolean(result?.canRequestAuthorPayout),
+      }))
+      setLicenseFile(null)
+      toast.success('License PDF uploaded. Waiting for Admin/Moderator verification.')
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Cannot upload license PDF')
+    } finally {
+      setUploadingLicense(false)
+    }
+  }
+
+  const licenseStatus = profile.licenseStatus || 'ACTIVE'
+  const licenseStatusLabel = licenseStatus.replace(/_/g, ' ')
+  const formatLicenseDate = (value) => {
+    if (!value) return 'Not set'
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString()
+  }
+
   return (
     <>
       <div className="author-page-header">
         <h1>Author Profile</h1>
         <p>Fill in the public author information used by your comics and moderation workflow.</p>
+      </div>
+
+      <div className="author-section-card" style={{ marginBottom: '24px' }}>
+        <h2 className="author-section-title">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <path d="M9 15l2 2 4-4" />
+          </svg>
+          Publishing License
+        </h2>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', marginBottom: '14px' }}>
+          <span className="status-badge" style={{ textTransform: 'uppercase' }}>{licenseStatusLabel}</span>
+          <span style={{ color: 'var(--author-text-secondary)' }}>Deadline: <strong>{formatLicenseDate(profile.licenseDeadlineAt)}</strong></span>
+          {profile.licenseUploadedAt && (
+            <span style={{ color: 'var(--author-text-secondary)' }}>Uploaded: <strong>{formatLicenseDate(profile.licenseUploadedAt)}</strong></span>
+          )}
+        </div>
+
+        {licenseStatus === 'ACTIVE' && (
+          <p style={{ color: 'var(--author-text-secondary)', marginTop: 0 }}>
+            License verified. Comic publishing/upload and Author payout are enabled.
+          </p>
+        )}
+        {licenseStatus === 'PENDING_VERIFICATION' && (
+          <p style={{ color: 'var(--author-text-secondary)', marginTop: 0 }}>
+            Your PDF was submitted and is waiting for Admin/Moderator verification. You can still login and edit your profile, but comic publishing and Author payout remain locked.
+          </p>
+        )}
+        {(licenseStatus === 'PENDING_LICENSE' || licenseStatus === 'REJECTED') && (
+          <>
+            {licenseStatus === 'REJECTED' && profile.licenseRejectionReason && (
+              <div className="admin-inline-alert admin-inline-alert--error" style={{ marginBottom: '14px' }}>
+                Rejection reason: {profile.licenseRejectionReason}
+              </div>
+            )}
+            <p style={{ color: 'var(--author-text-secondary)', marginTop: 0 }}>
+              Upload one license document in PDF format only. Maximum size: 10 MB.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <input
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={(e) => setLicenseFile(e.target.files?.[0] || null)}
+                disabled={!profile.canUploadLicense || uploadingLicense}
+              />
+              <button
+                type="button"
+                className="btn-author-action primary"
+                onClick={handleLicenseUpload}
+                disabled={!profile.canUploadLicense || !licenseFile || uploadingLicense}
+              >
+                {uploadingLicense ? 'Uploading PDF...' : 'Upload License PDF'}
+              </button>
+            </div>
+          </>
+        )}
+        {(licenseStatus === 'EXPIRED' || licenseStatus === 'AUTHOR_DISABLED') && (
+          <div className="admin-inline-alert admin-inline-alert--error">
+            {licenseStatus === 'EXPIRED'
+              ? 'The license upload deadline has expired. Contact an administrator for a new deadline.'
+              : 'Author publishing privileges are disabled. Contact an administrator.'}
+          </div>
+        )}
+
+        {profile.licenseUrl && (
+          <a href={profile.licenseUrl} target="_blank" rel="noreferrer" className="btn-author-action" style={{ marginTop: '14px', display: 'inline-flex' }}>
+            View uploaded PDF
+          </a>
+        )}
       </div>
 
       <div className="settings-grid author-profile-grid">

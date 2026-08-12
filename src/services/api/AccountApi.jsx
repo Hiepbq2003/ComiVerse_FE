@@ -39,3 +39,24 @@ export const searchTranslatorsApi = (query) => {
 export const searchProjectLeadersApi = (query) => {
   return AxiosClient.get('/users/project-leaders', { params: { query } });
 };
+
+// Author license review (Admin/Moderator endpoints; this admin page uses them directly)
+export const getAuthorLicenseReviewsApi = (status) => {
+  return AxiosClient.get('/author-license-reviews', { params: status ? { status } : {} });
+};
+
+export const approveAuthorLicenseApi = (authorId) => {
+  return AxiosClient.post(`/author-license-reviews/${authorId}/approve`);
+};
+
+export const rejectAuthorLicenseApi = (authorId, payload = {}) => {
+  return AxiosClient.post(`/author-license-reviews/${authorId}/reject`, payload);
+};
+
+export const disableAuthorLicenseApi = (authorId) => {
+  return AxiosClient.post(`/author-license-reviews/${authorId}/disable`);
+};
+
+export const reopenAuthorLicenseApi = (authorId, payload = {}) => {
+  return AxiosClient.post(`/author-license-reviews/${authorId}/reopen`, payload);
+};
