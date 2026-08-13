@@ -110,7 +110,8 @@ function resolveRejectionInfo(preview, comicId) {
     if (rawOverrides) {
       const overrides = JSON.parse(rawOverrides)
       if (Array.isArray(overrides)) {
-        const match = overrides.find(o => {
+        // First: direct top-level match
+        let match = overrides.find(o => {
           const st = String(o.status || '').toUpperCase()
           if (st !== 'REJECTED') return false
           const oId = String(o.id || o.chapterId || o.submissionId || '')
@@ -123,9 +124,30 @@ function resolveRejectionInfo(preview, comicId) {
           return (matchChapId || matchSubId || (matchNum && matchComic))
         })
 
+        // Second: dig into nested allChapters/chapters arrays for the specific chapter
+        if (!match) {
+          for (const o of overrides) {
+            const chaps = [...(o.allChapters || []), ...(o.chapters || []), ...(o.subItems || [])]
+            const nestedChap = chaps.find(c => {
+              const cSt = String(c.status || c.moderationStatus || '').toUpperCase()
+              if (cSt !== 'REJECTED') return false
+              const cId = String(c.id || c.chapterId || '')
+              const cNum = String(c.chapterNumber || c.number || '')
+              return (chapIdStr && cId && (cId === chapIdStr || cId === subIdStr)) ||
+                     (chapNumStr && chapNumStr !== 'N/A' && cNum && cNum === chapNumStr)
+            })
+            if (nestedChap) {
+              match = nestedChap
+              break
+            }
+          }
+        }
+
         if (match) {
           isRejected = true
-          if (match.rejectionReason) reason = match.rejectionReason
+          if (match.rejectionReason || match.rejection_reason) {
+            reason = match.rejectionReason || match.rejection_reason
+          }
         }
       }
     }
@@ -282,18 +304,28 @@ export default function AuthorChapterPreview() {
               if (Array.isArray(overrides)) {
                 const chapIdStr = String(chapterId)
                 const chapNumStr = String(preview?.chapterNumber || preview?.number || chapterId)
+                // First: direct top-level match
                 overrideData = overrides.find(o => {
                   const oId = String(o.id || o.chapterId || o.submissionId || '')
                   const oNum = String(o.chapterNumber || o.number || '')
                   return (chapIdStr && oId && chapIdStr === oId) || (chapNumStr && oNum && chapNumStr === oNum)
-                }) || overrides.find(o => {
-                  const chaps = o.allChapters || o.chapters || o.subItems || []
-                  return chaps.find(c => {
-                    const cId = String(c.id || c.chapterId || '')
-                    const cNum = String(c.chapterNumber || c.number || '')
-                    return (chapIdStr && cId && chapIdStr === cId) || (chapNumStr && cNum && chapNumStr === cNum)
-                  })
                 })
+                // Second: dig into nested allChapters/chapters/subItems and extract the SPECIFIC chapter object
+                if (!overrideData) {
+                  for (const o of overrides) {
+                    const chaps = [...(o.allChapters || []), ...(o.chapters || []), ...(o.subItems || [])]
+                    const nestedChap = chaps.find(c => {
+                      const cId = String(c.id || c.chapterId || '')
+                      const cNum = String(c.chapterNumber || c.number || '')
+                      return (chapIdStr && cId && chapIdStr === cId) || (chapNumStr && cNum && chapNumStr === cNum)
+                    })
+                    if (nestedChap) {
+                      // Return the specific chapter (with its pages), not the parent submission
+                      overrideData = nestedChap
+                      break
+                    }
+                  }
+                }
               }
             }
           } catch (e) {}

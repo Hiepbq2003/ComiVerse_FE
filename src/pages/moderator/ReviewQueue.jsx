@@ -1086,11 +1086,13 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
 
   const handleAddDocComment = (submissionId, targetType, targetKey, targetLabel, text, coords = null) => {
     if (!text || !text.trim()) return
+    const chapId = selectedChapter?.id || selectedChapter?.chapterId || selectedReview?.chapterId || selectedReview?.id
+    const comicIdVal = selectedReview?.comicId || selectedReview?.parentReviewId
     const newComment = {
       id: `doc-comment-${Date.now()}`,
       submissionId,
-      chapterId: selectedChapter?.id || selectedChapter?.chapterId || selectedReview?.chapterId || selectedReview?.id,
-      comicId: selectedReview?.comicId || selectedReview?.parentReviewId,
+      chapterId: chapId,
+      comicId: comicIdVal,
       targetType,
       targetKey,
       targetLabel,
@@ -1101,10 +1103,17 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       yPercentage: coords?.y !== undefined ? coords.y : null
     }
 
-    setDocCommentsMap(prev => ({
-      ...prev,
-      [submissionId]: [...(prev[submissionId] || []), newComment]
-    }))
+    setDocCommentsMap(prev => {
+      const next = {
+        ...prev,
+        [submissionId]: [...(prev[submissionId] || []), newComment]
+      }
+      // Also store under the chapter ID so the Author side can find it by chapterId
+      if (chapId && String(chapId) !== String(submissionId)) {
+        next[chapId] = [...(prev[chapId] || []), newComment]
+      }
+      return next
+    })
     setActivePinTarget(null)
     setPinCommentText('')
     setFieldCommentModalTarget(null)
