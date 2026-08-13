@@ -954,13 +954,23 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     const chapToReject = specificChap || selectedChapter || (selectedReview.allChapters && selectedReview.allChapters[0]);
     if (!chapToReject) return;
 
-    const targetSubId = chapToReject.submissionId || chapToReject.id || selectedReview.id;
-    const targetSubItem = chapToReject.originalSubmissionItem || (selectedReview.subItems ? selectedReview.subItems.find(s => (s.id || s) === targetSubId) : selectedReview);
+    // CRITICAL: Ensure the chapter object carries its pages so Author Preview doesn't show 0 pages
+    let enrichedChap = chapToReject;
+    if (!enrichedChap.pages || enrichedChap.pages.length === 0) {
+      // Try to get pages from the current Inspector view
+      const viewPages = getReviewViewPages(selectedReview, chapToReject, docCommentsMap);
+      if (viewPages.length > 0) {
+        enrichedChap = { ...chapToReject, pages: viewPages.map(p => p.url || p) };
+      }
+    }
+
+    const targetSubId = enrichedChap.submissionId || enrichedChap.id || selectedReview.id;
+    const targetSubItem = enrichedChap.originalSubmissionItem || (selectedReview.subItems ? selectedReview.subItems.find(s => (s.id || s) === targetSubId) : selectedReview);
     const baseItem = typeof targetSubItem === 'object' && targetSubItem !== null ? targetSubItem : (typeof selectedReview === 'object' && selectedReview !== null ? selectedReview : { id: targetSubId });
     setSelectedReject({
       ...baseItem,
       id: targetSubId,
-      rejectChapterObj: chapToReject,
+      rejectChapterObj: enrichedChap,
       parentReviewId: selectedReview.id || targetSubId
     });
     setRejectionReason('');
@@ -1035,7 +1045,17 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     if (selectedReject.rejectChapterObj && handleChapterReject) {
       // Single chapter rejection — strictly scope comments to this chapter
       const comicId = selectedReject.parentReviewId || selectedReject.id;
-      const targetChap = selectedReject.rejectChapterObj;
+      let targetChap = selectedReject.rejectChapterObj;
+
+      // CRITICAL: Ensure pages are attached before sending to handleChapterReject
+      // This prevents the Author Preview from showing 0 pages after rejection
+      if (!targetChap.pages || targetChap.pages.length === 0) {
+        const viewPages = getReviewViewPages(selectedReview, targetChap, docCommentsMap);
+        if (viewPages.length > 0) {
+          targetChap = { ...targetChap, pages: viewPages.map(p => p.url || p) };
+        }
+      }
+
       const comments = getChapterScopedComments(targetChap, selectedReject.id, comicId);
       let finalPayload = '';
 
@@ -1049,15 +1069,24 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         finalPayload = userOverallNote;
       }
       
-      handleChapterReject(selectedReject.parentReviewId || selectedReject.id, selectedReject.rejectChapterObj, finalPayload);
+      handleChapterReject(selectedReject.parentReviewId || selectedReject.id, targetChap, finalPayload);
     } else {
       // Bulk "Reject All"
       const itemsToReject = selectedReject.subItems || selectedReject.allChapters || selectedReject.chapters || [selectedReject];
       const comicId = selectedReject.parentReviewId || selectedReject.id;
 
       itemsToReject.forEach(i => {
+        // Enrich chapter with pages if missing
+        let enrichedItem = i;
+        if (!enrichedItem.pages || enrichedItem.pages.length === 0) {
+          const viewPages = getReviewViewPages(selectedReview || selectedReject, enrichedItem, docCommentsMap);
+          if (viewPages.length > 0) {
+            enrichedItem = { ...i, pages: viewPages.map(p => p.url || p) };
+          }
+        }
+
         // Scope comments to the specific sub-item being rejected
-        const comments = getChapterScopedComments(i, selectedReject.id, comicId);
+        const comments = getChapterScopedComments(enrichedItem, selectedReject.id, comicId);
         let finalPayload = '';
 
         if (userOverallNote && comments.length > 0) {
@@ -1071,10 +1100,10 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         }
 
         // Use handleChapterReject for chapters to preserve pages, else fallback to handleConfirmReject
-        if (handleChapterReject && isRealChapterSubmission(i)) {
-          handleChapterReject(comicId, i, finalPayload);
+        if (handleChapterReject && isRealChapterSubmission(enrichedItem)) {
+          handleChapterReject(comicId, enrichedItem, finalPayload);
         } else {
-          handleConfirmReject(i.id || i, finalPayload);
+          handleConfirmReject(enrichedItem.id || enrichedItem, finalPayload);
         }
       });
     }
