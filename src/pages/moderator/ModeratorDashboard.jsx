@@ -58,6 +58,15 @@ const getCategoryStyle = (actionType) => {
   }
 };
 
+const extractPages = (obj) => {
+  if (!obj) return [];
+  const raw = obj.pages || obj.images || obj.pageUrls || obj.pagesList || obj.urls || obj.chapterPages || (Array.isArray(obj.content) ? obj.content : []);
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.content)) return raw.content;
+  if (Array.isArray(raw?.items)) return raw.items;
+  return [];
+};
+
 const renderDescription = (description) => {
   if (!description) return '';
   const regex = /(chapter\s+[0-9a-zA-Z.-]+)/i;
@@ -843,7 +852,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               ...item,
               status: 'rejected',
               rejectedAt: nowIso,
-              rejectionReason: reason || 'Submission rejected'
+              rejectionReason: reason || ''
             };
           }
           return item;
@@ -866,6 +875,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     const tNum = Number(target.number !== undefined ? target.number : (target.chapterNumber !== undefined ? target.chapterNumber : NaN));
     if (!isNaN(cNum) && !isNaN(tNum) && cNum > 0 && tNum > 0) {
       if (cNum !== tNum) return false;
+      return true;
     }
     
     if (c.id && target.id && c.id === target.id) return true;
@@ -1023,7 +1033,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
 
   const handleChapterReject = async (submissionId, chapterObj, reason) => {
-    let cleanId = String(chapterObj?.submissionId || submissionId || '').replace(/^(comic|group|chap)-/, '');
+    let cleanId = String(chapterObj?.id || chapterObj?.submissionId || submissionId || '').replace(/^(comic|group|chap)-/, '');
     if (cleanId.includes('mock') || String(submissionId).includes('mock')) {
       const realSub = submissions.find(s => s.chapterId && String(s.chapterId) === String(chapterObj?.id));
       if (realSub && realSub.id && !String(realSub.id).includes('mock')) {
@@ -1041,14 +1051,39 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       return false;
     }) || submissions.find(item => item.id === targetSubId || item.submissionId === targetSubId || item.id === submissionId);
 
-    if (cleanId && !cleanId.startsWith('group-') && !cleanId.startsWith('comic-') && !cleanId.includes('mock')) {
-      try {
-        const rejectResponse = await rejectSubmissionApi(cleanId, reason || 'Chapter rejected');
-        const responseData = rejectResponse?.data || rejectResponse;
+    // Determine if this rejection will clear all pending chapters for this submission
+    let willRejectAll = true;
+    if (sub) {
+      const chaps = sub.allChapters || sub.chapters || [];
+      const pendingChaps = chaps.filter(c => c.status !== 'approved' && c.status !== 'rejected');
+      if (pendingChaps.length > 1) {
+        willRejectAll = false;
+      }
+    }
+
+    const chapterDbId = chapterObj?.chapterId || chapterObj?.chapter_id || chapterObj?.id;
+    const cleanChapterDbId = String(chapterDbId || '').replace(/^(comic|group|chap)-/, '');
+
+    try {
+      let responseData = null;
+      if (cleanId && !cleanId.startsWith('group-') && !cleanId.startsWith('comic-') && !cleanId.includes('mock')) {
+        if (willRejectAll) {
+          const rejectResponse = await rejectSubmissionApi(cleanId, reason || 'Chapter rejected');
+          responseData = rejectResponse?.data || rejectResponse;
+        } else if (cleanChapterDbId && !cleanChapterDbId.includes('mock')) {
+          try {
+            const { rejectChapterDirectApi } = await import('../../services/api/ChapterApi');
+            if (rejectChapterDirectApi) {
+              await rejectChapterDirectApi(cleanChapterDbId, reason || 'Chapter rejected');
+            }
+          } catch (chapErr) {
+            console.warn(`[handleChapterReject] rejectChapterDirectApi failed:`, chapErr?.message);
+          }
+        }
+        
         if (responseData?.comicAutoRejected) {
           toast.success(`Rejected "${chapTitle}" — All chapters rejected, comic profile auto-rejected!`);
           
-          // Mark ALL submissions for this comic as rejected
           const nowIso = new Date().toISOString();
           const comicId = sub?.comicId || chapterObj?.comicId;
           const comicTitleClean = (sub?.title || sub?.comicName || sub?.comicTitle || chapterObj?.comicTitle || '').trim().toLowerCase();
@@ -1067,7 +1102,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                       rejectedAt: nowIso,
                       rejectionReason: reason || 'Chapter rejected',
                       pages: chapterObj.pages || chapterObj.images || [],
-                      pageCount: (chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0)
+                      pageCount: chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0
                     }];
                   }
                   const exists = chapsArr.some(c => isSameChapterItem(c, chapterObj));
@@ -1075,8 +1110,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                     return chapsArr.map(c => isSameChapterItem(c, chapterObj) ? {
                       ...c,
                       ...chapterObj,
-                      pages: (chapterObj.pages && chapterObj.pages.length) ? chapterObj.pages : ((c.pages && c.pages.length) ? c.pages : (chapterObj.images || c.images || [])),
-                      pageCount: (chapterObj.pages && chapterObj.pages.length) ? chapterObj.pages.length : (c.pages?.length || c.pageCount || chapterObj.pageCount || (c.images?.length || 0)),
                       status: 'rejected',
                       rejectedAt: nowIso,
                       rejectionReason: reason || 'Chapter rejected'
@@ -1088,7 +1121,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                     rejectedAt: nowIso,
                     rejectionReason: reason || 'Chapter rejected',
                     pages: chapterObj.pages || chapterObj.images || [],
-                    pageCount: (chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0)
+                    pageCount: chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0
                   }];
                 };
 
@@ -1096,7 +1129,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                   ...item,
                   status: 'rejected',
                   rejectedAt: nowIso,
-                  rejectionReason: reason || 'All chapters were rejected. Comic profile auto-rejected.',
+                  rejectionReason: reason || '',
                   allChapters: updateChaps(item.allChapters),
                   chapters: updateChaps(item.chapters)
                 };
@@ -1142,7 +1175,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                   rejectedAt: nowIso,
                   rejectionReason: reason || 'Chapter rejected',
                   pages: chapterObj.pages || chapterObj.images || [],
-                  pageCount: (chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0)
+                  pageCount: chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0
                 }];
               }
               const exists = chapsArr.some(c => isSameChapterItem(c, chapterObj));
@@ -1150,8 +1183,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 return chapsArr.map(c => isSameChapterItem(c, chapterObj) ? {
                   ...c,
                   ...chapterObj,
-                  pages: (chapterObj.pages && chapterObj.pages.length) ? chapterObj.pages : ((c.pages && c.pages.length) ? c.pages : (chapterObj.images || c.images || [])),
-                  pageCount: (chapterObj.pages && chapterObj.pages.length) ? chapterObj.pages.length : (c.pages?.length || c.pageCount || chapterObj.pageCount || (c.images?.length || 0)),
                   status: 'rejected',
                   rejectedAt: nowIso,
                   rejectionReason: reason || 'Chapter rejected'
@@ -1163,7 +1194,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 rejectedAt: nowIso,
                 rejectionReason: reason || 'Chapter rejected',
                 pages: chapterObj.pages || chapterObj.images || [],
-                pageCount: (chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0)
+                pageCount: chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0
               }];
             };
 

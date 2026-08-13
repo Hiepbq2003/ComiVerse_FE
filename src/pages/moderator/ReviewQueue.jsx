@@ -2738,17 +2738,23 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
 
             <div className="mod-modal-body" style={{ padding: '20px 24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {(() => {
+                const isSingleChapterReject = !!selectedReject.rejectChapterObj;
                 const chaptersList = getSubmissionChapters(selectedReject);
                 const totalChapters = chaptersList.length;
                 const uninspectedCount = chaptersList.filter(c => !inspectedChapterIds.has(c.id)).length;
+                const chapTitle = isSingleChapterReject ? (selectedReject.rejectChapterObj.title || `Chapter ${selectedReject.rejectChapterObj.number || selectedReject.rejectChapterObj.chapterNumber || ''}`.trim()) : '';
                 
                 return (
                   <>
                     <p style={{ fontSize: '13.5px', margin: 0, lineHeight: '1.5', color: 'var(--mod-text-secondary)' }}>
-                      You are about to reject raw submission <strong>"{selectedReject.title}"</strong> (which contains {totalChapters} chapter{totalChapters !== 1 ? 's' : ''}). Review the attached inspection feedback report below before sending it to the author.
+                      {isSingleChapterReject ? (
+                        <>You are about to reject <strong>"{chapTitle}"</strong>. Review the attached inspection feedback report below before sending it to the author.</>
+                      ) : (
+                        <>You are about to reject raw submission <strong>"{selectedReject.title}"</strong> (which contains {totalChapters} chapter{totalChapters !== 1 ? 's' : ''}). Review the attached inspection feedback report below before sending it to the author.</>
+                      )}
                     </p>
-                    {uninspectedCount > 0 && (
-                      <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '12px 16px', borderRadius: '8px', color: '#b91c1c', fontSize: '13.5px' }}>
+                    {!isSingleChapterReject && uninspectedCount > 0 && (
+                      <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '12px 16px', borderRadius: '8px', color: '#b91c1c', fontSize: '13.5px', marginTop: '12px' }}>
                         ⚠️ <strong>Warning:</strong> {uninspectedCount} chapter{uninspectedCount !== 1 ? 's have' : ' has'} not been inspected yet. Are you sure you want to proceed with rejecting the entire submission?
                       </div>
                     )}
