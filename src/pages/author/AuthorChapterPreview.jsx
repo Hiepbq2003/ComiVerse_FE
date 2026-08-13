@@ -50,7 +50,10 @@ const formatStatus = (status) => {
 
 function parseCommentsFromReport(reasonText) {
   if (!reasonText || !reasonText.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) return []
-  const reportSection = reasonText.split('--- DETAILED INSPECTION FEEDBACK REPORT')[1] || ''
+  let reportSection = reasonText.split('--- DETAILED INSPECTION FEEDBACK REPORT')[1] || ''
+  if (reportSection.includes('--- PRESERVED PAGES BLOCK ---')) {
+    reportSection = reportSection.split('--- PRESERVED PAGES BLOCK ---')[0];
+  }
   const lines = reportSection.split('\n')
   const parsedComments = []
 
@@ -91,6 +94,16 @@ function parseCommentsFromReport(reasonText) {
   return parsedComments
 }
 
+function parsePagesFromReport(reasonText) {
+  if (!reasonText || !reasonText.includes('--- PRESERVED PAGES BLOCK ---')) return []
+  try {
+    const jsonStr = reasonText.split('--- PRESERVED PAGES BLOCK ---')[1].trim()
+    return JSON.parse(jsonStr)
+  } catch (e) {
+    return []
+  }
+}
+
 /* ────────────────── rejection data resolver ──────────────── */
 
 function resolveRejectionInfo(preview, comicId) {
@@ -111,6 +124,8 @@ function resolveRejectionInfo(preview, comicId) {
   const comicIdStr = String(comicId || preview?.comicId || '')
   const chapNumStr = String(getChapterNumber(preview))
 
+  let preservedPages = []
+
   // localStorage override removed for production readiness
   // Step 1: If reason contains structured report, parse exact comments from report FIRST
   if (reason) {
@@ -118,18 +133,23 @@ function resolveRejectionInfo(preview, comicId) {
     if (parsedFromReport.length > 0) {
       docComments = parsedFromReport
     }
+    preservedPages = parsePagesFromReport(reason)
   }
 
   // localStorage document comments removed for production readiness
-  return { isRejected, reason, docComments }
+  return { isRejected, reason, docComments, preservedPages }
 }
 
 function parseOverallNote(reason) {
   if (!reason) return ''
-  if (reason.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) {
-    return reason.split('--- DETAILED INSPECTION FEEDBACK REPORT')[0].trim()
+  let cleanReason = reason;
+  if (cleanReason.includes('--- PRESERVED PAGES BLOCK ---')) {
+    cleanReason = cleanReason.split('--- PRESERVED PAGES BLOCK ---')[0];
   }
-  return reason.trim()
+  if (cleanReason.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) {
+    return cleanReason.split('--- DETAILED INSPECTION FEEDBACK REPORT')[0].trim()
+  }
+  return cleanReason.trim()
 }
 
 /* ────────────────── badge renderer ──────────────── */
@@ -312,10 +332,14 @@ export default function AuthorChapterPreview() {
   }
 
   /* ── Derive data ─── */
-  const rawPages = extractPages(preview)
+  const { isRejected, reason, docComments, preservedPages } = resolveRejectionInfo(preview, comicId)
+  
+  let rawPages = extractPages(preview)
+  if (rawPages.length === 0 && preservedPages && preservedPages.length > 0) {
+    rawPages = preservedPages
+  }
   const pages = rawPages.map((p, idx) => normalizePage(p, idx))
 
-  const { isRejected, reason, docComments } = resolveRejectionInfo(preview, comicId)
   const overallNote = parseOverallNote(reason)
 
   // Comments for current page
