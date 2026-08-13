@@ -711,7 +711,7 @@ function TeamProjects() {
       : '';
     setNewTaskData({
       title: defaultTitle,
-      column: 'in_progress',
+      column: 'backlog',
       assigneeId: null,
       dueDate: '',
       priority: 'Medium',
@@ -1093,7 +1093,7 @@ function TeamProjects() {
         if (location.state?.openCreateTask) {
           setNewTaskData({
             title: location.state?.defaultTitle || '',
-            column: 'in_progress',
+            column: 'backlog',
             assigneeId: null,
             dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
             priority: 'High',
@@ -1690,10 +1690,7 @@ function TeamProjects() {
       toast.error('Please select a chapter.')
       return
     }
-    if (!data.assigneeId) {
-      toast.error('Please assign someone to this task.')
-      return
-    }
+    
 
     const comicName = selectedDetails?.comicName || selectedDetails?.title || 'Unknown Comic'
     const cleanTitle = data.title.trim()
@@ -1701,7 +1698,7 @@ function TeamProjects() {
     const dueDateVal = data.dueDate || new Date().toISOString().split('T')[0]
 
     const taskTypeVal = data.taskType || 'REGULAR';
-    const initialStatus = data.column || 'in_progress';
+    const initialStatus = 'backlog';
 
     const newTaskObj = {
       id: `task-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -1798,7 +1795,7 @@ function TeamProjects() {
     const formattedTitle = `[${(editTaskData.priority || 'MEDIUM').toUpperCase()}] [${editTaskData.comic || comicFallback}] ${editTaskData.title.trim()}`
 
     const targetId = selectedTask.id || selectedTask._id || selectedTask.taskId
-    const nextStatus = (editTaskData.status === 'backlog') ? 'in_progress' : editTaskData.status
+    const nextStatus = (getNormalizedStatusKey(editTaskData.status) === 'backlog') ? 'in_progress' : editTaskData.status
     const updatedTaskObj = {
       ...selectedTask,
       title: formattedTitle,

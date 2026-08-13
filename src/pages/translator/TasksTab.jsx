@@ -636,7 +636,7 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [inspectTaskData, setInspectTaskData] = useState({
     title: '',
-    column: 'in_progress',
+    column: 'backlog',
     assigneeId: null,
     dueDate: '',
     priority: 'High',
@@ -651,7 +651,7 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
     const defaultTitle = `${chapter?.title || `Chapter ${chapter?.number || chapter?.chapterNumber || ''}`} - ${isRevision ? 'Revision' : 'Translation & Proofreading'}`;
     setInspectTaskData({
       title: defaultTitle,
-      column: 'in_progress',
+      column: 'backlog',
       assigneeId: null,
       dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
       priority: 'High',
@@ -1317,18 +1317,79 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
   );
 }
 
-function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, readOnly = false }) {
+function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, readOnly = false, allowEmpty = false }) {
   const assignableCandidates = (candidates || []).filter(m => {
     const roleStr = String(m.role || '').toLowerCase().trim();
     const isLeaderRole = m.isLeader || roleStr.includes('leader') || roleStr === 'group leader' || roleStr === 'project leader' || roleStr === 'team leader' || roleStr === 'project_leader' || roleStr === 'team_leader';
     return !isLeaderRole;
   });
 
-  if (!Array.isArray(assignableCandidates) || assignableCandidates.length === 0) {
+  const chipStyle = (isSelected) => ({
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '6px 14px 6px 6px',
+    borderRadius: '9999px',
+    fontSize: '13px',
+    fontWeight: 600,
+    cursor: readOnly ? 'default' : 'pointer',
+    border: isSelected
+      ? '1.5px solid #a855f7'
+      : '1px solid rgba(255, 255, 255, 0.12)',
+    background: isSelected
+      ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.22) 0%, rgba(236, 72, 153, 0.18) 100%)'
+      : 'rgba(255, 255, 255, 0.05)',
+    color: isSelected ? '#e9d5ff' : 'var(--trans-text-secondary)',
+    boxShadow: isSelected
+      ? '0 4px 14px rgba(168, 85, 247, 0.25), inset 0 1px 0 rgba(255,255,255,0.15)'
+      : '0 2px 4px rgba(0,0,0,0.05)',
+    backdropFilter: 'blur(8px)',
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+  })
+
+  if ((!Array.isArray(assignableCandidates) || assignableCandidates.length === 0) && !(allowEmpty && !readOnly)) {
     return <p style={{ fontSize: '12px', color: 'var(--trans-text-muted)', margin: 0 }}>{emptyLabel || 'No assignees available'}</p>
   }
+
   return (
     <div className="trans-assignees-picker" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '4px 0' }}>
+      {allowEmpty && !readOnly && (
+        <button
+          type="button"
+          className={`trans-assignee-chip${selectedId == null ? ' selected' : ''}`}
+          onClick={() => onSelect && onSelect(null)}
+          style={chipStyle(selectedId == null)}
+        >
+          <span
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: '50%',
+              background: selectedId == null
+                ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)'
+                : 'rgba(255,255,255,0.15)',
+              color: '#ffffff',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '11px',
+              fontWeight: 700,
+              flexShrink: 0
+            }}
+          >
+            —
+          </span>
+          <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: '1.2' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600 }}>Unassigned</span>
+            <span style={{ fontSize: '10px', color: selectedId == null ? '#c084fc' : 'var(--trans-text-muted)', fontWeight: 500 }}>
+              Optional
+            </span>
+          </span>
+          {selectedId == null && (
+            <Check size={14} style={{ color: '#c084fc', strokeWidth: 2.5, marginLeft: '2px' }} />
+          )}
+        </button>
+      )}
       {assignableCandidates.map((m) => {
         const memberId = m.id || m.userId;
         const isSelected = selectedId != null && String(selectedId) === String(memberId);
@@ -1341,29 +1402,8 @@ function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, read
             key={memberId}
             type="button"
             className={`trans-assignee-chip${isSelected ? ' selected' : ''}`}
-            onClick={() => !readOnly && onSelect && onSelect(isSelected ? null : memberId)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 14px 6px 6px',
-              borderRadius: '9999px',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: readOnly ? 'default' : 'pointer',
-              border: isSelected
-                ? '1.5px solid #a855f7'
-                : '1px solid rgba(255, 255, 255, 0.12)',
-              background: isSelected
-                ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.22) 0%, rgba(236, 72, 153, 0.18) 100%)'
-                : 'rgba(255, 255, 255, 0.05)',
-              color: isSelected ? '#e9d5ff' : 'var(--trans-text-secondary)',
-              boxShadow: isSelected
-                ? '0 4px 14px rgba(168, 85, 247, 0.25), inset 0 1px 0 rgba(255,255,255,0.15)'
-                : '0 2px 4px rgba(0,0,0,0.05)',
-              backdropFilter: 'blur(8px)',
-              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-            }}
+            onClick={() => !readOnly && onSelect && onSelect(isSelected ? (allowEmpty ? null : memberId) : memberId)}
+            style={chipStyle(isSelected)}
           >
             <span
               style={{
@@ -1424,7 +1464,6 @@ export function CreateTaskModal({
   const errors = {
     title: !newTaskData.title.trim(),
     chapterId: !newTaskData.chapterId,
-    assigneeId: !newTaskData.assigneeId,
     dueDate: !newTaskData.dueDate || newTaskData.dueDate < todayStr
   }
   const showError = (field) => submitted && errors[field]
@@ -1557,16 +1596,17 @@ export function CreateTaskModal({
 
 
           <div className="trans-form-group" style={{ marginTop: '14px' }}>
-            <label className="trans-form-label">Assignee *</label>
+            <label className="trans-form-label">Assignee</label>
             <AssigneeChipPicker
               candidates={teamMembersForAssign}
               selectedId={newTaskData.assigneeId}
               onSelect={(memberId) => setNewTaskData({ ...newTaskData, assigneeId: memberId })}
               emptyLabel="No team members found for this project."
+              allowEmpty
             />
-            {showError('assigneeId') && (
-              <p style={{ color: '#ef4444', fontSize: '11px', margin: '6px 0 0' }}>Please assign someone to this task</p>
-            )}
+            <p style={{ color: 'var(--trans-text-muted)', fontSize: '11px', margin: '6px 0 0' }}>
+              Optional. You can assign a translator later.
+            </p>
           </div>
 
           <div className="trans-form-group" style={{ marginTop: '14px' }}>

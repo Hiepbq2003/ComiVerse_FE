@@ -100,7 +100,7 @@ export const createTeamTaskApi = async (teamId, task) => {
 
   const sanitizedTask = {
     title: task.title,
-    status: task.status || 'in_progress',
+    status: 'backlog',
     dueDate: task.dueDate || new Date().toISOString().split('T')[0],
     chapterId: chapterId,
     ...(assigneeId ? { assigneeId } : {}),
