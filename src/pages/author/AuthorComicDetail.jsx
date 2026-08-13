@@ -845,11 +845,19 @@ function AuthorComicDetail() {
           const chapNumStr = String(getChapterNumber(chapter))
           let match = null
 
+          const subIdStr = String(chapter?.submissionId || '')
+
           // Direct match
           match = overrides.find(o => {
             const oId = String(o.id || o.chapterId || o.submissionId || '')
+            const oSubId = String(o.submissionId || '')
             const oNum = String(o.chapterNumber || o.number || '')
-            return (chapIdStr && oId && chapIdStr === oId) || (chapNumStr && oNum && chapNumStr === oNum)
+            
+            const matchChapId = chapIdStr && oId && (oId === chapIdStr || oId === subIdStr || `chap-${oId}` === chapIdStr || oId === `chap-${chapIdStr}`)
+            const matchSubId = subIdStr && oSubId && (oSubId === subIdStr || oSubId === chapIdStr)
+            const matchNum = chapNumStr && chapNumStr !== 'N/A' && oNum && oNum === chapNumStr
+            
+            return matchChapId || matchSubId || matchNum
           })
 
           // Nested match
@@ -858,8 +866,14 @@ function AuthorComicDetail() {
               const chaps = [...(o.allChapters || []), ...(o.chapters || []), ...(o.subItems || [])]
               const foundChap = chaps.find(c => {
                 const cId = String(c.id || c.chapterId || '')
+                const cSubId = String(c.submissionId || '')
                 const cNum = String(c.chapterNumber || c.number || '')
-                return (chapIdStr && cId && chapIdStr === cId) || (chapNumStr && cNum && chapNumStr === cNum)
+                
+                const matchChapId = chapIdStr && cId && (cId === chapIdStr || cId === subIdStr || `chap-${cId}` === chapIdStr || cId === `chap-${chapIdStr}`)
+                const matchSubId = subIdStr && cSubId && (cSubId === subIdStr || cSubId === chapIdStr)
+                const matchNum = chapNumStr && chapNumStr !== 'N/A' && cNum && cNum === chapNumStr
+                
+                return matchChapId || matchSubId || matchNum
               })
               if (foundChap) {
                 match = foundChap
