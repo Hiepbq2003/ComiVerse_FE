@@ -1060,12 +1060,36 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               
               if (matchByComicId || matchByTitle) {
                 const updateChaps = (chapsArr) => {
-                  if (!Array.isArray(chapsArr)) return [{ ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' }];
+                  if (!Array.isArray(chapsArr)) {
+                    return [{
+                      ...chapterObj,
+                      status: 'rejected',
+                      rejectedAt: nowIso,
+                      rejectionReason: reason || 'Chapter rejected',
+                      pages: chapterObj.pages || chapterObj.images || [],
+                      pageCount: (chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0)
+                    }];
+                  }
                   const exists = chapsArr.some(c => isSameChapterItem(c, chapterObj));
                   if (exists) {
-                    return chapsArr.map(c => isSameChapterItem(c, chapterObj) ? { ...c, ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' } : { ...c, status: 'rejected', rejectedAt: nowIso });
+                    return chapsArr.map(c => isSameChapterItem(c, chapterObj) ? {
+                      ...c,
+                      ...chapterObj,
+                      pages: (chapterObj.pages && chapterObj.pages.length) ? chapterObj.pages : ((c.pages && c.pages.length) ? c.pages : (chapterObj.images || c.images || [])),
+                      pageCount: (chapterObj.pages && chapterObj.pages.length) ? chapterObj.pages.length : (c.pages?.length || c.pageCount || chapterObj.pageCount || (c.images?.length || 0)),
+                      status: 'rejected',
+                      rejectedAt: nowIso,
+                      rejectionReason: reason || 'Chapter rejected'
+                    } : { ...c, status: 'rejected', rejectedAt: nowIso });
                   }
-                  return [...chapsArr.map(c => ({...c, status: 'rejected', rejectedAt: nowIso})), { ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' }];
+                  return [...chapsArr.map(c => ({...c, status: 'rejected', rejectedAt: nowIso})), {
+                    ...chapterObj,
+                    status: 'rejected',
+                    rejectedAt: nowIso,
+                    rejectionReason: reason || 'Chapter rejected',
+                    pages: chapterObj.pages || chapterObj.images || [],
+                    pageCount: (chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0)
+                  }];
                 };
 
                 return {
@@ -1111,12 +1135,36 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
             sourceMatched = true;
 
             const updateChaps = (chapsArr) => {
-              if (!Array.isArray(chapsArr)) return [{ ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' }];
+              if (!Array.isArray(chapsArr)) {
+                return [{
+                  ...chapterObj,
+                  status: 'rejected',
+                  rejectedAt: nowIso,
+                  rejectionReason: reason || 'Chapter rejected',
+                  pages: chapterObj.pages || chapterObj.images || [],
+                  pageCount: (chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0)
+                }];
+              }
               const exists = chapsArr.some(c => isSameChapterItem(c, chapterObj));
               if (exists) {
-                return chapsArr.map(c => isSameChapterItem(c, chapterObj) ? { ...c, ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' } : c);
+                return chapsArr.map(c => isSameChapterItem(c, chapterObj) ? {
+                  ...c,
+                  ...chapterObj,
+                  pages: (chapterObj.pages && chapterObj.pages.length) ? chapterObj.pages : ((c.pages && c.pages.length) ? c.pages : (chapterObj.images || c.images || [])),
+                  pageCount: (chapterObj.pages && chapterObj.pages.length) ? chapterObj.pages.length : (c.pages?.length || c.pageCount || chapterObj.pageCount || (c.images?.length || 0)),
+                  status: 'rejected',
+                  rejectedAt: nowIso,
+                  rejectionReason: reason || 'Chapter rejected'
+                } : c);
               }
-              return [...chapsArr, { ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' }];
+              return [...chapsArr, {
+                ...chapterObj,
+                status: 'rejected',
+                rejectedAt: nowIso,
+                rejectionReason: reason || 'Chapter rejected',
+                pages: chapterObj.pages || chapterObj.images || [],
+                pageCount: (chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0)
+              }];
             };
 
             return {
