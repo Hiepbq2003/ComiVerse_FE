@@ -46,7 +46,7 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
     }
   }
 
-  const formattedNotifications = notifications.map(n => {
+  const formattedNotifications = (notifications || []).map(n => {
     let url = n.actionUrl;
     const titleLower = String(n.title).toLowerCase();
     

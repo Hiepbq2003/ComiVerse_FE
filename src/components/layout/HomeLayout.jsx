@@ -446,7 +446,7 @@ function HomeLayout({ children }) {
                           <p style={{ margin: 0, fontSize: '13px' }}>You have no notifications</p>
                         </div>
                       ) : (
-                        notifications.map((item) => (
+                        (notifications || []).map((item) => (
                           <div
                             key={item.id}
                             style={{

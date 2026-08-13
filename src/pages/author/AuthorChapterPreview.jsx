@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
+import { getAuthorComicChaptersApi, getAuthorChapterPreviewApi } from '../../services/api/AuthorComicApi'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
@@ -23,7 +23,7 @@ function getChapterNumber(chapter) {
 }
 
 const normalizePage = (page, idx) => {
-  const url = typeof page === 'string' ? page : (page?.imageUrl || page?.url || page?.pageUrl || '')
+  const url = typeof page === 'string' ? page : (page?.imageUrl || page?.url || page?.pageUrl || page?.path || page?.src || '')
   const number = (typeof page === 'object' && page?.pageNumber) ? page.pageNumber : (idx + 1)
   return { url, number }
 }
@@ -39,6 +39,49 @@ const formatStatus = (status) => {
   if (value === 'PREVIEW_READY') return 'Preview Ready'
   if (value === 'SUBMITTED_FOR_REVIEW' || value === 'PENDING') return '⏳ Pending'
   return value || 'N/A'
+}
+
+function parseCommentsFromReport(reasonText) {
+  if (!reasonText || !reasonText.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) return []
+  const reportSection = reasonText.split('--- DETAILED INSPECTION FEEDBACK REPORT')[1] || ''
+  const lines = reportSection.split('\n')
+  const parsedComments = []
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim()
+    if (!trimmed) return
+    const match = trimmed.match(/^\d+\.\s*\[([^\]]+)\]:\s*(.+)$/)
+    if (match) {
+      const label = match[1].trim()
+      const text = match[2].trim()
+
+      let pageNum = 1
+      const pMatch = label.match(/Page\s+(\d+)/i)
+      if (pMatch) pageNum = parseInt(pMatch[1], 10)
+
+      let xPercentage = null
+      let yPercentage = null
+      const coordMatch = label.match(/\((\d+(?:\.\d+)?)%\s*,\s*(\d+(?:\.\d+)?)%\)/)
+      if (coordMatch) {
+        xPercentage = parseFloat(coordMatch[1])
+        yPercentage = parseFloat(coordMatch[2])
+      }
+
+      parsedComments.push({
+        id: `parsed-doc-comment-${idx}-${Date.now()}`,
+        targetType: coordMatch ? 'point' : (label.toLowerCase().includes('page') ? 'page' : 'field'),
+        targetKey: `page-${pageNum}`,
+        targetLabel: label,
+        text,
+        createdAt: new Date().toISOString(),
+        author: 'Moderator',
+        xPercentage,
+        yPercentage
+      })
+    }
+  })
+
+  return parsedComments
 }
 
 /* ────────────────── rejection data resolver ──────────────── */
@@ -61,11 +104,17 @@ function resolveRejectionInfo(preview, comicId) {
     if (rawOverrides) {
       const overrides = JSON.parse(rawOverrides)
       if (Array.isArray(overrides)) {
+        const chapIdStr = String(preview?.id || preview?.chapterId || '')
+        const comicIdStr = String(comicId || preview?.comicId || '')
+        const chapNumStr = String(getChapterNumber(preview))
+
         const match = overrides.find(o => {
           const st = String(o.status || '').toUpperCase()
-          const matchId = (preview?.id && String(o.id) === String(preview.id)) || (preview?.submissionId && String(o.submissionId) === String(preview.submissionId))
-          const matchComicId = (comicId && (String(o.comicId) === String(comicId) || String(o.id) === String(comicId)))
-          return st === 'REJECTED' && (matchId || matchComicId)
+          if (st !== 'REJECTED') return false
+          const matchChapId = chapIdStr && (String(o.id) === chapIdStr || String(o.chapterId) === chapIdStr || String(o.submissionId) === chapIdStr)
+          const matchComicId = comicIdStr && (String(o.comicId) === comicIdStr || String(o.parentReviewId) === comicIdStr)
+          const matchNum = chapNumStr && chapNumStr !== 'N/A' && String(o.chapterNumber || o.number || '').includes(chapNumStr)
+          return matchChapId || matchComicId || matchNum
         }) || overrides.find(o => String(o.status || '').toUpperCase() === 'REJECTED')
 
         if (match) {
@@ -80,17 +129,49 @@ function resolveRejectionInfo(preview, comicId) {
     const rawCommentsMap = localStorage.getItem('comiverse_moderator_doc_comments')
     if (rawCommentsMap) {
       const commentsMap = JSON.parse(rawCommentsMap)
+      const chapIdStr = String(preview?.id || preview?.chapterId || '')
+      const subIdStr = String(preview?.submissionId || '')
+      const comicIdStr = String(comicId || preview?.comicId || '')
+      const chapNumStr = String(getChapterNumber(preview))
+
       Object.keys(commentsMap).forEach(key => {
-        if (
-          (preview?.id && key.includes(String(preview.id))) ||
-          (preview?.submissionId && key.includes(String(preview.submissionId))) ||
-          (comicId && key.includes(String(comicId)))
-        ) {
-          docComments = [...docComments, ...(commentsMap[key] || [])]
+        const keyStr = String(key)
+        const commentsList = commentsMap[key] || []
+        
+        const keyMatched = (
+          (chapIdStr && keyStr.includes(chapIdStr)) ||
+          (subIdStr && keyStr.includes(subIdStr)) ||
+          (comicIdStr && keyStr.includes(comicIdStr)) ||
+          (chapNumStr && chapNumStr !== 'N/A' && keyStr.includes(chapNumStr))
+        )
+
+        const commentMatched = commentsList.some(c => {
+          if (!c) return false
+          return (
+            (chapIdStr && (String(c.submissionId) === chapIdStr || String(c.chapterId) === chapIdStr)) ||
+            (subIdStr && String(c.submissionId) === subIdStr) ||
+            (comicIdStr && String(c.comicId) === comicIdStr)
+          )
+        })
+
+        if (keyMatched || commentMatched || Object.keys(commentsMap).length === 1) {
+          commentsList.forEach(c => {
+            if (c && !docComments.some(existing => existing.id === c.id)) {
+              docComments.push(c)
+            }
+          })
         }
       })
     }
   } catch (e) { /* ignore */ }
+
+  // Fallback: If docComments is still empty but reason contains structured inspection report
+  if (docComments.length === 0 && reason) {
+    const parsed = parseCommentsFromReport(reason)
+    if (parsed.length > 0) {
+      docComments = parsed
+    }
+  }
 
   return { isRejected, reason, docComments }
 }
@@ -166,11 +247,40 @@ export default function AuthorChapterPreview() {
     if (!preview) {
       const fetchChapter = async () => {
         try {
-          const res = await getAuthorComicChaptersApi(comicId)
-          if (res.status === 'fulfilled') {
-            const chapters = normalizeArrayResponse(res.value)
-            const found = chapters.find((c) => c.id === chapterId || c.chapterId === chapterId)
-            if (found) setPreview(found)
+          let previewData = null
+          try {
+            previewData = await getAuthorChapterPreviewApi(comicId, chapterId)
+          } catch {
+            // ignore
+          }
+
+          if (previewData && (
+            previewData.pages?.length ||
+            previewData.images?.length ||
+            previewData.pageUrls?.length ||
+            previewData.id
+          )) {
+            setPreview(previewData)
+          } else {
+            const res = await getAuthorComicChaptersApi(comicId)
+            const chapters = res?.data || res || []
+            const chaptersList = normalizeArrayResponse(chapters)
+            const found = chaptersList.find((c) => (
+              String(c.id) === String(chapterId) ||
+              String(c.chapterId) === String(chapterId) ||
+              String(c.chapterNumber) === String(chapterId)
+            ))
+            
+            if (found) {
+              try {
+                const detailData = await getAuthorChapterPreviewApi(comicId, found.id || found.chapterId || chapterId)
+                setPreview({ ...found, ...(detailData || {}) })
+              } catch {
+                setPreview(found)
+              }
+            } else if (previewData) {
+              setPreview(previewData)
+            }
           }
         } catch (error) {
           console.error('Failed to load chapter for preview:', error)
@@ -218,7 +328,15 @@ export default function AuthorChapterPreview() {
   }
 
   /* ── Derive data ─── */
-  const rawPages = normalizeArrayResponse(preview?.pages)
+  const rawPages = normalizeArrayResponse(
+    preview?.pages ||
+    preview?.images ||
+    preview?.pageUrls ||
+    preview?.pagesList ||
+    preview?.urls ||
+    preview?.chapterPages ||
+    (Array.isArray(preview?.content) ? preview.content : [])
+  )
   const pages = rawPages.map((p, idx) => normalizePage(p, idx))
 
   const { isRejected, reason, docComments } = resolveRejectionInfo(preview, comicId)
