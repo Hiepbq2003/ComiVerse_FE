@@ -6,7 +6,9 @@ const defaultKeywords = [
   { id: 'kw-1', word: 'toxic_word_1', category: 'Profanity', severity: 'HIGH', addedAt: '2026-07-01' },
   { id: 'kw-2', word: 'spam_link', category: 'Spam / Scam', severity: 'CRITICAL', addedAt: '2026-07-05' },
   { id: 'kw-3', word: 'hate_speech', category: 'Policy Violation', severity: 'CRITICAL', addedAt: '2026-07-10' },
-  { id: 'kw-4', word: 'gambling_site', category: 'Adverts', severity: 'MEDIUM', addedAt: '2026-07-15' }
+  { id: 'kw-4', word: 'gambling_site', category: 'Adverts', severity: 'MEDIUM', addedAt: '2026-07-15' },
+  { id: 'kw-5', word: 'scam_crypto', category: 'Spam / Scam', severity: 'CRITICAL', addedAt: '2026-07-20' },
+  { id: 'kw-6', word: 'hate_comment', category: 'Profanity', severity: 'HIGH', addedAt: '2026-07-22' }
 ];
 
 const loadLocalKeywords = () => {
