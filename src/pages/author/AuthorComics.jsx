@@ -362,77 +362,9 @@ function AddChapterModal({ comic, onClose, onUploaded }) {
     </div>
   )
 }
-
-function getModeratorOverridesMap() {
-  try {
-    const raw = localStorage.getItem('comiverse_moderator_submissions_override');
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch (e) {
-    return [];
-  }
-}
-
 function enrichComicWithModeratorOverrides(comic) {
-  if (!comic) return comic;
-
-  const overrides = getModeratorOverridesMap();
-  const comicTitleClean = (comic.title || '').trim().toLowerCase();
-  const comicIdStr = String(comic.id || comic.comicId || '');
-
-  const matchingOverrides = overrides.filter(o => {
-    if (!o) return false;
-    const matchId = (
-      (o.comicId && String(o.comicId) === comicIdStr) ||
-      (o.id && String(o.id) === comicIdStr) ||
-      (o.parentReviewId && String(o.parentReviewId) === comicIdStr) ||
-      (o.chapterComicId && String(o.chapterComicId) === comicIdStr)
-    );
-    const overrideComicTitle = (o.comicTitle || o.comicName || o.title || '').trim().toLowerCase();
-    const matchTitle = comicTitleClean && overrideComicTitle && (
-      overrideComicTitle === comicTitleClean ||
-      overrideComicTitle.includes(comicTitleClean) ||
-      comicTitleClean.includes(overrideComicTitle)
-    );
-
-    const matchChildChapter = Array.isArray(o.allChapters || o.chapters || o.subItems) && (o.allChapters || o.chapters || o.subItems).some(ch => {
-      return (ch.comicId && String(ch.comicId) === comicIdStr) || (ch.id && String(ch.id) === comicIdStr);
-    });
-
-    return matchId || matchTitle || matchChildChapter;
-  });
-
-  const hasRejectedChapterInComic = Array.isArray(comic.chapters) && comic.chapters.some(c => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED');
-  const hasRejectedOverride = matchingOverrides.some(o => (o.status || '').toString().toUpperCase() === 'REJECTED') || hasRejectedChapterInComic || ((comic.rejectedChapterCount || 0) > 0);
-  const hasApprovedOverride = matchingOverrides.some(o => (o.status || '').toString().toUpperCase() === 'APPROVED');
-  const hasPendingOverride = matchingOverrides.some(o => (o.status || '').toString().toUpperCase() === 'PENDING');
-
-  let appealedIds = [];
-  try {
-    appealedIds = JSON.parse(localStorage.getItem('appealedComics') || '[]');
-  } catch (e) {}
-
-  const isLocallyAppealed = appealedIds.some(id => String(id) === comicIdStr);
-  const isAppealed = Boolean(comic.isAppealed || (comic.moderationStatus || '').toString().toUpperCase() === 'APPEALED' || isLocallyAppealed);
-
-  let moderationStatus = comic.moderationStatus || comic.approvalStatus || 'DRAFT';
-  if (isAppealed) {
-    moderationStatus = 'APPEALED';
-  }
-
-  if (hasRejectedOverride) {
-    moderationStatus = 'REJECTED';
-  } else if (hasApprovedOverride && !hasPendingOverride) {
-    moderationStatus = 'APPROVED';
-  }
-
-  return {
-    ...comic,
-    isAppealed,
-    moderationStatus,
-    hasRejectedOverride,
-    rejectedChapterCount: hasRejectedOverride ? Math.max(1, comic.rejectedChapterCount || 0) : comic.rejectedChapterCount
-  };
+  // localStorage overrides removed for production readiness
+  return comic;
 }
 
 function AuthorComics() {

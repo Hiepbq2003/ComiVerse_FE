@@ -420,37 +420,8 @@ function ModeratorDashboard() {
   }
 
   const syncSubmissionsWithLocalOverride = (rawSubmissions) => {
-    let overrideList = [];
-    try {
-      const raw = localStorage.getItem('comiverse_moderator_submissions_override');
-      if (raw) overrideList = JSON.parse(raw);
-    } catch (e) {}
-
-    if (!Array.isArray(overrideList) || overrideList.length === 0) {
-      return rawSubmissions || [];
-    }
-
-    const overrideMap = new Map();
-    overrideList.forEach(item => {
-      if (item && item.id) overrideMap.set(String(item.id), item);
-    });
-
-    const merged = (rawSubmissions || []).map(item => {
-      if (!item) return item;
-      const key = String(item.id);
-      if (overrideMap.has(key)) {
-        return { ...item, ...overrideMap.get(key) };
-      }
-      return item;
-    });
-
-    overrideList.forEach(item => {
-      if (item && item.id && !merged.some(m => m && String(m.id) === String(item.id))) {
-        merged.push(item);
-      }
-    });
-
-    return merged;
+    // localStorage override removed for production readiness
+    return rawSubmissions || [];
   };
   
   const fetchSubmissionsData = async () => {
@@ -733,8 +704,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
           }
           return item;
         });
-
-        try { localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(next)); } catch (e) {}
         return next;
       });
 
@@ -775,7 +744,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       const nowIso = new Date().toISOString();
       setSubmissions(prev => {
         const next = prev.map(s => s.id === item.id ? { ...s, status: 'approved', approvedAt: nowIso, comicId: realDbId || s.comicId || `comic-${Date.now()}` } : s);
-        try { localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(next)); } catch (e) {}
         return next;
       });
       await fetchComicsAndTeams()
@@ -858,7 +826,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
           return item;
         });
 
-        try { localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(next)); } catch (e) {}
         return next;
       });
     } catch (err) {
@@ -1017,11 +984,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
             number: 1
           });
         }
-
-        try {
-          localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(nextSubmissions));
-        } catch (e) {}
-
         return nextSubmissions;
       });
       fetchComicsAndTeams();
@@ -1136,11 +1098,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               }
               return item;
             });
-
-            try {
-              localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(nextSubmissions));
-            } catch (e) {}
-
             return nextSubmissions;
           });
           return; // Early return — everything is handled
@@ -1214,11 +1171,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
           }
           return item;
         });
-
-        try {
-          localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(nextSubmissions));
-        } catch (e) {}
-
         return nextSubmissions;
       });
     } catch (err) {
@@ -1277,26 +1229,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     try {
       const existing = JSON.parse(localStorage.getItem('comiverse_local_comic_' + id) || '{}');
       localStorage.setItem('comiverse_local_comic_' + id, JSON.stringify({ ...existing, moderationStatus: 'UNPUBLISHED', archived: false }));
-      
-      const overrideRaw = localStorage.getItem('comiverse_moderator_submissions_override');
-      if (overrideRaw) {
-        let overrides = JSON.parse(overrideRaw);
-        overrides = overrides.filter(sub => {
-          const stableId = sub.comicId || (sub.id ? `comic-${sub.id}` : null);
-          return stableId !== id && sub.comicId !== id && sub.id !== id;
-        });
-        localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(overrides));
-      }
-      
-      const baseRaw = localStorage.getItem('comiverse_moderator_submissions');
-      if (baseRaw) {
-        let baseSubs = JSON.parse(baseRaw);
-        baseSubs = baseSubs.filter(sub => {
-          const stableId = sub.comicId || (sub.id ? `comic-${sub.id}` : null);
-          return stableId !== id && sub.comicId !== id && sub.id !== id;
-        });
-        localStorage.setItem('comiverse_moderator_submissions', JSON.stringify(baseSubs));
-      }
     } catch (e) { /* ignore */ }
 
     setComics(prev => prev.map(c => c.id === id || c.id === id.replace('comic-', '') ? { ...c, moderationStatus: 'UNPUBLISHED' } : c));

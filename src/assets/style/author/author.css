@@ -422,3 +422,68 @@ html.light .author-sidebar-footer {
     transition: none !important;
   }
 }
+
+/* Alerts */
+.author-alert {
+  padding: 16px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 24px;
+  border-left: 4px solid transparent;
+  background: var(--author-surface);
+  color: var(--author-text);
+  box-shadow: var(--author-shadow);
+  border: 1px solid var(--author-border);
+}
+
+.author-alert.info {
+  border-left-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.author-alert.warning {
+  border-left-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.author-alert.danger {
+  border-left-color: #ef4444;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.author-alert strong {
+  color: var(--author-heading);
+  font-weight: 600;
+}
+
+.author-alert.danger strong {
+  color: #ef4444;
+}
+
+.author-alert.info strong {
+  color: #3b82f6;
+}
+
+.author-alert.warning strong {
+  color: #f59e0b;
+}
+
+/* Light mode overrides for alerts */
+html.light .author-alert {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+html.light .author-alert.danger {
+  background: rgba(239, 68, 68, 0.05);
+}
+
+html.light .author-alert.warning {
+  background: rgba(245, 158, 11, 0.05);
+}
+
+html.light .author-alert.info {
+  background: rgba(59, 130, 246, 0.05);
+}
