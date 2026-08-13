@@ -1098,11 +1098,23 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
           if (isSourceItem) {
             sourceMatched = true;
+
+            const updateChaps = (chapsArr) => {
+              if (!Array.isArray(chapsArr)) return chapsArr;
+              const exists = chapsArr.some(c => isSameChapterItem(c, chapterObj));
+              if (exists) {
+                return chapsArr.map(c => isSameChapterItem(c, chapterObj) ? { ...c, ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' } : c);
+              }
+              return [...chapsArr, { ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' }];
+            };
+
             return {
               ...item,
               status: 'rejected',
               rejectedAt: nowIso,
-              rejectionReason: reason || 'Chapter rejected'
+              rejectionReason: reason || 'Chapter rejected',
+              allChapters: updateChaps(item.allChapters),
+              chapters: updateChaps(item.chapters)
             };
           }
           return item;
