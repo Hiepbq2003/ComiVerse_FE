@@ -990,7 +990,8 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
   const onConfirmRejectClick = () => {
     if (!selectedReject) return
     const comicId = selectedReject.parentReviewId || selectedReject.id;
-    const comments = docCommentsMap[comicId] || selectedReject.notes || [];
+    const targetChapId = selectedReject.rejectChapterObj?.id || selectedReject.rejectChapterObj?.chapterId || selectedReject.chapterId;
+    const comments = (targetChapId && docCommentsMap[targetChapId]) || docCommentsMap[selectedReject.id] || docCommentsMap[comicId] || selectedReject.notes || [];
     const userOverallNote = rejectionReason.trim();
     let finalPayload = '';
 
@@ -1061,6 +1062,8 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     const newComment = {
       id: `doc-comment-${Date.now()}`,
       submissionId,
+      chapterId: selectedChapter?.id || selectedChapter?.chapterId || selectedReview?.chapterId || selectedReview?.id,
+      comicId: selectedReview?.comicId || selectedReview?.parentReviewId,
       targetType,
       targetKey,
       targetLabel,
