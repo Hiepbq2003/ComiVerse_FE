@@ -566,10 +566,19 @@ function Forum() {
   const fetchThreads = async (page) => {
     const targetPage = page || currentPage
     try {
-      setLoading(true)
-      const response = await getForumThreadsPageApi(targetPage, ITEMS_PER_PAGE, searchQuery)
+      let response = null
+      try {
+        response = await getForumThreadsPageApi(targetPage, ITEMS_PER_PAGE, searchQuery)
+      } catch (apiErr) {
+        console.warn('Paged forum threads API error, falling back to all threads endpoint:', apiErr?.message || apiErr)
+        const fallbackData = await getAllForumThreadsApi().catch(() => [])
+        response = {
+          data: Array.isArray(fallbackData) ? fallbackData : (fallbackData?.data || []),
+          metadata: { page: 1, size: ITEMS_PER_PAGE, totalElements: (fallbackData || []).length, totalPages: 1 }
+        }
+      }
       // response = { data: [...], metadata: { page, size, totalElements, totalPages } }
-      const list = response.data || []
+      const list = Array.isArray(response) ? response : (response?.data || [])
 
       // Format DB threads
       const formattedDb = list.map(t => ({
