@@ -1029,19 +1029,23 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     let responseData = null;
     if (cleanId && !cleanId.startsWith('group-') && !cleanId.startsWith('comic-') && !cleanId.includes('mock')) {
         try {
-          if (willRejectAll) {
-            const rejectResponse = await rejectSubmissionApi(cleanId, reason || 'Chapter rejected');
-            responseData = rejectResponse?.data || rejectResponse;
-          } else if (cleanChapterDbId && !cleanChapterDbId.includes('mock')) {
-          try {
-            const { rejectChapterDirectApi } = await import('../../services/api/ChapterApi');
-            if (rejectChapterDirectApi) {
-              await rejectChapterDirectApi(cleanChapterDbId, reason || 'Chapter rejected');
+          let calledDirect = false;
+          if (cleanChapterDbId && !cleanChapterDbId.includes('mock')) {
+            try {
+              const { rejectChapterDirectApi } = await import('../../services/api/ChapterApi');
+              if (rejectChapterDirectApi) {
+                await rejectChapterDirectApi(cleanChapterDbId, reason || 'Chapter rejected');
+                calledDirect = true;
+              }
+            } catch (chapErr) {
+              console.warn(`[handleChapterReject] rejectChapterDirectApi failed:`, chapErr?.message);
             }
-          } catch (chapErr) {
-            console.warn(`[handleChapterReject] rejectChapterDirectApi failed:`, chapErr?.message);
           }
-        }
+
+          if (willRejectAll) {
+            const rejectResponse = await rejectSubmissionApi(cleanId, calledDirect ? (reason || 'Chapter rejected') : (reason || 'Chapter rejected'));
+            responseData = rejectResponse?.data || rejectResponse;
+          }
         
         if (responseData?.comicAutoRejected) {
           toast.success(`Rejected "${chapTitle}" — All chapters rejected, comic profile auto-rejected!`);
@@ -1074,7 +1078,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                       ...chapterObj,
                       status: 'rejected',
                       rejectedAt: nowIso,
-                      rejectionReason: reason || 'Chapter rejected'
+                      rejectionReason: reason || 'Chapter rejected',
+                      pages: chapterObj.pages || c.pages || chapterObj.images || c.images || [],
+                      pageCount: chapterObj.pages?.length || c.pages?.length || chapterObj.images?.length || chapterObj.pageCount || c.pageCount || 0
                     } : { ...c, status: 'rejected', rejectedAt: nowIso });
                   }
                   return [...chapsArr.map(c => ({...c, status: 'rejected', rejectedAt: nowIso})), {
@@ -1142,7 +1148,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                   ...chapterObj,
                   status: 'rejected',
                   rejectedAt: nowIso,
-                  rejectionReason: reason || 'Chapter rejected'
+                  rejectionReason: reason || 'Chapter rejected',
+                  pages: chapterObj.pages || c.pages || chapterObj.images || c.images || [],
+                  pageCount: chapterObj.pages?.length || c.pages?.length || chapterObj.images?.length || chapterObj.pageCount || c.pageCount || 0
                 } : c);
               }
               return [...chapsArr, {
