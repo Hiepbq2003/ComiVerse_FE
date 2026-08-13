@@ -77,6 +77,59 @@ const isSameChapterItem = (c, target) => {
   return false;
 };
 
+const isActedByCurrentModerator = (item, user) => {
+  if (!user) return true;
+
+  const userTokens = [
+    user.username,
+    user.fullName,
+    user.full_name,
+    user.email,
+    user.id ? String(user.id) : null,
+    user.userId ? String(user.userId) : null
+  ]
+    .filter(Boolean)
+    .map(s => String(s).toLowerCase().trim());
+
+  if (userTokens.length === 0) return true;
+
+  const itemActors = [
+    item.approvedBy,
+    item.rejectedBy,
+    item.reviewedBy,
+    item.moderatorName,
+    item.moderatorId,
+    item.reviewerId,
+    item.updatedBy,
+    item.reviewer,
+    item.actor
+  ]
+    .filter(Boolean)
+    .map(s => String(s).toLowerCase().trim());
+
+  if (Array.isArray(item.subItems)) {
+    item.subItems.forEach(sub => {
+      [sub.approvedBy, sub.rejectedBy, sub.reviewedBy, sub.moderatorName, sub.moderatorId]
+        .filter(Boolean)
+        .forEach(val => itemActors.push(String(val).toLowerCase().trim()));
+    });
+  }
+  if (Array.isArray(item.allChapters)) {
+    item.allChapters.forEach(chap => {
+      [chap.approvedBy, chap.rejectedBy, chap.reviewedBy, chap.moderatorName, chap.moderatorId]
+        .filter(Boolean)
+        .forEach(val => itemActors.push(String(val).toLowerCase().trim()));
+    });
+  }
+
+  // If no actor field was populated on this item at all (e.g. legacy/mock data), do not filter it out
+  if (itemActors.length === 0) return true;
+
+  return itemActors.some(actor =>
+    userTokens.some(uToken => actor === uToken || actor.includes(uToken) || uToken.includes(actor))
+  );
+};
+
 const CustomSortDropdown = ({ value, onChange }) => {
   const [isOpen, setIsOpen] = React.useState(false);
   const dropdownRef = React.useRef(null);
@@ -652,7 +705,13 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     );
 
     ['pending', 'approved', 'rejected'].forEach(tabStatus => {
-      const itemsInTab = scopedSubmissions.filter(i => i.status === tabStatus);
+      const itemsInTab = scopedSubmissions.filter(i => {
+        if (i.status !== tabStatus) return false;
+        if (tabStatus === 'approved' || tabStatus === 'rejected') {
+          return isActedByCurrentModerator(i, authUser);
+        }
+        return true;
+      });
       const uniqueKeys = new Set();
       itemsInTab.forEach(item => {
         const titleClean = (item.title || '').toLowerCase().trim();
@@ -708,6 +767,12 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     return submissions
       .filter(item => isLanguageInModeratorScope(getSubmissionLanguage(item), authUser))
       .filter(item => item.status === activeTab)
+      .filter(item => {
+        if (activeTab === 'approved' || activeTab === 'rejected') {
+          return isActedByCurrentModerator(item, authUser);
+        }
+        return true;
+      })
       .filter(item => {
         if (!query) return true;
         return (
@@ -2596,7 +2661,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                 </label>
                 <textarea
                   className="rejection-reason-textarea"
-                  placeholder="Type overall rejection remarks or specific revision instructions for the author..."
+                  placeholder="Type optional overall rejection remarks or specific revision instructions for the author..."
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   style={{ width: '100%', minHeight: '110px', padding: '12px', borderRadius: '8px', fontSize: '13.5px', outline: 'none' }}

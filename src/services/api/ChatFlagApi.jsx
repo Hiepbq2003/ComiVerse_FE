@@ -24,3 +24,8 @@ export const deleteChatFlagApi = (id) => {
   return AxiosClient.delete(`/chat-flags/${id}`);
 };
 
+export const createChatFlagApi = (flagData) => {
+  return AxiosClient.post('/chat-flags', flagData);
+};
+
+

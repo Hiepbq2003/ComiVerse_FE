@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import '../../assets/style/moderator/chat-monitor.css'
 import {
   getAllChatFlagsApi,
+  createChatFlagApi,
   warnChatFlagApi,
   muteUserChatApi,
   unmuteUserChatApi,
@@ -411,11 +412,11 @@ function ChatMonitor({ loading = false, fetchAllData }) {
         localFlags = raw ? JSON.parse(raw) : []
       } catch (e) {}
 
-      // Merge localFlags and serverFlags (local state takes priority for actioned status)
+      // Merge localFlags and serverFlags (local state takes priority for actioned status AND locally created flags)
       const flagMap = new Map()
       serverFlags.forEach(f => flagMap.set(f.id, f))
       localFlags.forEach(f => {
-        if (flagMap.has(f.id) || (f.status && f.status !== 'pending')) {
+        if (flagMap.has(f.id) || (f.status && f.status !== 'pending') || f.isLocal) {
           flagMap.set(f.id, { ...(flagMap.get(f.id) || {}), ...f })
         }
       })
@@ -601,7 +602,8 @@ function ChatMonitor({ loading = false, fetchAllData }) {
             status: 'muted',
             mutedUntil: `${muteHours}h`,
             actionedAt: new Date().toISOString(),
-            actionedBy: 'Moderator'
+            actionedBy: 'Moderator',
+            isLocal: true
           }, ...prev]
         }
       })
@@ -638,7 +640,8 @@ function ChatMonitor({ loading = false, fetchAllData }) {
       ...f,
       status: 'pending',
       actionedAt: null,
-      actionedBy: null
+      actionedBy: null,
+      isLocal: true
     } : f))
     toast.info('🔄 Flag restored and moved back to Active Flags queue.')
   }
@@ -1023,9 +1026,13 @@ function ChatMonitor({ loading = false, fetchAllData }) {
                 imageUrl: msg.imageUrl || msg.image || null,
                 reason: msg.imageUrl ? 'Image content flagged for inspection' : 'Flagged by Moderator during live stream inspection',
                 createdAt: new Date().toISOString(),
-                status: 'pending'
+                status: 'pending',
+                isLocal: true
               }
               updateFlagsState(prev => [newFlag, ...prev])
+              createChatFlagApi(newFlag).catch(err => {
+                console.warn('Backend create chat flag API offline, saved locally:', err)
+              })
 
               pushUserNotification(targetId, {
                 title: '🚩 Chat Message Flagged',
@@ -1066,9 +1073,11 @@ function ChatMonitor({ loading = false, fetchAllData }) {
                 status: 'warned',
                 warningCount: resUser.strikeCount,
                 actionedAt: new Date().toISOString(),
-                actionedBy: 'Moderator'
+                actionedBy: 'Moderator',
+                isLocal: true
               }
               updateFlagsState(prev => [newFlag, ...prev])
+              createChatFlagApi(newFlag).catch(() => {})
 
               if (resUser.penaltyType === 'BAN') {
                 toast.error(`🚫 Strike 3/3 issued to "${userName}": PERMANENT CHAT BAN applied! Moved to Audit Log.`)
@@ -1114,9 +1123,11 @@ function ChatMonitor({ loading = false, fetchAllData }) {
                   createdAt: new Date().toISOString(),
                   status: 'banned',
                   actionedAt: new Date().toISOString(),
-                  actionedBy: 'Moderator'
+                  actionedBy: 'Moderator',
+                  isLocal: true
                 }
                 updateFlagsState(prev => [newFlag, ...prev])
+                createChatFlagApi(newFlag).catch(() => {})
 
                 pushUserNotification(targetId, {
                   title: '🚫 Chat Access Permanently Banned',
