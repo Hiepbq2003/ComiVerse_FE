@@ -1060,7 +1060,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               
               if (matchByComicId || matchByTitle) {
                 const updateChaps = (chapsArr) => {
-                  if (!Array.isArray(chapsArr)) return chapsArr;
+                  if (!Array.isArray(chapsArr)) return [{ ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' }];
                   const exists = chapsArr.some(c => isSameChapterItem(c, chapterObj));
                   if (exists) {
                     return chapsArr.map(c => isSameChapterItem(c, chapterObj) ? { ...c, ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' } : { ...c, status: 'rejected', rejectedAt: nowIso });
@@ -1111,7 +1111,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
             sourceMatched = true;
 
             const updateChaps = (chapsArr) => {
-              if (!Array.isArray(chapsArr)) return chapsArr;
+              if (!Array.isArray(chapsArr)) return [{ ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' }];
               const exists = chapsArr.some(c => isSameChapterItem(c, chapterObj));
               if (exists) {
                 return chapsArr.map(c => isSameChapterItem(c, chapterObj) ? { ...c, ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' } : c);
