@@ -677,25 +677,30 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       const appSub = subItem || submissions.find(item => (item.id || item) === id || item.submissionId === id || item.id === cleanId);
       
       let realDbId = null;
+      let submissionApproveSucceeded = false;
       if (cleanId && !cleanId.startsWith('comic-') && !cleanId.startsWith('group-')) {
         try {
           const res = await approveSubmissionApi(cleanId);
+          submissionApproveSucceeded = true;
           realDbId = res?.data?.data?.comicId || res?.data?.comicId || res?.data?.data?.id || res?.data?.id || res?.id || null;
         } catch (apiErr) {
           console.warn(`[Backend Approve API Notice] ${apiErr?.message || apiErr}`);
         }
       }
 
-      // Also directly approve all chapter records associated with this submission group
-      // The submission approve API only updates submission.status but NOT chapter.moderation_status
-      const allSubItems = appSub?.subItems || [appSub];
-      for (const si of allSubItems) {
-        const chapDbId = si?.chapterId || si?.chapter_id;
-        if (chapDbId && !String(chapDbId).startsWith('chap-')) {
-          try {
-            await approveChapterDirectApi(chapDbId);
-          } catch (chapErr) {
-            console.warn(`[Backend DB Sync] approveChapterDirectApi(${chapDbId}) notice:`, chapErr?.message || chapErr);
+      // Submission approval already updates chapter.moderationStatus in the backend.
+      // Only use the direct chapter endpoint as a fallback when there is no valid
+      // submission approval path. Calling both paths can rewrite moderation history.
+      if (!submissionApproveSucceeded) {
+        const allSubItems = appSub?.subItems || [appSub];
+        for (const si of allSubItems) {
+          const chapDbId = si?.chapterId || si?.chapter_id;
+          if (chapDbId && !String(chapDbId).startsWith('chap-')) {
+            try {
+              await approveChapterDirectApi(chapDbId);
+            } catch (chapErr) {
+              console.warn(`[Backend DB Sync fallback] approveChapterDirectApi(${chapDbId}) notice:`, chapErr?.message || chapErr);
+            }
           }
         }
       }
@@ -742,22 +747,26 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
   const handleApproveAndCreateProject = async (item) => {
     try {
       let realDbId = null;
+      let submissionApproveSucceeded = false;
       try {
         const res = await approveSubmissionApi(item.id)
+        submissionApproveSucceeded = true;
         realDbId = res?.data?.data?.comicId || res?.data?.comicId || res?.data?.data?.id || res?.data?.id || res?.id || null;
       } catch (apiErr) {
         console.warn(`[Backend Approve API Notice] ${apiErr?.message || apiErr}`);
       }
 
-      // Also directly approve all chapter records
-      const allSubItems = item?.subItems || [item];
-      for (const si of allSubItems) {
-        const chapDbId = si?.chapterId || si?.chapter_id;
-        if (chapDbId && !String(chapDbId).startsWith('chap-')) {
-          try {
-            await approveChapterDirectApi(chapDbId);
-          } catch (chapErr) {
-            console.warn(`[Backend DB Sync] approveChapterDirectApi(${chapDbId}) notice:`, chapErr?.message || chapErr);
+      // Avoid approving the same chapter through two independent backend paths.
+      if (!submissionApproveSucceeded) {
+        const allSubItems = item?.subItems || [item];
+        for (const si of allSubItems) {
+          const chapDbId = si?.chapterId || si?.chapter_id;
+          if (chapDbId && !String(chapDbId).startsWith('chap-')) {
+            try {
+              await approveChapterDirectApi(chapDbId);
+            } catch (chapErr) {
+              console.warn(`[Backend DB Sync fallback] approveChapterDirectApi(${chapDbId}) notice:`, chapErr?.message || chapErr);
+            }
           }
         }
       }
@@ -900,9 +909,11 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       }
       realSubmissionId = realSubmissionId.replace(/^(comic|group|chap)-/, '');
 
+      let submissionApproveSucceeded = false;
       if (realSubmissionId && !realSubmissionId.startsWith('group-') && !realSubmissionId.startsWith('chap-') && !realSubmissionId.includes('mock')) {
         try {
           const res = await approveSubmissionApi(realSubmissionId);
+          submissionApproveSucceeded = true;
           const realDbComic = res?.data || res;
           if (realDbComic && (realDbComic.id || realDbComic.comicId) && sub) {
             sub.comicId = realDbComic.comicId || realDbComic.id;
@@ -912,13 +923,14 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
         }
       }
 
-      // 2. Also approve chapter directly to ensure chapters table is updated (moderationStatus → PUBLISHED)
+      // 2. Direct chapter approval is a fallback only. The submission endpoint already
+      // publishes the chapter and records moderation state atomically.
       const cleanChapterDbId = String(chapterDbId || '');
-      if (cleanChapterDbId && !cleanChapterDbId.startsWith('chap-') && !cleanChapterDbId.startsWith('group-')) {
+      if (!submissionApproveSucceeded && cleanChapterDbId && !cleanChapterDbId.startsWith('chap-') && !cleanChapterDbId.startsWith('group-')) {
         try {
           await approveChapterDirectApi(cleanChapterDbId);
         } catch (chapErr) {
-          console.warn(`[handleChapterApprove] approveChapterDirectApi(${cleanChapterDbId}) failed:`, chapErr?.message);
+          console.warn(`[handleChapterApprove] approveChapterDirectApi(${cleanChapterDbId}) fallback failed:`, chapErr?.message);
         }
       }
     } catch (apiErr) {

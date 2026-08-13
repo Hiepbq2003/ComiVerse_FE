@@ -301,7 +301,11 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       ? chap.pages
       : Array.isArray(chap.images) && chap.images.length > 0
         ? chap.images
-        : [];
+        : Array.isArray(chap.chapterImages) && chap.chapterImages.length > 0
+          ? chap.chapterImages
+          : Array.isArray(chap.chapter_images) && chap.chapter_images.length > 0
+            ? chap.chapter_images
+            : [];
         
     const rawTitle = String(chap.title || chap.chapter || '');
     let extractedNum = null;
@@ -318,6 +322,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       number: computedNum,
       title: rawTitle || `Chapter ${computedNum}`,
       pages,
+      pageCount: chap.pageCount ?? chap.page_count ?? pages.length,
       content: chap.content || null,
       words: chap.words || chap.wordCount || null,
       timestamp: chap.createdAt || chap.timestamp || Date.now()
@@ -331,6 +336,8 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     // Explicit arrays
     if (Array.isArray(item.pages) && item.pages.length > 0) return true;
     if (Array.isArray(item.images) && item.images.length > 0) return true;
+    if (Array.isArray(item.chapterImages) && item.chapterImages.length > 0) return true;
+    if (Array.isArray(item.chapter_images) && item.chapter_images.length > 0) return true;
     if (Array.isArray(item.chapters) && item.chapters.length > 0) return true;
     if (Array.isArray(item.allChapters) && item.allChapters.length > 0) return true;
 
@@ -362,15 +369,26 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         ? item.pages
         : Array.isArray(item.images) && item.images.length > 0
           ? item.images
-          : [];
+          : Array.isArray(item.chapterImages) && item.chapterImages.length > 0
+            ? item.chapterImages
+            : Array.isArray(item.chapter_images) && item.chapter_images.length > 0
+              ? item.chapter_images
+              : [];
 
       list = [normalizeChapter({
-        id: item.id || `chap-${Date.now()}`,
+        id: item.chapterId || item.id || `chap-${Date.now()}`,
+        chapterId: item.chapterId || item.id || null,
+        submissionId: item.submissionId || item.id || null,
+        comicId: item.comicId || null,
         chapterNumber: item.chapterNumber || item.number || 1,
         title: item.chapter || item.title || 'Chapter 1',
         pages,
+        pageCount: item.pageCount ?? item.page_count ?? pages.length,
         content: item.content || null,
         words: item.words || null,
+        status: item.status || null,
+        moderationStatus: item.moderationStatus || null,
+        rejectionReason: item.rejectionReason || item.rejection_reason || null,
         timestamp: item.timestamp || Date.now()
       }, 0)];
     }
@@ -990,7 +1008,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
   const isCommentMatchingChapter = (c, chapObj, comicId) => {
     if (!c) return false;
     const cComicId = String(c.comicId || '');
-    if (comicId && cComicId && String(comicId) !== String(comicId)) return false;
+    if (comicId && cComicId && cComicId !== String(comicId)) return false;
 
     const targetChapId = String(chapObj?.id || chapObj?.chapterId || '');
     const targetChapNum = String(chapObj?.chapterNumber || chapObj?.number || '');
@@ -1315,11 +1333,6 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
   }, [paginatedItems]);
 
   const handleOpenReviewModal = async (item) => {
-    if (item.status === 'rejected') {
-      setSimpleEvidenceView(item);
-      return;
-    }
-
     setSelectedReview(item);
     setPageIndex(0);
     setFetchingChapters(true);
@@ -1343,8 +1356,14 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
             chaps.push(bChap);
           } else {
             const existing = chaps.find(c => (c.id && bChap.id && c.id === bChap.id) || (c.title && bChap.title && c.title.toLowerCase() === bChap.title.toLowerCase()));
-            if (existing && (!existing.pages || existing.pages.length === 0) && bChap.pages?.length > 0) {
-              existing.pages = bChap.pages;
+            if (existing) {
+              if ((!existing.pages || existing.pages.length === 0) && bChap.pages?.length > 0) {
+                existing.pages = bChap.pages;
+              }
+              existing.pageCount = existing.pageCount ?? existing.page_count ?? bChap.pageCount ?? bChap.page_count ?? existing.pages?.length ?? 0;
+              existing.rejectionReason = existing.rejectionReason || bChap.rejectionReason || bChap.rejection_reason || null;
+              existing.moderationStatus = existing.moderationStatus || bChap.moderationStatus || null;
+              existing.status = existing.status || bChap.status || bChap.moderationStatus || null;
             }
           }
         });
@@ -1387,19 +1406,9 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     const active = chapter || chaps[0] || null;
     const base = (active && Array.isArray(active.pages)) ? active.pages : [];
     
-    let viewPages = base.map((url, idx) => ({ url, originalIdx: idx, pNum: idx + 1 }));
-    if (submission.status === 'rejected') {
-       const comments = docComments[submission.id] || [];
-       const pinnedSet = new Set(comments.map(c => {
-         const match = c.targetKey?.match(/^page-(\d+)$/);
-         return match ? parseInt(match[1], 10) : null;
-       }).filter(n => n !== null));
-       
-       if (pinnedSet.size > 0) {
-         viewPages = viewPages.filter(p => pinnedSet.has(p.pNum));
-       }
-    }
-    return viewPages;
+    // Rejected content is evidence: keep the complete chapter visible.
+    // Feedback pins are overlays/annotations and must never remove unpinned pages.
+    return base.map((url, idx) => ({ url, originalIdx: idx, pNum: idx + 1 }));
   }
 
   // Accelerated Image Preloading Strategy
@@ -1785,6 +1794,17 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                         )}
                       </div>
 
+                      {((String(activeChap?.status || activeChap?.moderationStatus || '').toLowerCase() === 'rejected') || selectedReview.status === 'rejected') && (activeChap?.rejectionReason || selectedReview.rejectionReason) && (
+                        <div style={{ margin: '10px 18px 0', padding: '12px 14px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderLeft: '4px solid #ef4444', whiteSpace: 'pre-wrap' }}>
+                          <strong style={{ color: '#ef4444', display: 'block', marginBottom: '4px', fontSize: '13px' }}>
+                            Rejection Feedback for {activeChap?.title || 'this chapter'}
+                          </strong>
+                          <span style={{ fontSize: '12.5px', lineHeight: '1.55' }}>
+                            {activeChap?.rejectionReason || selectedReview.rejectionReason}
+                          </span>
+                        </div>
+                      )}
+
                       {/* Central Wide Reader Container with Click Pinning */}
                       <div
                         className="mod-inspector-reader-area"
@@ -2074,7 +2094,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                                         {chap.title && !chap.title.toLowerCase().startsWith('chapter') ? `Chapter ${chap.number || idx + 1} — ${chap.title}` : (chap.title || `Chapter ${chap.number || idx + 1}`)}
                                       </td>
                                       <td style={{ padding: '14px 18px', fontWeight: '600', color: rowTextColor }}>
-                                        📄 {Array.isArray(chap.pages) ? chap.pages.length : (Array.isArray(chap.images) ? chap.images.length : 0)} Pages {chap.words ? `· ${chap.words}` : ''}
+                                        📄 {(Array.isArray(chap.pages) && chap.pages.length > 0) ? chap.pages.length : (chap.pageCount ?? chap.page_count ?? (Array.isArray(chap.images) ? chap.images.length : 0))} Pages {chap.words ? `· ${chap.words}` : ''}
                                       </td>
                                       <td style={{ padding: '14px 18px', fontWeight: '600', color: rowTextColor }}>
                                         ⏱️ {formatTimeAgo(chap.timestamp || selectedReview.timestamp)}

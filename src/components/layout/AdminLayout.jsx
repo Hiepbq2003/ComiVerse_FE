@@ -72,7 +72,6 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
     { id: 'report-categories', label: 'Report Categories', icon: 'categories', path: '/admin/report-categories' },
     { id: 'broadcast', label: 'Broadcast', icon: 'megaphone', path: '/admin/broadcast' },
     { id: 'payout', label: 'Payout Management', icon: 'wallet', path: '/admin/payout' },
-    { id: 'settings', label: 'System Settings', icon: 'settings', path: '/admin/settings' },
   ]
 
   const renderNavIcon = (icon) => {

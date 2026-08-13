@@ -6,8 +6,10 @@ import { toast } from 'react-toastify'
 import AuthorComics from '../../../../pages/author/AuthorComics'
 import * as AuthorComicApi from '../../../../services/api/AuthorComicApi'
 import * as UploadApi from '../../../../services/api/UploadApi'
+import * as AuthorProfileApi from '../../../../services/api/AuthorProfileApi'
 
 vi.mock('../../../../services/api/AuthorComicApi', () => ({
+  checkAuthorComicTitleExistsApi: vi.fn(),
   createAuthorComicApi: vi.fn(),
   getAuthorChapterUploadStatusApi: vi.fn(),
   getAuthorComicsApi: vi.fn(),
@@ -17,6 +19,10 @@ vi.mock('../../../../services/api/AuthorComicApi', () => ({
 
 vi.mock('../../../../services/api/UploadApi', () => ({
   uploadImageApi: vi.fn(),
+}))
+
+vi.mock('../../../../services/api/AuthorProfileApi', () => ({
+  getAuthorProfileApi: vi.fn(),
 }))
 
 vi.mock('react-toastify', () => ({
@@ -55,7 +61,12 @@ function renderAuthorComics() {
 describe('Author My Comics workflow', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    AuthorProfileApi.getAuthorProfileApi.mockResolvedValue({
+      licenseStatus: 'ACTIVE',
+      canPublishComic: true,
+    })
     AuthorComicApi.getAuthorComicsApi.mockResolvedValue([])
+    AuthorComicApi.checkAuthorComicTitleExistsApi.mockResolvedValue(false)
     AuthorComicApi.getAuthorChapterUploadStatusApi.mockResolvedValue({
       taskId: 'task-1',
       status: 'COMPLETED',
@@ -273,4 +284,25 @@ describe('Author My Comics workflow', () => {
     
     expect(AuthorComicApi.uploadAuthorChapterZipApi).not.toHaveBeenCalled()
   })
+  it('blocks inactive license before uploading a comic cover', async () => {
+    AuthorProfileApi.getAuthorProfileApi.mockResolvedValue({
+      licenseStatus: 'PENDING_VERIFICATION',
+      canPublishComic: false,
+    })
+    const coverFile = new File(['cover-bytes'], 'blocked-cover.png', { type: 'image/png' })
+
+    renderAuthorComics()
+    await screen.findByText('No comics yet')
+    fireEvent.click(screen.getByRole('button', { name: '+ Create Comic' }))
+    fireEvent.change(screen.getByLabelText(/title/i), { target: { value: 'Blocked Comic' } })
+    fireEvent.change(screen.getByLabelText(/original language/i), { target: { value: 'English' } })
+    const coverInput = document.querySelector('input[type="file"][accept="image/*"]')
+    fireEvent.change(coverInput, { target: { files: [coverFile] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create Draft' }))
+
+    expect(await screen.findByText(/Author license must be ACTIVE/i)).toBeInTheDocument()
+    expect(UploadApi.uploadImageApi).not.toHaveBeenCalled()
+    expect(AuthorComicApi.createAuthorComicApi).not.toHaveBeenCalled()
+  })
+
 })
