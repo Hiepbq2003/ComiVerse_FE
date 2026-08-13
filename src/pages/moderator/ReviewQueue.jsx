@@ -223,23 +223,8 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
   const [fetchingChapters, setFetchingChapters] = useState(false)
   const chapterCacheRef = useRef(new Map())
 
-  // Google Docs Style Contextual Comment States with Permanent LocalStorage Persistence
-  const [docCommentsMap, setDocCommentsMap] = useState(() => {
-    try {
-      const saved = localStorage.getItem('comiverse_moderator_doc_comments');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  })
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('comiverse_moderator_doc_comments', JSON.stringify(docCommentsMap));
-    } catch (e) {
-      console.error('Failed to persist docCommentsMap:', e);
-    }
-  }, [docCommentsMap])
+  // Google Docs Style Contextual Comment States (In-Memory during review)
+  const [docCommentsMap, setDocCommentsMap] = useState({})
   const [showCommentsSidebar, setShowCommentsSidebar] = useState(true)
   const [activePinTarget, setActivePinTarget] = useState(null)
   const [pinCommentText, setPinCommentText] = useState('')

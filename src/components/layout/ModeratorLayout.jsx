@@ -88,12 +88,12 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
     { id: 'review-queue', label: 'Review Queue', icon: 'review' },
     { id: 'comic-management', label: 'Comic Management', icon: 'comics' },
-    { id: 'genre-management', label: 'Genre Management', icon: 'genre' },
-    { id: 'reports', label: 'Violation Reports', icon: 'reports' },
-    { id: 'report-categories', label: 'Report Categories', icon: 'categories' },
     { id: 'project-teams', label: 'Project Teams', icon: 'teams' },
     { id: 'chat-monitor', label: 'Chat Monitor', icon: 'chat' },
     { id: 'forum', label: 'Forum', icon: 'forum' },
+    { id: 'genre-management', label: 'Genre Management', icon: 'genre' },
+    { id: 'reports', label: 'Violation Reports', icon: 'reports' },
+    { id: 'report-categories', label: 'Report Categories', icon: 'categories' },
   ]
 
   const renderNavIcon = (icon) => {
