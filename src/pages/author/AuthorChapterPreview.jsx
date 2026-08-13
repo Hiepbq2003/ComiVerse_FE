@@ -285,8 +285,19 @@ export default function AuthorChapterPreview() {
       const fetchChapter = async () => {
         try {
           let previewData = null
-          const pPages = extractPages(previewData)
 
+          // Primary: call the author chapter preview endpoint which returns pages
+          try {
+            const previewRes = await getAuthorChapterPreviewApi(comicId, chapterId)
+            if (previewRes?.data || previewRes) {
+              previewData = previewRes.data || previewRes
+            }
+          } catch {
+            // ignore — may fail for rejected chapters
+          }
+
+          // Fallback: if preview didn't return pages, try chapter detail endpoint
+          const pPages = extractPages(previewData)
           if (!previewData || pPages.length === 0) {
             try {
               const detailRes = await getChapterDetailApi(chapterId)

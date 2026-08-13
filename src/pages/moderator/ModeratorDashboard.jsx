@@ -1096,7 +1096,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                   ...item,
                   status: 'rejected',
                   rejectedAt: nowIso,
-                  rejectionReason: item.chapterId ? (reason || 'Chapter rejected') : 'All chapters were rejected. Comic profile auto-rejected.',
+                  rejectionReason: reason || 'All chapters were rejected. Comic profile auto-rejected.',
                   allChapters: updateChaps(item.allChapters),
                   chapters: updateChaps(item.chapters)
                 };
@@ -1167,13 +1167,18 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               }];
             };
 
+            const newAllChapters = updateChaps(item.allChapters);
+            const newChapters = updateChaps(item.chapters);
+            
+            const allRejected = newAllChapters.length > 0 && newAllChapters.every(c => c.status === 'rejected');
+
             return {
               ...item,
-              status: 'rejected',
-              rejectedAt: nowIso,
-              rejectionReason: reason || 'Chapter rejected',
-              allChapters: updateChaps(item.allChapters),
-              chapters: updateChaps(item.chapters)
+              status: allRejected ? 'rejected' : item.status,
+              rejectedAt: allRejected ? nowIso : item.rejectedAt,
+              rejectionReason: allRejected ? (reason || 'All chapters rejected') : item.rejectionReason,
+              allChapters: newAllChapters,
+              chapters: newChapters
             };
           }
           return item;

@@ -40,6 +40,13 @@ function TranslatorLayout({ children }) {
       markAllAsRead()
     } else {
       if (action.unread) await markAsRead(action.id)
+
+      const text = `${action.title || ''} ${action.message || ''}`.toLowerCase();
+      if (text.includes('assigned as project leader') || text.includes('team join request')) {
+        navigate('/translator/project-teams');
+        return;
+      }
+
       if (action.actionUrl?.startsWith('/') && !action.actionUrl.startsWith('//')) {
         navigate(action.actionUrl)
       }
