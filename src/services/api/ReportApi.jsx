@@ -229,7 +229,8 @@ export const createReportApi = async (reportRequest) => {
     target_type: reportRequest.target_type,
     target_id: reportRequest.target_id,
     category_id: reportRequest.category_id,
-    description_text: reportRequest.description_text?.trim()
+    description_text: reportRequest.description_text?.trim(),
+    ...(reportRequest.language_code ? { language_code: reportRequest.language_code } : {})
   };
   const res = await AxiosClient.post('/reports', payload);
   return res?.data !== undefined ? res.data : res;

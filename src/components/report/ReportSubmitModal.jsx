@@ -21,7 +21,8 @@ export default function ReportSubmitModal({
   targetType = 'COMIC', // 'COMIC' | 'CHAPTER' | 'CHAPTER_TRANSLATIONS'
   targetId,
   targetTitle = '',
-  chapterNumber = null
+  chapterNumber = null,
+  languageCode = ''
 }) {
   const navigate = useNavigate();
   const auth = getAuth();
@@ -108,6 +109,11 @@ export default function ReportSubmitModal({
       return;
     }
 
+    if (!targetId) {
+      setError('This item cannot be reported yet.');
+      return;
+    }
+
     setSubmitting(true);
     setError('');
 
@@ -116,7 +122,8 @@ export default function ReportSubmitModal({
         target_type: targetType,
         target_id: targetId,
         category_id: selectedCategoryId,
-        description_text: descriptionText.trim()
+        description_text: descriptionText.trim(),
+        ...(languageCode ? { language_code: languageCode } : {})
       });
 
       toast.success('Thank you for reporting! Our moderation team will review this issue shortly.');

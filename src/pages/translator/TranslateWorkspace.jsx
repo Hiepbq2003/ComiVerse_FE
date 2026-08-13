@@ -1251,6 +1251,8 @@ function GlossaryTabPanel({ projectId, pageId, imageUrl }) {
         note: newNote.trim(),
       });
       setTerms((prev) => [created, ...prev]);
+      setSuggestions((prev) => [created, ...prev]);
+      setLoadError(null);
       setNewSource("");
       setNewTarget("");
       setNewNote("");
@@ -1341,18 +1343,6 @@ function GlossaryTabPanel({ projectId, pageId, imageUrl }) {
     );
   }
 
-  if (loadError) {
-    return (
-      <div className="tw-tabpanel tw-x-glossary-panel">
-        <div className="tw-x-glossary-empty">
-          <AlertCircle size={28} strokeWidth={1.5} />
-          <p>Couldn't load the glossary.</p>
-          <span>{loadError}</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="tw-tabpanel tw-x-glossary-panel">
       <div style={{ display: "flex", gap: 6, padding: "0 0 10px" }}>
@@ -1429,6 +1419,29 @@ function GlossaryTabPanel({ projectId, pageId, imageUrl }) {
         </div>
       </div>
 
+      {loadError && (
+        <div className="tw-x-glossary-empty" style={{ padding: "12px", marginBottom: "12px", border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.1)", borderRadius: 8 }}>
+          <AlertCircle size={20} strokeWidth={1.5} color="#f87171" />
+          <p style={{ fontSize: 13, margin: "4px 0", color: "#f87171" }}>Couldn't load project glossary</p>
+          <span style={{ fontSize: 11, color: "#9ca3af" }}>{loadError}</span>
+          <button
+            type="button"
+            className="tw-btn"
+            style={{ marginTop: 8 }}
+            onClick={() => {
+              setLoading(true);
+              setLoadError(null);
+              fetchGlossaryTerms(projectId)
+                .then((data) => setTerms(Array.isArray(data) ? data : []))
+                .catch((err) => setLoadError(err.message || "Failed to load glossary"))
+                .finally(() => setLoading(false));
+            }}
+          >
+            <RefreshCw size={12} /> Retry Loading
+          </button>
+        </div>
+      )}
+
       {addOpen && (
         <div className="tw-x-glossary-form">
           <div className="tw-x-glossary-form-row">
@@ -1498,9 +1511,14 @@ function GlossaryTabPanel({ projectId, pageId, imageUrl }) {
           <AlertCircle size={28} strokeWidth={1.5} />
           <p>Couldn't scan this page.</p>
           <span>{suggestError}</span>
-          <button type="button" className="tw-btn-primary" onClick={() => runSuggestScan(true)}>
-            <RefreshCw size={13} /> Try Again
-          </button>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <button type="button" className="tw-btn-primary" onClick={() => runSuggestScan(true)}>
+              <RefreshCw size={13} /> Try Again
+            </button>
+            <button type="button" className="tw-btn" onClick={() => setMode("all")}>
+              View All Terms
+            </button>
+          </div>
         </div>
       )}
 
@@ -1541,14 +1559,21 @@ function GlossaryTabPanel({ projectId, pageId, imageUrl }) {
               )}
             </div>
           )}
-          {suggestions.length === 0 && (
+          {suggestions.length === 0 && !addOpen && (
             <div className="tw-x-glossary-empty">
               <BookMarked size={28} strokeWidth={1.5} />
               <p>No glossary terms detected on this page.</p>
-              <span>None of the saved terms matched the text Gemini read here.</span>
-              <button type="button" className="tw-btn" onClick={() => setMode("all")}>
-                View All Terms
-              </button>
+              <span>{terms.length > 0 ? "None of the saved terms matched the text Gemini read here." : "No glossary terms exist in this project yet."}</span>
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                {terms.length > 0 && (
+                  <button type="button" className="tw-btn" onClick={() => setMode("all")}>
+                    View All Terms ({terms.length})
+                  </button>
+                )}
+                <button type="button" className="tw-btn-primary" onClick={() => setAddOpen(true)}>
+                  <Plus size={13} /> Add Term
+                </button>
+              </div>
             </div>
           )}
         </>
@@ -2504,7 +2529,12 @@ async function submitTaskForReview(taskId, signal) {
     signal,
   });
   if (!res.ok) {
-    throw new Error(`Failed to submit for review (${res.status})`);
+    let message = `Failed to submit for review (${res.status})`;
+    try {
+      const payload = await res.json();
+      message = payload?.message || message;
+    } catch (e) {}
+    throw new Error(message);
   }
   return true;
 }
@@ -4021,10 +4051,6 @@ export default function TranslateWorkspace() {
 
     setSending(true);
     try {
-
-      
-
-      
       const saved = await persistCurrentPage();
       if (saved === false) {
         alert(
@@ -4033,23 +4059,34 @@ export default function TranslateWorkspace() {
         );
         return;
       }
-      const updatedPage = await updateTranslationPageStatus(currentPageMeta.pageId, "DONE");
-      setTaskPages((prev) => prev.map((page) => (
-        String(page.pageId || page.id) === String(currentPageMeta.pageId)
-          ? { ...page, ...updatedPage, status: "DONE" }
-          : page
-      )));
+
+      const pageIds = [...new Set(
+        taskPages
+          .map((page) => page.pageId || page.id)
+          .filter(Boolean)
+          .map(String)
+      )];
+      const completedEntries = await Promise.all(pageIds.map(async (pageId) => {
+        const updatedPage = await updateTranslationPageStatus(pageId, "DONE");
+        return [pageId, updatedPage];
+      }));
+      const updatedById = Object.fromEntries(completedEntries);
+      setTaskPages((prev) => prev.map((page) => {
+        const updatedPage = updatedById[String(page.pageId || page.id)];
+        return updatedPage ? { ...page, ...updatedPage, status: "DONE" } : page;
+      }));
+
       await submitTaskForReview(taskId);
       navigate("/translator/project-teams", {
         state: { teamId: chapterData?.projectTeamId, tab: "tasks" },
       });
     } catch (err) {
       console.error("Failed to submit for review:", err);
-      alert("Failed to submit chapter for review. Please try again.");
+      alert(err?.message || "Failed to submit chapter for review. Please try again.");
     } finally {
       setSending(false);
     }
-  }, [isLastPage, sending, canEdit, persistCurrentPage, currentPageMeta, taskId, navigate, chapterData]);
+  }, [isLastPage, sending, canEdit, persistCurrentPage, taskPages, taskId, navigate, chapterData]);
 
   useEffect(() => {
     const onKeyDown = (e) => {

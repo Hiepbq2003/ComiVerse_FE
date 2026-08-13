@@ -12,7 +12,7 @@ import { toast } from 'react-toastify'
 import { getReadChaptersByComicIdApi } from '../../services/api/ReadingHistoryApi'
 import CommentSection from '../../components/common/CommentSection'
 import StarRating from '../../components/common/StarRating'
-import ReadingLanguageSelector from '../../components/common/ReadingLanguageSelector'
+import ReadingLanguageSelector, { chapterHasLanguage, normalizeLanguageCode } from '../../components/common/ReadingLanguageSelector'
 import { useAuth } from '../../context/AuthContext'
 import SubscriptionPlanModal from '../../components/common/SubscriptionPlanModal'
 import ReportSubmitModal from '../../components/report/ReportSubmitModal'
@@ -254,18 +254,18 @@ function ComicDetail() {
   }, [targetCommentIdFromUrl])
 
   const handleReadChapter1 = () => {
-    const filteredChapters = selectedLanguage 
-      ? chapters.filter(ch => ch.translatedLanguages && ch.translatedLanguages.includes(selectedLanguage))
-      : chapters;
+    const filteredChapters = chapters.filter(ch => chapterHasLanguage(ch, selectedLanguage))
       
     if (filteredChapters && filteredChapters.length > 0) {
       // Find the first chapter (sorting by chapter number ascending)
       const sorted = [...filteredChapters].sort((a, b) => Number(a.chapterNumber) - Number(b.chapterNumber))
       const firstChap = sorted[0]
-      const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(selectedLanguage)}` : ''
+      const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(normalizeLanguageCode(selectedLanguage) || selectedLanguage)}` : ''
       navigate(`/comic/${id}/chapter/${firstChap.id}${langQuery}`)
     } else {
-      toast.warning('No chapters available for this comic yet.')
+      toast.warning(selectedLanguage
+        ? 'No translated chapters are available in this language yet.'
+        : 'No chapters available for this comic yet.')
     }
   }
 
@@ -331,6 +331,10 @@ function ComicDetail() {
     : (comic.likes || '0')
 
   const displaySummary = comic.summary || comic.tagline || 'No synopsis available.'
+  const visibleChapters = chapters.filter((ch) => chapterHasLanguage(ch, selectedLanguage))
+  const chapterLangQuery = selectedLanguage
+    ? `?lang=${encodeURIComponent(normalizeLanguageCode(selectedLanguage) || selectedLanguage)}`
+    : ''
 
   return (
     <HomeLayout>
@@ -648,9 +652,13 @@ function ComicDetail() {
                     paddingRight: '8px'
                   }}
                 >
-                {chapters
-                  .filter(ch => !selectedLanguage || (ch.translatedLanguages && ch.translatedLanguages.includes(selectedLanguage)))
-                  .map((ch) => {
+                {visibleChapters.length === 0 ? (
+                  <p style={{ color: '#94a3b8', fontSize: '14px', padding: '24px 8px', margin: 0 }}>
+                    {selectedLanguage
+                      ? 'No translated chapters are available in this language yet. Try Original, or wait until the translation is published.'
+                      : 'No chapters available for this comic yet.'}
+                  </p>
+                ) : visibleChapters.map((ch) => {
                   const chNumber = ch.chapterNumber || '0'
                   const chTitle = ch.title || `Chapter ${chNumber}`
                   const chViewsStr = formatViews(ch.viewCount || 0)
@@ -709,7 +717,7 @@ function ComicDetail() {
                           }
                         }
 
-                        const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(selectedLanguage)}` : ''
+                        const langQuery = chapterLangQuery
                         navigate(`/comic/${id}/chapter/${ch.id}${langQuery}`)
                       }}
                       onMouseEnter={(e) => {

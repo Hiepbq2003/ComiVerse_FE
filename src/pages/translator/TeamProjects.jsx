@@ -122,7 +122,7 @@ import { toast } from 'react-toastify'
 import HomeTab from './HomeTab'
 import MembersTab from './MembersTab'
 import RequestsTab from './RequestsTab'
-import TasksTab, { CreateTaskModal, EditTaskModal, parseTaskTitle, getTaskColumn } from './TasksTab'
+import TasksTab, { CreateTaskModal, EditTaskModal, parseTaskTitle, getTaskColumn, getNormalizedStatusKey } from './TasksTab'
 import SettingsTab from './SettingsTab'
 
 function parseCompletedPageNumbers(value) {
@@ -695,7 +695,7 @@ function TeamProjects() {
   const [memberSearch, setMemberSearch] = useState('')
   const [showCreateTask, setShowCreateTask] = useState(false)
   const [newTaskData, setNewTaskData] = useState({
-    title: '', column: 'backlog', assigneeId: null, dueDate: '', priority: 'Medium', chapterId: null, chapterRewardUsd: ''
+    title: '', column: 'backlog', assigneeId: null, dueDate: '', priority: 'Medium', chapterId: null, chapterRewardUsd: '', taskType: 'REGULAR'
   })
 
   const getAssigneeInitials = (memberId) => {
@@ -703,20 +703,25 @@ function TeamProjects() {
     return member?.avatar || '?'
   }
 
-  const openCreateTaskModal = (chap = null) => {
-    const chId = (chap && typeof chap === 'object') ? (chap.id || null) : null;
-    const defaultTitle = (chap && typeof chap === 'object' && chap.title) ? `${chap.title} - Translation & Proofreading` : '';
+  const openCreateTaskModal = (chap = null, customTaskType = 'REGULAR') => {
+    const chId = (chap && typeof chap === 'object') ? (chap.id || chap.chapterId || null) : null;
+    const isRevision = !!(chap && typeof chap === 'object' && chap.revision);
+    const defaultTitle = (chap && typeof chap === 'object' && chap.title)
+      ? `${chap.title} - ${isRevision ? 'Revision' : 'Translation & Proofreading'}`
+      : '';
     setNewTaskData({
       title: defaultTitle,
-      column: 'backlog',
+      column: 'in_progress',
       assigneeId: null,
       dueDate: '',
       priority: 'Medium',
       chapterId: chId,
-      chapterRewardUsd: ''
+      chapterRewardUsd: '',
+      taskType: isRevision ? 'REVISION' : customTaskType
     })
     setShowCreateTask(true)
   }
+
 
   useEffect(() => {
     if (selectedDetails) {
@@ -779,7 +784,7 @@ function TeamProjects() {
     } catch (e) { /* ignore */ }
 
     try {
-      const [annList, taskList, reqList, teamMembersList, bannedUsersList] = await Promise.all([
+      const [annList, taskList, reqList, teamMembersList, bannedUsersList, teamChaptersList] = await Promise.all([
         getTeamAnnouncementsApi(project.id),
         getTeamTasksApi(project.id),
         getTeamRequestsApi(project.id),
@@ -787,7 +792,11 @@ function TeamProjects() {
           console.error('Could not load real team members for assignee picker:', err)
           return []
         }),
-        getBannedUsersApi(project.id).catch(() => [])
+        getBannedUsersApi(project.id).catch(() => []),
+        getTeamChaptersApi(project.id).catch((err) => {
+          console.warn('Could not load team chapter flags:', err)
+          return []
+        })
       ])
 
       const rawComicTitle = project.comicName || project.title || 'Comic';
@@ -895,6 +904,45 @@ function TeamProjects() {
             status: 'Approved Raw Manuscript'
           }
         ];
+      }
+
+      const teamChapList = Array.isArray(teamChaptersList)
+        ? teamChaptersList
+        : (Array.isArray(teamChaptersList?.data) ? teamChaptersList.data : []);
+      if (teamChapList.length > 0) {
+        const flagsById = new Map();
+        for (const tc of teamChapList) {
+          const id = String(tc.chapterId || tc.id || '');
+          if (id) flagsById.set(id, tc);
+        }
+        finalChapters = finalChapters.map((ch) => {
+          const extra = flagsById.get(String(ch.id));
+          if (!extra) return ch;
+          return {
+            ...ch,
+            revision: extra.revision === true,
+            canCreateTask: extra.canCreateTask === true,
+            previousTaskId: extra.previousTaskId || extra.previous_task_id || null,
+            resolutionNote: extra.resolutionNote || extra.resolution_note || null
+          };
+        });
+        for (const tc of teamChapList) {
+          const id = String(tc.chapterId || tc.id || '');
+          if (!id || finalChapters.some((ch) => String(ch.id) === id)) continue;
+          if (tc.canCreateTask !== true && tc.revision !== true) continue;
+          finalChapters.push({
+            id: tc.chapterId || tc.id,
+            comicId: tc.comicId,
+            title: tc.title,
+            pagesCount: tc.pagesCount || tc.pages || 0,
+            pages: [],
+            status: 'Approved Raw Manuscript',
+            revision: tc.revision === true,
+            canCreateTask: tc.canCreateTask === true,
+            previousTaskId: tc.previousTaskId || tc.previous_task_id || null,
+            resolutionNote: tc.resolutionNote || tc.resolution_note || null
+          });
+        }
       }
 
       setChapterOptions(finalChapters);
@@ -1040,13 +1088,28 @@ function TeamProjects() {
     const targetProject = projects.find(p => p.id === targetTeamId)
     if (targetProject) {
       handleOpenDetails(targetProject).then(() => {
-        setWorkspaceTab(location.state?.tab || 'home')
+        const targetTab = location.state?.tab || 'home';
+        setWorkspaceTab(targetTab);
+        if (location.state?.openCreateTask) {
+          setNewTaskData({
+            title: location.state?.defaultTitle || '',
+            column: 'in_progress',
+            assigneeId: null,
+            dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
+            priority: 'High',
+            chapterId: location.state?.chapterId || null,
+            chapterRewardUsd: '',
+            taskType: location.state?.taskType || 'REGULAR'
+          });
+          setShowCreateTask(true);
+        }
       })
     }
 
     navigate(location.pathname, { replace: true, state: {} })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadingProjects, projects, location.state])
+
 
   const handleOpenEdit = (project, e) => {
     e.stopPropagation()
@@ -1637,7 +1700,8 @@ function TeamProjects() {
     const formattedTitle = cleanTitle.startsWith('[') ? cleanTitle : `[${(data.priority || 'MEDIUM').toUpperCase()}] [${comicName}] ${cleanTitle}`
     const dueDateVal = data.dueDate || new Date().toISOString().split('T')[0]
 
-    const initialStatus = data.column || 'backlog';
+    const taskTypeVal = data.taskType || 'REGULAR';
+    const initialStatus = data.column || 'in_progress';
 
     const newTaskObj = {
       id: `task-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -1645,6 +1709,7 @@ function TeamProjects() {
       status: initialStatus,
       assigneeId: data.assigneeId,
       chapterId: data.chapterId,
+      taskType: taskTypeVal,
       dueDate: dueDateVal,
       chapterRewardUsd: Number(data.chapterRewardUsd) > 0 ? Number(data.chapterRewardUsd) : undefined,
       createdAt: new Date().toISOString()
@@ -1658,13 +1723,14 @@ function TeamProjects() {
         status: initialStatus,
         assigneeId: data.assigneeId,
         chapterId: data.chapterId,
+        taskType: taskTypeVal,
         dueDate: dueDateVal,
         chapterRewardUsd: Number(data.chapterRewardUsd) > 0 ? Number(data.chapterRewardUsd) : undefined
       })
       taskToSave = (created && (created.id || created.title)) ? { ...newTaskObj, ...created } : newTaskObj
     } catch (err) {
       console.error('Backend createTeamTaskApi error, task was NOT created:', err)
-      toast.error('Failed to create task. Please try again.')
+      toast.error(err.response?.data?.message || 'Failed to create task. Please try again.')
       return
     }
 
@@ -1672,9 +1738,10 @@ function TeamProjects() {
     setTasks(updatedTasks)
 
     if (!customData) {
-      setNewTaskData({ title: '', column: 'backlog', assigneeId: null, dueDate: '', priority: 'Medium', chapterId: null, chapterRewardUsd: '' })
+      setNewTaskData({ title: '', column: 'backlog', assigneeId: null, dueDate: '', priority: 'Medium', chapterId: null, chapterRewardUsd: '', taskType: 'REGULAR' })
       setShowCreateTask(false)
     }
+
     toast.success('Task created successfully!')
   }
 
@@ -1834,8 +1901,9 @@ function TeamProjects() {
 
     const isCurrentLeader = isLeaderMatch(selectedDetails.leaderName)
 
-    const activeTasks = tasks.filter(t => getTaskColumn(t) !== 'paused')
-    const pausedTasks = tasks.filter(t => getTaskColumn(t) === 'paused')
+    const boardTasks = tasks.filter(t => String(t?.status || t?.column || '').toLowerCase() !== 'superseded')
+    const activeTasks = boardTasks.filter(t => getTaskColumn(t) !== 'paused')
+    const pausedTasks = boardTasks.filter(t => getTaskColumn(t) === 'paused')
     const comicName = selectedDetails?.comicName || selectedDetails?.title
     const filteredMembers = members.filter(m => m.name.toLowerCase().includes(memberSearch.toLowerCase()))
 
@@ -1881,7 +1949,7 @@ function TeamProjects() {
         onEditComment={handleEditComment}
         onDeleteComment={handleDeleteComment}
         comicName={comicName}
-        tasks={tasks}
+        tasks={boardTasks}
         activeTasks={activeTasks}
         pausedTasks={pausedTasks}
         lockedColumns={lockedColumns}

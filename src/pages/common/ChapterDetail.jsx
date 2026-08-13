@@ -12,7 +12,7 @@ import { isValidUuid } from '../../utils/uuid'
 import { useAuth } from '../../context/AuthContext'
 import CommentSection from '../../components/common/CommentSection'
 import SubscriptionPlanModal from '../../components/common/SubscriptionPlanModal'
-import ReadingLanguageSelector from '../../components/common/ReadingLanguageSelector'
+import ReadingLanguageSelector, { normalizeLanguageCode } from '../../components/common/ReadingLanguageSelector'
 import ReportSubmitModal from '../../components/report/ReportSubmitModal'
 import { Flag } from 'lucide-react'
 
@@ -294,13 +294,20 @@ function ChapterDetail() {
       && !hasInternalChapterAccess
   )
 
+  const translationLanguage = (t) => t?.languageCode || t?.language_code || ''
+  const translationRecordId = (t) =>
+    t?.id || t?.translationId || t?.chapterTranslationId || t?._id || null
+
   // Only show languages that actually have data for THIS chapter — the
   // comic-level picker (ComicDetail) may list languages that some
   // individual chapters don't have a translation for yet.
-  const availableLanguagesForChapter = translations.map((t) => t.languageCode)
-  const activeTranslation = translations.find((t) => t.languageCode === selectedLanguage)
+  const availableLanguagesForChapter = translations.map(translationLanguage)
+  const activeTranslation = translations.find((t) =>
+    normalizeLanguageCode(translationLanguage(t)) === normalizeLanguageCode(selectedLanguage)
+  )
+  const activeTranslationId = translationRecordId(activeTranslation)
   const selectedBubblesByPageNumber = activeTranslation
-    ? parseTranslationBubblesByPage(activeTranslation.pagesBubbles)
+    ? parseTranslationBubblesByPage(activeTranslation.pagesBubbles || activeTranslation.pages_bubbles)
     : {}
   const currentChapterNumberStr = currentChapter.chapterNumber || '?'
   const currentChapterTitleStr = currentChapter.title || `Chapter ${currentChapterNumberStr}`
@@ -556,13 +563,10 @@ function ChapterDetail() {
       <ReportSubmitModal
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}
-        targetType={selectedLanguage ? 'CHAPTER_TRANSLATIONS' : 'CHAPTER'}
-        targetId={
-          selectedLanguage
-            ? (activeTranslation?.id || activeTranslation?.translationId || activeTranslation?.chapterTranslationId || activeTranslation?._id || chapterId)
-            : chapterId
-        }
-        targetTitle={`${comic?.title || 'Comic'} - ${currentChapter?.title || `Chapter ${currentChapter?.chapterNumber || ''}`}${selectedLanguage ? ` (${selectedLanguage.toUpperCase()} Translation)` : ''}`}
+        targetType={activeTranslationId ? 'CHAPTER_TRANSLATIONS' : 'CHAPTER'}
+        targetId={activeTranslationId || chapterId}
+        languageCode={activeTranslationId ? (selectedLanguage || translationLanguage(activeTranslation)) : ''}
+        targetTitle={`${comic?.title || 'Comic'} - ${currentChapter?.title || `Chapter ${currentChapter?.chapterNumber || ''}`}${activeTranslationId ? ` (${(selectedLanguage || translationLanguage(activeTranslation)).toUpperCase()} Translation)` : ''}`}
         chapterNumber={currentChapter?.chapterNumber}
       />
     </HomeLayout>

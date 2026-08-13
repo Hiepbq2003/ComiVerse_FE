@@ -117,23 +117,31 @@ export function isUserAssignedToTask(t, teamMembers = [], authUser) {
   return false;
 }
 
+export function isSupersededTask(task) {
+  const status = String(task?.status || task?.column || '').toLowerCase().replace(/[-\s]/g, '_');
+  return status === 'superseded';
+}
+
 export function filterUnassignedChapters(chapterOptions, tasks) {
+  const activeTasks = (tasks || []).filter(t => t && !isSupersededTask(t));
+
   const assignedChapterIds = new Set(
-    (tasks || [])
+    activeTasks
       .map(t => String(t?.chapterId || t?.chapter_id || ''))
       .filter(Boolean)
   );
 
   return (chapterOptions || []).filter(ch => {
     if (!ch) return false;
-    // 1. Direct ID match
+    if (ch.canCreateTask === true || ch.revision === true) return true;
+    if (ch.canCreateTask === false) return false;
+
     if (ch.id && assignedChapterIds.has(String(ch.id))) return false;
 
-    // 2. Title / Chapter number pattern match against existing tasks
     const chTitleLower = (ch.title || '').toLowerCase();
     const chNumMatch = chTitleLower.match(/chapter\s*(\d+)/i);
 
-    const isTaskCreated = (tasks || []).some(t => {
+    const isTaskCreated = activeTasks.some(t => {
       if (!t || !t.title) return false;
       const tLower = t.title.toLowerCase();
 
@@ -176,10 +184,12 @@ function TaskCard({ task, colId, comicName, onOpenTaskDetails, getAssigneeInitia
   const { priority, cleanTitle } = parseTaskTitle(task.title, comicName)
   const isDone = colId === 'completed'
   const isRevoked = !isDone && Boolean(task.rejectionReason || task.isRevoked || task.status === 'REVOKED' || task.status === 'REVISION_NEEDED')
+  const isRevisionTask = ['REVISION', 'TRANSLATION_REPORT'].includes(String(task.taskType || task.task_type || '').toUpperCase())
+    || (task.title || '').toLowerCase().includes('[report fix]')
 
   return (
     <article
-      className={`task ${isDone ? 'task--completed' : ''} ${isRevoked ? 'task--revoked' : ''}`}
+      className={`task ${isDone ? 'task--completed' : ''} ${isRevoked ? 'task--revoked' : ''} ${isRevisionTask ? 'task--report-fix' : ''}`}
       tabIndex="0"
       onClick={() => onOpenTaskDetails(task)}
     >
@@ -197,12 +207,20 @@ function TaskCard({ task, colId, comicName, onOpenTaskDetails, getAssigneeInitia
           </div>
         )}
 
-        {isRevoked && (
+        {isRevisionTask && (
+          <span className="task__report-tag" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)', fontSize: '10px', fontWeight: '700', padding: '1px 6px', borderRadius: '4px' }}>
+            Revision
+          </span>
+        )}
+
+
+        {isRevoked && !isRevisionTask && (
           <span className="task__revoked-tag" title={task.rejectionReason ? `Revoked Reason: ${task.rejectionReason}` : 'Translation Revoked'}>
             ⚠️ REVOKED
           </span>
         )}
       </div>
+
 
       <h3>{cleanTitle}</h3>
       <p className="task__desc">Task for {comicName}</p>
@@ -622,20 +640,23 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
     assigneeId: null,
     dueDate: '',
     priority: 'High',
-    chapterId: null
+    chapterId: null,
+    taskType: 'REGULAR'
   });
 
   const handleOpenCreateTask = () => {
     if (!isCurrentLeader) return;
-    const chId = chapter?.id || null;
-    const defaultTitle = `${chapter?.title || `Chapter ${chapter?.number || chapter?.chapterNumber || ''}`} - Translation & Proofreading`;
+    const chId = chapter?.id || chapter?.chapterId || null;
+    const isRevision = !!chapter?.revision;
+    const defaultTitle = `${chapter?.title || `Chapter ${chapter?.number || chapter?.chapterNumber || ''}`} - ${isRevision ? 'Revision' : 'Translation & Proofreading'}`;
     setInspectTaskData({
       title: defaultTitle,
-      column: 'backlog',
+      column: 'in_progress',
       assigneeId: null,
       dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
       priority: 'High',
-      chapterId: chId
+      chapterId: chId,
+      taskType: isRevision ? 'REVISION' : 'REGULAR'
     });
     setShowCreateTaskModal(true);
   };
@@ -1461,10 +1482,14 @@ export function CreateTaskModal({
                 onChange={(e) => {
                   const chId = e.target.value || null;
                   const foundCh = availableChapterOptions.find(c => String(c.id) === String(chId));
+                  const isRevision = !!foundCh?.revision;
                   setNewTaskData(prev => ({
                     ...prev,
                     chapterId: chId,
-                    title: (!prev.title.trim() && foundCh) ? `${foundCh.title} - Translation & Proofreading` : prev.title
+                    taskType: isRevision ? 'REVISION' : (prev.taskType === 'REVISION' ? 'REGULAR' : (prev.taskType || 'REGULAR')),
+                    title: (!prev.title.trim() && foundCh)
+                      ? `${foundCh.title} - ${isRevision ? 'Revision' : 'Translation & Proofreading'}`
+                      : prev.title
                   }));
                 }}
                 disabled={availableChapterOptions.length === 0}
@@ -1474,7 +1499,7 @@ export function CreateTaskModal({
                 </option>
                 {availableChapterOptions.map((ch) => (
                   <option key={ch.id} value={ch.id}>
-                    📖 {ch.title}{ch.pagesCount > 0 ? ` (${ch.pagesCount} pages)` : ''}
+                    📖 {ch.title}{ch.pagesCount > 0 ? ` (${ch.pagesCount} pages)` : ''}{ch.revision ? ' — Revision' : ''}
                   </option>
                 ))}
               </select>
@@ -1518,12 +1543,18 @@ export function CreateTaskModal({
             {showError('chapterId') && (
               <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Please select a chapter</p>
             )}
+            {availableChapterOptions.find(c => String(c.id) === String(newTaskData.chapterId))?.revision && (
+              <p style={{ color: 'var(--trans-text-muted)', fontSize: '11px', margin: '6px 0 0', lineHeight: 1.4 }}>
+                This chapter has an accepted translation report. Creating a revision copies the previous bubbles. Readers keep the live translation until this task is published.
+              </p>
+            )}
           </div>
 
           <div className="trans-form-group" style={{ marginTop: '14px' }}>
             <label className="trans-form-label">Priority</label>
             <PriorityPicker value={newTaskData.priority} onChange={(v) => setNewTaskData({ ...newTaskData, priority: v })} />
           </div>
+
 
           <div className="trans-form-group" style={{ marginTop: '14px' }}>
             <label className="trans-form-label">Assignee *</label>
