@@ -987,15 +987,56 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     }
   }
 
+  const isCommentMatchingChapter = (c, chapObj, comicId) => {
+    if (!c) return false;
+    const cComicId = String(c.comicId || '');
+    if (comicId && cComicId && String(comicId) !== String(comicId)) return false;
+
+    const targetChapId = String(chapObj?.id || chapObj?.chapterId || '');
+    const targetChapNum = String(chapObj?.chapterNumber || chapObj?.number || '');
+
+    const cChapId = String(c.chapterId || '');
+    const cChapNum = String(c.chapterNumber || '');
+
+    if (targetChapId && cChapId && (cChapId === targetChapId || cChapId === `chap-${targetChapId}` || `chap-${cChapId}` === targetChapId)) {
+      return true;
+    }
+    if (targetChapNum && cChapNum && targetChapNum === cChapNum) {
+      return true;
+    }
+    return false;
+  };
+
+  const getChapterScopedComments = (chapObj, submissionId, comicId) => {
+    const targetChapId = chapObj?.id || chapObj?.chapterId;
+    const candidates = [
+      ...(targetChapId && docCommentsMap[targetChapId] ? docCommentsMap[targetChapId] : []),
+      ...(submissionId && docCommentsMap[submissionId] ? docCommentsMap[submissionId] : []),
+      ...(comicId && docCommentsMap[comicId] ? docCommentsMap[comicId] : []),
+      ...(chapObj?.notes || [])
+    ];
+
+    const comments = [];
+    const seenIds = new Set();
+    candidates.forEach(c => {
+      if (!c || seenIds.has(c.id)) return;
+      if (isCommentMatchingChapter(c, chapObj, comicId)) {
+        seenIds.add(c.id);
+        comments.push(c);
+      }
+    });
+    return comments;
+  };
+
   const onConfirmRejectClick = () => {
     if (!selectedReject) return
     const userOverallNote = rejectionReason.trim();
     
     if (selectedReject.rejectChapterObj && handleChapterReject) {
-      // Single chapter rejection
+      // Single chapter rejection — strictly scope comments to this chapter
       const comicId = selectedReject.parentReviewId || selectedReject.id;
-      const targetChapId = selectedReject.rejectChapterObj?.id || selectedReject.rejectChapterObj?.chapterId || selectedReject.chapterId;
-      const comments = (targetChapId && docCommentsMap[targetChapId]) || docCommentsMap[selectedReject.id] || docCommentsMap[comicId] || selectedReject.notes || [];
+      const targetChap = selectedReject.rejectChapterObj;
+      const comments = getChapterScopedComments(targetChap, selectedReject.id, comicId);
       let finalPayload = '';
 
       if (userOverallNote && comments.length > 0) {
@@ -1015,9 +1056,8 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       const comicId = selectedReject.parentReviewId || selectedReject.id;
 
       itemsToReject.forEach(i => {
-        const targetChapId = i.id || i.chapterId;
         // Scope comments to the specific sub-item being rejected
-        const comments = (targetChapId && docCommentsMap[targetChapId]) || docCommentsMap[comicId] || i.notes || [];
+        const comments = getChapterScopedComments(i, selectedReject.id, comicId);
         let finalPayload = '';
 
         if (userOverallNote && comments.length > 0) {
@@ -1087,12 +1127,17 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
   const handleAddDocComment = (submissionId, targetType, targetKey, targetLabel, text, coords = null) => {
     if (!text || !text.trim()) return
     const chapId = selectedChapter?.id || selectedChapter?.chapterId || selectedReview?.chapterId || selectedReview?.id
-    const comicIdVal = selectedReview?.comicId || selectedReview?.parentReviewId
+    const comicIdVal = selectedReview?.comicId || selectedReview?.parentReviewId || selectedChapter?.comicId
+    const chapNumVal = selectedChapter?.chapterNumber || selectedChapter?.number || selectedReview?.chapterNumber || selectedReview?.number
+    const comicTitleVal = selectedReview?.title || selectedReview?.comicTitle || selectedReview?.comicName || ''
+
     const newComment = {
       id: `doc-comment-${Date.now()}`,
-      submissionId,
-      chapterId: chapId,
-      comicId: comicIdVal,
+      submissionId: String(submissionId),
+      chapterId: chapId ? String(chapId) : null,
+      chapterNumber: chapNumVal ? String(chapNumVal) : null,
+      comicId: comicIdVal ? String(comicIdVal) : null,
+      comicTitle: comicTitleVal,
       targetType,
       targetKey,
       targetLabel,
@@ -1605,8 +1650,10 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           {/* Topbar Navigation & Review Actions */}
           {(() => {
             const viewPages = getReviewViewPages(selectedReview, selectedChapter, docCommentsMap);
-            const activeComments = docCommentsMap[selectedReview.id] || [];
             const chaptersList = getSubmissionChapters(selectedReview);
+            const activeChap = selectedChapter || chaptersList[0] || null;
+            const comicIdVal = selectedReview.comicId || selectedReview.parentReviewId;
+            const activeComments = getChapterScopedComments(activeChap, selectedReview.id, comicIdVal);
 
             return (
               <div className="mod-inspector-topbar">
@@ -1678,6 +1725,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                 const viewPages = getReviewViewPages(selectedReview, selectedChapter, docCommentsMap);
                 const chaptersList = getSubmissionChapters(selectedReview);
                 const activeChap = selectedChapter || chaptersList[0] || null;
+                const comicIdVal = selectedReview.comicId || selectedReview.parentReviewId;
 
                 /* MODE 1: RAW IMAGE READER VIEW */
                 if (previewTab === 'reader') {
@@ -1703,7 +1751,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                   }
 
                   const current = viewPages[pageIndex] || viewPages[0];
-                  const pageComments = (docCommentsMap[selectedReview.id] || [])
+                  const pageComments = getChapterScopedComments(activeChap, selectedReview.id, comicIdVal)
                     .filter(c => c.targetKey === `page-${current.pNum}`);
 
                   return (
@@ -2186,12 +2234,23 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                 {/* Sidebar Header */}
                 <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(148,163,184,0.15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <h4 className="mod-inspector-title" style={{ margin: 0, fontSize: '15px', fontWeight: '700' }}>
-                      💬 Contextual Feedback ({ (docCommentsMap[selectedReview.id] || []).length })
-                    </h4>
-                    <span className="mod-inspector-subtitle" style={{ fontSize: '11.5px' }}>
-                      Google Docs style pinned comments
-                    </span>
+                    {(() => {
+                      const chaptersList = getSubmissionChapters(selectedReview);
+                      const activeChap = selectedChapter || chaptersList[0] || null;
+                      const comicIdVal = selectedReview.comicId || selectedReview.parentReviewId;
+                      const allList = getChapterScopedComments(activeChap, selectedReview.id, comicIdVal);
+
+                      return (
+                        <>
+                          <h4 className="mod-inspector-title" style={{ margin: 0, fontSize: '15px', fontWeight: '700' }}>
+                            💬 Contextual Feedback ({ allList.length })
+                          </h4>
+                          <span className="mod-inspector-subtitle" style={{ fontSize: '11.5px' }}>
+                            {activeChap ? activeChap.title : 'Chapter'} · Google Docs style pinned comments
+                          </span>
+                        </>
+                      );
+                    })()}
                   </div>
                   <button
                     type="button"
@@ -2205,7 +2264,10 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
 
                 {/* Sub-tabs for filtering sidebar comments */}
                 {(() => {
-                  const allList = docCommentsMap[selectedReview.id] || [];
+                  const chaptersList = getSubmissionChapters(selectedReview);
+                  const activeChap = selectedChapter || chaptersList[0] || null;
+                  const comicIdVal = selectedReview.comicId || selectedReview.parentReviewId;
+                  const allList = getChapterScopedComments(activeChap, selectedReview.id, comicIdVal);
                   const pageNotesList = allList.filter(c => c.targetType === 'page' || (!c.coords && c.targetType !== 'field'));
                   const pointPinsList = allList.filter(c => c.targetType === 'point' || c.xPercentage !== null);
 
