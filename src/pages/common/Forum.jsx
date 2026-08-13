@@ -381,6 +381,16 @@ function Forum() {
   const [reportReason, setReportReason] = useState('')
   const [threadToReport, setThreadToReport] = useState(null)
 
+  // Reported threads state (localStorage)
+  const [reportedThreadIds, setReportedThreadIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('comiverse_user_reported_threads')
+      return saved ? new Set(JSON.parse(saved)) : new Set()
+    } catch (e) {
+      return new Set()
+    }
+  })
+
   // Followed threads state (localStorage)
   const [followedThreads, setFollowedThreads] = useState(() => {
     const saved = localStorage.getItem('comiverse_followed_threads')
@@ -757,6 +767,12 @@ function Forum() {
   // Handle reporting a thread
   const handleTriggerReport = (thread, event) => {
     if (event) event.stopPropagation()
+    if (!thread) return
+    const isAlreadyReported = reportedThreadIds.has(thread.id) || thread.isReported
+    if (isAlreadyReported) {
+      toast.info('🛡️ You have already reported this thread. A moderator is reviewing it.')
+      return
+    }
     setThreadToReport(thread)
     setReportReason('')
     setShowReportModal(true)
@@ -773,6 +789,20 @@ function Forum() {
       await reportForumThreadApi(threadToReport.id, reportReason.trim())
       toast.success('Thread reported successfully. A moderator will review it shortly.')
       setShowReportModal(false)
+
+      setReportedThreadIds(prev => {
+        const next = new Set(prev).add(threadToReport.id)
+        try {
+          localStorage.setItem('comiverse_user_reported_threads', JSON.stringify(Array.from(next)))
+        } catch (e) {}
+        return next
+      })
+
+      setThreads(prev => prev.map(t => t.id === threadToReport.id ? { ...t, isReported: true } : t))
+      if (selectedThread && selectedThread.id === threadToReport.id) {
+        setSelectedThread(prev => prev ? { ...prev, isReported: true } : prev)
+      }
+
       fetchThreads(currentPage)
       fetchAllThreadsForCounts()
     } catch (err) {
@@ -1616,13 +1646,22 @@ function Forum() {
                         const auth = getAuth();
                         const isCreator = auth?.user && (selectedThread.author === auth.user.fullName || selectedThread.author === auth.user.username);
                         if (isCreator) return null;
+                        const isReported = reportedThreadIds.has(selectedThread.id) || selectedThread.isReported;
                         return (
                           <button 
                             type="button"
-                            className="forum-panel-btn report" 
+                            className={`forum-panel-btn report ${isReported ? 'reported' : ''}`} 
                             onClick={() => handleTriggerReport(selectedThread)}
+                            disabled={isReported}
+                            style={isReported ? {
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              color: '#f87171',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              cursor: 'not-allowed',
+                              opacity: 0.85
+                            } : {}}
                           >
-                            <Flag size={16} aria-hidden="true" /> Report Thread
+                            <Flag size={16} aria-hidden="true" /> {isReported ? '🚩 Thread Reported' : 'Report Thread'}
                           </button>
                         );
                       })()}
@@ -1922,21 +1961,24 @@ function Forum() {
                                       </>
                                     )}
                                     {!isModerator && (() => {
-                                       const auth = getAuth();
-                                       const isCreator = auth?.user && (thread.author === auth.user.fullName || thread.author === auth.user.username);
-                                       if (isCreator) return null;
-                                       return (
-                                         <button 
-                                           className="forum-dropdown-item" 
-                                           onClick={(e) => {
-                                             handleTriggerReport(thread, e);
-                                             setActiveDropdownThreadId(null);
-                                           }}
-                                         >
-                                           <span>🚩</span> Report
-                                         </button>
-                                       );
-                                     })()}
+                                      const auth = getAuth();
+                                      const isCreator = auth?.user && (thread.author === auth.user.fullName || thread.author === auth.user.username);
+                                      if (isCreator) return null;
+                                      const isReported = reportedThreadIds.has(thread.id) || thread.isReported;
+                                      return (
+                                        <button 
+                                          className="forum-dropdown-item" 
+                                          onClick={(e) => {
+                                            handleTriggerReport(thread, e);
+                                            setActiveDropdownThreadId(null);
+                                          }}
+                                          disabled={isReported}
+                                          style={isReported ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+                                        >
+                                          <span>🚩</span> {isReported ? 'Reported' : 'Report'}
+                                        </button>
+                                      );
+                                    })()}
                                   </div>
                                 )}
                               </div>
