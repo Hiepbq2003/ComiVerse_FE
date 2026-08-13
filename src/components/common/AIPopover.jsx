@@ -414,7 +414,9 @@ export const AIPopover = ({
                       className={`pop-notif__item ${n.unread ? 'pop-notif__item--unread' : ''}`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        const hasNavigation = Boolean(n.actionUrl && n.actionUrl.startsWith('/') && !n.actionUrl.startsWith('//'));
+                        const hasNavigation = Boolean(n.actionUrl && n.actionUrl.startsWith('/') && !n.actionUrl.startsWith('//')) || 
+                                              notifText.includes('assigned as project leader') || 
+                                              notifText.includes('team join request');
                         if (hasNavigation) {
                           setIsOpen(false);
                         }

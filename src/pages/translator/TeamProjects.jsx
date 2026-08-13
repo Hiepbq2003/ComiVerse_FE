@@ -303,6 +303,331 @@ function EditProjectModal({ editForm, setEditForm, onCancel, onSave }) {
   )
 }
 
+function BanUserModal({ modalData, teamName, onClose, onConfirm }) {
+  const [reason, setReason] = useState(modalData?.reason || 'Spam applications / Not a good fit')
+  const [submitting, setSubmitting] = useState(false)
+
+  if (!modalData) return null
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!reason.trim()) return
+    setSubmitting(true)
+    try {
+      await onConfirm(reason.trim())
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="trans-modal-overlay fade-in" style={{ zIndex: 10000 }}>
+      <div
+        className="trans-modal-card"
+        style={{
+          maxWidth: '520px',
+          width: '92%',
+          borderRadius: '20px',
+          overflow: 'hidden',
+          border: '1px solid rgba(239, 68, 68, 0.35)',
+          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7), 0 0 35px rgba(239, 68, 68, 0.18)',
+          background: 'linear-gradient(145deg, #161022 0%, #0d0818 100%)'
+        }}
+      >
+        {/* Header */}
+        <div
+          className="trans-modal-header"
+          style={{
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            padding: '20px 24px',
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(22, 16, 34, 0.8) 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '12px',
+                background: 'rgba(239, 68, 68, 0.2)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px'
+              }}
+            >
+              🚫
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#ffffff', letterSpacing: '0.01em' }}>
+                Ban Applicant from Team
+              </h3>
+              <span style={{ fontSize: '13px', color: '#94a3b8', marginTop: '2px', display: 'block' }}>
+                Target User: <strong style={{ color: '#fca5a5' }}>{modalData.name}</strong>
+              </span>
+            </div>
+          </div>
+          <button className="trans-modal-close-btn" onClick={onClose} disabled={submitting} style={{ fontSize: '24px', color: '#94a3b8' }}>×</button>
+        </div>
+
+        {/* Body */}
+        <form onSubmit={handleSubmit}>
+          <div className="trans-modal-body" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div
+              style={{
+                padding: '14px 16px',
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                borderRadius: '12px',
+                fontSize: '13.5px',
+                color: '#fca5a5',
+                lineHeight: '1.5'
+              }}
+            >
+              ⚠️ Are you sure you want to ban <strong>{modalData.name}</strong> from <strong>{teamName || 'this team'}</strong>? Banning will reject their application and block them from submitting future join requests.
+            </div>
+
+            <div className="trans-form-group" style={{ margin: 0 }}>
+              <label
+                className="trans-form-label"
+                style={{
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  color: '#cbd5e1',
+                  marginBottom: '8px',
+                  display: 'block'
+                }}
+              >
+                Reason for Ban *
+              </label>
+              <textarea
+                className="trans-form-input textarea"
+                rows={3}
+                placeholder="Enter specific reason for banning this applicant..."
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                required
+                style={{
+                  width: '100%',
+                  background: 'rgba(10, 6, 18, 0.8)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '12px',
+                  color: '#ffffff',
+                  padding: '12px 16px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.4)',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+
+            {/* Presets */}
+            <div>
+              <span style={{ fontSize: '11.5px', color: '#94a3b8', display: 'block', marginBottom: '8px', fontWeight: '600' }}>
+                Quick Preset Reasons:
+              </span>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {[
+                  'Spam applications / Not a good fit',
+                  'Inappropriate CV or portfolio link',
+                  'Violates team community standards',
+                  'Repeated low-quality submissions'
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setReason(preset)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      background: reason === preset ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                      color: reason === preset ? '#fca5a5' : '#cbd5e1',
+                      border: reason === preset ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div
+            className="trans-modal-footer"
+            style={{
+              padding: '16px 24px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'rgba(10, 6, 18, 0.6)',
+              display: 'flex',
+              justify: 'flex-end',
+              gap: '12px'
+            }}
+          >
+            <button
+              type="button"
+              className="trans-btn secondary"
+              onClick={onClose}
+              disabled={submitting}
+              style={{ borderRadius: '10px', padding: '10px 18px', background: 'rgba(255,255,255,0.05)', color: '#cbd5e1' }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="trans-btn primary"
+              disabled={!reason.trim() || submitting}
+              style={{
+                borderRadius: '10px',
+                padding: '10px 22px',
+                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                color: '#ffffff',
+                fontWeight: '700',
+                border: 'none',
+                boxShadow: '0 4px 16px rgba(239, 68, 68, 0.4)',
+                opacity: (!reason.trim() || submitting) ? 0.6 : 1,
+                cursor: submitting ? 'wait' : 'pointer'
+              }}
+            >
+              {submitting ? 'Banning User...' : '🚫 Confirm Ban'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function UnbanUserModal({ modalData, teamName, onClose, onConfirm }) {
+  const [submitting, setSubmitting] = useState(false)
+
+  if (!modalData) return null
+
+  const handleConfirm = async () => {
+    setSubmitting(true)
+    try {
+      await onConfirm()
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="trans-modal-overlay fade-in" style={{ zIndex: 10000 }}>
+      <div
+        className="trans-modal-card"
+        style={{
+          maxWidth: '460px',
+          width: '92%',
+          borderRadius: '20px',
+          overflow: 'hidden',
+          border: '1px solid rgba(16, 185, 129, 0.35)',
+          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7), 0 0 35px rgba(16, 185, 129, 0.18)',
+          background: 'linear-gradient(145deg, #161022 0%, #0d0818 100%)'
+        }}
+      >
+        {/* Header */}
+        <div
+          className="trans-modal-header"
+          style={{
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            padding: '20px 24px',
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(22, 16, 34, 0.8) 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '12px',
+                background: 'rgba(16, 185, 129, 0.2)',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px'
+              }}
+            >
+              🔓
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#ffffff' }}>
+                Unban User
+              </h3>
+              <span style={{ fontSize: '13px', color: '#94a3b8', marginTop: '2px', display: 'block' }}>
+                Target User: <strong style={{ color: '#6ee7b7' }}>{modalData.name}</strong>
+              </span>
+            </div>
+          </div>
+          <button className="trans-modal-close-btn" onClick={onClose} disabled={submitting} style={{ fontSize: '24px', color: '#94a3b8' }}>×</button>
+        </div>
+
+        {/* Body */}
+        <div className="trans-modal-body" style={{ padding: '24px' }}>
+          <p style={{ margin: 0, fontSize: '14.5px', lineHeight: '1.6', color: '#cbd5e1' }}>
+            Are you sure you want to unban <strong>{modalData.name}</strong> from <strong>{teamName || 'this team'}</strong>? They will be allowed to submit join requests to the team again.
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div
+          className="trans-modal-footer"
+          style={{
+            padding: '16px 24px',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'rgba(10, 6, 18, 0.6)',
+            display: 'flex',
+            justify: 'flex-end',
+            gap: '12px'
+          }}
+        >
+          <button
+            type="button"
+            className="trans-btn secondary"
+            onClick={onClose}
+            disabled={submitting}
+            style={{ borderRadius: '10px', padding: '10px 18px', background: 'rgba(255,255,255,0.05)', color: '#cbd5e1' }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="trans-btn primary"
+            onClick={handleConfirm}
+            disabled={submitting}
+            style={{
+              borderRadius: '10px',
+              padding: '10px 22px',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#ffffff',
+              fontWeight: '700',
+              border: 'none',
+              boxShadow: '0 4px 16px rgba(16, 185, 129, 0.4)',
+              cursor: submitting ? 'wait' : 'pointer'
+            }}
+          >
+            {submitting ? 'Unbanning...' : '🔓 Confirm Unban'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function WorkspaceBreadcrumbs({ title, onBack }) {
   return (
     <div className="workspace-breadcrumbs">
@@ -1593,13 +1918,25 @@ function TeamProjects() {
     }
   }
 
-  const handleBanUser = async (userId, name, requestId) => {
+  const [banModalData, setBanModalData] = useState(null)
+  const [unbanModalData, setUnbanModalData] = useState(null)
+
+  const handleBanUser = (userId, name, requestId) => {
     if (!userId) {
       toast.error('Cannot ban user: Missing user ID.')
       return
     }
-    const reason = window.prompt(`Ban ${name} from applying to this team?\n\nReason:`, 'Spam applications / Not a good fit')
-    if (reason === null) return // Cancelled
+    setBanModalData({
+      userId,
+      name: name || 'Applicant',
+      requestId,
+      reason: 'Spam applications / Not a good fit'
+    })
+  }
+
+  const handleConfirmBanUser = async (reason) => {
+    if (!banModalData) return
+    const { userId, name, requestId } = banModalData
 
     if (requestId) {
       setJoinRequests(prev => prev.filter(req => req.id !== requestId))
@@ -1608,6 +1945,7 @@ function TeamProjects() {
     try {
       await banUserFromTeamApi(selectedDetails.id, userId, reason)
       toast.success(`${name} has been banned from this team.`)
+      setBanModalData(null)
       // Refresh bans
       getBannedUsersApi(selectedDetails.id).then(res => {
         setBannedUsers(Array.isArray(res) ? res : res?.data || [])
@@ -1618,12 +1956,19 @@ function TeamProjects() {
     }
   }
 
-  const handleUnbanUser = async (userId, name) => {
-    if (!window.confirm(`Unban ${name}? They will be able to apply to the team again.`)) return
+  const handleUnbanUser = (userId, name) => {
+    setUnbanModalData({ userId, name: name || 'User' })
+  }
+
+  const handleConfirmUnbanUser = async () => {
+    if (!unbanModalData) return
+    const { userId, name } = unbanModalData
+
     try {
       await unbanUserFromTeamApi(selectedDetails.id, userId)
       toast.success(`${name} has been unbanned.`)
       setBannedUsers(prev => prev.filter(b => b.userId !== userId))
+      setUnbanModalData(null)
     } catch (err) {
       console.error(err)
       toast.error(err.response?.data?.message || 'Failed to unban user.')
@@ -1856,7 +2201,8 @@ function TeamProjects() {
     const filteredMembers = members.filter(m => m.name.toLowerCase().includes(memberSearch.toLowerCase()))
 
     return (
-      <WorkspaceDetailView
+      <>
+        <WorkspaceDetailView
         selectedDetails={selectedDetails}
         setSelectedDetails={setSelectedDetails}
         tasksLoading={tasksLoading}
@@ -1924,8 +2270,25 @@ function TeamProjects() {
         onContinueToReviewWorkspace={() => navigate(`/translator/review-workspace/task/${selectedTask.id}`)}
         onSaveWorkspaceSettings={handleSaveWorkspaceSettings}
       />
-    )
-  }
+      {banModalData && (
+        <BanUserModal
+          modalData={banModalData}
+          teamName={selectedDetails?.teamName || selectedDetails?.title || 'this team'}
+          onClose={() => setBanModalData(null)}
+          onConfirm={handleConfirmBanUser}
+        />
+      )}
+      {unbanModalData && (
+        <UnbanUserModal
+          modalData={unbanModalData}
+          teamName={selectedDetails?.teamName || selectedDetails?.title || 'this team'}
+          onClose={() => setUnbanModalData(null)}
+          onConfirm={handleConfirmUnbanUser}
+        />
+      )}
+    </>
+  )
+}
 
   const handleQuickTranslate = async (proj) => {
     try {

@@ -1318,11 +1318,8 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
 }
 
 function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, readOnly = false, allowEmpty = false }) {
-  const assignableCandidates = (candidates || []).filter(m => {
-    const roleStr = String(m.role || '').toLowerCase().trim();
-    const isLeaderRole = m.isLeader || roleStr.includes('leader') || roleStr === 'group leader' || roleStr === 'project leader' || roleStr === 'team leader' || roleStr === 'project_leader' || roleStr === 'team_leader';
-    return !isLeaderRole;
-  });
+  // Allow all members, including leaders, to be selected as assignees
+  const assignableCandidates = candidates || [];
 
   const chipStyle = (isSelected) => ({
     display: 'inline-flex',
@@ -1465,7 +1462,8 @@ export function CreateTaskModal({
   const errors = {
     title: !newTaskData.title.trim(),
     chapterId: !newTaskData.chapterId,
-    dueDate: !newTaskData.dueDate || newTaskData.dueDate < todayStr
+    dueDate: !newTaskData.dueDate || newTaskData.dueDate < todayStr,
+    assigneeId: !newTaskData.assigneeId
   }
   const showError = (field) => submitted && errors[field]
   const errorBorder = (field) => showError(field) ? { borderColor: '#ef4444' } : undefined
@@ -1602,17 +1600,17 @@ export function CreateTaskModal({
 
 
           <div className="trans-form-group" style={{ marginTop: '14px' }}>
-            <label className="trans-form-label">Assignee</label>
+            <label className="trans-form-label">Assignee *</label>
             <AssigneeChipPicker
               candidates={teamMembersForAssign}
               selectedId={newTaskData.assigneeId}
               onSelect={(memberId) => setNewTaskData({ ...newTaskData, assigneeId: memberId })}
               emptyLabel="No team members found for this project."
-              allowEmpty
+              error={showError('assigneeId')}
             />
-            <p style={{ color: 'var(--trans-text-muted)', fontSize: '11px', margin: '6px 0 0' }}>
-              Optional. You can assign a translator later.
-            </p>
+            {showError('assigneeId') && (
+              <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Assignee is required</p>
+            )}
           </div>
 
           <div className="trans-form-group" style={{ marginTop: '14px' }}>

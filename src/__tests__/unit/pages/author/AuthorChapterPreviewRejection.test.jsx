@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, waitFor, cleanup } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import AuthorChapterPreview from '../../../../pages/author/AuthorChapterPreview'
@@ -32,6 +32,10 @@ describe('AuthorChapterPreview - Rejection & Comment Scoping Tests', () => {
     AuthContext.useAuth.mockReturnValue({
       user: { id: 'author-1', role: 'AUTHOR', fullName: 'Test Author' },
     })
+  })
+
+  afterEach(() => {
+    cleanup()
   })
 
   const renderComponent = (comicId = 'comic-100', chapterId = 'chap-2', state = null) => {
