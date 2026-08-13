@@ -55,10 +55,10 @@ export const AIPopover = ({
 
   // Specs for models in Dropdown Transition
   const modelSpecs = {
-    'GPT-5': { developer: 'OpenAI', context: '1M', cost: '$12', latency: '45ms' },
-    'Claude Opus 4': { developer: 'Anthropic', context: '200K', cost: '$15', latency: '65ms' },
-    'Gemini 2.5 Pro': { developer: 'Google', context: '1M', cost: '$5', latency: '55ms' },
-    'Llama 4 Maverick': { developer: 'Meta', context: '1M', cost: '$2', latency: '60ms' }
+    'gemini-3.6-flash': { developer: 'Google', context: '1M', cost: '$0.35', latency: '45ms' },
+    'gemini-2.5-pro': { developer: 'Google', context: '1M', cost: '$1.25', latency: '65ms' },
+    'gemini-3.5-flash-lite': { developer: 'Google', context: '1M', cost: '$0.07', latency: '35ms' },
+    'gemma-4-31b-it': { developer: 'Google', context: '8K', cost: 'Open', latency: '60ms' }
   };
 
   const handleSelectModel = (model) => {
@@ -68,9 +68,9 @@ export const AIPopover = ({
 
   // Notification items fallback data
   const notifications = data.notifications || [
-    { id: 1, msg: 'Training complete on <strong>Llama 4 Scout</strong>', time: '2 min ago', unread: true },
+    { id: 1, msg: 'Training complete on <strong>gemma-4-31b-it</strong>', time: '2 min ago', unread: true },
     { id: 2, msg: 'New eval results ready for review', time: '18 min ago', unread: true },
-    { id: 3, msg: 'Deployment <strong>prod-v3</strong> scaled to 4 replicas', time: '1 hr ago', unread: true }
+    { id: 3, msg: 'Deployment <strong>gemini-3.6-flash</strong> scaled to 4 replicas', time: '1 hr ago', unread: true }
   ];
 
   // Command Palette items
@@ -160,7 +160,7 @@ export const AIPopover = ({
           <div className="pop-dt__viewport">
             {/* List Panel */}
             <div className={`pop-dt__panel pop-dt__panel--list ${activePanel === 'detail' ? 'is-hidden' : ''}`}>
-              {['GPT-5', 'Claude Opus 4', 'Gemini 2.5 Pro', 'Llama 4 Maverick'].map((model, idx) => (
+              {['gemini-3.6-flash', 'gemini-2.5-pro', 'gemini-3.5-flash-lite', 'gemma-4-31b-it'].map((model, idx) => (
                 <div 
                   key={model} 
                   className="pop-dt__item"
@@ -183,7 +183,7 @@ export const AIPopover = ({
             </div>
 
             {/* Detail Panels */}
-            {['GPT-5', 'Claude Opus 4', 'Gemini 2.5 Pro', 'Llama 4 Maverick'].map((model, idx) => (
+            {['gemini-3.6-flash', 'gemini-2.5-pro', 'gemini-3.5-flash-lite', 'gemma-4-31b-it'].map((model, idx) => (
               <div 
                 key={model}
                 className={`pop-dt__panel pop-dt__panel--detail ${activePanel === 'detail' && selectedModel === model ? 'is-active' : ''}`}
@@ -244,7 +244,7 @@ export const AIPopover = ({
                 <div className="pop-status__pct">{data.progress || 73}%</div>
               </div>
               <div className="pop-status__info">
-                <p className="pop-status__model">{data.model || 'Claude Opus 4 — Fine-tune'}</p>
+                <p className="pop-status__model">{data.model || 'gemini-3.6-flash — Fine-tune'}</p>
                 <p className="pop-status__state">
                   <span className="pop-status__dot"></span>
                   {data.state || 'Training'}
