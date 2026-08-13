@@ -82,6 +82,7 @@ const formatStatus = (status) => {
   if (value === 'APPROVED' || value === 'PUBLISHED') return '✓ Approved'
   if (value === 'HIDDEN' || value === 'UNPUBLISHED') return '👁 Hidden'
   if (value === 'REJECTED') return '✕ Rejected'
+  if (value === 'APPEALED') return '⚖️ Appealed'
   if (value === 'DRAFT') return 'Draft'
   if (value === 'PREVIEW_READY') return 'Preview Ready'
   return '⏳ Pending'
@@ -755,6 +756,7 @@ function AuthorComicDetail() {
       const mergedPreview = {
         ...chapter,
         ...(data || {}),
+        pages: data?.pages || data?.images || data?.pageUrls || data?.pagesList || chapter?.pages || chapter?.images || [],
         status: data?.status || chapter?.status || chapter?.moderationStatus,
         rejectionReason: data?.rejectionReason || chapter?.rejectionReason || chapter?.rejection_reason || chapter?.rejectionNote
       }
@@ -923,10 +925,7 @@ function AuthorComicDetail() {
   const cover = getComicCover(comic)
   const genres = normalizeGenres(comic?.genres)
   const moderationStatus = comic?.moderationStatus || comic?.approvalStatus || 'DRAFT'
-  const isRejectedOrDisputed = ['REJECTED', 'CHANGES_REQUESTED', 'REVISION_REQUIRED'].includes(moderationStatus.toString().toUpperCase()) ||
-    Boolean(comic?.rejectionReason && comic.rejectionReason.trim()) ||
-    chapters.some((c) => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED') ||
-    searchParams.get('appeal') === 'true'
+  const isRejectedOrDisputed = Boolean(comic?.isModEdited) && !comic?.isAppealed
 
   return (
     <>

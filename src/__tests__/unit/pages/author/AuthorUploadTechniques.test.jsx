@@ -64,10 +64,10 @@ describe('Author Upload - Testing Techniques', () => {
         fireEvent.change(screen.getByLabelText(/chapter number/i), { target: { value: input } })
         
         const validFile = new File(['dummy'], 'Chapter 1.zip', { type: 'application/zip' })
-        const fileInput = document.querySelector('input[type="file"][accept=".zip"]')
+        const fileInput = document.querySelector('input[type="file"]')
         fireEvent.change(fileInput, { target: { files: [validFile] } })
         
-        fireEvent.click(screen.getByRole('button', { name: 'Upload ZIP' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Upload Folder' }))
         
         if (!valid) {
           expect(await screen.findByText(/Chapter number is required and must be a positive number/i)).toBeInTheDocument()
@@ -132,11 +132,11 @@ describe('Author Upload - Testing Techniques', () => {
         
         if (rule.fileSelected) {
           const file = new File(['dummy'], rule.fileName, { type: 'application/zip' })
-          const fileInput = document.querySelector('input[type="file"][accept=".zip"]')
+          const fileInput = document.querySelector('input[type="file"]')
           fireEvent.change(fileInput, { target: { files: [file] } })
         }
         
-        fireEvent.click(screen.getByRole('button', { name: 'Upload ZIP' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Upload Folder' }))
         
         if (rule.expectedError) {
           expect(await screen.findByText(rule.expectedError)).toBeInTheDocument()
@@ -163,10 +163,10 @@ describe('Author Upload - Testing Techniques', () => {
       
       const zeroByteFile = new File([], 'Chapter 1.zip', { type: 'application/zip' })
       // File size is 0, but valid name and extension
-      const fileInput = document.querySelector('input[type="file"][accept=".zip"]')
+      const fileInput = document.querySelector('input[type="file"]')
       fireEvent.change(fileInput, { target: { files: [zeroByteFile] } })
       
-      fireEvent.click(screen.getByRole('button', { name: 'Upload ZIP' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Upload Folder' }))
       
       await waitFor(() => {
         expect(AuthorComicApi.uploadAuthorChapterZipApi).toHaveBeenCalled()

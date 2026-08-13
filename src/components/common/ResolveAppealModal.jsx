@@ -20,6 +20,17 @@ function ResolveAppealModal({ isOpen, onClose, ticket, onSuccess }) {
         status,
         resolvedReason
       })
+      try {
+        const comicId = ticket.targetId || ticket.comicId
+        if (comicId) {
+          const existing = JSON.parse(localStorage.getItem('appealedComics') || '[]')
+          const updated = existing.filter((id) => String(id) !== String(comicId))
+          localStorage.setItem('appealedComics', JSON.stringify(updated))
+          window.dispatchEvent(new Event('appealStateChanged'))
+        }
+      } catch (e) {
+        console.error('Error clearing local appeal state:', e)
+      }
       toast.success(`Appeal has been marked as ${status}.`)
       onSuccess && onSuccess()
       onClose()

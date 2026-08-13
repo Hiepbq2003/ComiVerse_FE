@@ -135,8 +135,9 @@ function AccountManagement() {
       }
 
       const response = await getAllAccountsApi(params)
-      const accountsList = Array.isArray(response) ? response : (Array.isArray(response?.data) ? response.data : [])
-      const metadata = response?.metadata || {}
+      const responseData = response?.data?.data || response?.data || response;
+      const accountsList = Array.isArray(responseData) ? responseData : (Array.isArray(response) ? response : []);
+      const metadata = response?.metadata || response?.data?.metadata || {}
 
       const normalized = accountsList.map((acc) => {
         const cDate = acc.createdDate || acc.createdAt || acc.created_at

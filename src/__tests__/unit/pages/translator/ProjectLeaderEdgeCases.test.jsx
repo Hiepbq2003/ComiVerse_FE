@@ -25,7 +25,8 @@ vi.mock('../../../../context/ThemeContext', () => ({
 
 vi.mock('../../../../services/api/ProjectTeamApi', () => ({
   getMyTeamsApi: vi.fn(),
-  getAllProjectTeamsApi: vi.fn(),
+  getMyProjectTeamsApi: vi.fn().mockResolvedValue([]),
+  getAllProjectTeamsApi: vi.fn().mockResolvedValue([]),
   createTeamApi: vi.fn(),
   inviteMemberApi: vi.fn(),
   updateMemberRoleApi: vi.fn(),

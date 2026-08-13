@@ -381,17 +381,42 @@ function enrichComicWithModeratorOverrides(comic) {
   const comicIdStr = String(comic.id || comic.comicId || '');
 
   const matchingOverrides = overrides.filter(o => {
-    const matchId = (o.comicId && String(o.comicId) === comicIdStr) || (o.id && String(o.id) === comicIdStr);
-    const matchTitle = (comicTitleClean && o.title && o.title.trim().toLowerCase() === comicTitleClean);
-    return matchId || matchTitle;
+    if (!o) return false;
+    const matchId = (
+      (o.comicId && String(o.comicId) === comicIdStr) ||
+      (o.id && String(o.id) === comicIdStr) ||
+      (o.parentReviewId && String(o.parentReviewId) === comicIdStr) ||
+      (o.chapterComicId && String(o.chapterComicId) === comicIdStr)
+    );
+    const overrideComicTitle = (o.comicTitle || o.comicName || o.title || '').trim().toLowerCase();
+    const matchTitle = comicTitleClean && overrideComicTitle && (
+      overrideComicTitle === comicTitleClean ||
+      overrideComicTitle.includes(comicTitleClean) ||
+      comicTitleClean.includes(overrideComicTitle)
+    );
+
+    const matchChildChapter = Array.isArray(o.allChapters || o.chapters || o.subItems) && (o.allChapters || o.chapters || o.subItems).some(ch => {
+      return (ch.comicId && String(ch.comicId) === comicIdStr) || (ch.id && String(ch.id) === comicIdStr);
+    });
+
+    return matchId || matchTitle || matchChildChapter;
   });
 
-  const hasRejectedOverride = matchingOverrides.some(o => (o.status || '').toString().toUpperCase() === 'REJECTED');
+  const hasRejectedChapterInComic = Array.isArray(comic.chapters) && comic.chapters.some(c => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED');
+  const hasRejectedOverride = matchingOverrides.some(o => (o.status || '').toString().toUpperCase() === 'REJECTED') || hasRejectedChapterInComic || ((comic.rejectedChapterCount || 0) > 0);
   const hasApprovedOverride = matchingOverrides.some(o => (o.status || '').toString().toUpperCase() === 'APPROVED');
   const hasPendingOverride = matchingOverrides.some(o => (o.status || '').toString().toUpperCase() === 'PENDING');
 
+  let appealedIds = [];
+  try {
+    appealedIds = JSON.parse(localStorage.getItem('appealedComics') || '[]');
+  } catch (e) {}
+
+  const isLocallyAppealed = appealedIds.some(id => String(id) === comicIdStr);
+  const isAppealed = Boolean(comic.isAppealed || (comic.moderationStatus || '').toString().toUpperCase() === 'APPEALED' || isLocallyAppealed);
+
   let moderationStatus = comic.moderationStatus || comic.approvalStatus || 'DRAFT';
-  if (comic.isAppealed) {
+  if (isAppealed) {
     moderationStatus = 'APPEALED';
   }
 
@@ -403,6 +428,7 @@ function enrichComicWithModeratorOverrides(comic) {
 
   return {
     ...comic,
+    isAppealed,
     moderationStatus,
     hasRejectedOverride,
     rejectedChapterCount: hasRejectedOverride ? Math.max(1, comic.rejectedChapterCount || 0) : comic.rejectedChapterCount
@@ -434,7 +460,7 @@ function AuthorComics() {
     comics.forEach((comic) => {
       const status = (comic.moderationStatus || '').toString().toUpperCase()
       const isRejected = status === 'REJECTED' || (comic.rejectedChapterCount > 0) || comic.hasRejectedOverride
-      const isPending = !isRejected && (status.includes('REVIEW') || status.includes('SUBMITTED') || (comic.pendingChapterCount > 0))
+      const isPending = !isRejected && (status.includes('REVIEW') || status.includes('SUBMITTED') || status === 'APPEALED' || comic.isAppealed || (comic.pendingChapterCount > 0))
       const isApproved = !isRejected && !isPending && (status === 'APPROVED' || status === 'PUBLISHED')
 
       if (isRejected) rejected++
@@ -455,7 +481,7 @@ function AuthorComics() {
 
       const status = (comic.moderationStatus || '').toString().toUpperCase()
       const isRejected = status === 'REJECTED' || (comic.rejectedChapterCount > 0) || comic.hasRejectedOverride
-      const isPending = !isRejected && (status.includes('REVIEW') || status.includes('SUBMITTED') || (comic.pendingChapterCount > 0))
+      const isPending = !isRejected && (status.includes('REVIEW') || status.includes('SUBMITTED') || status === 'APPEALED' || comic.isAppealed || (comic.pendingChapterCount > 0))
       const isApproved = !isRejected && !isPending && (status === 'APPROVED' || status === 'PUBLISHED')
       const isDraft = !isRejected && !isPending && !isApproved
 
@@ -515,9 +541,18 @@ function AuthorComics() {
   }
 
   useEffect(() => {
-    if (comicsLoadedRef.current) return
-    comicsLoadedRef.current = true
-    loadComics()
+    if (!comicsLoadedRef.current) {
+      comicsLoadedRef.current = true
+      loadComics()
+    }
+
+    const handleAppealStateChange = () => {
+      loadComics()
+    }
+    window.addEventListener('appealStateChanged', handleAppealStateChange)
+    return () => {
+      window.removeEventListener('appealStateChanged', handleAppealStateChange)
+    }
   }, [])
 
   useEffect(() => {
@@ -752,9 +787,7 @@ function AuthorComics() {
           const cover = getComicCover(comic)
           const statusValue = (moderationStatus || 'DRAFT').toString().toUpperCase()
           const canPushReview = !['SUBMITTED_FOR_REVIEW', 'PUBLISHED', 'APPROVED'].includes(statusValue)
-          const isAppealable = ['REJECTED', 'CHANGES_REQUESTED', 'REVISION_REQUIRED'].includes(statusValue) || 
-            Boolean(comic.rejectionReason && comic.rejectionReason.trim()) || 
-            (comic.rejectedChapterCount > 0)
+          const isAppealable = Boolean(comic.isModEdited) && !comic.isAppealed
 
           return (
             <article className="author-comic-list-card" key={comicId || comic.title}>
