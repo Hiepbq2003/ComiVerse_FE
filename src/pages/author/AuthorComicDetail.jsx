@@ -47,8 +47,30 @@ const normalizeGenres = (genres) => {
   if (typeof genres === 'string' && genres.trim()) {
     return genres.split(',').map((genre) => genre.trim()).filter(Boolean)
   }
-  return []
 }
+
+const parsePageCountFromReason = (reasonText) => {
+  if (!reasonText || !reasonText.includes('--- PRESERVED PAGES BLOCK ---')) return null;
+  try {
+    const jsonStr = reasonText.split('--- PRESERVED PAGES BLOCK ---')[1].trim();
+    const pages = JSON.parse(jsonStr);
+    return Array.isArray(pages) ? pages.length : null;
+  } catch (e) {
+    return null;
+  }
+};
+
+const cleanReasonText = (reason) => {
+  if (!reason) return '';
+  let clean = reason;
+  if (clean.includes('--- PRESERVED PAGES BLOCK ---')) {
+    clean = clean.split('--- PRESERVED PAGES BLOCK ---')[0];
+  }
+  if (clean.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) {
+    clean = clean.split('--- DETAILED INSPECTION FEEDBACK REPORT')[0];
+  }
+  return clean.trim();
+};
 
 const getComicId = (comic) => comic?.id || comic?.comicId || comic?._id
 
@@ -1067,12 +1089,18 @@ function AuthorComicDetail() {
               <div>
                 <strong>🚫 Submission Rejected:</strong> Your submission requires revisions. Please review the feedback below. You can also click <strong>Preview</strong> on the rejected chapter below to inspect page-specific pins if any.
               </div>
-              {comic?.rejectionReason && (
+              {comic?.rejectionReason && !comic.rejectionReason.includes('All chapters were rejected') && (
                 <div style={{ padding: '12px 16px', background: 'var(--author-upload-zone-bg)', borderRadius: '6px', borderLeft: '3px solid #ef4444', color: 'var(--author-text-primary)', fontSize: '14px', width: '100%', lineHeight: '1.5' }}>
                   <div style={{ fontSize: '11px', color: '#ef4444', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: '4px', letterSpacing: '0.5px' }}>Overall Moderator Feedback</div>
-                  {comic.rejectionReason}
+                  {cleanReasonText(comic.rejectionReason)}
                 </div>
               )}
+              {chapters.filter(c => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED' && cleanReasonText(c.rejectionReason || c.rejection_reason)).map((c) => (
+                <div key={getChapterId(c)} style={{ padding: '12px 16px', background: 'var(--author-upload-zone-bg)', borderRadius: '6px', borderLeft: '3px solid #ef4444', color: 'var(--author-text-primary)', fontSize: '14px', width: '100%', lineHeight: '1.5' }}>
+                  <div style={{ fontSize: '11px', color: '#ef4444', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: '4px', letterSpacing: '0.5px' }}>Feedback for Chapter {getChapterNumber(c)}</div>
+                  {cleanReasonText(c.rejectionReason || c.rejection_reason)}
+                </div>
+              ))}
             </div>
           )}
 
@@ -1110,7 +1138,7 @@ function AuthorComicDetail() {
                         <td className="chapter-no">Ch.{getChapterNumber(chapter)}</td>
                         <td>{getChapterTitle(chapter)}</td>
                         <td>{formatDate(chapter.uploadedAt || chapter.createdAt || chapter.submittedAt)}</td>
-                        <td>{chapter.pageCount ?? normalizeArrayResponse(chapter.pages).length ?? '—'}</td>
+                        <td>{chapter.pageCount || normalizeArrayResponse(chapter.pages).length || parsePageCountFromReason(chapter.rejectionReason || chapter.rejection_reason) || 0}</td>
                         <td>{getChapterViews(chapter)}</td>
                         <td>
                           <span className={`author-status-badge ${getStatusClass(status)}`}>

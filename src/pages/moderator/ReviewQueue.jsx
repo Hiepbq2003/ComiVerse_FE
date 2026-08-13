@@ -1053,6 +1053,10 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       } else {
         finalPayload = userOverallNote;
       }
+
+      if (targetChap.pages && targetChap.pages.length > 0) {
+        finalPayload += `\n\n--- PRESERVED PAGES BLOCK ---\n${JSON.stringify(targetChap.pages)}`;
+      }
       
       handleChapterReject(selectedReject.parentReviewId || selectedReject.id, targetChap, finalPayload);
     } else {
@@ -1082,6 +1086,10 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           finalPayload = `--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
         } else {
           finalPayload = userOverallNote;
+        }
+
+        if (enrichedItem.pages && enrichedItem.pages.length > 0) {
+          finalPayload += `\n\n--- PRESERVED PAGES BLOCK ---\n${JSON.stringify(enrichedItem.pages)}`;
         }
 
         // Use handleChapterReject for chapters to preserve pages, else fallback to handleConfirmReject
