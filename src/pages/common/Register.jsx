@@ -45,6 +45,19 @@ function Register({ onNavigate, onVerificationRequired, showAlert, loading, setL
       return
     }
 
+    // Validate Email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(form.email.trim())) {
+      showAlert('error', 'Please enter a valid email address.')
+      return
+    }
+
+    // Validate Password
+    if (form.password.length < 8) {
+      showAlert('error', 'Password must be at least 8 characters long.')
+      return
+    }
+
     // Validate Password Match
     if (form.password !== form.confirmPassword) {
       showAlert('error', 'Passwords do not match!')
@@ -56,6 +69,33 @@ function Register({ onNavigate, onVerificationRequired, showAlert, loading, setL
     if (!usernameRegex.test(form.username.trim())) {
       showAlert('error', 'Username must be 3-20 characters, lowercase, numbers, and underscores only.')
       return
+    }
+
+    // Validate First Name and Last Name
+    const nameRegex = /^[\p{L}\s'-]+$/u;
+    const fName = form.firstName.trim();
+    const lName = form.lastName.trim();
+
+    if (fName) {
+      if (fName.length > 50) {
+        showAlert('error', 'First name must not exceed 50 characters.');
+        return;
+      }
+      if (!nameRegex.test(fName)) {
+        showAlert('error', 'First name cannot contain numbers or special characters (except spaces, hyphens, or apostrophes).');
+        return;
+      }
+    }
+
+    if (lName) {
+      if (lName.length > 50) {
+        showAlert('error', 'Last name must not exceed 50 characters.');
+        return;
+      }
+      if (!nameRegex.test(lName)) {
+        showAlert('error', 'Last name cannot contain numbers or special characters (except spaces, hyphens, or apostrophes).');
+        return;
+      }
     }
 
     // Validate Age (>= 13 years old)
@@ -140,6 +180,7 @@ function Register({ onNavigate, onVerificationRequired, showAlert, loading, setL
                   value={form.firstName}
                   onChange={(e) => setForm({ ...form, firstName: e.target.value })}
                   className="glass-input-field"
+                  maxLength="50"
                   required
                 />
               </div>
@@ -152,6 +193,7 @@ function Register({ onNavigate, onVerificationRequired, showAlert, loading, setL
                   value={form.lastName}
                   onChange={(e) => setForm({ ...form, lastName: e.target.value })}
                   className="glass-input-field"
+                  maxLength="50"
                   required
                 />
               </div>

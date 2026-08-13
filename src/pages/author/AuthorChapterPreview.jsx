@@ -18,6 +18,12 @@ const normalizeArrayResponse = (payload) => {
   return []
 }
 
+const extractPages = (obj) => {
+  if (!obj) return [];
+  const raw = obj.pages || obj.images || obj.pageUrls || obj.pagesList || obj.urls || obj.chapterPages || (Array.isArray(obj.content) ? obj.content : []);
+  return normalizeArrayResponse(raw);
+};
+
 function getChapterNumber(chapter) {
   if (!chapter) return ''
   return chapter.chapterNumber || chapter.number || chapter.order || 'N/A'
@@ -271,15 +277,7 @@ export default function AuthorChapterPreview() {
       return
     }
 
-    const currentRawPages = normalizeArrayResponse(
-      preview?.pages ||
-      preview?.images ||
-      preview?.pageUrls ||
-      preview?.pagesList ||
-      preview?.urls ||
-      preview?.chapterPages ||
-      (Array.isArray(preview?.content) ? preview.content : [])
-    )
+    const currentRawPages = extractPages(preview)
 
     const needsPageFetch = !preview || currentRawPages.length === 0
 
@@ -287,13 +285,9 @@ export default function AuthorChapterPreview() {
       const fetchChapter = async () => {
         try {
           let previewData = null
-          try {
-            previewData = await getAuthorChapterPreviewApi(comicId, chapterId)
-          } catch {
-            // ignore
-          }
+          const pPages = extractPages(previewData)
 
-          if (!previewData || (!previewData.pages?.length && !previewData.images?.length)) {
+          if (!previewData || pPages.length === 0) {
             try {
               const detailRes = await getChapterDetailApi(chapterId)
               if (detailRes?.data || detailRes) {
@@ -354,12 +348,9 @@ export default function AuthorChapterPreview() {
             }
           } catch (e) {}
 
-          const fetchedPages = (
-            (previewData?.pages && previewData.pages.length) ? previewData.pages :
-            (previewData?.images && previewData.images.length) ? previewData.images :
-            (overrideData?.pages && overrideData.pages.length) ? overrideData.pages :
-            (overrideData?.images && overrideData.images.length) ? overrideData.images : []
-          )
+          const previewPages = extractPages(previewData)
+          const ovPages = extractPages(overrideData)
+          const fetchedPages = previewPages.length > 0 ? previewPages : ovPages
 
           if (fetchedPages.length > 0) {
             setPreview(prev => ({
@@ -386,7 +377,8 @@ export default function AuthorChapterPreview() {
               } catch {
                 // ignore
               }
-              if (!detailData || (!detailData.pages?.length && !detailData.images?.length)) {
+              const foundDetailPages = extractPages(detailData)
+              if (!detailData || foundDetailPages.length === 0) {
                 try {
                   const detailRes = await getChapterDetailApi(found.id || found.chapterId || chapterId)
                   if (detailRes?.data || detailRes) {
@@ -447,15 +439,7 @@ export default function AuthorChapterPreview() {
   }
 
   /* ── Derive data ─── */
-  const rawPages = normalizeArrayResponse(
-    preview?.pages ||
-    preview?.images ||
-    preview?.pageUrls ||
-    preview?.pagesList ||
-    preview?.urls ||
-    preview?.chapterPages ||
-    (Array.isArray(preview?.content) ? preview.content : [])
-  )
+  const rawPages = extractPages(preview)
   const pages = rawPages.map((p, idx) => normalizePage(p, idx))
 
   const { isRejected, reason, docComments } = resolveRejectionInfo(preview, comicId)
