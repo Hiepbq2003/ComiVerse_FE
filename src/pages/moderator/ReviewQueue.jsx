@@ -1108,7 +1108,6 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         const nextChapter = remainingChapters[0];
         setSelectedChapter(nextChapter);
         setPageIndex(0);
-
         if (remainingChapters.length > 1) {
           setPreviewTab('chapters');
         } else {
