@@ -32,6 +32,12 @@ const normalizeArrayResponse = (payload) => {
   return []
 }
 
+const extractPages = (obj) => {
+  if (!obj) return [];
+  const raw = obj.pages || obj.images || obj.pageUrls || obj.pagesList || obj.urls || obj.chapterPages || (Array.isArray(obj.content) ? obj.content : []);
+  return normalizeArrayResponse(raw);
+};
+
 const normalizeGenres = (genres) => {
   if (Array.isArray(genres)) {
     return genres
@@ -839,7 +845,8 @@ function AuthorComicDetail() {
       // ignore
     }
 
-    if (!data || (!data.pages?.length && !data.images?.length)) {
+    const dataPages = extractPages(data);
+    if (dataPages.length === 0) {
       try {
         const detailRes = await getChapterDetailApi(chapterId)
         if (detailRes?.data || detailRes) {
@@ -908,12 +915,12 @@ function AuthorComicDetail() {
       }
     } catch (e) {}
 
-    const resolvedPages = (data?.pages && data.pages.length) ? data.pages :
-      (data?.images && data.images.length) ? data.images :
-      (overridePages && overridePages.length) ? overridePages :
-      (chapter?.pages && chapter.pages.length) ? chapter.pages :
-      (chapter?.images && chapter.images.length) ? chapter.images :
-      []
+    const dataPagesFinal = extractPages(data);
+    const chapterPages = extractPages(chapter);
+    
+    const resolvedPages = (dataPagesFinal.length > 0) ? dataPagesFinal :
+      (overridePages && overridePages.length > 0) ? overridePages :
+      (chapterPages.length > 0) ? chapterPages : [];
 
     const mergedPreview = {
       ...chapter,

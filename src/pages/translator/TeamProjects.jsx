@@ -908,7 +908,7 @@ function TeamProjects() {
           return {
             ...ch,
             revision: extra.revision === true,
-            canCreateTask: extra.canCreateTask === true,
+            canCreateTask: extra.canCreateTask,
             previousTaskId: extra.previousTaskId || extra.previous_task_id || null,
             resolutionNote: extra.resolutionNote || extra.resolution_note || null
           };
@@ -916,7 +916,7 @@ function TeamProjects() {
         for (const tc of teamChapList) {
           const id = String(tc.chapterId || tc.id || '');
           if (!id || finalChapters.some((ch) => String(ch.id) === id)) continue;
-          if (tc.canCreateTask !== true && tc.revision !== true) continue;
+          if (tc.canCreateTask === false && tc.revision !== true) continue;
           finalChapters.push({
             id: tc.chapterId || tc.id,
             comicId: tc.comicId,
@@ -925,7 +925,7 @@ function TeamProjects() {
             pages: [],
             status: 'Approved Raw Manuscript',
             revision: tc.revision === true,
-            canCreateTask: tc.canCreateTask === true,
+            canCreateTask: tc.canCreateTask,
             previousTaskId: tc.previousTaskId || tc.previous_task_id || null,
             resolutionNote: tc.resolutionNote || tc.resolution_note || null
           });
