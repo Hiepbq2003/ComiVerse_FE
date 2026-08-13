@@ -1303,10 +1303,10 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
             tasks={tasks}
             onCancel={() => setShowCreateTaskModal(false)}
             onCreate={async () => {
-              setShowCreateTaskModal(false);
               if (onCreateTask) {
                 await onCreateTask(inspectTaskData);
               }
+              setShowCreateTaskModal(false);
             }}
           />
         </div>,
@@ -1456,6 +1456,7 @@ export function CreateTaskModal({
   onCreate
 }) {
   const [submitted, setSubmitted] = useState(false)
+  const [creating, setCreating] = useState(false)
   const [inspectingChapter, setInspectingChapter] = useState(null)
 
   const todayStr = new Date().toISOString().split('T')[0]
@@ -1475,10 +1476,15 @@ export function CreateTaskModal({
     setNewTaskData({ ...newTaskData, dueDate: d.toISOString().split('T')[0] })
   }
 
-  const handleCreateClick = () => {
+  const handleCreateClick = async () => {
     setSubmitted(true)
-    if (Object.values(errors).some(Boolean)) return
-    onCreate()
+    if (creating || Object.values(errors).some(Boolean)) return
+    setCreating(true)
+    try {
+      await onCreate()
+    } finally {
+      setCreating(false)
+    }
   }
 
   return (
@@ -1491,7 +1497,7 @@ export function CreateTaskModal({
               Add a task to the {comicName || 'project'} board
             </p>
           </div>
-          <button className="trans-modal-close-btn" onClick={onCancel}>×</button>
+          <button className="trans-modal-close-btn" onClick={onCancel} disabled={creating}>×</button>
         </div>
 
         <div className="trans-modal-body">
@@ -1688,9 +1694,14 @@ export function CreateTaskModal({
         </div>
 
         <div className="trans-modal-footer">
-          <button className="trans-btn secondary" onClick={onCancel}>Cancel</button>
-          <button className="trans-btn primary" onClick={handleCreateClick}>
-            Create Task
+          <button className="trans-btn secondary" onClick={onCancel} disabled={creating}>Cancel</button>
+          <button
+            className="trans-btn primary"
+            onClick={handleCreateClick}
+            disabled={creating}
+            style={creating ? { opacity: 0.65, cursor: 'not-allowed', transform: 'none' } : undefined}
+          >
+            {creating ? 'creating...' : 'Create Task'}
           </button>
         </div>
       </div>

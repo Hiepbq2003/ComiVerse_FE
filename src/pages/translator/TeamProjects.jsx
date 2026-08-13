@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import '../../assets/style/translator/team-projects.css'
 import ModernButton from '../../components/common/ModernButton'
 import { getMyProjectTeamsApi, getAllProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
-import { createSubmissionApi, getAllSubmissionsApi } from '../../services/api/SubmissionApi'
+import { getAllSubmissionsApi } from '../../services/api/SubmissionApi'
 import { getAllComicsApi, getComicsPageApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi } from '../../services/api/ChapterApi'
 import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
@@ -380,11 +380,6 @@ function WorkspaceDetailView({
   onApproveRequest,
   onRejectRequest,
   onBanUser,
-  showUploadForm,
-  setShowUploadForm,
-  uploadData,
-  setUploadData,
-  onUploadChapter,
   newPostText,
   setNewPostText,
   onPostAnnouncement,
@@ -447,11 +442,6 @@ function WorkspaceDetailView({
         <HomeTab
           selectedDetails={selectedDetails}
           isCurrentLeader={isCurrentLeader}
-          showUploadForm={showUploadForm}
-          setShowUploadForm={setShowUploadForm}
-          uploadData={uploadData}
-          setUploadData={setUploadData}
-          onUploadChapter={onUploadChapter}
           newPostText={newPostText}
           setNewPostText={setNewPostText}
           onPostAnnouncement={onPostAnnouncement}
@@ -667,8 +657,6 @@ function TeamProjects() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDetails, setSelectedDetails] = useState(null)
   const [selectedEdit, setSelectedEdit] = useState(null)
-  const [showUploadForm, setShowUploadForm] = useState(false)
-  const [uploadData, setUploadData] = useState({ chapterTitle: '', chapterContent: '', wordsCount: 3000 })
   const [editForm, setEditForm] = useState({ description: '', status: 'Active', team: '' })
 
   const [workspaceTab, setWorkspaceTab] = useState('home')
@@ -750,7 +738,6 @@ function TeamProjects() {
     localStorage.setItem('comiverse_active_project_id', String(project.id));
     setSelectedDetails(project)
     setWorkspaceTab(initialTab)
-    setShowUploadForm(false)
     setTasks([])
     setTasksLoading(true)
 
@@ -1204,42 +1191,6 @@ function TeamProjects() {
       console.warn('Backend update workspace settings fallback:', err)
       setProjects(prev => prev.map(proj => (proj.id === selectedDetails.id ? selectedDetails : proj)))
       toast.success('Workspace details saved locally!')
-    }
-  }
-
-  const handleUploadChapter = async () => {
-    if (!selectedDetails || !uploadData.chapterTitle.trim()) return
-
-    const submission = {
-      title: selectedDetails.title,
-      chapter: uploadData.chapterTitle.trim(),
-      submittedBy: selectedDetails.team,
-      queueType: 'translator',
-      timeLabel: 'Just now',
-      timestamp: Date.now(),
-      words: Number(uploadData.wordsCount) || 3000,
-      priority: selectedDetails.priority || 'Medium',
-      flags: 0,
-      status: 'pending',
-      cover: getProjectCover(selectedDetails),
-      content: uploadData.chapterContent
-    }
-
-    try {
-      await createSubmissionApi(submission)
-      toast.success('Chapter uploaded successfully and sent for review!')
-      if (selectedDetails.chaptersList) {
-        selectedDetails.chaptersList.unshift({
-          num: uploadData.chapterTitle.trim(),
-          words: Number(uploadData.wordsCount) || 3000,
-          date: 'Just now'
-        })
-      }
-      setUploadData({ chapterTitle: '', chapterContent: '', wordsCount: 3000 })
-      setShowUploadForm(false)
-    } catch (err) {
-      console.error(err)
-      toast.error('Failed to submit chapter.')
     }
   }
 
@@ -1928,11 +1879,6 @@ function TeamProjects() {
         onApproveRequest={handleApproveRequest}
         onRejectRequest={handleRejectRequest}
         onBanUser={handleBanUser}
-        showUploadForm={showUploadForm}
-        setShowUploadForm={setShowUploadForm}
-        uploadData={uploadData}
-        setUploadData={setUploadData}
-        onUploadChapter={handleUploadChapter}
         newPostText={newPostText}
         setNewPostText={setNewPostText}
         onPostAnnouncement={handlePostAnnouncement}

@@ -7,11 +7,6 @@ import { getAuth } from '../../utils/Auth'
 function HomeTab({
   selectedDetails,
   isCurrentLeader,
-  showUploadForm,
-  setShowUploadForm,
-  uploadData,
-  setUploadData,
-  onUploadChapter,
   newPostText,
   setNewPostText,
   onPostAnnouncement,
@@ -200,59 +195,6 @@ function HomeTab({
     <div className="workspace-home-grid">
       {/* Left Feed Column */}
       <div className="workspace-feed-column">
-        <div style={{ marginBottom: '20px' }}>
-          {!showUploadForm ? (
-            <button className="upload-chapter-hero-btn" onClick={() => setShowUploadForm(true)}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              <span>Upload New Translated Chapter</span>
-            </button>
-          ) : (
-            <div className="upload-chapter-form-card">
-              <h4 style={{ margin: '0 0 14px', fontSize: '16px', fontWeight: '700', color: 'var(--trans-text-primary)' }}>
-                Upload Translated Chapter Draft
-              </h4>
-              <div className="trans-form-group">
-                <label className="trans-form-label">Chapter Title / Number</label>
-                <input
-                  type="text"
-                  className="trans-form-input"
-                  placeholder="e.g. Chapter 46: The Awakening"
-                  value={uploadData.chapterTitle}
-                  onChange={(e) => setUploadData({ ...uploadData, chapterTitle: e.target.value })}
-                />
-              </div>
-              <div className="trans-form-group">
-                <label className="trans-form-label">Estimated Word Count</label>
-                <input
-                  type="number"
-                  className="trans-form-input"
-                  value={uploadData.wordsCount}
-                  onChange={(e) => setUploadData({ ...uploadData, wordsCount: e.target.value })}
-                />
-              </div>
-              <div className="trans-form-group">
-                <label className="trans-form-label">Translation Text Content</label>
-                <textarea
-                  className="trans-form-input textarea"
-                  placeholder="Paste translated chapter script or text contents here..."
-                  value={uploadData.chapterContent}
-                  onChange={(e) => setUploadData({ ...uploadData, chapterContent: e.target.value })}
-                  style={{ minHeight: '120px' }}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
-                <button className="trans-btn secondary" onClick={() => setShowUploadForm(false)}>Cancel</button>
-                <button className="upload-chapter-hero-btn submit-btn" onClick={onUploadChapter} disabled={!uploadData.chapterTitle.trim()}>
-                  Submit Draft for Review
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
         {isCurrentLeader && (
           <div className="post-creation-card">
             <div className="post-user-avatar leader-glow">
