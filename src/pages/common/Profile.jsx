@@ -23,7 +23,7 @@ import { toast } from 'react-toastify'
 import { useAuth } from '../../context/AuthContext'
 import { getAuth } from '../../utils/Auth'
 import { getMyProjectTeamsApi, getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
-import { getModeratorScope } from '../../utils/moderatorScope'
+import { getModeratorScope, isScopeGlobal } from '../../utils/moderatorScope'
 import { getMyTranslatorProfileApi, updateMyTranslatorProfileApi } from '../../services/api/TranslatorApi'
 import { uploadFileApi } from '../../services/api/UploadApi'
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
@@ -168,12 +168,10 @@ function AuthorStats() {
   )
 }
 
-function ModeratorStats({ assignedLanguages = ['Japanese', 'Korean'] }) {
-  const langs = Array.isArray(assignedLanguages) && assignedLanguages.length > 0
-    ? assignedLanguages
-    : ['Japanese', 'Korean'];
+function ModeratorStats({ assignedLanguages = [], user }) {
+  const langs = Array.isArray(assignedLanguages) ? assignedLanguages : [];
 
-  const isGlobal = langs.length >= 7 || langs.some(s => ['global', 'all', 'any', '*'].includes(String(s).toLowerCase()));
+  const isGlobal = isScopeGlobal(langs, user);
 
   return (
     <div className="profile-stats-list">
@@ -182,10 +180,12 @@ function ModeratorStats({ assignedLanguages = ['Japanese', 'Korean'] }) {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
           {isGlobal ? (
             <span className="profile-lang-chip">🌐 All Languages</span>
-          ) : (
+          ) : langs.length > 0 ? (
             langs.map(l => (
               <span key={l} className="profile-lang-chip">🌐 {l}</span>
             ))
+          ) : (
+            <span className="profile-lang-chip" style={{ opacity: 0.7 }}>Not Assigned</span>
           )}
         </div>
       </div>
@@ -636,7 +636,7 @@ function Profile({ user: userProp }) {
       case 'AUTHOR':
         return <AuthorStats />
       case 'MODERATOR':
-        return <ModeratorStats assignedLanguages={assignedLanguages} />
+        return <ModeratorStats assignedLanguages={assignedLanguages} user={user} />
       case 'TRANSLATOR':
         return <TranslatorStats teams={projectTeams} loading={projectTeamsLoading} />
       case 'PROJECT_LEADER':

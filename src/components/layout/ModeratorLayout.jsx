@@ -6,7 +6,7 @@ import { useNotification } from '../../context/NotificationContext'
 import { AIPopover } from '../common/AIPopover'
 import LogoIcon from '../common/LogoIcon'
 import '../../assets/style/moderator/moderator.css'
-import { getModeratorScope } from '../../utils/moderatorScope'
+import { getModeratorScope, isScopeGlobal } from '../../utils/moderatorScope'
 
 function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBadges = {} }) {
   const navigate = useNavigate()
@@ -46,7 +46,7 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
     }
   }
 
-  const formattedNotifications = notifications.map(n => {
+  const formattedNotifications = (notifications || []).map(n => {
     let url = n.actionUrl;
     const titleLower = String(n.title).toLowerCase();
     
@@ -87,10 +87,10 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
     { id: 'review-queue', label: 'Review Queue', icon: 'review' },
-    { id: 'reports', label: 'Violation Reports', icon: 'reports' },
-    { id: 'report-categories', label: 'Report Categories', icon: 'categories' },
     { id: 'comic-management', label: 'Comic Management', icon: 'comics' },
     { id: 'genre-management', label: 'Genre Management', icon: 'genre' },
+    { id: 'reports', label: 'Violation Reports', icon: 'reports' },
+    { id: 'report-categories', label: 'Report Categories', icon: 'categories' },
     { id: 'project-teams', label: 'Project Teams', icon: 'teams' },
     { id: 'chat-monitor', label: 'Chat Monitor', icon: 'chat' },
     { id: 'forum', label: 'Forum', icon: 'forum' },
@@ -251,8 +251,9 @@ function ModeratorLayout({ children, activeNav = 'dashboard', onNavChange, navBa
               <span>
                 Scope: {(() => {
                   const scope = getModeratorScope(user);
-                  const isGlobal = scope.length === 0 || scope.length >= 7 || scope.some(s => ['global', 'all', 'any', '*'].includes(s) || s.includes('all'));
-                  return isGlobal ? 'All Languages' : scope.map(l => l.charAt(0).toUpperCase() + l.slice(1)).join(', ');
+                  const isGlobal = isScopeGlobal(scope, user);
+                  if (isGlobal) return 'All Languages';
+                  return scope.length > 0 ? scope.map(l => l.charAt(0).toUpperCase() + l.slice(1)).join(', ') : 'Not Assigned';
                 })()}
               </span>
             </span>

@@ -181,9 +181,9 @@ describe('Author My Comics workflow', () => {
     fireEvent.change(screen.getByLabelText(/chapter title/i), {
       target: { value: 'Moonlit Duel' },
     })
-    const chapterInput = document.querySelector('input[type="file"][accept=".zip"]')
+    const chapterInput = document.querySelector('input[type="file"]')
     fireEvent.change(chapterInput, { target: { files: [chapterFile] } })
-    fireEvent.click(screen.getByRole('button', { name: 'Upload ZIP' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Upload Folder' }))
 
     await waitFor(() => {
       expect(AuthorComicApi.uploadAuthorChapterZipApi).toHaveBeenCalledTimes(1)
@@ -210,9 +210,9 @@ describe('Author My Comics workflow', () => {
     renderAuthorComics()
     await screen.findByText('Moonblade Chronicle')
     fireEvent.click(screen.getByRole('button', { name: /add chapter/i }))
-    const chapterInput = document.querySelector('input[type="file"][accept=".zip"]')
+    const chapterInput = document.querySelector('input[type="file"]')
     fireEvent.change(chapterInput, { target: { files: [invalidFile] } })
-    fireEvent.click(screen.getByRole('button', { name: 'Upload ZIP' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Upload Folder' }))
 
     expect(
       await screen.findByText(/chapter archive name must be like/i),
@@ -260,11 +260,11 @@ describe('Author My Comics workflow', () => {
       target: { value: '' },
     })
     
-    const chapterInput = document.querySelector('input[type="file"][accept=".zip"]')
+    const chapterInput = document.querySelector('input[type="file"]')
     fireEvent.change(chapterInput, { target: { files: [chapterFile] } })
     
     // Attempt upload
-    fireEvent.click(screen.getByRole('button', { name: 'Upload ZIP' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Upload Folder' }))
 
     // We expect a validation error to appear instead of calling the API
     expect(

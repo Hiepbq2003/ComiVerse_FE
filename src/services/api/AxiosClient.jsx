@@ -145,7 +145,7 @@ AxiosClient.interceptors.response.use(
                 error.config?.suppressToast || 
                 error.config?.headers?.['X-Suppress-Toast'] ||
                 requestUrl.includes('/chat/') || 
-                requestUrl.includes('/chat-flags/') || 
+                requestUrl.includes('/chat-flags') || 
                 requestUrl.includes('/team-workspace/') ||
                 requestUrl.includes('/notifications') ||
                 requestUrl.includes('/comics') || 

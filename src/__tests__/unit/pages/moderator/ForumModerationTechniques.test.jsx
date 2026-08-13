@@ -5,11 +5,18 @@ import { MemoryRouter } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import ForumModeration from '../../../../pages/moderator/ForumModeration'
 import * as ForumThreadApi from '../../../../services/api/ForumThreadApi'
+import * as ForumCategoryApi from '../../../../services/api/ForumCategoryApi'
 
 vi.mock('../../../../services/api/ForumThreadApi', () => ({
   getAllForumThreadsApi: vi.fn(),
   deleteForumThreadApi: vi.fn(),
   updateForumThreadApi: vi.fn(),
+}))
+vi.mock('../../../../services/api/ForumCategoryApi', () => ({
+  getForumCategoriesApi: vi.fn(),
+  createForumCategoryApi: vi.fn(),
+  updateForumCategoryApi: vi.fn(),
+  deleteForumCategoryApi: vi.fn(),
 }))
 vi.mock('react-toastify', () => ({
   toast: {
@@ -28,6 +35,9 @@ describe('Forum Moderation - Testing Techniques', () => {
     ForumThreadApi.getAllForumThreadsApi.mockResolvedValue([
       { id: 't1', title: 'Normal Thread', author: 'UserA', category: 'General', isPinned: false, isLocked: false, isReported: false },
       { id: 't2', title: 'Reported Spam', author: 'Spammer', category: 'General', isPinned: false, isLocked: false, isReported: true, reportReason: 'Spam' },
+    ])
+    ForumCategoryApi.getForumCategoriesApi.mockResolvedValue([
+      { id: 'cat-general', name: 'General', color: '#94a3b8' },
     ])
   })
 
@@ -112,7 +122,38 @@ describe('Forum Moderation - Testing Techniques', () => {
     })
   })
 
-  describe('3. Error Guessing: Concurrency / State Conflicts', () => {
+  describe('3. Persistent forum categories', () => {
+    it('creates a category through the backend API', async () => {
+      ForumCategoryApi.createForumCategoryApi.mockResolvedValue({
+        id: 'cat-fan-art',
+        name: 'Fan Art',
+        color: '#3b82f6',
+      })
+
+      render(
+        <MemoryRouter>
+          <ForumModeration />
+        </MemoryRouter>
+      )
+      await screen.findByText('Normal Thread')
+      fireEvent.click(screen.getByRole('button', { name: /Categories/i }))
+      fireEvent.click(screen.getByRole('button', { name: /Add Category/i }))
+      fireEvent.change(screen.getByPlaceholderText(/Off-topic, Spoilers/i), {
+        target: { value: 'Fan Art' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+
+      await waitFor(() => {
+        expect(ForumCategoryApi.createForumCategoryApi).toHaveBeenCalledWith({
+          name: 'Fan Art',
+          color: '#3b82f6',
+        })
+      })
+      expect(ForumCategoryApi.getForumCategoriesApi).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('4. Error Guessing: Concurrency / State Conflicts', () => {
     it('handles 409 Conflict when another moderator already modified the thread', async () => {
       ForumThreadApi.updateForumThreadApi.mockRejectedValue({
         response: { status: 409 }

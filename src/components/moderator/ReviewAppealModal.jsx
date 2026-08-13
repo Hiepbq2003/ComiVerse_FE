@@ -50,6 +50,15 @@ function ReviewAppealModal({ isOpen, onClose, comic, onSuccess }) {
         status: 'ACCEPTED',
         note: 'Appeal accepted by moderator. Original content restored.'
       })
+      try {
+        const comicId = comic.id || comic.comicId
+        const existing = JSON.parse(localStorage.getItem('appealedComics') || '[]')
+        const updated = existing.filter((id) => String(id) !== String(comicId))
+        localStorage.setItem('appealedComics', JSON.stringify(updated))
+        window.dispatchEvent(new Event('appealStateChanged'))
+      } catch (e) {
+        console.error('Error clearing local appeal state:', e)
+      }
       toast.success('Appeal accepted successfully. Comic restored.')
       if (onSuccess) onSuccess()
       onClose()

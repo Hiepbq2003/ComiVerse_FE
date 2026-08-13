@@ -411,7 +411,37 @@ function ModeratorDashboard() {
   }
 
   const syncSubmissionsWithLocalOverride = (rawSubmissions) => {
-    return rawSubmissions || [];
+    let overrideList = [];
+    try {
+      const raw = localStorage.getItem('comiverse_moderator_submissions_override');
+      if (raw) overrideList = JSON.parse(raw);
+    } catch (e) {}
+
+    if (!Array.isArray(overrideList) || overrideList.length === 0) {
+      return rawSubmissions || [];
+    }
+
+    const overrideMap = new Map();
+    overrideList.forEach(item => {
+      if (item && item.id) overrideMap.set(String(item.id), item);
+    });
+
+    const merged = (rawSubmissions || []).map(item => {
+      if (!item) return item;
+      const key = String(item.id);
+      if (overrideMap.has(key)) {
+        return { ...item, ...overrideMap.get(key) };
+      }
+      return item;
+    });
+
+    overrideList.forEach(item => {
+      if (item && item.id && !merged.some(m => m && String(m.id) === String(item.id))) {
+        merged.push(item);
+      }
+    });
+
+    return merged;
   };
   
   const fetchSubmissionsData = async () => {
@@ -984,6 +1014,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
         return nextSubmissions;
       });
+      fetchComicsAndTeams();
     } catch (err) {
       console.error(err);
       toast.error('Failed to approve chapter.');
@@ -1028,11 +1059,46 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               const matchByTitle = comicTitleClean && (item.title || '').trim().toLowerCase() === comicTitleClean;
               
               if (matchByComicId || matchByTitle) {
+                const updateChaps = (chapsArr) => {
+                  if (!Array.isArray(chapsArr)) {
+                    return [{
+                      ...chapterObj,
+                      status: 'rejected',
+                      rejectedAt: nowIso,
+                      rejectionReason: reason || 'Chapter rejected',
+                      pages: chapterObj.pages || chapterObj.images || [],
+                      pageCount: (chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0)
+                    }];
+                  }
+                  const exists = chapsArr.some(c => isSameChapterItem(c, chapterObj));
+                  if (exists) {
+                    return chapsArr.map(c => isSameChapterItem(c, chapterObj) ? {
+                      ...c,
+                      ...chapterObj,
+                      pages: (chapterObj.pages && chapterObj.pages.length) ? chapterObj.pages : ((c.pages && c.pages.length) ? c.pages : (chapterObj.images || c.images || [])),
+                      pageCount: (chapterObj.pages && chapterObj.pages.length) ? chapterObj.pages.length : (c.pages?.length || c.pageCount || chapterObj.pageCount || (c.images?.length || 0)),
+                      status: 'rejected',
+                      rejectedAt: nowIso,
+                      rejectionReason: reason || 'Chapter rejected'
+                    } : { ...c, status: 'rejected', rejectedAt: nowIso });
+                  }
+                  return [...chapsArr.map(c => ({...c, status: 'rejected', rejectedAt: nowIso})), {
+                    ...chapterObj,
+                    status: 'rejected',
+                    rejectedAt: nowIso,
+                    rejectionReason: reason || 'Chapter rejected',
+                    pages: chapterObj.pages || chapterObj.images || [],
+                    pageCount: (chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0)
+                  }];
+                };
+
                 return {
                   ...item,
                   status: 'rejected',
                   rejectedAt: nowIso,
-                  rejectionReason: item.chapterId ? (reason || 'Chapter rejected') : 'All chapters were rejected. Comic profile auto-rejected.'
+                  rejectionReason: item.chapterId ? (reason || 'Chapter rejected') : 'All chapters were rejected. Comic profile auto-rejected.',
+                  allChapters: updateChaps(item.allChapters),
+                  chapters: updateChaps(item.chapters)
                 };
               }
               return item;
@@ -1067,11 +1133,47 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
           if (isSourceItem) {
             sourceMatched = true;
+
+            const updateChaps = (chapsArr) => {
+              if (!Array.isArray(chapsArr)) {
+                return [{
+                  ...chapterObj,
+                  status: 'rejected',
+                  rejectedAt: nowIso,
+                  rejectionReason: reason || 'Chapter rejected',
+                  pages: chapterObj.pages || chapterObj.images || [],
+                  pageCount: (chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0)
+                }];
+              }
+              const exists = chapsArr.some(c => isSameChapterItem(c, chapterObj));
+              if (exists) {
+                return chapsArr.map(c => isSameChapterItem(c, chapterObj) ? {
+                  ...c,
+                  ...chapterObj,
+                  pages: (chapterObj.pages && chapterObj.pages.length) ? chapterObj.pages : ((c.pages && c.pages.length) ? c.pages : (chapterObj.images || c.images || [])),
+                  pageCount: (chapterObj.pages && chapterObj.pages.length) ? chapterObj.pages.length : (c.pages?.length || c.pageCount || chapterObj.pageCount || (c.images?.length || 0)),
+                  status: 'rejected',
+                  rejectedAt: nowIso,
+                  rejectionReason: reason || 'Chapter rejected'
+                } : c);
+              }
+              return [...chapsArr, {
+                ...chapterObj,
+                status: 'rejected',
+                rejectedAt: nowIso,
+                rejectionReason: reason || 'Chapter rejected',
+                pages: chapterObj.pages || chapterObj.images || [],
+                pageCount: (chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0)
+              }];
+            };
+
             return {
               ...item,
               status: 'rejected',
               rejectedAt: nowIso,
-              rejectionReason: reason || 'Chapter rejected'
+              rejectionReason: reason || 'Chapter rejected',
+              allChapters: updateChaps(item.allChapters),
+              chapters: updateChaps(item.chapters)
             };
           }
           return item;
@@ -2023,6 +2125,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               handleApproveAndCreateProject={handleApproveAndCreateProject}
               handleChapterApprove={handleChapterApprove}
               handleChapterReject={handleChapterReject}
+              fetchAllData={fetchAllData}
             />
           )}
 

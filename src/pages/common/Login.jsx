@@ -7,7 +7,7 @@ import { getBackendHost } from '../../config/apiConfig'
 
 function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, loading, setLoading }) {
   const { login } = useAuth()
-  const [form, setForm] = useState({ username: '', password: '', rememberMe: false })
+  const [form, setForm] = useState({ username: '', password: '' })
   const [showPassword, setShowPassword] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({ username: '', password: '' })
 
@@ -289,16 +289,7 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
           )}
         </div>
 
-        <div className="form-action-options">
-          <label className="checkbox-custom-label">
-            <input 
-              type="checkbox" 
-              checked={form.rememberMe}
-              onChange={(e) => setForm({ ...form, rememberMe: e.target.checked })}
-            />
-            <span className="checkmark-box"></span>
-            Remember me
-          </label>
+        <div className="form-action-options" style={{ justifyContent: 'flex-end' }}>
           <button type="button" className="link-text-btn" onClick={() => onNavigate('forgot')}>
             Forgot password?
           </button>

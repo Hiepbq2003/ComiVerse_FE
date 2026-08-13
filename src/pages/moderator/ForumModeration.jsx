@@ -8,6 +8,12 @@ import {
 } from '../../services/api/ForumThreadApi'
 import { toast } from 'react-toastify'
 import ModernButton from '../../components/common/ModernButton'
+import {
+  createForumCategoryApi,
+  deleteForumCategoryApi,
+  getForumCategoriesApi,
+  updateForumCategoryApi,
+} from '../../services/api/ForumCategoryApi'
 
 const formatTimeAgo = (createdAtString) => {
   if (!createdAtString) return 'Just now'
@@ -56,15 +62,7 @@ function ForumModeration({ loading: parentLoading = false, fetchAllData }) {
   const [localLoading, setLocalLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   
-  // Local state for dynamically added custom categories (persisted in localStorage)
-  const [customCategories, setCustomCategories] = useState(() => {
-    const saved = localStorage.getItem('comiverse_forum_categories')
-    return saved ? JSON.parse(saved) : []
-  })
-
-  useEffect(() => {
-    localStorage.setItem('comiverse_forum_categories', JSON.stringify(customCategories))
-  }, [customCategories])
+  const [forumCategories, setForumCategories] = useState([])
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
@@ -76,10 +74,22 @@ function ForumModeration({ loading: parentLoading = false, fetchAllData }) {
   const [newCatName, setNewCatName] = useState('')
   const [newCatColor, setNewCatColor] = useState('#3b82f6')
   const [editCatName, setEditCatName] = useState('')
+  const [editCatColor, setEditCatColor] = useState('#3b82f6')
 
   useEffect(() => {
     fetchThreads()
+    fetchCategories()
   }, [])
+
+  const fetchCategories = async () => {
+    try {
+      const data = await getForumCategoriesApi()
+      setForumCategories(data || [])
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to load forum categories!')
+    }
+  }
 
   const fetchThreads = async () => {
     try {
@@ -238,19 +248,22 @@ function ForumModeration({ loading: parentLoading = false, fetchAllData }) {
   }
 
   // ── CATEGORY ACTIONS ───────────────────────────────
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
     if (submitting) return
     if (!newCatName.trim()) return
     const name = newCatName.trim()
     try {
       setSubmitting(true)
-      if (!customCategories.includes(name)) {
-        setCustomCategories(prev => [...prev, name])
-      }
+      await createForumCategoryApi({ name, color: newCatColor })
+      await fetchCategories()
       fetchAllData?.()
       setNewCatName('')
+      setNewCatColor('#3b82f6')
       setShowAddCategoryModal(false)
-      toast.success('New category added locally!')
+      toast.success('New category added!')
+    } catch (err) {
+      console.error(err)
+      toast.error(err.response?.data?.message || 'Failed to create forum category!')
     } finally {
       setSubmitting(false)
     }
@@ -259,20 +272,14 @@ function ForumModeration({ loading: parentLoading = false, fetchAllData }) {
   const handleEditCategory = async () => {
     if (submitting) return
     if (!editCatName.trim() || editingCategory === null) return
-    const oldName = categoriesList[editingCategory].name
     const newName = editCatName.trim()
+    const categoryId = categoriesList[editingCategory].id
     
     try {
       setSubmitting(true)
-      // Update all threads in DB that match the old category name
-      const threadsToUpdate = threads.filter(t => t.category === oldName)
-      await Promise.all(threadsToUpdate.map(t => 
-        updateForumThreadApi(t.id, { ...t, category: newName })
-      ))
-      
-      // Update custom list if it was a local add
-      setCustomCategories(prev => prev.map(c => c === oldName ? newName : c))
-      await fetchThreads()
+      if (!categoryId) throw new Error('Forum category is not synchronized yet')
+      await updateForumCategoryApi(categoryId, { name: newName, color: editCatColor })
+      await Promise.all([fetchThreads(), fetchCategories()])
       fetchAllData?.()
       toast.success(`Category renamed to "${newName}".`)
     } catch (err) {
@@ -281,23 +288,20 @@ function ForumModeration({ loading: parentLoading = false, fetchAllData }) {
     } finally {
       setEditingCategory(null)
       setEditCatName('')
+      setEditCatColor('#3b82f6')
       setSubmitting(false)
     }
   }
 
   const handleDeleteCategory = async (index, name) => {
     if (submitting) return
-    if (window.confirm(`Are you sure you want to delete the category "${name}"? Threads under this category will become uncategorized.`)) {
+    if (window.confirm(`Are you sure you want to delete the category "${name}"? Threads under this category will move to General.`)) {
       try {
         setSubmitting(true)
-        // Set category to blank for all matching threads in DB
-        const threadsToUpdate = threads.filter(t => t.category === name)
-        await Promise.all(threadsToUpdate.map(t => 
-          updateForumThreadApi(t.id, { ...t, category: '' })
-        ))
-        
-        setCustomCategories(prev => prev.filter(c => c !== name))
-        await fetchThreads()
+        const category = categoriesList[index]
+        if (!category?.id) throw new Error('Forum category is not synchronized yet')
+        await deleteForumCategoryApi(category.id)
+        await Promise.all([fetchThreads(), fetchCategories()])
         fetchAllData?.()
         toast.success(`Category "${name}" deleted.`)
       } catch (err) {
@@ -311,19 +315,21 @@ function ForumModeration({ loading: parentLoading = false, fetchAllData }) {
 
   // ── DYNAMIC CATEGORY RESOLUTION (DB DRIVEN) ────────
   const allCategoryNames = Array.from(new Set([
-    ...threads.map(t => t.category || 'General'),
-    ...customCategories
+    ...forumCategories.map(category => category.name),
+    ...threads.map(t => t.category || 'General')
   ]))
 
   const categoriesList = allCategoryNames.map(catName => {
     const count = threads.filter(t => (t.category || 'General') === catName).length
+    const persistedCategory = forumCategories.find(category => category.name === catName)
     const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1']
     const hash = catName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
     const color = colors[hash % colors.length]
     return {
+      id: persistedCategory?.id,
       name: catName,
       threadsCount: count,
-      color
+      color: persistedCategory?.color || color
     }
   })
 
@@ -605,15 +611,19 @@ function ForumModeration({ loading: parentLoading = false, fetchAllData }) {
                     onClick={() => {
                       setEditingCategory(idx)
                       setEditCatName(cat.name)
+                      setEditCatColor(cat.color || '#3b82f6')
                     }}
                   >
                     Edit
                   </button>
                   <button 
                     className="cat-btn-action delete"
-                    disabled={submitting}
-                    style={{ opacity: submitting ? 0.6 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}
+                    style={{
+                      opacity: submitting || cat.name.toLowerCase() === 'general' ? 0.6 : 1,
+                      cursor: submitting || cat.name.toLowerCase() === 'general' ? 'not-allowed' : 'pointer'
+                    }}
                     onClick={() => handleDeleteCategory(idx, cat.name)}
+                    disabled={submitting || cat.name.toLowerCase() === 'general'}
                   >
                     🗑️
                   </button>
@@ -643,6 +653,15 @@ function ForumModeration({ loading: parentLoading = false, fetchAllData }) {
                   value={newCatName}
                   onChange={(e) => setNewCatName(e.target.value)}
                   autoFocus
+                />
+              </div>
+              <div className="mod-form-group">
+                <label className="mod-label">Category Color</label>
+                <input
+                  type="color"
+                  className="mod-input"
+                  value={newCatColor}
+                  onChange={(e) => setNewCatColor(e.target.value)}
                 />
               </div>
             </div>
@@ -686,6 +705,15 @@ function ForumModeration({ loading: parentLoading = false, fetchAllData }) {
                   value={editCatName}
                   onChange={(e) => setEditCatName(e.target.value)}
                   autoFocus
+                />
+              </div>
+              <div className="mod-form-group">
+                <label className="mod-label">Category Color</label>
+                <input
+                  type="color"
+                  className="mod-input"
+                  value={editCatColor}
+                  onChange={(e) => setEditCatColor(e.target.value)}
                 />
               </div>
             </div>

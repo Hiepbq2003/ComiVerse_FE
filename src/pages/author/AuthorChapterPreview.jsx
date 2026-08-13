@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
+import { getAuthorComicChaptersApi, getAuthorChapterPreviewApi } from '../../services/api/AuthorComicApi'
+import { getChapterDetailApi } from '../../services/api/ChapterApi'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
@@ -23,7 +24,7 @@ function getChapterNumber(chapter) {
 }
 
 const normalizePage = (page, idx) => {
-  const url = typeof page === 'string' ? page : (page?.imageUrl || page?.url || page?.pageUrl || '')
+  const url = typeof page === 'string' ? page : (page?.imageUrl || page?.url || page?.pageUrl || page?.path || page?.src || '')
   const number = (typeof page === 'object' && page?.pageNumber) ? page.pageNumber : (idx + 1)
   return { url, number }
 }
@@ -41,6 +42,49 @@ const formatStatus = (status) => {
   return value || 'N/A'
 }
 
+function parseCommentsFromReport(reasonText) {
+  if (!reasonText || !reasonText.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) return []
+  const reportSection = reasonText.split('--- DETAILED INSPECTION FEEDBACK REPORT')[1] || ''
+  const lines = reportSection.split('\n')
+  const parsedComments = []
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim()
+    if (!trimmed) return
+    const match = trimmed.match(/^\d+\.\s*\[([^\]]+)\]:\s*(.+)$/)
+    if (match) {
+      const label = match[1].trim()
+      const text = match[2].trim()
+
+      let pageNum = 1
+      const pMatch = label.match(/Page\s+(\d+)/i)
+      if (pMatch) pageNum = parseInt(pMatch[1], 10)
+
+      let xPercentage = null
+      let yPercentage = null
+      const coordMatch = label.match(/\((\d+(?:\.\d+)?)%\s*,\s*(\d+(?:\.\d+)?)%\)/)
+      if (coordMatch) {
+        xPercentage = parseFloat(coordMatch[1])
+        yPercentage = parseFloat(coordMatch[2])
+      }
+
+      parsedComments.push({
+        id: `parsed-doc-comment-${idx}-${Date.now()}`,
+        targetType: coordMatch ? 'point' : (label.toLowerCase().includes('page') ? 'page' : 'field'),
+        targetKey: `page-${pageNum}`,
+        targetLabel: label,
+        text,
+        createdAt: new Date().toISOString(),
+        author: 'Moderator',
+        xPercentage,
+        yPercentage
+      })
+    }
+  })
+
+  return parsedComments
+}
+
 /* ────────────────── rejection data resolver ──────────────── */
 
 function resolveRejectionInfo(preview, comicId) {
@@ -56,38 +100,99 @@ function resolveRejectionInfo(preview, comicId) {
     return { isRejected: false, reason: '', docComments: [] }
   }
 
+  const chapIdStr = String(preview?.id || preview?.chapterId || '')
+  const subIdStr = String(preview?.submissionId || '')
+  const comicIdStr = String(comicId || preview?.comicId || '')
+  const chapNumStr = String(getChapterNumber(preview))
+
+  // Match override specifically for this chapter
   try {
     const rawOverrides = localStorage.getItem('comiverse_moderator_submissions_override')
     if (rawOverrides) {
       const overrides = JSON.parse(rawOverrides)
       if (Array.isArray(overrides)) {
-        const match = overrides.find(o => {
+        // First: direct top-level match
+        let match = overrides.find(o => {
           const st = String(o.status || '').toUpperCase()
-          const matchId = (preview?.id && String(o.id) === String(preview.id)) || (preview?.submissionId && String(o.submissionId) === String(preview.submissionId))
-          const matchComicId = (comicId && (String(o.comicId) === String(comicId) || String(o.id) === String(comicId)))
-          return st === 'REJECTED' && (matchId || matchComicId)
-        }) || overrides.find(o => String(o.status || '').toUpperCase() === 'REJECTED')
+          if (st !== 'REJECTED') return false
+          const oId = String(o.id || o.chapterId || o.submissionId || '')
+          const oSubId = String(o.submissionId || '')
+          const oNum = String(o.chapterNumber || o.number || '')
+          const matchChapId = chapIdStr && oId && (oId === chapIdStr || oId === subIdStr)
+          const matchSubId = subIdStr && oSubId && (oSubId === subIdStr || oSubId === chapIdStr)
+          const matchNum = chapNumStr && chapNumStr !== 'N/A' && oNum && oNum === chapNumStr
+          const matchComic = !comicIdStr || String(o.comicId || o.parentReviewId || '') === comicIdStr || !o.comicId
+          return ((matchChapId || matchSubId) && matchComic) || (matchNum && matchComic)
+        })
+
+        // Second: dig into nested allChapters/chapters arrays for the specific chapter
+        if (!match) {
+          for (const o of overrides) {
+            const oComicId = String(o.comicId || o.parentReviewId || o.id || '')
+            if (comicIdStr && oComicId && oComicId !== comicIdStr && !oComicId.includes(comicIdStr)) continue
+
+            const chaps = [...(o.allChapters || []), ...(o.chapters || []), ...(o.subItems || [])]
+            const nestedChap = chaps.find(c => {
+              const cSt = String(c.status || c.moderationStatus || '').toUpperCase()
+              if (cSt !== 'REJECTED') return false
+              const cId = String(c.id || c.chapterId || '')
+              const cNum = String(c.chapterNumber || c.number || '')
+              return (chapIdStr && cId && (cId === chapIdStr || cId === subIdStr || `chap-${cId}` === chapIdStr)) ||
+                     (chapNumStr && chapNumStr !== 'N/A' && cNum && cNum === chapNumStr)
+            })
+            if (nestedChap) {
+              match = nestedChap
+              break
+            }
+          }
+        }
 
         if (match) {
           isRejected = true
-          if (match.rejectionReason) reason = match.rejectionReason
+          if (match.rejectionReason || match.rejection_reason) {
+            reason = match.rejectionReason || match.rejection_reason
+          }
         }
       }
     }
   } catch (e) { /* ignore */ }
 
+  // Step 1: If reason contains structured report, parse exact comments from report FIRST
+  if (reason) {
+    const parsedFromReport = parseCommentsFromReport(reason)
+    if (parsedFromReport.length > 0) {
+      docComments = parsedFromReport
+    }
+  }
+
+  // Step 2: Check comiverse_moderator_doc_comments in localStorage STRICTLY matching this chapter
   try {
     const rawCommentsMap = localStorage.getItem('comiverse_moderator_doc_comments')
     if (rawCommentsMap) {
       const commentsMap = JSON.parse(rawCommentsMap)
+
       Object.keys(commentsMap).forEach(key => {
-        if (
-          (preview?.id && key.includes(String(preview.id))) ||
-          (preview?.submissionId && key.includes(String(preview.submissionId))) ||
-          (comicId && key.includes(String(comicId)))
-        ) {
-          docComments = [...docComments, ...(commentsMap[key] || [])]
-        }
+        const commentsList = commentsMap[key] || []
+
+        commentsList.forEach(c => {
+          if (!c) return
+          const cChapId = String(c.chapterId || '')
+          const cChapNum = String(c.chapterNumber || '')
+          const cComicId = String(c.comicId || '')
+
+          // Comic check: if comment has comicId, it must match current comicId
+          if (comicIdStr && cComicId && comicIdStr !== cComicId) return
+
+          // Strict Chapter Match: MUST match chapterId or chapterNumber!
+          const matchChapId = chapIdStr && cChapId && (cChapId === chapIdStr || cChapId === `chap-${chapIdStr}` || `chap-${cChapId}` === chapIdStr)
+          const matchChapNum = chapNumStr && chapNumStr !== 'N/A' && cChapNum && cChapNum === chapNumStr
+
+          if (matchChapId || matchChapNum) {
+            if (!docComments.some(existing => existing.id === c.id || (existing.targetLabel === c.targetLabel && existing.text === c.text))) {
+              docComments.push(c)
+            }
+          }
+        })
       })
     }
   } catch (e) { /* ignore */ }
@@ -163,14 +268,126 @@ export default function AuthorChapterPreview() {
       return
     }
 
-    if (!preview) {
+    const currentRawPages = normalizeArrayResponse(
+      preview?.pages ||
+      preview?.images ||
+      preview?.pageUrls ||
+      preview?.pagesList ||
+      preview?.urls ||
+      preview?.chapterPages ||
+      (Array.isArray(preview?.content) ? preview.content : [])
+    )
+
+    const needsPageFetch = !preview || currentRawPages.length === 0
+
+    if (needsPageFetch) {
       const fetchChapter = async () => {
         try {
-          const res = await getAuthorComicChaptersApi(comicId)
-          if (res.status === 'fulfilled') {
-            const chapters = normalizeArrayResponse(res.value)
-            const found = chapters.find((c) => c.id === chapterId || c.chapterId === chapterId)
-            if (found) setPreview(found)
+          let previewData = null
+          try {
+            previewData = await getAuthorChapterPreviewApi(comicId, chapterId)
+          } catch {
+            // ignore
+          }
+
+          if (!previewData || (!previewData.pages?.length && !previewData.images?.length)) {
+            try {
+              const detailRes = await getChapterDetailApi(chapterId)
+              if (detailRes?.data || detailRes) {
+                previewData = { ...(previewData || {}), ...(detailRes.data || detailRes) }
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          let overrideData = null
+          try {
+            const rawOverrides = localStorage.getItem('comiverse_moderator_submissions_override')
+            if (rawOverrides) {
+              const overrides = JSON.parse(rawOverrides)
+              if (Array.isArray(overrides)) {
+                const chapIdStr = String(chapterId)
+                const chapNumStr = String(preview?.chapterNumber || preview?.number || chapterId)
+                const comicIdStr = String(comicId || '')
+
+                // First: direct top-level match
+                overrideData = overrides.find(o => {
+                  const oId = String(o.id || o.chapterId || o.submissionId || '')
+                  const oNum = String(o.chapterNumber || o.number || '')
+                  const oComicId = String(o.comicId || o.parentReviewId || '')
+                  const matchComic = !comicIdStr || !oComicId || oComicId === comicIdStr
+                  return ((chapIdStr && oId && chapIdStr === oId) || (chapNumStr && oNum && chapNumStr === oNum)) && matchComic
+                })
+                // Second: dig into nested allChapters/chapters/subItems and extract the SPECIFIC chapter object
+                if (!overrideData) {
+                  for (const o of overrides) {
+                    const oComicId = String(o.comicId || o.parentReviewId || o.id || '')
+                    if (comicIdStr && oComicId && oComicId !== comicIdStr && !oComicId.includes(comicIdStr)) continue
+
+                    const chaps = [...(o.allChapters || []), ...(o.chapters || []), ...(o.subItems || [])]
+                    const nestedChap = chaps.find(c => {
+                      const cId = String(c.id || c.chapterId || '')
+                      const cNum = String(c.chapterNumber || c.number || '')
+                      return (chapIdStr && cId && (chapIdStr === cId || `chap-${chapIdStr}` === cId)) || (chapNumStr && cNum && chapNumStr === cNum)
+                    })
+                    if (nestedChap) {
+                      // Return the specific chapter (with its pages), not the parent submission
+                      overrideData = nestedChap
+                      break
+                    }
+                  }
+                }
+              }
+            }
+          } catch (e) {}
+
+          const fetchedPages = (
+            (previewData?.pages && previewData.pages.length) ? previewData.pages :
+            (previewData?.images && previewData.images.length) ? previewData.images :
+            (overrideData?.pages && overrideData.pages.length) ? overrideData.pages :
+            (overrideData?.images && overrideData.images.length) ? overrideData.images : []
+          )
+
+          if (fetchedPages.length > 0) {
+            setPreview(prev => ({
+              ...prev,
+              ...(previewData || {}),
+              ...(overrideData || {}),
+              pages: fetchedPages,
+              status: previewData?.status || overrideData?.status || prev?.status
+            }))
+          } else {
+            const res = await getAuthorComicChaptersApi(comicId)
+            const chapters = res?.data || res || []
+            const chaptersList = normalizeArrayResponse(chapters)
+            const found = chaptersList.find((c) => (
+              String(c.id) === String(chapterId) ||
+              String(c.chapterId) === String(chapterId) ||
+              String(c.chapterNumber) === String(chapterId)
+            ))
+            
+            if (found) {
+              let detailData = null
+              try {
+                detailData = await getAuthorChapterPreviewApi(comicId, found.id || found.chapterId || chapterId)
+              } catch {
+                // ignore
+              }
+              if (!detailData || (!detailData.pages?.length && !detailData.images?.length)) {
+                try {
+                  const detailRes = await getChapterDetailApi(found.id || found.chapterId || chapterId)
+                  if (detailRes?.data || detailRes) {
+                    detailData = { ...(detailData || {}), ...(detailRes.data || detailRes) }
+                  }
+                } catch {
+                  // ignore
+                }
+              }
+              setPreview(prev => ({ ...prev, ...found, ...(detailData || {}) }))
+            } else if (previewData || overrideData) {
+              setPreview(prev => ({ ...prev, ...(previewData || {}), ...(overrideData || {}) }))
+            }
           }
         } catch (error) {
           console.error('Failed to load chapter for preview:', error)
@@ -218,7 +435,15 @@ export default function AuthorChapterPreview() {
   }
 
   /* ── Derive data ─── */
-  const rawPages = normalizeArrayResponse(preview?.pages)
+  const rawPages = normalizeArrayResponse(
+    preview?.pages ||
+    preview?.images ||
+    preview?.pageUrls ||
+    preview?.pagesList ||
+    preview?.urls ||
+    preview?.chapterPages ||
+    (Array.isArray(preview?.content) ? preview.content : [])
+  )
   const pages = rawPages.map((p, idx) => normalizePage(p, idx))
 
   const { isRejected, reason, docComments } = resolveRejectionInfo(preview, comicId)

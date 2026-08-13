@@ -81,6 +81,7 @@ export const replaceAuthorChapterFolderApi = (comicId, chapterId, formData, onUp
 }
 
 // Backward-compatible alias
+export const uploadAuthorChapterZipApi = uploadAuthorChapterFolderApi
 export const replaceAuthorChapterZipApi = replaceAuthorChapterFolderApi
 
 export const submitAuthorComicAppealApi = (comicId, payload) => {

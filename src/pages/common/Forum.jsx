@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
-import { getForumThreadsPageApi, deleteForumThreadApi, createForumThreadApi, getAllForumThreadsApi, updateForumThreadApi, getForumThreadByIdApi } from '../../services/api/ForumThreadApi'
+import { getForumThreadsPageApi, deleteForumThreadApi, createForumThreadApi, getAllForumThreadsApi, updateForumThreadApi, getForumThreadByIdApi, incrementForumThreadViewApi, reportForumThreadApi } from '../../services/api/ForumThreadApi'
 import { createForumCommentApi, getForumCommentsApi, toggleForumCommentLikeApi, updateForumCommentApi, deleteForumCommentApi } from '../../services/api/ForumCommentApi'
+import { getForumCategoriesApi } from '../../services/api/ForumCategoryApi'
+import { uploadImageApi } from '../../services/api/UploadApi'
 import { getAuth } from '../../utils/Auth'
 import { toast } from 'react-toastify'
 import { ArrowLeft, Check, CornerDownRight, Edit3, Eye, Flag, Heart, Lock, MessageCircle, Plus, Search, Star, Trash2, X } from 'lucide-react'
@@ -51,18 +53,42 @@ const formatTimeAgo = (createdAtString) => {
 
 const sanitizeHtml = (html) => {
   if (!html) return ''
-  // Only allow safe inline tags for forum comments
   const div = document.createElement('div')
   div.innerHTML = html
-  // Remove script tags and event handlers
-  div.querySelectorAll('script, style, iframe, object, embed').forEach(el => el.remove())
-  div.querySelectorAll('*').forEach(el => {
-    const attrs = [...el.attributes]
-    attrs.forEach(attr => {
-      if (attr.name.startsWith('on') || attr.name === 'style') {
-        el.removeAttribute(attr.name)
+  const allowedTags = new Set([
+    'B', 'I', 'EM', 'STRONG', 'U', 'CODE', 'A', 'BLOCKQUOTE', 'BR', 'DIV', 'SPAN', 'IMG'
+  ])
+  const isSafeUrl = (value, allowDataImage = false) => {
+    const normalized = String(value || '').trim()
+    if (/^https?:\/\//i.test(normalized)) return true
+    return allowDataImage && /^data:image\/(png|jpe?g|gif|webp);base64,/i.test(normalized)
+  }
+
+  ;[...div.querySelectorAll('*')].forEach(el => {
+    if (!allowedTags.has(el.tagName)) {
+      el.replaceWith(...el.childNodes)
+      return
+    }
+
+    const sourceHref = el.getAttribute('href')
+    const sourceSrc = el.getAttribute('src')
+    ;[...el.attributes].forEach(attr => el.removeAttribute(attr.name))
+    if (el.tagName === 'A') {
+      if (isSafeUrl(sourceHref)) {
+        el.setAttribute('href', sourceHref)
+        el.setAttribute('target', '_blank')
+        el.setAttribute('rel', 'noopener noreferrer')
       }
-    })
+    }
+    if (el.tagName === 'IMG') {
+      if (!isSafeUrl(sourceSrc, true)) {
+        el.remove()
+        return
+      }
+      el.setAttribute('src', sourceSrc)
+      el.setAttribute('alt', 'Attached Image')
+      el.setAttribute('loading', 'lazy')
+    }
   })
   return div.innerHTML
 }
@@ -163,6 +189,13 @@ const normalizeForumComment = (comment) => {
   }
 }
 
+const ALLOWED_FORUM_IMAGE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+])
+
 const ForumAvatar = ({ avatarUrl, name, className = 'forum-avatar-placeholder', style }) => {
   const [imageFailed, setImageFailed] = useState(false)
 
@@ -211,10 +244,7 @@ function Forum() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalElements, setTotalElements] = useState(0)
   const [allThreadsForCounts, setAllThreadsForCounts] = useState([])
-  const [customCategories, setCustomCategories] = useState(() => {
-    const saved = localStorage.getItem('comiverse_forum_categories')
-    return saved ? JSON.parse(saved) : []
-  })
+  const [forumCategories, setForumCategories] = useState([])
   const ITEMS_PER_PAGE = 10
 
   // Reset page when category or sorting tab changes
@@ -230,6 +260,7 @@ function Forum() {
     content: ''
   })
   const [forumNewPostImage, setForumNewPostImage] = useState(null)
+  const [forumNewPostImageFile, setForumNewPostImageFile] = useState(null)
   const forumNewPostFileInputRef = useRef(null)
 
   // Selected Thread Detail Modal State
@@ -240,15 +271,21 @@ function Forum() {
   const [replyingToComment, setReplyingToComment] = useState(null)
   const [highlightedCommentId, setHighlightedCommentId] = useState(null)
   const [forumReplyImage, setForumReplyImage] = useState(null)
+  const [forumReplyImageFile, setForumReplyImageFile] = useState(null)
   const forumReplyFileInputRef = useRef(null)
 
   const handleForumNewPostImageSelect = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select a valid image file.')
+    if (!ALLOWED_FORUM_IMAGE_TYPES.has(file.type)) {
+      toast.error('Please select a JPG, PNG, GIF, or WebP image.')
       return
     }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must not exceed 5MB.')
+      return
+    }
+    setForumNewPostImageFile(file)
     const reader = new FileReader()
     reader.onload = () => setForumNewPostImage(reader.result)
     reader.readAsDataURL(file)
@@ -257,10 +294,15 @@ function Forum() {
   const handleForumReplyImageSelect = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select a valid image file.')
+    if (!ALLOWED_FORUM_IMAGE_TYPES.has(file.type)) {
+      toast.error('Please select a JPG, PNG, GIF, or WebP image.')
       return
     }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must not exceed 5MB.')
+      return
+    }
+    setForumReplyImageFile(file)
     const reader = new FileReader()
     reader.onload = () => setForumReplyImage(reader.result)
     reader.readAsDataURL(file)
@@ -339,6 +381,16 @@ function Forum() {
   const [reportReason, setReportReason] = useState('')
   const [threadToReport, setThreadToReport] = useState(null)
 
+  // Reported threads state (localStorage)
+  const [reportedThreadIds, setReportedThreadIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('comiverse_user_reported_threads')
+      return saved ? new Set(JSON.parse(saved)) : new Set()
+    } catch (e) {
+      return new Set()
+    }
+  })
+
   // Followed threads state (localStorage)
   const [followedThreads, setFollowedThreads] = useState(() => {
     const saved = localStorage.getItem('comiverse_followed_threads')
@@ -372,19 +424,7 @@ function Forum() {
   const incrementViews = async (thread) => {
     try {
       const nextViews = parseInt(thread.views || 0) + 1
-      await updateForumThreadApi(thread.id, {
-        id: thread.id,
-        title: thread.title,
-        author: thread.author,
-        category: thread.category,
-        content: thread.content,
-        isPinned: thread.isPinned || false,
-        isLocked: thread.isLocked || false,
-        isReported: thread.isReported || false,
-        reportReason: thread.reportReason || '',
-        replies: thread.replies,
-        views: nextViews
-      })
+      await incrementForumThreadViewApi(thread.id)
       // Update locally
       setThreads(prev => prev.map(t => t.id === thread.id ? { ...t, views: String(nextViews) } : t))
       setAllThreadsForCounts(prev => prev.map(t => t.id === thread.id ? { ...t, views: nextViews } : t))
@@ -473,14 +513,31 @@ function Forum() {
     }
   }, [threadId, threadComments])
 
-  // Categories list derived dynamically from database threads (synced with customCategories)
+  // Categories are shared through the backend; thread values remain as a legacy fallback.
   const categoriesList = [
     { name: 'All' },
     ...Array.from(new Set([
+      'General',
+      ...forumCategories.map(category => category.name),
       ...allThreadsForCounts.map(t => t.category || 'General'),
-      ...customCategories
     ])).map(name => ({ name }))
   ]
+
+  useEffect(() => {
+    let cancelled = false
+    const fetchCategories = async () => {
+      try {
+        const categories = await getForumCategoriesApi()
+        if (!cancelled) setForumCategories(categories || [])
+      } catch (err) {
+        console.error('Failed to load forum categories:', err)
+      }
+    }
+    fetchCategories()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Hover states for category selector
   const [hoveredCategory, setHoveredCategory] = useState(null)
@@ -519,10 +576,19 @@ function Forum() {
   const fetchThreads = async (page) => {
     const targetPage = page || currentPage
     try {
-      setLoading(true)
-      const response = await getForumThreadsPageApi(targetPage, ITEMS_PER_PAGE, searchQuery)
+      let response = null
+      try {
+        response = await getForumThreadsPageApi(targetPage, ITEMS_PER_PAGE, searchQuery)
+      } catch (apiErr) {
+        console.warn('Paged forum threads API error, falling back to all threads endpoint:', apiErr?.message || apiErr)
+        const fallbackData = await getAllForumThreadsApi().catch(() => [])
+        response = {
+          data: Array.isArray(fallbackData) ? fallbackData : (fallbackData?.data || []),
+          metadata: { page: 1, size: ITEMS_PER_PAGE, totalElements: (fallbackData || []).length, totalPages: 1 }
+        }
+      }
       // response = { data: [...], metadata: { page, size, totalElements, totalPages } }
-      const list = response.data || []
+      const list = Array.isArray(response) ? response : (response?.data || [])
 
       // Format DB threads
       const formattedDb = list.map(t => ({
@@ -575,6 +641,10 @@ function Forum() {
   // Publish new thread post
   const handlePublishPost = async () => {
     if (submitting) return
+    if (!auth?.token) {
+      navigate('/auth?mode=signin', { state: { from: location.pathname } })
+      return
+    }
     if (!newPostForm.title.trim()) {
       toast.warn('Please enter a thread title.')
       return
@@ -591,8 +661,9 @@ function Forum() {
       const authorName = auth?.user?.fullName || auth?.user?.username || 'Guest User'
 
       let finalContent = newPostForm.content.trim()
-      if (forumNewPostImage) {
-        finalContent += `\n\n![Attached Image](${forumNewPostImage})`
+      if (forumNewPostImageFile) {
+        const imageUrl = await uploadImageApi(forumNewPostImageFile)
+        finalContent += `\n\n![Attached Image](${imageUrl})`
       }
 
       await createForumThreadApi({
@@ -604,6 +675,7 @@ function Forum() {
       toast.success('Thread published successfully!')
       setShowNewPostModal(false)
       setForumNewPostImage(null)
+      setForumNewPostImageFile(null)
       setNewPostForm({
         title: '',
         category: 'General',
@@ -695,6 +767,12 @@ function Forum() {
   // Handle reporting a thread
   const handleTriggerReport = (thread, event) => {
     if (event) event.stopPropagation()
+    if (!thread) return
+    const isAlreadyReported = reportedThreadIds.has(thread.id) || thread.isReported
+    if (isAlreadyReported) {
+      toast.info('🛡️ You have already reported this thread. A moderator is reviewing it.')
+      return
+    }
     setThreadToReport(thread)
     setReportReason('')
     setShowReportModal(true)
@@ -708,21 +786,23 @@ function Forum() {
     }
     try {
       setSubmitting(true)
-      await updateForumThreadApi(threadToReport.id, {
-        id: threadToReport.id,
-        title: threadToReport.title,
-        author: threadToReport.author,
-        category: threadToReport.category,
-        content: threadToReport.content,
-        isPinned: threadToReport.isPinned || false,
-        isLocked: threadToReport.isLocked || false,
-        isReported: true,
-        reportReason: reportReason.trim(),
-        replies: threadToReport.replies,
-        views: parseInt(threadToReport.views || 0)
-      })
+      await reportForumThreadApi(threadToReport.id, reportReason.trim())
       toast.success('Thread reported successfully. A moderator will review it shortly.')
       setShowReportModal(false)
+
+      setReportedThreadIds(prev => {
+        const next = new Set(prev).add(threadToReport.id)
+        try {
+          localStorage.setItem('comiverse_user_reported_threads', JSON.stringify(Array.from(next)))
+        } catch (e) {}
+        return next
+      })
+
+      setThreads(prev => prev.map(t => t.id === threadToReport.id ? { ...t, isReported: true } : t))
+      if (selectedThread && selectedThread.id === threadToReport.id) {
+        setSelectedThread(prev => prev ? { ...prev, isReported: true } : prev)
+      }
+
       fetchThreads(currentPage)
       fetchAllThreadsForCounts()
     } catch (err) {
@@ -736,10 +816,14 @@ function Forum() {
   // Post a comment reply
   const handlePostReply = async () => {
     if (submitting) return
+    if (!auth?.token) {
+      navigate('/auth?mode=signin', { state: { from: location.pathname + location.search } })
+      return
+    }
     const editor = replyInputRef.current
     const htmlContent = editor ? editor.innerHTML : ''
     const textContent = editor ? editor.textContent.trim() : ''
-    if (!textContent && !forumReplyImage) {
+    if (!textContent && !forumReplyImageFile) {
       toast.warn('Please enter your reply or attach an image.')
       return
     }
@@ -747,8 +831,9 @@ function Forum() {
       setSubmitting(true)
       const nextRepliesCount = (selectedThread.replies || 0) + 1
       let finalCommentHtml = sanitizeHtml(htmlContent)
-      if (forumReplyImage) {
-        finalCommentHtml += `<br/><br/><img src="${forumReplyImage}" alt="Attached Image" style="max-width:100%; max-height:350px; border-radius:10px; border:1px solid rgba(255,255,255,0.1);" />`
+      if (forumReplyImageFile) {
+        const imageUrl = await uploadImageApi(forumReplyImageFile)
+        finalCommentHtml += `<br/><br/><img src="${imageUrl}" alt="Attached Image" />`
       }
 
       const created = await createForumCommentApi(selectedThread.id, {
@@ -761,6 +846,7 @@ function Forum() {
       if (editor) editor.innerHTML = ''
       setReplyingToComment(null)
       setForumReplyImage(null)
+      setForumReplyImageFile(null)
       if (forumReplyFileInputRef.current) forumReplyFileInputRef.current.value = ''
 
       setThreads(prev => prev.map(t => t.id === selectedThread.id ? { ...t, replies: nextRepliesCount } : t))
@@ -1033,24 +1119,6 @@ function Forum() {
     setThreads(prev => prev.map(t => t.id === targetId ? { ...t, likes: nextLikes } : t))
     setAllThreadsForCounts(prev => prev.map(t => t.id === targetId ? { ...t, likes: nextLikes } : t))
 
-    try {
-      await updateForumThreadApi(targetId, {
-        id: targetId,
-        title: threadToLike.title,
-        author: threadToLike.author,
-        category: threadToLike.category,
-        content: threadToLike.content,
-        isPinned: threadToLike.isPinned || false,
-        isLocked: threadToLike.isLocked || false,
-        isReported: threadToLike.isReported || false,
-        reportReason: threadToLike.reportReason || '',
-        replies: threadToLike.replies || 0,
-        views: parseInt(threadToLike.views || 0),
-        likes: nextLikes
-      })
-    } catch (err) {
-      console.error('Failed to update thread likes count:', err)
-    }
   }
 
   // Count threads inside category
@@ -1398,6 +1466,16 @@ function Forum() {
                         <div className="forum-locked-message-stv">
                           🔒 This discussion has been locked by a moderator. No further replies can be posted.
                         </div>
+                      ) : !auth?.token ? (
+                        <div className="forum-locked-message-stv">
+                          <button
+                            type="button"
+                            className="mod-btn approve"
+                            onClick={() => navigate('/auth?mode=signin', { state: { from: location.pathname + location.search } })}
+                          >
+                            Sign in to reply
+                          </button>
+                        </div>
                       ) : (
                         <div className="forum-editor-row-stv">
                           <ForumAvatar
@@ -1442,6 +1520,7 @@ function Forum() {
                                   type="button"
                                   onClick={() => {
                                     setForumReplyImage(null)
+                                    setForumReplyImageFile(null)
                                     if (forumReplyFileInputRef.current) forumReplyFileInputRef.current.value = ''
                                   }}
                                   style={{
@@ -1466,7 +1545,7 @@ function Forum() {
                             <input
                               type="file"
                               ref={forumReplyFileInputRef}
-                              accept="image/*"
+                              accept="image/png,image/jpeg,image/gif,image/webp"
                               style={{ display: 'none' }}
                               onChange={handleForumReplyImageSelect}
                             />
@@ -1505,6 +1584,10 @@ function Forum() {
                         className="forum-panel-btn primary"
                         disabled={selectedThread.isLocked}
                         onClick={() => {
+                          if (!auth?.token) {
+                            navigate('/auth?mode=signin', { state: { from: location.pathname + location.search } })
+                            return
+                          }
                           if (replyInputRef.current) {
                             replyInputRef.current.focus();
                             replyInputRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -1512,7 +1595,11 @@ function Forum() {
                         }}
                         style={{ opacity: selectedThread.isLocked ? 0.5 : 1, cursor: selectedThread.isLocked ? 'not-allowed' : 'pointer' }}
                       >
-                        {selectedThread.isLocked ? <><Lock size={16} aria-hidden="true" /> Locked</> : <><MessageCircle size={16} aria-hidden="true" /> Reply</>}
+                        {selectedThread.isLocked
+                          ? <><Lock size={16} aria-hidden="true" /> Locked</>
+                          : !auth?.token
+                            ? <><MessageCircle size={16} aria-hidden="true" /> Sign in to reply</>
+                            : <><MessageCircle size={16} aria-hidden="true" /> Reply</>}
                       </button>
                       
                       {/* Follow dropdown setting */}
@@ -1559,13 +1646,22 @@ function Forum() {
                         const auth = getAuth();
                         const isCreator = auth?.user && (selectedThread.author === auth.user.fullName || selectedThread.author === auth.user.username);
                         if (isCreator) return null;
+                        const isReported = reportedThreadIds.has(selectedThread.id) || selectedThread.isReported;
                         return (
                           <button 
                             type="button"
-                            className="forum-panel-btn report" 
+                            className={`forum-panel-btn report ${isReported ? 'reported' : ''}`} 
                             onClick={() => handleTriggerReport(selectedThread)}
+                            disabled={isReported}
+                            style={isReported ? {
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              color: '#f87171',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              cursor: 'not-allowed',
+                              opacity: 0.85
+                            } : {}}
                           >
-                            <Flag size={16} aria-hidden="true" /> Report Thread
+                            <Flag size={16} aria-hidden="true" /> {isReported ? '🚩 Thread Reported' : 'Report Thread'}
                           </button>
                         );
                       })()}
@@ -1657,7 +1753,13 @@ function Forum() {
                   <button 
                     type="button"
                     className="forum-btn-create-stv" 
-                    onClick={() => setShowNewPostModal(true)}
+                    onClick={() => {
+                      if (!auth?.token) {
+                        navigate('/auth?mode=signin', { state: { from: location.pathname } })
+                        return
+                      }
+                      setShowNewPostModal(true)
+                    }}
                   >
                     <Plus size={18} aria-hidden="true" /> Create Discussion
                   </button>
@@ -1859,21 +1961,24 @@ function Forum() {
                                       </>
                                     )}
                                     {!isModerator && (() => {
-                                       const auth = getAuth();
-                                       const isCreator = auth?.user && (thread.author === auth.user.fullName || thread.author === auth.user.username);
-                                       if (isCreator) return null;
-                                       return (
-                                         <button 
-                                           className="forum-dropdown-item" 
-                                           onClick={(e) => {
-                                             handleTriggerReport(thread, e);
-                                             setActiveDropdownThreadId(null);
-                                           }}
-                                         >
-                                           <span>🚩</span> Report
-                                         </button>
-                                       );
-                                     })()}
+                                      const auth = getAuth();
+                                      const isCreator = auth?.user && (thread.author === auth.user.fullName || thread.author === auth.user.username);
+                                      if (isCreator) return null;
+                                      const isReported = reportedThreadIds.has(thread.id) || thread.isReported;
+                                      return (
+                                        <button 
+                                          className="forum-dropdown-item" 
+                                          onClick={(e) => {
+                                            handleTriggerReport(thread, e);
+                                            setActiveDropdownThreadId(null);
+                                          }}
+                                          disabled={isReported}
+                                          style={isReported ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+                                        >
+                                          <span>🚩</span> {isReported ? 'Reported' : 'Report'}
+                                        </button>
+                                      );
+                                    })()}
                                   </div>
                                 )}
                               </div>
@@ -2005,7 +2110,7 @@ function Forum() {
               <input
                 type="file"
                 ref={forumNewPostFileInputRef}
-                accept="image/*"
+                accept="image/png,image/jpeg,image/gif,image/webp"
                 style={{ display: 'none' }}
                 onChange={handleForumNewPostImageSelect}
               />
@@ -2021,6 +2126,7 @@ function Forum() {
                     type="button"
                     onClick={() => {
                       setForumNewPostImage(null)
+                      setForumNewPostImageFile(null)
                       if (forumNewPostFileInputRef.current) forumNewPostFileInputRef.current.value = ''
                     }}
                     style={{

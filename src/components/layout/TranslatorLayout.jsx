@@ -46,7 +46,7 @@ function TranslatorLayout({ children }) {
     }
   }
 
-  const formattedNotifications = notifications.map(n => ({
+  const formattedNotifications = (notifications || []).map(n => ({
     id: n.id,
     unread: !n.isRead,
     title: n.title || 'Notification',
