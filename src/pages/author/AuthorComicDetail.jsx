@@ -610,7 +610,65 @@ function AuthorComicDetail() {
       ])
 
       const rawComic = comicResponse.value;
-      const rawChapters = chaptersResponse.status === 'fulfilled' ? normalizeArrayResponse(chaptersResponse.value) : [];
+      let rawChapters = chaptersResponse.status === 'fulfilled' ? normalizeArrayResponse(chaptersResponse.value) : [];
+
+      // Enrich chapters with local storage moderator overrides if available
+      try {
+        const rawOverrides = localStorage.getItem('comiverse_moderator_submissions_override');
+        if (rawOverrides) {
+          const overrides = JSON.parse(rawOverrides);
+          if (Array.isArray(overrides)) {
+            const comicIdStr = String(id);
+            const comicTitleClean = (rawComic?.title || '').trim().toLowerCase();
+
+            const matchingOverrides = overrides.filter(o => {
+              if (!o) return false;
+              const matchId = (
+                (o.comicId && String(o.comicId) === comicIdStr) ||
+                (o.id && String(o.id) === comicIdStr) ||
+                (o.parentReviewId && String(o.parentReviewId) === comicIdStr)
+              );
+              const overrideTitle = (o.comicTitle || o.comicName || o.title || '').trim().toLowerCase();
+              const matchTitle = comicTitleClean && overrideTitle && (overrideTitle === comicTitleClean || overrideTitle.includes(comicTitleClean));
+              return matchId || matchTitle;
+            });
+
+            const overrideChaptersList = [];
+            matchingOverrides.forEach(o => {
+              if (Array.isArray(o.allChapters)) overrideChaptersList.push(...o.allChapters);
+              if (Array.isArray(o.chapters)) overrideChaptersList.push(...o.chapters);
+              if (Array.isArray(o.subItems)) overrideChaptersList.push(...o.subItems);
+              if (o.chapterNumber || o.chapterId || o.number) overrideChaptersList.push(o);
+            });
+
+            rawChapters = rawChapters.map(chap => {
+              const cId = String(getChapterId(chap));
+              const cNum = String(getChapterNumber(chap));
+
+              const matchedOverride = overrideChaptersList.find(o => {
+                const oId = String(o.id || o.chapterId || o.submissionId || '');
+                const oNum = String(o.chapterNumber || o.number || '');
+                return (cId && oId && cId === oId) || (cNum && oNum && cNum === oNum);
+              });
+
+              if (matchedOverride) {
+                const ovStatus = (matchedOverride.status || matchedOverride.moderationStatus || '').toString().toUpperCase();
+                const ovPages = matchedOverride.pages || matchedOverride.images || matchedOverride.pageUrls || matchedOverride.pagesList || [];
+                return {
+                  ...chap,
+                  status: ovStatus || chap.status || chap.moderationStatus,
+                  rejectionReason: matchedOverride.rejectionReason || matchedOverride.rejection_reason || chap.rejectionReason,
+                  pages: (chap.pages && chap.pages.length) ? chap.pages : ovPages,
+                  pageCount: chap.pageCount || (ovPages.length > 0 ? ovPages.length : (chap.pages?.length || undefined))
+                };
+              }
+              return chap;
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse overrides in loadDetail:', e);
+      }
 
       const finalModerationStatus = (rawChapters.some(c => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED'))
         ? 'REJECTED'
@@ -751,21 +809,62 @@ function AuthorComicDetail() {
     setActionLoadingId(chapterId)
     setActionMessage('')
 
+    let data = null
     try {
-      const data = await getAuthorChapterPreviewApi(getComicId(comic), chapterId)
-      const mergedPreview = {
-        ...chapter,
-        ...(data || {}),
-        pages: data?.pages || data?.images || data?.pageUrls || data?.pagesList || chapter?.pages || chapter?.images || [],
-        status: data?.status || chapter?.status || chapter?.moderationStatus,
-        rejectionReason: data?.rejectionReason || chapter?.rejectionReason || chapter?.rejection_reason || chapter?.rejectionNote
-      }
-      navigate(`/author/comics/${id}/preview/${chapterId}`, { state: { preview: mergedPreview } })
+      data = await getAuthorChapterPreviewApi(getComicId(comic), chapterId)
     } catch {
-      navigate(`/author/comics/${id}/preview/${chapterId}`, { state: { preview: chapter } })
-    } finally {
-      setActionLoadingId(null)
+      // ignore
     }
+
+    let overridePages = []
+    let overrideReason = ''
+    let overrideStatus = ''
+    try {
+      const rawOverrides = localStorage.getItem('comiverse_moderator_submissions_override')
+      if (rawOverrides) {
+        const overrides = JSON.parse(rawOverrides)
+        if (Array.isArray(overrides)) {
+          const chapIdStr = String(chapterId)
+          const chapNumStr = String(getChapterNumber(chapter))
+          const match = overrides.find(o => {
+            const oId = String(o.id || o.chapterId || o.submissionId || '')
+            const oNum = String(o.chapterNumber || o.number || '')
+            return (chapIdStr && oId && chapIdStr === oId) || (chapNumStr && oNum && chapNumStr === oNum)
+          }) || overrides.find(o => {
+            const chaps = o.allChapters || o.chapters || o.subItems || []
+            return chaps.some(c => {
+              const cId = String(c.id || c.chapterId || '')
+              const cNum = String(c.chapterNumber || c.number || '')
+              return (chapIdStr && cId && chapIdStr === cId) || (chapNumStr && cNum && chapNumStr === cNum)
+            })
+          })
+
+          if (match) {
+            overridePages = match.pages || match.images || match.pageUrls || []
+            overrideReason = match.rejectionReason || match.rejection_reason || ''
+            overrideStatus = (match.status || '').toString().toUpperCase()
+          }
+        }
+      }
+    } catch (e) {}
+
+    const resolvedPages = (data?.pages && data.pages.length) ? data.pages :
+      (data?.images && data.images.length) ? data.images :
+      (chapter?.pages && chapter.pages.length) ? chapter.pages :
+      (chapter?.images && chapter.images.length) ? chapter.images :
+      overridePages
+
+    const mergedPreview = {
+      ...chapter,
+      ...(data || {}),
+      pages: resolvedPages,
+      pageCount: resolvedPages.length || chapter.pageCount,
+      status: overrideStatus || data?.status || chapter?.status || chapter?.moderationStatus,
+      rejectionReason: data?.rejectionReason || chapter?.rejectionReason || chapter?.rejection_reason || overrideReason
+    }
+
+    navigate(`/author/comics/${id}/preview/${chapterId}`, { state: { preview: mergedPreview } })
+    setActionLoadingId(null)
   }
 
   const handleSubmitForReview = async (chapter) => {
