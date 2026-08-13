@@ -118,7 +118,7 @@ function resolveRejectionInfo(preview, comicId) {
           const oId = String(o.id || o.chapterId || o.submissionId || '')
           const oSubId = String(o.submissionId || '')
           const oNum = String(o.chapterNumber || o.number || '')
-          const matchChapId = chapIdStr && oId && (oId === chapIdStr || oId === subIdStr)
+          const matchChapId = chapIdStr && oId && (oId === chapIdStr || oId === subIdStr || `chap-${oId}` === chapIdStr || oId === `chap-${chapIdStr}`)
           const matchSubId = subIdStr && oSubId && (oSubId === subIdStr || oSubId === chapIdStr)
           const matchNum = chapNumStr && chapNumStr !== 'N/A' && oNum && oNum === chapNumStr
           const matchComic = !comicIdStr || String(o.comicId || o.parentReviewId || '') === comicIdStr || !o.comicId
@@ -136,9 +136,12 @@ function resolveRejectionInfo(preview, comicId) {
               const cSt = String(c.status || c.moderationStatus || '').toUpperCase()
               if (cSt !== 'REJECTED') return false
               const cId = String(c.id || c.chapterId || '')
+              const cSubId = String(c.submissionId || '')
               const cNum = String(c.chapterNumber || c.number || '')
-              return (chapIdStr && cId && (cId === chapIdStr || cId === subIdStr || `chap-${cId}` === chapIdStr)) ||
-                     (chapNumStr && chapNumStr !== 'N/A' && cNum && cNum === chapNumStr)
+              const matchChapId = chapIdStr && cId && (cId === chapIdStr || cId === subIdStr || `chap-${cId}` === chapIdStr || cId === `chap-${chapIdStr}`)
+              const matchSubId = subIdStr && cSubId && (cSubId === subIdStr || cSubId === chapIdStr)
+              const matchNum = chapNumStr && chapNumStr !== 'N/A' && cNum && cNum === chapNumStr
+              return matchChapId || matchSubId || matchNum
             })
             if (nestedChap) {
               match = nestedChap
@@ -309,15 +312,20 @@ export default function AuthorChapterPreview() {
               if (Array.isArray(overrides)) {
                 const chapIdStr = String(chapterId)
                 const chapNumStr = String(preview?.chapterNumber || preview?.number || chapterId)
+                const subIdStr = String(preview?.submissionId || '')
                 const comicIdStr = String(comicId || '')
 
                 // First: direct top-level match
                 overrideData = overrides.find(o => {
                   const oId = String(o.id || o.chapterId || o.submissionId || '')
+                  const oSubId = String(o.submissionId || '')
                   const oNum = String(o.chapterNumber || o.number || '')
                   const oComicId = String(o.comicId || o.parentReviewId || '')
                   const matchComic = !comicIdStr || !oComicId || oComicId === comicIdStr
-                  return ((chapIdStr && oId && chapIdStr === oId) || (chapNumStr && oNum && chapNumStr === oNum)) && matchComic
+                  const matchChapId = chapIdStr && oId && (oId === chapIdStr || oId === subIdStr || `chap-${oId}` === chapIdStr || oId === `chap-${chapIdStr}`)
+                  const matchSubId = subIdStr && oSubId && (oSubId === subIdStr || oSubId === chapIdStr)
+                  const matchNum = chapNumStr && chapNumStr !== 'N/A' && oNum && oNum === chapNumStr
+                  return ((matchChapId || matchSubId) && matchComic) || (matchNum && matchComic)
                 })
                 // Second: dig into nested allChapters/chapters/subItems and extract the SPECIFIC chapter object
                 if (!overrideData) {
@@ -328,8 +336,12 @@ export default function AuthorChapterPreview() {
                     const chaps = [...(o.allChapters || []), ...(o.chapters || []), ...(o.subItems || [])]
                     const nestedChap = chaps.find(c => {
                       const cId = String(c.id || c.chapterId || '')
+                      const cSubId = String(c.submissionId || '')
                       const cNum = String(c.chapterNumber || c.number || '')
-                      return (chapIdStr && cId && (chapIdStr === cId || `chap-${chapIdStr}` === cId)) || (chapNumStr && cNum && chapNumStr === cNum)
+                      const matchChapId = chapIdStr && cId && (cId === chapIdStr || cId === subIdStr || `chap-${cId}` === chapIdStr || cId === `chap-${chapIdStr}`)
+                      const matchSubId = subIdStr && cSubId && (cSubId === subIdStr || cSubId === chapIdStr)
+                      const matchNum = chapNumStr && chapNumStr !== 'N/A' && cNum && cNum === chapNumStr
+                      return matchChapId || matchSubId || matchNum
                     })
                     if (nestedChap) {
                       // Return the specific chapter (with its pages), not the parent submission
