@@ -1064,13 +1064,13 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     const chapterDbId = chapterObj?.chapterId || chapterObj?.chapter_id || chapterObj?.id;
     const cleanChapterDbId = String(chapterDbId || '').replace(/^(comic|group|chap)-/, '');
 
-    try {
-      let responseData = null;
-      if (cleanId && !cleanId.startsWith('group-') && !cleanId.startsWith('comic-') && !cleanId.includes('mock')) {
-        if (willRejectAll) {
-          const rejectResponse = await rejectSubmissionApi(cleanId, reason || 'Chapter rejected');
-          responseData = rejectResponse?.data || rejectResponse;
-        } else if (cleanChapterDbId && !cleanChapterDbId.includes('mock')) {
+    let responseData = null;
+    if (cleanId && !cleanId.startsWith('group-') && !cleanId.startsWith('comic-') && !cleanId.includes('mock')) {
+        try {
+          if (willRejectAll) {
+            const rejectResponse = await rejectSubmissionApi(cleanId, reason || 'Chapter rejected');
+            responseData = rejectResponse?.data || rejectResponse;
+          } else if (cleanChapterDbId && !cleanChapterDbId.includes('mock')) {
           try {
             const { rejectChapterDirectApi } = await import('../../services/api/ChapterApi');
             if (rejectChapterDirectApi) {
