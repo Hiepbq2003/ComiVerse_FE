@@ -847,14 +847,25 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     if (!c || !target) return false;
     if (c === target) return true;
     
+    // Explicit ID match is a guarantee
+    if (c.id && target.id && String(c.id) === String(target.id)) return true;
+    if (c.chapterId && target.chapterId && String(c.chapterId) === String(target.chapterId)) return true;
+    
+    // If they have mismatched submission/comic IDs, they are definitely different chapters from different comics!
+    const cSub = c.submissionId || c.comicId;
+    const tSub = target.submissionId || target.comicId;
+    if (cSub && tSub && String(cSub) !== String(tSub)) return false;
+
     const cNum = Number(c.number !== undefined ? c.number : (c.chapterNumber !== undefined ? c.chapterNumber : NaN));
     const tNum = Number(target.number !== undefined ? target.number : (target.chapterNumber !== undefined ? target.chapterNumber : NaN));
+    
     if (!isNaN(cNum) && !isNaN(tNum) && cNum > 0 && tNum > 0) {
       if (cNum !== tNum) return false;
-      return true;
+      // If numbers match AND they belong to the same submission (or submission context is missing), they are the same
+      if (cSub && tSub && String(cSub) === String(tSub)) return true;
+      if (!cSub || !tSub) return true;
     }
     
-    if (c.id && target.id && c.id === target.id) return true;
     if (c.title && target.title && c.title.trim().toLowerCase() === target.title.trim().toLowerCase()) return true;
     return false;
   };
@@ -1074,34 +1085,44 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               if (matchByComicId || matchByTitle) {
                 const updateChaps = (chapsArr) => {
                   if (!Array.isArray(chapsArr)) {
+                    const extractedPages = extractPages(chapterObj);
                     return [{
                       ...chapterObj,
                       status: 'rejected',
                       rejectedAt: nowIso,
                       rejectionReason: reason || 'Chapter rejected',
-                      pages: chapterObj.pages || chapterObj.images || [],
-                      pageCount: chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0
+                      pages: extractedPages,
+                      pageCount: extractedPages.length || chapterObj.pageCount || 0
                     }];
                   }
                   const exists = chapsArr.some(c => isSameChapterItem(c, chapterObj));
                   if (exists) {
-                    return chapsArr.map(c => isSameChapterItem(c, chapterObj) ? {
-                      ...c,
-                      ...chapterObj,
-                      status: 'rejected',
-                      rejectedAt: nowIso,
-                      rejectionReason: reason || 'Chapter rejected',
-                      pages: chapterObj.pages || c.pages || chapterObj.images || c.images || [],
-                      pageCount: chapterObj.pages?.length || c.pages?.length || chapterObj.images?.length || chapterObj.pageCount || c.pageCount || 0
-                    } : { ...c, status: 'rejected', rejectedAt: nowIso });
+                    return chapsArr.map(c => {
+                      if (isSameChapterItem(c, chapterObj)) {
+                        const cPages = extractPages(c);
+                        const chapPages = extractPages(chapterObj);
+                        const resolvedPages = chapPages.length ? chapPages : cPages;
+                        return {
+                          ...c,
+                          ...chapterObj,
+                          status: 'rejected',
+                          rejectedAt: nowIso,
+                          rejectionReason: reason || 'Chapter rejected',
+                          pages: resolvedPages,
+                          pageCount: resolvedPages.length || c.pageCount || chapterObj.pageCount || 0
+                        };
+                      }
+                      return { ...c, status: 'rejected', rejectedAt: nowIso };
+                    });
                   }
+                  const extractedPages = extractPages(chapterObj);
                   return [...chapsArr.map(c => ({...c, status: 'rejected', rejectedAt: nowIso})), {
                     ...chapterObj,
                     status: 'rejected',
                     rejectedAt: nowIso,
                     rejectionReason: reason || 'Chapter rejected',
-                    pages: chapterObj.pages || chapterObj.images || [],
-                    pageCount: chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0
+                    pages: extractedPages,
+                    pageCount: extractedPages.length || chapterObj.pageCount || 0
                   }];
                 };
 
@@ -1144,34 +1165,44 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
             const updateChaps = (chapsArr) => {
               if (!Array.isArray(chapsArr)) {
+                const extractedPages = extractPages(chapterObj);
                 return [{
                   ...chapterObj,
                   status: 'rejected',
                   rejectedAt: nowIso,
                   rejectionReason: reason || 'Chapter rejected',
-                  pages: chapterObj.pages || chapterObj.images || [],
-                  pageCount: chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0
+                  pages: extractedPages,
+                  pageCount: extractedPages.length || chapterObj.pageCount || 0
                 }];
               }
               const exists = chapsArr.some(c => isSameChapterItem(c, chapterObj));
               if (exists) {
-                return chapsArr.map(c => isSameChapterItem(c, chapterObj) ? {
-                  ...c,
-                  ...chapterObj,
-                  status: 'rejected',
-                  rejectedAt: nowIso,
-                  rejectionReason: reason || 'Chapter rejected',
-                  pages: chapterObj.pages || c.pages || chapterObj.images || c.images || [],
-                  pageCount: chapterObj.pages?.length || c.pages?.length || chapterObj.images?.length || chapterObj.pageCount || c.pageCount || 0
-                } : c);
+                return chapsArr.map(c => {
+                  if (isSameChapterItem(c, chapterObj)) {
+                    const cPages = extractPages(c);
+                    const chapPages = extractPages(chapterObj);
+                    const resolvedPages = chapPages.length ? chapPages : cPages;
+                    return {
+                      ...c,
+                      ...chapterObj,
+                      status: 'rejected',
+                      rejectedAt: nowIso,
+                      rejectionReason: reason || 'Chapter rejected',
+                      pages: resolvedPages,
+                      pageCount: resolvedPages.length || c.pageCount || chapterObj.pageCount || 0
+                    };
+                  }
+                  return c;
+                });
               }
+              const extractedPages = extractPages(chapterObj);
               return [...chapsArr, {
                 ...chapterObj,
                 status: 'rejected',
                 rejectedAt: nowIso,
                 rejectionReason: reason || 'Chapter rejected',
-                pages: chapterObj.pages || chapterObj.images || [],
-                pageCount: chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0
+                pages: extractedPages,
+                pageCount: extractedPages.length || chapterObj.pageCount || 0
               }];
             };
 
