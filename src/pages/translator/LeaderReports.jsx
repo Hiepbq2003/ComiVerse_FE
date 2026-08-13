@@ -12,6 +12,7 @@ import {
   ChevronRight,
   X
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
   getAdminReportsApi,
@@ -23,7 +24,9 @@ import '../../assets/style/report/report-system.css';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
 
 export default function LeaderReports() {
+  const navigate = useNavigate();
   const [reports, setReports] = useState([]);
+
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -129,8 +132,25 @@ export default function LeaderReports() {
   const acceptedCount = reports.filter(r => r.status === 'ACCEPTED').length;
   const rejectedCount = reports.filter(r => r.status === 'REJECTED').length;
 
+  const handleCreateReportTask = (report, resolutionNote) => {
+    const targetChapterId = report?.chapter_id || report?.chapterId || null;
+    const projectTeamId = report?.project_team_id || report?.projectTeamId;
+    toast.info('Navigating to team workspace to create report revision task...');
+    navigate('/translator/projects', {
+      state: {
+        teamId: projectTeamId,
+        tab: 'tasks',
+        openCreateTask: true,
+        taskType: 'REVISION',
+        chapterId: targetChapterId,
+        defaultTitle: `[REPORT FIX] Fix translation for ${report?.target_title || 'Chapter'}`
+      }
+    });
+  };
+
   return (
     <div className="rep-container">
+
       {/* ── HEADER ── */}
       <div className="rep-header">
         <div className="rep-title-group">
@@ -479,8 +499,10 @@ export default function LeaderReports() {
           report={selectedReviewReport}
           onClose={() => setSelectedReviewReport(null)}
           onProcess={handleProcessReport}
+          onCreateReportTask={handleCreateReportTask}
         />
       )}
+
 
       {/* ── QUICK ACTION MODAL ── */}
       {quickActionReport && (

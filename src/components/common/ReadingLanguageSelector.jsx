@@ -7,38 +7,21 @@ export const getLanguageInfo = (langCode) => {
     return { code: '', name: 'Original', flag: '🌐', short: 'ORIG' }
   }
   const raw = String(langCode).trim()
-  const code = raw.toLowerCase()
+  const code = normalizeLanguageCode(raw)
   switch (code) {
     case 'en':
-    case 'eng':
-    case 'english':
       return { code: raw, name: 'English', flag: '🇬🇧', short: 'EN' }
     case 'vi':
-    case 'vie':
-    case 'vietnamese':
-    case 'tiếng việt':
       return { code: raw, name: 'Tiếng Việt', flag: '🇻🇳', short: 'VI' }
     case 'ja':
-    case 'jpn':
-    case 'japanese':
-    case '日本語':
       return { code: raw, name: '日本語', flag: '🇯🇵', short: 'JA' }
     case 'ko':
-    case 'kor':
-    case 'korean':
-    case '한국어':
       return { code: raw, name: '한국어', flag: '🇰🇷', short: 'KO' }
     case 'zh':
-    case 'chi':
-    case 'zho':
-    case 'chinese':
-    case '中文':
       return { code: raw, name: '中文', flag: '🇨🇳', short: 'ZH' }
     case 'fr':
-    case 'french':
       return { code: raw, name: 'Français', flag: '🇫🇷', short: 'FR' }
     case 'es':
-    case 'spanish':
       return { code: raw, name: 'Español', flag: '🇪🇸', short: 'ES' }
     default:
       return {
@@ -48,6 +31,41 @@ export const getLanguageInfo = (langCode) => {
         short: raw.toUpperCase().slice(0, 3)
       }
   }
+}
+
+function mapKnownLanguage(s) {
+  if (['vi', 'vie', 'vn', 'vietnamese', 'tieng viet'].includes(s)) return 'vi'
+  if (['en', 'eng', 'english'].includes(s)) return 'en'
+  if (['ja', 'jpn', 'jp', 'japanese'].includes(s)) return 'ja'
+  if (['ko', 'kor', 'kr', 'korean'].includes(s)) return 'ko'
+  if (['zh', 'chi', 'zho', 'cn', 'chinese'].includes(s)) return 'zh'
+  if (['fr', 'fra', 'french'].includes(s)) return 'fr'
+  if (['es', 'spa', 'spanish'].includes(s)) return 'es'
+  return null
+}
+
+export function normalizeLanguageCode(langCode) {
+  if (!langCode || String(langCode).toLowerCase() === 'original') return ''
+  const s = String(langCode)
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}+/gu, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const mapped = mapKnownLanguage(s)
+  if (mapped) return mapped
+  const first = s.split(' ')[0]
+  return mapKnownLanguage(first) || first
+}
+
+export function chapterHasLanguage(chapter, selectedLanguage) {
+  if (!selectedLanguage) return true
+  const langs = chapter?.translatedLanguages
+  if (!Array.isArray(langs) || langs.length === 0) return false
+  const wanted = normalizeLanguageCode(selectedLanguage)
+  return langs.some((lang) => normalizeLanguageCode(lang) === wanted)
 }
 
 export default function ReadingLanguageSelector({
@@ -66,13 +84,13 @@ export default function ReadingLanguageSelector({
     ...languages.map((lang) => getLanguageInfo(lang))
   ]
 
-  // Filter out any potential duplicates based on code
+  // Filter out any potential duplicates based on normalized language
   const uniqueOptions = options.filter(
-    (opt, idx, self) => idx === self.findIndex((o) => o.code.toLowerCase() === opt.code.toLowerCase())
+    (opt, idx, self) => idx === self.findIndex((o) => normalizeLanguageCode(o.code) === normalizeLanguageCode(opt.code))
   )
 
   const activeOption = uniqueOptions.find(
-    (opt) => opt.code.toLowerCase() === String(selectedLanguage || '').toLowerCase()
+    (opt) => normalizeLanguageCode(opt.code) === normalizeLanguageCode(selectedLanguage)
   ) || uniqueOptions[0]
 
   useEffect(() => {
@@ -114,14 +132,14 @@ export default function ReadingLanguageSelector({
         {isOpen && (
           <div className="reading-lang-menu">
             {uniqueOptions.map((opt) => {
-              const isSelected = opt.code.toLowerCase() === String(selectedLanguage || '').toLowerCase()
+              const isSelected = normalizeLanguageCode(opt.code) === normalizeLanguageCode(selectedLanguage)
               return (
                 <button
                   key={opt.code || 'original'}
                   type="button"
                   className={`reading-lang-menu-item ${isSelected ? 'selected' : ''}`}
                   onClick={() => {
-                    onChange(opt.code)
+                    onChange(normalizeLanguageCode(opt.code))
                     setIsOpen(false)
                   }}
                 >

@@ -117,23 +117,31 @@ export function isUserAssignedToTask(t, teamMembers = [], authUser) {
   return false;
 }
 
+export function isSupersededTask(task) {
+  const status = String(task?.status || task?.column || '').toLowerCase().replace(/[-\s]/g, '_');
+  return status === 'superseded';
+}
+
 export function filterUnassignedChapters(chapterOptions, tasks) {
+  const activeTasks = (tasks || []).filter(t => t && !isSupersededTask(t));
+
   const assignedChapterIds = new Set(
-    (tasks || [])
+    activeTasks
       .map(t => String(t?.chapterId || t?.chapter_id || ''))
       .filter(Boolean)
   );
 
   return (chapterOptions || []).filter(ch => {
     if (!ch) return false;
-    // 1. Direct ID match
+    if (ch.canCreateTask === true || ch.revision === true) return true;
+    if (ch.canCreateTask === false) return false;
+
     if (ch.id && assignedChapterIds.has(String(ch.id))) return false;
 
-    // 2. Title / Chapter number pattern match against existing tasks
     const chTitleLower = (ch.title || '').toLowerCase();
     const chNumMatch = chTitleLower.match(/chapter\s*(\d+)/i);
 
-    const isTaskCreated = (tasks || []).some(t => {
+    const isTaskCreated = activeTasks.some(t => {
       if (!t || !t.title) return false;
       const tLower = t.title.toLowerCase();
 
@@ -176,10 +184,12 @@ function TaskCard({ task, colId, comicName, onOpenTaskDetails, getAssigneeInitia
   const { priority, cleanTitle } = parseTaskTitle(task.title, comicName)
   const isDone = colId === 'completed'
   const isRevoked = !isDone && Boolean(task.rejectionReason || task.isRevoked || task.status === 'REVOKED' || task.status === 'REVISION_NEEDED')
+  const isRevisionTask = ['REVISION', 'TRANSLATION_REPORT'].includes(String(task.taskType || task.task_type || '').toUpperCase())
+    || (task.title || '').toLowerCase().includes('[report fix]')
 
   return (
     <article
-      className={`task ${isDone ? 'task--completed' : ''} ${isRevoked ? 'task--revoked' : ''}`}
+      className={`task ${isDone ? 'task--completed' : ''} ${isRevoked ? 'task--revoked' : ''} ${isRevisionTask ? 'task--report-fix' : ''}`}
       tabIndex="0"
       onClick={() => onOpenTaskDetails(task)}
     >
@@ -197,12 +207,20 @@ function TaskCard({ task, colId, comicName, onOpenTaskDetails, getAssigneeInitia
           </div>
         )}
 
-        {isRevoked && (
+        {isRevisionTask && (
+          <span className="task__report-tag" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)', fontSize: '10px', fontWeight: '700', padding: '1px 6px', borderRadius: '4px' }}>
+            Revision
+          </span>
+        )}
+
+
+        {isRevoked && !isRevisionTask && (
           <span className="task__revoked-tag" title={task.rejectionReason ? `Revoked Reason: ${task.rejectionReason}` : 'Translation Revoked'}>
             ⚠️ REVOKED
           </span>
         )}
       </div>
+
 
       <h3>{cleanTitle}</h3>
       <p className="task__desc">Task for {comicName}</p>
@@ -251,7 +269,7 @@ function KanbanColumn({
           <div className={`column__dot ${col.dotClass}`}></div>
           <h2>{col.title}</h2>
           <span className="column__count">
-            {colTasks.length + (col.id === 'backlog' && unassignedChapterOptions ? unassignedChapterOptions.length : 0)}
+            {colTasks.length}
           </span>
         </div>
         <div className={`column__add-wrap ${isDropdownOpen ? 'open' : ''}`}>
@@ -290,71 +308,6 @@ function KanbanColumn({
       </div>
 
       <div className="task-list" style={{ opacity: isLocked ? 0.6 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>
-        {col.id === 'backlog' && unassignedChapterOptions && unassignedChapterOptions.map((ch, idx) => (
-          <div
-            key={`raw-ch-${ch.id || idx}`}
-            className="task-card task-card-item"
-            style={{
-              background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(99, 102, 241, 0.08))',
-              border: '1.5px dashed rgba(168, 85, 247, 0.4)',
-              padding: '14px',
-              borderRadius: '12px',
-              marginBottom: '12px',
-              transition: 'all 0.2s ease',
-              cursor: 'pointer',
-              position: 'relative'
-            }}
-            onClick={() => onViewChapterClick && onViewChapterClick(ch)}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span className="raw-chapter-badge">
-                📖 Raw Chapter
-              </span>
-              {ch.pagesCount > 0 && (
-                <span style={{ fontSize: '11px', color: 'var(--trans-text-secondary)', fontWeight: '600', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
-                  {ch.pagesCount} pages
-                </span>
-              )}
-            </div>
-
-            <h4 style={{ margin: '6px 0 8px', fontSize: '14px', fontWeight: '700', color: 'var(--trans-text-primary)', lineHeight: '1.4' }}>
-              {ch.title}
-            </h4>
-
-            <div className="backlog-card-footer">
-              <span className="ready-to-translate-text">
-                <div className="status-dot-pulse"></div>
-                Ready to Translate
-              </span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  type="button"
-                  className="trans-btn secondary"
-                  style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px' }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onViewChapterClick && onViewChapterClick(ch);
-                  }}
-                >
-                  👁️ View
-                </button>
-                {isCurrentLeader && (
-                  <button
-                    type="button"
-                    className="trans-btn primary"
-                    style={{ fontSize: '11px', padding: '4px 10px', background: 'linear-gradient(110deg, #a855f7 0%, #ec4899 100%)', border: 'none', color: '#fff', borderRadius: '6px', fontWeight: '700', boxShadow: '0 2px 8px rgba(168,85,247,0.3)' }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onCreateTaskClick && onCreateTaskClick({ chapterId: ch.id, title: ch.title });
-                    }}
-                  >
-                    + Task
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
         {colTasks.map(task => (
           <TaskCard
             key={task.id}
@@ -423,15 +376,10 @@ function TasksTab({
   const auth = getAuth();
   const authUser = auth?.user;
 
-  // Leader sees ALL tasks in project. Members ONLY see tasks they are assigned to.
-  const visibleTasks = (tasks || []).filter(t => {
-    if (isCurrentLeader) return true;
-    return isUserAssignedToTask(t, members, authUser);
-  });
-  const visiblePausedTasks = (pausedTasks || []).filter(t => {
-    if (isCurrentLeader) return true;
-    return isUserAssignedToTask(t, members, authUser);
-  });
+  // All tasks in the project are visible to all members of the project team.
+  // Non-assigned members can view any task workspace in Read-Only mode.
+  const visibleTasks = tasks || [];
+  const visiblePausedTasks = pausedTasks || [];
 
   return (
     <div className="board tasks-board-tab-container fade-in" style={{ padding: 0, background: 'transparent' }}>
@@ -692,20 +640,23 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
     assigneeId: null,
     dueDate: '',
     priority: 'High',
-    chapterId: null
+    chapterId: null,
+    taskType: 'REGULAR'
   });
 
   const handleOpenCreateTask = () => {
     if (!isCurrentLeader) return;
-    const chId = chapter?.id || null;
-    const defaultTitle = `${chapter?.title || `Chapter ${chapter?.number || chapter?.chapterNumber || ''}`} - Translation & Proofreading`;
+    const chId = chapter?.id || chapter?.chapterId || null;
+    const isRevision = !!chapter?.revision;
+    const defaultTitle = `${chapter?.title || `Chapter ${chapter?.number || chapter?.chapterNumber || ''}`} - ${isRevision ? 'Revision' : 'Translation & Proofreading'}`;
     setInspectTaskData({
       title: defaultTitle,
       column: 'in_progress',
       assigneeId: null,
       dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
       priority: 'High',
-      chapterId: chId
+      chapterId: chId,
+      taskType: isRevision ? 'REVISION' : 'REGULAR'
     });
     setShowCreateTaskModal(true);
   };
@@ -1465,6 +1416,7 @@ export function CreateTaskModal({
   onCreate
 }) {
   const [submitted, setSubmitted] = useState(false)
+  const [inspectingChapter, setInspectingChapter] = useState(null)
 
   const todayStr = new Date().toISOString().split('T')[0]
   const availableChapterOptions = filterUnassignedChapters(chapterOptions, tasks)
@@ -1522,32 +1474,79 @@ export function CreateTaskModal({
 
           <div className="trans-form-group" style={{ marginTop: '14px' }}>
             <label className="trans-form-label">Chapter *</label>
-            <select required
-              className="trans-form-input"
-              value={newTaskData.chapterId || ''}
-              onChange={(e) => {
-                const chId = e.target.value || null;
-                const foundCh = availableChapterOptions.find(c => String(c.id) === String(chId));
-                setNewTaskData(prev => ({
-                  ...prev,
-                  chapterId: chId,
-                  title: (!prev.title.trim() && foundCh) ? `${foundCh.title} - Translation & Proofreading` : prev.title
-                }));
-              }}
-              disabled={availableChapterOptions.length === 0}
-              style={{ ...errorBorder('chapterId') }}
-            >
-              <option value="">
-                {availableChapterOptions.length === 0 ? 'No available chapters (all already have a task)' : 'Select a chapter…'}
-              </option>
-              {availableChapterOptions.map((ch) => (
-                <option key={ch.id} value={ch.id}>
-                  📖 {ch.title}{ch.pagesCount > 0 ? ` (${ch.pagesCount} pages)` : ''}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <select required
+                className="trans-form-input"
+                style={{ flex: 1, ...errorBorder('chapterId') }}
+                value={newTaskData.chapterId || ''}
+                onChange={(e) => {
+                  const chId = e.target.value || null;
+                  const foundCh = availableChapterOptions.find(c => String(c.id) === String(chId));
+                  const isRevision = !!foundCh?.revision;
+                  setNewTaskData(prev => ({
+                    ...prev,
+                    chapterId: chId,
+                    taskType: isRevision ? 'REVISION' : (prev.taskType === 'REVISION' ? 'REGULAR' : (prev.taskType || 'REGULAR')),
+                    title: (!prev.title.trim() && foundCh)
+                      ? `${foundCh.title} - ${isRevision ? 'Revision' : 'Translation & Proofreading'}`
+                      : prev.title
+                  }));
+                }}
+                disabled={availableChapterOptions.length === 0}
+              >
+                <option value="">
+                  {availableChapterOptions.length === 0 ? 'No available chapters (all already have a task)' : 'Select a chapter…'}
                 </option>
-              ))}
-            </select>
+                {availableChapterOptions.map((ch) => (
+                  <option key={ch.id} value={ch.id}>
+                    📖 {ch.title}{ch.pagesCount > 0 ? ` (${ch.pagesCount} pages)` : ''}{ch.revision ? ' — Revision' : ''}
+                  </option>
+                ))}
+              </select>
+
+              {/* 👁️ Nút xem chapter trước khi tạo task */}
+              {newTaskData.chapterId && (() => {
+                const selectedCh = availableChapterOptions.find(c => String(c.id) === String(newTaskData.chapterId));
+                return selectedCh ? (
+                  <button
+                    type="button"
+                    title="Preview this chapter before creating a task"
+                    onClick={() => setInspectingChapter(selectedCh)}
+                    style={{
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '10px',
+                      border: '1px solid rgba(168, 85, 247, 0.35)',
+                      background: 'rgba(168, 85, 247, 0.1)',
+                      color: '#a855f7',
+                      cursor: 'pointer',
+                      transition: 'all 0.18s ease',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'rgba(168, 85, 247, 0.22)';
+                      e.currentTarget.style.borderColor = '#a855f7';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'rgba(168, 85, 247, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.35)';
+                    }}
+                  >
+                    <Eye size={16} />
+                  </button>
+                ) : null;
+              })()}
+            </div>
             {showError('chapterId') && (
               <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Please select a chapter</p>
+            )}
+            {availableChapterOptions.find(c => String(c.id) === String(newTaskData.chapterId))?.revision && (
+              <p style={{ color: 'var(--trans-text-muted)', fontSize: '11px', margin: '6px 0 0', lineHeight: 1.4 }}>
+                This chapter has an accepted translation report. Creating a revision copies the previous bubbles. Readers keep the live translation until this task is published.
+              </p>
             )}
           </div>
 
@@ -1555,6 +1554,7 @@ export function CreateTaskModal({
             <label className="trans-form-label">Priority</label>
             <PriorityPicker value={newTaskData.priority} onChange={(v) => setNewTaskData({ ...newTaskData, priority: v })} />
           </div>
+
 
           <div className="trans-form-group" style={{ marginTop: '14px' }}>
             <label className="trans-form-label">Assignee *</label>
@@ -1654,6 +1654,17 @@ export function CreateTaskModal({
           </button>
         </div>
       </div>
+
+      {inspectingChapter && (
+        <ChapterInspectModal
+          chapter={inspectingChapter}
+          onClose={() => setInspectingChapter(null)}
+          comicName={comicName}
+          chapterOptions={chapterOptions}
+          teamMembersForAssign={teamMembersForAssign}
+          tasks={tasks}
+        />
+      )}
     </div>
   )
 }
@@ -1679,7 +1690,8 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
     return false;
   })();
 
-  const canAccessWorkspace = isProjectLeader || isAssigned;
+  const isEditableByMember = isProjectLeader || isAssigned;
+  const canAccessWorkspace = true;
 
   const assigneeChanged = String(editTaskData.originalAssigneeId || '') !== String(editTaskData.assigneeId || '')
   const parsedFactor = Number(editTaskData.handoverFactor)
@@ -1713,7 +1725,6 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   }
 
   const handleOpenWorkspaceClick = () => {
-    if (!canAccessWorkspace) return;
     if (onContinue) onContinue()
   }
 
@@ -1729,7 +1740,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
     <div className="trans-modal-overlay">
       <div className="trans-modal-card">
         <div className="trans-modal-header">
-          <h3>{isProjectLeader ? 'Edit Task Details' : 'Task Information'}</h3>
+          <h3>{isProjectLeader ? 'Edit Task Details' : (isEditableByMember ? 'Task Information' : 'Task Information (Read Only)')}</h3>
           <button className="trans-modal-close-btn" onClick={onCancel}>×</button>
         </div>
         <div className="trans-modal-body">
@@ -1762,11 +1773,10 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                   value={getNormalizedStatusKey(editTaskData.status)}
                   onChange={(e) => setEditTaskData({ ...editTaskData, status: e.target.value })}
                 >
-                  {getAllowedStatusOptions(editTaskData.status).map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
+                  <option value="backlog">⚪ Backlog</option>
+                  <option value="in_progress">🟠 In Progress</option>
+                  <option value="under_review">🟣 Under Review</option>
+                  <option value="completed">🟢 Completed</option>
                 </select>
               </div>
 
@@ -1786,16 +1796,14 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
 
               <div className="trans-form-group">
                 <label className="trans-form-label">Assignee *</label>
-                <div style={showError('assigneeId') ? { border: '1px solid #ef4444', borderRadius: '12px', padding: '8px' } : undefined}>
-                  <AssigneeChipPicker
-                    candidates={teamMembersForAssign}
-                    selectedId={editTaskData.assigneeId}
-                    onSelect={selectAssignee}
-                    emptyLabel="No team members found for this project."
-                  />
-                </div>
+                <AssigneeChipPicker
+                  candidates={teamMembersForAssign}
+                  selectedId={editTaskData.assigneeId}
+                  onSelect={selectAssignee}
+                  error={showError('assigneeId')}
+                />
                 {showError('assigneeId') && (
-                  <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>An assignee is required</p>
+                  <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Assignee is required</p>
                 )}
               </div>
 
@@ -1936,9 +1944,9 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                 </div>
               </div>
 
-              {!canAccessWorkspace && (
-                <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)', color: '#ef4444', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  🔒 <strong>Restricted Access:</strong> You are not assigned to this task. Only assigned members and Group Leaders can access this translation workspace.
+              {!isEditableByMember && (
+                <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.25)', color: '#60a5fa', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ℹ️ <strong>Read-Only Mode:</strong> You are not assigned to this task. You can view the task workspace in read-only mode.
                 </div>
               )}
             </div>
@@ -1963,10 +1971,10 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
             </button>
           )}
 
-          {/* Open Workspace — ONLY IF ASSIGNED OR PROJECT LEADER */}
-          {canAccessWorkspace && !isUnderReview && (
-            <button className="trans-btn primary" onClick={handleOpenWorkspaceClick} title="Open translate workspace">
-              <StepForward />Open Workspace
+          {/* Open Workspace — ALLOW FOR ALL MEMBERS */}
+          {!isUnderReview && (
+            <button className="trans-btn primary" onClick={handleOpenWorkspaceClick} title={isEditableByMember ? "Open translate workspace" : "View translate workspace in read-only mode"}>
+              <StepForward />{isEditableByMember ? 'Open Workspace' : 'View Workspace (Read Only)'}
             </button>
           )}
 

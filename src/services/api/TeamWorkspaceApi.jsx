@@ -100,10 +100,11 @@ export const createTeamTaskApi = async (teamId, task) => {
 
   const sanitizedTask = {
     title: task.title,
-    status: task.status || 'backlog',
+    status: task.status || 'in_progress',
     dueDate: task.dueDate || new Date().toISOString().split('T')[0],
     chapterId: chapterId,
     ...(assigneeId ? { assigneeId } : {}),
+    ...(task?.taskType ? { taskType: task.taskType } : {}),
     ...(Number(task?.chapterRewardUsd) > 0 ? { chapterRewardUsd: Number(task.chapterRewardUsd) } : {})
   }
 
@@ -111,7 +112,7 @@ export const createTeamTaskApi = async (teamId, task) => {
     return await AxiosClient.post(`/team-workspace/${teamId}/tasks`, sanitizedTask)
   } catch (err) {
     console.warn(`[TeamWorkspaceApi] createTeamTaskApi notice for team ${teamId}:`, err?.response?.data?.message || err?.message || err)
-    return null
+    throw err
   }
 }
 

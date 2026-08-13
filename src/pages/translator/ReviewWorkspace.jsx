@@ -141,17 +141,7 @@ function parseBubblesPayload(raw) {
   }
 }
 
-function computeChangedFlags(currentSelections, baselineSelections) {
-  if (!baselineSelections || baselineSelections.length === 0) {
-    return currentSelections.map(() => false);
-  }
-  const baselineById = new Map(baselineSelections.map((b) => [b.id, b]));
-  return currentSelections.map((sel) => {
-    const base = baselineById.get(sel.id);
-    if (!base) return true;
-    return (sel.translation ?? "") !== (base.translation ?? "");
-  });
-}
+
 
 function formatTime(dateStr) {
   return new Date(dateStr).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -366,7 +356,7 @@ function ReviewHeader({
           </div>
         </div>
 
-        <span className="rvw-changes-badge">{changeCount} changes</span>
+
       </div>
 
       <div className="rvw-header-right">
@@ -958,8 +948,7 @@ export default function ReviewWorkspace() {
   }, [isPickingZoomPoint, cancelZoomPick]);
 
   const currentSelections = useMemo(() => parseBubblesPayload(currentPage?.bubbles), [currentPage]);
-  const baselineSelections = useMemo(() => parseBubblesPayload(currentPage?.reviewBaselineBubbles), [currentPage]);
-  const changedFlags = useMemo(() => computeChangedFlags(currentSelections, baselineSelections), [currentSelections, baselineSelections]);
+  const changedFlags = useMemo(() => currentSelections.map(() => false), [currentSelections]);
   const changeCount = changedFlags.filter(Boolean).length;
 
   useEffect(() => {

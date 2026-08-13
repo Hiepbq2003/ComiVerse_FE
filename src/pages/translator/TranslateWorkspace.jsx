@@ -98,6 +98,40 @@ function PageStatusDot({ status }) {
   );
 }
 
+function UserInitialsAvatar({ name, size = 20 }) {
+  if (!name) return null;
+  const initials = name.split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash % 360);
+  const bgColor = `hsl(${hue}, 60%, 40%)`;
+  return (
+    <span
+      className="tw-user-avatar-badge"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: `${size}px`,
+        height: `${size}px`,
+        borderRadius: '50%',
+        backgroundColor: bgColor,
+        color: '#fff',
+        fontSize: `${Math.max(9, size * 0.45)}px`,
+        fontWeight: 600,
+        marginLeft: 'auto',
+        flexShrink: 0,
+        opacity: 0.9,
+      }}
+      title={`Translated by: ${name}`}
+    >
+      {initials}
+    </span>
+  );
+}
+
 function ChapterList({ chapters, openChapterId, onToggleChapter, chapterPagesLoading, currentChapterId, currentPageIndex, onSelectPage }) {
   return (
     <>
@@ -141,11 +175,25 @@ function ChapterList({ chapters, openChapterId, onToggleChapter, chapterPagesLoa
                     key={page.pageId}
                     className={`tw-page-row ${isCurrentPage ? "current" : ""}`}
                     onClick={() => onSelectPage(ch, pageIndex)}
+                    style={{ display: 'flex', alignItems: 'center', width: '100%', paddingRight: '12px' }}
                   >
-                    <span className="tw-page-row-inner">
+                    <span className="tw-page-row-inner" style={{ flex: 1, display: 'flex', alignItems: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <PageStatusDot status={status} />
                       Page {page.pageNumber}
                     </span>
+                    {page.contributorLabels && page.contributorLabels.length > 0 ? (
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        {page.contributorLabels.map((label, i) => (
+                          label !== "Unassigned" && label !== "Unknown Member" && (
+                            <UserInitialsAvatar key={i} name={label} size={18} />
+                          )
+                        ))}
+                      </div>
+                    ) : (
+                      page.translatorLabel && page.translatorLabel !== "Unassigned" && page.translatorLabel !== "Unknown Member" && (
+                        <UserInitialsAvatar name={page.translatorLabel} size={18} />
+                      )
+                    )}
                   </button>
                 );
               })}
@@ -156,7 +204,21 @@ function ChapterList({ chapters, openChapterId, onToggleChapter, chapterPagesLoa
   );
 }
 
-function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend, sending, saveStatus, canEdit = true }) {
+function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend, sending, saveStatus, canEdit = true, isPageTranslatedByOther = false, onUpload, isUploading = false }) {
+  const uploadInputRef = useRef(null);
+
+  const handleUploadClick = () => {
+    if (!canEdit || isUploading) return;
+    uploadInputRef.current?.click();
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    onUpload?.(file);
+    // Reset input so the same file can be picked again next time
+    e.target.value = "";
+  };
   const badgeConfig = {
     saving: { icon: <Loader2 size={11} strokeWidth={3} className="tw-spin" />, label: "SAVING" },
     saved: { icon: <Check size={11} strokeWidth={3} />, label: "SAVED" },
@@ -183,20 +245,39 @@ function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend,
 
       <div className="tw-header-right">
         {!canEdit && (
-          <span className="tw-badge-saved tw-font-mono" title="You are not assigned to this task">
-            🔒 VIEW ONLY
+          <span
+            className="tw-badge-saved tw-font-mono"
+            style={isPageTranslatedByOther ? { background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)' } : undefined}
+            title={isPageTranslatedByOther ? "This page was translated by a previous member and is read-only" : "You are not assigned to this task"}
+          >
+            🔒 {isPageTranslatedByOther ? "PREVIOUS MEMBER TRANSLATED (READ ONLY)" : "VIEW ONLY"}
           </span>
         )}
         <span className={`tw-badge-saved tw-font-mono is-${statusKey}`}>
           {badgeConfig.icon} {badgeConfig.label}
         </span>
+        <input
+          ref={uploadInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={handleFileChange}
+        />
         <button
           className="tw-btn"
-          disabled={!canEdit}
-          title={canEdit ? undefined : "You don't have permission to edit this task"}
-          style={!canEdit ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+          disabled={!canEdit || isUploading}
+          onClick={handleUploadClick}
+          title={
+            !canEdit
+              ? "You don't have permission to edit this task"
+              : isUploading
+              ? "Uploading…"
+              : "Replace the current page image"
+          }
+          style={(!canEdit || isUploading) ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
         >
-          <Upload size={14} /> Upload
+          {isUploading ? <Loader2 size={14} className="tw-spin" /> : <Upload size={14} />}
+          {isUploading ? "Uploading…" : "Upload"}
         </button>
         <button
           className="tw-btn-primary"
@@ -573,6 +654,7 @@ function PageImage({
       >
         {currentImage ? (
           <img
+            name = "page-image"
             ref={imgRef}
             src={currentImage}
             alt={`Page ${currentPageIndex + 1}`}
@@ -926,29 +1008,7 @@ function TranslateTabPanel({
         </div>
       )}
 
-      {hasActiveSelection && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            fontSize: "11px",
-            color: "#94a3b8",
-            margin: "8px 0 12px 0",
-            background: "rgba(255, 255, 255, 0.04)",
-            padding: "6px 12px",
-            borderRadius: "6px",
-            border: "1px solid rgba(255, 255, 255, 0.08)",
-          }}
-        >
-          <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-            👤 <strong style={{ color: "#e2e8f0" }}>{activeSelection.createdByName || userFullName || "Translator"}</strong>
-          </span>
-          <span style={{ color: "#64748b" }}>
-            🕒 {formatBubbleTime(activeSelection.updatedAt)}
-          </span>
-        </div>
-      )}
+
 
       <div className="tw-translation-block tw-x-block-spaced">
         <p className="tw-caption tw-x-caption-tight">
@@ -1012,8 +1072,8 @@ function TranslateTabPanel({
   );
 }
 
-async function fetchGlossaryTerms(comicId, signal) {
-  const res = await fetch(`${API_BASE}/glossary/comic/${comicId}`, {
+async function fetchGlossaryTerms(projectId, signal) {
+  const res = await fetch(`${API_BASE}/glossary/project/${projectId}`, {
     headers: authHeaders(),
     signal,
   });
@@ -1022,8 +1082,8 @@ async function fetchGlossaryTerms(comicId, signal) {
   return json?.data !== undefined ? json.data : json;
 }
 
-async function createGlossaryTermApi(comicId, term, signal) {
-  const res = await fetch(`${API_BASE}/glossary/comic/${comicId}`, {
+async function createGlossaryTermApi(projectId, term, signal) {
+  const res = await fetch(`${API_BASE}/glossary/project/${projectId}`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(term),
@@ -1059,9 +1119,9 @@ async function deleteGlossaryTermApi(id, signal) {
   return true;
 }
 
-async function fetchGlossarySuggestions(comicId, { pageId, imageUrl }, signal) {
+async function fetchGlossarySuggestions(projectId, { pageId, imageUrl }, signal) {
   const body = pageId ? { pageId } : { imageUrl };
-  const res = await fetch(`${API_BASE}/glossary/comic/${comicId}/suggest`, {
+  const res = await fetch(`${API_BASE}/glossary/project/${projectId}/suggest`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(body),
@@ -1078,7 +1138,7 @@ async function fetchGlossarySuggestions(comicId, { pageId, imageUrl }, signal) {
 
 const glossarySuggestionCache = new Map();
 
-function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
+function GlossaryTabPanel({ projectId, pageId, imageUrl }) {
   const [terms, setTerms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -1101,7 +1161,7 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
   const [showExtractedText, setShowExtractedText] = useState(false);
 
   useEffect(() => {
-    if (!comicId) {
+    if (!projectId) {
       setTerms([]);
       setLoading(false);
       return;
@@ -1109,19 +1169,19 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
     const controller = new AbortController();
     setLoading(true);
     setLoadError(null);
-    fetchGlossaryTerms(comicId, controller.signal)
+    fetchGlossaryTerms(projectId, controller.signal)
       .then((data) => setTerms(Array.isArray(data) ? data : []))
       .catch((err) => {
         if (err.name !== "AbortError") setLoadError(err.message || "Failed to load glossary");
       })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [comicId]);
+  }, [projectId]);
 
   const runSuggestScan = useCallback(
     (forceRefresh = false) => {
-      if (!comicId || !pageKey) return;
-      const cacheKey = `${comicId}::${pageKey}`;
+      if (!projectId || !pageKey) return;
+      const cacheKey = `${projectId}::${pageKey}`;
       if (!forceRefresh && glossarySuggestionCache.has(cacheKey)) {
         const cached = glossarySuggestionCache.get(cacheKey);
         setSuggestions(cached.suggestions);
@@ -1132,7 +1192,7 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
       const controller = new AbortController();
       setSuggestLoading(true);
       setSuggestError(null);
-      fetchGlossarySuggestions(comicId, { pageId, imageUrl }, controller.signal)
+      fetchGlossarySuggestions(projectId, { pageId, imageUrl }, controller.signal)
         .then((result) => {
           glossarySuggestionCache.set(cacheKey, result);
           setSuggestions(result.suggestions);
@@ -1144,7 +1204,7 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
         .finally(() => setSuggestLoading(false));
       return () => controller.abort();
     },
-    [comicId, pageId, imageUrl, pageKey]
+    [projectId, pageId, imageUrl, pageKey]
   );
 
   useEffect(() => {
@@ -1185,12 +1245,14 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
     if (!newSource.trim() || !newTarget.trim() || saving) return;
     setSaving(true);
     try {
-      const created = await createGlossaryTermApi(comicId, {
+      const created = await createGlossaryTermApi(projectId, {
         source: newSource.trim(),
         target: newTarget.trim(),
         note: newNote.trim(),
       });
       setTerms((prev) => [created, ...prev]);
+      setSuggestions((prev) => [created, ...prev]);
+      setLoadError(null);
       setNewSource("");
       setNewTarget("");
       setNewNote("");
@@ -1265,7 +1327,7 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `glossary_${comicId || "project"}.json`;
+    a.download = `glossary_${projectId || "project"}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -1276,18 +1338,6 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
         <div className="tw-x-glossary-empty">
           <Loader2 size={22} className="tw-spin" />
           <p>Loading glossary…</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <div className="tw-tabpanel tw-x-glossary-panel">
-        <div className="tw-x-glossary-empty">
-          <AlertCircle size={28} strokeWidth={1.5} />
-          <p>Couldn't load the glossary.</p>
-          <span>{loadError}</span>
         </div>
       </div>
     );
@@ -1357,16 +1407,7 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
               <RefreshCw size={12} className={suggestLoading ? "tw-spin" : ""} /> Rescan
             </button>
           )}
-          {mode === "all" && terms.length > 0 && (
-            <button
-              type="button"
-              className="tw-btn tw-x-mini-btn"
-              onClick={handleExport}
-              title="Export glossary as JSON"
-            >
-              Export
-            </button>
-          )}
+
           <button
             type="button"
             className="tw-btn-primary tw-x-glossary-add-btn"
@@ -1377,6 +1418,29 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
           </button>
         </div>
       </div>
+
+      {loadError && (
+        <div className="tw-x-glossary-empty" style={{ padding: "12px", marginBottom: "12px", border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.1)", borderRadius: 8 }}>
+          <AlertCircle size={20} strokeWidth={1.5} color="#f87171" />
+          <p style={{ fontSize: 13, margin: "4px 0", color: "#f87171" }}>Couldn't load project glossary</p>
+          <span style={{ fontSize: 11, color: "#9ca3af" }}>{loadError}</span>
+          <button
+            type="button"
+            className="tw-btn"
+            style={{ marginTop: 8 }}
+            onClick={() => {
+              setLoading(true);
+              setLoadError(null);
+              fetchGlossaryTerms(projectId)
+                .then((data) => setTerms(Array.isArray(data) ? data : []))
+                .catch((err) => setLoadError(err.message || "Failed to load glossary"))
+                .finally(() => setLoading(false));
+            }}
+          >
+            <RefreshCw size={12} /> Retry Loading
+          </button>
+        </div>
+      )}
 
       {addOpen && (
         <div className="tw-x-glossary-form">
@@ -1447,9 +1511,14 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
           <AlertCircle size={28} strokeWidth={1.5} />
           <p>Couldn't scan this page.</p>
           <span>{suggestError}</span>
-          <button type="button" className="tw-btn-primary" onClick={() => runSuggestScan(true)}>
-            <RefreshCw size={13} /> Try Again
-          </button>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <button type="button" className="tw-btn-primary" onClick={() => runSuggestScan(true)}>
+              <RefreshCw size={13} /> Try Again
+            </button>
+            <button type="button" className="tw-btn" onClick={() => setMode("all")}>
+              View All Terms
+            </button>
+          </div>
         </div>
       )}
 
@@ -1490,14 +1559,21 @@ function GlossaryTabPanel({ comicId, pageId, imageUrl }) {
               )}
             </div>
           )}
-          {suggestions.length === 0 && (
+          {suggestions.length === 0 && !addOpen && (
             <div className="tw-x-glossary-empty">
               <BookMarked size={28} strokeWidth={1.5} />
               <p>No glossary terms detected on this page.</p>
-              <span>None of the saved terms matched the text Gemini read here.</span>
-              <button type="button" className="tw-btn" onClick={() => setMode("all")}>
-                View All Terms
-              </button>
+              <span>{terms.length > 0 ? "None of the saved terms matched the text Gemini read here." : "No glossary terms exist in this project yet."}</span>
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                {terms.length > 0 && (
+                  <button type="button" className="tw-btn" onClick={() => setMode("all")}>
+                    View All Terms ({terms.length})
+                  </button>
+                )}
+                <button type="button" className="tw-btn-primary" onClick={() => setAddOpen(true)}>
+                  <Plus size={13} /> Add Term
+                </button>
+              </div>
             </div>
           )}
         </>
@@ -1727,7 +1803,7 @@ function TranslationSidePanel({
   resolveBubbleLabel,
   userFullName,
   onSelectBubble,
-  comicId,
+  projectId,
   pageId,
   canEdit = true,
   projectTeamId,
@@ -1766,7 +1842,7 @@ function TranslationSidePanel({
         />
       )}
       {activeTab === "glossary" && (
-        <GlossaryTabPanel comicId={comicId} pageId={pageId} imageUrl={currentImage} />
+        <GlossaryTabPanel projectId={projectId} pageId={pageId} imageUrl={currentImage} />
       )}
       {activeTab === "changes" && (
         <ChangeRequestsTabPanel
@@ -1957,21 +2033,25 @@ async function fetchChapterById(chapterId, signal) {
 
 function getTaskFallbackData(taskId) {
   let foundTask = null;
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith('comiverse_tasks_')) {
-      try {
-        const tasks = JSON.parse(localStorage.getItem(key));
-        if (Array.isArray(tasks)) {
-          const match = tasks.find(t => String(t.id) === String(taskId) || String(t._id) === String(taskId));
-          if (match) {
-            foundTask = match;
-            break;
-          }
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.length === 'number') {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('comiverse_tasks_')) {
+          try {
+            const tasks = JSON.parse(localStorage.getItem(key));
+            if (Array.isArray(tasks)) {
+              const match = tasks.find(t => String(t.id) === String(taskId) || String(t._id) === String(taskId));
+              if (match) {
+                foundTask = match;
+                break;
+              }
+            }
+          } catch (e) {}
         }
-      } catch (e) {}
+      }
     }
-  }
+  } catch (e) {}
 
   const rawTitle = foundTask?.title || 'Chapter 1 - Translation';
   const cleanTitleMatch = rawTitle.match(/^\[(URGENT|HIGH|MEDIUM|LOW)\]\s*(?:\[([^\]]+)\])?\s*(.*)$/i);
@@ -2112,6 +2192,36 @@ function isSameUser(assigneeId, userId) {
   return String(assigneeId) === String(userId);
 }
 
+function isSameTranslatorUser(translatorId, userId, userName, teamMembers = []) {
+  if (!translatorId) return false;
+
+  const target = String(translatorId).toLowerCase().trim();
+  const uId = userId ? String(userId).toLowerCase().trim() : '';
+  const uName = userName ? String(userName).toLowerCase().trim() : '';
+
+  if (uId && target === uId) return true;
+  if (uName && target === uName) return true;
+
+  if (teamMembers && teamMembers.length > 0) {
+    const matchedMem = teamMembers.find(m => {
+      if (!m) return false;
+      const memId = m.id ? String(m.id).toLowerCase().trim() : '';
+      const memName = (m.name || m.fullName || m.username || '').toLowerCase().trim();
+      return (memId && target === memId) || (memName && target === memName);
+    });
+
+    if (matchedMem) {
+      const memId = matchedMem.id ? String(matchedMem.id).toLowerCase().trim() : '';
+      const memName = (matchedMem.name || matchedMem.fullName || matchedMem.username || '').toLowerCase().trim();
+      if ((uId && memId === uId) || (uName && memName === uName)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 // Look up a member's display name by id from the fetched team member list.
 function resolveMemberName(memberId, teamMembers) {
   if (memberId == null) return null;
@@ -2137,12 +2247,12 @@ async function fetchPagesForTask(taskId, signal) {
   if (UUID_RE.test(taskId)) {
     try {
       const list = await fetchJson(`${API_BASE}/translate-workspace/${taskId}`, signal);
-      console.log('[DEBUG] /translate-workspace response:', list);
+      //console.log('[DEBUG] /translate-workspace response:', list);
       if (Array.isArray(list) && list.length > 0) {
         rawPages = list;
       }
     } catch (err) {
-      console.warn('[DEBUG] /translate-workspace fetch failed:', err);
+      //console.warn('[DEBUG] /translate-workspace fetch failed:', err);
     }
   }
 
@@ -2244,26 +2354,39 @@ async function fetchPagesForTask(taskId, signal) {
         const resolved = resolveImageUrl(rawUrl);
         if (!resolved) return null;
 
-        const pageId = item?.id || `p-${taskId}-${idx + 1}`;
+        // BE (ChapterPageDTO) returns `pageId`, not `id` — always try pageId first
+        const pageId = item?.pageId || item?.id || `p-${taskId}-${idx + 1}`;
         let bubblesData = item?.bubbles || [];
+        let localTranslatedBy = null;
+
+        // ── 1. Try to recover translatedBy from the bubbles JSON string stored in BE
+        //    (for pages translated before the DB column was added, the attribution
+        //     lives only inside the `bubbles` string as { selections:[…], translatedBy:"…" })
+        const rawBubbles = item?.bubbles;
+        if (rawBubbles && typeof rawBubbles === 'string' && !localTranslatedBy) {
+          try {
+            const parsedBubbles = JSON.parse(rawBubbles);
+            if (parsedBubbles?.translatedBy) localTranslatedBy = parsedBubbles.translatedBy;
+          } catch (e) {}
+        }
+
+        // ── 2. Also check localStorage (covers current session edits not yet saved to BE)
         try {
           const localSaved = localStorage.getItem(`comiverse_bubbles_${pageId}`);
           if (localSaved) {
+            const parsed = JSON.parse(localSaved);
             bubblesData = localSaved;
+            // localStorage wins over BE bubbles for translator attribution
+            if (parsed?.translatedBy) localTranslatedBy = parsed.translatedBy;
           }
         } catch (e) {}
 
         return {
-          ...(typeof item === 'object' && item ? item : {}),
-          id: item?.pageId || item?.id || `p-${taskId}-${idx + 1}`,
-          pageId: item?.pageId || item?.id || `p-${taskId}-${idx + 1}`,
+          id: item?.id || `p-${taskId}-${idx + 1}`,
+          pageId: item?.id || `p-${taskId}-${idx + 1}`,
           pageNumber: item?.pageNumber || idx + 1,
           imageUrl: resolved,
-          bubbles: bubblesData,
-          status: item?.status || 'TODO',
-          assignedTranslatorId: item?.assignedTranslatorId || null,
-          responsibilityFactor: item?.responsibilityFactor ?? 1,
-          completedAt: item?.completedAt || null
+          bubbles: bubblesData
         };
       })
       .filter(Boolean);
@@ -2335,7 +2458,7 @@ async function saveBubblesForPage(pageId, payload, signal) {
     const res = await fetch(`${API_BASE}/translate-workspace/pages/${pageId}/bubbles`, {
       method: "PUT",
       headers: authHeaders(),
-      body: JSON.stringify({ bubbles: JSON.stringify(payload) }),
+      body: JSON.stringify({ bubbles: JSON.stringify(payload), translatedBy: payload.translatedBy ?? null }),
       signal,
     });
     if (!res.ok) {
@@ -2352,6 +2475,33 @@ async function saveBubblesForPage(pageId, payload, signal) {
     } catch (e) {}
     return false;
   }
+}
+
+async function uploadImageToCloudinary(file, signal) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`${API_BASE}/upload/image`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+    signal,
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok || !json?.success) throw new Error(json?.message || `Upload failed (${res.status})`);
+  return json.data; // Cloudinary URL string
+}
+
+async function replacePageImage(pageId, imageUrl, signal) {
+  const res = await fetch(`${API_BASE}/translate-workspace/pages/${pageId}/image`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ imageUrl }),
+    signal,
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.message || `Failed to update page image (${res.status})`);
+  return json?.data !== undefined ? json.data : json;
 }
 
 async function updateTranslationPageStatus(pageId, status, signal) {
@@ -2379,7 +2529,12 @@ async function submitTaskForReview(taskId, signal) {
     signal,
   });
   if (!res.ok) {
-    throw new Error(`Failed to submit for review (${res.status})`);
+    let message = `Failed to submit for review (${res.status})`;
+    try {
+      const payload = await res.json();
+      message = payload?.message || message;
+    } catch (e) {}
+    throw new Error(message);
   }
   return true;
 }
@@ -2654,6 +2809,11 @@ function useSelectionAreas(canEdit = true) {
   const [activeTool, setActiveTool] = useState("rect");
   const [polygonDraft, setPolygonDraft] = useState(null);
 
+  // Use a ref so event-handler closures always read the LATEST canEdit value,
+  // not the stale one captured at hook-creation time.
+  const canEditRef = useRef(canEdit);
+  useEffect(() => { canEditRef.current = canEdit; }, [canEdit]);
+
   const [zoomScale, setZoomScale] = useState(1);
   const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
   const [isPickingZoomPoint, setIsPickingZoomPoint] = useState(false);
@@ -2710,7 +2870,7 @@ function useSelectionAreas(canEdit = true) {
     }
 
     if (dragState.current) return;
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
 
     const pos = getRelativePos(e);
 
@@ -2803,7 +2963,7 @@ function useSelectionAreas(canEdit = true) {
   };
 
   const finishPolygon = () => {
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
     if (polygonDraft && polygonDraft.length >= 3) {
       const newArea = {
         id: generateId(),
@@ -2829,7 +2989,7 @@ function useSelectionAreas(canEdit = true) {
   const selectArea = (id) => setActiveId(id);
 
   const deleteArea = (id) => {
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
     setSelections((prev) => prev.filter((s) => s.id !== id));
     setActiveId((cur) => (cur === id ? null : cur));
   };
@@ -2857,17 +3017,17 @@ function useSelectionAreas(canEdit = true) {
   };
 
   const updateTranslation = (id, translation) => {
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
     setSelections((prev) => prev.map((s) => (s.id === id ? { ...s, translation } : s)));
   };
 
   const updateName = (id, name) => {
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
     setSelections((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
   };
 
   const updateSelectionStyle = (id, patch) => {
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
     setSelections((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   };
 
@@ -2892,7 +3052,7 @@ function useSelectionAreas(canEdit = true) {
   };
 
   const startMove = (e, id) => {
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
     const selection = selections.find((s) => s.id === id);
     if (!selection) return;
     dragState.current = {
@@ -2905,7 +3065,7 @@ function useSelectionAreas(canEdit = true) {
   };
 
   const startResize = (e, id, handle) => {
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
     const selection = selections.find((s) => s.id === id);
     if (!selection) {
       return;
@@ -2921,7 +3081,7 @@ function useSelectionAreas(canEdit = true) {
   };
 
   const startVertexDrag = (e, id, vertexIndex) => {
-    if (!canEdit) return;
+    if (!canEditRef.current) return;
     const selection = selections.find((s) => s.id === id);
     if (!selection) {
       return;
@@ -3148,21 +3308,19 @@ export default function TranslateWorkspace() {
     return () => controller.abort();
   }, [chapterData?.projectTeamId]);
 
-  const isAssignedToTask = isSameUser(chapterData?.taskAssigneeId, currentUserId);
+  const isAssignedToTask = useMemo(() => {
+    return isSameUser(chapterData?.taskAssigneeId, currentUserId) ||
+           isSameTranslatorUser(chapterData?.taskAssigneeId, currentUserId, userFullName, teamMembers);
+  }, [chapterData?.taskAssigneeId, currentUserId, userFullName, teamMembers]);
 
   const isProjectLeader = useMemo(() => {
     const me = (teamMembers || []).find((m) => String(m.id) === String(currentUserId));
     return me?.role === "Group Leader";
   }, [teamMembers, currentUserId]);
 
-  const currentPageAssigneeId = taskPages[currentPageIndex]?.assignedTranslatorId;
-  const isAssignedToCurrentPage = currentPageAssigneeId
-    ? isSameUser(currentPageAssigneeId, currentUserId)
-    : isAssignedToTask;
-
-  // After a handover, accepted pages remain read-only for the new translator.
-  // The Project Leader can still inspect or correct any page.
-  const canEdit = status === "ready" && (isProjectLeader || isAssignedToCurrentPage);
+  // Nobody is allowed to edit until we've actually loaded the task and know
+  // who's assigned — default is read-only, not editable.
+  const canEdit = status === "ready" && (isProjectLeader || isAssignedToTask);
 
 
   const {
@@ -3229,6 +3387,8 @@ export default function TranslateWorkspace() {
               ...clamped,
             };
           });
+          // Prevent the selections change from triggering "unsaved" status
+          isLoadingPageRef.current = true;
           loadSelections(pxSelections);
         }
       } catch (err) {
@@ -3345,16 +3505,16 @@ export default function TranslateWorkspace() {
     selectionsRef.current = selections;
   }, [selections]);
 
-  const [saveStatus, setSaveStatus] = useState("unsaved");
-  const [sending, setSending] = useState(false);
-  const isLoadingPageRef = useRef(false);
+  const [saveStatus, setSaveStatus] = useState("saved");
+  const saveStatusRef = useRef(saveStatus);
   useEffect(() => {
-    if (isLoadingPageRef.current) {
-      isLoadingPageRef.current = false;
-      return;
-    }
-    setSaveStatus("unsaved");
-  }, [selections]);
+    saveStatusRef.current = saveStatus;
+  }, [saveStatus]);
+
+  const [sending, setSending] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const isLoadingPageRef = useRef(false);
+
 
   const activeSelection = selections.find((s) => s.id === activeId) ?? null;
   const activeSelectionIndex = selections.findIndex((s) => s.id === activeId);
@@ -3404,7 +3564,9 @@ export default function TranslateWorkspace() {
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) {
         const { chapter: cChapter, pages: cPages } = JSON.parse(cached);
-        if (cChapter && Array.isArray(cPages) && cPages.length > 0) {
+        // Invalidate cache if pages don't have translatedBy info (stale cache from old code)
+        const cacheHasTranslatorInfo = Array.isArray(cPages) && cPages.some(p => p.translatedBy != null);
+        if (cChapter && Array.isArray(cPages) && cPages.length > 0 && cacheHasTranslatorInfo) {
           setChapterData(cChapter);
           setTaskPages(cPages);
           setCurrentChapterId(cChapter.id);
@@ -3416,6 +3578,9 @@ export default function TranslateWorkspace() {
           cPages.slice(0, 3).forEach(p => {
             if (p.imageUrl) { const img = new Image(); img.src = p.imageUrl; }
           });
+        } else {
+          // Clear stale cache without translator info
+          sessionStorage.removeItem(cacheKey);
         }
       }
     } catch (e) {}
@@ -3490,7 +3655,10 @@ export default function TranslateWorkspace() {
   }, [currentPageMeta?.pageId]);
 
   useEffect(() => {
-    if (isLoadingPageRef.current) return;
+    if (isLoadingPageRef.current) {
+      isLoadingPageRef.current = false;
+      return;
+    }
     setSaveStatus("unsaved");
     const pageId = currentPageIdRef.current;
     if (!pageId) return;
@@ -3501,7 +3669,9 @@ export default function TranslateWorkspace() {
         : { width: 1000, height: 1400 };
       const canvasSize = measureCanvasSize(canvasRef);
       const percentSelections = selectionsToImagePercent(selections, canvasSize, naturalSize);
-      localStorage.setItem(`comiverse_bubbles_${pageId}`, JSON.stringify({ selections: percentSelections }));
+      // Include translatedBy so attribution survives page refresh / navigation
+      const savedTranslatedBy = currentPageMeta?.translatedBy || currentUserId || null;
+      localStorage.setItem(`comiverse_bubbles_${pageId}`, JSON.stringify({ selections: percentSelections, translatedBy: savedTranslatedBy }));
     } catch (e) {}
   
   }, [selections]);
@@ -3598,7 +3768,12 @@ export default function TranslateWorkspace() {
         ...p,
         pageId: p.pageId || p.id || `p-${idx + 1}`,
         pageNumber: p.pageNumber || idx + 1,
-        status: p.status === "DONE" ? "DONE" : (idx === currentPageIndex ? "current" : "todo")
+        status: p.status === "DONE" ? "DONE" : (idx === currentPageIndex ? "current" : "todo"),
+        translatorLabel: formatAssigneeLabel(p.translatedBy || p.translatorId || p.completedBy, teamMembers),
+        contributorLabels: Array.from(new Set([
+          p.translatedBy || p.translatorId || p.completedBy, 
+          p.status === "DONE" ? chapterData?.taskAssigneeId : null
+        ].filter(Boolean))).map(id => formatAssigneeLabel(id, teamMembers))
       })),
     };
 
@@ -3618,6 +3793,11 @@ export default function TranslateWorkspace() {
             pageId: p.pageId || p.id || `p-${idx + 1}`,
             pageNumber: p.pageNumber || idx + 1,
             status: p.status === "DONE" ? "DONE" : "todo",
+            translatorLabel: formatAssigneeLabel(p.translatedBy || p.translatorId || p.completedBy, teamMembers),
+            contributorLabels: Array.from(new Set([
+              p.translatedBy || p.translatorId || p.completedBy, 
+              p.status === "DONE" ? t.assigneeId : null
+            ].filter(Boolean))).map(id => formatAssigneeLabel(id, teamMembers))
           })),
         };
       });
@@ -3692,6 +3872,7 @@ export default function TranslateWorkspace() {
     (pageId, selectionsArray, expectedImageUrl) => {
       if (!pageId) return Promise.resolve(false);
       if (!canEdit) return Promise.resolve(false);
+      if (saveStatusRef.current === "saved") return Promise.resolve(true);
 
       setSaveStatus("saving");
 
@@ -3710,7 +3891,8 @@ export default function TranslateWorkspace() {
           return false;
         }
         const percentSelections = selectionsToImagePercent(selectionsArray, canvasSize, naturalSize);
-        const payload = { selections: percentSelections };
+        const activeUserId = currentUserId || getAuth()?.user?.id || getAuth()?.user?.userId;
+        const payload = { selections: percentSelections, translatedBy: activeUserId };
         const bubblesJson = JSON.stringify(payload);
         return saveBubblesForPage(pageId, payload).then((success) => {
           if (!success) {
@@ -3718,7 +3900,7 @@ export default function TranslateWorkspace() {
             return false;
           }
           setTaskPages((prev) =>
-            prev.map((p) => (p.pageId === pageId || p.id === pageId ? { ...p, bubbles: bubblesJson } : p))
+            prev.map((p) => (p.pageId === pageId || p.id === pageId ? { ...p, bubbles: bubblesJson, translatedBy: activeUserId || p.translatedBy, status: 'DONE' } : p))
           );
           setSaveStatus("saved");
           return true;
@@ -3832,15 +4014,43 @@ export default function TranslateWorkspace() {
 
   const isLastPage = images.length > 0 && currentPageIndex === images.length - 1;
 
+  const handleUploadImage = useCallback(async (file) => {
+    const pageId = currentPageMeta?.pageId;
+    if (!pageId) {
+      toast.error("No page loaded — cannot upload image.");
+      return;
+    }
+    if (!canEdit) {
+      toast.warning("You don't have permission to edit this task.");
+      return;
+    }
+    setIsUploading(true);
+    try {
+      const cloudinaryUrl = await uploadImageToCloudinary(file);
+      await replacePageImage(pageId, cloudinaryUrl);
+      // Update local state so canvas shows new image immediately
+      setTaskPages((prev) =>
+        prev.map((p) =>
+          (p.pageId === pageId || p.id === pageId)
+            ? { ...p, imageUrl: cloudinaryUrl }
+            : p
+        )
+      );
+      // Also invalidate session cache so re-load reflects new image
+      try { sessionStorage.removeItem(`comiverse_ws_cache_${taskId}`); } catch (e) {}
+      toast.success("Page image replaced successfully!");
+    } catch (err) {
+      toast.error(err?.message || "Failed to upload image.");
+    } finally {
+      setIsUploading(false);
+    }
+  }, [currentPageMeta, canEdit, taskId]);
+
   const handleSend = useCallback(async () => {
     if (!isLastPage || sending || !canEdit) return;
 
     setSending(true);
     try {
-
-      
-
-      
       const saved = await persistCurrentPage();
       if (saved === false) {
         alert(
@@ -3849,23 +4059,34 @@ export default function TranslateWorkspace() {
         );
         return;
       }
-      const updatedPage = await updateTranslationPageStatus(currentPageMeta.pageId, "DONE");
-      setTaskPages((prev) => prev.map((page) => (
-        String(page.pageId || page.id) === String(currentPageMeta.pageId)
-          ? { ...page, ...updatedPage, status: "DONE" }
-          : page
-      )));
+
+      const pageIds = [...new Set(
+        taskPages
+          .map((page) => page.pageId || page.id)
+          .filter(Boolean)
+          .map(String)
+      )];
+      const completedEntries = await Promise.all(pageIds.map(async (pageId) => {
+        const updatedPage = await updateTranslationPageStatus(pageId, "DONE");
+        return [pageId, updatedPage];
+      }));
+      const updatedById = Object.fromEntries(completedEntries);
+      setTaskPages((prev) => prev.map((page) => {
+        const updatedPage = updatedById[String(page.pageId || page.id)];
+        return updatedPage ? { ...page, ...updatedPage, status: "DONE" } : page;
+      }));
+
       await submitTaskForReview(taskId);
       navigate("/translator/project-teams", {
         state: { teamId: chapterData?.projectTeamId, tab: "tasks" },
       });
     } catch (err) {
       console.error("Failed to submit for review:", err);
-      alert("Failed to submit chapter for review. Please try again.");
+      alert(err?.message || "Failed to submit chapter for review. Please try again.");
     } finally {
       setSending(false);
     }
-  }, [isLastPage, sending, canEdit, persistCurrentPage, currentPageMeta, taskId, navigate, chapterData]);
+  }, [isLastPage, sending, canEdit, persistCurrentPage, taskPages, taskId, navigate, chapterData]);
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -3945,6 +4166,19 @@ export default function TranslateWorkspace() {
     return <div className="tw-root tw-loading">Loading error: {error}</div>;
   }
 
+  // canEditTask = same permission gate as canEdit (task-level write access)
+  const canEditTask = canEdit;
+
+  // isPageTranslatedByOther: true when the current page was translated by a
+  // different user (read-only for the current viewer).
+  const isPageTranslatedByOther = !canEdit && (() => {
+    if (!currentPageMeta) return false;
+    const translatedById = currentPageMeta.translatedBy ?? currentPageMeta.assignedTranslatorId ?? currentPageMeta.completedBy ?? null;
+    if (!translatedById) return false;
+    if (currentUserId && String(translatedById) === String(currentUserId)) return false;
+    return true;
+  })();
+
   return (
     <div className="tw-root">
       <TranslateHeaderBar
@@ -3952,10 +4186,13 @@ export default function TranslateWorkspace() {
         chapterTitle={deriveChapterTitle(chapterData)}
         onBack={gotoProjectList}
         onSend={handleSend}
-        canSend={isLastPage && canEdit}
+        canSend={isLastPage && canEditTask}
         canEdit={canEdit}
+        isPageTranslatedByOther={isPageTranslatedByOther}
         sending={sending}
         saveStatus={saveStatus}
+        onUpload={handleUploadImage}
+        isUploading={isUploading}
       />
 
       <div className="tw-body">
@@ -4096,7 +4333,7 @@ export default function TranslateWorkspace() {
           resolveBubbleLabel={resolveBubbleLabel}
           userFullName={userFullName}
           onSelectBubble={selectArea}
-          comicId={chapterData?.comicId}
+          projectId={chapterData?.projectTeamId}
           pageId={currentPageMeta?.pageId}
           canEdit={canEdit}
           projectTeamId={chapterData?.projectTeamId}

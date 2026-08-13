@@ -5,6 +5,155 @@ import { getAuth } from '../../utils/Auth'
 import { toast } from 'react-toastify'
 import ModernPagination from '../../components/common/ModernPagination'
 
+function MemberProfileModal({ member, onClose }) {
+  if (!member) return null;
+  return (
+    <div className="trans-modal-overlay fade-in" onClick={onClose} style={{ zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
+      <div className="trans-modal-card" onClick={e => e.stopPropagation()} style={{ width: '360px', padding: '0', overflow: 'hidden', background: '#1e1e2d', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}>
+        <div style={{ background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)', padding: '30px 20px 24px', textAlign: 'center', position: 'relative' }}>
+          <button onClick={onClose} style={{ position: 'absolute', top: '15px', right: '15px', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', transition: 'all 0.2s ease' }} onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'} onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}>×</button>
+          
+          <div className={`chat-avatar ${member.role === 'Group Leader' ? 'avatar-leader' : 'avatar-member'}`} style={{ width: '80px', height: '80px', fontSize: '32px', margin: '0 auto 15px', border: '3px solid rgba(255,255,255,0.15)', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+            {member.avatar || (member.name || '').substring(0, 2).toUpperCase()}
+          </div>
+          
+          <h3 style={{ margin: '0 0 8px', color: '#fff', fontSize: '20px', fontWeight: '600' }}>
+            {member.role === 'Group Leader' && '👑 '}
+            {member.name}
+          </h3>
+          <span className={`member-role-badge ${member.role === 'Group Leader' ? 'leader' : ''}`} style={{ display: 'inline-block', margin: '0 auto' }}>
+            {member.role}
+          </span>
+        </div>
+        
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', background: '#1e1e2d', maxHeight: '50vh', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>Status</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className={`status-dot ${member.online ? 'active' : 'offline'}`} style={{ width: '8px', height: '8px' }}></span>
+              <span style={{ color: '#f8fafc', fontSize: '13.5px', fontWeight: '500' }}>{formatMemberPresence(member)}</span>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>Join Date</span>
+            <span style={{ color: '#f8fafc', fontSize: '13.5px', fontWeight: '500' }}>{member.joinDate}</span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>Projects Joined</span>
+            <span style={{ color: '#f8fafc', fontSize: '13.5px', fontWeight: '500' }}>{member.joinedProjectCount || 0}</span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>Experience</span>
+            <span style={{ color: '#f8fafc', fontSize: '13.5px', fontWeight: '500' }}>{member.experienceYears || 0} years</span>
+          </div>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>Contributions</span>
+            <span style={{ color: '#f8fafc', fontSize: '13.5px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '16px' }}>🏆</span> {member.contributions}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>Revoked</span>
+            <span style={{ color: '#ef4444', fontSize: '13.5px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '16px' }}>❌</span> {member.revoked}
+            </span>
+          </div>
+
+          {member.specializations && member.specializations.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>Specializations</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {member.specializations.map((spec, i) => (
+                  <span key={i} style={{ background: 'rgba(139, 92, 246, 0.2)', color: '#c4b5fd', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' }}>
+                    {spec}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {member.bio && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>Bio</span>
+              <textarea 
+                readOnly 
+                value={member.bio}
+                style={{ 
+                  color: '#e2e8f0', 
+                  fontSize: '13px', 
+                  margin: 0, 
+                  lineHeight: 1.5,
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '8px',
+                  padding: '10px',
+                  minHeight: '80px',
+                  resize: 'none',
+                  outline: 'none',
+                  fontFamily: 'inherit'
+                }} 
+              />
+            </div>
+          )}
+
+          {(member.phoneNumber || member.facebookUrl || member.cvUrl) && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>Contact & Links</span>
+              {member.phoneNumber && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f8fafc', fontSize: '13.5px' }}>
+                  📞 {member.phoneNumber}
+                </div>
+              )}
+              {member.facebookUrl && (
+                <a href={member.facebookUrl} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#60a5fa', fontSize: '13.5px', textDecoration: 'none' }}>
+                  🌐 Facebook Profile
+                </a>
+              )}
+              {member.cvUrl && (
+                <a 
+                  href={member.cvUrl}
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    try {
+                      const res = await fetch(member.cvUrl);
+                      if (!res.ok) throw new Error('Network error');
+                      const blob = await res.blob();
+                      // Force PDF mime type just in case
+                      const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+                      const blobUrl = window.URL.createObjectURL(pdfBlob);
+                      const link = document.createElement('a');
+                      link.href = blobUrl;
+                      link.download = `CV_${member.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      window.URL.revokeObjectURL(blobUrl);
+                    } catch (err) {
+                      console.warn('CORS or fetch failed, falling back to new tab:', err);
+                      window.open(member.cvUrl, '_blank');
+                    }
+                  }}
+                  target="_blank" 
+                  rel="noreferrer" 
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#34d399', fontSize: '13.5px', textDecoration: 'none', cursor: 'pointer' }}
+                >
+                  📄 Download CV
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
 export function mapTeamMember(m, leaderName) {
   const name = m?.name || m?.fullName || m?.username || 'Member'
   const isLeader = m?.role === 'Group Leader' || (!!leaderName && String(name).toLowerCase().trim() === String(leaderName).toLowerCase().trim())
@@ -21,8 +170,16 @@ export function mapTeamMember(m, leaderName) {
     online,
     lastSeenAt: m?.lastSeenAt || null,
     joinDate: formattedJoinDate,
-    contributions: m?.contributions || '0 chapters',
-    avatar: m?.avatar || String(name).split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2)
+    contributions: m?.contributions || 0,
+    revoked: m?.revoked || 0,
+    avatar: m?.avatar || String(name).split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2),
+    specializations: m?.specializations || [],
+    experienceYears: m?.experienceYears || 0,
+    phoneNumber: m?.phoneNumber || '',
+    facebookUrl: m?.facebookUrl || '',
+    cvUrl: m?.cvUrl || '',
+    bio: m?.bio || '',
+    joinedProjectCount: m?.joinedProjectCount || 0
   }
 }
 
@@ -46,14 +203,28 @@ export function formatMemberPresence(member, now = Date.now()) {
   return `Offline · ${elapsedDays}d ago`
 }
 
+export function getTaskPageCount(t) {
+  if (!t) return 0
+  if (typeof t.pagesCount === 'number' && t.pagesCount > 0) return t.pagesCount
+  if (typeof t.pageCount === 'number' && t.pageCount > 0) return t.pageCount
+  if (Array.isArray(t.pages) && t.pages.length > 0) return t.pages.length
+  if (Array.isArray(t.images) && t.images.length > 0) return t.images.length
+  if (t.chapter) {
+    if (typeof t.chapter.pagesCount === 'number' && t.chapter.pagesCount > 0) return t.chapter.pagesCount
+    if (typeof t.chapter.pageCount === 'number' && t.chapter.pageCount > 0) return t.chapter.pageCount
+    if (Array.isArray(t.chapter.pages) && t.chapter.pages.length > 0) return t.chapter.pages.length
+    if (Array.isArray(t.chapter.images) && t.chapter.images.length > 0) return t.chapter.images.length
+  }
+  return 24
+}
+
 // A task counts as "published" once its translation work is fully done —
 // i.e. status reached "completed" in the kanban pipeline (backlog -> in_progress
-// -> under_review -> completed). Every task's chapter is already a PUBLISHED
-// chapter by the time a task can be created for it, so "completed task" is the
-// meaningful signal for a member's contribution count.
+// -> under_review -> completed). Contribution is calculated based on the total number of
+// completed/published pages for each member.
 function isPublishedTaskStatus(status) {
   const s = String(status || '').toLowerCase().trim()
-  return s === 'completed' || s === 'done'
+  return s === 'completed' || s === 'done' || s === 'published'
 }
 
 function MembersTab({
@@ -74,6 +245,7 @@ function MembersTab({
   const [loading, setLoading] = useState(parentMembers.length === 0)
   const [error, setError] = useState(null)
   const [activeDropdownMemberId, setActiveDropdownMemberId] = useState(null)
+  const [activeProfileMember, setActiveProfileMember] = useState(null)
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 })
   const dotsBtnRefs = useRef({})
   const onMembersLoadedRef = useRef(onMembersLoaded)
@@ -151,7 +323,8 @@ function MembersTab({
           status: 'Offline',
           online: false,
           joinDate: '01/15/2024',
-          contributions: '0 chapters',
+          contributions: 0,
+          revoked: 0,
           avatar: leaderInitials
         };
 
@@ -231,25 +404,91 @@ function MembersTab({
     return () => window.removeEventListener('scroll', handleClose, true)
   }, [activeDropdownMemberId])
 
-  // Count completed ("published") tasks per member, matched by their real
-  // backend id against each task's single assigneeId.
-  const contributionCounts = useMemo(() => {
-    const counts = new Map()
+  // Count completed ("published") translated pages per member.
+  // Supports granular per-page translator tracking (page.translatedBy / page.translatorId / task.pageContributions),
+  // so if Member A translated pages 1..5 before quitting/reassignment, those 5 pages stay credited to Member A,
+  // while Member B gets credited for pages translated by Member B.
+  const { contributionCounts, revokedCounts } = useMemo(() => {
+    const contributions = new Map()
+    const revoked = new Map()
+
     ;(tasks || []).forEach(t => {
-      if (!t || !t.assigneeId) return
-      if (!isPublishedTaskStatus(t.status)) return
-      const key = String(t.assigneeId)
-      counts.set(key, (counts.get(key) || 0) + 1)
+      if (!t) return
+
+      const isTaskApproved = String(t.status).toLowerCase() === 'completed' || String(t.status).toLowerCase() === 'published' || isPublishedTaskStatus(t.status)
+      const isTaskRevoked = String(t.status).toLowerCase() === 'revoked'
+      let recordedPagesForTask = false
+
+      // 1. Check if task has explicit pageContributions map
+      if (t.pageContributions && typeof t.pageContributions === 'object') {
+        Object.entries(t.pageContributions).forEach(([userId, pageCount]) => {
+          if (userId && typeof pageCount === 'number' && pageCount > 0) {
+            recordedPagesForTask = true
+            const key = String(userId)
+            if (isTaskRevoked) {
+              revoked.set(key, (revoked.get(key) || 0) + pageCount)
+            } else {
+              contributions.set(key, (contributions.get(key) || 0) + pageCount)
+            }
+          }
+        })
+      }
+
+      // 2. Check if task has pages with individual translatedBy/translatorId info
+      if (!recordedPagesForTask && Array.isArray(t.pages) && t.pages.length > 0) {
+        const pagesWithTranslator = t.pages.filter(p => p && (p.translatedBy || p.translatorId || p.completedBy))
+        if (pagesWithTranslator.length > 0) {
+          recordedPagesForTask = true
+          t.pages.forEach(p => {
+            if (!p) return
+            const pStatus = String(p.status || '').toUpperCase()
+            const isDone = pStatus === 'DONE' || isTaskApproved || isTaskRevoked
+            if (isDone) {
+              const translatedById = String(p.translatedBy || p.translatorId || p.completedBy || '')
+              const assigneeId = String(t.assigneeId || '')
+              
+              const contributors = new Set()
+              if (translatedById) contributors.add(translatedById)
+              if (assigneeId) contributors.add(assigneeId)
+              
+              contributors.forEach(uid => {
+                if (isTaskRevoked) {
+                  revoked.set(uid, (revoked.get(uid) || 0) + 1)
+                } else {
+                  contributions.set(uid, (contributions.get(uid) || 0) + 1)
+                }
+              })
+            }
+          })
+        }
+      }
+
+      // 3. Fallback
+      if (!recordedPagesForTask && t.assigneeId && (isTaskApproved || isTaskRevoked)) {
+        const key = String(t.assigneeId)
+        const pageCount = getTaskPageCount(t)
+        if (isTaskRevoked) {
+          revoked.set(key, (revoked.get(key) || 0) + pageCount)
+        } else {
+          contributions.set(key, (contributions.get(key) || 0) + pageCount)
+        }
+      }
     })
-    return counts
+
+    return { contributionCounts: contributions, revokedCounts: revoked }
   }, [tasks])
 
   const membersWithContributions = useMemo(() => {
     return members.map(m => {
-      const count = contributionCounts.get(String(m.id)) || 0
-      return { ...m, contributions: `${count} chapter${count !== 1 ? 's' : ''}` }
+      const contrib = contributionCounts.get(String(m.id)) || 0
+      const rev = revokedCounts.get(String(m.id)) || 0
+      return { 
+        ...m, 
+        contributions: contrib,
+        revoked: rev
+      }
     })
-  }, [members, contributionCounts])
+  }, [members, contributionCounts, revokedCounts])
 
   const teamLeader = membersWithContributions.find(m => m.role === 'Group Leader') || null
 
@@ -358,7 +597,9 @@ function MembersTab({
             borderRadius: '14px',
             background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(217, 119, 6, 0.06) 100%)',
             border: '1px solid rgba(245, 158, 11, 0.3)',
+            cursor: 'pointer'
           }}
+          onClick={() => setActiveProfileMember(teamLeader)}
         >
           <div className="chat-avatar avatar-leader">
             {teamLeader.avatar || teamLeader.name.substring(0, 2).toUpperCase()}
@@ -412,7 +653,7 @@ function MembersTab({
             <option value="all">🏆 Contribution: All</option>
             <option value="desc">🏆 Contribution: High to Low</option>
             <option value="asc">🏆 Contribution: Low to High</option>
-            <option value="active">🏆 Contribution: Active (&gt; 0 chapters)</option>
+            <option value="active">🏆 Contribution: Active (&gt; 0 contributions)</option>
           </select>
         </div>
 
@@ -436,7 +677,8 @@ function MembersTab({
                   <th>Member</th>
                   <th>Role</th>
                   <th>Join Date</th>
-                  <th>Contributions</th>
+                  <th style={{ textAlign: 'center' }}>Contributions</th>
+                  <th style={{ textAlign: 'center' }}>Revoked</th>
                   <th></th>
                 </tr>
               </thead>
@@ -450,7 +692,7 @@ function MembersTab({
                   const statusClass = String(member?.status || (member?.online ? 'active' : 'offline')).toLowerCase()
 
                   return (
-                    <tr key={memberId}>
+                    <tr key={memberId} style={{ cursor: 'pointer' }} onClick={() => setActiveProfileMember(member)}>
                       <td>
                         <div className="member-cell-info">
                           <div className={`chat-avatar ${member?.role === 'Group Leader' ? 'avatar-leader' : 'avatar-member'}`}>
@@ -481,7 +723,8 @@ function MembersTab({
                         </span>
                       </td>
                       <td className="member-join-date">{member.joinDate}</td>
-                      <td className="member-contributions">{member.contributions}</td>
+                      <td className="member-contributions" style={{ textAlign: 'center' }}>{member.contributions}</td>
+                      <td className="member-revoked" style={{ color: '#ef4444', textAlign: 'center' }}>{member.revoked}</td>
                       <td className="member-actions-cell">
                         {(canLeave || canRemove) && (
                           <button
@@ -527,6 +770,14 @@ function MembersTab({
                 )}
               </div>
             </>,
+            document.body
+          )}
+          
+          {activeProfileMember && createPortal(
+            <MemberProfileModal 
+              member={activeProfileMember} 
+              onClose={() => setActiveProfileMember(null)} 
+            />,
             document.body
           )}
 

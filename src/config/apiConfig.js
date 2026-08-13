@@ -17,7 +17,7 @@ export const getBackendHost = () => {
 
 // Centralized helper to resolve image/asset URLs
 export const resolveImageUrl = (url) => {
-  if (!url || typeof url !== 'string') return null;
+  if (!url) return null;
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
     return url;
   }
