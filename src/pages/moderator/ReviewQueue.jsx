@@ -66,13 +66,22 @@ const isSameChapterItem = (c, target) => {
   if (!c || !target) return false;
   if (c === target) return true;
   
+  if (c.id && target.id && String(c.id) === String(target.id)) return true;
+  if (c.chapterId && target.chapterId && String(c.chapterId) === String(target.chapterId)) return true;
+  
+  const cSub = c.submissionId || c.comicId;
+  const tSub = target.submissionId || target.comicId;
+  if (cSub && tSub && String(cSub) !== String(tSub)) return false;
+
   const cNum = Number(c.number !== undefined ? c.number : (c.chapterNumber !== undefined ? c.chapterNumber : NaN));
   const tNum = Number(target.number !== undefined ? target.number : (target.chapterNumber !== undefined ? target.chapterNumber : NaN));
+  
   if (!isNaN(cNum) && !isNaN(tNum) && cNum > 0 && tNum > 0) {
     if (cNum !== tNum) return false;
+    if (cSub && tSub && String(cSub) === String(tSub)) return true;
+    if (!cSub || !tSub) return true;
   }
   
-  if (c.id && target.id && c.id === target.id) return true;
   if (c.title && target.title && c.title.trim().toLowerCase() === target.title.trim().toLowerCase()) return true;
   return false;
 };
