@@ -15,7 +15,7 @@ const emptyProfile = {
   bio: '',
   note: '',
   countryCode: 'VN',
-  licenseStatus: 'ACTIVE',
+  licenseStatus: 'PENDING_LICENSE',
   licenseUrl: '',
   licenseOriginalFilename: '',
   licenseDeadlineAt: null,
@@ -23,8 +23,8 @@ const emptyProfile = {
   licenseVerifiedAt: null,
   licenseRejectionReason: '',
   canUploadLicense: false,
-  canPublishComic: true,
-  canRequestAuthorPayout: true,
+  canPublishComic: false,
+  canRequestAuthorPayout: false,
 }
 
 const authorTypeOptions = [
@@ -153,7 +153,7 @@ function AuthorProfile() {
     }
   }
 
-  const licenseStatus = profile.licenseStatus || 'ACTIVE'
+  const licenseStatus = profile.licenseStatus || 'PENDING_LICENSE'
   const licenseStatusLabel = licenseStatus.replace(/_/g, ' ')
   const formatLicenseDate = (value) => {
     if (!value) return 'Not set'
@@ -162,13 +162,13 @@ function AuthorProfile() {
   }
 
   return (
-    <>
+    <div className="author-profile-page">
       <div className="author-page-header">
         <h1>Author Profile</h1>
         <p>Fill in the public author information used by your comics and moderation workflow.</p>
       </div>
 
-      <div className="author-section-card" style={{ marginBottom: '24px' }}>
+      <section className="author-section-card author-profile-license-card">
         <h2 className="author-section-title">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -178,35 +178,35 @@ function AuthorProfile() {
           Publishing License
         </h2>
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', marginBottom: '14px' }}>
-          <span className="status-badge" style={{ textTransform: 'uppercase' }}>{licenseStatusLabel}</span>
-          <span style={{ color: 'var(--author-text-secondary)' }}>Deadline: <strong>{formatLicenseDate(profile.licenseDeadlineAt)}</strong></span>
+        <div className="author-profile-license-meta">
+          <span className={`author-profile-status author-profile-status--${licenseStatus.toLowerCase()}`}>{licenseStatusLabel}</span>
+          <span>Deadline: <strong>{formatLicenseDate(profile.licenseDeadlineAt)}</strong></span>
           {profile.licenseUploadedAt && (
-            <span style={{ color: 'var(--author-text-secondary)' }}>Uploaded: <strong>{formatLicenseDate(profile.licenseUploadedAt)}</strong></span>
+            <span>Uploaded: <strong>{formatLicenseDate(profile.licenseUploadedAt)}</strong></span>
           )}
         </div>
 
         {licenseStatus === 'ACTIVE' && (
-          <p style={{ color: 'var(--author-text-secondary)', marginTop: 0 }}>
+          <p className="author-profile-license-copy">
             License verified. Comic publishing/upload and Author payout are enabled.
           </p>
         )}
         {licenseStatus === 'PENDING_VERIFICATION' && (
-          <p style={{ color: 'var(--author-text-secondary)', marginTop: 0 }}>
+          <p className="author-profile-license-copy">
             Your PDF was submitted and is waiting for Admin/Moderator verification. You can still login and edit your profile, but comic publishing and Author payout remain locked.
           </p>
         )}
         {(licenseStatus === 'PENDING_LICENSE' || licenseStatus === 'REJECTED') && (
           <>
             {licenseStatus === 'REJECTED' && profile.licenseRejectionReason && (
-              <div className="admin-inline-alert admin-inline-alert--error" style={{ marginBottom: '14px' }}>
+              <div className="author-profile-alert author-profile-alert--error">
                 Rejection reason: {profile.licenseRejectionReason}
               </div>
             )}
-            <p style={{ color: 'var(--author-text-secondary)', marginTop: 0 }}>
+            <p className="author-profile-license-copy">
               Upload one license document in PDF format only. Maximum size: 10 MB.
             </p>
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div className="author-profile-upload-row">
               <input
                 type="file"
                 accept=".pdf,application/pdf"
@@ -225,7 +225,7 @@ function AuthorProfile() {
           </>
         )}
         {(licenseStatus === 'EXPIRED' || licenseStatus === 'AUTHOR_DISABLED') && (
-          <div className="admin-inline-alert admin-inline-alert--error">
+          <div className="author-profile-alert author-profile-alert--error">
             {licenseStatus === 'EXPIRED'
               ? 'The license upload deadline has expired. Contact an administrator for a new deadline.'
               : 'Author publishing privileges are disabled. Contact an administrator.'}
@@ -233,11 +233,11 @@ function AuthorProfile() {
         )}
 
         {profile.licenseUrl && (
-          <a href={profile.licenseUrl} target="_blank" rel="noreferrer" className="btn-author-action" style={{ marginTop: '14px', display: 'inline-flex' }}>
+          <a href={profile.licenseUrl} target="_blank" rel="noreferrer" className="btn-author-action author-profile-document-link">
             View uploaded PDF
           </a>
         )}
-      </div>
+      </section>
 
       <div className="settings-grid author-profile-grid">
         <div className="author-section-card author-profile-preview-card">
@@ -402,14 +402,14 @@ function AuthorProfile() {
                 </div>
               </div>
 
-              <button type="submit" className="btn-author-action primary" style={{ marginTop: '20px' }} disabled={saving}>
+              <button type="submit" className="btn-author-action primary author-profile-save" disabled={saving}>
                 {saving ? 'Saving...' : 'Save Author Profile'}
               </button>
             </form>
           )}
         </div>
       </div>
-    </>
+    </div>
   )
 }
 

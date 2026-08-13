@@ -37,7 +37,8 @@ vi.mock('../../../../utils/Auth', () => ({
 const mockComic = {
   id: 'comic-123',
   title: 'Solo Leveling',
-  author: 'Chugong',
+  authorId: 'author-profile-123',
+  authorName: 'Chugong',
   description: '10 years ago...',
   coverUrl: 'test.jpg',
   genres: ['Action', 'Fantasy'],
@@ -85,7 +86,9 @@ describe('Reader - ComicDetail Page Tests', () => {
     await screen.findByText('Solo Leveling', {}, { timeout: 4000 });
     
     expect(ComicApi.getComicByIdApi).toHaveBeenCalledWith('comic-123', expect.any(Object));
-    expect(screen.getAllByText('Chugong').length).toBeGreaterThan(0);
+    // The public ComicDTO only has authorId/authorName. ComicDetail must use
+    // authorName (AuthorEntity.displayName) for both the Author and Artist UI.
+    expect(screen.getAllByText('Chugong').length).toBeGreaterThanOrEqual(4);
     
     // Test tabs / chapters render
     expect(screen.getByText('Chapter 1')).toBeInTheDocument();

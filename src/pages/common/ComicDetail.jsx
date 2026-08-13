@@ -310,8 +310,19 @@ function ComicDetail() {
     ? comic.genres.map(g => typeof g === 'object' && g !== null ? g.name : g)
     : []
 
-  const displayAuthor = comic.author || 'Unknown'
-  const displayArtist = comic.artist || 'Unknown'
+  // ComicDTO exposes the creator profile name as `authorName`, resolved by the
+  // backend from ComicEntity.authorId -> AuthorEntity.displayName. The current
+  // domain model has no separate artist relation, so both Author and Artist
+  // intentionally display the same Author profile display name. Keep the old
+  // `author` fallback only for legacy/mock payloads.
+  const resolvedAuthorDisplayName =
+    comic.authorName ||
+    comic.authorDisplayName ||
+    (typeof comic.author === 'object' ? comic.author?.displayName : comic.author) ||
+    'Unknown'
+
+  const displayAuthor = resolvedAuthorDisplayName
+  const displayArtist = resolvedAuthorDisplayName
   const displayLanguage = comic.language || 'Unknown'
 
   const displayRating = comic.ratingAverage !== undefined

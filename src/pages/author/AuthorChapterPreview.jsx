@@ -204,6 +204,7 @@ export default function AuthorChapterPreview() {
 
   const readerAreaRef = useRef(null)
   const footerTimerRef = useRef(null)
+  const serverRefreshAttemptedRef = useRef(false)
 
   /* ── Auth guard ─────────────────── */
   useEffect(() => {
@@ -214,9 +215,13 @@ export default function AuthorChapterPreview() {
 
     const currentRawPages = extractPages(preview)
 
-    const needsPageFetch = !preview || currentRawPages.length === 0
+    const currentStatus = String(preview?.status || preview?.moderationStatus || '').toUpperCase()
+    const currentReason = preview?.rejectionReason || preview?.rejection_reason || ''
+    const needsRejectedFeedbackFetch = currentStatus === 'REJECTED' && !currentReason && !serverRefreshAttemptedRef.current
+    const needsServerFetch = !preview || currentRawPages.length === 0 || needsRejectedFeedbackFetch
 
-    if (needsPageFetch) {
+    if (needsServerFetch) {
+      serverRefreshAttemptedRef.current = true
       const fetchChapter = async () => {
         try {
           let previewData = null

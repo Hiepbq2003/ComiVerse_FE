@@ -6,8 +6,10 @@ import { toast } from 'react-toastify'
 import AuthorComics from '../../../../pages/author/AuthorComics'
 import * as AuthorComicApi from '../../../../services/api/AuthorComicApi'
 import * as UploadApi from '../../../../services/api/UploadApi'
+import * as AuthorProfileApi from '../../../../services/api/AuthorProfileApi'
 
 vi.mock('../../../../services/api/AuthorComicApi', () => ({
+  checkAuthorComicTitleExistsApi: vi.fn(),
   createAuthorComicApi: vi.fn(),
   getAuthorChapterUploadStatusApi: vi.fn(),
   getAuthorComicsApi: vi.fn(),
@@ -17,6 +19,10 @@ vi.mock('../../../../services/api/AuthorComicApi', () => ({
 
 vi.mock('../../../../services/api/UploadApi', () => ({
   uploadImageApi: vi.fn(),
+}))
+
+vi.mock('../../../../services/api/AuthorProfileApi', () => ({
+  getAuthorProfileApi: vi.fn(),
 }))
 
 vi.mock('react-toastify', () => ({
@@ -40,7 +46,12 @@ function renderAuthorComics() {
 describe('Author Comics - Testing Techniques', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    AuthorProfileApi.getAuthorProfileApi.mockResolvedValue({
+      licenseStatus: 'ACTIVE',
+      canPublishComic: true,
+    })
     AuthorComicApi.getAuthorComicsApi.mockResolvedValue([])
+    AuthorComicApi.checkAuthorComicTitleExistsApi.mockResolvedValue(false)
     AuthorComicApi.getAuthorChapterUploadStatusApi.mockResolvedValue({
       taskId: 'task-1',
       status: 'COMPLETED',

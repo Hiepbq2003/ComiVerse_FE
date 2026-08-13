@@ -416,9 +416,14 @@ function AccountManagement() {
     if (!account?.authorId) return
     const reason = window.prompt('Reason for rejection (Author gets a new 7-day PDF upload deadline):', '')
     if (reason === null) return
+    const rejectionReason = reason.trim()
+    if (!rejectionReason) {
+      showAlert('error', 'Rejection reason is required.')
+      return
+    }
     setActionLoadingId(account.id)
     try {
-      await rejectAuthorLicenseApi(account.authorId, { reason: reason.trim() || null, deadlineDays: 7 })
+      await rejectAuthorLicenseApi(account.authorId, { reason: rejectionReason, deadlineDays: 7 })
       showAlert('warning', `License rejected. ${account.fullName} can upload a replacement PDF within 7 days.`)
       await fetchAccounts()
     } catch (err) {
