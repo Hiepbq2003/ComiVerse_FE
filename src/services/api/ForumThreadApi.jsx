@@ -5,7 +5,11 @@ export const getAllForumThreadsApi = () => {
 };
 
 export const getForumThreadsPageApi = (page = 1, size = 10, search = '') => {
-  return AxiosClient.get('/forum-threads', { params: { page, size, search } });
+  const params = { page, size };
+  if (search && typeof search === 'string' && search.trim()) {
+    params.search = search.trim();
+  }
+  return AxiosClient.get('/forum-threads', { params });
 };
 
 export const deleteForumThreadApi = (id) => {
