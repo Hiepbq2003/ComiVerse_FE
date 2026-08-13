@@ -989,27 +989,54 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
 
   const onConfirmRejectClick = () => {
     if (!selectedReject) return
-    const comicId = selectedReject.parentReviewId || selectedReject.id;
-    const targetChapId = selectedReject.rejectChapterObj?.id || selectedReject.rejectChapterObj?.chapterId || selectedReject.chapterId;
-    const comments = (targetChapId && docCommentsMap[targetChapId]) || docCommentsMap[selectedReject.id] || docCommentsMap[comicId] || selectedReject.notes || [];
     const userOverallNote = rejectionReason.trim();
-    let finalPayload = '';
-
-    if (userOverallNote && comments.length > 0) {
-      const formattedComments = comments.map((c, i) => `${i + 1}. [${c.targetLabel}]: ${c.text}`).join('\n');
-      finalPayload = `${userOverallNote}\n\n--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
-    } else if (comments.length > 0) {
-      const formattedComments = comments.map((c, i) => `${i + 1}. [${c.targetLabel}]: ${c.text}`).join('\n');
-      finalPayload = `--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
-    } else {
-      finalPayload = userOverallNote;
-    }
-
+    
     if (selectedReject.rejectChapterObj && handleChapterReject) {
+      // Single chapter rejection
+      const comicId = selectedReject.parentReviewId || selectedReject.id;
+      const targetChapId = selectedReject.rejectChapterObj?.id || selectedReject.rejectChapterObj?.chapterId || selectedReject.chapterId;
+      const comments = (targetChapId && docCommentsMap[targetChapId]) || docCommentsMap[selectedReject.id] || docCommentsMap[comicId] || selectedReject.notes || [];
+      let finalPayload = '';
+
+      if (userOverallNote && comments.length > 0) {
+        const formattedComments = comments.map((c, i) => `${i + 1}. [${c.targetLabel}]: ${c.text}`).join('\n');
+        finalPayload = `${userOverallNote}\n\n--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
+      } else if (comments.length > 0) {
+        const formattedComments = comments.map((c, i) => `${i + 1}. [${c.targetLabel}]: ${c.text}`).join('\n');
+        finalPayload = `--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
+      } else {
+        finalPayload = userOverallNote;
+      }
+      
       handleChapterReject(selectedReject.parentReviewId || selectedReject.id, selectedReject.rejectChapterObj, finalPayload);
     } else {
-      const itemsToReject = selectedReject.subItems ? selectedReject.subItems : [selectedReject];
-      itemsToReject.forEach(i => handleConfirmReject(i.id || i, finalPayload));
+      // Bulk "Reject All"
+      const itemsToReject = selectedReject.subItems || selectedReject.allChapters || selectedReject.chapters || [selectedReject];
+      const comicId = selectedReject.parentReviewId || selectedReject.id;
+
+      itemsToReject.forEach(i => {
+        const targetChapId = i.id || i.chapterId;
+        // Scope comments to the specific sub-item being rejected
+        const comments = (targetChapId && docCommentsMap[targetChapId]) || docCommentsMap[comicId] || i.notes || [];
+        let finalPayload = '';
+
+        if (userOverallNote && comments.length > 0) {
+          const formattedComments = comments.map((c, idx) => `${idx + 1}. [${c.targetLabel}]: ${c.text}`).join('\n');
+          finalPayload = `${userOverallNote}\n\n--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
+        } else if (comments.length > 0) {
+          const formattedComments = comments.map((c, idx) => `${idx + 1}. [${c.targetLabel}]: ${c.text}`).join('\n');
+          finalPayload = `--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
+        } else {
+          finalPayload = userOverallNote;
+        }
+
+        // Use handleChapterReject for chapters to preserve pages, else fallback to handleConfirmReject
+        if (handleChapterReject && isRealChapterSubmission(i)) {
+          handleChapterReject(comicId, i, finalPayload);
+        } else {
+          handleConfirmReject(i.id || i, finalPayload);
+        }
+      });
     }
     fetchAllData?.();
 
