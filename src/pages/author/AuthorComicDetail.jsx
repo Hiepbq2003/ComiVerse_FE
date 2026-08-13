@@ -612,6 +612,7 @@ function AuthorComicDetail() {
 
       const rawComic = comicResponse.value;
       let rawChapters = chaptersResponse.status === 'fulfilled' ? normalizeArrayResponse(chaptersResponse.value) : [];
+      let finalRejectionReason = rawComic?.rejectionReason || rawComic?.rejection_reason;
 
       // Enrich chapters with local storage moderator overrides if available
       try {
@@ -648,8 +649,15 @@ function AuthorComicDetail() {
 
               const matchedOverride = overrideChaptersList.find(o => {
                 const oId = String(o.id || o.chapterId || o.submissionId || '');
+                const oSubId = String(o.submissionId || '');
                 const oNum = String(o.chapterNumber || o.number || '');
-                return (cId && oId && cId === oId) || (cNum && oNum && cNum === oNum);
+                const subIdStr = String(chap.submissionId || '');
+                
+                const matchChapId = cId && oId && (oId === cId || oId === subIdStr || `chap-${oId}` === cId || oId === `chap-${cId}`);
+                const matchSubId = subIdStr && oSubId && (oSubId === subIdStr || oSubId === cId);
+                const matchNum = cNum && cNum !== 'N/A' && oNum && cNum === oNum;
+                
+                return matchChapId || matchSubId || matchNum;
               });
 
               if (matchedOverride) {
@@ -670,6 +678,11 @@ function AuthorComicDetail() {
               }
               return chap;
             });
+            
+            const overrideWithReason = matchingOverrides.find(o => o.rejectionReason || o.rejection_reason);
+            if (overrideWithReason) {
+              finalRejectionReason = overrideWithReason.rejectionReason || overrideWithReason.rejection_reason;
+            }
           }
         }
       } catch (e) {
@@ -678,9 +691,13 @@ function AuthorComicDetail() {
 
       const finalModerationStatus = (rawChapters.some(c => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED'))
         ? 'REJECTED'
-        : (rawComic.moderationStatus || rawComic.approvalStatus || 'DRAFT');
+        : (rawComic?.moderationStatus || rawComic?.status || 'DRAFT');
 
-      setComic({ ...rawComic, moderationStatus: finalModerationStatus, rejectionReason: rawComic.rejectionReason });
+      setComic({
+        ...rawComic,
+        moderationStatus: finalModerationStatus,
+        rejectionReason: finalRejectionReason
+      });
       setChapters(rawChapters);
       setMetrics(metricsResponse.status === 'fulfilled' ? metricsResponse.value : null)
     } catch {
