@@ -1059,11 +1059,22 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               const matchByTitle = comicTitleClean && (item.title || '').trim().toLowerCase() === comicTitleClean;
               
               if (matchByComicId || matchByTitle) {
+                const updateChaps = (chapsArr) => {
+                  if (!Array.isArray(chapsArr)) return chapsArr;
+                  const exists = chapsArr.some(c => isSameChapterItem(c, chapterObj));
+                  if (exists) {
+                    return chapsArr.map(c => isSameChapterItem(c, chapterObj) ? { ...c, ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' } : { ...c, status: 'rejected', rejectedAt: nowIso });
+                  }
+                  return [...chapsArr.map(c => ({...c, status: 'rejected', rejectedAt: nowIso})), { ...chapterObj, status: 'rejected', rejectedAt: nowIso, rejectionReason: reason || 'Chapter rejected' }];
+                };
+
                 return {
                   ...item,
                   status: 'rejected',
                   rejectedAt: nowIso,
-                  rejectionReason: item.chapterId ? (reason || 'Chapter rejected') : 'All chapters were rejected. Comic profile auto-rejected.'
+                  rejectionReason: item.chapterId ? (reason || 'Chapter rejected') : 'All chapters were rejected. Comic profile auto-rejected.',
+                  allChapters: updateChaps(item.allChapters),
+                  chapters: updateChaps(item.chapters)
                 };
               }
               return item;
