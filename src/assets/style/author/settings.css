@@ -81,6 +81,156 @@ textarea.form-control-premium {
   margin-top: 2px;
 }
 
+/* Payout bank details */
+.author-bank-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.author-bank-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--author-accent), #ec4899);
+}
+
+.author-bank-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 22px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--author-border);
+}
+
+.author-bank-card .author-section-title {
+  margin: 0 0 8px;
+}
+
+.author-settings-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 9px;
+}
+
+.author-settings-icon--bank {
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  background: rgba(168, 85, 247, 0.1);
+  color: var(--author-accent-hover);
+}
+
+.author-bank-description {
+  margin: 0 0 0 42px;
+  color: var(--author-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.author-bank-security-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #34d399;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.author-bank-form .form-group-row {
+  gap: 18px;
+}
+
+.author-bank-form .form-group-cell {
+  gap: 7px;
+}
+
+.author-bank-form .form-group-cell label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.author-bank-form .form-group-cell small {
+  color: var(--author-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.author-bank-form .form-control-premium {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  background: var(--author-bg);
+}
+
+.author-bank-form .form-control-premium:hover {
+  border-color: var(--author-border-hover);
+}
+
+.author-bank-holder-input {
+  letter-spacing: 0.035em;
+}
+
+.author-bank-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--author-border);
+}
+
+.author-bank-form-footer p {
+  max-width: 560px;
+  margin: 0;
+  color: var(--author-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.author-bank-save-btn {
+  min-width: 170px;
+  justify-content: center;
+}
+
+html.light .author-bank-security-badge {
+  color: #047857;
+}
+
+@media (max-width: 640px) {
+  .form-group-row {
+    grid-template-columns: 1fr;
+  }
+
+  .form-group-cell.full-width {
+    grid-column: auto;
+  }
+
+  .author-bank-card-header,
+  .author-bank-form-footer {
+    flex-direction: column;
+  }
+
+  .author-bank-security-badge {
+    margin-left: 42px;
+  }
+
+  .author-bank-save-btn {
+    width: 100%;
+  }
+}
+
 /* Animations */
 /* ═══════════════════════════════════════════════════
    AUTHOR COMICS + DETAIL — ADMIN DARK POLISH

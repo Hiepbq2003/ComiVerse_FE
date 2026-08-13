@@ -21,6 +21,7 @@ import { toast } from 'react-toastify'
 
 import AuthorComics from '../../../../pages/author/AuthorComics'
 import * as AuthorComicApi from '../../../../services/api/AuthorComicApi'
+import * as AuthorProfileApi from '../../../../services/api/AuthorProfileApi'
 
 vi.mock('../../../../services/api/AuthorComicApi', () => ({
   checkAuthorComicTitleExistsApi: vi.fn(),
@@ -33,6 +34,10 @@ vi.mock('../../../../services/api/AuthorComicApi', () => ({
 
 vi.mock('../../../../services/api/UploadApi', () => ({
   uploadImageApi: vi.fn(),
+}))
+
+vi.mock('../../../../services/api/AuthorProfileApi', () => ({
+  getAuthorProfileApi: vi.fn(),
 }))
 
 vi.mock('react-toastify', () => ({
@@ -49,6 +54,10 @@ vi.mock('react-toastify', () => ({
 describe('Integration Test: Author Comic Creation Flow', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    AuthorProfileApi.getAuthorProfileApi.mockResolvedValue({
+      licenseStatus: 'ACTIVE',
+      canPublishComic: true,
+    })
 
     AuthorComicApi.getAuthorComicsApi.mockResolvedValue({
       content: [],

@@ -18,7 +18,6 @@ import StatisticsDashboard from './pages/admin/StatisticsDashboard'
 import RevenueManagement from './pages/admin/RevenueManagement'
 import PayoutManagement from './pages/admin/PayoutManagement'
 import PayoutSettings from './pages/admin/PayoutSettings'
-import AdminSystemSettings from './pages/admin/AdminSystemSettings'
 import SubscriptionManagement from './pages/admin/SubscriptionManagement'
 import AuthorDashboard from './pages/author/AuthorDashboard'
 import AuthorComics from './pages/author/AuthorComics'
@@ -124,7 +123,6 @@ function App() {
                 <Route path="/admin/payout" element={<PayoutManagement />} />
                 <Route path="/admin/payout/history" element={<PayoutManagement historyMode />} />
                 <Route path="/admin/payout/settings" element={<PayoutSettings />} />
-                <Route path="/admin/settings" element={<AdminSystemSettings />} />
                 <Route path="/admin/subscriptions" element={<SubscriptionManagement />} />
                 <Route path="/admin/report-categories" element={<AdminLayout activeNav="report-categories"><ReportCategories roleScope="ALL" /></AdminLayout>} />
                 {/* Moderator */}
