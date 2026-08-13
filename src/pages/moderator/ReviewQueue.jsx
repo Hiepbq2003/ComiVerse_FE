@@ -185,7 +185,7 @@ const CustomSortDropdown = ({ value, onChange }) => {
   );
 };
 
-function ReviewQueue({ loading = false, submissions = [], comics = [], handleApprove, handleConfirmReject, handleApproveAndCreateProject, handleChapterApprove, handleChapterReject }) {
+function ReviewQueue({ loading = false, submissions = [], comics = [], handleApprove, handleConfirmReject, handleApproveAndCreateProject, handleChapterApprove, handleChapterReject, fetchAllData }) {
   const { theme } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
@@ -946,6 +946,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         setPreviewTab(nextChapter && Array.isArray(nextChapter.pages) && nextChapter.pages.length > 0 ? 'reader' : 'chapters');
       }
     }
+    fetchAllData?.();
   };
 
   const onModalRejectClick = (specificChap = null) => {
@@ -1009,6 +1010,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       const itemsToReject = selectedReject.subItems ? selectedReject.subItems : [selectedReject];
       itemsToReject.forEach(i => handleConfirmReject(i.id || i, finalPayload));
     }
+    fetchAllData?.();
 
     if (selectedReview && (selectedReview.allChapters || selectedReview.subItems)) {
       const targetObj = selectedReject.rejectChapterObj || selectedReject;

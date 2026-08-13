@@ -411,7 +411,37 @@ function ModeratorDashboard() {
   }
 
   const syncSubmissionsWithLocalOverride = (rawSubmissions) => {
-    return rawSubmissions || [];
+    let overrideList = [];
+    try {
+      const raw = localStorage.getItem('comiverse_moderator_submissions_override');
+      if (raw) overrideList = JSON.parse(raw);
+    } catch (e) {}
+
+    if (!Array.isArray(overrideList) || overrideList.length === 0) {
+      return rawSubmissions || [];
+    }
+
+    const overrideMap = new Map();
+    overrideList.forEach(item => {
+      if (item && item.id) overrideMap.set(String(item.id), item);
+    });
+
+    const merged = (rawSubmissions || []).map(item => {
+      if (!item) return item;
+      const key = String(item.id);
+      if (overrideMap.has(key)) {
+        return { ...item, ...overrideMap.get(key) };
+      }
+      return item;
+    });
+
+    overrideList.forEach(item => {
+      if (item && item.id && !merged.some(m => m && String(m.id) === String(item.id))) {
+        merged.push(item);
+      }
+    });
+
+    return merged;
   };
   
   const fetchSubmissionsData = async () => {
@@ -984,6 +1014,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
         return nextSubmissions;
       });
+      fetchComicsAndTeams();
     } catch (err) {
       console.error(err);
       toast.error('Failed to approve chapter.');
@@ -2023,6 +2054,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               handleApproveAndCreateProject={handleApproveAndCreateProject}
               handleChapterApprove={handleChapterApprove}
               handleChapterReject={handleChapterReject}
+              fetchAllData={fetchAllData}
             />
           )}
 

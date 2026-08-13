@@ -25,7 +25,19 @@ export const deleteChatFlagApi = (id) => {
 };
 
 export const createChatFlagApi = (flagData) => {
-  return AxiosClient.post('/chat-flags', flagData);
+  const payload = {
+    userId: flagData.userId || flagData.user,
+    user: flagData.user || flagData.userId,
+    username: flagData.user || flagData.username,
+    message: flagData.message || flagData.content || '',
+    reason: flagData.reason || 'Flagged by Moderator',
+    messageId: flagData.messageId || flagData.id,
+    ...(flagData.imageUrl ? { imageUrl: flagData.imageUrl } : {})
+  };
+  return AxiosClient.post('/chat-flags', payload, {
+    suppressToast: true,
+    headers: { 'X-Suppress-Toast': 'true' }
+  });
 };
 
 
