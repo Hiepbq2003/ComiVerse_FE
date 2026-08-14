@@ -2937,7 +2937,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         }}
         comic={selectedAppealComic}
         onSuccess={() => {
-          fetchData(activeTab, getTabSearchQuery(activeTab), pagination[activeTab].page)
+          fetchAllData?.()
         }}
       />
     </div>
