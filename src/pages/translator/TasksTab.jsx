@@ -1614,22 +1614,6 @@ export function CreateTaskModal({
           </div>
 
           <div className="trans-form-group" style={{ marginTop: '14px' }}>
-            <label className="trans-form-label">Total chapter reward (USD)</label>
-            <input
-              type="number"
-              min="0.01"
-              step="0.01"
-              className="trans-form-input"
-              placeholder="Leave empty to use page count × Admin page rate"
-              value={newTaskData.chapterRewardUsd ?? ''}
-              onChange={(e) => setNewTaskData({ ...newTaskData, chapterRewardUsd: e.target.value })}
-            />
-            <p style={{ color: 'var(--trans-text-muted)', fontSize: '11px', margin: '5px 0 0', lineHeight: 1.45 }}>
-              The system divides this fixed chapter reward by the total number of pages. Earnings are locked until the whole chapter is approved.
-            </p>
-          </div>
-
-          <div className="trans-form-group" style={{ marginTop: '14px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
               <label className="trans-form-label" style={{ margin: 0 }}>
                 Due Date *
@@ -1749,8 +1733,6 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
     title: !editTaskData.title.trim(),
     assigneeId: !editTaskData.assigneeId,
     dueDate: !editTaskData.dueDate,
-    chapterRewardUsd: editTaskData.chapterRewardUsd !== '' && editTaskData.chapterRewardUsd != null
-      && (!Number.isFinite(Number(editTaskData.chapterRewardUsd)) || Number(editTaskData.chapterRewardUsd) <= 0),
     handoverReason: assigneeChanged && !String(editTaskData.handoverReason || '').trim(),
     handoverFactor: assigneeChanged && (!Number.isFinite(parsedFactor) || parsedFactor < 0 || parsedFactor > 1)
   }
@@ -1816,20 +1798,6 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
               </div>
 
               <div className="trans-form-group">
-                <label className="trans-form-label">Status (Sprint Column)</label>
-                <select
-                  className="trans-form-input"
-                  value={getNormalizedStatusKey(editTaskData.status)}
-                  onChange={(e) => setEditTaskData({ ...editTaskData, status: e.target.value })}
-                >
-                  <option value="backlog">⚪ Backlog</option>
-                  <option value="in_progress">🟠 In Progress</option>
-                  <option value="under_review">🟣 Under Review</option>
-                  <option value="completed">🟢 Completed</option>
-                </select>
-              </div>
-
-              <div className="trans-form-group">
                 <label className="trans-form-label">Priority</label>
                 <select
                   className="trans-form-input"
@@ -1854,26 +1822,6 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                 {showError('assigneeId') && (
                   <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Assignee is required</p>
                 )}
-              </div>
-
-              <div className="trans-form-group">
-                <label className="trans-form-label">Total chapter reward (USD)</label>
-                <input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  className="trans-form-input"
-                  style={errorBorder('chapterRewardUsd')}
-                  value={editTaskData.chapterRewardUsd ?? ''}
-                  onChange={(e) => setEditTaskData({ ...editTaskData, chapterRewardUsd: e.target.value })}
-                  disabled={Boolean(editTaskData.settledAt)}
-                />
-                {showError('chapterRewardUsd') && (
-                  <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Chapter reward must be greater than zero</p>
-                )}
-                <p style={{ color: 'var(--trans-text-muted)', fontSize: '11px', margin: '5px 0 0', lineHeight: 1.45 }}>
-                  Page rate = chapter reward ÷ total pages. This snapshot is locked after chapter approval.
-                </p>
               </div>
 
               {assigneeChanged && (

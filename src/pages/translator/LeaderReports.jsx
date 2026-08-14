@@ -24,9 +24,18 @@ import TranslationSplitScreenReview from '../../components/report/TranslationSpl
 import '../../assets/style/report/report-system.css';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
 import { exportToCsv } from '../../utils/exportToCsv';
+import { getAuth } from '../../utils/Auth';
 
 export default function LeaderReports() {
   const navigate = useNavigate();
+  const roleUpper = String(getAuth()?.user?.role || '').toUpperCase().replace(/[\s-]+/g, '_');
+
+  useEffect(() => {
+    if (roleUpper === 'TRANSLATOR') {
+      navigate('/translator/dashboard', { replace: true });
+    }
+  }, [roleUpper, navigate]);
+
   const [reports, setReports] = useState([]);
 
   const [categories, setCategories] = useState([]);
@@ -92,8 +101,9 @@ export default function LeaderReports() {
   }, [statusFilter, targetTypeFilter, categoryFilter, startDate, endDate, searchQuery, page]);
 
   useEffect(() => {
+    if (roleUpper === 'TRANSLATOR') return;
     fetchReports();
-  }, [fetchReports]);
+  }, [fetchReports, roleUpper]);
 
   // Handle Process report (Accept/Reject)
   const handleProcessReport = async (reportId, { action, resolution_note }) => {
@@ -188,6 +198,8 @@ export default function LeaderReports() {
     exportToCsv('ComiVerse_Leader_Reports_Export', headers, rows);
     toast.success('Leader reports exported successfully!');
   };
+
+  if (roleUpper === 'TRANSLATOR') return null;
 
   return (
     <div className="rep-container">
