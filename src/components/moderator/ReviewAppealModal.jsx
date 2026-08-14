@@ -152,6 +152,25 @@ function ReviewAppealModal({ isOpen, onClose, comic, onSuccess }) {
             </div>
           ) : (
             <>
+              {/* SLA Protection Banner */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '20px',
+                padding: '12px 16px',
+                background: 'rgba(59, 130, 246, 0.08)',
+                border: '1px solid rgba(59, 130, 246, 0.25)',
+                borderRadius: '10px',
+                fontSize: '0.86rem',
+                color: 'var(--text)'
+              }}>
+                <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>🛡️</span>
+                <div>
+                  <strong>Author Protection SLA Policy (3 Days):</strong> If moderators do not take action within 3 days, this appeal will be <strong>automatically approved & restored</strong> to protect the author's creative control.
+                </div>
+              </div>
+
               {/* Author's Appeal Reason */}
               <div style={{ marginBottom: '24px' }}>
                 <h4 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: '0.95rem' }}>Author's Explanation:</h4>

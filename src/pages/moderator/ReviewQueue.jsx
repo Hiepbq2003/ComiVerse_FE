@@ -1939,11 +1939,30 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                   {getSubmissionLanguage(item) !== 'Not specified' && <span> · <strong>Lang:</strong> {getSubmissionLanguage(item)}</span>}
                   {getSubmissionMinAge(item) !== 'Not specified' && <span> · <strong>Age:</strong> {getSubmissionMinAge(item)}</span>}
                 </p>
-                <div className="submission-extra" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
+                <div className="submission-extra" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px', flexWrap: 'wrap' }}>
                   <span className="submission-extra-item">⏱️ {formatTimeAgo(item.timestamp || item.submittedAt || item.createdAt)}</span>
                   <span className="submission-extra-item" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '2px 8px', borderRadius: '6px', fontWeight: '800', fontSize: '11.5px' }}>
                     📚 {item.isComicAppealItem ? (item.chapterCount || item.chapters || 0) : getSubmissionChapters(item).length} {item.isComicAppealItem ? ((item.chapterCount || item.chapters || 0) === 1 ? 'Chapter' : 'Chapters') : (getSubmissionChapters(item).length === 1 ? 'Chapter' : 'Chapters')}
                   </span>
+                  {item.isComicAppealItem && (
+                    <span className="submission-extra-item" style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.35)', padding: '2px 8px', borderRadius: '6px', fontWeight: '700', fontSize: '11.5px' }}>
+                      {(() => {
+                        const date = item.timestamp || item.submittedAt || item.createdAt || item.rawTicket?.createdAt;
+                        if (!date) return '🛡️ 3d SLA Protection';
+                        const createdTime = new Date(date).getTime();
+                        const elapsedMs = Date.now() - createdTime;
+                        const remainingMs = (3 * 24 * 60 * 60 * 1000) - elapsedMs;
+                        if (remainingMs <= 0) return '⚡ Auto-Restoring (SLA Reached)';
+                        const hoursLeft = Math.floor(remainingMs / (1000 * 60 * 60));
+                        if (hoursLeft >= 24) {
+                          const d = Math.floor(hoursLeft / 24);
+                          const h = hoursLeft % 24;
+                          return `⏳ SLA: ${d}d ${h}h left`;
+                        }
+                        return `⏳ SLA: ${hoursLeft}h left`;
+                      })()}
+                    </span>
+                  )}
                 </div>
               </div>
 
