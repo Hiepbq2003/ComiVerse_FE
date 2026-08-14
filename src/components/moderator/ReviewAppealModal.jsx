@@ -99,6 +99,7 @@ function ReviewAppealModal({ isOpen, onClose, comic, onSuccess }) {
     try {
       await resolveAppealApi(ticketId, { 
         status: 'APPROVED',
+        resolvedReason: 'Appeal accepted by moderator. Original content restored.',
         note: 'Appeal accepted by moderator. Original content restored.'
       })
       try {

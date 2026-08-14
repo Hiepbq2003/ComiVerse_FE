@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { registerApi } from '../../services/api/AuthApi'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
-import { getBackendHost } from '../../config/apiConfig'
+import { getGoogleAuthUrl } from '../../config/apiConfig'
 
 function Register({ onNavigate, onVerificationRequired, showAlert, loading, setLoading, onOpenModal }) {
   const [form, setForm] = useState({
@@ -145,7 +145,7 @@ function Register({ onNavigate, onVerificationRequired, showAlert, loading, setL
   }
 
   const handleGoogleSignup = () => {
-    window.location.href = `${getBackendHost()}/api/oauth2/authorization/google`
+    window.location.href = getGoogleAuthUrl()
   }
 
   return (

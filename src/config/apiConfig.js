@@ -24,6 +24,18 @@ export const resolveImageUrl = (url) => {
   return `${backendHost}${url.startsWith('/') ? '' : '/'}${url}`;
 };
 
+// Helper to compute bulletproof Google OAuth URL
+export const getGoogleAuthUrl = () => {
+  try {
+    const raw = (API_BASE_URL || '').trim();
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      const parsed = new URL(raw);
+      return `${parsed.origin}/api/oauth2/authorization/google`;
+    }
+  } catch (e) {}
+  return 'https://sep490g37sum26java-production-0ff1.up.railway.app/api/oauth2/authorization/google';
+};
+
 // Compute Native WebSocket URL (ws:// or wss://)
 export const getWebSocketUrl = () => {
   if (
@@ -36,3 +48,4 @@ export const getWebSocketUrl = () => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${window.location.host}/api/ws`
 }
+
