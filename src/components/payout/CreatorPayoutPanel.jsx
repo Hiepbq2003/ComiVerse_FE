@@ -468,7 +468,7 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
           >
             {generateMonthOptions(
               month,
-              overview?.latestRequestableMonth || overview?.lastClosedMonth
+              `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
             ).map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
@@ -720,7 +720,7 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
             title={
               !overview?.requestable
                 ? overview?.notRequestableReason
-                  || 'Payout request is not available yet'
+                || 'Payout request is not available yet'
                 : undefined
             }
           >
