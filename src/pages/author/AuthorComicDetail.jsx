@@ -32,6 +32,12 @@ const normalizeArrayResponse = (payload) => {
   return []
 }
 
+const extractPages = (obj) => {
+  if (!obj) return [];
+  const raw = obj.pages || obj.images || obj.pageUrls || obj.pagesList || obj.urls || obj.chapterPages || (Array.isArray(obj.content) ? obj.content : []);
+  return normalizeArrayResponse(raw);
+};
+
 const normalizeGenres = (genres) => {
   if (Array.isArray(genres)) {
     return genres
@@ -43,6 +49,51 @@ const normalizeGenres = (genres) => {
   }
   return []
 }
+
+const parsePageCountFromReason = (reasonText) => {
+  if (!reasonText || !reasonText.includes('--- PRESERVED PAGES BLOCK ---')) return null;
+  try {
+    let jsonStr = reasonText.split('--- PRESERVED PAGES BLOCK ---')[1].trim();
+    if (jsonStr.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) {
+      jsonStr = jsonStr.split('--- DETAILED INSPECTION FEEDBACK REPORT')[0].trim();
+    }
+    try {
+      let parsed = JSON.parse(jsonStr);
+      if (typeof parsed === 'string') {
+        parsed = JSON.parse(parsed);
+      }
+      if (Array.isArray(parsed)) return parsed.length;
+    } catch (e) {
+      // ignore
+    }
+    const start = jsonStr.indexOf('[');
+    const end = jsonStr.lastIndexOf(']');
+    if (start !== -1 && end !== -1 && end > start) {
+      let arrayStr = jsonStr.substring(start, end + 1);
+      arrayStr = arrayStr.replace(/\\"/g, '"');
+      let pages = JSON.parse(arrayStr);
+      if (typeof pages === 'string') {
+        pages = JSON.parse(pages);
+      }
+      return Array.isArray(pages) ? pages.length : null;
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+};
+
+const cleanReasonText = (reason) => {
+  if (!reason) return '';
+  let clean = reason;
+  if (clean.includes('--- PRESERVED PAGES BLOCK ---')) {
+    clean = clean.split('--- PRESERVED PAGES BLOCK ---')[0];
+  }
+  if (clean.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) {
+    clean = clean.split('--- DETAILED INSPECTION FEEDBACK REPORT')[0];
+  }
+  return clean.trim();
+};
 
 const getComicId = (comic) => comic?.id || comic?.comicId || comic?._id
 
@@ -56,7 +107,14 @@ const getChapterTitle = (chapter) => chapter?.title || chapter?.chapterTitle || 
 
 const getChapterCount = (comic) => comic?.chapterCount ?? 0
 
-const getChapterViews = (chapter) => chapter?.views ?? chapter?.viewCount ?? chapter?.totalViews ?? '—'
+const getChapterViews = (chapter, chaptersList = [], comicViewCount = 0) => {
+  let count = chapter?.viewCount ?? chapter?.views ?? chapter?.totalViews
+  if ((count === null || count === undefined || Number(count) === 0) && chaptersList.length === 1 && Number(comicViewCount) > 0) {
+    count = comicViewCount
+  }
+  if (count === null || count === undefined || count === '') return '0'
+  return Number(count).toLocaleString('en-US')
+}
 
 const normalizePublicationStatusValue = (status) => {
   const value = (status || 'ONGOING').toString().replace(/[-\s]+/g, '_').toUpperCase()
@@ -128,8 +186,8 @@ const formatDate = (value) => {
 }
 
 const formatMoney = (value) => {
-  if (value === null || value === undefined || value === '') return '0đ'
-  if (typeof value === 'number') return `${value.toLocaleString('vi-VN')}đ`
+  if (value === null || value === undefined || value === '') return '$0.00'
+  if (typeof value === 'number') return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   return value
 }
 
@@ -519,11 +577,69 @@ function ModEditReviewModal({ currentComic, onClose, onAppeal }) {
   let oldComic = {}
   try {
     if (currentComic?.previousStateSnapshot) {
-      oldComic = JSON.parse(currentComic.previousStateSnapshot)
+      oldComic = typeof currentComic.previousStateSnapshot === 'string'
+        ? JSON.parse(currentComic.previousStateSnapshot)
+        : currentComic.previousStateSnapshot
     }
   } catch (e) {
     console.error('Failed to parse previous state snapshot', e)
   }
+
+  const formatDiffValue = (key, val) => {
+    if (val === null || val === undefined || val === '') return 'None';
+    if (key === 'genres' || key === 'genreIds') {
+      if (Array.isArray(val)) {
+        if (val.length === 0) return 'None';
+        return val
+          .map(g => (typeof g === 'object' ? g?.name || g?.title || g?.label || '' : String(g)))
+          .filter(Boolean)
+          .join(', ') || 'None';
+      }
+      if (typeof val === 'string') {
+        return val.trim() || 'None';
+      }
+      return 'None';
+    }
+    if (key === 'minimumAge') {
+      return `${val}+`;
+    }
+    if (typeof val === 'object') {
+      if (Array.isArray(val)) return val.join(', ') || 'None';
+      return JSON.stringify(val);
+    }
+    return String(val);
+  };
+
+  const fieldsToCheck = [
+    { key: 'title', label: 'Title' },
+    { key: 'summary', label: 'Summary' },
+    { key: 'genres', label: 'Genres' },
+    { key: 'publicationStatus', label: 'Publication Status' },
+    { key: 'minimumAge', label: 'Age Rating' },
+    { key: 'language', label: 'Language' },
+    { key: 'cover', label: 'Cover Image' }
+  ];
+
+  const diffRows = fieldsToCheck.map(({ key, label }) => {
+    const rawOld = oldComic[key] !== undefined ? oldComic[key] : (key === 'genres' ? oldComic.genreIds : undefined);
+    const rawNew = currentComic[key] !== undefined ? currentComic[key] : (key === 'genres' ? currentComic.genreIds : undefined);
+    
+    const oldFormatted = formatDiffValue(key, rawOld);
+    const newFormatted = formatDiffValue(key, rawNew);
+
+    if (rawOld === undefined && rawNew === undefined) return null;
+    if (oldFormatted.toLowerCase().trim() === newFormatted.toLowerCase().trim() && oldFormatted !== 'None') {
+      return null;
+    }
+    if (oldFormatted === newFormatted) return null;
+
+    return {
+      key,
+      label,
+      previous: oldFormatted,
+      current: newFormatted
+    };
+  }).filter(Boolean);
 
   return (
     <div className="author-modal-backdrop" role="presentation">
@@ -533,34 +649,34 @@ function ModEditReviewModal({ currentComic, onClose, onAppeal }) {
             <h2>Moderator Edits</h2>
             <p>Review the changes made by the moderator to your comic metadata.</p>
           </div>
-          <button type="button" className="author-icon-btn ghost" onClick={onClose} aria-label="Close">A-</button>
+          <button type="button" className="author-icon-btn ghost" onClick={onClose} aria-label="Close">×</button>
         </div>
         
         <div className="author-modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                <th style={{ padding: '12px 8px', width: '20%' }}>Field</th>
-                <th style={{ padding: '12px 8px', width: '40%', color: 'var(--text)' }}>Previous</th>
-                <th style={{ padding: '12px 8px', width: '40%', color: 'var(--accent)' }}>New (Current)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {['title', 'summary', 'language', 'minimumAge', 'publicationStatus'].map(key => {
-                const oldVal = oldComic[key]
-                const newVal = currentComic[key]
-                if (oldVal === newVal) return null;
-                
-                return (
+          {diffRows.length > 0 ? (
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  <th style={{ padding: '12px 8px', width: '25%' }}>Field</th>
+                  <th style={{ padding: '12px 8px', width: '37.5%', color: 'var(--text)' }}>Previous</th>
+                  <th style={{ padding: '12px 8px', width: '37.5%', color: 'var(--accent)' }}>New (Current)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {diffRows.map(({ key, label, previous, current }) => (
                   <tr key={key} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '12px 8px', fontWeight: 'bold' }}>{key}</td>
-                    <td style={{ padding: '12px 8px', color: 'var(--text)' }}>{String(oldVal || 'N/A')}</td>
-                    <td style={{ padding: '12px 8px', color: 'var(--accent)' }}>{String(newVal || 'N/A')}</td>
+                    <td style={{ padding: '12px 8px', fontWeight: 'bold' }}>{label}</td>
+                    <td style={{ padding: '12px 8px', color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{previous}</td>
+                    <td style={{ padding: '12px 8px', color: 'var(--accent)', fontWeight: '600', whiteSpace: 'pre-wrap' }}>{current}</td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              No differences detected between snapshots.
+            </div>
+          )}
         </div>
 
         <div className="author-modal-actions" style={{ marginTop: '24px' }}>
@@ -614,81 +730,6 @@ function AuthorComicDetail() {
       let rawChapters = chaptersResponse.status === 'fulfilled' ? normalizeArrayResponse(chaptersResponse.value) : [];
       let finalRejectionReason = rawComic?.rejectionReason || rawComic?.rejection_reason;
 
-      // Enrich chapters with local storage moderator overrides if available
-      try {
-        const rawOverrides = localStorage.getItem('comiverse_moderator_submissions_override');
-        if (rawOverrides) {
-          const overrides = JSON.parse(rawOverrides);
-          if (Array.isArray(overrides)) {
-            const comicIdStr = String(id);
-            const comicTitleClean = (rawComic?.title || '').trim().toLowerCase();
-
-            const matchingOverrides = overrides.filter(o => {
-              if (!o) return false;
-              const matchId = (
-                (o.comicId && String(o.comicId) === comicIdStr) ||
-                (o.id && String(o.id) === comicIdStr) ||
-                (o.parentReviewId && String(o.parentReviewId) === comicIdStr)
-              );
-              const overrideTitle = (o.comicTitle || o.comicName || o.title || '').trim().toLowerCase();
-              const matchTitle = comicTitleClean && overrideTitle && (overrideTitle === comicTitleClean || overrideTitle.includes(comicTitleClean));
-              return matchId || matchTitle;
-            });
-
-            const overrideChaptersList = [];
-            matchingOverrides.forEach(o => {
-              if (Array.isArray(o.allChapters)) overrideChaptersList.push(...o.allChapters);
-              if (Array.isArray(o.chapters)) overrideChaptersList.push(...o.chapters);
-              if (Array.isArray(o.subItems)) overrideChaptersList.push(...o.subItems);
-              if (o.chapterNumber || o.chapterId || o.number) overrideChaptersList.push(o);
-            });
-
-            rawChapters = rawChapters.map(chap => {
-              const cId = String(getChapterId(chap));
-              const cNum = String(getChapterNumber(chap));
-
-              const matchedOverride = overrideChaptersList.find(o => {
-                const oId = String(o.id || o.chapterId || o.submissionId || '');
-                const oSubId = String(o.submissionId || '');
-                const oNum = String(o.chapterNumber || o.number || '');
-                const subIdStr = String(chap.submissionId || '');
-                
-                const matchChapId = cId && oId && (oId === cId || oId === subIdStr || `chap-${oId}` === cId || oId === `chap-${cId}`);
-                const matchSubId = subIdStr && oSubId && (oSubId === subIdStr || oSubId === cId);
-                const matchNum = cNum && cNum !== 'N/A' && oNum && cNum === oNum;
-                
-                return matchChapId || matchSubId || matchNum;
-              });
-
-              if (matchedOverride) {
-                const ovStatus = (matchedOverride.status || matchedOverride.moderationStatus || '').toString().toUpperCase();
-                const ovPages = matchedOverride.pages || matchedOverride.images || matchedOverride.pageUrls || matchedOverride.pagesList || [];
-                const resolvedPages = (chap.pages && chap.pages.length) ? chap.pages : ovPages;
-                const resolvedCount = (resolvedPages && resolvedPages.length > 0)
-                  ? resolvedPages.length
-                  : (chap.pageCount || (matchedOverride.pageCount ? Number(matchedOverride.pageCount) : (ovPages.length > 0 ? ovPages.length : undefined)));
-
-                return {
-                  ...chap,
-                  status: ovStatus || chap.status || chap.moderationStatus,
-                  rejectionReason: matchedOverride.rejectionReason || matchedOverride.rejection_reason || chap.rejectionReason,
-                  pages: resolvedPages,
-                  pageCount: resolvedCount
-                };
-              }
-              return chap;
-            });
-            
-            const overrideWithReason = matchingOverrides.find(o => o.rejectionReason || o.rejection_reason);
-            if (overrideWithReason) {
-              finalRejectionReason = overrideWithReason.rejectionReason || overrideWithReason.rejection_reason;
-            }
-          }
-        }
-      } catch (e) {
-        console.error('Failed to parse overrides in loadDetail:', e);
-      }
-
       const finalModerationStatus = (rawChapters.some(c => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED'))
         ? 'REJECTED'
         : (rawComic?.moderationStatus || rawComic?.status || 'DRAFT');
@@ -726,11 +767,17 @@ function AuthorComicDetail() {
     }
   }, [comic, searchParams, setSearchParams])
 
-  const summary = useMemo(() => ({
-    chapters: metrics?.chapterCount ?? getChapterCount(comic),
-    views: metrics?.viewCount ?? comic?.viewCount ?? '0',
-    revenue: formatMoney(metrics?.estimatedRevenue ?? metrics?.revenue ?? metrics?.totalRevenue ?? comic?.revenue ?? comic?.totalRevenue),
-  }), [comic, metrics])
+  const summary = useMemo(() => {
+    const totalChapterViews = chapters.reduce((acc, c) => acc + (Number(c?.viewCount ?? c?.views ?? 0) || 0), 0)
+    const comicViews = Number(metrics?.viewCount ?? comic?.viewCount ?? 0) || 0
+    const resolvedViews = Math.max(totalChapterViews, comicViews)
+
+    return {
+      chapters: metrics?.chapterCount ?? getChapterCount(comic),
+      views: resolvedViews.toLocaleString('vi-VN'),
+      revenue: formatMoney(metrics?.estimatedRevenue ?? metrics?.revenue ?? metrics?.totalRevenue ?? comic?.revenue ?? comic?.totalRevenue),
+    }
+  }, [comic, metrics, chapters])
 
   const appendUploadedChapter = (uploadedPreview) => {
     const newChapter = {
@@ -839,7 +886,8 @@ function AuthorComicDetail() {
       // ignore
     }
 
-    if (!data || (!data.pages?.length && !data.images?.length)) {
+    const dataPages = extractPages(data);
+    if (dataPages.length === 0) {
       try {
         const detailRes = await getChapterDetailApi(chapterId)
         if (detailRes?.data || detailRes) {
@@ -850,78 +898,19 @@ function AuthorComicDetail() {
       }
     }
 
-    let overridePages = []
-    let overrideReason = ''
-    let overrideStatus = ''
-    try {
-      const rawOverrides = localStorage.getItem('comiverse_moderator_submissions_override')
-      if (rawOverrides) {
-        const overrides = JSON.parse(rawOverrides)
-        if (Array.isArray(overrides)) {
-          const chapIdStr = String(chapterId)
-          const chapNumStr = String(getChapterNumber(chapter))
-          let match = null
-
-          const subIdStr = String(chapter?.submissionId || '')
-
-          // Direct match
-          match = overrides.find(o => {
-            const oId = String(o.id || o.chapterId || o.submissionId || '')
-            const oSubId = String(o.submissionId || '')
-            const oNum = String(o.chapterNumber || o.number || '')
-            
-            const matchChapId = chapIdStr && oId && (oId === chapIdStr || oId === subIdStr || `chap-${oId}` === chapIdStr || oId === `chap-${chapIdStr}`)
-            const matchSubId = subIdStr && oSubId && (oSubId === subIdStr || oSubId === chapIdStr)
-            const matchNum = chapNumStr && chapNumStr !== 'N/A' && oNum && oNum === chapNumStr
-            
-            return matchChapId || matchSubId || matchNum
-          })
-
-          // Nested match
-          if (!match) {
-            for (const o of overrides) {
-              const chaps = [...(o.allChapters || []), ...(o.chapters || []), ...(o.subItems || [])]
-              const foundChap = chaps.find(c => {
-                const cId = String(c.id || c.chapterId || '')
-                const cSubId = String(c.submissionId || '')
-                const cNum = String(c.chapterNumber || c.number || '')
-                
-                const matchChapId = chapIdStr && cId && (cId === chapIdStr || cId === subIdStr || `chap-${cId}` === chapIdStr || cId === `chap-${chapIdStr}`)
-                const matchSubId = subIdStr && cSubId && (cSubId === subIdStr || cSubId === chapIdStr)
-                const matchNum = chapNumStr && chapNumStr !== 'N/A' && cNum && cNum === chapNumStr
-                
-                return matchChapId || matchSubId || matchNum
-              })
-              if (foundChap) {
-                match = foundChap
-                break
-              }
-            }
-          }
-
-          if (match) {
-            overridePages = match.pages || match.images || match.pageUrls || []
-            overrideReason = match.rejectionReason || match.rejection_reason || ''
-            overrideStatus = (match.status || '').toString().toUpperCase()
-          }
-        }
-      }
-    } catch (e) {}
-
-    const resolvedPages = (data?.pages && data.pages.length) ? data.pages :
-      (data?.images && data.images.length) ? data.images :
-      (overridePages && overridePages.length) ? overridePages :
-      (chapter?.pages && chapter.pages.length) ? chapter.pages :
-      (chapter?.images && chapter.images.length) ? chapter.images :
-      []
+    const dataPagesFinal = extractPages(data);
+    const chapterPages = extractPages(chapter);
+    
+    const resolvedPages = (dataPagesFinal.length > 0) ? dataPagesFinal :
+      (chapterPages.length > 0) ? chapterPages : [];
 
     const mergedPreview = {
       ...chapter,
       ...(data || {}),
       pages: resolvedPages,
       pageCount: resolvedPages.length || chapter.pageCount || chapter.pages?.length,
-      status: overrideStatus || data?.status || chapter?.status || chapter?.moderationStatus,
-      rejectionReason: overrideReason || data?.rejectionReason || chapter?.rejectionReason || chapter?.rejection_reason
+      status: data?.status || chapter?.status || chapter?.moderationStatus,
+      rejectionReason: data?.rejectionReason || chapter?.rejectionReason || chapter?.rejection_reason || comic?.rejectionReason
     }
 
     navigate(`/author/comics/${id}/preview/${chapterId}`, { state: { preview: mergedPreview } })
@@ -1194,12 +1183,18 @@ function AuthorComicDetail() {
               <div>
                 <strong>🚫 Submission Rejected:</strong> Your submission requires revisions. Please review the feedback below. You can also click <strong>Preview</strong> on the rejected chapter below to inspect page-specific pins if any.
               </div>
-              {comic?.rejectionReason && (
+              {comic?.rejectionReason && !comic.rejectionReason.includes('All chapters were rejected') && (
                 <div style={{ padding: '12px 16px', background: 'var(--author-upload-zone-bg)', borderRadius: '6px', borderLeft: '3px solid #ef4444', color: 'var(--author-text-primary)', fontSize: '14px', width: '100%', lineHeight: '1.5' }}>
                   <div style={{ fontSize: '11px', color: '#ef4444', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: '4px', letterSpacing: '0.5px' }}>Overall Moderator Feedback</div>
-                  {comic.rejectionReason}
+                  {cleanReasonText(comic.rejectionReason)}
                 </div>
               )}
+              {chapters.filter(c => (c.status || c.moderationStatus || '').toString().toUpperCase() === 'REJECTED' && cleanReasonText(c.rejectionReason || c.rejection_reason)).map((c) => (
+                <div key={getChapterId(c)} style={{ padding: '12px 16px', background: 'var(--author-upload-zone-bg)', borderRadius: '6px', borderLeft: '3px solid #ef4444', color: 'var(--author-text-primary)', fontSize: '14px', width: '100%', lineHeight: '1.5' }}>
+                  <div style={{ fontSize: '11px', color: '#ef4444', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: '4px', letterSpacing: '0.5px' }}>Feedback for Chapter {getChapterNumber(c)}</div>
+                  {cleanReasonText(c.rejectionReason || c.rejection_reason)}
+                </div>
+              ))}
             </div>
           )}
 
@@ -1237,8 +1232,8 @@ function AuthorComicDetail() {
                         <td className="chapter-no">Ch.{getChapterNumber(chapter)}</td>
                         <td>{getChapterTitle(chapter)}</td>
                         <td>{formatDate(chapter.uploadedAt || chapter.createdAt || chapter.submittedAt)}</td>
-                        <td>{chapter.pageCount ?? normalizeArrayResponse(chapter.pages).length ?? '—'}</td>
-                        <td>{getChapterViews(chapter)}</td>
+                        <td>{chapter.pageCount || normalizeArrayResponse(chapter.pages).length || parsePageCountFromReason(chapter.rejectionReason || chapter.rejection_reason || comic?.rejectionReason) || 0}</td>
+                        <td>{getChapterViews(chapter, chapters, metrics?.viewCount ?? comic?.viewCount ?? 0)}</td>
                         <td>
                           <span className={`author-status-badge ${getStatusClass(status)}`}>
                             {formatStatus(status)}

@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'react-toastify'
-import { createAppealApi } from '../../services/api/AppealApi'
+import { createAppealApi, getPendingAppealByTargetApi } from '../../services/api/AppealApi'
+import { formatTimeAgo } from '../../utils/formatTimeAgo'
 
 const APPEAL_CATEGORIES = [
   { id: 'PUBLICATION_STATUS', label: 'Publication Status Dispute', icon: '🔄' },
@@ -14,15 +15,49 @@ function AuthorAppealModal({ comic, initialCategory = 'PUBLICATION_STATUS', init
   const [category, setCategory] = useState(initialCategory)
   const [statement, setStatement] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [checkingExisting, setCheckingExisting] = useState(true)
+  const [existingAppeal, setExistingAppeal] = useState(null)
   const [error, setError] = useState('')
 
   if (!comic) return null
 
   const comicId = comic.id || comic.comicId
   const comicTitle = comic.title || 'Comic'
+  const cleanTargetId = String(comicId).replace(/^(comic|sub|chap)-/, '')
+
+  useEffect(() => {
+    let mounted = true
+    setCheckingExisting(true)
+    getPendingAppealByTargetApi(cleanTargetId)
+      .then((res) => {
+        if (!mounted) return
+        const data = res?.data || res
+        if (data && (data.id || (Array.isArray(data) && data.length > 0))) {
+          const ticket = Array.isArray(data) ? data[0] : data
+          setExistingAppeal(ticket)
+        } else {
+          setExistingAppeal(null)
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to check existing appeal from API:', err?.message || err)
+      })
+      .finally(() => {
+        if (mounted) setCheckingExisting(false)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [cleanTargetId])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (existingAppeal) {
+      toast.info('An active appeal is already pending review for this item.')
+      return
+    }
+
     const trimmedStatement = statement.trim()
     if (trimmedStatement.length < 10) {
       setError('Please provide an appeal explanation with at least 10 characters.')
@@ -33,17 +68,6 @@ function AuthorAppealModal({ comic, initialCategory = 'PUBLICATION_STATUS', init
       return
     }
 
-    const recordAppeal = () => {
-      try {
-        const existing = JSON.parse(localStorage.getItem('appealedComics') || '[]');
-        if (!existing.includes(comicId)) {
-          existing.push(comicId);
-          localStorage.setItem('appealedComics', JSON.stringify(existing));
-          window.dispatchEvent(new Event('appealStateChanged'));
-        }
-      } catch(e) {}
-    };
-
     try {
       setSubmitting(true)
       setError('')
@@ -51,21 +75,24 @@ function AuthorAppealModal({ comic, initialCategory = 'PUBLICATION_STATUS', init
         ? `[Moderator Action: ${initialContext}] ${trimmedStatement}`
         : trimmedStatement
 
-      await createAppealApi({
-        targetId: comicId,
+      const res = await createAppealApi({
+        targetId: cleanTargetId,
         targetType: 'COMIC_EDIT',
         appealReason: fullReason,
         evidenceUrls: ''
       })
 
-      recordAppeal()
       toast.success('Appeal submitted successfully! Moderators will review your request.')
-      if (onSubmitted) onSubmitted(comicId)
+      if (onSubmitted) onSubmitted(cleanTargetId, res?.data || res)
       onClose()
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Failed to submit appeal. Please try again.'
       if (msg.toLowerCase().includes('already exists')) {
-        recordAppeal()
+        setExistingAppeal({
+          appealReason: trimmedStatement || 'Appeal submitted and awaiting moderator review.',
+          createdAt: new Date().toISOString(),
+          status: 'PENDING'
+        })
       }
       setError(msg)
       toast.error(msg)
@@ -107,7 +134,7 @@ function AuthorAppealModal({ comic, initialCategory = 'PUBLICATION_STATUS', init
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="author-appeal-target-title">{comicTitle}</div>
               <div className="author-appeal-target-meta">
-                Publication: <strong>{comic.publicationStatus || 'ONGOING'}</strong> | Moderation: <strong>{comic.moderationStatus || comic.approvalStatus || 'APPROVED'}</strong>
+                Publication: <strong>{comic.publicationStatus || 'ONGOING'}</strong> | Moderation: <strong>{comic.moderationStatus || comic.approvalStatus || 'REJECTED'}</strong>
               </div>
             </div>
           </div>
@@ -118,42 +145,70 @@ function AuthorAppealModal({ comic, initialCategory = 'PUBLICATION_STATUS', init
             </div>
           )}
 
-          {/* Category Selector */}
-          <label className="author-form-label">
-            Appeal Category *
-          </label>
-          <div className="author-appeal-categories">
-            {APPEAL_CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                className={`author-appeal-cat-btn ${category === cat.id ? 'active' : ''}`}
-                onClick={() => setCategory(cat.id)}
-              >
-                <span>{cat.icon}</span>
-                <span style={{ flex: 1 }}>{cat.label}</span>
-              </button>
-            ))}
-          </div>
+          {/* Active Appeal Banner if already submitted */}
+          {existingAppeal ? (
+            <div style={{ 
+              background: 'rgba(245, 158, 11, 0.1)', 
+              border: '1px solid rgba(245, 158, 11, 0.35)', 
+              borderRadius: '10px', 
+              padding: '16px', 
+              marginBottom: '16px' 
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', fontWeight: '700', fontSize: '14px', marginBottom: '6px' }}>
+                <span>⏳</span> Active Appeal Under Review
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--author-text, #334155)', lineHeight: '1.5' }}>
+                You have already submitted an appeal for this item:
+                <div style={{ background: 'rgba(0,0,0,0.04)', padding: '10px', borderRadius: '6px', marginTop: '6px', fontStyle: 'italic' }}>
+                  "{existingAppeal.appealReason || existingAppeal.reason || 'Pending moderation review'}"
+                </div>
+              </div>
+              {existingAppeal.createdAt && (
+                <div style={{ fontSize: '12px', color: 'var(--author-text-muted, #94a3b8)', marginTop: '8px', textAlign: 'right' }}>
+                  Submitted {formatTimeAgo(existingAppeal.createdAt)}
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Category Selector */}
+              <label className="author-form-label">
+                Appeal Category *
+              </label>
+              <div className="author-appeal-categories">
+                {APPEAL_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    className={`author-appeal-cat-btn ${category === cat.id ? 'active' : ''}`}
+                    onClick={() => setCategory(cat.id)}
+                  >
+                    <span>{cat.icon}</span>
+                    <span style={{ flex: 1 }}>{cat.label}</span>
+                  </button>
+                ))}
+              </div>
 
-          {/* Statement Input */}
-          <label className="author-form-label">
-            Detailed Appeal Statement & Justification *
-            <textarea
-              className="author-input author-appeal-textarea"
-              placeholder="State clearly why the moderation decision should be revised or explain the adjustments made (minimum 10 characters)..."
-              value={statement}
-              onChange={(e) => {
-                setStatement(e.target.value)
-                if (error) setError('')
-              }}
-              required
-            />
-          </label>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--author-text-muted, #94a3b8)', marginTop: '4px' }}>
-            <span>Minimum 10 characters</span>
-            <span>{statement.length}/2000</span>
-          </div>
+              {/* Statement Input */}
+              <label className="author-form-label">
+                Detailed Appeal Statement & Justification *
+                <textarea
+                  className="author-input author-appeal-textarea"
+                  placeholder="State clearly why the moderation decision should be revised or explain the adjustments made (minimum 10 characters)..."
+                  value={statement}
+                  onChange={(e) => {
+                    setStatement(e.target.value)
+                    if (error) setError('')
+                  }}
+                  required
+                />
+              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--author-text-muted, #94a3b8)', marginTop: '4px' }}>
+                <span>Minimum 10 characters</span>
+                <span>{statement.length}/2000</span>
+              </div>
+            </>
+          )}
 
           {error && (
             <div className="author-form-error" style={{ marginTop: '10px' }}>
@@ -168,11 +223,13 @@ function AuthorAppealModal({ comic, initialCategory = 'PUBLICATION_STATUS', init
 
         <div className="author-modal-actions">
           <button type="button" className="btn-author-action ghost" onClick={onClose} disabled={submitting}>
-            Cancel
+            {existingAppeal ? 'Close' : 'Cancel'}
           </button>
-          <button type="submit" className="btn-author-action primary" disabled={submitting || statement.trim().length < 10}>
-            {submitting ? 'Submitting...' : '⚖️ Submit Appeal'}
-          </button>
+          {!existingAppeal && (
+            <button type="submit" className="btn-author-action primary" disabled={submitting || checkingExisting || statement.trim().length < 10}>
+              {submitting ? 'Submitting...' : '⚖️ Submit Appeal'}
+            </button>
+          )}
         </div>
       </form>
     </div>

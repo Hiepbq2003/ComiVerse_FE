@@ -19,6 +19,7 @@ import { getAllChatFlagsApi } from '../../services/api/ChatFlagApi'
 import { approveChapterDirectApi } from '../../services/api/ChapterApi'
 import { toast } from 'react-toastify'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
+import { exportToCsv } from '../../utils/exportToCsv'
 import ModernButton from '../../components/common/ModernButton'
 import { getAuth } from '../../utils/Auth'
 import { isLanguageInModeratorScope, getModeratorScope } from '../../utils/moderatorScope'
@@ -56,6 +57,15 @@ const getCategoryStyle = (actionType) => {
     default:
       return { background: 'rgba(255, 255, 255, 0.05)', color: 'var(--mod-text-secondary)', border: '1px solid rgba(255, 255, 255, 0.1)' };
   }
+};
+
+const extractPages = (obj) => {
+  if (!obj) return [];
+  const raw = obj.pages || obj.images || obj.pageUrls || obj.pagesList || obj.urls || obj.chapterPages || (Array.isArray(obj.content) ? obj.content : []);
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.content)) return raw.content;
+  if (Array.isArray(raw?.items)) return raw.items;
+  return [];
 };
 
 const renderDescription = (description) => {
@@ -411,37 +421,8 @@ function ModeratorDashboard() {
   }
 
   const syncSubmissionsWithLocalOverride = (rawSubmissions) => {
-    let overrideList = [];
-    try {
-      const raw = localStorage.getItem('comiverse_moderator_submissions_override');
-      if (raw) overrideList = JSON.parse(raw);
-    } catch (e) {}
-
-    if (!Array.isArray(overrideList) || overrideList.length === 0) {
-      return rawSubmissions || [];
-    }
-
-    const overrideMap = new Map();
-    overrideList.forEach(item => {
-      if (item && item.id) overrideMap.set(String(item.id), item);
-    });
-
-    const merged = (rawSubmissions || []).map(item => {
-      if (!item) return item;
-      const key = String(item.id);
-      if (overrideMap.has(key)) {
-        return { ...item, ...overrideMap.get(key) };
-      }
-      return item;
-    });
-
-    overrideList.forEach(item => {
-      if (item && item.id && !merged.some(m => m && String(m.id) === String(item.id))) {
-        merged.push(item);
-      }
-    });
-
-    return merged;
+    // localStorage override removed for production readiness
+    return rawSubmissions || [];
   };
   
   const fetchSubmissionsData = async () => {
@@ -729,8 +710,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
           }
           return item;
         });
-
-        try { localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(next)); } catch (e) {}
         return next;
       });
 
@@ -775,7 +754,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       const nowIso = new Date().toISOString();
       setSubmissions(prev => {
         const next = prev.map(s => s.id === item.id ? { ...s, status: 'approved', approvedAt: nowIso, comicId: realDbId || s.comicId || `comic-${Date.now()}` } : s);
-        try { localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(next)); } catch (e) {}
         return next;
       });
       await fetchComicsAndTeams()
@@ -852,13 +830,12 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               ...item,
               status: 'rejected',
               rejectedAt: nowIso,
-              rejectionReason: reason || 'Submission rejected'
+              rejectionReason: reason || ''
             };
           }
           return item;
         });
 
-        try { localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(next)); } catch (e) {}
         return next;
       });
     } catch (err) {
@@ -871,13 +848,25 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     if (!c || !target) return false;
     if (c === target) return true;
     
+    // Explicit ID match is a guarantee
+    if (c.id && target.id && String(c.id) === String(target.id)) return true;
+    if (c.chapterId && target.chapterId && String(c.chapterId) === String(target.chapterId)) return true;
+    
+    // If they have mismatched submission/comic IDs, they are definitely different chapters from different comics!
+    const cSub = c.submissionId || c.comicId;
+    const tSub = target.submissionId || target.comicId;
+    if (cSub && tSub && String(cSub) !== String(tSub)) return false;
+
     const cNum = Number(c.number !== undefined ? c.number : (c.chapterNumber !== undefined ? c.chapterNumber : NaN));
     const tNum = Number(target.number !== undefined ? target.number : (target.chapterNumber !== undefined ? target.chapterNumber : NaN));
+    
     if (!isNaN(cNum) && !isNaN(tNum) && cNum > 0 && tNum > 0) {
       if (cNum !== tNum) return false;
+      // If numbers match AND they belong to the same submission (or submission context is missing), they are the same
+      if (cSub && tSub && String(cSub) === String(tSub)) return true;
+      if (!cSub || !tSub) return true;
     }
     
-    if (c.id && target.id && c.id === target.id) return true;
     if (c.title && target.title && c.title.trim().toLowerCase() === target.title.trim().toLowerCase()) return true;
     return false;
   };
@@ -1019,11 +1008,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
             number: 1
           });
         }
-
-        try {
-          localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(nextSubmissions));
-        } catch (e) {}
-
         return nextSubmissions;
       });
       fetchComicsAndTeams();
@@ -1034,9 +1018,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
   };
 
 
-  const handleChapterReject = async (submissionId, chapterObj, reason) => {
-    let cleanId = String(chapterObj?.submissionId || submissionId || '').replace(/^(comic|group|chap)-/, '');
-    if (cleanId.includes('mock') || String(submissionId).includes('mock')) {
+  const handleChapterReject = async (submissionId, chapterObj, reason, overallReason = null, skipSubmissionReject = false) => {
+    let cleanId = String(submissionId || chapterObj?.submissionId || chapterObj?.comicId || '').replace(/^(comic|group|chap)-/, '');
+    if (cleanId.includes('mock')) {
       const realSub = submissions.find(s => s.chapterId && String(s.chapterId) === String(chapterObj?.id));
       if (realSub && realSub.id && !String(realSub.id).includes('mock')) {
         cleanId = String(realSub.id).replace(/^(comic|group|chap)-/, '');
@@ -1053,14 +1037,44 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       return false;
     }) || submissions.find(item => item.id === targetSubId || item.submissionId === targetSubId || item.id === submissionId);
 
+    // Determine if this rejection will clear all pending chapters for this submission
+    let willRejectAll = true;
+    if (sub) {
+      const chaps = sub.allChapters || sub.chapters || [];
+      const pendingChaps = chaps.filter(c => c.status !== 'approved' && c.status !== 'rejected');
+      if (pendingChaps.length > 1) {
+        willRejectAll = false;
+      }
+    }
+
+    const chapterDbId = chapterObj?.chapterId || chapterObj?.chapter_id || chapterObj?.id;
+    const cleanChapterDbId = String(chapterDbId || '').replace(/^(comic|group|chap)-/, '');
+
+    let responseData = null;
     if (cleanId && !cleanId.startsWith('group-') && !cleanId.startsWith('comic-') && !cleanId.includes('mock')) {
-      try {
-        const rejectResponse = await rejectSubmissionApi(cleanId, reason || 'Chapter rejected');
-        const responseData = rejectResponse?.data || rejectResponse;
+        try {
+          let calledDirect = false;
+          if (cleanChapterDbId && !cleanChapterDbId.includes('mock')) {
+            try {
+              const { rejectChapterDirectApi } = await import('../../services/api/ChapterApi');
+              if (rejectChapterDirectApi) {
+                await rejectChapterDirectApi(cleanChapterDbId, reason || 'Chapter rejected');
+                calledDirect = true;
+              }
+            } catch (chapErr) {
+              console.warn(`[handleChapterReject] rejectChapterDirectApi failed:`, chapErr?.message);
+            }
+          }
+
+          if (willRejectAll && !skipSubmissionReject) {
+            const finalSubmissionReason = reason || overallReason || 'Submission rejected';
+            const rejectResponse = await rejectSubmissionApi(cleanId, finalSubmissionReason);
+            responseData = rejectResponse?.data || rejectResponse;
+          }
+        
         if (responseData?.comicAutoRejected) {
           toast.success(`Rejected "${chapTitle}" — All chapters rejected, comic profile auto-rejected!`);
           
-          // Mark ALL submissions for this comic as rejected
           const nowIso = new Date().toISOString();
           const comicId = sub?.comicId || chapterObj?.comicId;
           const comicTitleClean = (sub?.title || sub?.comicName || sub?.comicTitle || chapterObj?.comicTitle || '').trim().toLowerCase();
@@ -1073,34 +1087,44 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               if (matchByComicId || matchByTitle) {
                 const updateChaps = (chapsArr) => {
                   if (!Array.isArray(chapsArr)) {
+                    const extractedPages = extractPages(chapterObj);
                     return [{
                       ...chapterObj,
                       status: 'rejected',
                       rejectedAt: nowIso,
                       rejectionReason: reason || 'Chapter rejected',
-                      pages: chapterObj.pages || chapterObj.images || [],
-                      pageCount: (chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0)
+                      pages: extractedPages,
+                      pageCount: extractedPages.length || chapterObj.pageCount || 0
                     }];
                   }
                   const exists = chapsArr.some(c => isSameChapterItem(c, chapterObj));
                   if (exists) {
-                    return chapsArr.map(c => isSameChapterItem(c, chapterObj) ? {
-                      ...c,
-                      ...chapterObj,
-                      pages: (chapterObj.pages && chapterObj.pages.length) ? chapterObj.pages : ((c.pages && c.pages.length) ? c.pages : (chapterObj.images || c.images || [])),
-                      pageCount: (chapterObj.pages && chapterObj.pages.length) ? chapterObj.pages.length : (c.pages?.length || c.pageCount || chapterObj.pageCount || (c.images?.length || 0)),
-                      status: 'rejected',
-                      rejectedAt: nowIso,
-                      rejectionReason: reason || 'Chapter rejected'
-                    } : { ...c, status: 'rejected', rejectedAt: nowIso });
+                    return chapsArr.map(c => {
+                      if (isSameChapterItem(c, chapterObj)) {
+                        const cPages = extractPages(c);
+                        const chapPages = extractPages(chapterObj);
+                        const resolvedPages = chapPages.length ? chapPages : cPages;
+                        return {
+                          ...c,
+                          ...chapterObj,
+                          status: 'rejected',
+                          rejectedAt: nowIso,
+                          rejectionReason: reason || 'Chapter rejected',
+                          pages: resolvedPages,
+                          pageCount: resolvedPages.length || c.pageCount || chapterObj.pageCount || 0
+                        };
+                      }
+                      return { ...c, status: 'rejected', rejectedAt: nowIso };
+                    });
                   }
+                  const extractedPages = extractPages(chapterObj);
                   return [...chapsArr.map(c => ({...c, status: 'rejected', rejectedAt: nowIso})), {
                     ...chapterObj,
                     status: 'rejected',
                     rejectedAt: nowIso,
                     rejectionReason: reason || 'Chapter rejected',
-                    pages: chapterObj.pages || chapterObj.images || [],
-                    pageCount: (chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0)
+                    pages: extractedPages,
+                    pageCount: extractedPages.length || chapterObj.pageCount || 0
                   }];
                 };
 
@@ -1108,18 +1132,13 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                   ...item,
                   status: 'rejected',
                   rejectedAt: nowIso,
-                  rejectionReason: item.chapterId ? (reason || 'Chapter rejected') : 'All chapters were rejected. Comic profile auto-rejected.',
+                  rejectionReason: reason || '',
                   allChapters: updateChaps(item.allChapters),
                   chapters: updateChaps(item.chapters)
                 };
               }
               return item;
             });
-
-            try {
-              localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(nextSubmissions));
-            } catch (e) {}
-
             return nextSubmissions;
           });
           return; // Early return — everything is handled
@@ -1148,53 +1167,63 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
             const updateChaps = (chapsArr) => {
               if (!Array.isArray(chapsArr)) {
+                const extractedPages = extractPages(chapterObj);
                 return [{
                   ...chapterObj,
                   status: 'rejected',
                   rejectedAt: nowIso,
                   rejectionReason: reason || 'Chapter rejected',
-                  pages: chapterObj.pages || chapterObj.images || [],
-                  pageCount: (chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0)
+                  pages: extractedPages,
+                  pageCount: extractedPages.length || chapterObj.pageCount || 0
                 }];
               }
               const exists = chapsArr.some(c => isSameChapterItem(c, chapterObj));
               if (exists) {
-                return chapsArr.map(c => isSameChapterItem(c, chapterObj) ? {
-                  ...c,
-                  ...chapterObj,
-                  pages: (chapterObj.pages && chapterObj.pages.length) ? chapterObj.pages : ((c.pages && c.pages.length) ? c.pages : (chapterObj.images || c.images || [])),
-                  pageCount: (chapterObj.pages && chapterObj.pages.length) ? chapterObj.pages.length : (c.pages?.length || c.pageCount || chapterObj.pageCount || (c.images?.length || 0)),
-                  status: 'rejected',
-                  rejectedAt: nowIso,
-                  rejectionReason: reason || 'Chapter rejected'
-                } : c);
+                return chapsArr.map(c => {
+                  if (isSameChapterItem(c, chapterObj)) {
+                    const cPages = extractPages(c);
+                    const chapPages = extractPages(chapterObj);
+                    const resolvedPages = chapPages.length ? chapPages : cPages;
+                    return {
+                      ...c,
+                      ...chapterObj,
+                      status: 'rejected',
+                      rejectedAt: nowIso,
+                      rejectionReason: reason || 'Chapter rejected',
+                      pages: resolvedPages,
+                      pageCount: resolvedPages.length || c.pageCount || chapterObj.pageCount || 0
+                    };
+                  }
+                  return c;
+                });
               }
+              const extractedPages = extractPages(chapterObj);
               return [...chapsArr, {
                 ...chapterObj,
                 status: 'rejected',
                 rejectedAt: nowIso,
                 rejectionReason: reason || 'Chapter rejected',
-                pages: chapterObj.pages || chapterObj.images || [],
-                pageCount: (chapterObj.pages?.length || chapterObj.images?.length || chapterObj.pageCount || 0)
+                pages: extractedPages,
+                pageCount: extractedPages.length || chapterObj.pageCount || 0
               }];
             };
 
+            const newAllChapters = updateChaps(item.allChapters);
+            const newChapters = updateChaps(item.chapters);
+            
+            const allRejected = newAllChapters.length > 0 && newAllChapters.every(c => c.status === 'rejected');
+
             return {
               ...item,
-              status: 'rejected',
-              rejectedAt: nowIso,
-              rejectionReason: reason || 'Chapter rejected',
-              allChapters: updateChaps(item.allChapters),
-              chapters: updateChaps(item.chapters)
+              status: allRejected ? 'rejected' : item.status,
+              rejectedAt: allRejected ? nowIso : item.rejectedAt,
+              rejectionReason: allRejected ? (reason || 'All chapters rejected') : item.rejectionReason,
+              allChapters: newAllChapters,
+              chapters: newChapters
             };
           }
           return item;
         });
-
-        try {
-          localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(nextSubmissions));
-        } catch (e) {}
-
         return nextSubmissions;
       });
     } catch (err) {
@@ -1253,26 +1282,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     try {
       const existing = JSON.parse(localStorage.getItem('comiverse_local_comic_' + id) || '{}');
       localStorage.setItem('comiverse_local_comic_' + id, JSON.stringify({ ...existing, moderationStatus: 'UNPUBLISHED', archived: false }));
-      
-      const overrideRaw = localStorage.getItem('comiverse_moderator_submissions_override');
-      if (overrideRaw) {
-        let overrides = JSON.parse(overrideRaw);
-        overrides = overrides.filter(sub => {
-          const stableId = sub.comicId || (sub.id ? `comic-${sub.id}` : null);
-          return stableId !== id && sub.comicId !== id && sub.id !== id;
-        });
-        localStorage.setItem('comiverse_moderator_submissions_override', JSON.stringify(overrides));
-      }
-      
-      const baseRaw = localStorage.getItem('comiverse_moderator_submissions');
-      if (baseRaw) {
-        let baseSubs = JSON.parse(baseRaw);
-        baseSubs = baseSubs.filter(sub => {
-          const stableId = sub.comicId || (sub.id ? `comic-${sub.id}` : null);
-          return stableId !== id && sub.comicId !== id && sub.id !== id;
-        });
-        localStorage.setItem('comiverse_moderator_submissions', JSON.stringify(baseSubs));
-      }
     } catch (e) { /* ignore */ }
 
     setComics(prev => prev.map(c => c.id === id || c.id === id.replace('comic-', '') ? { ...c, moderationStatus: 'UNPUBLISHED' } : c));
@@ -1434,6 +1443,65 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     }
   }
 
+  const handleExportDashboardReport = () => {
+    try {
+      const pendingReviewsCount = submissions.filter(s => s.status === 'pending').length;
+      const approvedReviewsCount = submissions.filter(s => s.status === 'approved').length;
+      const rejectedReviewsCount = submissions.filter(s => s.status === 'rejected').length;
+      const totalChaptersCount = comics.reduce((acc, c) => acc + (c.chaptersCount || c.chapterCount || c.chapters?.length || 0), 0);
+      const activeTeamsCount = projectTeams.filter(t => t.status?.toUpperCase() === 'ACTIVE').length;
+      const ongoingComicsCount = comics.filter(c => c.publicationStatus?.toUpperCase() === 'ONGOING' || !c.publicationStatus).length;
+      const completedComicsCount = comics.filter(c => c.publicationStatus?.toUpperCase() === 'COMPLETED').length;
+
+      const headers = ['Category / Domain', 'Metric Indicator', 'Current Value', 'Status / Detail Note'];
+      const rows = [
+        ['EXECUTIVE OVERVIEW', 'Total Comics in System', comics.length, 'Active catalog titles'],
+        ['EXECUTIVE OVERVIEW', 'Total Chapters Registered', totalChaptersCount, 'Across all comics'],
+        ['EXECUTIVE OVERVIEW', 'Ongoing Comics', ongoingComicsCount, 'Actively updating serialization'],
+        ['EXECUTIVE OVERVIEW', 'Completed Comics', completedComicsCount, 'Finished stories'],
+        ['MODERATION QUEUE', 'Pending Raw Submissions', pendingReviewsCount, 'Awaiting moderator review'],
+        ['MODERATION QUEUE', 'Approved Submissions', approvedReviewsCount, 'Accepted to catalog'],
+        ['MODERATION QUEUE', 'Rejected Submissions', rejectedReviewsCount, 'Rejected with feedback'],
+        ['TRANSLATION TEAMS', 'Active Project Teams', activeTeamsCount, 'Active translating groups'],
+        ['TRANSLATION TEAMS', 'Total Project Teams', projectTeams.length, 'All registered teams'],
+        ['SAFETY & COMMUNITY', 'Flagged Chat Messages', chatFlags.length, 'Reported chat items'],
+        ['SAFETY & COMMUNITY', 'Reported Forum Threads', forumThreads.filter(t => t.isReported).length, 'Open forum moderation flags'],
+        ['', '', '', ''],
+        ['TOP GENRES BREAKDOWN', 'Genre Name', 'Registered Comics', 'Percentage Share (%)'],
+        ...genres.slice(0, 15).map(g => {
+          const count = comics.filter(c => {
+            const cGenres = Array.isArray(c.genres) ? c.genres : (typeof c.genres === 'string' ? c.genres.split(',') : []);
+            return cGenres.some(cg => (cg.name || cg.title || cg || '').toLowerCase().includes(g.name?.toLowerCase() || ''));
+          }).length;
+          const pct = comics.length > 0 ? Math.round((count / comics.length) * 100) : 0;
+          return ['GENRE DISTRIBUTION', g.name || 'Uncategorized', count, `${pct}%`];
+        }),
+        ['', '', '', ''],
+        ['PROJECT TEAMS SNAPSHOT', 'Team Title', 'Comic Title', 'Leader | Target Lang | Status'],
+        ...projectTeams.map(t => [
+          'PROJECT TEAM',
+          t.title || 'Untitled Team',
+          t.comicName || t.comicTitle || 'N/A',
+          `Leader: ${t.leaderName || 'N/A'} | Lang: ${t.targetLang || t.targetLanguage || 'All'} | Status: ${t.status || 'Active'}`
+        ]),
+        ['', '', '', ''],
+        ['CATALOG COMICS SNAPSHOT', 'Comic Title', 'Author Name', 'Status | Chapters | Views'],
+        ...comics.slice(0, 50).map(c => [
+          'COMIC TITLE',
+          c.title || 'Untitled',
+          c.authorName || c.author || 'N/A',
+          `Status: ${c.moderationStatus || 'PUBLISHED'} | Chapters: ${c.chaptersCount || c.chapterCount || c.chapters?.length || 0} | Views: ${c.views || 0}`
+        ])
+      ];
+
+      exportToCsv('ComiVerse_Moderator_Dashboard_Report', headers, rows);
+      toast.success('📊 Moderator statistical report exported successfully!');
+    } catch (err) {
+      console.error('Failed to export dashboard report:', err);
+      toast.error('Failed to export report: ' + err.message);
+    }
+  };
+
   return (
     <ModeratorLayout activeNav={activeNav} onNavChange={setActiveNav} navBadges={getNavBadges()}>
       <>
@@ -1459,6 +1527,17 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                       <>System is running smoothly. There are currently <strong>{submissions.filter(s => s.status === 'pending').length}</strong> reviews pending and <strong>{forumThreads.filter(t => t.isReported).length}</strong> open forum reports.</>
                     )}
                   </p>
+                </div>
+                <div className="mod-welcome-actions" style={{ position: 'relative', zIndex: 2, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    className="mod-export-btn"
+                    onClick={handleExportDashboardReport}
+                    disabled={loadingPhase1}
+                    title="Export complete moderation statistics report as Excel-compatible CSV"
+                  >
+                    <span>📥 Export Statistics (CSV)</span>
+                  </button>
                 </div>
               </div>
 

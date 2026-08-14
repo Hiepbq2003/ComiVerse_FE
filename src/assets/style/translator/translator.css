@@ -218,6 +218,9 @@ html.light .trans-form-input {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-width: 0;
+  max-width: calc(100vw - var(--trans-sidebar-w));
+  overflow-x: hidden;
 }
 
 /* ── TOPBAR ──────────────────────────────────────── */
@@ -348,6 +351,9 @@ html.light .trans-form-input {
 .translator-page-content {
   padding: 24px;
   flex: 1;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .translator-page-header {
@@ -3779,57 +3785,6 @@ html.light .system-warning-time {
   opacity: 0.55 !important;
   cursor: not-allowed !important;
   transform: none !important;
-}
-
-/* Hero Upload Button */
-.upload-chapter-hero-btn {
-  background: linear-gradient(110deg, #a855f7 0%, #ff6b35 55%, #ff9416 100%) !important;
-  border: none !important;
-  color: #ffffff !important;
-  padding: 12px 24px !important;
-  border-radius: 12px !important;
-  font-weight: 700 !important;
-  font-size: 14px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  cursor: pointer !important;
-  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  box-shadow: 0 4px 16px rgba(168, 85, 247, 0.35) !important;
-}
-
-.upload-chapter-hero-btn:hover:not(:disabled) {
-  transform: translateY(-2px) scale(1.02) !important;
-  box-shadow: 0 8px 24px rgba(255, 107, 53, 0.45) !important;
-}
-
-.upload-chapter-hero-btn:disabled {
-  opacity: 0.5 !important;
-  cursor: not-allowed !important;
-  transform: none !important;
-}
-
-.upload-chapter-hero-btn.submit-btn {
-  padding: 10px 20px !important;
-  font-size: 13.5px !important;
-}
-
-/* Upload Chapter Form Card */
-.upload-chapter-form-card {
-  background: rgba(255, 255, 255, 0.03) !important;
-  border: 1px solid var(--trans-border, rgba(255, 255, 255, 0.08)) !important;
-  padding: 20px !important;
-  border-radius: 16px !important;
-  backdrop-filter: blur(12px) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
-  margin-bottom: 20px !important;
-  animation: fadeIn 0.2s ease !important;
-}
-
-html.light .upload-chapter-form-card {
-  background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
 }
 
 /* Leader Post Creation Upgrades */

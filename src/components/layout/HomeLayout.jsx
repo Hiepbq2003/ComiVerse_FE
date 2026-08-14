@@ -66,12 +66,23 @@ function HomeLayout({ children }) {
   }
 
   const handleNotificationClick = async (notification) => {
+    const text = `${notification.title || ''} ${notification.message || ''}`.toLowerCase();
+    const isTeamNotif = text.includes('assigned as project leader') || text.includes('team join request');
+    
     const actionUrl = notification.actionUrl
     const hasNavigation = typeof actionUrl === 'string' && actionUrl.startsWith('/') && !actionUrl.startsWith('//')
+    
     try {
       await handleMarkAsRead(notification.id, notification.isRead)
     } finally {
-      if (hasNavigation) {
+      if (isTeamNotif) {
+        setShowNotificationDropdown(false)
+        if (user?.role === 'PROJECT_LEADER' || user?.role === 'TRANSLATOR') {
+          navigate('/translator/project-teams');
+        } else {
+          navigate('/admin/project-teams');
+        }
+      } else if (hasNavigation) {
         setShowNotificationDropdown(false)
         navigate(actionUrl)
       }

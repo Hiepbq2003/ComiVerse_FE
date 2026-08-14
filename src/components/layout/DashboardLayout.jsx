@@ -53,19 +53,35 @@ function DashboardLayout({ children, user, onLogout, badgeClass, badgeLabel }) {
     }
   }
 
-  const handleMarkAsRead = async (id, isRead) => {
-    if (isRead) return
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-    )
-    setUnreadCount((prev) => Math.max(0, prev - 1))
-    try {
-      await markAsReadApi(id)
-    } catch (err) {
-      const status = err?.response?.status
-      if (status !== 401 && status !== 502 && status !== 504 && err?.code !== 'ECONNABORTED') {
-        console.warn('Failed to mark notification as read:', err?.message)
+  const handleMarkAsRead = async (item) => {
+    setShowDropdown(false)
+    if (!item.isRead) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
+      )
+      setUnreadCount((prev) => Math.max(0, prev - 1))
+      try {
+        await markAsReadApi(item.id)
+      } catch (err) {
+        const status = err?.response?.status
+        if (status !== 401 && status !== 502 && status !== 504 && err?.code !== 'ECONNABORTED') {
+          console.warn('Failed to mark notification as read:', err?.message)
+        }
       }
+    }
+
+    const text = `${item.title || ''} ${item.message || ''}`.toLowerCase();
+    if (text.includes('assigned as project leader') || text.includes('team join request')) {
+      if (user?.role === 'PROJECT_LEADER' || user?.role === 'TRANSLATOR') {
+        navigate('/translator/project-teams');
+      } else {
+        navigate('/admin/project-teams'); // Fallback if admin
+      }
+      return;
+    }
+
+    if (item.actionUrl?.startsWith('/') && !item.actionUrl.startsWith('//')) {
+      navigate(item.actionUrl)
     }
   }
 
@@ -151,7 +167,7 @@ function DashboardLayout({ children, user, onLogout, badgeClass, badgeLabel }) {
                       <div
                         key={item.id}
                         className={`notification-dropdown-item ${!item.isRead ? 'unread' : ''}`}
-                        onClick={() => handleMarkAsRead(item.id, item.isRead)}
+                        onClick={() => handleMarkAsRead(item)}
                       >
                         <div className="notification-item-top">
                           <span className={`notification-item-badge ${(item.type || 'info').toLowerCase()}`}>

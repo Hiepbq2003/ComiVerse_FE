@@ -20,6 +20,7 @@ import ChatInputBar from '../../components/chat/ChatInputBar'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import ModernButton from '../../components/common/ModernButton'
 import { toast } from 'react-toastify'
+import { exportToCsv } from '../../utils/exportToCsv'
 import { pushUserNotification, setUserChatRestriction, issueUserWarningStrike, getAuth } from '../../utils/Auth'
 
 /* ── MODERATOR LIVE STREAM COMPONENT ─────────────────── */
@@ -705,27 +706,75 @@ function ChatMonitor({ loading = false, fetchAllData }) {
     !keywordFilter || k.word?.toLowerCase().includes(keywordFilter.toLowerCase()) || k.category?.toLowerCase().includes(keywordFilter.toLowerCase())
   )
 
+  const handleExportChatAudit = () => {
+    try {
+      const allItems = Array.isArray(flags) ? flags : []
+      if (allItems.length === 0) {
+        toast.warn('No chat moderation flags or audit records available to export.')
+        return
+      }
+      const headers = [
+        'Flag ID',
+        'Message ID',
+        'Reported User',
+        'Flagged Message',
+        'Flag Reason / Category',
+        'Moderation Status',
+        'Actioned By',
+        'Actioned At',
+        'Created At'
+      ]
+      const rows = allItems.map(f => [
+        f.id || 'N/A',
+        f.messageId || 'N/A',
+        f.user || f.senderUsername || f.senderName || f.userName || 'Unknown User',
+        (f.message || f.content || '').replace(/[\r\n]+/g, ' '),
+        f.reason || f.flagReason || 'Profanity / Toxic Content',
+        (f.status || 'pending').toUpperCase(),
+        f.actionedBy || (f.status && f.status !== 'pending' ? 'Moderator' : 'Unprocessed'),
+        f.actionedAt ? new Date(f.actionedAt).toLocaleString() : 'N/A',
+        f.createdAt ? new Date(f.createdAt).toLocaleString() : 'N/A'
+      ])
+
+      exportToCsv('ComiVerse_Chat_Moderation_Audit_Log', headers, rows)
+      toast.success('📥 Chat moderation audit log exported successfully!')
+    } catch (err) {
+      console.error('Failed to export chat audit:', err)
+      toast.error('Failed to export chat log: ' + err.message)
+    }
+  }
+
   return (
     <div className="fade-in cv-chat-monitor-container">
       {/* Header & Metrics */}
-      <div className="moderator-page-header">
+      <div className="moderator-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h1>Chat Moderation Center</h1>
           <p>Manage violating accounts, update instant client-side keyword pre-filters, and inspect live streams.</p>
         </div>
 
-        <div className="cv-chat-metrics-bar">
-          <div className="cv-metric-pill highlight">
-            <span className="cv-metric-val">{pendingFlags.length}</span>
-            <span className="cv-metric-lbl">Active Flags</span>
-          </div>
-          <div className="cv-metric-pill">
-            <span className="cv-metric-val">{resolvedFlags.length}</span>
-            <span className="cv-metric-lbl">Audit Log</span>
-          </div>
-          <div className="cv-metric-pill">
-            <span className="cv-metric-val">{keywords.length}</span>
-            <span className="cv-metric-lbl">Banned Keywords</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="mod-export-btn"
+            onClick={handleExportChatAudit}
+            title="Export chat moderation audit log as CSV"
+          >
+            <span>📥 Export Audit Log (CSV)</span>
+          </button>
+          <div className="cv-chat-metrics-bar">
+            <div className="cv-metric-pill highlight">
+              <span className="cv-metric-val">{pendingFlags.length}</span>
+              <span className="cv-metric-lbl">Active Flags</span>
+            </div>
+            <div className="cv-metric-pill">
+              <span className="cv-metric-val">{resolvedFlags.length}</span>
+              <span className="cv-metric-lbl">Audit Log</span>
+            </div>
+            <div className="cv-metric-pill">
+              <span className="cv-metric-val">{keywords.length}</span>
+              <span className="cv-metric-lbl">Banned Keywords</span>
+            </div>
           </div>
         </div>
       </div>

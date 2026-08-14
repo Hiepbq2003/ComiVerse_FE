@@ -42,7 +42,7 @@ const HISTORY_FILTER_TABS = [
 
 
 const formatMoney = (value, currency = 'USD') => (
-  new Intl.NumberFormat('vi-VN', {
+  new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency || 'USD',
     maximumFractionDigits: 2,
@@ -54,7 +54,7 @@ const formatDate = (value) => {
   const parsed = new Date(value)
   return Number.isNaN(parsed.getTime())
     ? value
-    : parsed.toLocaleString('vi-VN')
+    : parsed.toLocaleString('en-US')
 }
 
 function PayoutManagement({ historyMode = false }) {

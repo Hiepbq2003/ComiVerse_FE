@@ -1303,10 +1303,10 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
             tasks={tasks}
             onCancel={() => setShowCreateTaskModal(false)}
             onCreate={async () => {
-              setShowCreateTaskModal(false);
               if (onCreateTask) {
                 await onCreateTask(inspectTaskData);
               }
+              setShowCreateTaskModal(false);
             }}
           />
         </div>,
@@ -1318,11 +1318,8 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
 }
 
 function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, readOnly = false, allowEmpty = false }) {
-  const assignableCandidates = (candidates || []).filter(m => {
-    const roleStr = String(m.role || '').toLowerCase().trim();
-    const isLeaderRole = m.isLeader || roleStr.includes('leader') || roleStr === 'group leader' || roleStr === 'project leader' || roleStr === 'team leader' || roleStr === 'project_leader' || roleStr === 'team_leader';
-    return !isLeaderRole;
-  });
+  // Allow all members, including leaders, to be selected as assignees
+  const assignableCandidates = candidates || [];
 
   const chipStyle = (isSelected) => ({
     display: 'inline-flex',
@@ -1456,6 +1453,7 @@ export function CreateTaskModal({
   onCreate
 }) {
   const [submitted, setSubmitted] = useState(false)
+  const [creating, setCreating] = useState(false)
   const [inspectingChapter, setInspectingChapter] = useState(null)
 
   const todayStr = new Date().toISOString().split('T')[0]
@@ -1464,7 +1462,8 @@ export function CreateTaskModal({
   const errors = {
     title: !newTaskData.title.trim(),
     chapterId: !newTaskData.chapterId,
-    dueDate: !newTaskData.dueDate || newTaskData.dueDate < todayStr
+    dueDate: !newTaskData.dueDate || newTaskData.dueDate < todayStr,
+    assigneeId: !newTaskData.assigneeId
   }
   const showError = (field) => submitted && errors[field]
   const errorBorder = (field) => showError(field) ? { borderColor: '#ef4444' } : undefined
@@ -1475,10 +1474,15 @@ export function CreateTaskModal({
     setNewTaskData({ ...newTaskData, dueDate: d.toISOString().split('T')[0] })
   }
 
-  const handleCreateClick = () => {
+  const handleCreateClick = async () => {
     setSubmitted(true)
-    if (Object.values(errors).some(Boolean)) return
-    onCreate()
+    if (creating || Object.values(errors).some(Boolean)) return
+    setCreating(true)
+    try {
+      await onCreate()
+    } finally {
+      setCreating(false)
+    }
   }
 
   return (
@@ -1491,7 +1495,7 @@ export function CreateTaskModal({
               Add a task to the {comicName || 'project'} board
             </p>
           </div>
-          <button className="trans-modal-close-btn" onClick={onCancel}>×</button>
+          <button className="trans-modal-close-btn" onClick={onCancel} disabled={creating}>×</button>
         </div>
 
         <div className="trans-modal-body">
@@ -1596,17 +1600,17 @@ export function CreateTaskModal({
 
 
           <div className="trans-form-group" style={{ marginTop: '14px' }}>
-            <label className="trans-form-label">Assignee</label>
+            <label className="trans-form-label">Assignee *</label>
             <AssigneeChipPicker
               candidates={teamMembersForAssign}
               selectedId={newTaskData.assigneeId}
               onSelect={(memberId) => setNewTaskData({ ...newTaskData, assigneeId: memberId })}
               emptyLabel="No team members found for this project."
-              allowEmpty
+              error={showError('assigneeId')}
             />
-            <p style={{ color: 'var(--trans-text-muted)', fontSize: '11px', margin: '6px 0 0' }}>
-              Optional. You can assign a translator later.
-            </p>
+            {showError('assigneeId') && (
+              <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Assignee is required</p>
+            )}
           </div>
 
           <div className="trans-form-group" style={{ marginTop: '14px' }}>
@@ -1688,9 +1692,14 @@ export function CreateTaskModal({
         </div>
 
         <div className="trans-modal-footer">
-          <button className="trans-btn secondary" onClick={onCancel}>Cancel</button>
-          <button className="trans-btn primary" onClick={handleCreateClick}>
-            Create Task
+          <button className="trans-btn secondary" onClick={onCancel} disabled={creating}>Cancel</button>
+          <button
+            className="trans-btn primary"
+            onClick={handleCreateClick}
+            disabled={creating}
+            style={creating ? { opacity: 0.65, cursor: 'not-allowed', transform: 'none' } : undefined}
+          >
+            {creating ? 'creating...' : 'Create Task'}
           </button>
         </div>
       </div>

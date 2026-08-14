@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { getAuthorComicChaptersApi, getAuthorChapterPreviewApi } from '../../services/api/AuthorComicApi'
+import { getAuthorComicChaptersApi, getAuthorChapterPreviewApi, getAuthorComicByIdApi } from '../../services/api/AuthorComicApi'
 import { getChapterDetailApi } from '../../services/api/ChapterApi'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
@@ -17,6 +17,12 @@ const normalizeArrayResponse = (payload) => {
   if (Array.isArray(payload?.items)) return payload.items
   return []
 }
+
+const extractPages = (obj) => {
+  if (!obj) return [];
+  const raw = obj.pages || obj.images || obj.pageUrls || obj.pagesList || obj.urls || obj.chapterPages || (Array.isArray(obj.content) ? obj.content : []);
+  return normalizeArrayResponse(raw);
+};
 
 function getChapterNumber(chapter) {
   if (!chapter) return ''
@@ -43,46 +49,86 @@ const formatStatus = (status) => {
 }
 
 function parseCommentsFromReport(reasonText) {
-  if (!reasonText || !reasonText.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) return []
-  const reportSection = reasonText.split('--- DETAILED INSPECTION FEEDBACK REPORT')[1] || ''
-  const lines = reportSection.split('\n')
+  if (!reasonText || typeof reasonText !== 'string' || !reasonText.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) return []
+  let reportSection = reasonText.split('--- DETAILED INSPECTION FEEDBACK REPORT')[1] || ''
+  if (reportSection.includes('--- PRESERVED PAGES BLOCK ---')) {
+    reportSection = reportSection.split('--- PRESERVED PAGES BLOCK ---')[0];
+  }
   const parsedComments = []
+  
+  // Regex to match "1. [Label]: text" even if text spans multiple lines.
+  const regex = /\d+\.\s*\[([^\]]+)\]:\s*([\s\S]*?)(?=\n\s*\d+\.\s*\[|$)/g;
+  let match;
+  let idx = 0;
+  
+  while ((match = regex.exec(reportSection)) !== null) {
+    const label = match[1].trim();
+    const text = match[2].trim();
 
-  lines.forEach((line, idx) => {
-    const trimmed = line.trim()
-    if (!trimmed) return
-    const match = trimmed.match(/^\d+\.\s*\[([^\]]+)\]:\s*(.+)$/)
-    if (match) {
-      const label = match[1].trim()
-      const text = match[2].trim()
+    if (!label || !text) continue;
 
-      let pageNum = 1
-      const pMatch = label.match(/Page\s+(\d+)/i)
-      if (pMatch) pageNum = parseInt(pMatch[1], 10)
+    let pageNum = 1
+    const pMatch = label.match(/Page\s+(\d+)/i)
+    if (pMatch) pageNum = parseInt(pMatch[1], 10)
 
-      let xPercentage = null
-      let yPercentage = null
-      const coordMatch = label.match(/\((\d+(?:\.\d+)?)%\s*,\s*(\d+(?:\.\d+)?)%\)/)
-      if (coordMatch) {
-        xPercentage = parseFloat(coordMatch[1])
-        yPercentage = parseFloat(coordMatch[2])
-      }
-
-      parsedComments.push({
-        id: `parsed-doc-comment-${idx}-${Date.now()}`,
-        targetType: coordMatch ? 'point' : (label.toLowerCase().includes('page') ? 'page' : 'field'),
-        targetKey: `page-${pageNum}`,
-        targetLabel: label,
-        text,
-        createdAt: new Date().toISOString(),
-        author: 'Moderator',
-        xPercentage,
-        yPercentage
-      })
+    let xPercentage = null
+    let yPercentage = null
+    const coordMatch = label.match(/\((\d+(?:\.\d+)?)%\s*,\s*(\d+(?:\.\d+)?)%\)/)
+    if (coordMatch) {
+      xPercentage = parseFloat(coordMatch[1])
+      yPercentage = parseFloat(coordMatch[2])
     }
-  })
+
+    parsedComments.push({
+      id: `parsed-doc-comment-${idx}-${Date.now()}`,
+      targetType: coordMatch ? 'point' : (label.toLowerCase().includes('page') ? 'page' : 'field'),
+      targetKey: `page-${pageNum}`,
+      targetLabel: label,
+      text,
+      createdAt: new Date().toISOString(),
+      author: 'Moderator',
+      xPercentage,
+      yPercentage
+    })
+    idx++;
+  }
 
   return parsedComments
+}
+
+function parsePagesFromReport(reasonText) {
+  if (!reasonText || !reasonText.includes('--- PRESERVED PAGES BLOCK ---')) return []
+  try {
+    let jsonStr = reasonText.split('--- PRESERVED PAGES BLOCK ---')[1].trim();
+    if (jsonStr.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) {
+      jsonStr = jsonStr.split('--- DETAILED INSPECTION FEEDBACK REPORT')[0].trim();
+    }
+    
+    try {
+      let parsed = JSON.parse(jsonStr);
+      if (typeof parsed === 'string') {
+        parsed = JSON.parse(parsed);
+      }
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      // ignore
+    }
+
+    const start = jsonStr.indexOf('[');
+    const end = jsonStr.lastIndexOf(']');
+    if (start !== -1 && end !== -1 && end > start) {
+      let arrayStr = jsonStr.substring(start, end + 1);
+      arrayStr = arrayStr.replace(/\\"/g, '"');
+      let pages = JSON.parse(arrayStr);
+      if (typeof pages === 'string') {
+        pages = JSON.parse(pages);
+      }
+      return Array.isArray(pages) ? pages : []
+    }
+    return [];
+  } catch (e) {
+    return []
+  }
 }
 
 /* ────────────────── rejection data resolver ──────────────── */
@@ -94,121 +140,88 @@ function resolveRejectionInfo(preview, comicId) {
 
   let reason = preview?.rejectionReason || preview?.rejection_reason || preview?.rejectionNote || preview?.reason || preview?.notes || ''
   let docComments = []
+  let preservedPages = []
 
   // If chapter is explicitly in a pre-submission or pending state, do not load old rejections.
   if (['DRAFT', 'PREVIEW_READY', 'SUBMITTED_FOR_REVIEW', 'PENDING'].includes(statusStr)) {
     return { isRejected: false, reason: '', docComments: [] }
   }
 
-  const chapIdStr = String(preview?.id || preview?.chapterId || '')
-  const subIdStr = String(preview?.submissionId || '')
-  const comicIdStr = String(comicId || preview?.comicId || '')
-  const chapNumStr = String(getChapterNumber(preview))
-
-  // Match override specifically for this chapter
-  try {
-    const rawOverrides = localStorage.getItem('comiverse_moderator_submissions_override')
-    if (rawOverrides) {
-      const overrides = JSON.parse(rawOverrides)
-      if (Array.isArray(overrides)) {
-        // First: direct top-level match
-        let match = overrides.find(o => {
-          const st = String(o.status || '').toUpperCase()
-          if (st !== 'REJECTED') return false
-          const oId = String(o.id || o.chapterId || o.submissionId || '')
-          const oSubId = String(o.submissionId || '')
-          const oNum = String(o.chapterNumber || o.number || '')
-          const matchChapId = chapIdStr && oId && (oId === chapIdStr || oId === subIdStr || `chap-${oId}` === chapIdStr || oId === `chap-${chapIdStr}`)
-          const matchSubId = subIdStr && oSubId && (oSubId === subIdStr || oSubId === chapIdStr)
-          const matchNum = chapNumStr && chapNumStr !== 'N/A' && oNum && oNum === chapNumStr
-          const matchComic = !comicIdStr || String(o.comicId || o.parentReviewId || '') === comicIdStr || !o.comicId
-          return ((matchChapId || matchSubId) && matchComic) || (matchNum && matchComic)
-        })
-
-        // Second: dig into nested allChapters/chapters arrays for the specific chapter
-        if (!match) {
-          for (const o of overrides) {
-            const oComicId = String(o.comicId || o.parentReviewId || o.id || '')
-            if (comicIdStr && oComicId && oComicId !== comicIdStr && !oComicId.includes(comicIdStr)) continue
-
-            const chaps = [...(o.allChapters || []), ...(o.chapters || []), ...(o.subItems || [])]
-            const nestedChap = chaps.find(c => {
-              const cSt = String(c.status || c.moderationStatus || '').toUpperCase()
-              if (cSt !== 'REJECTED') return false
-              const cId = String(c.id || c.chapterId || '')
-              const cSubId = String(c.submissionId || '')
-              const cNum = String(c.chapterNumber || c.number || '')
-              const matchChapId = chapIdStr && cId && (cId === chapIdStr || cId === subIdStr || `chap-${cId}` === chapIdStr || cId === `chap-${chapIdStr}`)
-              const matchSubId = subIdStr && cSubId && (cSubId === subIdStr || cSubId === chapIdStr)
-              const matchNum = chapNumStr && chapNumStr !== 'N/A' && cNum && cNum === chapNumStr
-              return matchChapId || matchSubId || matchNum
-            })
-            if (nestedChap) {
-              match = nestedChap
-              break
-            }
-          }
-        }
-
-        if (match) {
-          isRejected = true
-          if (match.rejectionReason || match.rejection_reason) {
-            reason = match.rejectionReason || match.rejection_reason
-          }
-        }
-      }
-    }
-  } catch (e) { /* ignore */ }
-
-  // Step 1: If reason contains structured report, parse exact comments from report FIRST
+  // Parse exact comments & page preservation from server-persisted report in rejectionReason
   if (reason) {
     const parsedFromReport = parseCommentsFromReport(reason)
     if (parsedFromReport.length > 0) {
       docComments = parsedFromReport
     }
+    preservedPages = parsePagesFromReport(reason)
   }
 
-  // Step 2: Check comiverse_moderator_doc_comments in localStorage STRICTLY matching this chapter
-  try {
-    const rawCommentsMap = localStorage.getItem('comiverse_moderator_doc_comments')
-    if (rawCommentsMap) {
-      const commentsMap = JSON.parse(rawCommentsMap)
+  // Fallback: Check local storage for offline / unit test comments
+  if (docComments.length === 0 && isRejected) {
+    try {
+      const rawStored = localStorage.getItem('comiverse_moderator_doc_comments') || localStorage.getItem('mod_doc_comments_draft')
+      if (rawStored) {
+        const parsed = JSON.parse(rawStored)
+        const chapIdStr = String(preview?.id || preview?.chapterId || '')
+        const subIdStr = String(preview?.submissionId || '')
+        const comicIdStr = String(comicId || preview?.comicId || '')
+        const chapNumStr = String(getChapterNumber(preview))
 
-      Object.keys(commentsMap).forEach(key => {
-        const commentsList = commentsMap[key] || []
+        const candidates = [
+          ...(chapIdStr && parsed[chapIdStr] ? parsed[chapIdStr] : []),
+          ...(subIdStr && parsed[subIdStr] ? parsed[subIdStr] : []),
+          ...(comicIdStr && parsed[comicIdStr] ? parsed[comicIdStr] : [])
+        ]
 
-        commentsList.forEach(c => {
+        Object.values(parsed).forEach(list => {
+          if (Array.isArray(list)) {
+            list.forEach(c => {
+              if (c && (
+                (c.chapterId && chapIdStr && (String(c.chapterId) === chapIdStr || String(c.chapterId) === `chap-${chapIdStr}` || `chap-${c.chapterId}` === chapIdStr)) ||
+                (c.chapterNumber && chapNumStr && String(c.chapterNumber) === chapNumStr)
+              )) {
+                candidates.push(c)
+              }
+            })
+          }
+        })
+
+        const seenIds = new Set()
+        candidates.forEach(c => {
           if (!c) return
           const cChapId = String(c.chapterId || '')
-          const cChapNum = String(c.chapterNumber || '')
-          const cComicId = String(c.comicId || '')
+          const cChapNum = String(c.chapterNumber ?? c.number ?? '')
+          const matchId = chapIdStr && cChapId && (cChapId === chapIdStr || cChapId === `chap-${chapIdStr}` || `chap-${cChapId}` === chapIdStr)
+          const matchNum = chapNumStr && cChapNum && cChapNum === chapNumStr
+          const isGeneric = !cChapId && !cChapNum
 
-          // Comic check: if comment has comicId, it must match current comicId
-          if (comicIdStr && cComicId && comicIdStr !== cComicId) return
-
-          // Strict Chapter Match: MUST match chapterId or chapterNumber!
-          const matchChapId = chapIdStr && cChapId && (cChapId === chapIdStr || cChapId === `chap-${chapIdStr}` || `chap-${cChapId}` === chapIdStr)
-          const matchChapNum = chapNumStr && chapNumStr !== 'N/A' && cChapNum && cChapNum === chapNumStr
-
-          if (matchChapId || matchChapNum) {
-            if (!docComments.some(existing => existing.id === c.id || (existing.targetLabel === c.targetLabel && existing.text === c.text))) {
+          if (matchId || matchNum || isGeneric) {
+            const uKey = c.id || `${c.targetKey}-${c.text}`
+            if (!seenIds.has(uKey)) {
+              seenIds.add(uKey)
               docComments.push(c)
             }
           }
         })
-      })
+      }
+    } catch (e) {
+      // ignore
     }
-  } catch (e) { /* ignore */ }
+  }
 
-  return { isRejected, reason, docComments }
+  return { isRejected, reason, docComments, preservedPages }
 }
 
 function parseOverallNote(reason) {
   if (!reason) return ''
-  if (reason.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) {
-    return reason.split('--- DETAILED INSPECTION FEEDBACK REPORT')[0].trim()
+  let cleanReason = reason;
+  if (cleanReason.includes('--- PRESERVED PAGES BLOCK ---')) {
+    cleanReason = cleanReason.split('--- PRESERVED PAGES BLOCK ---')[0];
   }
-  return reason.trim()
+  if (cleanReason.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) {
+    return cleanReason.split('--- DETAILED INSPECTION FEEDBACK REPORT')[0].trim()
+  }
+  return cleanReason.trim()
 }
 
 /* ────────────────── badge renderer ──────────────── */
@@ -272,15 +285,7 @@ export default function AuthorChapterPreview() {
       return
     }
 
-    const currentRawPages = normalizeArrayResponse(
-      preview?.pages ||
-      preview?.images ||
-      preview?.pageUrls ||
-      preview?.pagesList ||
-      preview?.urls ||
-      preview?.chapterPages ||
-      (Array.isArray(preview?.content) ? preview.content : [])
-    )
+    const currentRawPages = extractPages(preview)
 
     const currentStatus = String(preview?.status || preview?.moderationStatus || '').toUpperCase()
     const currentReason = preview?.rejectionReason || preview?.rejection_reason || ''
@@ -292,13 +297,20 @@ export default function AuthorChapterPreview() {
       const fetchChapter = async () => {
         try {
           let previewData = null
+
+          // Primary: call the author chapter preview endpoint which returns pages
           try {
-            previewData = await getAuthorChapterPreviewApi(comicId, chapterId)
+            const previewRes = await getAuthorChapterPreviewApi(comicId, chapterId)
+            if (previewRes?.data || previewRes) {
+              previewData = previewRes.data || previewRes
+            }
           } catch {
-            // ignore
+            // ignore — may fail for rejected chapters
           }
 
-          if (!previewData || (!previewData.pages?.length && !previewData.images?.length)) {
+          // Fallback: if preview didn't return pages, try chapter detail endpoint
+          const pPages = extractPages(previewData)
+          if (!previewData || pPages.length === 0) {
             try {
               const detailRes = await getChapterDetailApi(chapterId)
               if (detailRes?.data || detailRes) {
@@ -309,70 +321,29 @@ export default function AuthorChapterPreview() {
             }
           }
 
-          let overrideData = null
-          try {
-            const rawOverrides = localStorage.getItem('comiverse_moderator_submissions_override')
-            if (rawOverrides) {
-              const overrides = JSON.parse(rawOverrides)
-              if (Array.isArray(overrides)) {
-                const chapIdStr = String(chapterId)
-                const chapNumStr = String(preview?.chapterNumber || preview?.number || chapterId)
-                const subIdStr = String(preview?.submissionId || '')
-                const comicIdStr = String(comicId || '')
-
-                // First: direct top-level match
-                overrideData = overrides.find(o => {
-                  const oId = String(o.id || o.chapterId || o.submissionId || '')
-                  const oSubId = String(o.submissionId || '')
-                  const oNum = String(o.chapterNumber || o.number || '')
-                  const oComicId = String(o.comicId || o.parentReviewId || '')
-                  const matchComic = !comicIdStr || !oComicId || oComicId === comicIdStr
-                  const matchChapId = chapIdStr && oId && (oId === chapIdStr || oId === subIdStr || `chap-${oId}` === chapIdStr || oId === `chap-${chapIdStr}`)
-                  const matchSubId = subIdStr && oSubId && (oSubId === subIdStr || oSubId === chapIdStr)
-                  const matchNum = chapNumStr && chapNumStr !== 'N/A' && oNum && oNum === chapNumStr
-                  return ((matchChapId || matchSubId) && matchComic) || (matchNum && matchComic)
-                })
-                // Second: dig into nested allChapters/chapters/subItems and extract the SPECIFIC chapter object
-                if (!overrideData) {
-                  for (const o of overrides) {
-                    const oComicId = String(o.comicId || o.parentReviewId || o.id || '')
-                    if (comicIdStr && oComicId && oComicId !== comicIdStr && !oComicId.includes(comicIdStr)) continue
-
-                    const chaps = [...(o.allChapters || []), ...(o.chapters || []), ...(o.subItems || [])]
-                    const nestedChap = chaps.find(c => {
-                      const cId = String(c.id || c.chapterId || '')
-                      const cSubId = String(c.submissionId || '')
-                      const cNum = String(c.chapterNumber || c.number || '')
-                      const matchChapId = chapIdStr && cId && (cId === chapIdStr || cId === subIdStr || `chap-${cId}` === chapIdStr || cId === `chap-${chapIdStr}`)
-                      const matchSubId = subIdStr && cSubId && (cSubId === subIdStr || cSubId === chapIdStr)
-                      const matchNum = chapNumStr && chapNumStr !== 'N/A' && cNum && cNum === chapNumStr
-                      return matchChapId || matchSubId || matchNum
-                    })
-                    if (nestedChap) {
-                      // Return the specific chapter (with its pages), not the parent submission
-                      overrideData = nestedChap
-                      break
-                    }
-                  }
-                }
+          // Fetch comic level reason if it's missing from the chapter
+          if (needsRejectedFeedbackFetch) {
+            try {
+              const comicRes = await getAuthorComicByIdApi(comicId)
+              const comicData = comicRes?.data || comicRes
+              if (comicData?.rejectionReason) {
+                previewData = { ...(previewData || {}), rejectionReason: comicData.rejectionReason }
               }
+            } catch {
+              // ignore
             }
-          } catch (e) {}
+          }
 
-          const fetchedPages = (
-            (previewData?.pages && previewData.pages.length) ? previewData.pages :
-            (previewData?.images && previewData.images.length) ? previewData.images :
-            (overrideData?.pages && overrideData.pages.length) ? overrideData.pages :
-            (overrideData?.images && overrideData.images.length) ? overrideData.images : []
-          )
+          // Re-extract pages after possible fallback fetch
+          const finalPages = extractPages(previewData);
+          const fetchedPages = finalPages.length > 0 ? finalPages : [];
 
           if (fetchedPages.length > 0) {
             setPreview(prev => ({
               ...prev,
               ...(previewData || {}),
-              ...(overrideData || {}),
               pages: fetchedPages,
-              status: previewData?.status || overrideData?.status || prev?.status
+              status: previewData?.status || prev?.status
             }))
           } else {
             const res = await getAuthorComicChaptersApi(comicId)
@@ -391,7 +362,8 @@ export default function AuthorChapterPreview() {
               } catch {
                 // ignore
               }
-              if (!detailData || (!detailData.pages?.length && !detailData.images?.length)) {
+              const foundDetailPages = extractPages(detailData)
+              if (!detailData || foundDetailPages.length === 0) {
                 try {
                   const detailRes = await getChapterDetailApi(found.id || found.chapterId || chapterId)
                   if (detailRes?.data || detailRes) {
@@ -402,8 +374,8 @@ export default function AuthorChapterPreview() {
                 }
               }
               setPreview(prev => ({ ...prev, ...found, ...(detailData || {}) }))
-            } else if (previewData || overrideData) {
-              setPreview(prev => ({ ...prev, ...(previewData || {}), ...(overrideData || {}) }))
+            } else if (previewData) {
+              setPreview(prev => ({ ...prev, ...(previewData || {}) }))
             }
           }
         } catch (error) {
@@ -452,18 +424,14 @@ export default function AuthorChapterPreview() {
   }
 
   /* ── Derive data ─── */
-  const rawPages = normalizeArrayResponse(
-    preview?.pages ||
-    preview?.images ||
-    preview?.pageUrls ||
-    preview?.pagesList ||
-    preview?.urls ||
-    preview?.chapterPages ||
-    (Array.isArray(preview?.content) ? preview.content : [])
-  )
+  const { isRejected, reason, docComments, preservedPages } = resolveRejectionInfo(preview, comicId)
+  
+  let rawPages = extractPages(preview)
+  if (rawPages.length === 0 && preservedPages && preservedPages.length > 0) {
+    rawPages = preservedPages
+  }
   const pages = rawPages.map((p, idx) => normalizePage(p, idx))
 
-  const { isRejected, reason, docComments } = resolveRejectionInfo(preview, comicId)
   const overallNote = parseOverallNote(reason)
 
   // Comments for current page
@@ -519,14 +487,20 @@ export default function AuthorChapterPreview() {
 
         {/* Right: Sidebar toggle + Close */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-          {docComments.length > 0 && (
+          {(docComments.length > 0 || isRejected) && (
             <button
               type="button"
-              className={`mod-mode-tab ${showCommentsSidebar ? 'active' : ''}`}
-              onClick={() => setShowCommentsSidebar(!showCommentsSidebar)}
+              className={`author-feedback-header-btn ${showCommentsSidebar ? 'active' : ''}`}
+              onClick={() => {
+                if (previewTab === 'details') {
+                  setPreviewTab('reader')
+                }
+                setShowCommentsSidebar(!showCommentsSidebar)
+              }}
               title="Toggle Moderator Feedback Sidebar"
             >
-              💬 Feedback Pins ({docComments.length})
+              <span>💬 Feedback Pins</span>
+              <span className="author-feedback-count-badge">{docComments.length}</span>
             </button>
           )}
 
@@ -787,86 +761,87 @@ export default function AuthorChapterPreview() {
 
           {/* === TAB: DETAILS & FEEDBACK === */}
           {previewTab === 'details' && (
-            <div style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
-              <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ flex: 1, padding: '28px 24px', overflowY: 'auto' }}>
+              <div style={{ maxWidth: '820px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '22px' }}>
 
                 {/* Rejection Banner */}
                 {isRejected && (
-                  <div style={{
-                    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.18) 0%, rgba(153, 27, 27, 0.3) 100%)',
-                    border: '1px solid rgba(239, 68, 68, 0.45)',
-                    borderRadius: '12px',
-                    padding: '20px 24px',
-                    boxShadow: '0 12px 36px rgba(239, 68, 68, 0.2)'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                      <span style={{ fontSize: '22px' }}>⛔</span>
-                      <h3 style={{ margin: 0, color: '#fca5a5', fontSize: '17px', fontWeight: '700' }}>
+                  <div className="author-rejection-banner">
+                    <div className="author-rejection-banner-header">
+                      <span className="author-rejection-icon-badge">⛔</span>
+                      <h3 className="author-rejection-banner-title">
                         Chapter Rejected by Moderator — Action Required
                       </h3>
                     </div>
 
-                    <div style={{
-                      fontSize: '14px', color: '#f8fafc', lineHeight: '1.6', background: 'rgba(0,0,0,0.35)',
-                      padding: '14px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)'
-                    }}>
-                      <strong style={{ color: '#fca5a5' }}>Moderator Overall Note:</strong>
-                      <p style={{ margin: '6px 0 0 0', whiteSpace: 'pre-wrap', color: '#e2e8f0', fontSize: '13.5px' }}>
-                        {overallNote || 'No overall remarks provided. Please inspect page feedback in the sidebar.'}
+                    <div className="author-rejection-note-box">
+                      <div className="author-rejection-note-label">
+                        <span>🛡️</span> Moderator Overall Remarks
+                      </div>
+                      <p className="author-rejection-note-text">
+                        {overallNote || 'No overall remarks provided. Please inspect page-specific feedback and pin markers in the viewer.'}
                       </p>
                     </div>
                   </div>
                 )}
 
                 {/* Chapter Info Card */}
-                <div className="mod-inspector-card" style={{ padding: '20px', borderRadius: '12px' }}>
-                  <h4 className="mod-inspector-title" style={{ margin: '0 0 12px', fontSize: '17px', fontWeight: '700' }}>
+                <div className="author-preview-card">
+                  <h4 className="author-preview-title">
                     📖 Chapter {getChapterNumber(preview)} Details
                   </h4>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
-                    <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
-                      <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Total Pages</span>
-                      <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px' }}>{pages.length}</strong>
+                  <div className="author-preview-stats-grid">
+                    <div className="author-preview-stat-card">
+                      <span className="author-preview-stat-label">Total Pages</span>
+                      <div className="author-preview-stat-value">
+                        <span>📄</span> {pages.length} pages
+                      </div>
                     </div>
 
-                    <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
-                      <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Status</span>
-                      <strong style={{
-                        fontSize: '13.5px', display: 'block', marginTop: '4px',
-                        color: isRejected ? '#ef4444' : '#10b981'
-                      }}>
-                        {isRejected ? '✕ Rejected' : formatStatus(preview?.status || preview?.moderationStatus)}
-                      </strong>
+                    <div className="author-preview-stat-card">
+                      <span className="author-preview-stat-label">Moderation Status</span>
+                      <div className="author-preview-stat-value">
+                        <span className={`author-status-pill ${isRejected ? 'rejected' : 'approved'}`}>
+                          {isRejected ? '✕ Rejected' : formatStatus(preview?.status || preview?.moderationStatus)}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="mod-inspector-card" style={{ padding: '10px 12px', borderRadius: '8px' }}>
-                      <span className="mod-inspector-subtitle" style={{ fontSize: '11px', fontWeight: '600', display: 'block' }}>Feedback Count</span>
-                      <strong style={{ fontSize: '13.5px', display: 'block', marginTop: '4px', color: '#c084fc' }}>{docComments.length} comments</strong>
+                    <div 
+                      className="author-preview-stat-card feedback-stat" 
+                      onClick={() => {
+                        setPreviewTab('reader')
+                        setShowCommentsSidebar(true)
+                      }}
+                      style={{ cursor: 'pointer' }}
+                      title="Click to view all pins on pages"
+                    >
+                      <span className="author-preview-stat-label">Feedback Pins</span>
+                      <div className="author-preview-stat-value">
+                        <span className="author-status-pill feedback">
+                          💬 {docComments.length} {docComments.length === 1 ? 'comment pin' : 'comment pins'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Feedback Summary */}
                 {docComments.length > 0 && (
-                  <div className="mod-inspector-card" style={{ padding: '20px', borderRadius: '12px' }}>
-                    <h4 className="mod-inspector-title" style={{ margin: '0 0 12px', fontSize: '15px', fontWeight: '700' }}>
-                      💬 All Moderator Feedback ({docComments.length})
+                  <div className="author-preview-card">
+                    <h4 className="author-preview-title">
+                      💬 Moderator Inspection Feedback ({docComments.length})
                     </h4>
-                    <p className="mod-inspector-subtitle" style={{ margin: '0 0 16px', fontSize: '12px' }}>
-                      Click "💬 Feedback Pins" in the top bar to open the detailed sidebar panel.
+                    <p className="mod-inspector-subtitle" style={{ margin: '0 0 16px', fontSize: '13px' }}>
+                      Click on any feedback item below to open the page and inspect the exact pin location:
                     </p>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {docComments.map((c, idx) => (
                         <div
                           key={c.id || idx}
-                          style={{
-                            padding: '12px 14px', borderRadius: '10px',
-                            background: theme === 'light' ? '#f8fafc' : 'rgba(255,255,255,0.04)',
-                            border: `1px solid ${c.targetType === 'point' ? 'rgba(168,85,247,0.3)' : 'rgba(14,165,233,0.3)'}`,
-                            cursor: 'pointer'
-                          }}
+                          className="author-feedback-item-card"
                           onClick={() => {
                             if (c.targetKey?.startsWith('page-')) {
                               const pNum = parseInt(c.targetKey.replace('page-', ''), 10)
@@ -879,16 +854,21 @@ export default function AuthorChapterPreview() {
                             }
                           }}
                         >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             {renderCommentBadge(c, idx + 1)}
-                            <span className="mod-inspector-subtitle" style={{ fontSize: '11px' }}>
+                            <span className="mod-inspector-subtitle" style={{ fontSize: '11.5px' }}>
                               {formatTimeAgo(c.createdAt)}
                             </span>
                           </div>
-                          <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{c.text}</p>
-                          <span style={{ fontSize: '11px', fontWeight: '700', color: '#7c3aed', marginTop: '4px', display: 'block' }}>
-                            🛡️ {c.author || 'Moderator'}
-                          </span>
+                          <p className="author-feedback-item-text">{c.text}</p>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span className="author-feedback-item-author">
+                              🛡️ {c.author || 'Moderator'}
+                            </span>
+                            <span style={{ fontSize: '11.5px', color: '#a855f7', fontWeight: '600' }}>
+                              Click to view on page →
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>

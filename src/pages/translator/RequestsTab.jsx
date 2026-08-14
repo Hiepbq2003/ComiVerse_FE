@@ -41,19 +41,23 @@ function RequestsTab({ joinRequests = [], onApprove, onReject, onBan }) {
     }
   };
 
+  const pendingRequests = (Array.isArray(joinRequests) ? joinRequests : []).filter(
+    r => r && (!r.status || r.status.toUpperCase() === 'PENDING')
+  );
+
   return (
     <div className="join-requests-tab-container fade-in">
       <h3 className="requests-count-header" style={{ color: isLight ? '#0f172a' : '#f8fafc' }}>
-        {joinRequests.length} requests pending review
+        {pendingRequests.length} requests pending review
       </h3>
 
-      {joinRequests.length === 0 ? (
+      {pendingRequests.length === 0 ? (
         <div className="translator-empty-state">
           <h3 style={{ color: isLight ? '#0f172a' : '#f8fafc' }}>No pending recruitment requests</h3>
           <p style={{ color: isLight ? '#64748b' : '#94a3b8' }}>New request applications will appear here when users apply.</p>
         </div>
       ) : (
-        joinRequests.map(req => {
+        pendingRequests.map(req => {
           const cvLink = req.cvUrl || req.cv_url || req.cvFile || req.attachmentUrl;
           const rawCvName = req.cvFileName || req.cv_file_name || req.fileName || 'Applicant_CV_Resume.pdf';
           const cvName = rawCvName.toLowerCase().endsWith('.pdf') ? rawCvName : `${rawCvName}.pdf`;
