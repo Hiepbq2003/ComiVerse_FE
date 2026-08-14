@@ -106,7 +106,14 @@ const getChapterTitle = (chapter) => chapter?.title || chapter?.chapterTitle || 
 
 const getChapterCount = (comic) => comic?.chapterCount ?? 0
 
-const getChapterViews = (chapter) => chapter?.views ?? chapter?.viewCount ?? chapter?.totalViews ?? '—'
+const getChapterViews = (chapter, chaptersList = [], comicViewCount = 0) => {
+  let count = chapter?.viewCount ?? chapter?.views ?? chapter?.totalViews
+  if ((count === null || count === undefined || Number(count) === 0) && chaptersList.length === 1 && Number(comicViewCount) > 0) {
+    count = comicViewCount
+  }
+  if (count === null || count === undefined || count === '') return '0'
+  return Number(count).toLocaleString('en-US')
+}
 
 const normalizePublicationStatusValue = (status) => {
   const value = (status || 'ONGOING').toString().replace(/[-\s]+/g, '_').toUpperCase()
@@ -178,8 +185,8 @@ const formatDate = (value) => {
 }
 
 const formatMoney = (value) => {
-  if (value === null || value === undefined || value === '') return '0đ'
-  if (typeof value === 'number') return `${value.toLocaleString('vi-VN')}đ`
+  if (value === null || value === undefined || value === '') return '$0.00'
+  if (typeof value === 'number') return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   return value
 }
 
@@ -701,11 +708,17 @@ function AuthorComicDetail() {
     }
   }, [comic, searchParams, setSearchParams])
 
-  const summary = useMemo(() => ({
-    chapters: metrics?.chapterCount ?? getChapterCount(comic),
-    views: metrics?.viewCount ?? comic?.viewCount ?? '0',
-    revenue: formatMoney(metrics?.estimatedRevenue ?? metrics?.revenue ?? metrics?.totalRevenue ?? comic?.revenue ?? comic?.totalRevenue),
-  }), [comic, metrics])
+  const summary = useMemo(() => {
+    const totalChapterViews = chapters.reduce((acc, c) => acc + (Number(c?.viewCount ?? c?.views ?? 0) || 0), 0)
+    const comicViews = Number(metrics?.viewCount ?? comic?.viewCount ?? 0) || 0
+    const resolvedViews = Math.max(totalChapterViews, comicViews)
+
+    return {
+      chapters: metrics?.chapterCount ?? getChapterCount(comic),
+      views: resolvedViews.toLocaleString('vi-VN'),
+      revenue: formatMoney(metrics?.estimatedRevenue ?? metrics?.revenue ?? metrics?.totalRevenue ?? comic?.revenue ?? comic?.totalRevenue),
+    }
+  }, [comic, metrics, chapters])
 
   const appendUploadedChapter = (uploadedPreview) => {
     const newChapter = {
@@ -1161,7 +1174,7 @@ function AuthorComicDetail() {
                         <td>{getChapterTitle(chapter)}</td>
                         <td>{formatDate(chapter.uploadedAt || chapter.createdAt || chapter.submittedAt)}</td>
                         <td>{chapter.pageCount || normalizeArrayResponse(chapter.pages).length || parsePageCountFromReason(chapter.rejectionReason || chapter.rejection_reason || comic?.rejectionReason) || 0}</td>
-                        <td>{getChapterViews(chapter)}</td>
+                        <td>{getChapterViews(chapter, chapters, metrics?.viewCount ?? comic?.viewCount ?? 0)}</td>
                         <td>
                           <span className={`author-status-badge ${getStatusClass(status)}`}>
                             {formatStatus(status)}

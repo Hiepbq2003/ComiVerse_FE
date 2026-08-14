@@ -32,9 +32,10 @@ const formatCompactNumber = (value) => new Intl.NumberFormat('en-US', {
 
 const formatFullNumber = (value) => new Intl.NumberFormat('en-US').format(numberValue(value))
 
-const formatMoney = (value) => `${new Intl.NumberFormat('vi-VN', {
-  maximumFractionDigits: 0,
-}).format(numberValue(value))}đ`
+const formatMoney = (value) => `$${new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+}).format(numberValue(value))}`
 
 const formatPercent = (value) => `${numberValue(value).toFixed(1).replace('.0', '')}%`
 
