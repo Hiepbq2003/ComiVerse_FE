@@ -244,8 +244,24 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
   const [fetchingChapters, setFetchingChapters] = useState(false)
   const chapterCacheRef = useRef(new Map())
 
-  // Google Docs Style Contextual Comment States (In-Memory during review)
-  const [docCommentsMap, setDocCommentsMap] = useState({})
+  // Google Docs Style Contextual Comment States (In-Memory with localStorage fallback)
+  const [docCommentsMap, setDocCommentsMap] = useState(() => {
+    try {
+      const saved = localStorage.getItem('mod_doc_comments_draft');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Failed to load draft comments', e);
+    }
+    return {};
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('mod_doc_comments_draft', JSON.stringify(docCommentsMap));
+    } catch (e) {
+      console.warn('Failed to save draft comments', e);
+    }
+  }, [docCommentsMap])
   const [showCommentsSidebar, setShowCommentsSidebar] = useState(true)
   const [activePinTarget, setActivePinTarget] = useState(null)
   const [pinCommentText, setPinCommentText] = useState('')
@@ -1206,6 +1222,10 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
 
     setSelectedReject(null)
     setRejectionReason('')
+    
+    // Clear draft after successful submission
+    setDocCommentsMap({})
+    localStorage.removeItem('mod_doc_comments_draft')
   }
 
   const handleAddDocComment = (submissionId, targetType, targetKey, targetLabel, text, coords = null) => {
