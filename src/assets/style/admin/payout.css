@@ -368,6 +368,58 @@
   color: var(--admin-text-muted);
 }
 
+.admin-payout-details {
+  width: 220px;
+  max-width: 220px;
+  overflow: hidden;
+}
+
+.admin-payout-details-text,
+.admin-payout-details small {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-payout-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  color: var(--admin-text-muted);
+  font-size: 13px;
+}
+
+.admin-payout-pagination > div {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-payout-pagination button {
+  padding: 8px 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: 9px;
+  background: var(--admin-card-bg);
+  color: var(--admin-text-secondary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-payout-pagination button:hover:not(:disabled) {
+  border-color: var(--admin-border-hover);
+  background: var(--admin-hover-bg);
+  color: var(--admin-text-primary);
+}
+
+.admin-payout-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .status-badge.pending { color: var(--admin-yellow); }
 .status-badge.processing,
 .status-badge.approved { background: rgba(59, 130, 246, 0.1); color: var(--admin-blue); }
@@ -400,5 +452,10 @@
 
   .payout-filter-tab {
     flex: 0 0 auto;
+  }
+
+  .admin-payout-pagination {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

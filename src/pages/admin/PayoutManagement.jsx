@@ -32,6 +32,8 @@ const FILTER_TABS = [
   { label: 'Pending', value: 'PENDING' },
   { label: 'Approved', value: 'APPROVED' },
   { label: 'Processing', value: 'PROCESSING' },
+  { label: 'Failed', value: 'FAILED' },
+  { label: 'Rejected', value: 'REJECTED' },
 ]
 
 const HISTORY_FILTER_TABS = [
@@ -39,6 +41,12 @@ const HISTORY_FILTER_TABS = [
   { label: 'Rejected', value: 'REJECTED' },
   { label: 'Failed', value: 'FAILED' },
 ]
+
+const PAGE_SIZE = 20
+
+const getPayoutStatus = (payout) => (
+  payout?.status || payout?.paymentStatus || payout?.payoutStatus || 'UNKNOWN'
+).toString().toUpperCase()
 
 
 const formatMoney = (value, currency = 'USD') => (
@@ -64,19 +72,32 @@ function PayoutManagement({ historyMode = false }) {
   const [loading, setLoading] = useState(true)
   const [workingId, setWorkingId] = useState('')
   const [error, setError] = useState('')
+  const [page, setPage] = useState(0)
+  const [pagination, setPagination] = useState({
+    totalElements: 0,
+    totalPages: 0,
+    size: PAGE_SIZE,
+  })
 
   const loadPayouts = useCallback(async () => {
     try {
       setLoading(true)
       setError('')
-      const requestKey = 'admin-payouts:ALL:100'
+      const requestKey = `admin-payouts:${activeStatus}:${page}:${PAGE_SIZE}`
       const result = await runDedupedRequest(
         requestKey,
         () => getAdminPayoutsApi({
-          size: 100,
+          status: activeStatus,
+          page,
+          size: PAGE_SIZE,
         }),
       )
       setData(result || { items: [], counts: {}, totals: {} })
+      setPagination({
+        totalElements: Number(result?.totalElements ?? result?.page?.totalElements ?? 0),
+        totalPages: Number(result?.totalPages ?? result?.page?.totalPages ?? 0),
+        size: Number(result?.size ?? result?.page?.size ?? PAGE_SIZE),
+      })
     } catch (err) {
       setError(
         err?.response?.data?.message
@@ -86,7 +107,7 @@ function PayoutManagement({ historyMode = false }) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [activeStatus, page])
 
   useEffect(() => {
     loadPayouts()
@@ -94,6 +115,7 @@ function PayoutManagement({ historyMode = false }) {
 
   useEffect(() => {
     setActiveStatus(historyMode ? 'PAID' : 'PENDING')
+    setPage(0)
   }, [historyMode])
 
   const allItems = Array.isArray(data?.items)
@@ -103,9 +125,7 @@ function PayoutManagement({ historyMode = false }) {
       : Array.isArray(data?.data)
         ? data.data
         : []
-  const items = allItems.filter((payout) => (
-    (payout?.status || '').toString().toUpperCase() === activeStatus
-  ))
+  const items = allItems.filter((payout) => getPayoutStatus(payout) === activeStatus)
   const totalsCurrency = data?.totalsCurrency || 'USD'
   const summaryCards = useMemo(
     () => [
@@ -233,10 +253,13 @@ function PayoutManagement({ historyMode = false }) {
           <button
             key={tab.label}
             className={`payout-filter-tab ${activeStatus === tab.value ? 'active' : ''}`}
-            onClick={() => setActiveStatus(tab.value)}
+            onClick={() => {
+              setActiveStatus(tab.value)
+              setPage(0)
+            }}
           >
             {tab.label}
-            {` (${Number(data?.counts?.[tab.value]) || allItems.filter((item) => (item?.status || '').toString().toUpperCase() === tab.value).length})`}
+            {` (${Number(data?.counts?.[tab.value]) || allItems.filter((item) => getPayoutStatus(item) === tab.value).length})`}
           </button>
         ))}
       </div>
@@ -272,7 +295,14 @@ function PayoutManagement({ historyMode = false }) {
                   No payout requests match this filter.
                 </td>
               </tr>
-            ) : items.map((payout) => (
+            ) : items.map((payout) => {
+              const status = getPayoutStatus(payout)
+              const details = payout.failureReason
+                || payout.adminNote
+                || payout.calculationDetails
+                || payout.requestNote
+                || '—'
+              return (
               <tr key={payout.id}>
                 <td>
                   <div className="payout-user-cell">
@@ -305,17 +335,13 @@ function PayoutManagement({ historyMode = false }) {
                   {payout.stripeConnectedAccountId || '—'}
                 </td>
                 <td>
-                  <span className={`status-badge ${(payout.status || '').toLowerCase()}`}>
-                    {payout.status}
+                  <span className={`status-badge ${status.toLowerCase()}`}>
+                    {status}
                   </span>
                 </td>
                 <td>{formatDate(payout.requestedAt || payout.createdAt)}</td>
-                <td className="admin-payout-details">
-                  {payout.failureReason
-                    || payout.adminNote
-                    || payout.calculationDetails
-                    || payout.requestNote
-                    || '—'}
+                <td className="admin-payout-details" title={details}>
+                  <span className="admin-payout-details-text">{details}</span>
                   {payout.stripeTransferId && (
                     <small>Transfer: {payout.stripeTransferId}</small>
                   )}
@@ -326,10 +352,35 @@ function PayoutManagement({ historyMode = false }) {
                   </div>
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>
+      {pagination.totalPages > 1 && (
+        <nav className="admin-payout-pagination" aria-label="Payout pagination">
+          <span>
+            Page {page + 1} of {pagination.totalPages}
+            {pagination.totalElements > 0 && ` · ${pagination.totalElements.toLocaleString()} records`}
+          </span>
+          <div>
+            <button
+              type="button"
+              disabled={loading || page === 0}
+              onClick={() => setPage((current) => Math.max(0, current - 1))}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              disabled={loading || page + 1 >= pagination.totalPages}
+              onClick={() => setPage((current) => current + 1)}
+            >
+              Next
+            </button>
+          </div>
+        </nav>
+      )}
       </div>
     </AdminLayout>
   )
