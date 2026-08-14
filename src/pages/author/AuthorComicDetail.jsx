@@ -52,9 +52,31 @@ const normalizeGenres = (genres) => {
 const parsePageCountFromReason = (reasonText) => {
   if (!reasonText || !reasonText.includes('--- PRESERVED PAGES BLOCK ---')) return null;
   try {
-    const jsonStr = reasonText.split('--- PRESERVED PAGES BLOCK ---')[1].trim();
-    const pages = JSON.parse(jsonStr);
-    return Array.isArray(pages) ? pages.length : null;
+    let jsonStr = reasonText.split('--- PRESERVED PAGES BLOCK ---')[1].trim();
+    if (jsonStr.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) {
+      jsonStr = jsonStr.split('--- DETAILED INSPECTION FEEDBACK REPORT')[0].trim();
+    }
+    try {
+      let parsed = JSON.parse(jsonStr);
+      if (typeof parsed === 'string') {
+        parsed = JSON.parse(parsed);
+      }
+      if (Array.isArray(parsed)) return parsed.length;
+    } catch (e) {
+      // ignore
+    }
+    const start = jsonStr.indexOf('[');
+    const end = jsonStr.lastIndexOf(']');
+    if (start !== -1 && end !== -1 && end > start) {
+      let arrayStr = jsonStr.substring(start, end + 1);
+      arrayStr = arrayStr.replace(/\\"/g, '"');
+      let pages = JSON.parse(arrayStr);
+      if (typeof pages === 'string') {
+        pages = JSON.parse(pages);
+      }
+      return Array.isArray(pages) ? pages.length : null;
+    }
+    return null;
   } catch (e) {
     return null;
   }

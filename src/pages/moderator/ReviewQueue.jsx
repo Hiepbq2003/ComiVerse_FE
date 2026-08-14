@@ -18,6 +18,18 @@ import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import { getAuth } from '../../utils/Auth'
 import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
 
+const cleanReasonText = (reason) => {
+  if (!reason) return '';
+  let clean = String(reason);
+  if (clean.includes('--- PRESERVED PAGES BLOCK ---')) {
+    clean = clean.split('--- PRESERVED PAGES BLOCK ---')[0];
+  }
+  if (clean.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) {
+    clean = clean.split('--- DETAILED INSPECTION FEEDBACK REPORT')[0];
+  }
+  return clean.trim();
+};
+
 const formatSubmitterName = (submittedBy) => {
   if (!submittedBy) return 'Unknown';
   let name = submittedBy;
@@ -1092,9 +1104,8 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         finalPayload = userOverallNote;
       }
 
-      if (targetChap.pages && targetChap.pages.length > 0) {
-        finalPayload += `\n\n--- PRESERVED PAGES BLOCK ---\n${JSON.stringify(targetChap.pages)}`;
-      }
+      // The backend now natively preserves the image array using rejectedImagesSnapshot,
+      // so we no longer need to sneak it into the rejection reason string.
       
       handleChapterReject(selectedReject.parentReviewId || selectedReject.comicId || selectedReject.id, targetChap, finalPayload);
     } else {
@@ -1137,9 +1148,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           finalPayload = userOverallNote;
         }
 
-        if (enrichedItem.pages && enrichedItem.pages.length > 0) {
-          finalPayload += `\n\n--- PRESERVED PAGES BLOCK ---\n${JSON.stringify(enrichedItem.pages)}`;
-        }
+        // The backend now natively preserves the image array using rejectedImagesSnapshot.
 
         // Use handleChapterReject for chapters to preserve pages, else fallback to handleConfirmReject
         if (handleChapterReject && isRealChapterSubmission(enrichedItem)) {
@@ -1853,7 +1862,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                             Rejection Feedback for {activeChap?.title || 'this chapter'}
                           </strong>
                           <span style={{ fontSize: '12.5px', lineHeight: '1.55' }}>
-                            {activeChap?.rejectionReason || selectedReview.rejectionReason}
+                            {cleanReasonText(activeChap?.rejectionReason || selectedReview.rejectionReason)}
                           </span>
                         </div>
                       )}
@@ -2290,7 +2299,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                             Rejection Feedback:
                           </strong>
                           <span style={{ fontStyle: 'italic', fontSize: '13.5px' }}>
-                            "{selectedReview.rejectionReason || 'No feedback recorded.'}"
+                            "{cleanReasonText(selectedReview.rejectionReason) || 'No feedback recorded.'}"
                           </span>
                         </div>
                       )}
