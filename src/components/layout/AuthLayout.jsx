@@ -1,11 +1,21 @@
+import { useEffect, useRef } from 'react'
 import comicAction from '../../assets/comic_action.png'
 import comicAdventure from '../../assets/comic_adventure.png'
 import comicScifi from '../../assets/comic_scifi.png'
 import LogoIcon from '../common/LogoIcon'
 import { Link } from 'react-router-dom'
+import { House, Moon, Sun } from 'lucide-react'
+import { useTheme } from '../../context/ThemeContext'
 import '../../assets/style/auth/auth.css'
 
 function AuthLayout({ children, alert, isWide }) {
+  const { theme, toggleTheme } = useTheme()
+  const formPaneRef = useRef(null)
+
+  useEffect(() => {
+    formPaneRef.current?.scrollTo?.({ top: 0, behavior: 'auto' })
+  }, [isWide])
+
   return (
     <div className="auth-page-container">
       {/* Left Pane - Branding & Floating Comic Cards */}
@@ -49,21 +59,39 @@ function AuthLayout({ children, alert, isWide }) {
 
           <div className="brand-footer-text">
             <h1>Every chapter is <br/><span className="text-highlight">a new world.</span></h1>
-            <p>Discover 1,000+ comics, manhwa & manga — updated daily, completely free.</p>
+            <p>Discover 1,000+ comics, manhwa & manga - updated daily, completely free.</p>
           </div>
         </div>
       )}
 
       {/* Right Pane - Dynamic Authentication Forms */}
-      <div className="right-form-pane" style={isWide ? { flex: 1, width: '100%', minHeight: '100vh', position: 'relative' } : { position: 'relative' }}>
-        
-        <Link to="/" className="auth-back-btn" aria-label="Back to Home">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-            <polyline points="9 22 9 12 15 12 15 22"></polyline>
-          </svg>
-          <span style={{ marginLeft: '6px', fontWeight: '600' }}>Home</span>
-        </Link>
+      <div ref={formPaneRef} className={`right-form-pane ${isWide ? 'right-form-pane--wide' : ''}`} style={isWide ? { flex: 1, width: '100%', minHeight: '100vh', position: 'relative' } : { position: 'relative' }}>
+        <div className="auth-topbar">
+          <Link
+            to="/"
+            className={`auth-topbar-logo ${isWide ? '' : 'auth-topbar-logo--compact'}`}
+            aria-label="ComiVerse home"
+          >
+            <LogoIcon size={32} />
+          </Link>
+
+          <div className="auth-topbar-actions">
+            <button
+              type="button"
+              className="auth-theme-toggle"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+
+            <Link to="/" className="auth-back-btn" aria-label="Back to Home">
+              <House size={18} aria-hidden="true" />
+              <span>Home</span>
+            </Link>
+          </div>
+        </div>
 
         {/* Toast Alert Banner */}
         {alert && alert.message && (

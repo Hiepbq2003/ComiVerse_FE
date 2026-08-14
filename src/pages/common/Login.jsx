@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'react-toastify'
+import { ChevronRight, LockKeyhole, TriangleAlert } from 'lucide-react'
 import { loginApi, getMeApi } from '../../services/api/AuthApi'
 import { useAuth } from '../../context/AuthContext'
 import { setAuth, clearAuth } from '../../utils/Auth'
@@ -296,20 +297,14 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
         </div>
 
         {(failedAttempts > 0 || lockoutTimer > 0) && (
-          <div style={{
-            padding: '10px 14px',
-            margin: '0 0 14px 0',
-            borderRadius: '10px',
-            background: lockoutTimer > 0 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)',
-            border: `1px solid ${lockoutTimer > 0 ? 'rgba(239, 68, 68, 0.35)' : 'rgba(245, 158, 11, 0.35)'}`,
-            color: lockoutTimer > 0 ? '#f87171' : '#fbbf24',
-            fontSize: '12.5px',
-            lineHeight: '1.4',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px'
-          }}>
-            <span style={{ fontSize: '16px' }}>{lockoutTimer > 0 ? '🔒' : '⚠️'}</span>
+          <div
+            className={`login-security-notice ${lockoutTimer > 0 ? 'is-locked' : 'is-warning'}`}
+            role="status"
+            aria-live="polite"
+          >
+            <span className="login-security-notice-icon" aria-hidden="true">
+              {lockoutTimer > 0 ? <LockKeyhole size={17} /> : <TriangleAlert size={17} />}
+            </span>
             <div>
               {lockoutTimer > 0 ? (
                 <span><strong>Login Locked:</strong> You have failed 5 times. Please wait <strong>{Math.floor(lockoutTimer / 60)}m {lockoutTimer % 60}s</strong> before trying again to prevent spam.</span>
@@ -321,7 +316,8 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
         )}
 
         <button type="submit" className="btn-primary" disabled={loading || lockoutTimer > 0} style={lockoutTimer > 0 ? { opacity: 0.6, cursor: 'not-allowed', background: '#64748b' } : {}}>
-          <span>{lockoutTimer > 0 ? `Locked (${Math.floor(lockoutTimer / 60)}m ${lockoutTimer % 60}s)` : (loading ? 'Signing In...' : 'Sign In')}</span> <span className="btn-arrow-icon">›</span>
+          <span>{lockoutTimer > 0 ? `Locked (${Math.floor(lockoutTimer / 60)}m ${lockoutTimer % 60}s)` : (loading ? 'Signing In...' : 'Sign In')}</span>
+          <ChevronRight className="btn-arrow-icon" size={18} aria-hidden="true" />
         </button>
       </form>
 

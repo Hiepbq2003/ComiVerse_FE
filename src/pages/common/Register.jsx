@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Circle } from 'lucide-react'
 import { registerApi } from '../../services/api/AuthApi'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { getGoogleAuthUrl } from '../../config/apiConfig'
@@ -361,7 +362,7 @@ function Register({ onNavigate, onVerificationRequired, showAlert, loading, setL
                             <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="20 6 9 17 4 12" />
                             </svg>
-                          ) : '•'}
+                          ) : <Circle size={6} fill="currentColor" aria-hidden="true" />}
                         </span>
                         <span>{rule.label}</span>
                       </li>
