@@ -1325,7 +1325,9 @@ function TeamProjects() {
       setTasks(finalCombinedTasks);
       setTasksLoading(false);
 
-      const mappedRequests = reqList.map(r => ({ ...r, roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles }));
+      const mappedRequests = (Array.isArray(reqList) ? reqList : [])
+        .filter(r => r && (!r.status || r.status.toUpperCase() === 'PENDING'))
+        .map(r => ({ ...r, roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles }));
       setJoinRequests(mappedRequests)
 
       const backendMems = Array.isArray(teamMembersList) ? teamMembersList : [];

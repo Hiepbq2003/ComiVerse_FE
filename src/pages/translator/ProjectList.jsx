@@ -50,17 +50,28 @@ function ProjectList() {
       ]);
       const projList = Array.isArray(projectsData) ? projectsData : [];
       const requestsList = Array.isArray(requestsData) ? requestsData : [];
-      const appIds = requestsList
-        .filter(req => !req.status || req.status === 'PENDING')
-        .map(req => req.projectTeamId);
 
-      // Build teamId -> requestId map for cancel functionality
+      let appIds = [];
       const reqMap = {};
-      requestsList.forEach(req => {
-        if (!req.status || req.status === 'PENDING') {
-          reqMap[req.projectTeamId] = req.id;
-        }
-      });
+
+      if (statusData && Array.isArray(statusData.pendingDetails) && statusData.pendingDetails.length > 0) {
+        statusData.pendingDetails.forEach(item => {
+          if (item.projectTeamId) {
+            appIds.push(item.projectTeamId);
+            if (item.requestId) {
+              reqMap[item.projectTeamId] = item.requestId;
+            }
+          }
+        });
+      } else {
+        requestsList.forEach(req => {
+          const s = (req.status || '').toUpperCase();
+          if (s === 'PENDING') {
+            appIds.push(req.projectTeamId);
+            reqMap[req.projectTeamId] = req.id;
+          }
+        });
+      }
 
       setProjects(projList);
       setAppliedIds(appIds);

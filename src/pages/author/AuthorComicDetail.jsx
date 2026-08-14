@@ -47,6 +47,7 @@ const normalizeGenres = (genres) => {
   if (typeof genres === 'string' && genres.trim()) {
     return genres.split(',').map((genre) => genre.trim()).filter(Boolean)
   }
+  return []
 }
 
 const parsePageCountFromReason = (reasonText) => {
