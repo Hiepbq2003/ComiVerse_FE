@@ -4,6 +4,7 @@ import '../../assets/style/translator/dashboard.css'
 import { getAllProjectTeamsApi, getMyProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getTeamTasksApi, getTeamChaptersApi } from '../../services/api/TeamWorkspaceApi'
 import { getAuth } from '../../utils/Auth'
+import { exportToCsv } from '../../utils/exportToCsv'
 import { toast } from 'react-toastify'
 
 const PROJECTS_PER_PAGE = 4
@@ -269,6 +270,66 @@ function TranslatorDashboard() {
     return list
   }, [filteredProjects, teamStats])
 
+  // Export Statistics & Workload to Excel CSV
+  const handleExportDashboard = () => {
+    if (!filteredProjects || filteredProjects.length === 0) {
+      toast.warn('No project data available to export.')
+      return
+    }
+
+    const headers = [
+      'Team Name',
+      'Comic Title',
+      'Role in Team',
+      'Team Status',
+      'Language (Source -> Target)',
+      'Members Count',
+      'Published Chapters',
+      'Backlog Tasks',
+      'In Progress Tasks',
+      'In Review Tasks',
+      'Completed Tasks',
+      'Total Tasks'
+    ]
+
+    const rows = filteredProjects.map(p => {
+      const pStats = teamStats[p.id] || { tasks: [], chapters: [] }
+      let backlog = 0, inProgress = 0, review = 0, done = 0
+
+      pStats.tasks.forEach(t => {
+        const col = (t.column || t.status || '').toLowerCase()
+        if (col.includes('done') || col.includes('completed')) done++
+        else if (col.includes('progress') || col.includes('doing')) inProgress++
+        else if (col.includes('review')) review++
+        else backlog++
+      })
+
+      const totalTasks = backlog + inProgress + review + done
+
+      return [
+        p.team || p.title || 'Unnamed Team',
+        p.comicName || p.title || 'Untitled Comic',
+        p.isLeader ? 'Project Leader' : 'Translator Member',
+        p.status || 'ACTIVE',
+        `${p.sourceLang || 'Any'} -> ${p.targetLang || 'Vietnamese'}`,
+        p.membersCount || 1,
+        pStats.chapters?.length || 0,
+        backlog,
+        inProgress,
+        review,
+        done,
+        totalTasks
+      ]
+    })
+
+    const prefix = filterRole === 'LED_BY_ME'
+      ? 'ComiVerse_Project_Leader_Workload_Report'
+      : 'ComiVerse_Translator_Dashboard_Report'
+
+    exportToCsv(prefix, headers, rows)
+    toast.success('Workload report exported successfully!')
+  }
+
   // Paginated Active Tasks List
   const totalTasksPages = Math.max(1, Math.ceil(allActiveTasks.length / TASKS_PER_PAGE))
   const paginatedTasks = useMemo(() => {
@@ -308,19 +369,48 @@ function TranslatorDashboard() {
           <p>Real-time analytics, task completion progress, published releases, and team workload.</p>
         </div>
 
-        {/* Workspace Filter Pills */}
-        <div className="dashboard-filter-pills">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          {/* Workspace Filter Pills */}
+          <div className="dashboard-filter-pills">
+            <button
+              className={`dashboard-filter-btn ${filterRole === 'ALL' ? 'active' : ''}`}
+              onClick={() => setFilterRole('ALL')}
+            >
+              All Workspaces ({projects.length})
+            </button>
+            <button
+              className={`dashboard-filter-btn ${filterRole === 'LED_BY_ME' ? 'active' : ''}`}
+              onClick={() => setFilterRole('LED_BY_ME')}
+            >
+              👑 Led by Me ({projects.filter(p => p.isLeader).length})
+            </button>
+          </div>
+
           <button
-            className={`dashboard-filter-btn ${filterRole === 'ALL' ? 'active' : ''}`}
-            onClick={() => setFilterRole('ALL')}
+            type="button"
+            onClick={handleExportDashboard}
+            disabled={loading || filteredProjects.length === 0}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 16px',
+              borderRadius: '20px',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#ffffff',
+              border: 'none',
+              fontWeight: '700',
+              fontSize: '13px',
+              cursor: loading || filteredProjects.length === 0 ? 'not-allowed' : 'pointer',
+              opacity: loading || filteredProjects.length === 0 ? 0.6 : 1,
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+              transition: 'all 0.2s ease',
+              height: '38px',
+              whiteSpace: 'nowrap'
+            }}
+            title="Export full statistics and workload breakdown to Excel CSV"
           >
-            All Workspaces ({projects.length})
-          </button>
-          <button
-            className={`dashboard-filter-btn ${filterRole === 'LED_BY_ME' ? 'active' : ''}`}
-            onClick={() => setFilterRole('LED_BY_ME')}
-          >
-            👑 Led by Me ({projects.filter(p => p.isLeader).length})
+            📥 Export Report
           </button>
         </div>
       </div>

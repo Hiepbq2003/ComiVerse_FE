@@ -8,6 +8,7 @@ import { getAllComicsApi, getComicsPageApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi } from '../../services/api/ChapterApi'
 import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
 import { getAuth } from '../../utils/Auth'
+import { exportToCsv } from '../../utils/exportToCsv'
 import { uploadImageApi } from '../../services/api/UploadApi'
 const getProjectCover = (proj, dbComics = [], dbSubs = []) => {
   if (!proj) return '';
@@ -154,6 +155,44 @@ function getTimeAgo(date) {
 }
 
 function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpenDetails, onQuickTranslate, onOpenEdit, isLeaderMatch }) {
+  const handleExportProjects = () => {
+    if (!teamProjectsList || teamProjectsList.length === 0) {
+      return
+    }
+
+    const headers = [
+      'Team ID',
+      'Team Name',
+      'Comic Title',
+      'Leader Name',
+      'Source Language',
+      'Target Language',
+      'Status',
+      'Recruiting Status',
+      'Members Count',
+      'Max Members Capacity',
+      'Chapters Count',
+      'Progress'
+    ]
+
+    const rows = teamProjectsList.map(p => [
+      p.id || '',
+      p.team || p.title || '',
+      p.comicName || p.title || '',
+      p.leaderName || '',
+      p.sourceLang || 'Any',
+      p.targetLang || 'Vietnamese',
+      p.status || 'ACTIVE',
+      p.isRecruiting ? 'Open for Recruiting' : 'Closed',
+      p.membersCount || 1,
+      (Number(p.maxMembers) || 5) + 1,
+      p.chaptersCount || 0,
+      p.progress ? `${p.progress}%` : '0%'
+    ])
+
+    exportToCsv('ComiVerse_Translation_Projects_Export', headers, rows)
+  }
+
   return (
     <div className="fade-in">
       <div className="translator-page-header">
@@ -161,7 +200,7 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
           <h1>Translation Projects</h1>
           <p>All group translation project teams registered on the platform.</p>
         </div>
-        <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <input
             type="text"
             className="trans-form-input"
@@ -170,6 +209,32 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
           />
+          <button
+            type="button"
+            onClick={handleExportProjects}
+            disabled={teamProjectsList.length === 0}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 16px',
+              borderRadius: '20px',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#ffffff',
+              border: 'none',
+              fontWeight: '700',
+              fontSize: '13px',
+              cursor: teamProjectsList.length === 0 ? 'not-allowed' : 'pointer',
+              opacity: teamProjectsList.length === 0 ? 0.6 : 1,
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+              transition: 'all 0.2s ease',
+              height: '38px',
+              whiteSpace: 'nowrap'
+            }}
+            title="Export projects list to Excel CSV"
+          >
+            📥 Export Projects
+          </button>
         </div>
       </div>
 

@@ -1029,9 +1029,9 @@
 
 .tw-x-translation-textarea {
   color: #ffffff;
-  text-align: var(--text-align, left);
-  font-weight: var(--font-weight, 400);
-  font-style: var(--font-style, normal);
+  text-align: left;
+  font-weight: 400;
+  font-style: normal;
 }
 
 /* ---- Root layout: collapsible left sidebar ---- */

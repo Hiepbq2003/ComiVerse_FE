@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import '../../assets/style/moderator/project-teams.css'
 import { toast } from 'react-toastify'
+import { exportToCsv } from '../../utils/exportToCsv'
 import { searchTranslatorsApi, searchProjectLeadersApi } from '../../services/api/AccountApi'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import ModernPagination from '../../components/common/ModernPagination'
@@ -432,20 +433,67 @@ function ProjectTeams({
     handleCreateLeaderSearch('')
   }
 
+  const handleExportTeams = () => {
+    try {
+      const headers = [
+        'Team ID',
+        'Team Title',
+        'Comic Name',
+        'Leader Name',
+        'Source Language',
+        'Target Language',
+        'Priority',
+        'Status',
+        'Recruiting Status',
+        'Members Count',
+        'Active Tasks'
+      ];
+      const rows = projectTeams.map(t => [
+        t.id || 'N/A',
+        t.title || 'Untitled Team',
+        t.comicName || t.comicTitle || 'N/A',
+        t.leaderName || 'N/A',
+        t.sourceLang || 'Japanese',
+        t.targetLang || t.targetLanguage || 'English',
+        t.priority || 'Medium',
+        t.status || 'ACTIVE',
+        t.isRecruiting ? 'Recruiting' : 'Closed',
+        t.membersCount || t.members?.length || 0,
+        t.activeTasksCount || 0
+      ]);
+
+      exportToCsv('ComiVerse_Moderator_Project_Teams', headers, rows);
+      toast.success('📥 Project Teams exported successfully!');
+    } catch (err) {
+      console.error('Failed to export project teams:', err);
+      toast.error('Failed to export teams: ' + err.message);
+    }
+  };
+
   return (
     <div className="fade-in">
-      <div className="comic-mgmt-header">
+      <div className="comic-mgmt-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div className="moderator-page-header">
           <h1>Project Teams</h1>
           <p>Create and manage translation project teams. Assign leaders from translator members.</p>
         </div>
-        <button 
-          className="mod-btn approve mod-btn-create"
-          style={{ padding: '10px 18px' }}
-          onClick={triggerOpenCreate}
-        >
-          <span style={{ fontWeight: '800', fontSize: '16px', color: '#ffffff', marginRight: '6px' }}>+</span> Create Project Team
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="mod-export-btn"
+            onClick={handleExportTeams}
+            title="Export project teams list as CSV"
+          >
+            <span>📥 Export Teams (CSV)</span>
+          </button>
+          <button 
+            className="mod-btn approve mod-btn-create"
+            style={{ padding: '10px 18px' }}
+            onClick={triggerOpenCreate}
+          >
+            <span style={{ fontWeight: '800', fontSize: '16px', color: '#ffffff', marginRight: '6px' }}>+</span> Create Project Team
+          </button>
+        </div>
       </div>
 
       <div className="mod-stats-cards-row">
