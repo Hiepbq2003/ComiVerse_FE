@@ -976,14 +976,14 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       }
     }
 
-    const targetSubId = enrichedChap.submissionId || enrichedChap.id || selectedReview.id;
-    const targetSubItem = enrichedChap.originalSubmissionItem || (selectedReview.subItems ? selectedReview.subItems.find(s => (s.id || s) === targetSubId) : selectedReview);
+    const targetSubId = enrichedChap.submissionId || enrichedChap.id || selectedReview.id || selectedReview.comicId;
+    const targetSubItem = enrichedChap.originalSubmissionItem || (selectedReview.subItems ? selectedReview.subItems.find(s => (s.id || s.comicId || s) === targetSubId) : selectedReview);
     const baseItem = typeof targetSubItem === 'object' && targetSubItem !== null ? targetSubItem : (typeof selectedReview === 'object' && selectedReview !== null ? selectedReview : { id: targetSubId });
     setSelectedReject({
       ...baseItem,
       id: targetSubId,
       rejectChapterObj: enrichedChap,
-      parentReviewId: selectedReview.id || targetSubId
+      parentReviewId: selectedReview.id || selectedReview.comicId || targetSubId
     });
     setRejectionReason('');
   };
@@ -1085,11 +1085,11 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         finalPayload += `\n\n--- PRESERVED PAGES BLOCK ---\n${JSON.stringify(targetChap.pages)}`;
       }
       
-      handleChapterReject(selectedReject.parentReviewId || selectedReject.id, targetChap, finalPayload);
+      handleChapterReject(selectedReject.parentReviewId || selectedReject.comicId || selectedReject.id, targetChap, finalPayload);
     } else {
       // Bulk "Reject All"
       const itemsToReject = selectedReject.subItems || selectedReject.allChapters || selectedReject.chapters || [selectedReject];
-      const comicId = selectedReject.parentReviewId || selectedReject.id;
+      const comicId = selectedReject.parentReviewId || selectedReject.comicId || selectedReject.id;
 
       itemsToReject.forEach(i => {
         // Enrich chapter with pages if missing
