@@ -413,8 +413,8 @@ function ProjectList() {
         </p>
       </div>
 
-      {/* Slot Counter & Cooldown Banner */}
-      {appStatus ? (
+      {/* Slot Counter & Cooldown Banner (Only for Translators, hidden for Project Leaders) */}
+      {!isUserProjectLeader && appStatus ? (
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -458,7 +458,7 @@ function ProjectList() {
             </div>
           )}
         </div>
-      ) : atProjectLimit && (
+      ) : (!isUserProjectLeader && atProjectLimit) && (
         <div style={{
           display: 'flex',
           alignItems: 'center',
