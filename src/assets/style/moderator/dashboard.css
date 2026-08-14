@@ -1401,3 +1401,69 @@ html.light .timeframe-btn.active {
   color: #ffffff !important;
 }
 
+/* ═══════════════════════════════════════════════════════
+   EXPORT STATISTICAL REPORT BUTTONS
+   ═══════════════════════════════════════════════════════ */
+.mod-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  color: #ffffff !important;
+  font-size: 13px;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.35);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.mod-export-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.55);
+  filter: brightness(1.1);
+}
+
+.mod-export-btn:active {
+  transform: translateY(0);
+}
+
+.mod-export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.mod-export-btn.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: none;
+  color: #e2e8f0 !important;
+}
+
+.mod-export-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: #a855f7;
+  color: #ffffff !important;
+}
+
+html.light .mod-export-btn,
+.light-theme .mod-export-btn {
+  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.25) !important;
+}
+
+html.light .mod-export-btn.secondary,
+.light-theme .mod-export-btn.secondary {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+

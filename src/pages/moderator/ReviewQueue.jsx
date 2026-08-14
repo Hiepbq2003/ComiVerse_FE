@@ -15,6 +15,8 @@ import {
 } from '../../services/api/AppealApi'
 import { useTheme } from '../../context/ThemeContext'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
+import { exportToCsv } from '../../utils/exportToCsv'
+import { toast } from 'react-toastify'
 import { getAuth } from '../../utils/Auth'
 import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
 
@@ -1736,11 +1738,65 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedReview, selectedChapter, previewTab, pageIndex])
 
+  const handleExportReviewQueue = () => {
+    try {
+      const itemsToExport = filteredItems && filteredItems.length > 0 ? filteredItems : (submissions || []);
+      const headers = [
+        'Submission ID',
+        'Title',
+        'Type',
+        'Author / Submitter',
+        'Language',
+        'Current Status',
+        'Total Chapters',
+        'Submission / Update Date',
+        'Rejection Note / Moderator Feedback'
+      ];
+      
+      const rows = itemsToExport.map(item => {
+        const isAppeal = item.isAppealTicket;
+        const subType = isAppeal ? 'Appeal Ticket' : (item.type === 'COMIC' || !item.chapterNumber ? 'Comic Profile' : `Chapter ${item.chapterNumber}`);
+        const submitter = isAppeal ? (item.requesterName || item.requesterEmail || 'Author') : formatSubmitterName(item.submittedBy).replace('Author: ', '');
+        const dateStr = item.submittedAt || item.createdAt || item.updatedAt || 'N/A';
+        const cleanNote = cleanReasonText(item.rejectionReason || item.rejection_reason || item.appealReason || item.reason || item.notes || '');
+        const chapsCount = (item.allChapters?.length || item.chapters?.length || (item.chapterNumber ? 1 : 0));
+
+        return [
+          item.id || 'N/A',
+          item.title || item.comicName || item.targetName || 'Untitled',
+          subType,
+          submitter,
+          item.language || item.sourceLanguage || item.targetLanguage || 'Japanese',
+          (item.status || item.moderationStatus || 'PENDING').toUpperCase(),
+          chapsCount,
+          dateStr,
+          cleanNote || 'None'
+        ];
+      });
+
+      exportToCsv(`ComiVerse_Moderation_ReviewQueue_${activeTab.toUpperCase()}`, headers, rows);
+      toast.success(`📥 Review Queue (${activeTab}) exported successfully!`);
+    } catch (err) {
+      console.error('Failed to export review queue:', err);
+      toast.error('Failed to export review queue: ' + err.message);
+    }
+  };
+
   return (
     <div className="fade-in">
-      <div className="moderator-page-header">
-        <h1>Raw Content Review Queue</h1>
-        <p>Review and verify author submission inputs (Title, Language, Min Age, Description, Genres, Cover & Chapters), inspect raw chapter manuscripts, and approve catalog publication.</p>
+      <div className="moderator-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <h1>Raw Content Review Queue</h1>
+          <p>Review and verify author submission inputs (Title, Language, Min Age, Description, Genres, Cover & Chapters), inspect raw chapter manuscripts, and approve catalog publication.</p>
+        </div>
+        <button
+          type="button"
+          className="mod-export-btn"
+          onClick={handleExportReviewQueue}
+          title="Export current review queue items as CSV"
+        >
+          <span>📥 Export Queue ({activeTab.toUpperCase()})</span>
+        </button>
       </div>
 
       {/* Dynamic Statistics Ribbon */}

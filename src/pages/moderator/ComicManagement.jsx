@@ -8,6 +8,7 @@ import ModernPagination from '../../components/common/ModernPagination'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import { createTranslationRequestApi } from '../../services/api/TranslationPoolApi'
 import { toast } from 'react-toastify'
+import { exportToCsv } from '../../utils/exportToCsv'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getChaptersByComicIdApi, deleteChapterApi } from '../../services/api/ChapterApi'
 import { getComicByIdApi } from '../../services/api/ComicApi'
@@ -509,13 +510,66 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
     setEditingComic(null)
   }
 
+  const handleExportComicCatalog = () => {
+    try {
+      const itemsToExport = filteredComics && filteredComics.length > 0 ? filteredComics : comics;
+      const headers = [
+        'Comic ID',
+        'Title',
+        'Author',
+        'Original Language',
+        'Publication Status',
+        'Moderation Status',
+        'Total Chapters',
+        'Genres',
+        'Assigned Team',
+        'Views',
+        'Rating'
+      ];
+      const rows = itemsToExport.map(c => {
+        const cGenres = Array.isArray(c.genres) 
+          ? c.genres.map(g => g.name || g.title || g).join(', ') 
+          : (typeof c.genres === 'string' ? c.genres : '');
+        const chapsCount = c.chaptersCount || c.chapterCount || c.chapters?.length || 0;
+        
+        return [
+          c.id || 'N/A',
+          c.title || 'Untitled',
+          c.authorName || c.author || 'N/A',
+          c.language || 'Japanese',
+          c.publicationStatus || 'ONGOING',
+          c.moderationStatus || 'PUBLISHED',
+          chapsCount,
+          cGenres || 'None',
+          c.projectTeam || c.teamName || 'None',
+          c.views || 0,
+          c.rating || 0
+        ];
+      });
+
+      exportToCsv('ComiVerse_Moderator_Comic_Catalog', headers, rows);
+      toast.success('📥 Comic catalog exported successfully!');
+    } catch (err) {
+      console.error('Failed to export comic catalog:', err);
+      toast.error('Failed to export catalog: ' + err.message);
+    }
+  };
+
   return (
     <div className="fade-in">
-      <div className="comic-mgmt-header">
+      <div className="comic-mgmt-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div className="moderator-page-header">
           <h1>Comic Management</h1>
           <p>Browse catalog comics, edit details, archive, or assign translator teams.</p>
         </div>
+        <button
+          type="button"
+          className="mod-export-btn"
+          onClick={handleExportComicCatalog}
+          title="Export current comic catalog as CSV"
+        >
+          <span>📥 Export Catalog (CSV)</span>
+        </button>
       </div>
 
       {/* Statistics overview cards row */}
