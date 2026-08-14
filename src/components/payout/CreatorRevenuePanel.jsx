@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Download } from 'lucide-react'
 import '../../assets/style/common/creator-payout.css'
 import { getCreatorPayoutOverviewApi } from '../../services/api/PayoutApi'
+import { exportToCsv } from '../../utils/exportToCsv'
 
 const formatMoney = (value, currency = 'USD') => (
   new Intl.NumberFormat('vi-VN', {
@@ -80,6 +82,35 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
   ))
   const chartMax = Math.max(1, ...chartValues)
 
+  const handleExport = () => {
+    if (isTranslator) {
+      const headers = ['Task', 'Chapter', 'Credited Pages', 'Rate/Page', 'K Factor', 'Settled At', 'Revenue']
+      const rows = tasks.map(task => [
+        task.taskTitle || 'Untitled task',
+        task.chapterNumber ? `Chapter ${task.chapterNumber}` : (task.chapterTitle || '—'),
+        task.rowType === 'ADJUSTMENT' ? '—' : `${Number(task.completedPageCount || 0)} / ${Number(task.totalPageCount || 0)}`,
+        task.pageRateUsd == null ? '—' : formatMoney(convertUsd(task.pageRateUsd), currency),
+        task.averageResponsibilityFactor == null ? '—' : Number(task.averageResponsibilityFactor).toFixed(2),
+        formatDate(task.settledAt || task.completedAt),
+        formatMoney(convertUsd(task.revenueUsd), currency)
+      ])
+      exportToCsv(`Translator_Revenue_${month || 'Latest'}`, headers, rows)
+    } else {
+      const headers = ['Comic', 'Monthly Views', 'View Units', 'View Revenue', 'Monthly Follows', 'Follow Units', 'Follow Revenue', 'Total Revenue']
+      const rows = comics.map(comic => [
+        comic.comicTitle,
+        Number(comic.monthlyViews || 0),
+        Number(comic.viewUnits || 0),
+        formatMoney(convertUsd(comic.viewRevenueUsd), currency),
+        Number(comic.monthlyFollows || 0),
+        Number(comic.followUnits || 0),
+        formatMoney(convertUsd(comic.followRevenueUsd), currency),
+        formatMoney(convertUsd(comic.totalRevenueUsd), currency)
+      ])
+      exportToCsv(`Author_Revenue_${month || 'Latest'}`, headers, rows)
+    }
+  }
+
   if (loading && !overview) {
     return (
       <div className="creator-payout-card creator-payout-loading">
@@ -98,19 +129,30 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
               || 'Monthly revenue is calculated by the server.'}
           </p>
         </div>
-        <label className="creator-payout-month">
-          Revenue month
-          <input
-            type="month"
-            value={month}
-            max={overview?.latestRequestableMonth || overview?.lastClosedMonth || undefined}
-            onChange={(event) => {
-              const value = event.target.value
-              setMonth(value)
-              loadOverview(value)
-            }}
-          />
-        </label>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
+          <label className="creator-payout-month">
+            Revenue month
+            <input
+              type="month"
+              value={month}
+              max={overview?.latestRequestableMonth || overview?.lastClosedMonth || undefined}
+              onChange={(event) => {
+                const value = event.target.value
+                setMonth(value)
+                loadOverview(value)
+              }}
+            />
+          </label>
+          <button 
+            type="button" 
+            className="author-secondary-btn" 
+            onClick={handleExport} 
+            disabled={loading || !overview}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', height: '40px' }}
+          >
+            <Download size={16} /> Export CSV
+          </button>
+        </div>
       </div>
 
       <div className="creator-payout-summary creator-payout-summary--six">
