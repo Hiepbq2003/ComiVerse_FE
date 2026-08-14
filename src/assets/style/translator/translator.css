@@ -996,6 +996,7 @@ html.light .trans-assignee-chip.selected {
   display: flex;
   gap: 10px;
   max-width: 85%;
+  min-width: 0;
   align-self: flex-start;
 }
 
@@ -1026,6 +1027,8 @@ html.light .trans-assignee-chip.selected {
 .chat-bubble-wrapper {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .chat-sender-info {
@@ -1050,7 +1053,10 @@ html.light .trans-assignee-chip.selected {
   font-size: 12.5px;
   color: var(--trans-text-primary);
   line-height: 1.4;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .chat-message-item.me .chat-bubble {
@@ -3412,6 +3418,8 @@ html.light .request-review-msg-box.empty {
 .chat-bubble-wrapper {
   display: flex !important;
   flex-direction: column !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
 }
 
 .chat-sender-info {
@@ -3437,6 +3445,9 @@ html.light .request-review-msg-box.empty {
   color: var(--trans-text-primary, #f1f5f9) !important;
   line-height: 1.45 !important;
   word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  white-space: pre-wrap !important;
+  max-width: 100% !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
   transition: transform 0.2s ease, box-shadow 0.2s ease !important;
 }
@@ -3687,6 +3698,9 @@ html.light .chat-mod-btn.warn:hover {
   margin: 10px 0 !important;
   padding: 10px 14px !important;
   border-radius: 12px !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(220, 38, 38, 0.08) 100%) !important;
   border: 1px solid rgba(245, 158, 11, 0.35) !important;
   color: #fef08a !important;
@@ -3716,7 +3730,10 @@ html.light .chat-mod-btn.warn:hover {
   font-size: 12.5px !important;
   line-height: 1.4 !important;
   font-weight: 500 !important;
+  overflow-wrap: anywhere !important;
   word-break: break-word !important;
+  white-space: pre-wrap !important;
+  max-width: 100% !important;
 }
 
 .system-warning-time {

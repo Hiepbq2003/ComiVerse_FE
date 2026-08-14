@@ -1442,6 +1442,7 @@
 
 .tw-msg-row-inner {
   max-width: 78%;
+  min-width: 0;
 }
 
 .tw-msg-sender {
@@ -1458,6 +1459,9 @@
   line-height: 1.35;
   background: var(--ink-850);
   color: var(--ink-text);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .tw-msg-row.is-me .tw-msg-bubble {

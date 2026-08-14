@@ -23,6 +23,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import "../../assets/style/translator/review-workspace.css";
 import { API_BASE_URL as API_BASE } from "../../config/apiConfig";
+import { updateTeamTaskApi } from "../../services/api/TeamWorkspaceApi";
 
 const TOKEN_KEY = "token";
 
@@ -109,13 +110,6 @@ async function deleteCommentApi(commentId) {
 async function resolveComment(commentId) {
   return fetchJson(`${API_BASE}/review-workspace/comments/${commentId}/resolve`, {
     method: "PUT",
-  });
-}
-
-async function submitDecision(taskId, decision) {
-  return fetchJson(`${API_BASE}/review-workspace/tasks/${taskId}/decision`, {
-    method: "PUT",
-    body: JSON.stringify({ decision }),
   });
 }
 
@@ -329,10 +323,17 @@ function ReviewHeader({
   onNextPage,
   deciding,
   isLastPage,
+  hasOpenReviews = false,
   onApprove,
   onRequestChanges,
 }) {
   const actionsDisabled = deciding || !isLastPage;
+  const approveDisabled = actionsDisabled || hasOpenReviews;
+  const approveDisabledTitle = hasOpenReviews
+    ? "Accept is unavailable while this chapter has review comments. Use Request Changes."
+    : !isLastPage
+      ? "Only available on the last page"
+      : undefined;
   const actionsDisabledTitle = !isLastPage ? "Only available on the last page" : undefined;
 
   return (
@@ -411,10 +412,10 @@ function ReviewHeader({
 
         <button
           type="button"
-          disabled={actionsDisabled}
+          disabled={approveDisabled}
           onClick={onApprove}
           className="rvw-approve-btn"
-          title={actionsDisabledTitle}
+          title={approveDisabledTitle}
         >
           <CheckCircle2 size={15} /> Approve
         </button>
@@ -585,7 +586,7 @@ function CommentsSidebar({
       )}
 
       <div>
-        {commentsLoading && selectedBubbleId != null && (
+        {commentsLoading && (
           <p className="rvw-sidebar-empty">Loading comments…</p>
         )}
         {!commentsLoading && selectedBubbleId == null && (
@@ -594,7 +595,7 @@ function CommentsSidebar({
         {!commentsLoading && selectedBubbleId != null && comments.length === 0 && (
           <p className="rvw-sidebar-empty">No comment on this bubble yet.</p>
         )}
-        {comments.map((c) => (
+        {!commentsLoading && comments.map((c) => (
           <CommentThread
             key={c.id}
             comment={c}
@@ -607,7 +608,7 @@ function CommentsSidebar({
         ))}
       </div>
 
-      {!bubbleAlreadyHasComment && (
+      {!commentsLoading && !bubbleAlreadyHasComment && (
         <div className="rvw-composer">
           {selectedBubbleId == null && (
             <p className="rvw-sidebar-empty" style={{ padding: "0 0 8px" }}>
@@ -646,7 +647,10 @@ function CommentsSidebar({
           Page-level review
         </p>
 
-        {generalComments && generalComments.length > 0 && (
+        {commentsLoading && (
+          <p className="rvw-sidebar-empty">Loading comments…</p>
+        )}
+        {!commentsLoading && generalComments && generalComments.length > 0 && (
           <div style={{ flex: "0 0 auto", maxHeight: "220px" }}>
             {generalComments.map((c) => (
               <CommentThread
@@ -662,7 +666,7 @@ function CommentsSidebar({
           </div>
         )}
 
-        {!alreadyHasGeneralComment && (
+        {!commentsLoading && !alreadyHasGeneralComment && (
           <div className="rvw-composer-row rvw-composer-row--wrap" style={{ padding: "0 16px 12px" }}>
             <textarea
               value={generalComposeValue}
@@ -845,25 +849,74 @@ function useReviewData(taskId) {
 
 function usePageComments(pageId) {
   const [comments, setComments] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(Boolean(pageId));
+  const loadedPageIdRef = useRef(null);
 
   useEffect(() => {
     if (!pageId) {
+      loadedPageIdRef.current = null;
       setComments([]);
+      setLoading(false);
       return;
     }
-    const controller = new AbortController();
+
+    loadedPageIdRef.current = null;
+    setComments([]);
     setLoading(true);
-    fetchComments(pageId, controller.signal)
-      .then(setComments)
-      .catch((err) => {
-        if (err.name !== "AbortError") console.error("Failed to load comments:", err);
+
+    const controller = new AbortController();
+    const requestedPageId = pageId;
+    fetchComments(requestedPageId, controller.signal)
+      .then((list) => {
+        if (controller.signal.aborted) return;
+        loadedPageIdRef.current = requestedPageId;
+        setComments(Array.isArray(list) ? list : []);
       })
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (err.name === "AbortError") return;
+        console.error("Failed to load comments:", err);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
     return () => controller.abort();
   }, [pageId]);
 
-  return { comments, setComments, loading };
+  const commentsBelongToPage = loadedPageIdRef.current === pageId;
+  return {
+    comments: commentsBelongToPage ? comments : [],
+    setComments,
+    loading: Boolean(pageId) && (loading || !commentsBelongToPage),
+  };
+}
+
+function useOpenReviewsByTask(pages, currentPageId, currentComments) {
+  const [otherOpenCount, setOtherOpenCount] = useState(0);
+
+  useEffect(() => {
+    const pageIds = (pages || []).map((p) => p.pageId || p.id).filter(Boolean);
+    if (pageIds.length === 0) {
+      setOtherOpenCount(0);
+      return;
+    }
+    const controller = new AbortController();
+    Promise.all(pageIds.map((id) => fetchComments(id, controller.signal).then((list) => [String(id), list])))
+      .then((entries) => {
+        const openOnOtherPages = entries.reduce((count, [pageId, list]) => {
+          if (String(pageId) === String(currentPageId)) return count;
+          return count + (Array.isArray(list) ? list.filter((c) => !c.resolved).length : 0);
+        }, 0);
+        setOtherOpenCount(openOnOtherPages);
+      })
+      .catch((err) => {
+        if (err.name !== "AbortError") console.error("Failed to load review comments:", err);
+      });
+    return () => controller.abort();
+  }, [pages, currentPageId]);
+
+  const openOnCurrentPage = (currentComments || []).some((c) => !c.resolved);
+  return otherOpenCount > 0 || openOnCurrentPage;
 }
 
 export default function ReviewWorkspace() {
@@ -884,6 +937,7 @@ export default function ReviewWorkspace() {
   const isLastPage = pages.length > 0 && pageIndex === pages.length - 1;
 
   const { comments, setComments, loading: commentsLoading } = usePageComments(currentPage?.pageId);
+  const hasOpenReviews = useOpenReviewsByTask(pages, currentPage?.pageId, comments);
   const [composeValue, setComposeValue] = useState("");
   const [generalComposeValue, setGeneralComposeValue] = useState("");
   const [selectedBubbleId, setSelectedBubbleId] = useState(null);
@@ -1086,6 +1140,10 @@ export default function ReviewWorkspace() {
   const handleDecision = async (decision) => {
     if (deciding) return;
     const isApprove = decision === "approved";
+    if (isApprove && hasOpenReviews) {
+      toast.error("This chapter has review comments. Use Request Changes instead of Accept.");
+      return;
+    }
 
     const confirmMessage = isApprove
       ? "Are you sure you want to approve this chapter and publish it?"
@@ -1095,7 +1153,7 @@ export default function ReviewWorkspace() {
 
     setDeciding(true);
     try {
-      await submitDecision(taskId, decision);
+      await updateTeamTaskApi(taskId, { status: isApprove ? "completed" : "in_progress" });
 
       if (isApprove) {
         toast.success("The chapter has been approved and published!");
@@ -1106,7 +1164,7 @@ export default function ReviewWorkspace() {
       goBackToProjectTeams();
     } catch (err) {
       console.error("Failed to submit decision:", err);
-      toast.error("Failed to submit your decision. Please try again.");
+      toast.error(err?.response?.data?.message || err?.message || "Failed to submit your decision. Please try again.");
     } finally {
       setDeciding(false);
     }
@@ -1140,6 +1198,7 @@ export default function ReviewWorkspace() {
         onNextPage={() => setPageIndex((p) => p + 1)}
         deciding={deciding}
         isLastPage={isLastPage}
+        hasOpenReviews={hasOpenReviews}
         onApprove={() => handleDecision("approved")}
         onRequestChanges={() => handleDecision("changes_requested")}
       />

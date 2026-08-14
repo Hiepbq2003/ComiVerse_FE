@@ -2110,10 +2110,6 @@ function TeamProjects() {
       toast.error('Only the Project Leader can change task status.')
       return
     }
-    if (getNormalizedStatusKey(newCol) === 'completed') {
-      toast.info('A task becomes Completed only after every page is DONE and the chapter is approved in Review.')
-      return
-    }
     const previousTasks = tasks
     const updatedTasks = tasks.map(task => task.id === id ? { ...task, status: newCol } : task)
     setTasks(updatedTasks)

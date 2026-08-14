@@ -35,6 +35,7 @@ import useWorkspaceSecurity from "../../hooks/useWorkspaceSecurity";
 import { useChat } from "../../hooks/useChat";
 import "../../assets/style/translator/translate-workspace.css";
 import { API_BASE_URL as API_BASE, resolveImageUrl } from "../../config/apiConfig";
+import { updateTeamTaskApi } from "../../services/api/TeamWorkspaceApi";
 
 const TOKEN_KEY = "token";
 const IS_DEV = process.env.NODE_ENV === "development";
@@ -1854,7 +1855,7 @@ function TeamMessagePopup({ groupId, onClose }) {
     isNearBottomRef,
     fetchOlderMessages,
     sendMessage,
-  } = useChat("GROUP", groupId);
+  } = useChat("TEAM", groupId);
 
   const handleScroll = () => {
     const container = scrollContainerRef.current;
@@ -2073,6 +2074,7 @@ async function fetchChapterForTask(taskId, signal) {
       (Array.isArray(task) ? task[0]?.chapterId : undefined);
 
     const taskAssigneeId = task?.assigneeId ?? null;
+    const taskStatus = task?.status ?? null;
 
     if (!chapterId || !UUID_RE.test(chapterId)) {
       throw new Error(`Task ${taskId} has no valid chapter linked (got chapterId: ${chapterId ?? "none"})`);
@@ -2083,6 +2085,7 @@ async function fetchChapterForTask(taskId, signal) {
       ...chapterResult,
       projectTeamId: task?.projectTeamId ?? null,
       taskAssigneeId,
+      taskStatus,
     };
   }
 
@@ -2097,10 +2100,11 @@ async function fetchChapterForTask(taskId, signal) {
       ...chapterResult,
       projectTeamId: null,
       taskAssigneeId: fallbackAssigneeId,
+      taskStatus: fallback.task?.status ?? null,
     };
   }
 
-  return { ...fallback.chapter, taskAssigneeId: fallbackAssigneeId };
+  return { ...fallback.chapter, taskAssigneeId: fallbackAssigneeId, taskStatus: fallback.task?.status ?? null };
 }
 
 // ChapterEntity has no `title` field — only `chapterNumber`. Every place that
@@ -2159,6 +2163,11 @@ async function fetchTeamMembers(projectTeamId, signal) {
 function isSameUser(assigneeId, userId) {
   if (assigneeId == null || userId == null) return false;
   return String(assigneeId) === String(userId);
+}
+
+function isBacklogTaskStatus(status) {
+  const normalized = String(status || "").toLowerCase().replace(/[-\s]/g, "_");
+  return !normalized || normalized === "backlog" || normalized === "todo";
 }
 
 function isSameTranslatorUser(translatorId, userId, userName, teamMembers = []) {
@@ -2448,24 +2457,6 @@ async function saveBubblesForPage(pageId, payload, signal) {
     } catch (e) {}
     return false;
   }
-}
-
-async function updateTranslationPageStatus(pageId, status, signal) {
-  const res = await fetch(`${API_BASE}/translate-workspace/pages/${pageId}/status`, {
-    method: "PUT",
-    headers: authHeaders(),
-    body: JSON.stringify({ status }),
-    signal,
-  });
-  if (!res.ok) {
-    let message = `Failed to update page status (${res.status})`;
-    try {
-      const payload = await res.json();
-      message = payload?.message || message;
-    } catch (e) {}
-    throw new Error(message);
-  }
-  return res.json();
 }
 
 async function submitTaskForReview(taskId, signal) {
@@ -3843,15 +3834,42 @@ export default function TranslateWorkspace() {
           }
           setTaskPages((prev) =>
             prev.map((p) => (p.pageId === pageId || p.id === pageId
-              ? { ...p, bubbles: bubblesJson, translatedBy: activeUserId || p.translatedBy, assignedTranslatorId: activeUserId || p.assignedTranslatorId, status: "DONE" }
+              ? {
+                  ...p,
+                  bubbles: bubblesJson,
+                  translatedBy: activeUserId || p.translatedBy,
+                  assignedTranslatorId: activeUserId || p.assignedTranslatorId,
+                  status: hasTranslationWork(bubblesJson) ? "DONE" : "TODO",
+                }
               : p))
           );
-          setSaveStatus("saved");
-          return true;
+
+          const markSaved = () => {
+            setSaveStatus("saved");
+            return true;
+          };
+          if (!isBacklogTaskStatus(chapterData?.taskStatus)) {
+            return markSaved();
+          }
+          return updateTeamTaskApi(taskId, { status: "in_progress" })
+            .then(() => {
+              setChapterData((prev) => (prev ? { ...prev, taskStatus: "in_progress" } : prev));
+              setSiblingTasks((prev) =>
+                (prev || []).map((t) =>
+                  String(t.id) === String(taskId) ? { ...t, status: "in_progress" } : t
+                )
+              );
+              return markSaved();
+            })
+            .catch((err) => {
+              console.error("[persistBubbles] Failed to move task to in_progress via PUT /tasks/{id}:", err);
+              toast.error(err?.response?.data?.message || "Could not move the task to In Progress");
+              return markSaved();
+            });
         });
       });
     },
-    [canvasRef, canEdit]
+    [canvasRef, canEdit, chapterData?.taskStatus, taskId]
   );
 
 
@@ -3929,18 +3947,8 @@ export default function TranslateWorkspace() {
       toast.error("Page could not be saved. It was not marked as completed.");
       return;
     }
-    try {
-      const updatedPage = await updateTranslationPageStatus(currentPageMeta.pageId, "DONE");
-      setTaskPages((prev) => prev.map((page) => (
-        String(page.pageId || page.id) === String(currentPageMeta.pageId)
-          ? { ...page, ...updatedPage, status: "DONE" }
-          : page
-      )));
-      if (currentPageIndex < images.length - 1) {
-        setCurrentPageIndex(currentPageIndex + 1);
-      }
-    } catch (err) {
-      toast.error(err?.message || "Failed to mark the page as completed.");
+    if (currentPageIndex < images.length - 1) {
+      setCurrentPageIndex(currentPageIndex + 1);
     }
   }, [canEdit, currentPageMeta, persistCurrentPage, currentPageIndex, images.length]);
 
@@ -3972,22 +3980,6 @@ export default function TranslateWorkspace() {
         return;
       }
 
-      const pageIds = [...new Set(
-        taskPages
-          .map((page) => page.pageId || page.id)
-          .filter(Boolean)
-          .map(String)
-      )];
-      const completedEntries = await Promise.all(pageIds.map(async (pageId) => {
-        const updatedPage = await updateTranslationPageStatus(pageId, "DONE");
-        return [pageId, updatedPage];
-      }));
-      const updatedById = Object.fromEntries(completedEntries);
-      setTaskPages((prev) => prev.map((page) => {
-        const updatedPage = updatedById[String(page.pageId || page.id)];
-        return updatedPage ? { ...page, ...updatedPage, status: "DONE" } : page;
-      }));
-
       await submitTaskForReview(taskId);
       navigate("/translator/project-teams", {
         state: { teamId: chapterData?.projectTeamId, tab: "tasks" },
@@ -3998,7 +3990,7 @@ export default function TranslateWorkspace() {
     } finally {
       setSending(false);
     }
-  }, [isLastPage, sending, canEdit, persistCurrentPage, taskPages, taskId, navigate, chapterData]);
+  }, [isLastPage, sending, canEdit, persistCurrentPage, taskId, navigate, chapterData]);
 
   useEffect(() => {
     const onKeyDown = (e) => {
