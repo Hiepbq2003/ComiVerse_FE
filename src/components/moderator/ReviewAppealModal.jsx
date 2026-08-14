@@ -13,22 +13,50 @@ function ReviewAppealModal({ isOpen, onClose, comic, onSuccess }) {
 
   useEffect(() => {
     if (isOpen && comic) {
+      if (comic.rawTicket) {
+        setAppealData(comic.rawTicket)
+        setLoading(false)
+        return
+      }
+
       setLoading(true)
       setAppealData(null)
       
-      // Fetch appeal data
-      getPendingAppealByTargetApi(comic.id || comic.comicId)
+      const rawTargetId = String(comic.targetId || comic.id || comic.comicId || '')
+      const cleanTargetId = rawTargetId.replace(/^(comic|sub|chap)-/, '')
+      
+      getPendingAppealByTargetApi(cleanTargetId)
         .then(res => {
           const data = res?.data || res
-          if (data && data.length > 0) {
+          if (data && Array.isArray(data) && data.length > 0) {
              setAppealData(data[0])
-          } else if (data && !Array.isArray(data)) {
+          } else if (data && !Array.isArray(data) && data.id) {
              setAppealData(data)
+          } else if (comic.appealReason || comic.reason) {
+             setAppealData({
+               id: comic.id || comic.comicId,
+               targetId: cleanTargetId,
+               targetType: 'COMIC_EDIT',
+               appealReason: comic.appealReason || comic.reason,
+               authorName: comic.authorName || comic.author || 'Author',
+               createdAt: comic.updatedAt || new Date().toISOString(),
+               status: 'PENDING'
+             })
           }
         })
         .catch(err => {
-          console.error('Failed to fetch appeal:', err)
-          toast.error('Failed to load appeal details')
+          console.warn('Appeal ticket not found or already processed:', err?.message)
+          if (comic.appealReason || comic.reason) {
+             setAppealData({
+               id: comic.id || comic.comicId,
+               targetId: cleanTargetId,
+               targetType: 'COMIC_EDIT',
+               appealReason: comic.appealReason || comic.reason,
+               authorName: comic.authorName || comic.author || 'Author',
+               createdAt: comic.updatedAt || new Date().toISOString(),
+               status: 'PENDING'
+             })
+          }
         })
         .finally(() => {
           setLoading(false)
@@ -39,19 +67,20 @@ function ReviewAppealModal({ isOpen, onClose, comic, onSuccess }) {
   if (!isOpen || !comic) return null
 
   const handleAcceptAppeal = async () => {
-    if (!appealData || !appealData.id) {
+    const ticketId = appealData?.id || comic.appealTicketId || comic.rawTicket?.id
+    if (!ticketId) {
       toast.error('Appeal data not found')
       return
     }
 
     setSubmitting(true)
     try {
-      await resolveAppealApi(appealData.id, { 
+      await resolveAppealApi(ticketId, { 
         status: 'APPROVED',
         note: 'Appeal accepted by moderator. Original content restored.'
       })
       try {
-        const comicId = comic.id || comic.comicId
+        const comicId = comic.targetId || comic.id || comic.comicId
         const existing = JSON.parse(localStorage.getItem('appealedComics') || '[]')
         const updated = existing.filter((id) => String(id) !== String(comicId))
         localStorage.setItem('appealedComics', JSON.stringify(updated))
@@ -65,6 +94,39 @@ function ReviewAppealModal({ isOpen, onClose, comic, onSuccess }) {
     } catch (error) {
       console.error('Error resolving appeal:', error)
       toast.error(error?.response?.data?.message || error?.message || 'Failed to accept appeal')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleRejectAppeal = async () => {
+    const ticketId = appealData?.id || comic.appealTicketId || comic.rawTicket?.id
+    if (!ticketId) {
+      toast.error('Appeal data not found')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      await resolveAppealApi(ticketId, { 
+        status: 'REJECTED',
+        note: 'Appeal rejected by moderator. Decision upheld.'
+      })
+      try {
+        const comicId = comic.targetId || comic.id || comic.comicId
+        const existing = JSON.parse(localStorage.getItem('appealedComics') || '[]')
+        const updated = existing.filter((id) => String(id) !== String(comicId))
+        localStorage.setItem('appealedComics', JSON.stringify(updated))
+        window.dispatchEvent(new Event('appealStateChanged'))
+      } catch (e) {
+        console.error('Error clearing local appeal state:', e)
+      }
+      toast.info('Appeal rejected. Moderation decision upheld.')
+      if (onSuccess) onSuccess()
+      onClose()
+    } catch (error) {
+      console.error('Error rejecting appeal:', error)
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to reject appeal')
     } finally {
       setSubmitting(false)
     }
@@ -215,6 +277,26 @@ function ReviewAppealModal({ isOpen, onClose, comic, onSuccess }) {
             disabled={submitting}
           />
           <button 
+            type="button"
+            className="btn-danger"
+            onClick={handleRejectAppeal}
+            disabled={loading || submitting || (!appealData && !comic.appealReason)}
+            style={{ 
+              padding: '8px 16px', 
+              borderRadius: '8px', 
+              fontWeight: '600', 
+              whiteSpace: 'nowrap',
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              color: '#ef4444',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {submitting ? "Processing..." : "✕ Reject Appeal"}
+          </button>
+          <button 
+            type="button"
             className="btn-primary"
             onClick={handleAcceptAppeal} 
             disabled={loading || submitting || (!appealData && !comic.appealReason)}

@@ -341,6 +341,23 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
   
   const [isAppealModalOpen, setIsAppealModalOpen] = useState(false)
   const [selectedAppealComic, setSelectedAppealComic] = useState(null)
+  const [appealTickets, setAppealTickets] = useState([])
+
+  const fetchAppealTickets = useCallback(async () => {
+    try {
+      const res = await getPendingAppealsQueueApi(0, 100);
+      const data = res?.data?.content || res?.data?.items || res?.data || res || [];
+      if (Array.isArray(data)) {
+        setAppealTickets(data);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch pending appeals queue:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAppealTickets();
+  }, [fetchAppealTickets, activeTab]);
 
   const [isHydrating, setIsHydrating] = useState(false)
   const [hydratedItems, setHydratedItems] = useState([])
@@ -809,11 +826,12 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       counts[tabStatus] = uniqueKeys.size;
     });
 
-    const appealedComics = comics.filter(c => c.isAppealed || c.appealed || c.moderationStatus === 'APPEALED');
-    counts.appealed = appealedComics.length;
+    const ticketTargetIds = new Set(appealTickets.map(t => String(t.targetId || t.id)));
+    const uniqueAppealedComics = comics.filter(c => (c.isAppealed || c.appealed || c.moderationStatus === 'APPEALED') && !ticketTargetIds.has(String(c.id)));
+    counts.appealed = appealTickets.length + uniqueAppealedComics.length;
 
     return counts;
-  }, [submissions, comics]);
+  }, [submissions, comics, appealTickets]);
 
   // 2. High-Performance Instant Query Filter & Sort
   const filteredItems = useMemo(() => {
@@ -821,12 +839,37 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     const authUser = getAuth()?.user;
     
     if (activeTab === 'appealed') {
-      return comics
-        .filter(c => c.isAppealed || c.appealed || c.moderationStatus === 'APPEALED')
-        .filter(c => {
-           if (!query) return true;
-           return (c.title?.toLowerCase().includes(query) || c.authorName?.toLowerCase().includes(query));
-        })
+      const mappedTickets = appealTickets.map(ticket => {
+        const matchingComic = comics.find(c => String(c.id) === String(ticket.targetId)) ||
+                              submissions.find(s => String(s.comicId) === String(ticket.targetId) || String(s.id) === String(ticket.targetId));
+
+        return {
+          id: ticket.id,
+          appealTicketId: ticket.id,
+          targetId: ticket.targetId,
+          targetType: ticket.targetType,
+          title: ticket.targetName || matchingComic?.title || matchingComic?.comicTitle || 'Appealed Submission',
+          submittedBy: ticket.authorName || matchingComic?.authorName || matchingComic?.submittedBy || 'Author',
+          authorName: ticket.authorName || matchingComic?.authorName || matchingComic?.submittedBy || 'Author',
+          language: matchingComic?.language || matchingComic?.originalLanguage || 'Spanish',
+          minimumAge: matchingComic?.minimumAge || matchingComic?.minAge || 13,
+          cover: matchingComic?.cover || matchingComic?.coverImage || matchingComic?.coverImageUrl || '/assets/default_cover.jpg',
+          chapterCount: matchingComic?.chapterCount || (matchingComic?.chapters ? matchingComic.chapters.length : 1),
+          status: 'appealed',
+          type: 'Comic Appeal',
+          appealReason: ticket.appealReason,
+          reason: ticket.appealReason,
+          timestamp: ticket.createdAt || Date.now(),
+          isComicAppealItem: true,
+          previousStateSnapshot: ticket.previousStateSnapshot,
+          rawTicket: ticket,
+          rawComic: matchingComic
+        };
+      });
+
+      const ticketTargetIds = new Set(appealTickets.map(t => String(t.targetId || t.id)));
+      const extraAppealedComics = comics
+        .filter(c => (c.isAppealed || c.appealed || c.moderationStatus === 'APPEALED') && !ticketTargetIds.has(String(c.id)))
         .map(c => ({
           ...c,
           status: 'appealed',
@@ -834,7 +877,15 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           submittedBy: c.authorName,
           timestamp: c.updatedAt || c.createdAt || Date.now(),
           isComicAppealItem: true
-        }))
+        }));
+
+      const allAppealed = [...mappedTickets, ...extraAppealedComics];
+
+      return allAppealed
+        .filter(item => {
+          if (!query) return true;
+          return ((item.title || '').toLowerCase().includes(query) || (item.submittedBy || '').toLowerCase().includes(query));
+        })
         .sort((a, b) => {
           if (sortFilter === 'title_asc') {
             return (a.title || '').localeCompare(b.title || '');
@@ -3059,6 +3110,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         }}
         comic={selectedAppealComic}
         onSuccess={() => {
+          fetchAppealTickets()
           fetchAllData?.()
         }}
       />

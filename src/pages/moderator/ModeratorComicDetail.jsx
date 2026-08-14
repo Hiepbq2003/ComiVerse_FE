@@ -771,15 +771,41 @@ function ModeratorComicDetail() {
   const handleReviewAppealClick = async () => {
     try {
       setIsFetchingAppeal(true)
-      const res = await getPendingAppealByTargetApi(comic.id || comic.comicId)
-      if (res.data || res) {
-        setActiveAppealTicket(res.data || res)
+      const cleanTargetId = String(comic.id || comic.comicId || '').replace(/^(comic|sub|chap)-/, '')
+      const res = await getPendingAppealByTargetApi(cleanTargetId)
+      const ticketData = res?.data || res
+      if (ticketData && ticketData.id) {
+        setActiveAppealTicket(ticketData)
+        setResolveModalOpen(true)
+      } else if (comic.appealReason || comic.appeal_reason || comic.isAppealed) {
+        setActiveAppealTicket({
+          id: comic.id || comic.comicId,
+          targetId: cleanTargetId,
+          targetType: 'COMIC_EDIT',
+          appealReason: comic.appealReason || comic.appeal_reason || 'Author requested moderation review.',
+          authorName: comic.authorName || comic.author || 'Author',
+          createdAt: comic.updatedAt || new Date().toISOString(),
+          status: 'PENDING'
+        })
         setResolveModalOpen(true)
       } else {
         toast.error('No pending appeal found for this comic.')
       }
     } catch (err) {
-      toast.error('Failed to fetch appeal details.')
+      if (comic.appealReason || comic.appeal_reason || comic.isAppealed) {
+        setActiveAppealTicket({
+          id: comic.id || comic.comicId,
+          targetId: String(comic.id || comic.comicId || '').replace(/^(comic|sub|chap)-/, ''),
+          targetType: 'COMIC_EDIT',
+          appealReason: comic.appealReason || comic.appeal_reason || 'Author requested moderation review.',
+          authorName: comic.authorName || comic.author || 'Author',
+          createdAt: comic.updatedAt || new Date().toISOString(),
+          status: 'PENDING'
+        })
+        setResolveModalOpen(true)
+      } else {
+        toast.error('Failed to fetch appeal details.')
+      }
     } finally {
       setIsFetchingAppeal(false)
     }
