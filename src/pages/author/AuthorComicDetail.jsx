@@ -583,7 +583,7 @@ function ModEditReviewModal({ currentComic, onClose, onAppeal }) {
             <h2>Moderator Edits</h2>
             <p>Review the changes made by the moderator to your comic metadata.</p>
           </div>
-          <button type="button" className="author-icon-btn ghost" onClick={onClose} aria-label="Close">A-</button>
+          <button type="button" className="author-icon-btn ghost" onClick={onClose} aria-label="Close">×</button>
         </div>
         
         <div className="author-modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>

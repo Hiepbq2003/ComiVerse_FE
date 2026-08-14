@@ -1134,6 +1134,8 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                             [selectedReject];
       const comicId = selectedReject.parentReviewId || selectedReject.comicId || selectedReject.id;
 
+      let accumulatedMockPayloads = [];
+
       for (let i of itemsToReject) {
         // Enrich chapter with pages if missing
         let enrichedItem = i;
@@ -1171,13 +1173,24 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           // Pass skipSubmissionReject = true to prevent redundant/conflicting submission rejections
           handleChapterReject(comicId, enrichedItem, finalPayload, null, true);
         } else {
-          // Fallback for mock items
-          handleConfirmReject(enrichedItem.id || enrichedItem, finalPayload);
+          // Fallback for mock items: accumulate payload to append to overall submission rejection
+          if (finalPayload) {
+            accumulatedMockPayloads.push(finalPayload);
+          }
         }
       }
       
-      // Finally, reject the Submission Profile with the overall note
-      handleConfirmReject(selectedReject.id || selectedReject, userOverallNote);
+      let finalOverallNote = userOverallNote;
+      if (accumulatedMockPayloads.length > 0) {
+        if (finalOverallNote) {
+          finalOverallNote += '\n\n' + accumulatedMockPayloads.join('\n\n');
+        } else {
+          finalOverallNote = accumulatedMockPayloads.join('\n\n');
+        }
+      }
+
+      // Finally, reject the Submission Profile with the overall note (including mock item pins)
+      handleConfirmReject(selectedReject.id || selectedReject, finalOverallNote);
     }
     fetchAllData?.();
 

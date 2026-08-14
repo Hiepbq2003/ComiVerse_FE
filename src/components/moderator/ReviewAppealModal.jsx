@@ -47,7 +47,7 @@ function ReviewAppealModal({ isOpen, onClose, comic, onSuccess }) {
     setSubmitting(true)
     try {
       await resolveAppealApi(appealData.id, { 
-        status: 'ACCEPTED',
+        status: 'APPROVED',
         note: 'Appeal accepted by moderator. Original content restored.'
       })
       try {
