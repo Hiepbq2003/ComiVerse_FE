@@ -222,11 +222,10 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
               const tasksRes = await getTasksByChapterIdApi(chapter.id);
               const tasks = tasksRes?.data?.data || tasksRes?.data || tasksRes || [];
               if (Array.isArray(tasks) && tasks.length > 0) {
-                // Find matching task for this language
-                const matchedTask = tasks.find(t => {
-                  const tLang = (t.targetLanguage || t.targetLang || t.languageCode || t.language || '').toLowerCase().trim();
-                  return tLang === targetLangClean || tLang.includes(targetLangClean) || targetLangClean.includes(tLang) || tasks.length === 1;
-                }) || tasks[0];
+                // Find matching task for this team
+                const matchedTask = tasks.find(t => assignedTeam && t.projectTeamId === assignedTeam.id) 
+                                 || tasks.find(t => t.status !== 'REVOKED') 
+                                 || tasks[0];
 
                 if (matchedTask?.id) {
                   try {
@@ -237,7 +236,8 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
                         const pNum = Number(rp.pageNumber || rp.page_number || rp.number || (idx + 1));
                         const b = parseBubblesPayload(rp.bubblesPayload || rp.bubbles || rp.selections || rp.speechBubbles);
                         translatedPagesMap[pNum] = {
-                          translatedImageUrl: rp.translatedImageUrl || rp.canvasImageUrl || rp.renderedImageUrl || null,
+                          // Map rp.imageUrl because team workspace stores the working page image in imageUrl
+                          translatedImageUrl: rp.imageUrl || rp.translatedImageUrl || rp.canvasImageUrl || rp.renderedImageUrl || null,
                           bubbles: b
                         };
                       });
@@ -256,14 +256,18 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
           if (Object.keys(translatedPagesMap).length > 0) {
             pageList = pageList.map((p, idx) => {
               const pNum = Number(p.pageNumber || (idx + 1));
-              const transInfo = translatedPagesMap[pNum] || {};
-              const bubbles = transInfo.bubbles && transInfo.bubbles.length > 0 ? transInfo.bubbles : p.bubbles;
-              const transImg = transInfo.translatedImageUrl || p.translatedImageUrl || (bubbles.length > 0 ? (p.imageUrl || p.url) : null);
-              return {
-                ...p,
-                translatedImageUrl: transImg,
-                bubbles: bubbles
-              };
+              const transInfo = translatedPagesMap[pNum];
+              if (transInfo) {
+                const bubbles = transInfo.bubbles && transInfo.bubbles.length > 0 ? transInfo.bubbles : p.bubbles;
+                const transImg = transInfo.translatedImageUrl || p.translatedImageUrl || (bubbles.length > 0 ? (p.imageUrl || p.url) : null);
+                return {
+                  ...p,
+                  translatedImageUrl: transImg,
+                  bubbles: bubbles,
+                  hasTranslation: true // flag to force render
+                };
+              }
+              return p;
             });
           }
         }
@@ -432,7 +436,7 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
                     </span>
                   </div>
                   <div className="mod-pane-content" style={{ position: 'relative' }}>
-                    {(currentPage?.translatedImageUrl || (Array.isArray(currentPage?.bubbles) && currentPage.bubbles.length > 0)) ? (
+                    {(currentPage?.translatedImageUrl || currentPage?.hasTranslation || (Array.isArray(currentPage?.bubbles) && currentPage.bubbles.length > 0)) ? (
                       <div style={{ position: 'relative', display: 'inline-block', width: '100%', maxWidth: '640px' }}>
                         <img
                           src={currentPage.translatedImageUrl || currentPage.imageUrl || currentPage.url || ''}

@@ -548,6 +548,13 @@ html.light .mod-inspector-overlay.light-theme .mod-chapters-table tr.selected td
   position: relative;
 }
 
+.mod-inspector-main-content {
+  flex: 1;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 /* Side-by-Side Comparison Container */
 .mod-comparison-view {
   width: 100%;
@@ -596,9 +603,10 @@ html.light .mod-inspector-overlay.light-theme .mod-chapters-table tr.selected td
 .mod-pane-content {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 20px;
 }
 
