@@ -426,11 +426,7 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
           <input
             type="month"
             value={month}
-            max={
-              overview?.latestRequestableMonth
-              || overview?.lastClosedMonth
-              || undefined
-            }
+            max={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`}
             onChange={handleMonthChange}
           />
         </label>
