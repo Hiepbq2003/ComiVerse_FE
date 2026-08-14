@@ -1050,7 +1050,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     return comments;
   };
 
-  const onConfirmRejectClick = () => {
+  const onConfirmRejectClick = async () => {
     if (!selectedReject) return
     const userOverallNote = rejectionReason.trim();
     
@@ -1065,6 +1065,17 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         const viewPages = getReviewViewPages(selectedReview, targetChap, docCommentsMap);
         if (viewPages.length > 0) {
           targetChap = { ...targetChap, pages: viewPages.map(p => p.url || p) };
+        } else {
+          try {
+            const detailRes = await getChapterDetailApi(targetChap.id);
+            const dData = detailRes?.data?.data || detailRes?.data || {};
+            const extracted = dData.pages || dData.images || [];
+            if (extracted.length > 0) {
+              targetChap = { ...targetChap, pages: extracted.map(p => p.url || p) };
+            }
+          } catch (e) {
+            console.warn('Failed to fetch chapter details for preservation', e);
+          }
         }
       }
 
@@ -1091,13 +1102,24 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       const itemsToReject = selectedReject.subItems || selectedReject.allChapters || selectedReject.chapters || [selectedReject];
       const comicId = selectedReject.parentReviewId || selectedReject.comicId || selectedReject.id;
 
-      itemsToReject.forEach(i => {
+      for (let i of itemsToReject) {
         // Enrich chapter with pages if missing
         let enrichedItem = i;
         if (!enrichedItem.pages || enrichedItem.pages.length === 0) {
           const viewPages = getReviewViewPages(selectedReview || selectedReject, enrichedItem, docCommentsMap);
           if (viewPages.length > 0) {
             enrichedItem = { ...i, pages: viewPages.map(p => p.url || p) };
+          } else {
+            try {
+              const detailRes = await getChapterDetailApi(enrichedItem.id);
+              const dData = detailRes?.data?.data || detailRes?.data || {};
+              const extracted = dData.pages || dData.images || [];
+              if (extracted.length > 0) {
+                enrichedItem = { ...enrichedItem, pages: extracted.map(p => p.url || p) };
+              }
+            } catch (e) {
+              console.warn('Failed to fetch chapter details for preservation', e);
+            }
           }
         }
 
@@ -1125,7 +1147,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         } else {
           handleConfirmReject(enrichedItem.id || enrichedItem, finalPayload);
         }
-      });
+      }
     }
     fetchAllData?.();
 

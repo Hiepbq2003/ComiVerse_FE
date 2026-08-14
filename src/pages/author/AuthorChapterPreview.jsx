@@ -249,7 +249,7 @@ export default function AuthorChapterPreview() {
             }
           }
 
-          const fetchedPages = previewPages.length > 0 ? previewPages : [];
+          const fetchedPages = pPages.length > 0 ? pPages : [];
 
           if (fetchedPages.length > 0) {
             setPreview(prev => ({
