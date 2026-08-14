@@ -1018,8 +1018,8 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
 
   const handleChapterReject = async (submissionId, chapterObj, reason) => {
-    let cleanId = String(chapterObj?.id || chapterObj?.submissionId || submissionId || '').replace(/^(comic|group|chap)-/, '');
-    if (cleanId.includes('mock') || String(submissionId).includes('mock')) {
+    let cleanId = String(submissionId || chapterObj?.submissionId || chapterObj?.comicId || '').replace(/^(comic|group|chap)-/, '');
+    if (cleanId.includes('mock')) {
       const realSub = submissions.find(s => s.chapterId && String(s.chapterId) === String(chapterObj?.id));
       if (realSub && realSub.id && !String(realSub.id).includes('mock')) {
         cleanId = String(realSub.id).replace(/^(comic|group|chap)-/, '');
