@@ -1094,12 +1094,14 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       const comments = getChapterScopedComments(targetChap, selectedReject.id, comicId);
       let finalPayload = '';
 
-      if (userOverallNote && comments.length > 0) {
+      if (comments.length > 0) {
         const formattedComments = comments.map((c, i) => `${i + 1}. [${c.targetLabel}]: ${c.text}`).join('\n');
-        finalPayload = `${userOverallNote}\n\n--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
-      } else if (comments.length > 0) {
-        const formattedComments = comments.map((c, i) => `${i + 1}. [${c.targetLabel}]: ${c.text}`).join('\n');
-        finalPayload = `--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
+        
+        if (userOverallNote) {
+          finalPayload = `${userOverallNote}\n\n--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
+        } else {
+          finalPayload = `--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
+        }
       } else {
         finalPayload = userOverallNote;
       }
@@ -1110,7 +1112,10 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       handleChapterReject(selectedReject.parentReviewId || selectedReject.comicId || selectedReject.id, targetChap, finalPayload);
     } else {
       // Bulk "Reject All"
-      const itemsToReject = selectedReject.subItems || selectedReject.allChapters || selectedReject.chapters || [selectedReject];
+      const itemsToReject = (selectedReject.subItems && selectedReject.subItems.length > 0 ? selectedReject.subItems : null) ||
+                            (selectedReject.allChapters && selectedReject.allChapters.length > 0 ? selectedReject.allChapters : null) ||
+                            (selectedReject.chapters && selectedReject.chapters.length > 0 ? selectedReject.chapters : null) ||
+                            [selectedReject];
       const comicId = selectedReject.parentReviewId || selectedReject.comicId || selectedReject.id;
 
       for (let i of itemsToReject) {
@@ -1138,25 +1143,25 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         const comments = getChapterScopedComments(enrichedItem, selectedReject.id, comicId);
         let finalPayload = '';
 
-        if (userOverallNote && comments.length > 0) {
-          const formattedComments = comments.map((c, idx) => `${idx + 1}. [${c.targetLabel}]: ${c.text}`).join('\n');
-          finalPayload = `${userOverallNote}\n\n--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
-        } else if (comments.length > 0) {
+        if (comments.length > 0) {
           const formattedComments = comments.map((c, idx) => `${idx + 1}. [${c.targetLabel}]: ${c.text}`).join('\n');
           finalPayload = `--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
-        } else {
-          finalPayload = userOverallNote;
         }
 
         // The backend now natively preserves the image array using rejectedImagesSnapshot.
 
         // Use handleChapterReject for chapters to preserve pages, else fallback to handleConfirmReject
         if (handleChapterReject && isRealChapterSubmission(enrichedItem)) {
-          handleChapterReject(comicId, enrichedItem, finalPayload);
+          // Pass skipSubmissionReject = true to prevent redundant/conflicting submission rejections
+          handleChapterReject(comicId, enrichedItem, finalPayload, null, true);
         } else {
+          // Fallback for mock items
           handleConfirmReject(enrichedItem.id || enrichedItem, finalPayload);
         }
       }
+      
+      // Finally, reject the Submission Profile with the overall note
+      handleConfirmReject(selectedReject.id || selectedReject, userOverallNote);
     }
     fetchAllData?.();
 
@@ -1205,9 +1210,12 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
 
   const handleAddDocComment = (submissionId, targetType, targetKey, targetLabel, text, coords = null) => {
     if (!text || !text.trim()) return
-    const chapId = selectedChapter?.id || selectedChapter?.chapterId || selectedReview?.chapterId || selectedReview?.id
-    const comicIdVal = selectedReview?.comicId || selectedReview?.parentReviewId || selectedChapter?.comicId
-    const chapNumVal = selectedChapter?.chapterNumber || selectedChapter?.number || selectedReview?.chapterNumber || selectedReview?.number
+    const chaptersList = getSubmissionChapters(selectedReview || { id: submissionId });
+    const activeChap = selectedChapter || chaptersList[0] || null;
+
+    const chapId = activeChap?.id || activeChap?.chapterId || selectedReview?.chapterId || selectedReview?.id
+    const comicIdVal = selectedReview?.comicId || selectedReview?.parentReviewId || activeChap?.comicId
+    const chapNumVal = activeChap?.chapterNumber || activeChap?.number || selectedReview?.chapterNumber || selectedReview?.number
     const comicTitleVal = selectedReview?.title || selectedReview?.comicTitle || selectedReview?.comicName || ''
 
     const newComment = {
@@ -1305,10 +1313,10 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       let list = chaptersData?.data || chaptersData || [];
       if (!Array.isArray(list)) list = [];
       
-      // Filter out PREVIEW_READY or DRAFT chapters since moderator should not see them
+      // Filter out DRAFT chapters, but keep PREVIEW_READY so new comic submissions show their chapters
       list = list.filter(ch => {
         const status = (ch.status || ch.moderationStatus || '').toUpperCase();
-        return !status || status === 'APPROVED' || status === 'PUBLISHED' || status === 'SUBMITTED_FOR_REVIEW' || status === 'REJECTED';
+        return !status || status === 'APPROVED' || status === 'PUBLISHED' || status === 'SUBMITTED_FOR_REVIEW' || status === 'REJECTED' || status === 'PREVIEW_READY';
       });
 
       if (list.length === 0) return [];

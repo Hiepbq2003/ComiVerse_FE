@@ -25,7 +25,7 @@ export const approveChapterDirectApi = (chapterId) => {
 };
 
 export const rejectChapterDirectApi = (chapterId, reason) => {
-  return AxiosClient.put(`/chapters/${chapterId}/reject`, { reason });
+  return AxiosClient.post(`/chapters/${chapterId}/takedown`, { reason });
 };
 
 export const getChapterTranslationsApi = (chapterId) => {

@@ -1017,7 +1017,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
   };
 
 
-  const handleChapterReject = async (submissionId, chapterObj, reason) => {
+  const handleChapterReject = async (submissionId, chapterObj, reason, overallReason = null, skipSubmissionReject = false) => {
     let cleanId = String(submissionId || chapterObj?.submissionId || chapterObj?.comicId || '').replace(/^(comic|group|chap)-/, '');
     if (cleanId.includes('mock')) {
       const realSub = submissions.find(s => s.chapterId && String(s.chapterId) === String(chapterObj?.id));
@@ -1065,8 +1065,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
             }
           }
 
-          if (willRejectAll) {
-            const rejectResponse = await rejectSubmissionApi(cleanId, calledDirect ? (reason || 'Chapter rejected') : (reason || 'Chapter rejected'));
+          if (willRejectAll && !skipSubmissionReject) {
+            const finalSubmissionReason = overallReason !== null ? overallReason : (reason || 'Chapter rejected');
+            const rejectResponse = await rejectSubmissionApi(cleanId, finalSubmissionReason);
             responseData = rejectResponse?.data || rejectResponse;
           }
         
