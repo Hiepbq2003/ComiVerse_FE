@@ -1066,7 +1066,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
           }
 
           if (willRejectAll && !skipSubmissionReject) {
-            const finalSubmissionReason = overallReason !== null ? overallReason : (reason || 'Chapter rejected');
+            const finalSubmissionReason = reason || overallReason || 'Submission rejected';
             const rejectResponse = await rejectSubmissionApi(cleanId, finalSubmissionReason);
             responseData = rejectResponse?.data || rejectResponse;
           }
