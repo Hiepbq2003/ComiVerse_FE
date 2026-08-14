@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Download } from 'lucide-react'
 import '../../assets/style/author/dashboard.css'
 import { getAuthorDashboardMetricsApi } from '../../services/api/AuthorComicApi'
+import { exportToCsv } from '../../utils/exportToCsv'
 
 const EMPTY_SUMMARY = {
   totalComics: 0,
@@ -30,9 +32,10 @@ const formatCompactNumber = (value) => new Intl.NumberFormat('en-US', {
 
 const formatFullNumber = (value) => new Intl.NumberFormat('en-US').format(numberValue(value))
 
-const formatMoney = (value) => `${new Intl.NumberFormat('vi-VN', {
-  maximumFractionDigits: 0,
-}).format(numberValue(value))}đ`
+const formatMoney = (value) => `$${new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+}).format(numberValue(value))}`
 
 const formatPercent = (value) => `${numberValue(value).toFixed(1).replace('.0', '')}%`
 
@@ -114,6 +117,8 @@ function AuthorDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [chartPeriod, setChartPeriod] = useState('WEEK') // WEEK, MONTH, YEAR
+  const [lineHoverData, setLineHoverData] = useState(null)
+  const [barHoverData, setBarHoverData] = useState(null)
 
   const loadDashboard = useCallback(async () => {
     setLoading(true)
@@ -185,6 +190,21 @@ function AuthorDashboard() {
     }
   }, [monthlyMetrics])
 
+  const handleExport = () => {
+    if (!monthlyMetrics || monthlyMetrics.length === 0) return
+    const headers = ['Period', 'Views', 'Followers', 'Estimated Revenue (USD)', 'Chapters Uploaded', 'Reviews Submitted', 'Chapters Approved']
+    const rows = monthlyMetrics.map(item => [
+      item.label || item.monthKey,
+      numberValue(item.views),
+      numberValue(item.followers),
+      numberValue(item.estimatedRevenue),
+      numberValue(item.chaptersUploaded),
+      numberValue(item.reviewsSubmitted),
+      numberValue(item.chaptersApproved)
+    ])
+    exportToCsv(`Author_Metrics_Overview_${chartPeriod}`, headers, rows)
+  }
+
   const generatedLabel = dashboard?.generatedAt
     ? new Date(dashboard.generatedAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     : new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
@@ -217,6 +237,14 @@ function AuthorDashboard() {
           <p>Creative performance overview · {generatedLabel}</p>
         </div>
         <div className="author-dashboard-actions">
+          <button 
+            className="author-secondary-btn" 
+            onClick={handleExport} 
+            disabled={loading || !dashboard}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Download size={16} /> Export CSV
+          </button>
           <button className="author-secondary-btn" onClick={() => navigate('/author/comics')}>
             📖 My Comics
           </button>
@@ -278,6 +306,26 @@ function AuthorDashboard() {
               const x = lineChart.padX + (index / denominator) * (lineChart.chartW - lineChart.padX * 2)
               return <text key={item.monthKey || index} x={x} y={lineChart.chartH - 5} textAnchor="middle" fill="#94a3b8" fontSize="11" fontFamily="Outfit">{item.label}</text>
             })}
+            
+            {/* Interactive Hover Areas */}
+            {monthlyMetrics.map((item, index) => {
+              const denominator = Math.max(1, monthlyMetrics.length - 1)
+              const x = lineChart.padX + (index / denominator) * (lineChart.chartW - lineChart.padX * 2)
+              const bandW = (lineChart.chartW - lineChart.padX * 2) / Math.max(1, monthlyMetrics.length - 1)
+              return (
+                <rect
+                  key={`hover-${index}`}
+                  x={x - bandW / 2}
+                  y={lineChart.padY}
+                  width={bandW}
+                  height={lineChart.chartH - lineChart.padY * 2}
+                  fill={lineHoverData?.index === index ? "rgba(192, 132, 252, 0.05)" : "transparent"}
+                  onMouseEnter={() => setLineHoverData({ index, x })}
+                  onMouseLeave={() => setLineHoverData(null)}
+                  style={{ cursor: 'crosshair', transition: 'fill 0.2s' }}
+                />
+              )
+            })}
             <path d={lineChart.viewPath} fill="none" stroke="#c084fc" strokeWidth="2.5" strokeLinejoin="round"/>
             <path d={lineChart.revenuePath} fill="none" stroke="#aa3bff" strokeWidth="2" strokeDasharray="6 3" strokeLinejoin="round"/>
             <path d={lineChart.followerPath} fill="none" stroke="#10b981" strokeWidth="2" strokeDasharray="4 4" strokeLinejoin="round"/>
@@ -287,15 +335,46 @@ function AuthorDashboard() {
               const vy = lineChart.padY + (1 - value / lineChart.maxVal) * (lineChart.chartH - lineChart.padY * 2)
               const ry = lineChart.padY + (1 - lineChart.revenue[index] / lineChart.maxVal) * (lineChart.chartH - lineChart.padY * 2)
               const fy = lineChart.padY + (1 - lineChart.followers[index] / lineChart.maxVal) * (lineChart.chartH - lineChart.padY * 2)
+              
+              const isHovered = lineHoverData?.index === index
+              const r = isHovered ? "6" : "4"
+              
               return (
-                <g key={index}>
-                  <circle cx={x} cy={vy} r="4" fill="#c084fc"><title>Views: {formatFullNumber(value)}</title></circle>
-                  <circle cx={x} cy={ry} r="4" fill="#aa3bff"><title>Revenue: ${formatFullNumber(lineChart.revenue[index])}</title></circle>
-                  <circle cx={x} cy={fy} r="4" fill="#10b981"><title>Followers: {formatFullNumber(lineChart.followers[index])}</title></circle>
+                <g key={index} style={{ pointerEvents: 'none' }}>
+                  <circle cx={x} cy={vy} r={r} fill="#c084fc" style={{ transition: 'all 0.2s' }} />
+                  <circle cx={x} cy={ry} r={r} fill="#aa3bff" style={{ transition: 'all 0.2s' }} />
+                  <circle cx={x} cy={fy} r={r} fill="#10b981" style={{ transition: 'all 0.2s' }} />
                 </g>
               )
             })}
           </svg>
+          
+          {lineHoverData && (() => {
+            const { index, x } = lineHoverData
+            const item = monthlyMetrics[index]
+            const px = (x / lineChart.chartW) * 100
+            let alignClass = ''
+            if (px > 80) alignClass = ' align-right'
+            if (px < 20) alignClass = ' align-left'
+            
+            return (
+              <div className={`author-chart-tooltip${alignClass}`} style={{ left: `${px}%`, top: '40%' }}>
+                <div className="author-chart-tooltip-header">{item.label}</div>
+                <div className="author-chart-tooltip-row">
+                  <span className="author-chart-tooltip-label"><span className="author-legend-dot dark"/> Views</span>
+                  <span className="author-chart-tooltip-value">{formatFullNumber(lineChart.views[index])}</span>
+                </div>
+                <div className="author-chart-tooltip-row">
+                  <span className="author-chart-tooltip-label"><span className="author-legend-dot purple"/> Revenue</span>
+                  <span className="author-chart-tooltip-value">{formatMoney(lineChart.revenue[index])}</span>
+                </div>
+                <div className="author-chart-tooltip-row">
+                  <span className="author-chart-tooltip-label"><span className="author-legend-dot green"/> Followers</span>
+                  <span className="author-chart-tooltip-value">{formatFullNumber(lineChart.followers[index])}</span>
+                </div>
+              </div>
+            )
+          })()}
         </div>
         <div className="author-analytics-legend">
           <span className="author-legend-item"><span className="author-legend-dot dark"/>Views</span>
@@ -322,9 +401,57 @@ function AuthorDashboard() {
                 const uploadH = (barChart.uploaded[index] / barChart.max) * availableH
                 const reviewH = (barChart.submitted[index] / barChart.max) * availableH
                 const approvedH = (barChart.approved[index] / barChart.max) * availableH
-                return <g key={item.monthKey || index}><rect x={gx} y={baseY - uploadH} width={bw} height={uploadH} rx="2" fill="#94a3b8"/><rect x={gx + bw + 2} y={baseY - reviewH} width={bw} height={reviewH} rx="2" fill="#aa3bff"/><rect x={gx + bw * 2 + 4} y={baseY - approvedH} width={bw} height={approvedH} rx="2" fill="#10b981"/><text x={gx + bw} y={barH - 4} textAnchor="middle" fill="#94a3b8" fontSize="9" fontFamily="Outfit">{item.label}</text></g>
+                const isHovered = barHoverData?.index === index
+                
+                return (
+                  <g key={item.monthKey || index}>
+                    {/* Invisible Hover Rect */}
+                    <rect 
+                      x={barPadX + index * barGroupW} 
+                      y={barPadY} 
+                      width={barGroupW} 
+                      height={availableH} 
+                      fill={isHovered ? "rgba(255,255,255,0.03)" : "transparent"} 
+                      onMouseEnter={() => setBarHoverData({ index, x: barPadX + index * barGroupW + barGroupW/2 })}
+                      onMouseLeave={() => setBarHoverData(null)}
+                      style={{ cursor: 'pointer', transition: 'fill 0.2s' }}
+                    />
+                    
+                    <rect x={gx} y={baseY - uploadH} width={bw} height={uploadH} rx="2" fill={isHovered ? "#cbd5e1" : "#94a3b8"} style={{ pointerEvents: 'none', transition: 'fill 0.2s' }} />
+                    <rect x={gx + bw + 2} y={baseY - reviewH} width={bw} height={reviewH} rx="2" fill={isHovered ? "#c084fc" : "#aa3bff"} style={{ pointerEvents: 'none', transition: 'fill 0.2s' }} />
+                    <rect x={gx + bw * 2 + 4} y={baseY - approvedH} width={bw} height={approvedH} rx="2" fill={isHovered ? "#34d399" : "#10b981"} style={{ pointerEvents: 'none', transition: 'fill 0.2s' }} />
+                    <text x={gx + bw} y={barH - 4} textAnchor="middle" fill="#94a3b8" fontSize="9" fontFamily="Outfit" style={{ pointerEvents: 'none' }}>{item.label}</text>
+                  </g>
+                )
               })}
             </svg>
+            
+            {barHoverData && (() => {
+              const { index, x } = barHoverData
+              const item = monthlyMetrics[index]
+              const px = (x / barW) * 100
+              let alignClass = ''
+              if (px > 80) alignClass = ' align-right'
+              if (px < 20) alignClass = ' align-left'
+              
+              return (
+                <div className={`author-chart-tooltip${alignClass}`} style={{ left: `${px}%`, top: '40%' }}>
+                  <div className="author-chart-tooltip-header">{item.label}</div>
+                  <div className="author-chart-tooltip-row">
+                    <span className="author-chart-tooltip-label"><span className="author-legend-dot slate"/> Uploaded</span>
+                    <span className="author-chart-tooltip-value">{formatFullNumber(barChart.uploaded[index])}</span>
+                  </div>
+                  <div className="author-chart-tooltip-row">
+                    <span className="author-chart-tooltip-label"><span className="author-legend-dot purple"/> Submitted</span>
+                    <span className="author-chart-tooltip-value">{formatFullNumber(barChart.submitted[index])}</span>
+                  </div>
+                  <div className="author-chart-tooltip-row">
+                    <span className="author-chart-tooltip-label"><span className="author-legend-dot green"/> Approved</span>
+                    <span className="author-chart-tooltip-value">{formatFullNumber(barChart.approved[index])}</span>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
           <div className="author-analytics-legend"><span className="author-legend-item"><span className="author-legend-dot slate"/>Uploaded</span><span className="author-legend-item"><span className="author-legend-dot purple"/>Submitted</span><span className="author-legend-item"><span className="author-legend-dot green"/>Approved</span></div>
         </div>

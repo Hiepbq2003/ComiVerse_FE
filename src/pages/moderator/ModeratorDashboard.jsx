@@ -19,6 +19,7 @@ import { getAllChatFlagsApi } from '../../services/api/ChatFlagApi'
 import { approveChapterDirectApi } from '../../services/api/ChapterApi'
 import { toast } from 'react-toastify'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
+import { exportToCsv } from '../../utils/exportToCsv'
 import ModernButton from '../../components/common/ModernButton'
 import { getAuth } from '../../utils/Auth'
 import { isLanguageInModeratorScope, getModeratorScope } from '../../utils/moderatorScope'
@@ -1017,7 +1018,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
   };
 
 
-  const handleChapterReject = async (submissionId, chapterObj, reason) => {
+  const handleChapterReject = async (submissionId, chapterObj, reason, overallReason = null, skipSubmissionReject = false) => {
     let cleanId = String(submissionId || chapterObj?.submissionId || chapterObj?.comicId || '').replace(/^(comic|group|chap)-/, '');
     if (cleanId.includes('mock')) {
       const realSub = submissions.find(s => s.chapterId && String(s.chapterId) === String(chapterObj?.id));
@@ -1065,8 +1066,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
             }
           }
 
-          if (willRejectAll) {
-            const rejectResponse = await rejectSubmissionApi(cleanId, calledDirect ? (reason || 'Chapter rejected') : (reason || 'Chapter rejected'));
+          if (willRejectAll && !skipSubmissionReject) {
+            const finalSubmissionReason = reason || overallReason || 'Submission rejected';
+            const rejectResponse = await rejectSubmissionApi(cleanId, finalSubmissionReason);
             responseData = rejectResponse?.data || rejectResponse;
           }
         
@@ -1441,6 +1443,65 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     }
   }
 
+  const handleExportDashboardReport = () => {
+    try {
+      const pendingReviewsCount = submissions.filter(s => s.status === 'pending').length;
+      const approvedReviewsCount = submissions.filter(s => s.status === 'approved').length;
+      const rejectedReviewsCount = submissions.filter(s => s.status === 'rejected').length;
+      const totalChaptersCount = comics.reduce((acc, c) => acc + (c.chaptersCount || c.chapterCount || c.chapters?.length || 0), 0);
+      const activeTeamsCount = projectTeams.filter(t => t.status?.toUpperCase() === 'ACTIVE').length;
+      const ongoingComicsCount = comics.filter(c => c.publicationStatus?.toUpperCase() === 'ONGOING' || !c.publicationStatus).length;
+      const completedComicsCount = comics.filter(c => c.publicationStatus?.toUpperCase() === 'COMPLETED').length;
+
+      const headers = ['Category / Domain', 'Metric Indicator', 'Current Value', 'Status / Detail Note'];
+      const rows = [
+        ['EXECUTIVE OVERVIEW', 'Total Comics in System', comics.length, 'Active catalog titles'],
+        ['EXECUTIVE OVERVIEW', 'Total Chapters Registered', totalChaptersCount, 'Across all comics'],
+        ['EXECUTIVE OVERVIEW', 'Ongoing Comics', ongoingComicsCount, 'Actively updating serialization'],
+        ['EXECUTIVE OVERVIEW', 'Completed Comics', completedComicsCount, 'Finished stories'],
+        ['MODERATION QUEUE', 'Pending Raw Submissions', pendingReviewsCount, 'Awaiting moderator review'],
+        ['MODERATION QUEUE', 'Approved Submissions', approvedReviewsCount, 'Accepted to catalog'],
+        ['MODERATION QUEUE', 'Rejected Submissions', rejectedReviewsCount, 'Rejected with feedback'],
+        ['TRANSLATION TEAMS', 'Active Project Teams', activeTeamsCount, 'Active translating groups'],
+        ['TRANSLATION TEAMS', 'Total Project Teams', projectTeams.length, 'All registered teams'],
+        ['SAFETY & COMMUNITY', 'Flagged Chat Messages', chatFlags.length, 'Reported chat items'],
+        ['SAFETY & COMMUNITY', 'Reported Forum Threads', forumThreads.filter(t => t.isReported).length, 'Open forum moderation flags'],
+        ['', '', '', ''],
+        ['TOP GENRES BREAKDOWN', 'Genre Name', 'Registered Comics', 'Percentage Share (%)'],
+        ...genres.slice(0, 15).map(g => {
+          const count = comics.filter(c => {
+            const cGenres = Array.isArray(c.genres) ? c.genres : (typeof c.genres === 'string' ? c.genres.split(',') : []);
+            return cGenres.some(cg => (cg.name || cg.title || cg || '').toLowerCase().includes(g.name?.toLowerCase() || ''));
+          }).length;
+          const pct = comics.length > 0 ? Math.round((count / comics.length) * 100) : 0;
+          return ['GENRE DISTRIBUTION', g.name || 'Uncategorized', count, `${pct}%`];
+        }),
+        ['', '', '', ''],
+        ['PROJECT TEAMS SNAPSHOT', 'Team Title', 'Comic Title', 'Leader | Target Lang | Status'],
+        ...projectTeams.map(t => [
+          'PROJECT TEAM',
+          t.title || 'Untitled Team',
+          t.comicName || t.comicTitle || 'N/A',
+          `Leader: ${t.leaderName || 'N/A'} | Lang: ${t.targetLang || t.targetLanguage || 'All'} | Status: ${t.status || 'Active'}`
+        ]),
+        ['', '', '', ''],
+        ['CATALOG COMICS SNAPSHOT', 'Comic Title', 'Author Name', 'Status | Chapters | Views'],
+        ...comics.slice(0, 50).map(c => [
+          'COMIC TITLE',
+          c.title || 'Untitled',
+          c.authorName || c.author || 'N/A',
+          `Status: ${c.moderationStatus || 'PUBLISHED'} | Chapters: ${c.chaptersCount || c.chapterCount || c.chapters?.length || 0} | Views: ${c.views || 0}`
+        ])
+      ];
+
+      exportToCsv('ComiVerse_Moderator_Dashboard_Report', headers, rows);
+      toast.success('📊 Moderator statistical report exported successfully!');
+    } catch (err) {
+      console.error('Failed to export dashboard report:', err);
+      toast.error('Failed to export report: ' + err.message);
+    }
+  };
+
   return (
     <ModeratorLayout activeNav={activeNav} onNavChange={setActiveNav} navBadges={getNavBadges()}>
       <>
@@ -1466,6 +1527,17 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                       <>System is running smoothly. There are currently <strong>{submissions.filter(s => s.status === 'pending').length}</strong> reviews pending and <strong>{forumThreads.filter(t => t.isReported).length}</strong> open forum reports.</>
                     )}
                   </p>
+                </div>
+                <div className="mod-welcome-actions" style={{ position: 'relative', zIndex: 2, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    className="mod-export-btn"
+                    onClick={handleExportDashboardReport}
+                    disabled={loadingPhase1}
+                    title="Export complete moderation statistics report as Excel-compatible CSV"
+                  >
+                    <span>📥 Export Statistics (CSV)</span>
+                  </button>
                 </div>
               </div>
 

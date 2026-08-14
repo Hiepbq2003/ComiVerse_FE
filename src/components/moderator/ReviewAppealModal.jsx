@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { toast } from 'react-toastify'
 import ModernButton from '../common/ModernButton'
 import { getPendingAppealByTargetApi, resolveAppealApi } from '../../services/api/AppealApi'
+import { getComicByIdApi } from '../../services/api/ComicApi'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import '../../assets/style/moderator/review-queue.css'
 
@@ -10,48 +11,98 @@ function ReviewAppealModal({ isOpen, onClose, comic, onSuccess }) {
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [appealData, setAppealData] = useState(null)
+  const [liveComic, setLiveComic] = useState(null)
 
   useEffect(() => {
     if (isOpen && comic) {
-      setLoading(true)
-      setAppealData(null)
+      const rawTargetId = String(comic.targetId || comic.id || comic.comicId || '')
+      const cleanTargetId = rawTargetId.replace(/^(comic|sub|chap)-/, '')
       
-      // Fetch appeal data
-      getPendingAppealByTargetApi(comic.id || comic.comicId)
-        .then(res => {
-          const data = res?.data || res
-          if (data && data.length > 0) {
-             setAppealData(data[0])
-          } else if (data && !Array.isArray(data)) {
-             setAppealData(data)
-          }
-        })
-        .catch(err => {
-          console.error('Failed to fetch appeal:', err)
-          toast.error('Failed to load appeal details')
-        })
-        .finally(() => {
-          setLoading(false)
-        })
+      setLoading(true)
+      setLiveComic(null)
+
+      if (comic.rawTicket) {
+        setAppealData(comic.rawTicket)
+      } else {
+        setAppealData(null)
+      }
+
+      const promises = []
+
+      if (!comic.rawTicket && cleanTargetId) {
+        promises.push(
+          getPendingAppealByTargetApi(cleanTargetId)
+            .then(res => {
+              const data = res?.data || res
+              if (data && Array.isArray(data) && data.length > 0) {
+                 setAppealData(data[0])
+              } else if (data && !Array.isArray(data) && data.id) {
+                 setAppealData(data)
+              } else if (comic.appealReason || comic.reason) {
+                 setAppealData({
+                   id: comic.id || comic.comicId,
+                   targetId: cleanTargetId,
+                   targetType: 'COMIC_EDIT',
+                   appealReason: comic.appealReason || comic.reason,
+                   authorName: comic.authorName || comic.author || 'Author',
+                   createdAt: comic.updatedAt || new Date().toISOString(),
+                   status: 'PENDING'
+                 })
+              }
+            })
+            .catch(err => {
+              console.warn('Appeal ticket not found or already processed:', err?.message)
+              if (comic.appealReason || comic.reason) {
+                 setAppealData({
+                   id: comic.id || comic.comicId,
+                   targetId: cleanTargetId,
+                   targetType: 'COMIC_EDIT',
+                   appealReason: comic.appealReason || comic.reason,
+                   authorName: comic.authorName || comic.author || 'Author',
+                   createdAt: comic.updatedAt || new Date().toISOString(),
+                   status: 'PENDING'
+                 })
+              }
+            })
+        )
+      }
+
+      if (cleanTargetId) {
+        promises.push(
+          getComicByIdApi(cleanTargetId)
+            .then(res => {
+              const data = res?.data || res
+              if (data) setLiveComic(data)
+            })
+            .catch(err => {
+              console.warn('Failed to fetch live comic data:', err?.message)
+            })
+        )
+      }
+
+      Promise.all(promises).finally(() => {
+        setLoading(false)
+      })
     }
   }, [isOpen, comic])
 
   if (!isOpen || !comic) return null
 
   const handleAcceptAppeal = async () => {
-    if (!appealData || !appealData.id) {
+    const ticketId = appealData?.id || comic.appealTicketId || comic.rawTicket?.id
+    if (!ticketId) {
       toast.error('Appeal data not found')
       return
     }
 
     setSubmitting(true)
     try {
-      await resolveAppealApi(appealData.id, { 
-        status: 'ACCEPTED',
+      await resolveAppealApi(ticketId, { 
+        status: 'APPROVED',
         note: 'Appeal accepted by moderator. Original content restored.'
       })
       try {
-        const comicId = comic.id || comic.comicId
+        const comicId = comic.targetId || comic.id || comic.comicId
         const existing = JSON.parse(localStorage.getItem('appealedComics') || '[]')
         const updated = existing.filter((id) => String(id) !== String(comicId))
         localStorage.setItem('appealedComics', JSON.stringify(updated))
@@ -69,6 +120,8 @@ function ReviewAppealModal({ isOpen, onClose, comic, onSuccess }) {
       setSubmitting(false)
     }
   }
+
+
 
   const modalContent = (
     <div className="mod-modal-overlay" onClick={onClose} style={{ zIndex: 100000 }}>
@@ -99,6 +152,25 @@ function ReviewAppealModal({ isOpen, onClose, comic, onSuccess }) {
             </div>
           ) : (
             <>
+              {/* SLA Protection Banner */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '20px',
+                padding: '12px 16px',
+                background: 'rgba(59, 130, 246, 0.08)',
+                border: '1px solid rgba(59, 130, 246, 0.25)',
+                borderRadius: '10px',
+                fontSize: '0.86rem',
+                color: 'var(--text)'
+              }}>
+                <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>🛡️</span>
+                <div>
+                  <strong>Author Protection SLA Policy (3 Days):</strong> If moderators do not take action within 3 days, this appeal will be <strong>automatically approved & restored</strong> to protect the author's creative control.
+                </div>
+              </div>
+
               {/* Author's Appeal Reason */}
               <div style={{ marginBottom: '24px' }}>
                 <h4 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: '0.95rem' }}>Author's Explanation:</h4>
@@ -121,88 +193,146 @@ function ReviewAppealModal({ isOpen, onClose, comic, onSuccess }) {
               </div>
 
               {/* Rejection Reason or Original Content */}
-              {(comic.previousStateSnapshot) ? (
-                <div style={{ marginBottom: '16px' }}>
-                  <h4 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: '0.95rem' }}>Original Content to Restore:</h4>
-                  <div style={{ 
-                    background: 'var(--bg-secondary, rgba(0,0,0,0.03))', 
-                    border: '1px solid var(--border)', 
-                    padding: '16px', 
-                    borderRadius: '10px',
-                    fontSize: '0.9rem',
-                    maxHeight: '200px',
-                    overflowY: 'auto'
-                  }}>
-                    {(() => {
-                      try {
-                        const original = JSON.parse(comic.previousStateSnapshot);
-                        return (
+              {(() => {
+                const snapshotRaw = appealData?.previousStateSnapshot || comic.previousStateSnapshot || liveComic?.previousStateSnapshot || comic.rawTicket?.previousStateSnapshot || comic.rawComic?.previousStateSnapshot;
+                if (!snapshotRaw) {
+                  if (comic.rejectionReason) {
+                    return (
+                      <div style={{ marginBottom: '16px' }}>
+                        <h4 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: '0.95rem' }}>Moderator's Rejection Reason:</h4>
+                        <div style={{ 
+                          background: 'rgba(239, 68, 68, 0.05)', 
+                          border: '1px solid rgba(239, 68, 68, 0.2)', 
+                          padding: '16px', 
+                          borderRadius: '10px',
+                          fontSize: '0.9rem',
+                          color: 'var(--text)'
+                        }}>
+                          {comic.rejectionReason}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div style={{ marginBottom: '16px' }}>
+                      <h4 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: '0.95rem' }}>Original Content to Restore:</h4>
+                      <div style={{ 
+                        background: 'var(--bg-secondary, rgba(0,0,0,0.03))', 
+                        border: '1px solid var(--border)', 
+                        padding: '16px', 
+                        borderRadius: '10px',
+                        fontSize: '0.9rem',
+                        color: 'var(--text-muted)'
+                      }}>
+                        No edit history or rejection reason found. Accepting this appeal will restore the comic to its previous status.
+                      </div>
+                    </div>
+                  );
+                }
+
+                try {
+                  const original = typeof snapshotRaw === 'string'
+                    ? JSON.parse(snapshotRaw)
+                    : snapshotRaw;
+
+                  const currentTarget = liveComic || comic.rawComic || comic;
+
+                  const formatVal = (k, v) => {
+                    if (v == null || v === '') return 'None';
+                    if (k === 'genres' || k === 'genreIds') {
+                      if (Array.isArray(v)) {
+                        if (v.length === 0) return 'None';
+                        return v.map(g => (typeof g === 'object' ? g?.name || g?.title || g?.label || '' : String(g))).filter(Boolean).join(', ') || 'None';
+                      }
+                      if (typeof v === 'string') return v.trim() || 'None';
+                    }
+                    if (k === 'minimumAge') return `${v}+`;
+                    if (k === 'publicationStatus') return String(v).toUpperCase();
+                    if (typeof v === 'object') {
+                      if (Array.isArray(v)) return v.join(', ') || 'None';
+                      return JSON.stringify(v);
+                    }
+                    return String(v);
+                  };
+
+                  const keysToCheck = [
+                    { key: 'title', label: 'Title' },
+                    { key: 'summary', label: 'Summary' },
+                    { key: 'genres', label: 'Genres' },
+                    { key: 'publicationStatus', label: 'Publication Status' },
+                    { key: 'minimumAge', label: 'Age Rating' },
+                    { key: 'language', label: 'Language' },
+                    { key: 'cover', label: 'Cover Image' }
+                  ];
+
+                  const diffItems = keysToCheck.map(({ key, label }) => {
+                    let origRaw = original[key];
+                    if (origRaw === undefined) {
+                      if (key === 'genres') origRaw = original.genreIds;
+                      if (key === 'publicationStatus') origRaw = original.publication_status || original.status;
+                    }
+
+                    let curRaw = currentTarget[key];
+                    if (curRaw === undefined) {
+                      if (key === 'genres') curRaw = currentTarget.genreIds || currentTarget.genresList;
+                      if (key === 'publicationStatus') curRaw = currentTarget.publication_status || (currentTarget.status && currentTarget.status !== 'appealed' && currentTarget.status !== 'pending' ? currentTarget.status : undefined);
+                    }
+
+                    if (origRaw === undefined && curRaw === undefined) return null;
+                    const origFormatted = formatVal(key, origRaw);
+                    const curFormatted = formatVal(key, curRaw);
+                    if (origFormatted.toLowerCase().trim() === curFormatted.toLowerCase().trim() && origFormatted !== 'None') return null;
+                    if (origFormatted === curFormatted) return null;
+                    return { key, label, orig: origFormatted, cur: curFormatted };
+                  }).filter(Boolean);
+
+                  return (
+                    <div style={{ marginBottom: '16px' }}>
+                      <h4 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: '0.95rem' }}>Original Content to Restore:</h4>
+                      <div style={{ 
+                        background: 'var(--bg-secondary, rgba(0,0,0,0.03))', 
+                        border: '1px solid var(--border)', 
+                        padding: '16px', 
+                        borderRadius: '10px',
+                        fontSize: '0.9rem',
+                        maxHeight: '200px',
+                        overflowY: 'auto'
+                      }}>
+                        {diffItems.length === 0 ? (
+                          <span style={{ color: 'var(--text-muted)' }}>No differences detected between snapshots.</span>
+                        ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {Object.keys(original).filter(key => {
-                              const ignoredKeys = ['updatedAt', 'createdAt', 'moderationStatus', 'isAppealed', 'appealReason', 'rejectionReason', 'isModEdited', 'previousStateSnapshot', 'chapterCount', 'rejectedChapterCount', 'pendingChapterCount', 'lastChapterUpdatedAt', 'approvedAt', 'approvedBy', 'viewCount', 'likeCount', 'saveCount', 'ratingCount', 'ratingAverage', 'latestChapterNumber', 'genreIds'];
-                              if (ignoredKeys.includes(key)) return false;
-                              // Ensure they are actually different
-                              return JSON.stringify(original[key]) !== JSON.stringify(comic[key]);
-                            }).map(key => (
+                            {diffItems.map(({ key, label, orig, cur }) => (
                               <div key={key} style={{ display: 'flex', flexDirection: 'column', paddingBottom: '8px', borderBottom: '1px solid rgba(148,163,184,0.1)' }}>
-                                <span style={{ fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                                <span style={{ fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
+                                  {label}
+                                </span>
                                 <div style={{ display: 'flex', gap: '8px', marginTop: '4px', wordBreak: 'break-word' }}>
-                                  <span style={{ textDecoration: 'line-through', color: 'var(--mod-red, #ef4444)', opacity: 0.8, flex: 1 }}>
-                                    {(() => {
-                                      const val = comic[key];
-                                      if (val == null || (Array.isArray(val) && val.length === 0) || val === '') return 'None';
-                                      if (Array.isArray(val)) return val.map(v => typeof v === 'object' ? v.name || JSON.stringify(v) : v).join(', ');
-                                      return typeof val === 'object' ? JSON.stringify(val) : String(val);
-                                    })()}
+                                  <span style={{ textDecoration: 'line-through', color: 'var(--mod-red, #ef4444)', opacity: 0.85, flex: 1 }}>
+                                    Current: {cur}
                                   </span>
-                                  <span style={{ color: 'var(--mod-green, #10b981)', fontWeight: '500', flex: 1 }}>
-                                    {(() => {
-                                      const val = original[key];
-                                      if (val == null || (Array.isArray(val) && val.length === 0) || val === '') return 'None';
-                                      if (Array.isArray(val)) return val.map(v => typeof v === 'object' ? v.name || JSON.stringify(v) : v).join(', ');
-                                      return typeof val === 'object' ? JSON.stringify(val) : String(val);
-                                    })()}
+                                  <span style={{ color: 'var(--mod-green, #10b981)', fontWeight: '600', flex: 1 }}>
+                                    Restore to: {orig}
                                   </span>
                                 </div>
                               </div>
                             ))}
                           </div>
-                        );
-                      } catch (e) {
-                        return <span style={{ color: 'var(--text-muted)' }}>{comic.previousStateSnapshot}</span>;
-                      }
-                    })()}
-                  </div>
-                </div>
-              ) : comic.rejectionReason ? (
-                <div style={{ marginBottom: '16px' }}>
-                  <h4 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: '0.95rem' }}>Moderator's Rejection Reason:</h4>
-                  <div style={{ 
-                    background: 'rgba(239, 68, 68, 0.05)', 
-                    border: '1px solid rgba(239, 68, 68, 0.2)', 
-                    padding: '16px', 
-                    borderRadius: '10px',
-                    fontSize: '0.9rem',
-                    color: 'var(--text)'
-                  }}>
-                    {comic.rejectionReason}
-                  </div>
-                </div>
-              ) : (
-                <div style={{ marginBottom: '16px' }}>
-                  <h4 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: '0.95rem' }}>Original Content to Restore:</h4>
-                  <div style={{ 
-                    background: 'var(--bg-secondary, rgba(0,0,0,0.03))', 
-                    border: '1px solid var(--border)', 
-                    padding: '16px', 
-                    borderRadius: '10px',
-                    fontSize: '0.9rem',
-                    color: 'var(--text-muted)'
-                  }}>
-                    No edit history or rejection reason found. Accepting this appeal will restore the comic to its previous status.
-                  </div>
-                </div>
-              )}
+                        )}
+                      </div>
+                    </div>
+                  );
+                } catch (e) {
+                  return (
+                    <div style={{ marginBottom: '16px' }}>
+                      <h4 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: '0.95rem' }}>Original Content to Restore:</h4>
+                      <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', padding: '16px', borderRadius: '10px' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>{String(snapshotRaw)}</span>
+                      </div>
+                    </div>
+                  );
+                }
+              })()}
             </>
           )}
         </div>
@@ -215,12 +345,13 @@ function ReviewAppealModal({ isOpen, onClose, comic, onSuccess }) {
             disabled={submitting}
           />
           <button 
+            type="button"
             className="btn-primary"
             onClick={handleAcceptAppeal} 
             disabled={loading || submitting || (!appealData && !comic.appealReason)}
-            style={{ padding: '8px 16px', borderRadius: '8px', fontWeight: '600', whiteSpace: 'nowrap' }}
+            style={{ padding: '8px 18px', borderRadius: '8px', fontWeight: '700', whiteSpace: 'nowrap' }}
           >
-            {submitting ? "Accepting..." : "✓ Accept Appeal"}
+            {submitting ? "Accepting & Restoring..." : "✓ Accept & Restore Appeal"}
           </button>
         </div>
       </div>

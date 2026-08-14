@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Download } from 'lucide-react'
 import '../../assets/style/common/creator-payout.css'
 import { getCreatorPayoutOverviewApi } from '../../services/api/PayoutApi'
+import { exportToCsv } from '../../utils/exportToCsv'
 
 const formatMoney = (value, currency = 'USD') => (
-  new Intl.NumberFormat('vi-VN', {
+  new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency || 'USD',
     maximumFractionDigits: 2,
@@ -15,7 +17,41 @@ const formatDate = (value) => {
   const parsed = new Date(value)
   return Number.isNaN(parsed.getTime())
     ? value
-    : parsed.toLocaleString('vi-VN')
+    : parsed.toLocaleString('en-US')
+}
+
+const formatMonthLabel = (monthStr) => {
+  if (!monthStr) return ''
+  const [year, month] = monthStr.split('-').map(Number)
+  if (!year || !month) return monthStr
+  const date = new Date(Date.UTC(year, month - 1, 1))
+  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+}
+
+const generateMonthOptions = (currentMonth, maxMonth) => {
+  const options = []
+  const baseDate = maxMonth ? new Date(`${maxMonth}-01T00:00:00Z`) : new Date()
+  let y = baseDate.getUTCFullYear()
+  let m = baseDate.getUTCMonth() + 1
+
+  if (currentMonth) {
+    const [cy, cm] = currentMonth.split('-').map(Number)
+    if (cy && cm && (cy > y || (cy === y && cm > m))) {
+      y = cy
+      m = cm
+    }
+  }
+
+  for (let i = 0; i < 24; i++) {
+    const mStr = `${y}-${String(m).padStart(2, '0')}`
+    options.push({ value: mStr, label: formatMonthLabel(mStr) })
+    m -= 1
+    if (m < 1) {
+      m = 12
+      y -= 1
+    }
+  }
+  return options
 }
 
 function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
@@ -80,6 +116,35 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
   ))
   const chartMax = Math.max(1, ...chartValues)
 
+  const handleExport = () => {
+    if (isTranslator) {
+      const headers = ['Task', 'Chapter', 'Credited Pages', 'Rate/Page', 'K Factor', 'Settled At', 'Revenue']
+      const rows = tasks.map(task => [
+        task.taskTitle || 'Untitled task',
+        task.chapterNumber ? `Chapter ${task.chapterNumber}` : (task.chapterTitle || '—'),
+        task.rowType === 'ADJUSTMENT' ? '—' : `${Number(task.completedPageCount || 0)} / ${Number(task.totalPageCount || 0)}`,
+        task.pageRateUsd == null ? '—' : formatMoney(convertUsd(task.pageRateUsd), currency),
+        task.averageResponsibilityFactor == null ? '—' : Number(task.averageResponsibilityFactor).toFixed(2),
+        formatDate(task.settledAt || task.completedAt),
+        formatMoney(convertUsd(task.revenueUsd), currency)
+      ])
+      exportToCsv(`Translator_Revenue_${month || 'Latest'}`, headers, rows)
+    } else {
+      const headers = ['Comic', 'Monthly Views', 'View Units', 'View Revenue', 'Monthly Follows', 'Follow Units', 'Follow Revenue', 'Total Revenue']
+      const rows = comics.map(comic => [
+        comic.comicTitle,
+        Number(comic.monthlyViews || 0),
+        Number(comic.viewUnits || 0),
+        formatMoney(convertUsd(comic.viewRevenueUsd), currency),
+        Number(comic.monthlyFollows || 0),
+        Number(comic.followUnits || 0),
+        formatMoney(convertUsd(comic.followRevenueUsd), currency),
+        formatMoney(convertUsd(comic.totalRevenueUsd), currency)
+      ])
+      exportToCsv(`Author_Revenue_${month || 'Latest'}`, headers, rows)
+    }
+  }
+
   if (loading && !overview) {
     return (
       <div className="creator-payout-card creator-payout-loading">
@@ -98,19 +163,42 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
               || 'Monthly revenue is calculated by the server.'}
           </p>
         </div>
-        <label className="creator-payout-month">
-          Revenue month
-          <input
-            type="month"
-            value={month}
-            max={overview?.latestRequestableMonth || overview?.lastClosedMonth || undefined}
-            onChange={(event) => {
-              const value = event.target.value
-              setMonth(value)
-              loadOverview(value)
-            }}
-          />
-        </label>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
+          <label className="creator-payout-month">
+            Revenue month
+            <select
+              value={month}
+              onChange={(event) => {
+                const value = event.target.value
+                setMonth(value)
+                loadOverview(value)
+              }}
+              style={{
+                cursor: 'pointer',
+                background: 'var(--author-card-bg, #fff)',
+                minWidth: '170px'
+              }}
+            >
+              {generateMonthOptions(
+                month,
+                overview?.latestRequestableMonth || overview?.lastClosedMonth
+              ).map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button 
+            type="button" 
+            className="author-secondary-btn" 
+            onClick={handleExport} 
+            disabled={loading || !overview}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', height: '40px' }}
+          >
+            <Download size={16} /> Export CSV
+          </button>
+        </div>
       </div>
 
       <div className="creator-payout-summary creator-payout-summary--six">
@@ -164,7 +252,7 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
               )}
             </strong>
             <small>
-              Every {Number(overview?.authorViewsPerUnit || 0).toLocaleString('vi-VN')} views / comic
+              Every {Number(overview?.authorViewsPerUnit || 0).toLocaleString('en-US')} views / comic
             </small>
           </div>
         )}
@@ -186,7 +274,7 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
               )}
             </strong>
             <small>
-              Every {Number(overview?.authorFollowsPerUnit || 0).toLocaleString('vi-VN')} follows / comic
+              Every {Number(overview?.authorFollowsPerUnit || 0).toLocaleString('en-US')} follows / comic
             </small>
           </div>
         )}
@@ -276,7 +364,7 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
           <span>Accounting currency: USD</span>
           <span>Display/transfer currency: {currency}</span>
           <span>
-            Conversion rate: 1 USD = {unitsPerUsd.toLocaleString('vi-VN', {
+            Conversion rate: 1 USD = {unitsPerUsd.toLocaleString('en-US', {
               maximumFractionDigits: 6,
             })} {currency}
           </span>
@@ -369,10 +457,10 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
                   <tr key={comic.comicId}>
                     <td>{comic.comicTitle}</td>
                     <td>
-                      {Number(comic.monthlyViews || 0).toLocaleString('vi-VN')}
+                      {Number(comic.monthlyViews || 0).toLocaleString('en-US')}
                     </td>
                     <td>
-                      {Number(comic.viewUnits || 0).toLocaleString('vi-VN')}
+                      {Number(comic.viewUnits || 0).toLocaleString('en-US')}
                     </td>
                     <td>
                       {formatMoney(
@@ -381,10 +469,10 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
                       )}
                     </td>
                     <td>
-                      {Number(comic.monthlyFollows || 0).toLocaleString('vi-VN')}
+                      {Number(comic.monthlyFollows || 0).toLocaleString('en-US')}
                     </td>
                     <td>
-                      {Number(comic.followUnits || 0).toLocaleString('vi-VN')}
+                      {Number(comic.followUnits || 0).toLocaleString('en-US')}
                     </td>
                     <td>
                       {formatMoney(

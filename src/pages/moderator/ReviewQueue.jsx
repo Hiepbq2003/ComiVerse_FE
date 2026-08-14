@@ -15,8 +15,69 @@ import {
 } from '../../services/api/AppealApi'
 import { useTheme } from '../../context/ThemeContext'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
+import { exportToCsv } from '../../utils/exportToCsv'
+import { toast } from 'react-toastify'
 import { getAuth } from '../../utils/Auth'
 import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
+
+const cleanReasonText = (reason) => {
+  if (!reason) return '';
+  let clean = String(reason);
+  if (clean.includes('--- PRESERVED PAGES BLOCK ---')) {
+    clean = clean.split('--- PRESERVED PAGES BLOCK ---')[0];
+  }
+  if (clean.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) {
+    clean = clean.split('--- DETAILED INSPECTION FEEDBACK REPORT')[0];
+  }
+  return clean.trim();
+};
+
+const parseCommentsFromReport = (reasonText) => {
+  if (!reasonText || typeof reasonText !== 'string' || !reasonText.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) return [];
+  let reportSection = reasonText.split('--- DETAILED INSPECTION FEEDBACK REPORT')[1] || '';
+  if (reportSection.includes('--- PRESERVED PAGES BLOCK ---')) {
+    reportSection = reportSection.split('--- PRESERVED PAGES BLOCK ---')[0];
+  }
+  const parsedComments = [];
+  
+  const regex = /\d+\.\s*\[([^\]]+)\]:\s*([\s\S]*?)(?=\n\s*\d+\.\s*\[|$)/g;
+  let match;
+  let idx = 0;
+  
+  while ((match = regex.exec(reportSection)) !== null) {
+    const label = match[1].trim();
+    const text = match[2].trim();
+
+    if (!label || !text) continue;
+
+    let pageNum = 1;
+    const pMatch = label.match(/Page\s+(\d+)/i);
+    if (pMatch) pageNum = parseInt(pMatch[1], 10);
+
+    let xPercentage = null;
+    let yPercentage = null;
+    const coordMatch = label.match(/\((\d+(?:\.\d+)?)%\s*,\s*(\d+(?:\.\d+)?)%\)/);
+    if (coordMatch) {
+      xPercentage = parseFloat(coordMatch[1]);
+      yPercentage = parseFloat(coordMatch[2]);
+    }
+
+    parsedComments.push({
+      id: `parsed-doc-comment-${idx}-${Date.now()}`,
+      targetType: coordMatch ? 'point' : (label.toLowerCase().includes('page') ? 'page' : 'field'),
+      targetKey: `page-${pageNum}`,
+      targetLabel: label,
+      text,
+      createdAt: new Date().toISOString(),
+      author: 'Moderator',
+      xPercentage,
+      yPercentage
+    });
+    idx++;
+  }
+
+  return parsedComments;
+};
 
 const formatSubmitterName = (submittedBy) => {
   if (!submittedBy) return 'Unknown';
@@ -232,8 +293,24 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
   const [fetchingChapters, setFetchingChapters] = useState(false)
   const chapterCacheRef = useRef(new Map())
 
-  // Google Docs Style Contextual Comment States (In-Memory during review)
-  const [docCommentsMap, setDocCommentsMap] = useState({})
+  // Google Docs Style Contextual Comment States (In-Memory with localStorage fallback)
+  const [docCommentsMap, setDocCommentsMap] = useState(() => {
+    try {
+      const saved = localStorage.getItem('mod_doc_comments_draft');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Failed to load draft comments', e);
+    }
+    return {};
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('mod_doc_comments_draft', JSON.stringify(docCommentsMap));
+    } catch (e) {
+      console.warn('Failed to save draft comments', e);
+    }
+  }, [docCommentsMap])
   const [showCommentsSidebar, setShowCommentsSidebar] = useState(true)
   const [activePinTarget, setActivePinTarget] = useState(null)
   const [pinCommentText, setPinCommentText] = useState('')
@@ -266,6 +343,23 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
   
   const [isAppealModalOpen, setIsAppealModalOpen] = useState(false)
   const [selectedAppealComic, setSelectedAppealComic] = useState(null)
+  const [appealTickets, setAppealTickets] = useState([])
+
+  const fetchAppealTickets = useCallback(async () => {
+    try {
+      const res = await getPendingAppealsQueueApi(0, 100);
+      const data = res?.data?.content || res?.data?.items || res?.data || res || [];
+      if (Array.isArray(data)) {
+        setAppealTickets(data);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch pending appeals queue:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAppealTickets();
+  }, [fetchAppealTickets, activeTab]);
 
   const [isHydrating, setIsHydrating] = useState(false)
   const [hydratedItems, setHydratedItems] = useState([])
@@ -734,11 +828,12 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       counts[tabStatus] = uniqueKeys.size;
     });
 
-    const appealedComics = comics.filter(c => c.isAppealed || c.appealed || c.moderationStatus === 'APPEALED');
-    counts.appealed = appealedComics.length;
+    const ticketTargetIds = new Set(appealTickets.map(t => String(t.targetId || t.id)));
+    const uniqueAppealedComics = comics.filter(c => (c.isAppealed || c.appealed || c.moderationStatus === 'APPEALED') && !ticketTargetIds.has(String(c.id)));
+    counts.appealed = appealTickets.length + uniqueAppealedComics.length;
 
     return counts;
-  }, [submissions, comics]);
+  }, [submissions, comics, appealTickets]);
 
   // 2. High-Performance Instant Query Filter & Sort
   const filteredItems = useMemo(() => {
@@ -746,12 +841,41 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     const authUser = getAuth()?.user;
     
     if (activeTab === 'appealed') {
-      return comics
-        .filter(c => c.isAppealed || c.appealed || c.moderationStatus === 'APPEALED')
-        .filter(c => {
-           if (!query) return true;
-           return (c.title?.toLowerCase().includes(query) || c.authorName?.toLowerCase().includes(query));
-        })
+      const mappedTickets = appealTickets.map(ticket => {
+        const matchingComic = comics.find(c => String(c.id) === String(ticket.targetId)) ||
+                              submissions.find(s => String(s.comicId) === String(ticket.targetId) || String(s.id) === String(ticket.targetId));
+
+        return {
+          ...matchingComic,
+          id: ticket.id,
+          appealTicketId: ticket.id,
+          targetId: ticket.targetId,
+          targetType: ticket.targetType,
+          title: ticket.targetName || matchingComic?.title || matchingComic?.comicTitle || 'Appealed Submission',
+          submittedBy: ticket.authorName || matchingComic?.authorName || matchingComic?.submittedBy || 'Author',
+          authorName: ticket.authorName || matchingComic?.authorName || matchingComic?.submittedBy || 'Author',
+          language: matchingComic?.language || matchingComic?.originalLanguage || 'Japanese',
+          publicationStatus: matchingComic?.publicationStatus || matchingComic?.publication_status || 'ONGOING',
+          genres: matchingComic?.genres || matchingComic?.genreIds || [],
+          summary: matchingComic?.summary || matchingComic?.description || '',
+          minimumAge: matchingComic?.minimumAge || matchingComic?.minAge || 13,
+          cover: matchingComic?.cover || matchingComic?.coverImage || matchingComic?.coverImageUrl || '/assets/default_cover.jpg',
+          chapterCount: matchingComic?.chapterCount || (matchingComic?.chapters ? matchingComic.chapters.length : 1),
+          status: 'appealed',
+          type: 'Comic Appeal',
+          appealReason: ticket.appealReason,
+          reason: ticket.appealReason,
+          timestamp: ticket.createdAt || Date.now(),
+          isComicAppealItem: true,
+          previousStateSnapshot: ticket.previousStateSnapshot || matchingComic?.previousStateSnapshot,
+          rawTicket: ticket,
+          rawComic: matchingComic
+        };
+      });
+
+      const ticketTargetIds = new Set(appealTickets.map(t => String(t.targetId || t.id)));
+      const extraAppealedComics = comics
+        .filter(c => (c.isAppealed || c.appealed || c.moderationStatus === 'APPEALED') && !ticketTargetIds.has(String(c.id)))
         .map(c => ({
           ...c,
           status: 'appealed',
@@ -759,7 +883,15 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           submittedBy: c.authorName,
           timestamp: c.updatedAt || c.createdAt || Date.now(),
           isComicAppealItem: true
-        }))
+        }));
+
+      const allAppealed = [...mappedTickets, ...extraAppealedComics];
+
+      return allAppealed
+        .filter(item => {
+          if (!query) return true;
+          return ((item.title || '').toLowerCase().includes(query) || (item.submittedBy || '').toLowerCase().includes(query));
+        })
         .sort((a, b) => {
           if (sortFilter === 'title_asc') {
             return (a.title || '').localeCompare(b.title || '');
@@ -1011,14 +1143,11 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
 
   const isCommentMatchingChapter = (c, chapObj, comicId) => {
     if (!c) return false;
-    const cComicId = String(c.comicId || '');
-    if (comicId && cComicId && cComicId !== String(comicId)) return false;
-
     const targetChapId = String(chapObj?.id || chapObj?.chapterId || '');
-    const targetChapNum = String(chapObj?.chapterNumber || chapObj?.number || '');
+    const targetChapNum = String(chapObj?.chapterNumber ?? chapObj?.number ?? '');
 
     const cChapId = String(c.chapterId || '');
-    const cChapNum = String(c.chapterNumber || '');
+    const cChapNum = String(c.chapterNumber ?? c.number ?? '');
 
     if (targetChapId && cChapId && (cChapId === targetChapId || cChapId === `chap-${targetChapId}` || `chap-${cChapId}` === targetChapId)) {
       return true;
@@ -1026,6 +1155,9 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     if (targetChapNum && cChapNum && targetChapNum === cChapNum) {
       return true;
     }
+    // If neither chapterId nor chapterNumber is constrained on the comment, allow match
+    if (!cChapId && !cChapNum) return true;
+
     return false;
   };
 
@@ -1038,19 +1170,43 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       ...(chapObj?.notes || [])
     ];
 
+    // Fallback: If no comments in state, check if rejection reason contains a feedback report
+    const reasonText = chapObj?.rejectionReason || chapObj?.rejection_reason || selectedReview?.rejectionReason || selectedReview?.rejection_reason;
+    if (candidates.length === 0 && reasonText && reasonText.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) {
+      const fromReport = parseCommentsFromReport(reasonText);
+      candidates.push(...fromReport);
+    }
+
     const comments = [];
     const seenIds = new Set();
     candidates.forEach(c => {
-      if (!c || seenIds.has(c.id)) return;
-      if (isCommentMatchingChapter(c, chapObj, comicId)) {
-        seenIds.add(c.id);
+      if (!c) return;
+      const uniqueKey = c.id || `${c.targetKey}-${c.text}`;
+      if (seenIds.has(uniqueKey)) return;
+      if (isCommentMatchingChapter(c, chapObj, comicId) || (!chapObj && !submissionId)) {
+        seenIds.add(uniqueKey);
         comments.push(c);
       }
     });
+
+    // If still empty but candidates had items and submission has only 1 chapter, include all
+    if (comments.length === 0 && candidates.length > 0) {
+      const chaps = getSubmissionChapters(selectedReview || { id: submissionId });
+      if (chaps.length <= 1) {
+        candidates.forEach(c => {
+          const uniqueKey = c.id || `${c.targetKey}-${c.text}`;
+          if (!seenIds.has(uniqueKey)) {
+            seenIds.add(uniqueKey);
+            comments.push(c);
+          }
+        });
+      }
+    }
+
     return comments;
   };
 
-  const onConfirmRejectClick = () => {
+  const onConfirmRejectClick = async () => {
     if (!selectedReject) return
     const userOverallNote = rejectionReason.trim();
     
@@ -1065,39 +1221,70 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         const viewPages = getReviewViewPages(selectedReview, targetChap, docCommentsMap);
         if (viewPages.length > 0) {
           targetChap = { ...targetChap, pages: viewPages.map(p => p.url || p) };
+        } else {
+          try {
+            const detailRes = await getChapterDetailApi(targetChap.id);
+            const dData = detailRes?.data?.data || detailRes?.data || {};
+            const extracted = dData.pages || dData.images || [];
+            if (extracted.length > 0) {
+              targetChap = { ...targetChap, pages: extracted.map(p => p.url || p) };
+            }
+          } catch (e) {
+            console.warn('Failed to fetch chapter details for preservation', e);
+          }
         }
       }
 
       const comments = getChapterScopedComments(targetChap, selectedReject.id, comicId);
       let finalPayload = '';
 
-      if (userOverallNote && comments.length > 0) {
-        const formattedComments = comments.map((c, i) => `${i + 1}. [${c.targetLabel}]: ${c.text}`).join('\n');
-        finalPayload = `${userOverallNote}\n\n--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
-      } else if (comments.length > 0) {
-        const formattedComments = comments.map((c, i) => `${i + 1}. [${c.targetLabel}]: ${c.text}`).join('\n');
-        finalPayload = `--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
+      if (comments.length > 0) {
+        const formattedComments = comments.map((c, i) => {
+          const coordStr = (c.xPercentage !== null && c.xPercentage !== undefined && !c.targetLabel.includes('%'))
+            ? ` (${c.xPercentage}%, ${c.yPercentage}%)`
+            : '';
+          return `${i + 1}. [${c.targetLabel}${coordStr}]: ${c.text}`;
+        }).join('\n');
+        
+        if (userOverallNote) {
+          finalPayload = `${userOverallNote}\n\n--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
+        } else {
+          finalPayload = `--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
+        }
       } else {
         finalPayload = userOverallNote;
       }
 
-      if (targetChap.pages && targetChap.pages.length > 0) {
-        finalPayload += `\n\n--- PRESERVED PAGES BLOCK ---\n${JSON.stringify(targetChap.pages)}`;
-      }
-      
-      handleChapterReject(selectedReject.parentReviewId || selectedReject.comicId || selectedReject.id, targetChap, finalPayload);
+      // The backend natively preserves the image array using rejectedImagesSnapshot
+      handleChapterReject(selectedReject.parentReviewId || selectedReject.comicId || selectedReject.id, targetChap, finalPayload, userOverallNote);
     } else {
       // Bulk "Reject All"
-      const itemsToReject = selectedReject.subItems || selectedReject.allChapters || selectedReject.chapters || [selectedReject];
+      const itemsToReject = (selectedReject.subItems && selectedReject.subItems.length > 0 ? selectedReject.subItems : null) ||
+                            (selectedReject.allChapters && selectedReject.allChapters.length > 0 ? selectedReject.allChapters : null) ||
+                            (selectedReject.chapters && selectedReject.chapters.length > 0 ? selectedReject.chapters : null) ||
+                            [selectedReject];
       const comicId = selectedReject.parentReviewId || selectedReject.comicId || selectedReject.id;
 
-      itemsToReject.forEach(i => {
+      let accumulatedMockPayloads = [];
+
+      for (let i of itemsToReject) {
         // Enrich chapter with pages if missing
         let enrichedItem = i;
         if (!enrichedItem.pages || enrichedItem.pages.length === 0) {
           const viewPages = getReviewViewPages(selectedReview || selectedReject, enrichedItem, docCommentsMap);
           if (viewPages.length > 0) {
             enrichedItem = { ...i, pages: viewPages.map(p => p.url || p) };
+          } else {
+            try {
+              const detailRes = await getChapterDetailApi(enrichedItem.id);
+              const dData = detailRes?.data?.data || detailRes?.data || {};
+              const extracted = dData.pages || dData.images || [];
+              if (extracted.length > 0) {
+                enrichedItem = { ...enrichedItem, pages: extracted.map(p => p.url || p) };
+              }
+            } catch (e) {
+              console.warn('Failed to fetch chapter details for preservation', e);
+            }
           }
         }
 
@@ -1105,27 +1292,39 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         const comments = getChapterScopedComments(enrichedItem, selectedReject.id, comicId);
         let finalPayload = '';
 
-        if (userOverallNote && comments.length > 0) {
-          const formattedComments = comments.map((c, idx) => `${idx + 1}. [${c.targetLabel}]: ${c.text}`).join('\n');
-          finalPayload = `${userOverallNote}\n\n--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
-        } else if (comments.length > 0) {
-          const formattedComments = comments.map((c, idx) => `${idx + 1}. [${c.targetLabel}]: ${c.text}`).join('\n');
+        if (comments.length > 0) {
+          const formattedComments = comments.map((c, idx) => {
+            const coordStr = (c.xPercentage !== null && c.xPercentage !== undefined && !c.targetLabel.includes('%'))
+              ? ` (${c.xPercentage}%, ${c.yPercentage}%)`
+              : '';
+            return `${idx + 1}. [${c.targetLabel}${coordStr}]: ${c.text}`;
+          }).join('\n');
           finalPayload = `--- DETAILED INSPECTION FEEDBACK REPORT (${comments.length} PINNED ITEMS) ---\n${formattedComments}`;
-        } else {
-          finalPayload = userOverallNote;
-        }
-
-        if (enrichedItem.pages && enrichedItem.pages.length > 0) {
-          finalPayload += `\n\n--- PRESERVED PAGES BLOCK ---\n${JSON.stringify(enrichedItem.pages)}`;
         }
 
         // Use handleChapterReject for chapters to preserve pages, else fallback to handleConfirmReject
         if (handleChapterReject && isRealChapterSubmission(enrichedItem)) {
-          handleChapterReject(comicId, enrichedItem, finalPayload);
+          // Pass skipSubmissionReject = true to prevent redundant/conflicting submission rejections
+          handleChapterReject(comicId, enrichedItem, finalPayload, null, true);
         } else {
-          handleConfirmReject(enrichedItem.id || enrichedItem, finalPayload);
+          // Fallback for mock items: accumulate payload to append to overall submission rejection
+          if (finalPayload) {
+            accumulatedMockPayloads.push(finalPayload);
+          }
         }
-      });
+      }
+      
+      let finalOverallNote = userOverallNote;
+      if (accumulatedMockPayloads.length > 0) {
+        if (finalOverallNote) {
+          finalOverallNote += '\n\n' + accumulatedMockPayloads.join('\n\n');
+        } else {
+          finalOverallNote = accumulatedMockPayloads.join('\n\n');
+        }
+      }
+
+      // Finally, reject the Submission Profile with the overall note (including mock item pins)
+      handleConfirmReject(selectedReject.id || selectedReject, finalOverallNote);
     }
     fetchAllData?.();
 
@@ -1170,14 +1369,32 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
 
     setSelectedReject(null)
     setRejectionReason('')
+    
+    // Retain comments in localStorage under comiverse_moderator_doc_comments for persistence
+    try {
+      const currentSaved = JSON.parse(localStorage.getItem('comiverse_moderator_doc_comments') || '{}');
+      const updatedSaved = { ...currentSaved, ...docCommentsMap };
+      localStorage.setItem('comiverse_moderator_doc_comments', JSON.stringify(updatedSaved));
+    } catch(e) {}
   }
 
   const handleAddDocComment = (submissionId, targetType, targetKey, targetLabel, text, coords = null) => {
     if (!text || !text.trim()) return
-    const chapId = selectedChapter?.id || selectedChapter?.chapterId || selectedReview?.chapterId || selectedReview?.id
-    const comicIdVal = selectedReview?.comicId || selectedReview?.parentReviewId || selectedChapter?.comicId
-    const chapNumVal = selectedChapter?.chapterNumber || selectedChapter?.number || selectedReview?.chapterNumber || selectedReview?.number
+    const chaptersList = getSubmissionChapters(selectedReview || { id: submissionId });
+    const activeChap = selectedChapter || chaptersList[0] || null;
+
+    const chapId = activeChap?.id || activeChap?.chapterId || selectedReview?.chapterId || selectedReview?.id
+    const comicIdVal = selectedReview?.comicId || selectedReview?.parentReviewId || activeChap?.comicId
+    const chapNumVal = activeChap?.chapterNumber || activeChap?.number || selectedReview?.chapterNumber || selectedReview?.number
     const comicTitleVal = selectedReview?.title || selectedReview?.comicTitle || selectedReview?.comicName || ''
+
+    const xVal = coords?.x !== undefined ? coords.x : null;
+    const yVal = coords?.y !== undefined ? coords.y : null;
+
+    let labelWithCoords = targetLabel;
+    if (targetType === 'point' && xVal !== null && yVal !== null && !labelWithCoords.includes('%')) {
+      labelWithCoords = `${targetLabel} (${xVal}%, ${yVal}%)`;
+    }
 
     const newComment = {
       id: `doc-comment-${Date.now()}`,
@@ -1188,12 +1405,12 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       comicTitle: comicTitleVal,
       targetType,
       targetKey,
-      targetLabel,
+      targetLabel: labelWithCoords,
       text: text.trim(),
       createdAt: new Date().toISOString(),
       author: 'Moderator',
-      xPercentage: coords?.x !== undefined ? coords.x : null,
-      yPercentage: coords?.y !== undefined ? coords.y : null
+      xPercentage: xVal,
+      yPercentage: yVal
     }
 
     setDocCommentsMap(prev => {
@@ -1201,9 +1418,12 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         ...prev,
         [submissionId]: [...(prev[submissionId] || []), newComment]
       }
-      // Also store under the chapter ID so the Author side can find it by chapterId
+      // Also store under the chapter ID and comic ID
       if (chapId && String(chapId) !== String(submissionId)) {
         next[chapId] = [...(prev[chapId] || []), newComment]
+      }
+      if (comicIdVal && String(comicIdVal) !== String(submissionId) && String(comicIdVal) !== String(chapId)) {
+        next[comicIdVal] = [...(prev[comicIdVal] || []), newComment]
       }
       return next
     })
@@ -1223,12 +1443,17 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
 
   const handleSaveEditDocComment = (submissionId, commentId) => {
     if (!editingCommentText.trim()) return
-    setDocCommentsMap(prev => ({
-      ...prev,
-      [submissionId]: (prev[submissionId] || []).map(c => 
-        c.id === commentId ? { ...c, text: editingCommentText.trim(), editedAt: new Date().toISOString() } : c
-      )
-    }))
+    setDocCommentsMap(prev => {
+      const next = { ...prev };
+      for (const key in next) {
+        if (next[key]) {
+          next[key] = next[key].map(c => 
+            c.id === commentId ? { ...c, text: editingCommentText.trim(), editedAt: new Date().toISOString() } : c
+          );
+        }
+      }
+      return next;
+    });
     setEditingCommentId(null)
     setEditingCommentText('')
   }
@@ -1243,10 +1468,15 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
   }
 
   const handleDeleteDocComment = (submissionId, commentId) => {
-    setDocCommentsMap(prev => ({
-      ...prev,
-      [submissionId]: (prev[submissionId] || []).filter(c => c.id !== commentId)
-    }))
+    setDocCommentsMap(prev => {
+      const next = { ...prev };
+      for (const key in next) {
+        if (next[key]) {
+          next[key] = next[key].filter(c => c.id !== commentId);
+        }
+      }
+      return next;
+    });
   }
 
 
@@ -1274,10 +1504,10 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       let list = chaptersData?.data || chaptersData || [];
       if (!Array.isArray(list)) list = [];
       
-      // Filter out PREVIEW_READY or DRAFT chapters since moderator should not see them
+      // Filter out DRAFT chapters, but keep PREVIEW_READY so new comic submissions show their chapters
       list = list.filter(ch => {
         const status = (ch.status || ch.moderationStatus || '').toUpperCase();
-        return !status || status === 'APPROVED' || status === 'PUBLISHED' || status === 'SUBMITTED_FOR_REVIEW' || status === 'REJECTED';
+        return !status || status === 'APPROVED' || status === 'PUBLISHED' || status === 'SUBMITTED_FOR_REVIEW' || status === 'REJECTED' || status === 'PREVIEW_READY';
       });
 
       if (list.length === 0) return [];
@@ -1417,6 +1647,37 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       setPreviewTab(firstChap && Array.isArray(firstChap.pages) && firstChap.pages.length > 0 ? 'reader' : 'chapters');
     }
 
+    // Hydrate report comments from rejection reasons into docCommentsMap so moderator sees all feedback pins
+    const reasonsToParse = [
+      item.rejectionReason,
+      item.rejection_reason,
+      item.notes,
+      ...(chaps.map(c => c.rejectionReason || c.rejection_reason))
+    ].filter(Boolean);
+
+    reasonsToParse.forEach(r => {
+      if (typeof r === 'string' && r.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) {
+        const parsed = parseCommentsFromReport(r);
+        if (parsed.length > 0) {
+          setDocCommentsMap(prev => {
+            const next = { ...prev };
+            const subKey = String(item.id);
+            const existing = next[subKey] || [];
+            const merged = [...existing];
+            parsed.forEach(p => {
+              if (!merged.some(m => m.text === p.text && m.targetKey === p.targetKey)) {
+                merged.push(p);
+              }
+            });
+            next[subKey] = merged;
+            if (item.comicId) next[String(item.comicId)] = merged;
+            if (firstChap?.id) next[String(firstChap.id)] = merged;
+            return next;
+          });
+        }
+      }
+    });
+
     setFetchingChapters(false);
   };
 
@@ -1481,11 +1742,65 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedReview, selectedChapter, previewTab, pageIndex])
 
+  const handleExportReviewQueue = () => {
+    try {
+      const itemsToExport = filteredItems && filteredItems.length > 0 ? filteredItems : (submissions || []);
+      const headers = [
+        'Submission ID',
+        'Title',
+        'Type',
+        'Author / Submitter',
+        'Language',
+        'Current Status',
+        'Total Chapters',
+        'Submission / Update Date',
+        'Rejection Note / Moderator Feedback'
+      ];
+      
+      const rows = itemsToExport.map(item => {
+        const isAppeal = item.isAppealTicket;
+        const subType = isAppeal ? 'Appeal Ticket' : (item.type === 'COMIC' || !item.chapterNumber ? 'Comic Profile' : `Chapter ${item.chapterNumber}`);
+        const submitter = isAppeal ? (item.requesterName || item.requesterEmail || 'Author') : formatSubmitterName(item.submittedBy).replace('Author: ', '');
+        const dateStr = item.submittedAt || item.createdAt || item.updatedAt || 'N/A';
+        const cleanNote = cleanReasonText(item.rejectionReason || item.rejection_reason || item.appealReason || item.reason || item.notes || '');
+        const chapsCount = (item.allChapters?.length || item.chapters?.length || (item.chapterNumber ? 1 : 0));
+
+        return [
+          item.id || 'N/A',
+          item.title || item.comicName || item.targetName || 'Untitled',
+          subType,
+          submitter,
+          item.language || item.sourceLanguage || item.targetLanguage || 'Japanese',
+          (item.status || item.moderationStatus || 'PENDING').toUpperCase(),
+          chapsCount,
+          dateStr,
+          cleanNote || 'None'
+        ];
+      });
+
+      exportToCsv(`ComiVerse_Moderation_ReviewQueue_${activeTab.toUpperCase()}`, headers, rows);
+      toast.success(`📥 Review Queue (${activeTab}) exported successfully!`);
+    } catch (err) {
+      console.error('Failed to export review queue:', err);
+      toast.error('Failed to export review queue: ' + err.message);
+    }
+  };
+
   return (
     <div className="fade-in">
-      <div className="moderator-page-header">
-        <h1>Raw Content Review Queue</h1>
-        <p>Review and verify author submission inputs (Title, Language, Min Age, Description, Genres, Cover & Chapters), inspect raw chapter manuscripts, and approve catalog publication.</p>
+      <div className="moderator-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <h1>Raw Content Review Queue</h1>
+          <p>Review and verify author submission inputs (Title, Language, Min Age, Description, Genres, Cover & Chapters), inspect raw chapter manuscripts, and approve catalog publication.</p>
+        </div>
+        <button
+          type="button"
+          className="mod-export-btn"
+          onClick={handleExportReviewQueue}
+          title="Export current review queue items as CSV"
+        >
+          <span>📥 Export Queue ({activeTab.toUpperCase()})</span>
+        </button>
       </div>
 
       {/* Dynamic Statistics Ribbon */}
@@ -1624,11 +1939,30 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                   {getSubmissionLanguage(item) !== 'Not specified' && <span> · <strong>Lang:</strong> {getSubmissionLanguage(item)}</span>}
                   {getSubmissionMinAge(item) !== 'Not specified' && <span> · <strong>Age:</strong> {getSubmissionMinAge(item)}</span>}
                 </p>
-                <div className="submission-extra" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
+                <div className="submission-extra" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px', flexWrap: 'wrap' }}>
                   <span className="submission-extra-item">⏱️ {formatTimeAgo(item.timestamp || item.submittedAt || item.createdAt)}</span>
                   <span className="submission-extra-item" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '2px 8px', borderRadius: '6px', fontWeight: '800', fontSize: '11.5px' }}>
                     📚 {item.isComicAppealItem ? (item.chapterCount || item.chapters || 0) : getSubmissionChapters(item).length} {item.isComicAppealItem ? ((item.chapterCount || item.chapters || 0) === 1 ? 'Chapter' : 'Chapters') : (getSubmissionChapters(item).length === 1 ? 'Chapter' : 'Chapters')}
                   </span>
+                  {item.isComicAppealItem && (
+                    <span className="submission-extra-item" style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.35)', padding: '2px 8px', borderRadius: '6px', fontWeight: '700', fontSize: '11.5px' }}>
+                      {(() => {
+                        const date = item.timestamp || item.submittedAt || item.createdAt || item.rawTicket?.createdAt;
+                        if (!date) return '🛡️ 3d SLA Protection';
+                        const createdTime = new Date(date).getTime();
+                        const elapsedMs = Date.now() - createdTime;
+                        const remainingMs = (3 * 24 * 60 * 60 * 1000) - elapsedMs;
+                        if (remainingMs <= 0) return '⚡ Auto-Restoring (SLA Reached)';
+                        const hoursLeft = Math.floor(remainingMs / (1000 * 60 * 60));
+                        if (hoursLeft >= 24) {
+                          const d = Math.floor(hoursLeft / 24);
+                          const h = hoursLeft % 24;
+                          return `⏳ SLA: ${d}d ${h}h left`;
+                        }
+                        return `⏳ SLA: ${hoursLeft}h left`;
+                      })()}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -1831,7 +2165,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                             Rejection Feedback for {activeChap?.title || 'this chapter'}
                           </strong>
                           <span style={{ fontSize: '12.5px', lineHeight: '1.55' }}>
-                            {activeChap?.rejectionReason || selectedReview.rejectionReason}
+                            {cleanReasonText(activeChap?.rejectionReason || selectedReview.rejectionReason)}
                           </span>
                         </div>
                       )}
@@ -2268,7 +2602,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                             Rejection Feedback:
                           </strong>
                           <span style={{ fontStyle: 'italic', fontSize: '13.5px' }}>
-                            "{selectedReview.rejectionReason || 'No feedback recorded.'}"
+                            "{cleanReasonText(selectedReview.rejectionReason) || 'No feedback recorded.'}"
                           </span>
                         </div>
                       )}
@@ -2855,7 +3189,8 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         }}
         comic={selectedAppealComic}
         onSuccess={() => {
-          fetchData(activeTab, getTabSearchQuery(activeTab), pagination[activeTab].page)
+          fetchAppealTickets()
+          fetchAllData?.()
         }}
       />
     </div>

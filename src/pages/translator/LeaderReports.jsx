@@ -10,6 +10,7 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
+  Download,
   X
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -22,6 +23,7 @@ import {
 import TranslationSplitScreenReview from '../../components/report/TranslationSplitScreenReview';
 import '../../assets/style/report/report-system.css';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
+import { exportToCsv } from '../../utils/exportToCsv';
 
 export default function LeaderReports() {
   const navigate = useNavigate();
@@ -148,6 +150,45 @@ export default function LeaderReports() {
     });
   };
 
+  // Export Reports list to Excel CSV
+  const handleExportReports = () => {
+    if (!reports || reports.length === 0) {
+      toast.warn('No report records available to export.');
+      return;
+    }
+
+    const headers = [
+      'Report ID',
+      'Reporter Name',
+      'Target Title',
+      'Target Type',
+      'Issue Category',
+      'Reason / Description',
+      'Status',
+      'Assigned Role',
+      'Resolution Action',
+      'Resolution Note',
+      'Created Date'
+    ];
+
+    const rows = reports.map(r => [
+      r.id || '',
+      r.reporter_name || r.reporter?.fullName || r.reporter?.username || 'Anonymous',
+      r.target_title || r.comic_title || 'Untitled Target',
+      r.target_type || 'CHAPTER_TRANSLATIONS',
+      r.category_name || r.category?.name || 'General',
+      (r.description || r.reason || '').replace(/[\r\n]+/g, ' '),
+      r.status || 'PENDING',
+      r.assigned_role || 'PROJECT_LEADER',
+      r.resolution_action || '-',
+      (r.resolution_note || '-').replace(/[\r\n]+/g, ' '),
+      r.created_at ? new Date(r.created_at).toLocaleString() : ''
+    ]);
+
+    exportToCsv('ComiVerse_Leader_Reports_Export', headers, rows);
+    toast.success('Leader reports exported successfully!');
+  };
+
   return (
     <div className="rep-container">
 
@@ -161,6 +202,15 @@ export default function LeaderReports() {
         <div className="rep-header-actions">
           <button className="rep-btn rep-btn-ghost" onClick={fetchReports} title="Refresh data">
             <RefreshCw size={15} /> Refresh
+          </button>
+          <button
+            className="rep-btn rep-btn-primary"
+            onClick={handleExportReports}
+            disabled={loading || reports.length === 0}
+            title="Export reports list to Excel CSV"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Download size={15} /> Export CSV
           </button>
         </div>
       </div>

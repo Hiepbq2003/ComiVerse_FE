@@ -37,7 +37,7 @@ const getPayoutOverviewDeduped = (month) => {
 
 const formatMoney = (value, currency = 'USD') => {
   const amount = Number(value) || 0
-  return new Intl.NumberFormat('vi-VN', {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency || 'USD',
     maximumFractionDigits: 2,
@@ -49,7 +49,41 @@ const formatDate = (value) => {
   const parsed = new Date(value)
   return Number.isNaN(parsed.getTime())
     ? value
-    : parsed.toLocaleString('vi-VN')
+    : parsed.toLocaleString('en-US')
+}
+
+const formatMonthLabel = (monthStr) => {
+  if (!monthStr) return ''
+  const [year, month] = monthStr.split('-').map(Number)
+  if (!year || !month) return monthStr
+  const date = new Date(Date.UTC(year, month - 1, 1))
+  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+}
+
+const generateMonthOptions = (currentMonth, maxMonth) => {
+  const options = []
+  const baseDate = maxMonth ? new Date(`${maxMonth}-01T00:00:00Z`) : new Date()
+  let y = baseDate.getUTCFullYear()
+  let m = baseDate.getUTCMonth() + 1
+
+  if (currentMonth) {
+    const [cy, cm] = currentMonth.split('-').map(Number)
+    if (cy && cm && (cy > y || (cy === y && cm > m))) {
+      y = cy
+      m = cm
+    }
+  }
+
+  for (let i = 0; i < 24; i++) {
+    const mStr = `${y}-${String(m).padStart(2, '0')}`
+    options.push({ value: mStr, label: formatMonthLabel(mStr) })
+    m -= 1
+    if (m < 1) {
+      m = 12
+      y -= 1
+    }
+  }
+  return options
 }
 
 const statusLabel = (status) => {
@@ -423,16 +457,24 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
         </div>
         <label className="creator-payout-month">
           Payout month
-          <input
-            type="month"
+          <select
             value={month}
-            max={
-              overview?.latestRequestableMonth
-              || overview?.lastClosedMonth
-              || undefined
-            }
             onChange={handleMonthChange}
-          />
+            style={{
+              cursor: 'pointer',
+              background: 'var(--author-card-bg, #fff)',
+              minWidth: '170px'
+            }}
+          >
+            {generateMonthOptions(
+              month,
+              overview?.latestRequestableMonth || overview?.lastClosedMonth
+            ).map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
 

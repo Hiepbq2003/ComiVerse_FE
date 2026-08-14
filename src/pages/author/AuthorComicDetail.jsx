@@ -47,14 +47,37 @@ const normalizeGenres = (genres) => {
   if (typeof genres === 'string' && genres.trim()) {
     return genres.split(',').map((genre) => genre.trim()).filter(Boolean)
   }
+  return []
 }
 
 const parsePageCountFromReason = (reasonText) => {
   if (!reasonText || !reasonText.includes('--- PRESERVED PAGES BLOCK ---')) return null;
   try {
-    const jsonStr = reasonText.split('--- PRESERVED PAGES BLOCK ---')[1].trim();
-    const pages = JSON.parse(jsonStr);
-    return Array.isArray(pages) ? pages.length : null;
+    let jsonStr = reasonText.split('--- PRESERVED PAGES BLOCK ---')[1].trim();
+    if (jsonStr.includes('--- DETAILED INSPECTION FEEDBACK REPORT')) {
+      jsonStr = jsonStr.split('--- DETAILED INSPECTION FEEDBACK REPORT')[0].trim();
+    }
+    try {
+      let parsed = JSON.parse(jsonStr);
+      if (typeof parsed === 'string') {
+        parsed = JSON.parse(parsed);
+      }
+      if (Array.isArray(parsed)) return parsed.length;
+    } catch (e) {
+      // ignore
+    }
+    const start = jsonStr.indexOf('[');
+    const end = jsonStr.lastIndexOf(']');
+    if (start !== -1 && end !== -1 && end > start) {
+      let arrayStr = jsonStr.substring(start, end + 1);
+      arrayStr = arrayStr.replace(/\\"/g, '"');
+      let pages = JSON.parse(arrayStr);
+      if (typeof pages === 'string') {
+        pages = JSON.parse(pages);
+      }
+      return Array.isArray(pages) ? pages.length : null;
+    }
+    return null;
   } catch (e) {
     return null;
   }
@@ -84,7 +107,14 @@ const getChapterTitle = (chapter) => chapter?.title || chapter?.chapterTitle || 
 
 const getChapterCount = (comic) => comic?.chapterCount ?? 0
 
-const getChapterViews = (chapter) => chapter?.views ?? chapter?.viewCount ?? chapter?.totalViews ?? '—'
+const getChapterViews = (chapter, chaptersList = [], comicViewCount = 0) => {
+  let count = chapter?.viewCount ?? chapter?.views ?? chapter?.totalViews
+  if ((count === null || count === undefined || Number(count) === 0) && chaptersList.length === 1 && Number(comicViewCount) > 0) {
+    count = comicViewCount
+  }
+  if (count === null || count === undefined || count === '') return '0'
+  return Number(count).toLocaleString('en-US')
+}
 
 const normalizePublicationStatusValue = (status) => {
   const value = (status || 'ONGOING').toString().replace(/[-\s]+/g, '_').toUpperCase()
@@ -156,8 +186,8 @@ const formatDate = (value) => {
 }
 
 const formatMoney = (value) => {
-  if (value === null || value === undefined || value === '') return '0đ'
-  if (typeof value === 'number') return `${value.toLocaleString('vi-VN')}đ`
+  if (value === null || value === undefined || value === '') return '$0.00'
+  if (typeof value === 'number') return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   return value
 }
 
@@ -547,11 +577,69 @@ function ModEditReviewModal({ currentComic, onClose, onAppeal }) {
   let oldComic = {}
   try {
     if (currentComic?.previousStateSnapshot) {
-      oldComic = JSON.parse(currentComic.previousStateSnapshot)
+      oldComic = typeof currentComic.previousStateSnapshot === 'string'
+        ? JSON.parse(currentComic.previousStateSnapshot)
+        : currentComic.previousStateSnapshot
     }
   } catch (e) {
     console.error('Failed to parse previous state snapshot', e)
   }
+
+  const formatDiffValue = (key, val) => {
+    if (val === null || val === undefined || val === '') return 'None';
+    if (key === 'genres' || key === 'genreIds') {
+      if (Array.isArray(val)) {
+        if (val.length === 0) return 'None';
+        return val
+          .map(g => (typeof g === 'object' ? g?.name || g?.title || g?.label || '' : String(g)))
+          .filter(Boolean)
+          .join(', ') || 'None';
+      }
+      if (typeof val === 'string') {
+        return val.trim() || 'None';
+      }
+      return 'None';
+    }
+    if (key === 'minimumAge') {
+      return `${val}+`;
+    }
+    if (typeof val === 'object') {
+      if (Array.isArray(val)) return val.join(', ') || 'None';
+      return JSON.stringify(val);
+    }
+    return String(val);
+  };
+
+  const fieldsToCheck = [
+    { key: 'title', label: 'Title' },
+    { key: 'summary', label: 'Summary' },
+    { key: 'genres', label: 'Genres' },
+    { key: 'publicationStatus', label: 'Publication Status' },
+    { key: 'minimumAge', label: 'Age Rating' },
+    { key: 'language', label: 'Language' },
+    { key: 'cover', label: 'Cover Image' }
+  ];
+
+  const diffRows = fieldsToCheck.map(({ key, label }) => {
+    const rawOld = oldComic[key] !== undefined ? oldComic[key] : (key === 'genres' ? oldComic.genreIds : undefined);
+    const rawNew = currentComic[key] !== undefined ? currentComic[key] : (key === 'genres' ? currentComic.genreIds : undefined);
+    
+    const oldFormatted = formatDiffValue(key, rawOld);
+    const newFormatted = formatDiffValue(key, rawNew);
+
+    if (rawOld === undefined && rawNew === undefined) return null;
+    if (oldFormatted.toLowerCase().trim() === newFormatted.toLowerCase().trim() && oldFormatted !== 'None') {
+      return null;
+    }
+    if (oldFormatted === newFormatted) return null;
+
+    return {
+      key,
+      label,
+      previous: oldFormatted,
+      current: newFormatted
+    };
+  }).filter(Boolean);
 
   return (
     <div className="author-modal-backdrop" role="presentation">
@@ -561,34 +649,34 @@ function ModEditReviewModal({ currentComic, onClose, onAppeal }) {
             <h2>Moderator Edits</h2>
             <p>Review the changes made by the moderator to your comic metadata.</p>
           </div>
-          <button type="button" className="author-icon-btn ghost" onClick={onClose} aria-label="Close">A-</button>
+          <button type="button" className="author-icon-btn ghost" onClick={onClose} aria-label="Close">×</button>
         </div>
         
         <div className="author-modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                <th style={{ padding: '12px 8px', width: '20%' }}>Field</th>
-                <th style={{ padding: '12px 8px', width: '40%', color: 'var(--text)' }}>Previous</th>
-                <th style={{ padding: '12px 8px', width: '40%', color: 'var(--accent)' }}>New (Current)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {['title', 'summary', 'language', 'minimumAge', 'publicationStatus'].map(key => {
-                const oldVal = oldComic[key]
-                const newVal = currentComic[key]
-                if (oldVal === newVal) return null;
-                
-                return (
+          {diffRows.length > 0 ? (
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  <th style={{ padding: '12px 8px', width: '25%' }}>Field</th>
+                  <th style={{ padding: '12px 8px', width: '37.5%', color: 'var(--text)' }}>Previous</th>
+                  <th style={{ padding: '12px 8px', width: '37.5%', color: 'var(--accent)' }}>New (Current)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {diffRows.map(({ key, label, previous, current }) => (
                   <tr key={key} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '12px 8px', fontWeight: 'bold' }}>{key}</td>
-                    <td style={{ padding: '12px 8px', color: 'var(--text)' }}>{String(oldVal || 'N/A')}</td>
-                    <td style={{ padding: '12px 8px', color: 'var(--accent)' }}>{String(newVal || 'N/A')}</td>
+                    <td style={{ padding: '12px 8px', fontWeight: 'bold' }}>{label}</td>
+                    <td style={{ padding: '12px 8px', color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{previous}</td>
+                    <td style={{ padding: '12px 8px', color: 'var(--accent)', fontWeight: '600', whiteSpace: 'pre-wrap' }}>{current}</td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              No differences detected between snapshots.
+            </div>
+          )}
         </div>
 
         <div className="author-modal-actions" style={{ marginTop: '24px' }}>
@@ -679,11 +767,17 @@ function AuthorComicDetail() {
     }
   }, [comic, searchParams, setSearchParams])
 
-  const summary = useMemo(() => ({
-    chapters: metrics?.chapterCount ?? getChapterCount(comic),
-    views: metrics?.viewCount ?? comic?.viewCount ?? '0',
-    revenue: formatMoney(metrics?.estimatedRevenue ?? metrics?.revenue ?? metrics?.totalRevenue ?? comic?.revenue ?? comic?.totalRevenue),
-  }), [comic, metrics])
+  const summary = useMemo(() => {
+    const totalChapterViews = chapters.reduce((acc, c) => acc + (Number(c?.viewCount ?? c?.views ?? 0) || 0), 0)
+    const comicViews = Number(metrics?.viewCount ?? comic?.viewCount ?? 0) || 0
+    const resolvedViews = Math.max(totalChapterViews, comicViews)
+
+    return {
+      chapters: metrics?.chapterCount ?? getChapterCount(comic),
+      views: resolvedViews.toLocaleString('vi-VN'),
+      revenue: formatMoney(metrics?.estimatedRevenue ?? metrics?.revenue ?? metrics?.totalRevenue ?? comic?.revenue ?? comic?.totalRevenue),
+    }
+  }, [comic, metrics, chapters])
 
   const appendUploadedChapter = (uploadedPreview) => {
     const newChapter = {
@@ -816,7 +910,7 @@ function AuthorComicDetail() {
       pages: resolvedPages,
       pageCount: resolvedPages.length || chapter.pageCount || chapter.pages?.length,
       status: data?.status || chapter?.status || chapter?.moderationStatus,
-      rejectionReason: data?.rejectionReason || chapter?.rejectionReason || chapter?.rejection_reason
+      rejectionReason: data?.rejectionReason || chapter?.rejectionReason || chapter?.rejection_reason || comic?.rejectionReason
     }
 
     navigate(`/author/comics/${id}/preview/${chapterId}`, { state: { preview: mergedPreview } })
@@ -1138,8 +1232,8 @@ function AuthorComicDetail() {
                         <td className="chapter-no">Ch.{getChapterNumber(chapter)}</td>
                         <td>{getChapterTitle(chapter)}</td>
                         <td>{formatDate(chapter.uploadedAt || chapter.createdAt || chapter.submittedAt)}</td>
-                        <td>{chapter.pageCount || normalizeArrayResponse(chapter.pages).length || parsePageCountFromReason(chapter.rejectionReason || chapter.rejection_reason) || 0}</td>
-                        <td>{getChapterViews(chapter)}</td>
+                        <td>{chapter.pageCount || normalizeArrayResponse(chapter.pages).length || parsePageCountFromReason(chapter.rejectionReason || chapter.rejection_reason || comic?.rejectionReason) || 0}</td>
+                        <td>{getChapterViews(chapter, chapters, metrics?.viewCount ?? comic?.viewCount ?? 0)}</td>
                         <td>
                           <span className={`author-status-badge ${getStatusClass(status)}`}>
                             {formatStatus(status)}
