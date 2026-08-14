@@ -846,6 +846,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                               submissions.find(s => String(s.comicId) === String(ticket.targetId) || String(s.id) === String(ticket.targetId));
 
         return {
+          ...matchingComic,
           id: ticket.id,
           appealTicketId: ticket.id,
           targetId: ticket.targetId,
@@ -853,7 +854,10 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           title: ticket.targetName || matchingComic?.title || matchingComic?.comicTitle || 'Appealed Submission',
           submittedBy: ticket.authorName || matchingComic?.authorName || matchingComic?.submittedBy || 'Author',
           authorName: ticket.authorName || matchingComic?.authorName || matchingComic?.submittedBy || 'Author',
-          language: matchingComic?.language || matchingComic?.originalLanguage || 'Spanish',
+          language: matchingComic?.language || matchingComic?.originalLanguage || 'Japanese',
+          publicationStatus: matchingComic?.publicationStatus || matchingComic?.publication_status || 'ONGOING',
+          genres: matchingComic?.genres || matchingComic?.genreIds || [],
+          summary: matchingComic?.summary || matchingComic?.description || '',
           minimumAge: matchingComic?.minimumAge || matchingComic?.minAge || 13,
           cover: matchingComic?.cover || matchingComic?.coverImage || matchingComic?.coverImageUrl || '/assets/default_cover.jpg',
           chapterCount: matchingComic?.chapterCount || (matchingComic?.chapters ? matchingComic.chapters.length : 1),
@@ -863,7 +867,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           reason: ticket.appealReason,
           timestamp: ticket.createdAt || Date.now(),
           isComicAppealItem: true,
-          previousStateSnapshot: ticket.previousStateSnapshot,
+          previousStateSnapshot: ticket.previousStateSnapshot || matchingComic?.previousStateSnapshot,
           rawTicket: ticket,
           rawComic: matchingComic
         };

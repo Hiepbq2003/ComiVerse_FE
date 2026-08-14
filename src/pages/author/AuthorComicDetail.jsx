@@ -577,11 +577,69 @@ function ModEditReviewModal({ currentComic, onClose, onAppeal }) {
   let oldComic = {}
   try {
     if (currentComic?.previousStateSnapshot) {
-      oldComic = JSON.parse(currentComic.previousStateSnapshot)
+      oldComic = typeof currentComic.previousStateSnapshot === 'string'
+        ? JSON.parse(currentComic.previousStateSnapshot)
+        : currentComic.previousStateSnapshot
     }
   } catch (e) {
     console.error('Failed to parse previous state snapshot', e)
   }
+
+  const formatDiffValue = (key, val) => {
+    if (val === null || val === undefined || val === '') return 'None';
+    if (key === 'genres' || key === 'genreIds') {
+      if (Array.isArray(val)) {
+        if (val.length === 0) return 'None';
+        return val
+          .map(g => (typeof g === 'object' ? g?.name || g?.title || g?.label || '' : String(g)))
+          .filter(Boolean)
+          .join(', ') || 'None';
+      }
+      if (typeof val === 'string') {
+        return val.trim() || 'None';
+      }
+      return 'None';
+    }
+    if (key === 'minimumAge') {
+      return `${val}+`;
+    }
+    if (typeof val === 'object') {
+      if (Array.isArray(val)) return val.join(', ') || 'None';
+      return JSON.stringify(val);
+    }
+    return String(val);
+  };
+
+  const fieldsToCheck = [
+    { key: 'title', label: 'Title' },
+    { key: 'summary', label: 'Summary' },
+    { key: 'genres', label: 'Genres' },
+    { key: 'publicationStatus', label: 'Publication Status' },
+    { key: 'minimumAge', label: 'Age Rating' },
+    { key: 'language', label: 'Language' },
+    { key: 'cover', label: 'Cover Image' }
+  ];
+
+  const diffRows = fieldsToCheck.map(({ key, label }) => {
+    const rawOld = oldComic[key] !== undefined ? oldComic[key] : (key === 'genres' ? oldComic.genreIds : undefined);
+    const rawNew = currentComic[key] !== undefined ? currentComic[key] : (key === 'genres' ? currentComic.genreIds : undefined);
+    
+    const oldFormatted = formatDiffValue(key, rawOld);
+    const newFormatted = formatDiffValue(key, rawNew);
+
+    if (rawOld === undefined && rawNew === undefined) return null;
+    if (oldFormatted.toLowerCase().trim() === newFormatted.toLowerCase().trim() && oldFormatted !== 'None') {
+      return null;
+    }
+    if (oldFormatted === newFormatted) return null;
+
+    return {
+      key,
+      label,
+      previous: oldFormatted,
+      current: newFormatted
+    };
+  }).filter(Boolean);
 
   return (
     <div className="author-modal-backdrop" role="presentation">
@@ -595,30 +653,30 @@ function ModEditReviewModal({ currentComic, onClose, onAppeal }) {
         </div>
         
         <div className="author-modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                <th style={{ padding: '12px 8px', width: '20%' }}>Field</th>
-                <th style={{ padding: '12px 8px', width: '40%', color: 'var(--text)' }}>Previous</th>
-                <th style={{ padding: '12px 8px', width: '40%', color: 'var(--accent)' }}>New (Current)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {['title', 'summary', 'language', 'minimumAge', 'publicationStatus'].map(key => {
-                const oldVal = oldComic[key]
-                const newVal = currentComic[key]
-                if (oldVal === newVal) return null;
-                
-                return (
+          {diffRows.length > 0 ? (
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  <th style={{ padding: '12px 8px', width: '25%' }}>Field</th>
+                  <th style={{ padding: '12px 8px', width: '37.5%', color: 'var(--text)' }}>Previous</th>
+                  <th style={{ padding: '12px 8px', width: '37.5%', color: 'var(--accent)' }}>New (Current)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {diffRows.map(({ key, label, previous, current }) => (
                   <tr key={key} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '12px 8px', fontWeight: 'bold' }}>{key}</td>
-                    <td style={{ padding: '12px 8px', color: 'var(--text)' }}>{String(oldVal || 'N/A')}</td>
-                    <td style={{ padding: '12px 8px', color: 'var(--accent)' }}>{String(newVal || 'N/A')}</td>
+                    <td style={{ padding: '12px 8px', fontWeight: 'bold' }}>{label}</td>
+                    <td style={{ padding: '12px 8px', color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{previous}</td>
+                    <td style={{ padding: '12px 8px', color: 'var(--accent)', fontWeight: '600', whiteSpace: 'pre-wrap' }}>{current}</td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              No differences detected between snapshots.
+            </div>
+          )}
         </div>
 
         <div className="author-modal-actions" style={{ marginTop: '24px' }}>
