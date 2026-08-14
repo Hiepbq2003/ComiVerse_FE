@@ -21,6 +21,7 @@ import {
 import ContentInspectionModal from '../../components/report/ContentInspectionModal';
 import '../../assets/style/report/report-system.css';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
+import { exportToCsv } from '../../utils/exportToCsv';
 
 export default function ModeratorReports() {
   const [reports, setReports] = useState([]);
@@ -99,16 +100,55 @@ export default function ModeratorReports() {
   const acceptedCount = reports.filter(r => r.status === 'ACCEPTED').length;
   const rejectedCount = reports.filter(r => r.status === 'REJECTED').length;
 
+  const handleExportReports = () => {
+    try {
+      const headers = [
+        'Report ID',
+        'Target Type',
+        'Target ID',
+        'Category',
+        'Reporter Name',
+        'Description / Reason',
+        'Status',
+        'Created Date'
+      ];
+      const rows = reports.map(r => [
+        r.id || 'N/A',
+        r.targetType || 'COMIC',
+        r.targetId || 'N/A',
+        r.categoryName || r.category || 'General Violation',
+        r.reporterName || r.reporterUsername || 'Anonymous',
+        r.description || r.reason || 'None',
+        r.status || 'PENDING',
+        r.createdAt || 'N/A'
+      ]);
+
+      exportToCsv('ComiVerse_Violation_Reports_Log', headers, rows);
+      toast.success('📥 Violation reports exported successfully!');
+    } catch (err) {
+      console.error('Failed to export reports:', err);
+      toast.error('Failed to export reports: ' + err.message);
+    }
+  };
+
   return (
     <div className="fade-in">
       {/* ── HEADER ── */}
-      <div className="moderator-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div className="moderator-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h1>Violation Reports Management</h1>
           <p>Inspect corrupt imagery, broken chapters, unauthorized ads, duplicate titles, and community standards violations.</p>
         </div>
 
-        <div className="rep-header-actions">
+        <div className="rep-header-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="mod-export-btn"
+            onClick={handleExportReports}
+            title="Export violation reports log as CSV"
+          >
+            <span>📥 Export Reports (CSV)</span>
+          </button>
           <button className="rep-btn rep-btn-ghost" onClick={fetchReports} title="Refresh data">
             <RefreshCw size={15} /> Refresh
           </button>

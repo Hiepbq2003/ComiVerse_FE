@@ -38,8 +38,9 @@ html.light {
 
 /* Base Container */
 .rep-container {
-  padding: 24px 32px;
-  max-width: 1600px;
+  padding: 0;
+  max-width: 100%;
+  width: 100%;
   margin: 0 auto;
   font-family: var(--rep-font);
   color: var(--rep-text-primary);
@@ -48,7 +49,7 @@ html.light {
 
 @media (max-width: 768px) {
   .rep-container {
-    padding: 16px;
+    padding: 0;
   }
 }
 
@@ -59,11 +60,13 @@ html.light {
   align-items: flex-start;
   flex-wrap: wrap;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .rep-title-group h1 {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
   letter-spacing: -0.5px;
   margin: 0 0 6px 0;
@@ -74,35 +77,40 @@ html.light {
 
 .rep-title-group p {
   color: var(--rep-text-secondary);
-  font-size: 14px;
+  font-size: 13.5px;
   margin: 0;
 }
 
 .rep-header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 /* Stat Grid */
 .rep-stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .rep-stat-card {
   background: var(--rep-card-bg);
   border: 1px solid var(--rep-border);
-  border-radius: 16px;
-  padding: 18px 20px;
+  border-radius: 14px;
+  padding: 14px 16px;
   backdrop-filter: blur(12px);
   box-shadow: var(--rep-shadow);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .rep-stat-card:hover {
@@ -112,13 +120,13 @@ html.light {
 }
 
 .rep-stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 20px;
   flex-shrink: 0;
 }
 
@@ -150,20 +158,28 @@ html.light {
 .rep-stat-info {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .rep-stat-value {
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--rep-text-primary);
   line-height: 1.2;
   font-family: var(--rep-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rep-stat-label {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--rep-text-secondary);
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Tabs & Filter Bar */
@@ -178,6 +194,8 @@ html.light {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .rep-status-tabs {
@@ -185,8 +203,10 @@ html.light {
   align-items: center;
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding-bottom: 6px;
   border-bottom: 1px solid var(--rep-border);
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
 }
 
 .rep-status-tab {
@@ -202,6 +222,7 @@ html.light {
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.2s ease;
 }
 
@@ -241,6 +262,8 @@ html.light .rep-status-tab:hover {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .rep-search-box {
@@ -251,9 +274,10 @@ html.light .rep-status-tab:hover {
   border: 1px solid var(--rep-border);
   border-radius: 10px;
   padding: 8px 14px;
-  min-width: 260px;
-  flex: 1;
-  max-width: 400px;
+  min-width: 200px;
+  flex: 1 1 240px;
+  max-width: 100%;
+  box-sizing: border-box;
   transition: all 0.2s ease;
 }
 
@@ -284,6 +308,10 @@ html.light .rep-search-box {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .rep-select {
@@ -305,6 +333,10 @@ html.light .rep-search-box {
   background-position: right 12px center;
   background-size: 14px;
   transition: all 0.2s ease;
+  max-width: 280px;
+  min-width: 140px;
+  box-sizing: border-box;
+  text-overflow: ellipsis;
 }
 
 .rep-select:hover {
@@ -747,15 +779,22 @@ html.light .rep-date-input {
   overflow: hidden;
   box-shadow: var(--rep-shadow);
   backdrop-filter: blur(12px);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .rep-table-responsive {
   width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
 }
 
 .rep-table {
   width: 100%;
+  min-width: 820px;
   border-collapse: collapse;
   text-align: left;
   font-size: 13.5px;
