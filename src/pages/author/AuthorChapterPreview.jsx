@@ -54,42 +54,44 @@ function parseCommentsFromReport(reasonText) {
   if (reportSection.includes('--- PRESERVED PAGES BLOCK ---')) {
     reportSection = reportSection.split('--- PRESERVED PAGES BLOCK ---')[0];
   }
-  const lines = reportSection.split('\n')
   const parsedComments = []
+  
+  // Regex to match "1. [Label]: text" even if text spans multiple lines.
+  const regex = /\d+\.\s*\[([^\]]+)\]:\s*([\s\S]*?)(?=\n\d+\.\s*\[|$)/g;
+  let match;
+  let idx = 0;
+  
+  while ((match = regex.exec(reportSection)) !== null) {
+    const label = match[1].trim();
+    const text = match[2].trim();
 
-  lines.forEach((line, idx) => {
-    const trimmed = line.trim()
-    if (!trimmed) return
-    const match = trimmed.match(/^\d+\.\s*\[([^\]]+)\]:\s*(.+)$/)
-    if (match) {
-      const label = match[1].trim()
-      const text = match[2].trim()
+    if (!label || !text) continue;
 
-      let pageNum = 1
-      const pMatch = label.match(/Page\s+(\d+)/i)
-      if (pMatch) pageNum = parseInt(pMatch[1], 10)
+    let pageNum = 1
+    const pMatch = label.match(/Page\s+(\d+)/i)
+    if (pMatch) pageNum = parseInt(pMatch[1], 10)
 
-      let xPercentage = null
-      let yPercentage = null
-      const coordMatch = label.match(/\((\d+(?:\.\d+)?)%\s*,\s*(\d+(?:\.\d+)?)%\)/)
-      if (coordMatch) {
-        xPercentage = parseFloat(coordMatch[1])
-        yPercentage = parseFloat(coordMatch[2])
-      }
-
-      parsedComments.push({
-        id: `parsed-doc-comment-${idx}-${Date.now()}`,
-        targetType: coordMatch ? 'point' : (label.toLowerCase().includes('page') ? 'page' : 'field'),
-        targetKey: `page-${pageNum}`,
-        targetLabel: label,
-        text,
-        createdAt: new Date().toISOString(),
-        author: 'Moderator',
-        xPercentage,
-        yPercentage
-      })
+    let xPercentage = null
+    let yPercentage = null
+    const coordMatch = label.match(/\((\d+(?:\.\d+)?)%\s*,\s*(\d+(?:\.\d+)?)%\)/)
+    if (coordMatch) {
+      xPercentage = parseFloat(coordMatch[1])
+      yPercentage = parseFloat(coordMatch[2])
     }
-  })
+
+    parsedComments.push({
+      id: `parsed-doc-comment-${idx}-${Date.now()}`,
+      targetType: coordMatch ? 'point' : (label.toLowerCase().includes('page') ? 'page' : 'field'),
+      targetKey: `page-${pageNum}`,
+      targetLabel: label,
+      text,
+      createdAt: new Date().toISOString(),
+      author: 'Moderator',
+      xPercentage,
+      yPercentage
+    })
+    idx++;
+  }
 
   return parsedComments
 }

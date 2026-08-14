@@ -1108,8 +1108,8 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
 
       // The backend now natively preserves the image array using rejectedImagesSnapshot,
       // so we no longer need to sneak it into the rejection reason string.
-      
-      handleChapterReject(selectedReject.parentReviewId || selectedReject.comicId || selectedReject.id, targetChap, finalPayload);
+      // Pass userOverallNote explicitly so if it auto-rejects the comic, it uses the overall note, NOT the chapter's finalPayload!
+      handleChapterReject(selectedReject.parentReviewId || selectedReject.comicId || selectedReject.id, targetChap, finalPayload, userOverallNote);
     } else {
       // Bulk "Reject All"
       const itemsToReject = (selectedReject.subItems && selectedReject.subItems.length > 0 ? selectedReject.subItems : null) ||
@@ -1262,12 +1262,17 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
 
   const handleSaveEditDocComment = (submissionId, commentId) => {
     if (!editingCommentText.trim()) return
-    setDocCommentsMap(prev => ({
-      ...prev,
-      [submissionId]: (prev[submissionId] || []).map(c => 
-        c.id === commentId ? { ...c, text: editingCommentText.trim(), editedAt: new Date().toISOString() } : c
-      )
-    }))
+    setDocCommentsMap(prev => {
+      const next = { ...prev };
+      for (const key in next) {
+        if (next[key]) {
+          next[key] = next[key].map(c => 
+            c.id === commentId ? { ...c, text: editingCommentText.trim(), editedAt: new Date().toISOString() } : c
+          );
+        }
+      }
+      return next;
+    });
     setEditingCommentId(null)
     setEditingCommentText('')
   }
@@ -1282,10 +1287,15 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
   }
 
   const handleDeleteDocComment = (submissionId, commentId) => {
-    setDocCommentsMap(prev => ({
-      ...prev,
-      [submissionId]: (prev[submissionId] || []).filter(c => c.id !== commentId)
-    }))
+    setDocCommentsMap(prev => {
+      const next = { ...prev };
+      for (const key in next) {
+        if (next[key]) {
+          next[key] = next[key].filter(c => c.id !== commentId);
+        }
+      }
+      return next;
+    });
   }
 
 
