@@ -123,7 +123,7 @@ import { toast } from 'react-toastify'
 import HomeTab from './HomeTab'
 import MembersTab from './MembersTab'
 import RequestsTab from './RequestsTab'
-import TasksTab, { CreateTaskModal, EditTaskModal, parseTaskTitle, getTaskColumn, getNormalizedStatusKey } from './TasksTab'
+import TasksTab, { CreateTaskModal, EditTaskModal, parseTaskTitle, getTaskColumn } from './TasksTab'
 import SettingsTab from './SettingsTab'
 
 function parseCompletedPageNumbers(value) {
@@ -2071,7 +2071,6 @@ function TeamProjects() {
       chapterId: data.chapterId,
       taskType: taskTypeVal,
       dueDate: dueDateVal,
-      chapterRewardUsd: Number(data.chapterRewardUsd) > 0 ? Number(data.chapterRewardUsd) : undefined,
       createdAt: new Date().toISOString()
     }
 
@@ -2084,8 +2083,7 @@ function TeamProjects() {
         assigneeId: data.assigneeId,
         chapterId: data.chapterId,
         taskType: taskTypeVal,
-        dueDate: dueDateVal,
-        chapterRewardUsd: Number(data.chapterRewardUsd) > 0 ? Number(data.chapterRewardUsd) : undefined
+        dueDate: dueDateVal
       })
       taskToSave = (created && (created.id || created.title)) ? { ...newTaskObj, ...created } : newTaskObj
     } catch (err) {
@@ -2154,11 +2152,9 @@ function TeamProjects() {
     const formattedTitle = `[${(editTaskData.priority || 'MEDIUM').toUpperCase()}] [${editTaskData.comic || comicFallback}] ${editTaskData.title.trim()}`
 
     const targetId = selectedTask.id || selectedTask._id || selectedTask.taskId
-    const nextStatus = (getNormalizedStatusKey(editTaskData.status) === 'backlog') ? 'in_progress' : editTaskData.status
     const updatedTaskObj = {
       ...selectedTask,
       title: formattedTitle,
-      status: nextStatus,
       assigneeId: editTaskData.assigneeId,
       dueDate: editTaskData.dueDate
     }
@@ -2171,12 +2167,8 @@ function TeamProjects() {
       const assigneeChanged = String(editTaskData.originalAssigneeId || '') !== String(editTaskData.assigneeId || '')
       await updateTeamTaskApi(targetId, {
         title: formattedTitle,
-        status: nextStatus,
         assigneeId: assigneeChanged ? editTaskData.originalAssigneeId : editTaskData.assigneeId,
-        dueDate: editTaskData.dueDate,
-        ...(Number(editTaskData.chapterRewardUsd) > 0
-          ? { chapterRewardUsd: Number(editTaskData.chapterRewardUsd) }
-          : {})
+        dueDate: editTaskData.dueDate
       })
 
       if (assigneeChanged) {

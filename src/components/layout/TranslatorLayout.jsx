@@ -78,7 +78,9 @@ function TranslatorLayout({ children }) {
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', path: '/translator/dashboard' },
     { id: 'project-list', label: 'Project List', icon: 'list', path: '/translator/project-list' },
     { id: 'project-teams', label: 'Project Teams', icon: 'comics', path: '/translator/project-teams' },
-    { id: 'reports', label: 'Translation Reports', icon: 'reports', path: '/leader/reports' },
+    ...(roleUpper === 'PROJECT_LEADER'
+      ? [{ id: 'reports', label: 'Translation Reports', icon: 'reports', path: '/leader/reports' }]
+      : []),
     ...(roleUpper === 'TRANSLATOR'
       ? [
           { id: 'revenue', label: 'Revenue', icon: 'revenue', path: '/translator/revenue' },

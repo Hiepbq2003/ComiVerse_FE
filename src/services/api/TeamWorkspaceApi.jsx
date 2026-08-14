@@ -104,8 +104,7 @@ export const createTeamTaskApi = async (teamId, task) => {
     dueDate: task.dueDate || new Date().toISOString().split('T')[0],
     chapterId: chapterId,
     ...(assigneeId ? { assigneeId } : {}),
-    ...(task?.taskType ? { taskType: task.taskType } : {}),
-    ...(Number(task?.chapterRewardUsd) > 0 ? { chapterRewardUsd: Number(task.chapterRewardUsd) } : {})
+    ...(task?.taskType ? { taskType: task.taskType } : {})
   }
 
   try {
