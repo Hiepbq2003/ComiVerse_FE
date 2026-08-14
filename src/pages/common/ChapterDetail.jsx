@@ -76,13 +76,13 @@ function ChapterDetail() {
       setComic(null)
       setChaptersList([])
 
-      toast.error('Security alert: Inspect element or developer tool opened. Reading session is suspended.', {
+      toast.error('Security alert: Developer tools detected. Reading session is suspended.', {
         position: 'top-right',
         autoClose: 5000,
         theme: 'dark'
       })
     },
-    disableDetector: true
+    disableDetector: false
   })
 
   // Scroll to top on chapter change

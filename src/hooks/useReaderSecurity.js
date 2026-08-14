@@ -1,23 +1,26 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 /**
  * Custom hook to enforce copy-protection, blocking shortcuts, context menus,
- * and performing debugger-based detection of open DevTools.
+ * and performing multi-layer detection of open DevTools.
  *
  * @param {Object} options
  * @param {Function} options.onDevToolsOpen Callback when DevTools detection triggers
- * @param {boolean} [options.disableDetector=false] Option to disable the debugger detector (e.g., for local development)
+ * @param {boolean} [options.disableDetector=false] Option to disable the detector (e.g., for local development)
+ * @param {string} [options.targetElementId='secure-comic-reader'] Element ID to blur upon protection triggers
  */
-function useReaderSecurity({ onDevToolsOpen, disableDetector = false }) {
-  useEffect(() => {
+function useReaderSecurity({ onDevToolsOpen, disableDetector = false, targetElementId = 'secure-comic-reader' } = {}) {
+  const onDevToolsOpenRef = useRef(onDevToolsOpen)
+  onDevToolsOpenRef.current = onDevToolsOpen
 
+  useEffect(() => {
     // 1. Context Menu Blocker
     const handleContextMenu = (e) => {
       e.preventDefault()
     }
 
     const triggerBlur = (shouldBlur) => {
-      const readerDom = document.getElementById('secure-comic-reader')
+      const readerDom = document.getElementById(targetElementId)
       if (readerDom) {
         if (shouldBlur) {
           readerDom.style.filter = 'blur(40px) grayscale(100%)'
@@ -41,6 +44,7 @@ function useReaderSecurity({ onDevToolsOpen, disableDetector = false }) {
       // F12
       if (e.key === 'F12' || e.keyCode === 123) {
         e.preventDefault()
+        triggerBlur(true)
         return false
       }
 
@@ -50,6 +54,7 @@ function useReaderSecurity({ onDevToolsOpen, disableDetector = false }) {
         (isMac && e.metaKey && e.altKey && (e.key === 'I' || e.key === 'i' || e.keyCode === 73))
       ) {
         e.preventDefault()
+        triggerBlur(true)
         return false
       }
 
@@ -59,6 +64,7 @@ function useReaderSecurity({ onDevToolsOpen, disableDetector = false }) {
         (isMac && e.metaKey && e.altKey && (e.key === 'J' || e.key === 'j' || e.keyCode === 74))
       ) {
         e.preventDefault()
+        triggerBlur(true)
         return false
       }
 
@@ -68,6 +74,7 @@ function useReaderSecurity({ onDevToolsOpen, disableDetector = false }) {
         (isMac && e.metaKey && e.altKey && (e.key === 'C' || e.key === 'c' || e.keyCode === 67))
       ) {
         e.preventDefault()
+        triggerBlur(true)
         return false
       }
 
@@ -108,6 +115,7 @@ function useReaderSecurity({ onDevToolsOpen, disableDetector = false }) {
         (e.metaKey && e.shiftKey && (e.key === 'S' || e.key === 's' || e.keyCode === 83))
       ) {
         e.preventDefault()
+        triggerBlur(true)
         return false
       }
 
@@ -117,6 +125,7 @@ function useReaderSecurity({ onDevToolsOpen, disableDetector = false }) {
         (e.key === '3' || e.key === '4' || e.key === '5' || e.keyCode === 51 || e.keyCode === 52 || e.keyCode === 53)
       ) {
         e.preventDefault()
+        triggerBlur(true)
         return false
       }
     }
@@ -163,11 +172,11 @@ function useReaderSecurity({ onDevToolsOpen, disableDetector = false }) {
       window.removeEventListener('blur', handleWindowBlur)
       window.removeEventListener('focus', handleWindowFocus)
     }
-  }, [])
+  }, [targetElementId])
 
-  // 4. Layer 3: DevTools Debugger Hook Detector
+  // 4. Multi-Layer DevTools Detector
   useEffect(() => {
-    // Avoid running debugger statements in development environments to not block developers
+    // Avoid running detector in local development unless explicitly forced
     const isDev = import.meta.env.DEV || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     if (disableDetector || (isDev && !window.__FORCE_READER_SECURITY_DETECTOR__)) {
       return
@@ -176,35 +185,70 @@ function useReaderSecurity({ onDevToolsOpen, disableDetector = false }) {
     let isDevToolsTriggered = false
     let intervalId
 
-    const detect = () => {
+    const triggerDetected = () => {
       if (isDevToolsTriggered) return
+      isDevToolsTriggered = true
 
-      const start = performance.now()
+      const readerDom = document.getElementById(targetElementId)
+      if (readerDom) {
+        readerDom.style.filter = 'blur(50px) grayscale(100%)'
+        readerDom.style.pointerEvents = 'none'
+      }
 
-      // The debugger statement forces code execution to pause if DevTools is open.
-      // If DevTools is closed, the pause doesn't trigger and delta remains extremely low.
-      debugger
-
-      const end = performance.now()
-
-      // If it takes more than 100ms, it's highly likely that the debugger paused execution
-      if (end - start > 100) {
-        isDevToolsTriggered = true
-        if (onDevToolsOpen) {
-          onDevToolsOpen()
-        }
-        // Continuous reload defense action
-        window.location.reload()
+      if (onDevToolsOpenRef.current) {
+        onDevToolsOpenRef.current()
       }
     }
 
-    // Run interval
-    intervalId = setInterval(detect, 1000)
+    const detect = () => {
+      if (isDevToolsTriggered) return
+
+      // Method 1: Docked Window Size Threshold
+      const threshold = 160
+      const widthDiff = window.outerWidth - window.innerWidth
+      const heightDiff = window.outerHeight - window.innerHeight
+      if (widthDiff > threshold || heightDiff > threshold) {
+        triggerDetected()
+        return
+      }
+
+      // Method 2: Debugger Timing (for undocked / standalone DevTools)
+      const start = performance.now()
+      // debugger forces pause when DevTools is open
+      debugger
+      const end = performance.now()
+
+      if (end - start > 100) {
+        triggerDetected()
+        return
+      }
+
+      // Method 3: Console getter inspection
+      const element = new Image()
+      Object.defineProperty(element, 'id', {
+        get: function () {
+          triggerDetected()
+          return ''
+        },
+        configurable: true
+      })
+      // Trigger evaluation in console if active
+      if (console && console.debug) {
+        console.debug(element)
+      }
+    }
+
+    // Run detector interval every 800ms
+    intervalId = setInterval(detect, 800)
+
+    // Also run on window resize (e.g., when dock is toggled)
+    window.addEventListener('resize', detect)
 
     return () => {
       clearInterval(intervalId)
+      window.removeEventListener('resize', detect)
     }
-  }, [onDevToolsOpen, disableDetector])
+  }, [disableDetector, targetElementId])
 }
 
 export default useReaderSecurity
