@@ -31,6 +31,7 @@ function ProjectList() {
   const [cancelling, setCancelling] = useState(null); // teamId being cancelled
   const fileInputRef = useRef(null);
   const [activeProjectsCount, setActiveProjectsCount] = useState(0);
+  const [myProjectTeams, setMyProjectTeams] = useState([]);
 
   // Application status (slot counter + cooldown)
   const [appStatus, setAppStatus] = useState(null);
@@ -39,6 +40,7 @@ function ProjectList() {
   const auth = getAuth();
   const authUser = auth?.user;
   const userFullName = authUser?.fullName || authUser?.username || 'Translator';
+  const isUserProjectLeader = (authUser?.role || '').toUpperCase() === 'PROJECT_LEADER' || (authUser?.role || '').toUpperCase().includes('LEADER');
 
   const fetchProjectsAndRequests = async (silent = false) => {
     try {
@@ -114,10 +116,11 @@ function ProjectList() {
       })
       .catch(() => {});
 
-    // Load số projects đang active để kiểm tra giới hạn
+    // Load số projects user đang tham gia / làm leader để kiểm tra giới hạn
     getMyProjectTeamsApi()
       .then(myProjects => {
         const projList = Array.isArray(myProjects) ? myProjects : [];
+        setMyProjectTeams(projList);
         const activeCount = projList.filter(
           p => p.status && p.status.toUpperCase() !== 'COMPLETED'
         ).length;
@@ -169,13 +172,24 @@ function ProjectList() {
         if (!matchComic && !matchTeam && !matchLeader) return false;
       }
 
-      // 5. Exclude projects led by current user
-      if (p.leaderName) {
-        const ln = p.leaderName.toLowerCase().trim();
-        if (ln === currentUserName || ln === currentUsername) return false;
+      // 5. Exclude projects led by current user (Project Leaders manage their team, they do not apply to it)
+      const isLeader = (p.leaderId && authUser?.id && String(p.leaderId) === String(authUser.id)) ||
+        (p.leaderName && (p.leaderName.toLowerCase().trim() === currentUserName || p.leaderName.toLowerCase().trim() === currentUsername));
+      if (isLeader) return false;
+
+      // Exclude projects where current user is already an approved member or leader in backend list
+      const isAlreadyInMyTeams = myProjectTeams.some(mp => mp.id === p.id);
+      if (isAlreadyInMyTeams) return false;
+
+      // 6. Exclude projects where current user is in members list
+      if (Array.isArray(p.members) && p.members.some(m => {
+        const mId = m.userId || m.user?.id || m.id;
+        const mName = (m.name || m.user?.fullName || m.user?.username || '').toLowerCase().trim();
+        return (mId && authUser?.id && String(mId) === String(authUser.id)) || mName === currentUserName || mName === currentUsername;
+      })) {
+        return false;
       }
 
-      // 6. Exclude projects where current user is ALREADY an approved member
       const localApprovedKey = `comiverse_approved_members_${p.id}`;
       let savedMems = [];
       try {
@@ -189,7 +203,7 @@ function ProjectList() {
 
       return !isAlreadyMember;
     });
-  }, [projects, selectedTargetLang, selectedPriority, searchTerm, userFullName, authUser]);
+  }, [projects, selectedTargetLang, selectedPriority, searchTerm, userFullName, authUser, myProjectTeams]);
 
   // Reset to page 1 whenever filters change
   useEffect(() => {
@@ -206,6 +220,26 @@ function ProjectList() {
   const atProjectLimit = activeProjectsCount >= MAX_ACTIVE_PROJECTS;
 
   const handleApplyClick = (project) => {
+    // 0. Check if user is a Project Leader
+    if (isUserProjectLeader) {
+      toast.error('Project Leaders manage project teams and cannot apply to join translation teams.');
+      return;
+    }
+
+    // 1. Check if user is the leader of this project
+    const isLeader = (project.leaderId && authUser?.id && String(project.leaderId) === String(authUser.id)) ||
+      (project.leaderName && (project.leaderName.toLowerCase().trim() === (userFullName || '').toLowerCase().trim() || project.leaderName.toLowerCase().trim() === (authUser?.username || '').toLowerCase().trim()));
+    if (isLeader) {
+      toast.error('You are the leader of this project team and cannot apply to join your own team.');
+      return;
+    }
+
+    // 2. Check if user is already a member of this project
+    if (myProjectTeams.some(mp => mp.id === project.id)) {
+      toast.error('You are already an approved member of this project team.');
+      return;
+    }
+
     if (atProjectLimit) {
       toast.warn(`Bạn đang tham gia ${activeProjectsCount} dự án cùng lúc (tối đa ${MAX_ACTIVE_PROJECTS}). Hãy hoàn thành hoặc rời khỏi một dự án trước.`);
       return;
@@ -519,9 +553,10 @@ function ProjectList() {
         {paginatedProjects.map((project) => {
           const alreadyApplied = appliedIds.includes(project.id);
 
-          const recruitedCount = Math.max(1, project.membersCount || 0);
+          const totalMembers = Number(project.membersCount) || 1;
+          const recruitedTranslators = Math.max(0, totalMembers - 1); // Exclude the leader
           const limit = Number(project.maxMembers) || 5;
-          const spotsLeft = Math.max(0, limit - recruitedCount);
+          const spotsLeft = Math.max(0, limit - recruitedTranslators);
 
           const isDisabled = alreadyApplied || spotsLeft === 0 || atProjectLimit;
           const btnLabel = alreadyApplied
@@ -578,49 +613,104 @@ function ProjectList() {
               </div>
 
               <div style={{ marginTop: '24px', display: 'flex', gap: '8px' }}>
-                {alreadyApplied ? (
-                  <>
+                {(() => {
+                  const isProjectLeader = (project.leaderId && authUser?.id && String(project.leaderId) === String(authUser.id)) ||
+                    (project.leaderName && (project.leaderName.toLowerCase().trim() === (userFullName || '').toLowerCase().trim() || project.leaderName.toLowerCase().trim() === (authUser?.username || '').toLowerCase().trim()));
+                  const isProjectMember = myProjectTeams.some(mp => mp.id === project.id);
+
+                  if (isProjectLeader) {
+                    return (
+                      <button
+                        className="available-project-apply-btn"
+                        disabled
+                        style={{ flex: 1, opacity: 0.85, cursor: 'default', background: 'rgba(168, 85, 247, 0.15)', border: '1px solid rgba(168, 85, 247, 0.3)', color: '#c084fc', fontWeight: '600' }}
+                      >
+                        👑 Your Project (Leader)
+                      </button>
+                    );
+                  }
+
+                  if (isProjectMember) {
+                    return (
+                      <button
+                        className="available-project-apply-btn"
+                        disabled
+                        style={{ flex: 1, opacity: 0.85, cursor: 'default', background: 'rgba(34, 197, 94, 0.15)', border: '1px solid rgba(34, 197, 94, 0.3)', color: '#4ade80', fontWeight: '600' }}
+                      >
+                        ✓ Active Member
+                      </button>
+                    );
+                  }
+
+                  if (isUserProjectLeader) {
+                    return (
+                      <button
+                        className="available-project-apply-btn"
+                        disabled
+                        style={{
+                          flex: 1,
+                          background: 'rgba(255, 255, 255, 0.04)',
+                          border: '1px solid rgba(255, 255, 255, 0.08)',
+                          color: '#64748b',
+                          cursor: 'not-allowed',
+                          opacity: 0.6,
+                          fontWeight: '600'
+                        }}
+                        title="Project Leaders manage teams and cannot apply to join"
+                      >
+                        Apply to Join
+                      </button>
+                    );
+                  }
+
+                  if (alreadyApplied) {
+                    return (
+                      <>
+                        <button
+                          className="available-project-apply-btn"
+                          disabled
+                          style={{ flex: 1, opacity: 0.7, cursor: 'not-allowed' }}
+                        >
+                          Applied ✓
+                        </button>
+                        <button
+                          className="available-project-apply-btn"
+                          onClick={() => handleCancelApplication(project.id)}
+                          disabled={cancelling === project.id}
+                          style={{
+                            flex: 'none',
+                            width: 'auto',
+                            padding: '10px 18px',
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            color: '#ef4444',
+                            fontSize: '13px',
+                            fontWeight: '600'
+                          }}
+                        >
+                          {cancelling === project.id ? 'Cancelling...' : '✕ Cancel'}
+                        </button>
+                      </>
+                    );
+                  }
+
+                  return (
                     <button
                       className="available-project-apply-btn"
-                      disabled
-                      style={{ flex: 1, opacity: 0.7, cursor: 'not-allowed' }}
+                      disabled={spotsLeft === 0 || atProjectLimit || (appStatus && appStatus.availableSlots <= 0) || (appStatus && appStatus.cooldownUntil && new Date(appStatus.cooldownUntil) > new Date())}
+                      onClick={() => handleApplyClick(project)}
+                      style={{ flex: 1 }}
                     >
-                      Applied ✓
+                      {spotsLeft === 0 
+                        ? 'Team Full' 
+                        : (appStatus && appStatus.availableSlots <= 0) || atProjectLimit
+                        ? 'Max Teams Reached' 
+                        : (appStatus && appStatus.cooldownUntil && new Date(appStatus.cooldownUntil) > new Date()) 
+                        ? '⏳ On Cooldown' 
+                        : 'Apply to Join'}
                     </button>
-                    <button
-                      className="available-project-apply-btn"
-                      onClick={() => handleCancelApplication(project.id)}
-                      disabled={cancelling === project.id}
-                      style={{
-                        flex: 'none',
-                        width: 'auto',
-                        padding: '10px 18px',
-                        background: 'rgba(239, 68, 68, 0.15)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        color: '#ef4444',
-                        fontSize: '13px',
-                        fontWeight: '600'
-                      }}
-                    >
-                      {cancelling === project.id ? 'Cancelling...' : '✕ Cancel'}
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    className="available-project-apply-btn"
-                    disabled={spotsLeft === 0 || atProjectLimit || (appStatus && appStatus.availableSlots <= 0) || (appStatus && appStatus.cooldownUntil && new Date(appStatus.cooldownUntil) > new Date())}
-                    onClick={() => handleApplyClick(project)}
-                    style={{ flex: 1 }}
-                  >
-                    {spotsLeft === 0 
-                      ? 'Team Full' 
-                      : (appStatus && appStatus.availableSlots <= 0) || atProjectLimit
-                      ? 'Max Teams Reached' 
-                      : (appStatus && appStatus.cooldownUntil && new Date(appStatus.cooldownUntil) > new Date()) 
-                      ? '⏳ On Cooldown' 
-                      : 'Apply to Join'}
-                  </button>
-                )}
+                  );
+                })()}
               </div>
             </div>
           );
@@ -774,7 +864,7 @@ function ProjectList() {
                 <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: 'var(--trans-text-secondary)' }}>Comic Project:</p>
                 <strong style={{ fontSize: '15px', color: '#c084fc' }}>{selectedProject.comicName || selectedProject.title}</strong>
                 <p style={{ margin: '8px 0 0 0', fontSize: '12.5px', color: '#10b981' }}>
-                  Open Positions: {Math.max(0, (selectedProject.maxMembers || 5) - Math.max(0, selectedProject.membersCount || 0))} spots left
+                  Open Positions: {Math.max(0, (Number(selectedProject.maxMembers) || 5) - Math.max(0, (Number(selectedProject.membersCount) || 1) - 1))} spots left
                 </p>
               </div>
 

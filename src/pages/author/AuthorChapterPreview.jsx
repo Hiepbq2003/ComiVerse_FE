@@ -490,11 +490,17 @@ export default function AuthorChapterPreview() {
           {(docComments.length > 0 || isRejected) && (
             <button
               type="button"
-              className={`mod-mode-tab ${showCommentsSidebar ? 'active' : ''}`}
-              onClick={() => setShowCommentsSidebar(!showCommentsSidebar)}
+              className={`author-feedback-header-btn ${showCommentsSidebar ? 'active' : ''}`}
+              onClick={() => {
+                if (previewTab === 'details') {
+                  setPreviewTab('reader')
+                }
+                setShowCommentsSidebar(!showCommentsSidebar)
+              }}
               title="Toggle Moderator Feedback Sidebar"
             >
-              💬 Feedback Pins ({docComments.length})
+              <span>💬 Feedback Pins</span>
+              <span className="author-feedback-count-badge">{docComments.length}</span>
             </button>
           )}
 
@@ -802,11 +808,19 @@ export default function AuthorChapterPreview() {
                       </div>
                     </div>
 
-                    <div className="author-preview-stat-card">
+                    <div 
+                      className="author-preview-stat-card feedback-stat" 
+                      onClick={() => {
+                        setPreviewTab('reader')
+                        setShowCommentsSidebar(true)
+                      }}
+                      style={{ cursor: 'pointer' }}
+                      title="Click to view all pins on pages"
+                    >
                       <span className="author-preview-stat-label">Feedback Pins</span>
                       <div className="author-preview-stat-value">
                         <span className="author-status-pill feedback">
-                          💬 {docComments.length} {docComments.length === 1 ? 'comment' : 'comments'}
+                          💬 {docComments.length} {docComments.length === 1 ? 'comment pin' : 'comment pins'}
                         </span>
                       </div>
                     </div>
