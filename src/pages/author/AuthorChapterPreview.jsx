@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { getAuthorComicChaptersApi, getAuthorChapterPreviewApi } from '../../services/api/AuthorComicApi'
+import { getAuthorComicChaptersApi, getAuthorChapterPreviewApi, getAuthorComicByIdApi } from '../../services/api/AuthorComicApi'
 import { getChapterDetailApi } from '../../services/api/ChapterApi'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
@@ -243,6 +243,19 @@ export default function AuthorChapterPreview() {
               const detailRes = await getChapterDetailApi(chapterId)
               if (detailRes?.data || detailRes) {
                 previewData = { ...(previewData || {}), ...(detailRes.data || detailRes) }
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          // Fetch comic level reason if it's missing from the chapter
+          if (needsRejectedFeedbackFetch) {
+            try {
+              const comicRes = await getAuthorComicByIdApi(comicId)
+              const comicData = comicRes?.data || comicRes
+              if (comicData?.rejectionReason) {
+                previewData = { ...(previewData || {}), rejectionReason: comicData.rejectionReason }
               }
             } catch {
               // ignore

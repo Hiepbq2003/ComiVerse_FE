@@ -816,7 +816,7 @@ function AuthorComicDetail() {
       pages: resolvedPages,
       pageCount: resolvedPages.length || chapter.pageCount || chapter.pages?.length,
       status: data?.status || chapter?.status || chapter?.moderationStatus,
-      rejectionReason: data?.rejectionReason || chapter?.rejectionReason || chapter?.rejection_reason
+      rejectionReason: data?.rejectionReason || chapter?.rejectionReason || chapter?.rejection_reason || comic?.rejectionReason
     }
 
     navigate(`/author/comics/${id}/preview/${chapterId}`, { state: { preview: mergedPreview } })
@@ -1138,7 +1138,7 @@ function AuthorComicDetail() {
                         <td className="chapter-no">Ch.{getChapterNumber(chapter)}</td>
                         <td>{getChapterTitle(chapter)}</td>
                         <td>{formatDate(chapter.uploadedAt || chapter.createdAt || chapter.submittedAt)}</td>
-                        <td>{chapter.pageCount || normalizeArrayResponse(chapter.pages).length || parsePageCountFromReason(chapter.rejectionReason || chapter.rejection_reason) || 0}</td>
+                        <td>{chapter.pageCount || normalizeArrayResponse(chapter.pages).length || parsePageCountFromReason(chapter.rejectionReason || chapter.rejection_reason || comic?.rejectionReason) || 0}</td>
                         <td>{getChapterViews(chapter)}</td>
                         <td>
                           <span className={`author-status-badge ${getStatusClass(status)}`}>
