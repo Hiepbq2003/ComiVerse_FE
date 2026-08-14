@@ -1,6 +1,40 @@
 import { useEffect, useRef } from 'react'
 
 /**
+ * Synchronous pre-flight check to see if DevTools is currently open.
+ * Useful before firing critical API requests.
+ */
+export function isDevToolsOpenSync() {
+  const isDev = import.meta.env.DEV || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  if (isDev && !window.__FORCE_READER_SECURITY_DETECTOR__) {
+    return false
+  }
+
+  // Method 1: Docked dimension threshold
+  const threshold = 160
+  const widthDiff = window.outerWidth - window.innerWidth
+  const heightDiff = window.outerHeight - window.innerHeight
+  if (widthDiff > threshold || heightDiff > threshold) {
+    return true
+  }
+
+  // Method 2: Synchronous Debugger timing check
+  const start = performance.now()
+  try {
+    const debugFn = (function () {}).constructor('debugger')
+    debugFn()
+  } catch {
+    // Ignore CSP errors
+  }
+  const duration = performance.now() - start
+  if (duration > 100) {
+    return true
+  }
+
+  return false
+}
+
+/**
  * Custom hook to enforce copy-protection, blocking shortcuts, context menus,
  * and performing multi-layer detection of open DevTools.
  *
@@ -184,6 +218,8 @@ function useReaderSecurity({ onDevToolsOpen, disableDetector = false, targetElem
 
     let isDevToolsTriggered = false
     let intervalId
+    let animationFrameId
+    let lastFrameTime = performance.now()
 
     const triggerDetected = () => {
       if (isDevToolsTriggered) return
@@ -213,9 +249,14 @@ function useReaderSecurity({ onDevToolsOpen, disableDetector = false, targetElem
       }
 
       // Method 2: Debugger Timing (for undocked / standalone DevTools)
+      // Use dynamic constructor so Vite/esbuild minifier does not strip it during build
       const start = performance.now()
-      // debugger forces pause when DevTools is open
-      debugger
+      try {
+        const debugFn = (function () {}).constructor('debugger')
+        debugFn()
+      } catch {
+        // ignore if blocked by CSP
+      }
       const end = performance.now()
 
       if (end - start > 100) {
@@ -238,14 +279,42 @@ function useReaderSecurity({ onDevToolsOpen, disableDetector = false, targetElem
       }
     }
 
-    // Run detector interval every 800ms
-    intervalId = setInterval(detect, 800)
+    // Method 4: Continuous RequestAnimationFrame delta loop (catches undocked debugger pauses in real-time)
+    const runFrameLoop = () => {
+      if (isDevToolsTriggered) return
+
+      const currentTime = performance.now()
+      const delta = currentTime - lastFrameTime
+
+      // If execution was halted by debugger in DevTools for > 250ms between frames
+      if (delta > 250 && lastFrameTime > 0) {
+        triggerDetected()
+        return
+      }
+
+      try {
+        const debugFn = (function () {}).constructor('debugger')
+        debugFn()
+      } catch {}
+
+      lastFrameTime = performance.now()
+      animationFrameId = requestAnimationFrame(runFrameLoop)
+    }
+
+    // Run detector interval every 600ms
+    intervalId = setInterval(detect, 600)
+
+    // Run frame loop
+    animationFrameId = requestAnimationFrame(runFrameLoop)
 
     // Also run on window resize (e.g., when dock is toggled)
     window.addEventListener('resize', detect)
 
     return () => {
       clearInterval(intervalId)
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId)
+      }
       window.removeEventListener('resize', detect)
     }
   }, [disableDetector, targetElementId])

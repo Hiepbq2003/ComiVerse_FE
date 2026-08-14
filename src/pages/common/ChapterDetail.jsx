@@ -4,7 +4,7 @@ import HomeLayout from '../../components/layout/HomeLayout'
 import { getComicByIdApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi, getChapterDetailApi, getChapterTranslationsApi } from '../../services/api/ChapterApi'
 import { toast } from 'react-toastify'
-import useReaderSecurity from '../../hooks/useReaderSecurity'
+import useReaderSecurity, { isDevToolsOpenSync } from '../../hooks/useReaderSecurity'
 import ComicPageCanvas from '../../components/common/ComicPageCanvas'
 import '../../assets/style/reader/chapter-detail.css'
 import '../../assets/style/reader/comments.css'
@@ -104,6 +104,14 @@ function ChapterDetail() {
   // Fetch API details or fall back to mock
   useEffect(() => {
     const fetchChapterAndComicInfo = async () => {
+      // Pre-flight check: if DevTools is already open when loading,
+      // prevent leaking API endpoints and image requests in Network panel
+      if (isDevToolsOpenSync()) {
+        setIsDevToolsOpen(true)
+        setLoading(false)
+        return
+      }
+
       try {
         setLoading(true)
 
