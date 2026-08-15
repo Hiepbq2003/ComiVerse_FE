@@ -801,6 +801,14 @@ function Profile({ user: userProp }) {
               >
                 ⭐ My Ratings
               </button>
+              {(roleUpper === 'AUTHOR' || roleUpper === 'TRANSLATOR' || isTranslator) && (
+                <button 
+                  className={`profile-sidebar-nav-btn ${activeTab === 'professional' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('professional')}
+                >
+                  📄 Workspace Profile
+                </button>
+              )}
             </div>
 
             {/* Stats Block */}
@@ -922,212 +930,7 @@ function Profile({ user: userProp }) {
                   />
                 </div>
 
-                {/* Moderator Specific: Assigned Scope (Read-Only, Assigned by Admin) */}
-                {roleUpper === 'MODERATOR' && (
-                  <div className="profile-input-group">
-                    <label>Assigned Moderation Languages (Scope)</label>
-                    <div className="profile-readonly-scope-container">
-                      {assignedLanguages.map((lang) => (
-                        <span key={lang} className="profile-readonly-scope-badge">
-                          🌐 {lang}
-                        </span>
-                      ))}
-                    </div>
-                    <p className="profile-input-desc">
-                      Moderation tasks, chat monitoring, and comic review queues will be filtered based on your assigned language scope.
-                    </p>
-                  </div>
-                )}
 
-                {/* Author Specific: Copyright Identity */}
-                {roleUpper === 'AUTHOR' && (
-                  <div className="profile-translator-section" style={{ marginTop: '24px', borderColor: 'rgba(168, 85, 247, 0.3)' }}>
-                    <div className="profile-translator-header">
-                      <div className="profile-translator-icon-wrap" style={{ background: 'rgba(168, 85, 247, 0.1)', color: 'var(--mod-purple)' }}>✍️</div>
-                      <div>
-                        <h4 className="profile-translator-title" style={{ color: 'var(--mod-purple)' }}>
-                          Author Copyright Identity
-                        </h4>
-                        <p className="profile-translator-subtitle">
-                          This verified name is used as your public publisher identity and copyright holder name for all comics.
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="profile-input-group">
-                      <label>Copyright Holder / Pen Name</label>
-                      <input
-                        type="text"
-                        value={user.fullName || 'Unknown'}
-                        disabled
-                        style={{ cursor: 'not-allowed', opacity: 0.8 }}
-                      />
-                      <small style={{ color: 'var(--profile-text-muted)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                        Linked to your account Full Name for legal copyright protection. Contact support to change this identity.
-                      </small>
-                    </div>
-
-                    {/* Copyright Document Upload */}
-                    <div className="profile-input-group" style={{ marginTop: '16px' }}>
-                      <label>Copyright Registration Document (PDF)</label>
-                      <div className="profile-cv-box">
-                        <div className="profile-cv-doc-info">
-                          <span className="profile-cv-icon">📄</span>
-                          <div>
-                            {authorCopyrightDoc ? (
-                              <>
-                                <a
-                                  href={authorCopyrightDoc}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="profile-cv-link"
-                                >
-                                  View Uploaded Copyright Document ↗
-                                </a>
-                                <p className="profile-cv-badge">✓ Active and verified for publishing</p>
-                              </>
-                            ) : (
-                              <span className="profile-cv-empty-text">No document attached. Upload a PDF for copyright verification.</span>
-                            )}
-                          </div>
-                        </div>
-
-                        <label
-                          htmlFor="author-copyright-file-input"
-                          className="profile-cv-upload-btn"
-                          style={{ background: 'var(--mod-purple)', borderColor: 'var(--mod-purple)' }}
-                        >
-                          {cvUploading ? 'Uploading...' : authorCopyrightDoc ? 'Replace Document' : 'Upload PDF'}
-                        </label>
-                        <input
-                          id="author-copyright-file-input"
-                          type="file"
-                          accept="application/pdf,.pdf"
-                          style={{ display: 'none' }}
-                          onChange={handleCvUpload}
-                          disabled={cvUploading}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Translator Specific: Professional Profile & CV (Auto-attached on Team Application) */}
-                {(roleUpper === 'TRANSLATOR' || isTranslator) && (
-                  <div className="profile-translator-section">
-                    <div className="profile-translator-header">
-                      <div className="profile-translator-icon-wrap">🌐</div>
-                      <div>
-                        <h4 className="profile-translator-title">
-                          Translator Professional Profile
-                        </h4>
-                        <p className="profile-translator-subtitle">
-                          This verified info is automatically attached when you apply to Comic Translation Teams.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Language Specializations */}
-                    <div className="profile-input-group" style={{ marginBottom: '18px' }}>
-                      <label>Language Specializations</label>
-                      <div className="profile-specialization-list">
-                        {COMIC_LANGUAGE_OPTIONS.map((lang) => {
-                          const selected = transSpecializations.includes(lang)
-                          return (
-                            <button
-                              key={lang}
-                              type="button"
-                              onClick={() => toggleSpecialization(lang)}
-                              className={`profile-spec-btn ${selected ? 'selected' : ''}`}
-                            >
-                              {selected ? '✓ ' : '+ '} {lang}
-                            </button>
-                          )
-                        })}
-                      </div>
-                      {transSpecializations.length === 0 && (
-                        <p style={{ color: '#f59e0b', fontSize: '12px', marginTop: '6px', fontWeight: '500' }}>Please select at least one language specialization.</p>
-                      )}
-                    </div>
-
-                    {/* Experience & Contact Grid */}
-                    <div className="profile-form-grid" style={{ marginBottom: '18px' }}>
-                      <div className="profile-input-group">
-                        <label>Years of Translation Experience</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="50"
-                          value={transExp}
-                          onChange={(e) => setTransExp(e.target.value)}
-                          placeholder="e.g. 2"
-                        />
-                      </div>
-
-                      <div className="profile-input-group">
-                        <label>Phone Number / Direct Contact</label>
-                        <input
-                          type="text"
-                          value={transPhone}
-                          onChange={(e) => setTransPhone(e.target.value)}
-                          placeholder="e.g. 0904034333"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="profile-input-group" style={{ marginBottom: '18px' }}>
-                      <label>Social / Portfolio URL (Facebook / Discord / LinkedIn)</label>
-                      <input
-                        type="url"
-                        value={transFacebook}
-                        onChange={(e) => setTransFacebook(e.target.value)}
-                        placeholder="https://facebook.com/... or discord handle"
-                      />
-                    </div>
-
-                    {/* CV / Resume Document */}
-                    <div className="profile-input-group" style={{ marginBottom: '8px' }}>
-                      <label>Attached CV / Portfolio Resume (PDF)</label>
-                      <div className="profile-cv-box">
-                        <div className="profile-cv-doc-info">
-                          <span className="profile-cv-icon">📄</span>
-                          <div>
-                            {transCvUrl ? (
-                              <>
-                                <a
-                                  href={transCvUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="profile-cv-link"
-                                >
-                                  View Uploaded CV Document (PDF) ↗
-                                </a>
-                                <p className="profile-cv-badge">✓ Active and ready to auto-attach for team applications</p>
-                              </>
-                            ) : (
-                              <span className="profile-cv-empty-text">No CV attached yet. Upload a PDF for 1-click team applications.</span>
-                            )}
-                          </div>
-                        </div>
-
-                        <label
-                          htmlFor="profile-cv-file-input"
-                          className="profile-cv-upload-btn"
-                        >
-                          {cvUploading ? 'Uploading...' : transCvUrl ? 'Replace CV File' : 'Upload CV (PDF)'}
-                        </label>
-                        <input
-                          id="profile-cv-file-input"
-                          type="file"
-                          accept="application/pdf,.pdf"
-                          style={{ display: 'none' }}
-                          onChange={handleCvUpload}
-                          disabled={cvUploading}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 <button type="submit" className="profile-save-btn" disabled={profileSaving}>
                   {profileSaving ? 'Saving...' : 'Save Changes'}
@@ -1283,6 +1086,228 @@ function Profile({ user: userProp }) {
                   })}
                 </div>
               )}
+            </div>
+          ) : activeTab === 'professional' ? (
+            <div className="fade-in">
+              <h2 className="profile-content-title">Workspace Profile</h2>
+              <p className="profile-input-desc" style={{ marginBottom: '24px', fontSize: '13px' }}>
+                Manage your professional identity and credentials used in the Creator and Mod Workspaces.
+              </p>
+
+              <form onSubmit={handleSaveInfo}>
+                {/* Moderator Specific: Assigned Scope (Read-Only, Assigned by Admin) */}
+                {roleUpper === 'MODERATOR' && (
+                  <div className="profile-input-group" style={{ marginBottom: '24px' }}>
+                    <label>Assigned Moderation Languages (Scope)</label>
+                    <div className="profile-readonly-scope-container">
+                      {assignedLanguages.map((lang) => (
+                        <span key={lang} className="profile-readonly-scope-badge">
+                          🌐 {lang}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="profile-input-desc">
+                      Moderation tasks, chat monitoring, and comic review queues will be filtered based on your assigned language scope.
+                    </p>
+                  </div>
+                )}
+
+                {/* Author Specific: Copyright Identity */}
+                {roleUpper === 'AUTHOR' && (
+                  <div className="profile-translator-section" style={{ marginBottom: '24px', borderColor: 'rgba(168, 85, 247, 0.3)' }}>
+                    <div className="profile-translator-header">
+                      <div className="profile-translator-icon-wrap" style={{ background: 'rgba(168, 85, 247, 0.1)', color: 'var(--mod-purple)' }}>✍️</div>
+                      <div>
+                        <h4 className="profile-translator-title" style={{ color: 'var(--mod-purple)' }}>
+                          Author Copyright Identity
+                        </h4>
+                        <p className="profile-translator-subtitle">
+                          This verified name is used as your public publisher identity and copyright holder name for all comics.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="profile-input-group">
+                      <label>Copyright Holder / Pen Name</label>
+                      <input
+                        type="text"
+                        value={user.fullName || 'Unknown'}
+                        disabled
+                        style={{ cursor: 'not-allowed', opacity: 0.8 }}
+                      />
+                      <small style={{ color: 'var(--profile-text-muted)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                        Linked to your account Full Name for legal copyright protection. Contact support to change this identity.
+                      </small>
+                    </div>
+
+                    {/* Copyright Document Upload */}
+                    <div className="profile-input-group" style={{ marginTop: '16px' }}>
+                      <label>Copyright Registration Document (PDF)</label>
+                      <div className="profile-cv-box">
+                        <div className="profile-cv-doc-info">
+                          <span className="profile-cv-icon">📄</span>
+                          <div>
+                            {authorCopyrightDoc ? (
+                              <>
+                                <a
+                                  href={authorCopyrightDoc}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="profile-cv-link"
+                                >
+                                  View Uploaded Copyright Document ↗
+                                </a>
+                                <p className="profile-cv-badge">✓ Active and verified for publishing</p>
+                              </>
+                            ) : (
+                              <span className="profile-cv-empty-text">No document attached. Upload a PDF for copyright verification.</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <label
+                          htmlFor="author-copyright-file-input"
+                          className="profile-cv-upload-btn"
+                          style={{ background: 'var(--mod-purple)', borderColor: 'var(--mod-purple)' }}
+                        >
+                          {cvUploading ? 'Uploading...' : authorCopyrightDoc ? 'Replace Document' : 'Upload PDF'}
+                        </label>
+                        <input
+                          id="author-copyright-file-input"
+                          type="file"
+                          accept="application/pdf,.pdf"
+                          style={{ display: 'none' }}
+                          onChange={handleCvUpload}
+                          disabled={cvUploading}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Translator Specific: Professional Profile & CV (Auto-attached on Team Application) */}
+                {(roleUpper === 'TRANSLATOR' || isTranslator) && (
+                  <div className="profile-translator-section" style={{ marginBottom: '24px' }}>
+                    <div className="profile-translator-header">
+                      <div className="profile-translator-icon-wrap">🌐</div>
+                      <div>
+                        <h4 className="profile-translator-title">
+                          Translator Professional Profile
+                        </h4>
+                        <p className="profile-translator-subtitle">
+                          This verified info is automatically attached when you apply to Comic Translation Teams.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Language Specializations */}
+                    <div className="profile-input-group" style={{ marginBottom: '18px' }}>
+                      <label>Language Specializations</label>
+                      <div className="profile-specialization-list">
+                        {COMIC_LANGUAGE_OPTIONS.map((lang) => {
+                          const selected = transSpecializations.includes(lang)
+                          return (
+                            <button
+                              key={lang}
+                              type="button"
+                              onClick={() => toggleSpecialization(lang)}
+                              className={`profile-spec-btn ${selected ? 'selected' : ''}`}
+                            >
+                              {selected ? '✓ ' : '+ '} {lang}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {transSpecializations.length === 0 && (
+                        <p style={{ color: '#f59e0b', fontSize: '12px', marginTop: '6px', fontWeight: '500' }}>Please select at least one language specialization.</p>
+                      )}
+                    </div>
+
+                    {/* Experience & Contact Grid */}
+                    <div className="profile-form-grid" style={{ marginBottom: '18px' }}>
+                      <div className="profile-input-group">
+                        <label>Years of Translation Experience</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="50"
+                          value={transExp}
+                          onChange={(e) => setTransExp(e.target.value)}
+                          placeholder="e.g. 2"
+                        />
+                      </div>
+
+                      <div className="profile-input-group">
+                        <label>Phone Number / Direct Contact</label>
+                        <input
+                          type="text"
+                          value={transPhone}
+                          onChange={(e) => setTransPhone(e.target.value)}
+                          placeholder="e.g. 0904034333"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="profile-input-group" style={{ marginBottom: '18px' }}>
+                      <label>Social / Portfolio URL (Facebook / Discord / LinkedIn)</label>
+                      <input
+                        type="url"
+                        value={transFacebook}
+                        onChange={(e) => setTransFacebook(e.target.value)}
+                        placeholder="https://facebook.com/... or discord handle"
+                      />
+                    </div>
+
+                    {/* CV / Resume Document */}
+                    <div className="profile-input-group" style={{ marginBottom: '8px' }}>
+                      <label>Attached CV / Portfolio Resume (PDF)</label>
+                      <div className="profile-cv-box">
+                        <div className="profile-cv-doc-info">
+                          <span className="profile-cv-icon">📄</span>
+                          <div>
+                            {transCvUrl ? (
+                              <>
+                                <a
+                                  href={transCvUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="profile-cv-link"
+                                >
+                                  View Uploaded CV Document (PDF) ↗
+                                </a>
+                                <p className="profile-cv-badge">✓ Active and ready to auto-attach for team applications</p>
+                              </>
+                            ) : (
+                              <span className="profile-cv-empty-text">No CV attached yet. Upload a PDF for 1-click team applications.</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <label
+                          htmlFor="profile-cv-file-input"
+                          className="profile-cv-upload-btn"
+                        >
+                          {cvUploading ? 'Uploading...' : transCvUrl ? 'Replace CV File' : 'Upload CV (PDF)'}
+                        </label>
+                        <input
+                          id="profile-cv-file-input"
+                          type="file"
+                          accept="application/pdf,.pdf"
+                          style={{ display: 'none' }}
+                          onChange={handleCvUpload}
+                          disabled={cvUploading}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {(roleUpper === 'AUTHOR' || roleUpper === 'TRANSLATOR' || isTranslator) && (
+                  <button type="submit" className="profile-save-btn" disabled={profileSaving}>
+                    {profileSaving ? 'Saving...' : 'Save Workspace Profile'}
+                  </button>
+                )}
+              </form>
             </div>
           ) : null}
         </div>
