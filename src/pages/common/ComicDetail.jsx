@@ -16,7 +16,7 @@ import ReadingLanguageSelector, { chapterHasLanguage, normalizeLanguageCode } fr
 import { useAuth } from '../../context/AuthContext'
 import SubscriptionPlanModal from '../../components/common/SubscriptionPlanModal'
 import ReportSubmitModal from '../../components/report/ReportSubmitModal'
-import { Flag } from 'lucide-react'
+import { Flag, BookOpen, Bookmark, Heart, MessageSquare, Info, Star, Eye, Calendar, User, Globe, Layers } from 'lucide-react'
 import '../../assets/style/reader/comic-detail.css'
 
 // Import assets
@@ -425,26 +425,26 @@ function ComicDetail() {
                 onClick={handleReadChapter1}
                 className="hero-btn-primary"
               >
-                <span>📖</span> Read Chapter 1
+                <BookOpen size={18} /> Read Chapter 1
               </button>
               <button
                 onClick={handleAddToLibrary}
                 className={`hero-btn-glass ${inLibrary ? 'active-saved' : ''}`}
               >
-                {inLibrary ? '✓ Saved to Library' : '🔖 Add to Library'}
+                <Bookmark size={18} /> {inLibrary ? 'Saved to Library' : 'Add to Library'}
               </button>
               <button
                 onClick={handleToggleLike}
                 className={`hero-btn-glass ${isLiked ? 'active-liked' : ''}`}
               >
-                {isLiked ? '❤️ Liked' : '🤍 Like'}
+                <Heart size={18} fill={isLiked ? '#f472b6' : 'none'} color={isLiked ? '#f472b6' : '#ffffff'} /> {isLiked ? 'Liked' : 'Like'}
               </button>
               <button
                 onClick={() => setShowReportModal(true)}
                 className="hero-btn-glass hero-btn-report"
                 title="Report issues with this comic or upload"
               >
-                <Flag size={16} /> Report
+                <Flag size={18} /> Report
               </button>
             </div>
 
@@ -480,7 +480,7 @@ function ComicDetail() {
             {/* Synopsis */}
             <div className="detail-synopsis-card">
               <h3 className="detail-section-title">
-                <span>📖</span> Synopsis
+                <BookOpen size={20} color="#a855f7" /> Synopsis
               </h3>
               <p className="detail-synopsis-text">{displaySummary}</p>
             </div>
@@ -492,13 +492,13 @@ function ComicDetail() {
                   onClick={() => setActiveTab('chapters')}
                   className={`detail-tab-button ${activeTab === 'chapters' ? 'active' : ''}`}
                 >
-                  Chapters ({chapters.length})
+                  <Layers size={18} /> Chapters ({chapters.length})
                 </button>
                 <button
                   onClick={() => setActiveTab('comments')}
                   className={`detail-tab-button ${activeTab === 'comments' ? 'active' : ''}`}
                 >
-                  Comments
+                  <MessageSquare size={18} /> Comments
                 </button>
               </div>
 
@@ -607,7 +607,7 @@ function ComicDetail() {
           <div>
             <div className="detail-sidebar-info-card">
               <h3 className="detail-section-title">
-                <span>ℹ️</span> Comic Info
+                <Info size={20} color="#06b6d4" /> Comic Details
               </h3>
               <div className="detail-info-list">
                 <div className="detail-info-item">
