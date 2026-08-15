@@ -367,6 +367,15 @@ function ModeratorDashboard() {
 
   const enrichProjectTeamsWithTasks = async (rawTeamsList, currentComics = []) => {
     if (!Array.isArray(rawTeamsList) || rawTeamsList.length === 0) return rawTeamsList || [];
+    
+    // O(N) map building for O(1) lookups
+    const comicTitleMap = new Map();
+    const comicIdMap = new Map();
+    (currentComics || []).forEach(c => {
+      if (c.id) comicIdMap.set(String(c.id), c);
+      if (c.title) comicTitleMap.set(c.title.toLowerCase().trim(), c);
+    });
+
     try {
       const enriched = await Promise.all(
         rawTeamsList.map(async (t) => {
@@ -475,11 +484,17 @@ function ModeratorDashboard() {
           });
 
           // Match linked comic for chapter counts & progress
-          const matchedComic = (currentComics || []).find(c =>
-            (t.comicName && c.title && c.title.toLowerCase().trim() === t.comicName.toLowerCase().trim()) ||
-            (t.comicTitle && c.title && c.title.toLowerCase().trim() === t.comicTitle.toLowerCase().trim()) ||
-            (t.comicId && String(c.id) === String(t.comicId))
-          );
+          const cNameLower = (t.comicName || '').toLowerCase().trim();
+          const cTitleLower = (t.comicTitle || '').toLowerCase().trim();
+          
+          let matchedComic = null;
+          if (t.comicId && comicIdMap.has(String(t.comicId))) {
+            matchedComic = comicIdMap.get(String(t.comicId));
+          } else if (cNameLower && comicTitleMap.has(cNameLower)) {
+            matchedComic = comicTitleMap.get(cNameLower);
+          } else if (cTitleLower && comicTitleMap.has(cTitleLower)) {
+            matchedComic = comicTitleMap.get(cTitleLower);
+          }
 
           const totalDone = Math.max(completedTasks.length, t.completedTasksCount || 0, t.totalCompletedTasks || 0);
 
