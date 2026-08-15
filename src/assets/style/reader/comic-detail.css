@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════
    COMIC DETAIL PAGE — CINEMATIC HIGH-END DUAL-MODE STYLESHEET
-   ComiVerse Design System - Ultra-Contrast & Modern Aesthetics
+   ComiVerse Design System - Ultra-Crisp Borders & Distinct Outlines
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── HERO BANNER SECTION (Always Atmospheric Cinematic Header) ── */
@@ -11,7 +11,7 @@
   color: #ffffff;
   padding: 50px 8% 44px;
   overflow: hidden;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.12);
   display: flex;
   align-items: flex-end;
   box-sizing: border-box;
@@ -23,7 +23,7 @@
   inset: 0;
   background-size: cover;
   background-position: center 25%;
-  filter: brightness(0.2) blur(30px);
+  filter: brightness(0.22) blur(32px);
   transform: scale(1.18);
   z-index: 0;
   pointer-events: none;
@@ -34,9 +34,9 @@
   position: absolute;
   inset: 0;
   background: 
-    radial-gradient(ellipse 80% 60% at top left, rgba(168, 85, 247, 0.38) 0%, transparent 70%),
-    radial-gradient(ellipse 60% 50% at bottom right, rgba(6, 182, 212, 0.25) 0%, transparent 65%),
-    linear-gradient(to top, #080512 0%, rgba(8, 5, 18, 0.72) 45%, rgba(8, 5, 18, 0.5) 100%);
+    radial-gradient(ellipse 80% 60% at top left, rgba(168, 85, 247, 0.4) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 50% at bottom right, rgba(6, 182, 212, 0.28) 0%, transparent 65%),
+    linear-gradient(to top, #080512 0%, rgba(8, 5, 18, 0.75) 45%, rgba(8, 5, 18, 0.5) 100%);
   z-index: 1;
   pointer-events: none;
 }
@@ -57,19 +57,20 @@
   height: 318px;
   border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.85), 0 0 38px rgba(168, 85, 247, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.85), 0 0 38px rgba(168, 85, 247, 0.45);
+  border: 2px solid rgba(255, 255, 255, 0.3);
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.05);
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease;
+  background: rgba(255, 255, 255, 0.06);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease, border-color 0.3s ease;
 }
 
 .comic-detail-cover-wrapper:hover {
   transform: translateY(-6px) scale(1.02);
-  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.9), 0 0 48px rgba(168, 85, 247, 0.55);
+  border-color: rgba(168, 85, 247, 0.7);
+  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.9), 0 0 48px rgba(168, 85, 247, 0.6);
 }
 
 .comic-detail-cover-wrapper img {
@@ -111,14 +112,14 @@
 html.light .comic-detail-hero-section .hero-status-badge {
   background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%) !important;
   color: #ffffff !important;
-  padding: 5px 15px !important;
+  padding: 6px 16px !important;
   border-radius: 20px !important;
   font-size: 11px !important;
   font-weight: 800 !important;
   letter-spacing: 0.6px !important;
   text-transform: uppercase !important;
-  box-shadow: 0 3px 12px rgba(168, 85, 247, 0.35) !important;
-  border: none !important;
+  box-shadow: 0 3px 14px rgba(168, 85, 247, 0.4) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
 }
 
 .comic-detail-hero-section .detail-genre-tag,
@@ -126,9 +127,9 @@ html.light .comic-detail-hero-section .detail-genre-tag {
   background: rgba(255, 255, 255, 0.12) !important;
   backdrop-filter: blur(10px) !important;
   -webkit-backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.3) !important;
   color: #ffffff !important;
-  padding: 5px 14px !important;
+  padding: 5px 15px !important;
   border-radius: 20px !important;
   font-size: 12px !important;
   font-weight: 600 !important;
@@ -137,8 +138,8 @@ html.light .comic-detail-hero-section .detail-genre-tag {
 
 .comic-detail-hero-section .detail-genre-tag:hover,
 html.light .comic-detail-hero-section .detail-genre-tag:hover {
-  background: rgba(255, 255, 255, 0.24) !important;
-  border-color: rgba(255, 255, 255, 0.45) !important;
+  background: rgba(255, 255, 255, 0.25) !important;
+  border-color: #ffffff !important;
   transform: translateY(-1px) !important;
 }
 
@@ -172,22 +173,22 @@ html.light .comic-detail-hero-section .hero-comic-credits strong {
   font-weight: 700 !important;
 }
 
-/* Glassmorphism Stats Bar */
+/* Glassmorphism Stats Bar with Distinct Borders */
 .comic-detail-hero-section .hero-stats-glass-bar,
 html.light .comic-detail-hero-section .hero-stats-glass-bar {
   display: flex !important;
   align-items: center !important;
   gap: 22px !important;
   margin-bottom: 24px !important;
-  background: rgba(15, 10, 26, 0.75) !important;
+  background: rgba(15, 10, 26, 0.82) !important;
   backdrop-filter: blur(18px) !important;
   -webkit-backdrop-filter: blur(18px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.16) !important;
-  padding: 10px 24px !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.28) !important;
+  padding: 11px 26px !important;
   border-radius: 16px !important;
   width: max-content !important;
   max-width: 100% !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
 }
 
 .hero-stat-item {
@@ -223,12 +224,12 @@ html.light .comic-detail-hero-section .hero-stat-val.rating {
 
 .comic-detail-hero-section .hero-stat-divider,
 html.light .comic-detail-hero-section .hero-stat-divider {
-  width: 1px !important;
+  width: 1.5px !important;
   height: 28px !important;
-  background: rgba(255, 255, 255, 0.14) !important;
+  background: rgba(255, 255, 255, 0.2) !important;
 }
 
-/* Action Buttons */
+/* Action Buttons with Crisp Visible Borders */
 .hero-actions-group {
   display: flex;
   gap: 14px;
@@ -240,13 +241,13 @@ html.light .comic-detail-hero-section .hero-stat-divider {
 html.light .comic-detail-hero-section .hero-btn-primary {
   background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%) !important;
   color: #ffffff !important;
-  border: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
   padding: 13px 30px !important;
   border-radius: 14px !important;
   font-size: 15px !important;
   font-weight: 700 !important;
   cursor: pointer !important;
-  box-shadow: 0 6px 22px rgba(168, 85, 247, 0.45) !important;
+  box-shadow: 0 6px 24px rgba(168, 85, 247, 0.5) !important;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -256,7 +257,7 @@ html.light .comic-detail-hero-section .hero-btn-primary {
 .comic-detail-hero-section .hero-btn-primary:hover,
 html.light .comic-detail-hero-section .hero-btn-primary:hover {
   transform: translateY(-2px) !important;
-  box-shadow: 0 10px 30px rgba(168, 85, 247, 0.6) !important;
+  box-shadow: 0 10px 32px rgba(168, 85, 247, 0.65) !important;
   background: linear-gradient(135deg, #b866ff 0%, #f458a6 100%) !important;
 }
 
@@ -266,7 +267,7 @@ html.light .comic-detail-hero-section .hero-btn-glass {
   backdrop-filter: blur(14px) !important;
   -webkit-backdrop-filter: blur(14px) !important;
   color: #ffffff !important;
-  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.32) !important;
   padding: 13px 22px !important;
   border-radius: 14px !important;
   font-size: 15px !important;
@@ -276,42 +277,45 @@ html.light .comic-detail-hero-section .hero-btn-glass {
   display: inline-flex !important;
   align-items: center !important;
   gap: 8px !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25) !important;
 }
 
 .comic-detail-hero-section .hero-btn-glass:hover,
 html.light .comic-detail-hero-section .hero-btn-glass:hover {
-  background: rgba(255, 255, 255, 0.2) !important;
-  border-color: rgba(255, 255, 255, 0.4) !important;
+  background: rgba(255, 255, 255, 0.22) !important;
+  border-color: rgba(255, 255, 255, 0.65) !important;
   transform: translateY(-2px) !important;
 }
 
 .comic-detail-hero-section .hero-btn-glass.active-saved,
 html.light .comic-detail-hero-section .hero-btn-glass.active-saved {
-  background: rgba(16, 185, 129, 0.28) !important;
-  border-color: rgba(16, 185, 129, 0.65) !important;
-  color: #34d399 !important;
+  background: rgba(16, 185, 129, 0.3) !important;
+  border-color: #10b981 !important;
+  color: #6ee7b7 !important;
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.4) !important;
 }
 
 .comic-detail-hero-section .hero-btn-glass.active-liked,
 html.light .comic-detail-hero-section .hero-btn-glass.active-liked {
-  background: rgba(236, 72, 153, 0.28) !important;
-  border-color: rgba(236, 72, 153, 0.65) !important;
+  background: rgba(236, 72, 153, 0.3) !important;
+  border-color: #ec4899 !important;
   color: #f472b6 !important;
+  box-shadow: 0 0 18px rgba(236, 72, 153, 0.4) !important;
 }
 
 .comic-detail-hero-section .hero-btn-report,
 html.light .comic-detail-hero-section .hero-btn-report {
-  border-color: rgba(239, 68, 68, 0.4) !important;
+  border-color: rgba(239, 68, 68, 0.55) !important;
   color: #fca5a5 !important;
 }
 
 .comic-detail-hero-section .hero-btn-report:hover,
 html.light .comic-detail-hero-section .hero-btn-report:hover {
-  background: rgba(239, 68, 68, 0.2) !important;
-  border-color: rgba(239, 68, 68, 0.6) !important;
+  background: rgba(239, 68, 68, 0.25) !important;
+  border-color: #ef4444 !important;
 }
 
-/* Star Rating in Hero Section (Force Dark Glass Integration) */
+/* Star Rating in Hero Section with Distinct Border */
 .hero-rating-box {
   margin-top: 20px;
   width: max-content;
@@ -320,12 +324,12 @@ html.light .comic-detail-hero-section .hero-btn-report:hover {
 
 .comic-detail-hero-section .hero-rating-box .comic-star-rating-container,
 html.light .comic-detail-hero-section .hero-rating-box .comic-star-rating-container {
-  background: rgba(15, 10, 26, 0.7) !important;
+  background: rgba(15, 10, 26, 0.82) !important;
   backdrop-filter: blur(16px) !important;
   -webkit-backdrop-filter: blur(16px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.28) !important;
   color: #ffffff !important;
-  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45) !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5) !important;
 }
 
 .comic-detail-hero-section .hero-rating-box .star-rating-score-num,
@@ -341,12 +345,12 @@ html.light .comic-detail-hero-section .hero-rating-box .star-rating-muted-text {
 .comic-detail-hero-section .hero-rating-box .star-button.filled,
 html.light .comic-detail-hero-section .hero-rating-box .star-button.filled {
   color: #fbbf24 !important;
-  filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.45)) !important;
+  filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.5)) !important;
 }
 
 .comic-detail-hero-section .hero-rating-box .star-button.empty,
 html.light .comic-detail-hero-section .hero-rating-box .star-button.empty {
-  color: rgba(255, 255, 255, 0.28) !important;
+  color: rgba(255, 255, 255, 0.32) !important;
 }
 
 .comic-detail-hero-section .hero-rating-box .star-button.empty:hover,
@@ -360,7 +364,7 @@ html.light .comic-detail-hero-section .hero-rating-box .star-rating-hint-text {
 }
 
 
-/* ── BODY SECTION (Crystal Clear Dual-Mode Styling) ── */
+/* ── BODY SECTION (Crystal Clear Borders & Outlines) ── */
 .comic-detail-body-container {
   padding: 48px 8% 80px;
   min-height: 550px;
@@ -368,16 +372,16 @@ html.light .comic-detail-hero-section .hero-rating-box .star-rating-hint-text {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
-/* Dark Mode Body */
+/* Dark Mode Body Canvas */
 html.dark .comic-detail-body-container,
 :root:not(.light) .comic-detail-body-container {
-  background: #0b0716;
+  background: #090514;
   color: #f1f5f9;
 }
 
-/* Light Mode Body */
+/* Light Mode Body Canvas (Clean contrastive canvas) */
 html.light .comic-detail-body-container {
-  background: #f8f7f4;
+  background: #f1f5f9;
   color: #0f172a;
 }
 
@@ -394,7 +398,7 @@ html.light .comic-detail-body-container {
   }
 }
 
-/* Synopsis Card */
+/* Synopsis Card (Clear Visible Outlines & 3D Depth) */
 .detail-synopsis-card {
   padding: 30px;
   border-radius: 20px;
@@ -403,15 +407,15 @@ html.light .comic-detail-body-container {
 
 html.dark .detail-synopsis-card,
 :root:not(.light) .detail-synopsis-card {
-  background: #140e24;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  background: #140d25;
+  border: 1.5px solid rgba(168, 85, 247, 0.28);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 html.light .detail-synopsis-card {
   background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  border: 1.5px solid #cbd5e1;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.07), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
 }
 
 .detail-section-title {
@@ -447,31 +451,19 @@ html.light .detail-synopsis-text {
   color: #334155;
 }
 
-/* Modern Tab Selector */
+/* Modern Tab Selector with High Definition */
 .detail-tabs-header {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   margin-top: 14px;
   margin-bottom: 24px;
-  border-bottom: 2px solid;
-  padding-bottom: 6px;
-}
-
-html.dark .detail-tabs-header,
-:root:not(.light) .detail-tabs-header {
-  border-bottom-color: rgba(255, 255, 255, 0.08);
-}
-
-html.light .detail-tabs-header {
-  border-bottom-color: rgba(0, 0, 0, 0.08);
+  padding-bottom: 4px;
 }
 
 .detail-tab-button {
-  background: transparent;
-  border: none;
   border-radius: 12px;
-  padding: 10px 22px;
-  font-size: 16px;
+  padding: 11px 24px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -480,35 +472,48 @@ html.light .detail-tabs-header {
   gap: 8px;
 }
 
+/* Dark Mode Tabs */
 html.dark .detail-tab-button,
 :root:not(.light) .detail-tab-button {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1.5px solid rgba(255, 255, 255, 0.14);
   color: #94a3b8;
 }
 
 html.dark .detail-tab-button:hover,
 :root:not(.light) .detail-tab-button:hover {
   color: #ffffff;
-  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.09);
 }
 
 html.dark .detail-tab-button.active,
 :root:not(.light) .detail-tab-button.active {
-  color: #c084fc !important;
-  background: rgba(168, 85, 247, 0.14) !important;
+  color: #f3e8ff !important;
+  background: rgba(168, 85, 247, 0.22) !important;
+  border: 1.5px solid #a855f7 !important;
+  box-shadow: 0 0 18px rgba(168, 85, 247, 0.3) !important;
 }
 
+/* Light Mode Tabs */
 html.light .detail-tab-button {
-  color: #64748b;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  color: #475569;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
 html.light .detail-tab-button:hover {
   color: #0f172a;
-  background: rgba(0, 0, 0, 0.04);
+  border-color: #94a3b8;
+  background: #f8fafc;
 }
 
 html.light .detail-tab-button.active {
   color: #7c3aed !important;
-  background: rgba(124, 58, 237, 0.1) !important;
+  background: #f5f3ff !important;
+  border: 1.5px solid #7c3aed !important;
+  box-shadow: 0 3px 12px rgba(124, 58, 237, 0.18) !important;
 }
 
 /* Chapter List Container */
@@ -531,44 +536,44 @@ html.light .detail-tab-button.active {
   transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Dark Mode Chapter Card */
 html.dark .detail-chapter-card,
 :root:not(.light) .detail-chapter-card {
-  background: #140e24;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
-}
-
-html.light .detail-chapter-card {
-  background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.03);
-}
-
-.detail-chapter-card:hover {
-  transform: translateX(6px);
+  background: #140d25;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
 html.dark .detail-chapter-card:hover,
 :root:not(.light) .detail-chapter-card:hover {
-  border-color: rgba(168, 85, 247, 0.5) !important;
-  background: rgba(168, 85, 247, 0.08) !important;
-  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.15);
+  transform: translateX(6px);
+  border-color: #a855f7 !important;
+  background: rgba(168, 85, 247, 0.12) !important;
+  box-shadow: 0 8px 24px rgba(168, 85, 247, 0.25);
+}
+
+/* Light Mode Chapter Card */
+html.light .detail-chapter-card {
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 html.light .detail-chapter-card:hover {
-  border-color: #8b5cf6 !important;
+  transform: translateX(6px);
+  border-color: #7c3aed !important;
   background: #fbf9ff !important;
-  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.12);
+  box-shadow: 0 6px 22px rgba(124, 58, 237, 0.16) !important;
 }
 
 .detail-chapter-card.read {
-  border-color: rgba(168, 85, 247, 0.25);
-  background: rgba(168, 85, 247, 0.04);
+  border-color: rgba(168, 85, 247, 0.4);
+  background: rgba(168, 85, 247, 0.05);
 }
 
 .detail-chapter-card.premium {
-  border-color: rgba(245, 158, 11, 0.35);
-  background: rgba(245, 158, 11, 0.05);
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.06);
 }
 
 .detail-chapter-name {
@@ -590,9 +595,10 @@ html.light .detail-chapter-name {
 
 .read-status-pill {
   font-size: 10px;
-  padding: 3px 8px;
+  padding: 3px 9px;
   border-radius: 8px;
-  background: rgba(168, 85, 247, 0.15);
+  background: rgba(168, 85, 247, 0.18);
+  border: 1px solid rgba(168, 85, 247, 0.35);
   color: #c084fc;
   font-weight: 700;
   letter-spacing: 0.3px;
@@ -601,24 +607,27 @@ html.light .detail-chapter-name {
 html.light .read-status-pill {
   color: #7c3aed;
   background: rgba(124, 58, 237, 0.12);
+  border-color: rgba(124, 58, 237, 0.3);
 }
 
 .premium-badge-pill {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
   color: #ffffff;
-  padding: 3px 10px;
+  padding: 4px 11px;
   border-radius: 12px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
+  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.4);
   letter-spacing: 0.3px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .detail-chapter-meta {
   font-size: 13px;
+  font-weight: 500;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -637,20 +646,23 @@ html.light .detail-chapter-meta {
   padding: 36px 20px;
   text-align: center;
   border-radius: 16px;
+  border: 1.5px dashed;
 }
 
 html.dark .detail-no-chapters,
 :root:not(.light) .detail-no-chapters {
   background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.12);
   color: #94a3b8;
 }
 
 html.light .detail-no-chapters {
-  background: rgba(0, 0, 0, 0.02);
+  background: #ffffff;
+  border-color: #cbd5e1;
   color: #64748b;
 }
 
-/* Sidebar Info Box */
+/* Sidebar Info Box (Distinct Elevation & Sharp Hairline Borders) */
 .detail-sidebar-info-card {
   padding: 28px;
   border-radius: 20px;
@@ -663,15 +675,15 @@ html.light .detail-no-chapters {
 
 html.dark .detail-sidebar-info-card,
 :root:not(.light) .detail-sidebar-info-card {
-  background: #140e24;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  background: #140d25;
+  border: 1.5px solid rgba(168, 85, 247, 0.28);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 html.light .detail-sidebar-info-card {
   background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  border: 1.5px solid #cbd5e1;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.07), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
 }
 
 .detail-info-list {
@@ -685,7 +697,7 @@ html.light .detail-sidebar-info-card {
   flex-direction: column;
   gap: 4px;
   padding-bottom: 12px;
-  border-bottom: 1px solid;
+  border-bottom: 1.5px solid;
 }
 
 .detail-info-item:last-child {
@@ -695,11 +707,11 @@ html.light .detail-sidebar-info-card {
 
 html.dark .detail-info-item,
 :root:not(.light) .detail-info-item {
-  border-bottom-color: rgba(255, 255, 255, 0.06);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
 html.light .detail-info-item {
-  border-bottom-color: rgba(0, 0, 0, 0.06);
+  border-bottom-color: #e2e8f0;
 }
 
 .info-item-label {
