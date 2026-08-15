@@ -609,6 +609,23 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     });
   }
 
+  const getPendingComicsCount = () => {
+    const authUser = getAuth()?.user;
+    const scopedSubmissions = (submissions || []).filter(item => {
+      const lang = item.language || item.rawLanguage || item.originalLanguage || item.lang || 'Original Raw';
+      return isLanguageInModeratorScope(lang, authUser);
+    });
+    const itemsInTab = scopedSubmissions.filter(item => item.status === 'pending' || !item.status);
+    const uniqueKeys = new Set();
+    itemsInTab.forEach(item => {
+      const titleClean = (item.title || item.comicTitle || item.comicName || '').toLowerCase().trim();
+      const submitterClean = (item.submittedBy || item.author || '').toLowerCase().trim();
+      const key = item.comicId ? `comic-${item.comicId}` : `group-${titleClean}_${submitterClean}`;
+      uniqueKeys.add(key);
+    });
+    return uniqueKeys.size;
+  };
+
   const getNavBadges = () => {
     let localFlags = []
     try {
@@ -624,22 +641,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     const pendingChatFlags = allFlags.filter(item => !item.status || item.status === 'pending').length
 
     return {
-      'review-queue': (() => {
-        const authUser = getAuth()?.user;
-        const scopedSubmissions = submissions.filter(item => {
-          const lang = item.language || item.rawLanguage || item.originalLanguage || item.lang || 'Original Raw';
-          return isLanguageInModeratorScope(lang, authUser);
-        });
-        const itemsInTab = scopedSubmissions.filter(item => item.status === 'pending' || !item.status);
-        const uniqueKeys = new Set();
-        itemsInTab.forEach(item => {
-          const titleClean = (item.title || '').toLowerCase().trim();
-          const submitterClean = (item.submittedBy || '').toLowerCase().trim();
-          const key = item.comicId ? `comic-${item.comicId}` : `group-${titleClean}_${submitterClean}`;
-          uniqueKeys.add(key);
-        });
-        return uniqueKeys.size;
-      })(),
+      'review-queue': getPendingComicsCount(),
       'chat-monitor': pendingChatFlags,
       'forum': forumThreads.filter(item => item.isReported).length,
     }
@@ -1445,7 +1447,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
   const handleExportDashboardReport = () => {
     try {
-      const pendingReviewsCount = submissions.filter(s => s.status === 'pending').length;
+      const pendingReviewsCount = getPendingComicsCount();
       const approvedReviewsCount = submissions.filter(s => s.status === 'approved').length;
       const rejectedReviewsCount = submissions.filter(s => s.status === 'rejected').length;
       const totalChaptersCount = comics.reduce((acc, c) => acc + (c.chaptersCount || c.chapterCount || c.chapters?.length || 0), 0);
@@ -1524,7 +1526,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                     {loadingPhase1 ? (
                       <span className="skeleton-line skeleton-shimmer" style={{ width: '300px', display: 'inline-block', margin: 0 }}></span>
                     ) : (
-                      <>System is running smoothly. There are currently <strong>{submissions.filter(s => s.status === 'pending').length}</strong> reviews pending and <strong>{forumThreads.filter(t => t.isReported).length}</strong> open forum reports.</>
+                      <>System is running smoothly. There are currently <strong>{getPendingComicsCount()}</strong> reviews pending and <strong>{forumThreads.filter(t => t.isReported).length}</strong> open forum reports.</>
                     )}
                   </p>
                 </div>
@@ -1552,7 +1554,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                   <div className="mod-core-body">
                     <div className="mod-core-value-group">
                       <div className="mod-core-value">
-                        {loadingPhase1 ? <div className="skeleton-line skeleton-shimmer" style={{ width: '60px', height: '32px', margin: 0 }}></div> : submissions.filter(s => s.status === 'pending').length}
+                        {loadingPhase1 ? <div className="skeleton-line skeleton-shimmer" style={{ width: '60px', height: '32px', margin: 0 }}></div> : getPendingComicsCount()}
                       </div>
                       <span className="mod-core-trend">Awaiting review queue</span>
                     </div>
