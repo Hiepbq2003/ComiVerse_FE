@@ -12,6 +12,7 @@ import ModeratorReports from './ModeratorReports'
 import ReportCategories from './ReportCategories'
 import { getAllComicsApi, updateComicApi, deleteComicApi, getComicLeaderboardApi } from '../../services/api/ComicApi'
 import { getAllProjectTeamsApi, createProjectTeamApi, deleteProjectTeamApi } from '../../services/api/ProjectTeamApi'
+import { getTeamTasksApi, getTeamMembersApi } from '../../services/api/TeamWorkspaceApi'
 import { getAllSubmissionsApi, approveSubmissionApi, rejectSubmissionApi } from '../../services/api/SubmissionApi'
 import { getAllGenresApi } from '../../services/api/GenreApi'
 import { getAllForumThreadsApi } from '../../services/api/ForumThreadApi'
@@ -413,8 +414,86 @@ function ModeratorDashboard() {
           mergedTeamsMap.set(key, t);
         }
       });
-      setProjectTeams(Array.from(mergedTeamsMap.values()));
+      
+      const allUniqueTeams = Array.from(mergedTeamsMap.values());
+      setProjectTeams(allUniqueTeams);
       setGenres(genresData?.data || genresData || [])
+
+      // Enrich asynchronously with live task completion counts and members
+      Promise.all(
+        allUniqueTeams.map(async (t) => {
+          if (!t || !t.id) return t;
+          let tasks = [];
+          let members = [];
+          try {
+            const [tasksRes, membersRes] = await Promise.allSettled([
+              getTeamTasksApi(t.id),
+              getTeamMembersApi(t.id)
+            ]);
+
+            if (tasksRes.status === 'fulfilled') {
+              const val = tasksRes.value;
+              tasks = Array.isArray(val) ? val : (val?.data || val?.content || []);
+            }
+            if (membersRes.status === 'fulfilled') {
+              const val = membersRes.value;
+              members = Array.isArray(val) ? val : (val?.data || val?.content || []);
+            }
+          } catch (e) {}
+
+          // Merge local tasks if any
+          try {
+            const localKey = `comiverse_tasks_${t.id}`;
+            const localTasks = JSON.parse(localStorage.getItem(localKey) || '[]');
+            if (Array.isArray(localTasks) && localTasks.length > 0) {
+              const taskMap = new Map();
+              tasks.forEach(tsk => taskMap.set(String(tsk.id), tsk));
+              localTasks.forEach(tsk => taskMap.set(String(tsk.id), tsk));
+              tasks = Array.from(taskMap.values());
+            }
+          } catch (e) {}
+
+          const now = new Date();
+          const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+          const sevenDaysAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+          const thirtyDaysAgo = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+
+          const isTaskCompleted = (tsk) => {
+            const s = (tsk.status || '').toUpperCase();
+            return s === 'COMPLETED' || s === 'DONE' || s === 'PUBLISHED' || tsk.isCompleted === true;
+          };
+
+          const completedTasks = tasks.filter(isTaskCompleted);
+
+          const tasksToday = completedTasks.filter(tsk => {
+            const time = new Date(tsk.completedAt || tsk.updatedAt || tsk.createdAt || Date.now()).getTime();
+            return time >= startOfToday;
+          }).length;
+
+          const tasksWeek = completedTasks.filter(tsk => {
+            const time = new Date(tsk.completedAt || tsk.updatedAt || tsk.createdAt || Date.now()).getTime();
+            return time >= sevenDaysAgo;
+          }).length;
+
+          const tasksMonth = completedTasks.filter(tsk => {
+            const time = new Date(tsk.completedAt || tsk.updatedAt || tsk.createdAt || Date.now()).getTime();
+            return time >= thirtyDaysAgo;
+          }).length;
+
+          const membersCount = members.length > 0 ? members.length : (t.membersCount || 1);
+
+          return {
+            ...t,
+            tasksToday,
+            tasksWeek,
+            tasksMonth,
+            totalCompletedTasks: completedTasks.length,
+            membersCount
+          };
+        })
+      ).then(enriched => {
+        setProjectTeams(enriched);
+      }).catch(e => console.warn('[ModeratorDashboard] Error enriching teams:', e));
     } catch (err) {
       console.error('Failed to fetch comics/teams:', err)
     }
@@ -2097,11 +2176,20 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                     </div>
                     <div className="mod-team-cards-row">
                       {projectTeams.slice().sort((a, b) => {
-                        const scoreA = (a.tasksToday || 0) * 100 + (a.tasksWeek || 0) * 10 + (a.tasksMonth || 0);
-                        const scoreB = (b.tasksToday || 0) * 100 + (b.tasksWeek || 0) * 10 + (b.tasksMonth || 0);
-                        return scoreB - scoreA;
-                      }).slice(0, 3).map(t => (
-                        <div key={t.id} className="mod-team-dashboard-card">
+                        const scoreA = (a.tasksToday || 0) * 100 + (a.tasksWeek || 0) * 10 + (a.tasksMonth || 0) + (a.totalCompletedTasks || 0);
+                        const scoreB = (b.tasksToday || 0) * 100 + (b.tasksWeek || 0) * 10 + (b.tasksMonth || 0) + (b.totalCompletedTasks || 0);
+                        if (scoreA !== scoreB) return scoreB - scoreA;
+                        const timeA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+                        const timeB = new Date(b.createdAt || b.updatedAt || 0).getTime();
+                        return timeB - timeA;
+                      }).slice(0, 6).map(t => (
+                        <div 
+                          key={t.id} 
+                          className="mod-team-dashboard-card"
+                          onClick={() => setActiveNav('project-teams')}
+                          style={{ cursor: 'pointer' }}
+                          title="Click to manage team in Project Teams workspace"
+                        >
                           <div className="mod-team-card-header">
                             <h4 className="mod-team-card-title" title={t.title}>{t.title}</h4>
                             <span className={`team-status-badge ${(t.status || 'Active').toLowerCase()}`}>{t.status || 'Active'}</span>
