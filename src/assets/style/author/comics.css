@@ -3037,7 +3037,11 @@ html.light .author-feedback-item-author,
   color: #ffffff;
   font-size: 11.5px;
   font-weight: 800;
-}  margin-bottom: 4px;
+}
+
+.author-comics-page .author-list-header-row,
+.author-comic-detail-page .author-detail-breadcrumb {
+  margin-bottom: 4px;
 }
 
 .author-comics-page .author-list-header-row h1 {
