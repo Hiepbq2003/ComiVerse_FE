@@ -28,20 +28,6 @@ export default function CategoryModal({
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
-  // 3D Parallax Mouse Response
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
-
-  const handleMouseMove = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 4;
-    const y = ((e.clientY - rect.top) / rect.height - 0.5) * -4;
-    setTilt({ x, y });
-  };
-
-  const handleMouseLeave = () => {
-    setTilt({ x: 0, y: 0 });
-  };
-
   useEffect(() => {
     if (category) {
       setFormData({
@@ -116,11 +102,8 @@ export default function CategoryModal({
         className="rep-modal-card"
         style={{
           maxWidth: '920px',
-          width: '92%',
-          transform: `perspective(1000px) rotateX(${tilt.y}deg) rotateY(${tilt.x}deg)`
+          width: '92%'
         }}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
         onClick={e => e.stopPropagation()}
       >
         {/* Header (Fixed) */}

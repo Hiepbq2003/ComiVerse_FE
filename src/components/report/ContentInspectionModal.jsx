@@ -33,20 +33,6 @@ export default function ContentInspectionModal({
   const [targetDetails, setTargetDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
-  // 3D Parallax Mouse Response
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
-
-  const handleMouseMove = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 4; // subtle max 2deg tilt
-    const y = ((e.clientY - rect.top) / rect.height - 0.5) * -4;
-    setTilt({ x, y });
-  };
-
-  const handleMouseLeave = () => {
-    setTilt({ x: 0, y: 0 });
-  };
-
   useEffect(() => {
     let isMounted = true;
     const fetchTargetData = async () => {
@@ -172,11 +158,8 @@ export default function ContentInspectionModal({
       <div
         className="rep-modal-card"
         style={{
-          maxWidth: '860px',
-          transform: `perspective(1000px) rotateX(${tilt.y}deg) rotateY(${tilt.x}deg)`
+          maxWidth: '860px'
         }}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Header (Fixed) */}
