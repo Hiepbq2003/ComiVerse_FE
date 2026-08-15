@@ -350,7 +350,7 @@ html.light .author-bank-security-badge {
 html.light .author-comic-detail-page .author-detail-hero {
   background: var(--author-card-bg);
   border: 1px solid var(--author-border);
-  box-shadow: var(--author-shadow-lg);
+  box-shadow: var(--author-shadow);
 }
 
 .author-comic-detail-page .author-detail-stat-card {
@@ -362,7 +362,7 @@ html.light .author-comic-detail-page .author-detail-hero {
 html.light .author-comic-detail-page .author-detail-stat-card {
   background: var(--author-card-bg);
   border: 1px solid var(--author-border);
-  box-shadow: var(--author-shadow);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .author-comic-detail-page .author-detail-stat-card span {

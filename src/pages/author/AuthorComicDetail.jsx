@@ -1122,7 +1122,7 @@ function AuthorComicDetail() {
               )}
               <button className="btn-author-action" onClick={() => setShowEditComic(true)}>Edit Info</button>
               {!['SUBMITTED_FOR_REVIEW', 'PUBLISHED', 'APPROVED'].includes(moderationStatus?.toString().toUpperCase()) && (
-                <button className="btn-author-action review" onClick={handleSubmitComicForReview} disabled={submittingComic}>
+                <button className="btn-author-action primary" onClick={handleSubmitComicForReview} disabled={submittingComic}>
                   {submittingComic ? 'Submitting...' : 'Push Review'}
                 </button>
               )}
