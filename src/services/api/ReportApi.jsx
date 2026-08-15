@@ -35,13 +35,13 @@ export const getActiveReportCategoriesApi = async (targetType, assignedRole) => 
 export const getAllReportCategoriesApi = async (filterParams = {}) => {
   const params = {};
   if (filterParams.is_active !== undefined && filterParams.is_active !== 'ALL') {
-    params.is_active = filterParams.is_active;
+    params.isActive = filterParams.is_active;
   }
   if (filterParams.assigned_role && filterParams.assigned_role !== 'ALL') {
-    params.assigned_role = filterParams.assigned_role;
+    params.assignedRole = filterParams.assigned_role;
   }
   if (filterParams.target_type && filterParams.target_type !== 'ALL') {
-    params.target_type = filterParams.target_type;
+    params.targetType = filterParams.target_type;
   }
 
   const res = await AxiosClient.get('/report-categories/admin/all', {
@@ -131,11 +131,11 @@ export const deleteReportCategoryApi = async (id) => {
 export const getAdminReportsApi = async (filterDTO = {}) => {
   const params = {};
   if (filterDTO.status && filterDTO.status !== 'ALL') params.status = filterDTO.status;
-  if (filterDTO.target_type && filterDTO.target_type !== 'ALL') params.target_type = filterDTO.target_type;
-  if (filterDTO.category_id && filterDTO.category_id !== 'ALL') params.category_id = filterDTO.category_id;
-  if (filterDTO.assigned_role && filterDTO.assigned_role !== 'ALL') params.assigned_role = filterDTO.assigned_role;
-  if (filterDTO.start_date) params.start_date = filterDTO.start_date;
-  if (filterDTO.end_date) params.end_date = filterDTO.end_date;
+  if (filterDTO.target_type && filterDTO.target_type !== 'ALL') params.targetType = filterDTO.target_type;
+  if (filterDTO.category_id && filterDTO.category_id !== 'ALL') params.categoryId = filterDTO.category_id;
+  if (filterDTO.assigned_role && filterDTO.assigned_role !== 'ALL') params.assignedRole = filterDTO.assigned_role;
+  if (filterDTO.start_date) params.startDate = filterDTO.start_date;
+  if (filterDTO.end_date) params.endDate = filterDTO.end_date;
   if (filterDTO.search) params.search = filterDTO.search.trim();
 
   // Spring Pageable pagination: 0-indexed page in Spring backend
