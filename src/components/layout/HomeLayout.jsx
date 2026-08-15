@@ -191,10 +191,39 @@ function HomeLayout({ children }) {
 
   const [isHeaderVisible, setIsHeaderVisible] = useState(true)
   const lastScrollY = useRef(0)
+  const isProgrammaticScroll = useRef(false)
+
+  useEffect(() => {
+    const handleProgStart = () => {
+      setIsHeaderVisible(false)
+      isProgrammaticScroll.current = true
+      // Safety timeout in case scrollend is not fired (e.g. already at target)
+      setTimeout(() => {
+        isProgrammaticScroll.current = false
+      }, 1000)
+    }
+
+    const handleScrollEnd = () => {
+      isProgrammaticScroll.current = false
+    }
+
+    window.addEventListener('programmatic-scroll-start', handleProgStart)
+    window.addEventListener('scrollend', handleScrollEnd)
+
+    return () => {
+      window.removeEventListener('programmatic-scroll-start', handleProgStart)
+      window.removeEventListener('scrollend', handleScrollEnd)
+    }
+  }, [])
 
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY
+      if (isProgrammaticScroll.current) {
+        lastScrollY.current = currentScrollY
+        return
+      }
+      
       if (currentScrollY > lastScrollY.current && currentScrollY > 80) {
         setIsHeaderVisible(false)
       } else {
