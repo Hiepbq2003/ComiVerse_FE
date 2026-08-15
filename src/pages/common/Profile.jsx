@@ -44,7 +44,9 @@ const ROLE_NOTIFICATION_OPTIONS = {
   ] }],
 
   AUTHOR: [{ title: 'Author Hub', options: [
-    { key: 'SUBMISSION_STATUS', label: 'Submission status', description: 'Approval, rejection, and change requests for your submitted work.' },
+    { key: 'AUTHOR_REVIEWS', label: 'Review Notifications', description: 'Get notified when a reader posts a review on your series.' },
+    { key: 'AUTHOR_CHAPTER_UPDATES', label: 'Chapter Updates', description: 'Receive updates about chapter approvals and translation status.' },
+    { key: 'AUTHOR_WEEKLY_DIGEST', label: 'Weekly digest report', description: 'Receive an email summary of page views and subscriber milestones.' },
   ] }],
   TRANSLATOR: [{ title: 'Translator Hub', options: [
     { key: 'PROJECT_OPPORTUNITIES', label: 'Project opportunities', description: 'New translation projects available in the project pool.' },
@@ -927,6 +929,36 @@ function Profile({ user: userProp }) {
                     <p className="profile-input-desc">
                       Moderation tasks, chat monitoring, and comic review queues will be filtered based on your assigned language scope.
                     </p>
+                  </div>
+                )}
+
+                {/* Author Specific: Copyright Identity */}
+                {roleUpper === 'AUTHOR' && (
+                  <div className="profile-translator-section" style={{ marginTop: '24px', borderColor: 'rgba(168, 85, 247, 0.3)' }}>
+                    <div className="profile-translator-header">
+                      <div className="profile-translator-icon-wrap" style={{ background: 'rgba(168, 85, 247, 0.1)', color: 'var(--mod-purple)' }}>✍️</div>
+                      <div>
+                        <h4 className="profile-translator-title" style={{ color: 'var(--mod-purple)' }}>
+                          Author Copyright Identity
+                        </h4>
+                        <p className="profile-translator-subtitle">
+                          This verified name is used as your public publisher identity and copyright holder name for all comics.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="profile-input-group">
+                      <label>Copyright Holder / Pen Name</label>
+                      <input
+                        type="text"
+                        value={user.fullName || 'Unknown'}
+                        disabled
+                        style={{ cursor: 'not-allowed', opacity: 0.8 }}
+                      />
+                      <small style={{ color: 'var(--profile-text-muted)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                        Linked to your account Full Name for legal copyright protection. Contact support to change this identity.
+                      </small>
+                    </div>
                   </div>
                 )}
 
