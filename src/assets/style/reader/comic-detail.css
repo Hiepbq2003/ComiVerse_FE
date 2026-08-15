@@ -380,11 +380,11 @@ html.dark .comic-detail-body-container,
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* Light Mode Body Canvas (Clean contrastive canvas) */
+/* Light Mode Body Canvas (Clean contrastive warm canvas) */
 html.light .comic-detail-body-container {
-  background: #f1f5f9;
-  color: #0f172a;
-  border-bottom: 1.5px solid #cbd5e1;
+  background: #faf6f0;
+  color: #182235;
+  border-bottom: 1.5px solid #e8e0d5;
 }
 
 .comic-detail-main-grid {
@@ -416,8 +416,8 @@ html.dark .detail-synopsis-card,
 
 html.light .detail-synopsis-card {
   background: #ffffff;
-  border: 1.5px solid #cbd5e1;
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.07), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+  border: 1.5px solid #e8e0d5;
+  box-shadow: 0 4px 20px -2px rgba(60, 45, 30, 0.06), 0 2px 6px -1px rgba(60, 45, 30, 0.04);
 }
 
 .detail-section-title {
@@ -500,20 +500,20 @@ html.dark .detail-tab-button.active,
 /* Light Mode Tabs */
 html.light .detail-tab-button {
   background: #ffffff;
-  border: 1.5px solid #cbd5e1;
-  color: #475569;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  border: 1.5px solid #e8e0d5;
+  color: #5c5046;
+  box-shadow: 0 1px 4px rgba(60, 45, 30, 0.04);
 }
 
 html.light .detail-tab-button:hover {
-  color: #0f172a;
-  border-color: #94a3b8;
-  background: #f8fafc;
+  color: #182235;
+  border-color: #d8cec2;
+  background: #fdfbf7;
 }
 
 html.light .detail-tab-button.active {
   color: #7c3aed !important;
-  background: #f5f3ff !important;
+  background: #f5edff !important;
   border: 1.5px solid #7c3aed !important;
   box-shadow: 0 3px 12px rgba(124, 58, 237, 0.18) !important;
 }
@@ -557,14 +557,14 @@ html.dark .detail-chapter-card:hover,
 /* Light Mode Chapter Card */
 html.light .detail-chapter-card {
   background: #ffffff;
-  border: 1.5px solid #cbd5e1;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1.5px solid #e8e0d5;
+  box-shadow: 0 2px 8px rgba(60, 45, 30, 0.03);
 }
 
 html.light .detail-chapter-card:hover {
   transform: translateX(6px);
   border-color: #7c3aed !important;
-  background: #fbf9ff !important;
+  background: #fffcf8 !important;
   box-shadow: 0 6px 22px rgba(124, 58, 237, 0.16) !important;
 }
 
@@ -660,8 +660,8 @@ html.dark .detail-no-chapters,
 
 html.light .detail-no-chapters {
   background: #ffffff;
-  border-color: #cbd5e1;
-  color: #64748b;
+  border-color: #e8e0d5;
+  color: #786c62;
 }
 
 /* Sidebar Info Box (Distinct Elevation & Sharp Hairline Borders) */
@@ -684,8 +684,8 @@ html.dark .detail-sidebar-info-card,
 
 html.light .detail-sidebar-info-card {
   background: #ffffff;
-  border: 1.5px solid #cbd5e1;
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.07), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+  border: 1.5px solid #e8e0d5;
+  box-shadow: 0 4px 20px -2px rgba(60, 45, 30, 0.06), 0 2px 6px -1px rgba(60, 45, 30, 0.04);
 }
 
 .detail-info-list {
@@ -713,7 +713,7 @@ html.dark .detail-info-item,
 }
 
 html.light .detail-info-item {
-  border-bottom-color: #e2e8f0;
+  border-bottom-color: #f0e9e1;
 }
 
 .info-item-label {
