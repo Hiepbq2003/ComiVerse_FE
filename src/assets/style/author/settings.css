@@ -202,6 +202,60 @@ textarea.form-control-premium {
 .author-bank-save-btn {
   min-width: 170px;
   justify-content: center;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(110deg, #a855f7 0%, #ff6b35 55%, #ff9416 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
+}
+
+.author-bank-save-btn::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.2) 0%, transparent 60%);
+  filter: blur(16px);
+  animation: liquid-drift 6s infinite ease-in-out;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.author-bank-save-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: none;
+  z-index: 1;
+}
+
+.author-bank-save-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(255, 107, 53, 0.35) !important;
+}
+
+.author-bank-save-btn:hover::after {
+  left: 200%;
+  transition: left 0.8s ease-in-out;
+}
+
+@keyframes liquid-drift {
+  0%, 100% {
+    transform: translate3d(-4px, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(4px, -1px, 0) scale(1.02);
+  }
 }
 
 html.light .author-bank-security-badge {
