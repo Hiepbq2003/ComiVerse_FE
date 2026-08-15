@@ -970,79 +970,99 @@ function TeamProjects() {
   const userFullName = authUser?.fullName || authUser?.username || 'Translator'
   const user = authUser || {}
 
+  const [allMatchedTeams, setAllMatchedTeams] = useState([])
+
+  // Fast Instant Paging from memory
+  useEffect(() => {
+    if (allMatchedTeams.length > 0) {
+      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+      const pageSlice = allMatchedTeams.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+      setProjects(pageSlice)
+    }
+  }, [currentPage, allMatchedTeams])
+
   const fetchProjects = async (silent = false) => {
     try {
       if (!silent && projects.length === 0) setLoadingProjects(true)
+
+      // Check session cache for instant load
+      let cachedComics = []
+      let cachedSubs = []
+      try {
+        const c1 = sessionStorage.getItem('comiverse_comics_cache')
+        if (c1) cachedComics = JSON.parse(c1)
+        const c2 = sessionStorage.getItem('comiverse_subs_cache')
+        if (c2) cachedSubs = JSON.parse(c2)
+      } catch (e) {}
+
+      const fetchComicsPromise = cachedComics.length > 0 ? Promise.resolve(cachedComics) : getAllComicsApi().catch(() => [])
+      const fetchSubsPromise = cachedSubs.length > 0 ? Promise.resolve(cachedSubs) : getAllSubmissionsApi().catch(() => [])
+
       const [pageRes, allComicsRes, submissionsRes, allTeamsRes, myTeamsRes] = await Promise.all([
         getMyProjectTeamsPageApi(currentPage, ITEMS_PER_PAGE, searchTerm).catch(() => null),
-        getAllComicsApi().catch(() => []),
-        getAllSubmissionsApi().catch(() => []),
+        fetchComicsPromise,
+        fetchSubsPromise,
         getAllProjectTeamsApi().catch(() => []),
         getMyProjectTeamsApi().catch(() => [])
       ])
 
-      const dbComics = allComicsRes?.data?.data || allComicsRes?.data || (Array.isArray(allComicsRes) ? allComicsRes : []);
-      const dbSubs = submissionsRes?.data?.data || submissionsRes?.data || (Array.isArray(submissionsRes) ? submissionsRes : []);
+      const dbComics = Array.isArray(allComicsRes) ? allComicsRes : (allComicsRes?.data?.data || allComicsRes?.data || cachedComics);
+      const dbSubs = Array.isArray(submissionsRes) ? submissionsRes : (submissionsRes?.data?.data || submissionsRes?.data || cachedSubs);
 
-      const pageData = pageRes?.data?.data || pageRes?.data || pageRes;
-      let fetchedProjects = pageData?.content || (Array.isArray(pageData) ? pageData : []);
-      let fetchedTotalPages = pageData?.totalPages || 1;
+      try {
+        if (Array.isArray(dbComics) && dbComics.length > 0) sessionStorage.setItem('comiverse_comics_cache', JSON.stringify(dbComics))
+        if (Array.isArray(dbSubs) && dbSubs.length > 0) sessionStorage.setItem('comiverse_subs_cache', JSON.stringify(dbSubs))
+      } catch (e) {}
 
-      // Fallback: If server pagination returns 0 items or fails, retrieve and filter from all available teams
-      if (!fetchedProjects || fetchedProjects.length === 0) {
-        let allTeams = [];
-        if (Array.isArray(allTeamsRes)) {
-          allTeams = allTeamsRes;
-        } else if (allTeamsRes?.data?.data || allTeamsRes?.data || allTeamsRes?.content) {
-          allTeams = allTeamsRes.data?.data || allTeamsRes.data || allTeamsRes.content || [];
-        } else if (Array.isArray(myTeamsRes)) {
-          allTeams = myTeamsRes;
-        } else if (myTeamsRes?.data?.data || myTeamsRes?.data || myTeamsRes?.content) {
-          allTeams = myTeamsRes.data?.data || myTeamsRes.data || myTeamsRes.content || [];
-        }
-
-        const currentUserName = (user.fullName || '').toLowerCase().trim();
-        const currentUsername = (user.username || '').toLowerCase().trim();
-        const currentUserId = user.id || user.userId;
-        const cleanSearch = (searchTerm || '').toLowerCase().trim();
-
-        const filtered = allTeams.filter(p => {
-          const leaderName = (p.leaderName || '').toLowerCase().trim();
-          const leaderId = p.leaderId || p.createdById;
-          const isLeader = (currentUserName && leaderName === currentUserName) ||
-                           (currentUsername && leaderName === currentUsername) ||
-                           (currentUserId && leaderId === currentUserId);
-
-          const localApprovedKey = `comiverse_approved_members_${p.id}`;
-          let savedMems = [];
-          try {
-            savedMems = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
-          } catch (e) {}
-
-          const isApprovedMember = savedMems.some(m => {
-            const mn = (m.name || m.username || '').toLowerCase().trim();
-            return (currentUserName && mn === currentUserName) || (currentUsername && mn === currentUsername);
-          }) || (Array.isArray(p.members) && p.members.some(m => m.userId === currentUserId || (m.name || '').toLowerCase().trim() === currentUserName));
-
-          const userMatched = isLeader || isApprovedMember;
-          if (!userMatched) return false;
-
-          if (cleanSearch) {
-            const titleMatch = (p.title || p.name || '').toLowerCase().includes(cleanSearch);
-            const comicMatch = (p.comicName || p.comicTitle || '').toLowerCase().includes(cleanSearch);
-            return titleMatch || comicMatch;
-          }
-          return true;
-        });
-
-        fetchedTotalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
-        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-        fetchedProjects = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+      let allTeams = [];
+      if (Array.isArray(allTeamsRes)) {
+        allTeams = allTeamsRes;
+      } else if (allTeamsRes?.data?.data || allTeamsRes?.data || allTeamsRes?.content) {
+        allTeams = allTeamsRes.data?.data || allTeamsRes.data || allTeamsRes.content || [];
+      } else if (Array.isArray(myTeamsRes)) {
+        allTeams = myTeamsRes;
+      } else if (myTeamsRes?.data?.data || myTeamsRes?.data || myTeamsRes?.content) {
+        allTeams = myTeamsRes.data?.data || myTeamsRes.data || myTeamsRes.content || [];
       }
-      
-      setTotalPages(fetchedTotalPages);
 
-      const finalProjectsList = fetchedProjects.map(p => {
+      const currentUserName = (user.fullName || '').toLowerCase().trim();
+      const currentUsername = (user.username || '').toLowerCase().trim();
+      const currentUserId = user.id || user.userId;
+      const cleanSearch = (searchTerm || '').toLowerCase().trim();
+
+      const filtered = allTeams.filter(p => {
+        const leaderName = (p.leaderName || '').toLowerCase().trim();
+        const leaderId = p.leaderId || p.createdById;
+        const isLeader = (currentUserName && leaderName === currentUserName) ||
+                         (currentUsername && leaderName === currentUsername) ||
+                         (currentUserId && leaderId === currentUserId);
+
+        const localApprovedKey = `comiverse_approved_members_${p.id}`;
+        let savedMems = [];
+        try {
+          savedMems = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
+        } catch (e) {}
+
+        const isApprovedMember = savedMems.some(m => {
+          const mn = (m.name || m.username || '').toLowerCase().trim();
+          return (currentUserName && mn === currentUserName) || (currentUsername && mn === currentUsername);
+        }) || (Array.isArray(p.members) && p.members.some(m => m.userId === currentUserId || (m.name || '').toLowerCase().trim() === currentUserName));
+
+        const userMatched = isLeader || isApprovedMember;
+        if (!userMatched) return false;
+
+        if (cleanSearch) {
+          const titleMatch = (p.title || p.name || '').toLowerCase().includes(cleanSearch);
+          const comicMatch = (p.comicName || p.comicTitle || '').toLowerCase().includes(cleanSearch);
+          return titleMatch || comicMatch;
+        }
+        return true;
+      });
+
+      const totalCalculatedPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+      setTotalPages(totalCalculatedPages);
+
+      const allMapped = filtered.map(p => {
         const realCount = Math.max(1, p.membersCount || 0);
         const maxCap = (Number(p.maxMembers) || 5) + 1;
 
@@ -1070,7 +1090,9 @@ function TeamProjects() {
         };
       });
 
-      setProjects(finalProjectsList)
+      setAllMatchedTeams(allMapped);
+      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+      setProjects(allMapped.slice(startIndex, startIndex + ITEMS_PER_PAGE));
     } catch (err) {
       console.error(err)
     } finally {
@@ -1079,11 +1101,9 @@ function TeamProjects() {
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchProjects();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [currentPage, searchTerm])
+    fetchProjects(allMatchedTeams.length > 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm])
 
   const [selectedDetails, setSelectedDetails] = useState(null)
   const [selectedEdit, setSelectedEdit] = useState(null)
