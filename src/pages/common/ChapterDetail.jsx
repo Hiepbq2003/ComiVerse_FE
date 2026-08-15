@@ -61,6 +61,8 @@ function ChapterDetail() {
   const [selectedLanguage, setSelectedLanguage] = useState(searchParams.get('lang') || '')
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
+  const [readerLayout, setReaderLayout] = useState('vertical') // 'vertical' | 'single'
+  const [pageIndex, setPageIndex] = useState(0)
   const closeSubscriptionModal = useCallback(() => setShowSubscriptionModal(false), [])
 
   const { user, refreshSubscription } = useAuth()
@@ -88,6 +90,7 @@ function ChapterDetail() {
   // Scroll to top on chapter change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
+    setPageIndex(0)
   }, [chapterId])
 
   // Close dropdown on click outside
@@ -438,6 +441,26 @@ function ChapterDetail() {
                 />
               )}
 
+              {/* Layout Toggle */}
+              <div className="reader-layout-toggle" style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '8px' }}>
+                <button 
+                  className={`btn-layout-toggle ${readerLayout === 'vertical' ? 'active' : ''}`}
+                  onClick={() => setReaderLayout('vertical')}
+                  title="Vertical scroll"
+                  style={{ background: readerLayout === 'vertical' ? 'rgba(255,255,255,0.15)' : 'transparent', border: 'none', color: '#fff', padding: '4px 8px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+                </button>
+                <button 
+                  className={`btn-layout-toggle ${readerLayout === 'single' ? 'active' : ''}`}
+                  onClick={() => setReaderLayout('single')}
+                  title="Single page"
+                  style={{ background: readerLayout === 'single' ? 'rgba(255,255,255,0.15)' : 'transparent', border: 'none', color: '#fff', padding: '4px 8px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+                </button>
+              </div>
+
               <button
                 className="btn-reader-nav"
                 onClick={() => setShowReportModal(true)}
@@ -492,6 +515,42 @@ function ChapterDetail() {
             <div style={{ padding: '80px 20px', color: '#64748b', textAlign: 'center' }}>
               <p style={{ fontSize: '36px', margin: '0 0 16px' }}>📖</p>
               <p>This chapter contains no images yet.</p>
+            </div>
+          ) : readerLayout === 'single' ? (
+            <div className="single-page-reader" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <ComicPageCanvas
+                key={`single-${pageIndex}`}
+                src={pages[pageIndex]}
+                pageIndex={pageIndex}
+                isEncrypted={false}
+                fallbackSrc="https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&q=80"
+                bubbles={selectedBubblesByPageNumber[pageIndex + 1]}
+              />
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '24px', paddingBottom: '24px' }}>
+                <button 
+                  className="btn-reader-secondary-action" 
+                  disabled={pageIndex === 0} 
+                  onClick={() => {
+                    setPageIndex(p => Math.max(0, p - 1))
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}
+                >
+                  ◀ Prev Page
+                </button>
+                <span style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', fontWeight: '500' }}>
+                  {pageIndex + 1} / {pages.length}
+                </span>
+                <button 
+                  className="btn-reader-secondary-action" 
+                  disabled={pageIndex === pages.length - 1} 
+                  onClick={() => {
+                    setPageIndex(p => Math.min(pages.length - 1, p + 1))
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}
+                >
+                  Next Page ▶
+                </button>
+              </div>
             </div>
           ) : (
             pages.map((imgUrl, index) => (
