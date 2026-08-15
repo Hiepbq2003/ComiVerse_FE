@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom';
 import '../../assets/style/translator/team-projects.css'
 import ModernButton from '../../components/common/ModernButton'
-import { getMyProjectTeamsApi, getAllProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
+import ModernPagination from '../../components/common/ModernPagination'
+import { getMyProjectTeamsApi, getMyProjectTeamsPageApi, getAllProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getAllSubmissionsApi } from '../../services/api/SubmissionApi'
 import { getAllComicsApi, getComicsPageApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi } from '../../services/api/ChapterApi'
@@ -154,7 +155,7 @@ function getTimeAgo(date) {
   return date.toLocaleDateString()
 }
 
-function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpenDetails, onQuickTranslate, onOpenEdit, isLeaderMatch }) {
+function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpenDetails, onQuickTranslate, onOpenEdit, isLeaderMatch, currentPage, totalPages, onPageChange }) {
   const handleExportProjects = () => {
     if (!teamProjectsList || teamProjectsList.length === 0) {
       return
@@ -313,6 +314,16 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
           ))
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
+          <ModernPagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={onPageChange}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -949,6 +960,11 @@ function TeamProjects() {
 
   const [projects, setProjects] = useState([])
   const [loadingProjects, setLoadingProjects] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [searchTerm, setSearchTerm] = useState('')
+  const ITEMS_PER_PAGE = 4
+
   const auth = getAuth()
   const authUser = auth?.user
   const userFullName = authUser?.fullName || authUser?.username || 'Translator'
@@ -957,9 +973,8 @@ function TeamProjects() {
   const fetchProjects = async (silent = false) => {
     try {
       if (!silent && projects.length === 0) setLoadingProjects(true)
-      const [myTeams, allTeams, allComicsRes, submissionsRes] = await Promise.all([
-        getMyProjectTeamsApi().catch(() => []),
-        getAllProjectTeamsApi().catch(() => []),
+      const [pageRes, allComicsRes, submissionsRes] = await Promise.all([
+        getMyProjectTeamsPageApi(currentPage, ITEMS_PER_PAGE, searchTerm).catch(() => ({ data: { data: { content: [], totalPages: 1 } } })),
         getAllComicsApi().catch(() => []),
         getAllSubmissionsApi().catch(() => [])
       ])
@@ -967,45 +982,16 @@ function TeamProjects() {
       const dbComics = allComicsRes?.data?.data || allComicsRes?.data || (Array.isArray(allComicsRes) ? allComicsRes : []);
       const dbSubs = submissionsRes?.data?.data || submissionsRes?.data || (Array.isArray(submissionsRes) ? submissionsRes : []);
 
-      const currentUserName = (userFullName || '').toLowerCase().trim();
-      const currentUsername = (authUser?.username || '').toLowerCase().trim();
+      const pageData = pageRes?.data?.data || pageRes?.data;
+      const fetchedProjects = pageData?.content || [];
+      const fetchedTotalPages = pageData?.totalPages || 1;
       
-      const combinedProjectsMap = new Map();
+      setTotalPages(fetchedTotalPages);
 
-      // 1. Add projects returned by backend getMyProjectTeamsApi
-      (myTeams || []).forEach(p => {
-        if (p && p.id) combinedProjectsMap.set(p.id, p);
-      });
-
-      // 2. Add projects from allTeams if current user is the leader
-      (allTeams || []).forEach(p => {
-        if (!p || !p.id) return;
-
-        const isLeader = (p.leaderName || '').toLowerCase().trim() === currentUserName || (p.leaderName || '').toLowerCase().trim() === currentUsername;
-        
-        // Restore local storage check so members who were approved locally can still see the project during testing
-        const localApprovedKey = `comiverse_approved_members_${p.id}`;
-        let savedMems = [];
-        try {
-          savedMems = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
-        } catch (e) {}
-
-        const isApprovedMember = savedMems.some(m => {
-          const mn = (m.name || '').toLowerCase().trim();
-          return mn === currentUserName || mn === currentUsername;
-        });
-
-        if (isLeader || isApprovedMember) {
-          combinedProjectsMap.set(p.id, p);
-        }
-      });
-
-      const finalProjectsList = Array.from(combinedProjectsMap.values()).map(p => {
-        // Real members count: backend usually counts the leader in members. If it's 0, assume at least 1 (the leader)
+      const finalProjectsList = fetchedProjects.map(p => {
         const realCount = Math.max(1, p.membersCount || 0);
         const maxCap = (Number(p.maxMembers) || 5) + 1;
 
-        // Recruitment status: Default to OPEN unless full or manually closed by leader
         const localStatusKey = `comiverse_is_recruiting_${p.id}`;
         const manualStatus = localStorage.getItem(localStatusKey);
 
@@ -1016,7 +1002,6 @@ function TeamProjects() {
           isRecruiting = p.isRecruiting;
         }
 
-        // Automatically close ONLY if team capacity is FULL
         if (realCount >= maxCap) {
           isRecruiting = false;
         }
@@ -1032,7 +1017,6 @@ function TeamProjects() {
       });
 
       setProjects(finalProjectsList)
-      setProjects(finalProjectsList)
     } catch (err) {
       console.error(err)
     } finally {
@@ -1041,10 +1025,12 @@ function TeamProjects() {
   }
 
   useEffect(() => {
-    fetchProjects();
-  }, [])
+    const timer = setTimeout(() => {
+      fetchProjects();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [currentPage, searchTerm])
 
-  const [searchTerm, setSearchTerm] = useState('')
   const [selectedDetails, setSelectedDetails] = useState(null)
   const [selectedEdit, setSelectedEdit] = useState(null)
   const [editForm, setEditForm] = useState({ description: '', status: 'Active', team: '' })
@@ -2410,6 +2396,9 @@ function TeamProjects() {
         onQuickTranslate={handleQuickTranslate}
         onOpenEdit={handleOpenEdit}
         isLeaderMatch={isLeaderMatch}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
       />
       {selectedEdit && (
         <EditProjectModal
