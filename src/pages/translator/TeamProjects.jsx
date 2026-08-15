@@ -972,6 +972,28 @@ function TeamProjects() {
 
   const [allMatchedTeams, setAllMatchedTeams] = useState([])
 
+  // Instant 0ms Load on Mount from Session Cache
+  useEffect(() => {
+    let hasCache = false
+    try {
+      const cached = sessionStorage.getItem('comiverse_projects_cache') || sessionStorage.getItem('comiverse_dash_cache')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        const list = Array.isArray(parsed) ? parsed : (parsed.projects || [])
+        if (Array.isArray(list) && list.length > 0) {
+          setAllMatchedTeams(list)
+          setProjects(list.slice(0, ITEMS_PER_PAGE))
+          setTotalPages(Math.max(1, Math.ceil(list.length / ITEMS_PER_PAGE)))
+          setLoadingProjects(false)
+          hasCache = true
+        }
+      }
+    } catch (e) {}
+
+    fetchProjects(hasCache)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Fast Instant Paging from memory
   useEffect(() => {
     if (allMatchedTeams.length > 0) {
@@ -998,12 +1020,11 @@ function TeamProjects() {
       const fetchComicsPromise = cachedComics.length > 0 ? Promise.resolve(cachedComics) : getAllComicsApi().catch(() => [])
       const fetchSubsPromise = cachedSubs.length > 0 ? Promise.resolve(cachedSubs) : getAllSubmissionsApi().catch(() => [])
 
-      const [pageRes, allComicsRes, submissionsRes, allTeamsRes, myTeamsRes] = await Promise.all([
-        getMyProjectTeamsPageApi(currentPage, ITEMS_PER_PAGE, searchTerm).catch(() => null),
-        fetchComicsPromise,
-        fetchSubsPromise,
+      const [allTeamsRes, myTeamsRes, allComicsRes, submissionsRes] = await Promise.all([
         getAllProjectTeamsApi().catch(() => []),
-        getMyProjectTeamsApi().catch(() => [])
+        getMyProjectTeamsApi().catch(() => []),
+        fetchComicsPromise,
+        fetchSubsPromise
       ])
 
       const dbComics = Array.isArray(allComicsRes) ? allComicsRes : (allComicsRes?.data?.data || allComicsRes?.data || cachedComics);
@@ -1093,6 +1114,11 @@ function TeamProjects() {
       setAllMatchedTeams(allMapped);
       const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
       setProjects(allMapped.slice(startIndex, startIndex + ITEMS_PER_PAGE));
+
+      // Cache to sessionStorage for instantaneous future tab switches
+      try {
+        sessionStorage.setItem('comiverse_projects_cache', JSON.stringify(allMapped))
+      } catch (e) {}
     } catch (err) {
       console.error(err)
     } finally {
@@ -1101,7 +1127,9 @@ function TeamProjects() {
   }
 
   useEffect(() => {
-    fetchProjects(allMatchedTeams.length > 0);
+    if (searchTerm) {
+      fetchProjects(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm])
 
