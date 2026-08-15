@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   ExternalLink,
@@ -8,10 +9,7 @@ import {
   XCircle,
   Clock,
   Sparkles,
-  User,
-  Layers,
-  AlertCircle,
-  FileText
+  AlertCircle
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
@@ -34,6 +32,20 @@ export default function ContentInspectionModal({
   // Real-time target metadata
   const [targetDetails, setTargetDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+
+  // 3D Parallax Mouse Response
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+
+  const handleMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 4; // subtle max 2deg tilt
+    const y = ((e.clientY - rect.top) / rect.height - 0.5) * -4;
+    setTilt({ x, y });
+  };
+
+  const handleMouseLeave = () => {
+    setTilt({ x: 0, y: 0 });
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -155,14 +167,19 @@ export default function ContentInspectionModal({
     }
   };
 
-  return (
+  const modalContent = (
     <div className="rep-modal-backdrop" onClick={onClose}>
       <div
         className="rep-modal-card"
-        style={{ maxWidth: '860px' }}
+        style={{
+          maxWidth: '860px',
+          transform: `perspective(1000px) rotateX(${tilt.y}deg) rotateY(${tilt.x}deg)`
+        }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
         onClick={e => e.stopPropagation()}
       >
-        {/* Modal Header */}
+        {/* Modal Header (Fixed) */}
         <div className="rep-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span className={`rep-target-badge ${targetType.toLowerCase()}`}>
@@ -175,7 +192,7 @@ export default function ContentInspectionModal({
           </button>
         </div>
 
-        {/* Modal Body */}
+        {/* Modal Body (Scrollable with Slim Scrollbar) */}
         <div className="rep-modal-body">
           {/* Reporter & Issue Summary Card */}
           <div className="rep-inspect-card">
@@ -365,79 +382,87 @@ export default function ContentInspectionModal({
               </p>
             </div>
           )}
+        </div>
 
-          {/* ── RESOLUTION FORM SECTION ── */}
-          <div className="rep-inspect-action-bar">
-            <label className="rep-form-label">
+        {/* Modal Footer (Pinned Bottom - Action Decision Bar) */}
+        <div className="rep-modal-footer">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--rep-text-primary)' }}>
               Moderator Action Decision:
-            </label>
-
-            <div className="rep-inspect-decision-buttons">
-              <button
-                type="button"
-                className={`rep-inspect-dec-btn ${actionType === 'ACCEPT' ? 'accept active' : 'accept'}`}
-                onClick={() => {
-                  setActionType('ACCEPT');
-                  setResolutionNote('Confirmed violation. Action taken to suspend comic / remove content.');
-                }}
-              >
-                <CheckCircle2 size={17} /> Accept Report (ACCEPT)
-              </button>
-
-              <button
-                type="button"
-                className={`rep-inspect-dec-btn ${actionType === 'REJECT' ? 'reject active' : 'reject'}`}
-                onClick={() => {
-                  setActionType('REJECT');
-                  setResolutionNote('');
-                }}
-              >
-                <XCircle size={17} /> Reject Report (REJECT)
-              </button>
-            </div>
-
+            </span>
             {actionType && (
-              <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
-                <div className="rep-form-group">
-                  <label className="rep-form-label">
-                    {actionType === 'ACCEPT' ? 'Action Summary / Resolution Note:' : 'Rejection Reason (Sent back to reporter):'}
-                  </label>
-                  <textarea
-                    className="rep-form-textarea"
-                    placeholder={
-                      actionType === 'ACCEPT'
-                        ? 'e.g., Suspended duplicate comic, notified author regarding policy guidelines...'
-                        : 'e.g., Verified content authenticity; no violation found based on submitted report...'
-                    }
-                    value={resolutionNote}
-                    onChange={e => setResolutionNote(e.target.value)}
-                    required={actionType === 'REJECT'}
-                    autoFocus
-                  />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                  <button
-                    type="button"
-                    className="rep-inspect-dec-btn ghost"
-                    style={{ flex: 'none', padding: '10px 20px' }}
-                    onClick={() => setActionType(null)}
-                    disabled={submitting}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className={`rep-inspect-dec-btn ${actionType === 'ACCEPT' ? 'accept active' : 'reject active'}`}
-                    style={{ flex: 'none', padding: '10px 24px' }}
-                    disabled={submitting}
-                  >
-                    {submitting ? 'Processing...' : (actionType === 'ACCEPT' ? 'Confirm Action' : 'Confirm Rejection')}
-                  </button>
-                </div>
-              </form>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: actionType === 'ACCEPT' ? '#22c55e' : '#ef4444' }}>
+                Mode: {actionType === 'ACCEPT' ? 'Approving Violation' : 'Rejecting Violation'}
+              </span>
             )}
           </div>
+
+          <div className="rep-inspect-decision-buttons">
+            <button
+              type="button"
+              className={`rep-inspect-dec-btn ${actionType === 'ACCEPT' ? 'accept active' : 'accept'}`}
+              onClick={() => {
+                setActionType('ACCEPT');
+                setResolutionNote('Confirmed violation. Action taken to suspend comic / remove content.');
+              }}
+            >
+              <CheckCircle2 size={17} /> Accept Report (ACCEPT)
+            </button>
+
+            <button
+              type="button"
+              className={`rep-inspect-dec-btn ${actionType === 'REJECT' ? 'reject active' : 'reject'}`}
+              onClick={() => {
+                setActionType('REJECT');
+                setResolutionNote('');
+              }}
+            >
+              <XCircle size={17} /> Reject Report (REJECT)
+            </button>
+          </div>
+
+          {actionType && (
+            <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+              <div className="rep-form-group">
+                <label className="rep-form-label">
+                  {actionType === 'ACCEPT' ? 'Action Summary / Resolution Note:' : 'Rejection Reason (Sent back to reporter):'}
+                </label>
+                <textarea
+                  className="rep-form-textarea"
+                  placeholder={
+                    actionType === 'ACCEPT'
+                      ? 'e.g., Suspended duplicate comic, notified author regarding policy guidelines...'
+                      : 'e.g., Verified content authenticity; no violation found based on submitted report...'
+                  }
+                  value={resolutionNote}
+                  onChange={e => setResolutionNote(e.target.value)}
+                  required={actionType === 'REJECT'}
+                  autoFocus
+                  style={{ minHeight: '75px' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="rep-inspect-dec-btn ghost"
+                  style={{ flex: 'none', padding: '9px 18px', fontSize: '13px' }}
+                  onClick={() => setActionType(null)}
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className={`rep-inspect-dec-btn ${actionType === 'ACCEPT' ? 'accept active' : 'reject active'}`}
+                  style={{ flex: 'none', padding: '9px 22px', fontSize: '13px' }}
+                  disabled={submitting}
+                >
+                  {submitting ? 'Processing...' : (actionType === 'ACCEPT' ? 'Confirm Action' : 'Confirm Rejection')}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
 
         {/* Lightbox zoomed preview */}
@@ -452,5 +477,8 @@ export default function ContentInspectionModal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
+
 

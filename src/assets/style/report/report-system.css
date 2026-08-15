@@ -1280,55 +1280,85 @@ html.light .rep-resolution-bar {
   border: 1px solid var(--rep-border);
   border-radius: 20px;
   width: 100%;
-  max-width: 600px;
-  box-shadow: var(--rep-shadow), var(--rep-glow);
+  max-width: 860px;
+  max-height: 90vh;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), 0 0 35px rgba(168, 85, 247, 0.18);
   overflow: hidden;
   display: flex;
   flex-direction: column;
   animation: repSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+  transform-style: preserve-3d;
 }
 
-@keyframes repSlideUp {
-  from { transform: translateY(20px) scale(0.97); opacity: 0; }
-  to { transform: translateY(0) scale(1); opacity: 1; }
+html.light .rep-modal-card {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.12), 0 8px 24px rgba(124, 58, 237, 0.08) !important;
 }
 
 .rep-modal-header {
-  padding: 20px 24px;
+  padding: 18px 24px;
   border-bottom: 1px solid var(--rep-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .rep-modal-header h3 {
   margin: 0;
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--rep-text-primary);
+  letter-spacing: -0.01em;
 }
 
 .rep-modal-body {
-  padding: 24px;
+  padding: 20px 24px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  max-height: 80vh;
+  gap: 16px;
   overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  max-height: calc(90vh - 160px);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}
+
+.rep-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.rep-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.rep-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 999px;
+}
+
+.rep-modal-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 85, 247, 0.6);
 }
 
 .rep-modal-footer {
   padding: 16px 24px;
   border-top: 1px solid var(--rep-border);
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  flex-direction: column;
   gap: 12px;
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(10, 6, 20, 0.6);
+  flex-shrink: 0;
+  border-bottom-left-radius: 20px;
+  border-bottom-right-radius: 20px;
 }
 
 html.light .rep-modal-footer {
-  background: rgba(0, 0, 0, 0.02);
+  background: #f8fafc !important;
+  border-top: 1px solid #e2e8f0 !important;
 }
 
 /* Form Groups */
@@ -1372,15 +1402,29 @@ html.light .rep-form-textarea {
 }
 
 .rep-form-textarea {
-  min-height: 100px;
+  min-height: 90px;
   resize: vertical;
+}
+
+/* Category Modal Horizontal 2-Column Grid */
+.rep-category-modal-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: 22px;
+  align-items: stretch;
+}
+
+@media (max-width: 768px) {
+  .rep-category-modal-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Role Selector Cards */
 .rep-role-cards {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .rep-role-card {
