@@ -1659,12 +1659,21 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
         ]),
         ['', '', '', ''],
         ['CATALOG COMICS SNAPSHOT', 'Comic Title', 'Author Name', 'Status | Chapters | Views'],
-        ...comics.slice(0, 50).map(c => [
-          'COMIC TITLE',
-          c.title || 'Untitled',
-          c.authorName || c.author || 'N/A',
-          `Status: ${c.moderationStatus || 'PUBLISHED'} | Chapters: ${c.chaptersCount || c.chapterCount || c.chapters?.length || 0} | Views: ${c.views || 0}`
-        ])
+        ...comics.slice(0, 50).map(c => {
+          let v = c.viewCount || c.views || c.totalViews || 0;
+          if (typeof v === 'string') {
+            let num = parseFloat(v.replace(/[^0-9.]/g, '')) || 0;
+            if (v.toUpperCase().includes('M')) num *= 1000000;
+            if (v.toUpperCase().includes('K')) num *= 1000;
+            v = num;
+          }
+          return [
+            'COMIC TITLE',
+            c.title || 'Untitled',
+            c.authorName || c.author || 'N/A',
+            `Status: ${c.moderationStatus || 'PUBLISHED'} | Chapters: ${c.chaptersCount || c.chapterCount || c.chapters?.length || 0} | Views: ${v}`
+          ];
+        })
       ];
 
       exportToCsv('ComiVerse_Moderator_Dashboard_Report', headers, rows);
