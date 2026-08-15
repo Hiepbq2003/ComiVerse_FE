@@ -104,6 +104,30 @@ function ChapterDetail() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Keyboard navigation for Single Page Mode
+  useEffect(() => {
+    if (readerLayout !== 'single') return
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'd') {
+        if (pageIndex < pages.length - 1) {
+          setPageIndex((p) => p + 1)
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        } else if (hasNextChapter) {
+          handleGoToNextChapter()
+        }
+      } else if (e.key === 'ArrowLeft' || e.key === 'a') {
+        if (pageIndex > 0) {
+          setPageIndex((p) => p - 1)
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        } else if (hasPrevChapter) {
+          handleGoToPrevChapter()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [readerLayout, pageIndex, pages.length, hasNextChapter, hasPrevChapter])
+
   // Fetch API details or fall back to mock
   useEffect(() => {
     const fetchChapterAndComicInfo = async () => {
@@ -442,20 +466,18 @@ function ChapterDetail() {
               )}
 
               {/* Layout Toggle */}
-              <div className="reader-layout-toggle" style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '8px' }}>
+              <div className="reader-layout-toggle">
                 <button 
                   className={`btn-layout-toggle ${readerLayout === 'vertical' ? 'active' : ''}`}
                   onClick={() => setReaderLayout('vertical')}
-                  title="Vertical scroll"
-                  style={{ background: readerLayout === 'vertical' ? 'rgba(255,255,255,0.15)' : 'transparent', border: 'none', color: '#fff', padding: '4px 8px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  data-tooltip="Vertical scroll"
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
                 </button>
                 <button 
                   className={`btn-layout-toggle ${readerLayout === 'single' ? 'active' : ''}`}
                   onClick={() => setReaderLayout('single')}
-                  title="Single page"
-                  style={{ background: readerLayout === 'single' ? 'rgba(255,255,255,0.15)' : 'transparent', border: 'none', color: '#fff', padding: '4px 8px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  data-tooltip="Single page"
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
                 </button>
@@ -517,7 +539,25 @@ function ChapterDetail() {
               <p>This chapter contains no images yet.</p>
             </div>
           ) : readerLayout === 'single' ? (
-            <div className="single-page-reader" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div className="premium-single-page-wrapper">
+              {/* Left Navigation Zone */}
+              <div 
+                className="premium-page-nav-zone left" 
+                onClick={() => {
+                  if (pageIndex > 0) {
+                    setPageIndex(p => Math.max(0, p - 1))
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  } else if (hasPrevChapter) {
+                    handleGoToPrevChapter()
+                  }
+                }}
+              >
+                <div className="premium-page-nav-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </div>
+              </div>
+
+              {/* Main Image Canvas */}
               <ComicPageCanvas
                 key={`single-${pageIndex}`}
                 src={pages[pageIndex]}
@@ -526,30 +566,28 @@ function ChapterDetail() {
                 fallbackSrc="https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&q=80"
                 bubbles={selectedBubblesByPageNumber[pageIndex + 1]}
               />
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '24px', paddingBottom: '24px' }}>
-                <button 
-                  className="btn-reader-secondary-action" 
-                  disabled={pageIndex === 0} 
-                  onClick={() => {
-                    setPageIndex(p => Math.max(0, p - 1))
-                    window.scrollTo({ top: 0, behavior: 'smooth' })
-                  }}
-                >
-                  ◀ Prev Page
-                </button>
-                <span style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', fontWeight: '500' }}>
-                  {pageIndex + 1} / {pages.length}
-                </span>
-                <button 
-                  className="btn-reader-secondary-action" 
-                  disabled={pageIndex === pages.length - 1} 
-                  onClick={() => {
+
+              {/* Right Navigation Zone */}
+              <div 
+                className="premium-page-nav-zone right" 
+                onClick={() => {
+                  if (pageIndex < pages.length - 1) {
                     setPageIndex(p => Math.min(pages.length - 1, p + 1))
                     window.scrollTo({ top: 0, behavior: 'smooth' })
-                  }}
-                >
-                  Next Page ▶
-                </button>
+                  } else if (hasNextChapter) {
+                    handleGoToNextChapter()
+                  }
+                }}
+              >
+                <div className="premium-page-nav-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </div>
+              </div>
+
+              {/* Premium Floating Page Counter */}
+              <div className="premium-page-counter">
+                <span style={{ opacity: 0.7 }}>Page</span>
+                <span>{pageIndex + 1} <span style={{ opacity: 0.5 }}>/</span> {pages.length}</span>
               </div>
             </div>
           ) : (
