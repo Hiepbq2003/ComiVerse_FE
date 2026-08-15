@@ -106,20 +106,6 @@ function ChapterDetail() {
     setPageIndex(0)
   }, [chapterId, scrollToViewer])
 
-  // Preload next 3 images
-  useEffect(() => {
-    if (!pages || pages.length === 0) return
-
-    const preloadCount = 3
-    for (let i = 1; i <= preloadCount; i++) {
-      const nextIndex = pageIndex + i
-      if (nextIndex < pages.length) {
-        const img = new Image()
-        img.src = pages[nextIndex]
-      }
-    }
-  }, [pageIndex, pages])
-
   // Close dropdowns on click outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -354,6 +340,21 @@ function ChapterDetail() {
   }
 
   const pages = currentChapter.images || []
+
+  // Preload next 3 images
+  useEffect(() => {
+    if (!pages || pages.length === 0) return
+
+    const preloadCount = 3
+    for (let i = 1; i <= preloadCount; i++) {
+      const nextIndex = pageIndex + i
+      if (nextIndex < pages.length) {
+        const img = new Image()
+        img.src = pages[nextIndex]
+      }
+    }
+  }, [pageIndex, pages])
+
   // The backend decides access by returning chapter images only to authorized users.
   // Do not trust a possibly stale local premium flag when rendering the lock state.
   const isPremiumLocked = Boolean(
