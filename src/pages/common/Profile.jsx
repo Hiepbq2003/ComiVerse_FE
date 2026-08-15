@@ -44,6 +44,7 @@ const ROLE_NOTIFICATION_OPTIONS = {
   ] }],
 
   AUTHOR: [{ title: 'Author Hub', options: [
+    { key: 'SUBMISSION_STATUS', label: 'Submission status', description: 'Approval, rejection, and change requests for your submitted work.' },
     { key: 'AUTHOR_REVIEWS', label: 'Review Notifications', description: 'Get notified when a reader posts a review on your series.' },
     { key: 'AUTHOR_CHAPTER_UPDATES', label: 'Chapter Updates', description: 'Receive updates about chapter approvals and translation status.' },
     { key: 'AUTHOR_WEEKLY_DIGEST', label: 'Weekly digest report', description: 'Receive an email summary of page views and subscriber milestones.' },
@@ -357,6 +358,7 @@ function Profile({ user: userProp }) {
   const [transBio, setTransBio] = useState('')
   const [isTranslator, setIsTranslator] = useState(false)
   const [cvUploading, setCvUploading] = useState(false)
+  const [authorCopyrightDoc, setAuthorCopyrightDoc] = useState('')
 
   const [notifSettings, setNotifSettings] = useState({})
   const [availableNotifKeys, setAvailableNotifKeys] = useState([])
@@ -421,7 +423,7 @@ function Profile({ user: userProp }) {
     if (!file) return
     const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
     if (!isPdf) {
-      toast.warn('🚫 Invalid file format! Only PDF documents (.pdf) are accepted for CV uploads.')
+      toast.warn('🚫 Invalid file format! Only PDF documents (.pdf) are accepted.')
       e.target.value = ''
       return
     }
@@ -435,12 +437,17 @@ function Profile({ user: userProp }) {
       const uploadResult = await uploadFileApi(file)
       const uploadedUrl = typeof uploadResult === 'string' ? uploadResult : uploadResult?.url || uploadResult?.fileUrl || null
       if (uploadedUrl) {
-        setTransCvUrl(uploadedUrl)
-        toast.success('CV / Resume document uploaded successfully!')
+        if (roleUpper === 'AUTHOR') {
+          setAuthorCopyrightDoc(uploadedUrl)
+          toast.success('Copyright document uploaded successfully!')
+        } else {
+          setTransCvUrl(uploadedUrl)
+          toast.success('CV / Resume document uploaded successfully!')
+        }
       }
     } catch (err) {
-      console.error('CV upload error:', err)
-      toast.error('Failed to upload CV document.')
+      console.error('Upload error:', err)
+      toast.error('Failed to upload document.')
     } finally {
       setCvUploading(false)
     }
@@ -959,6 +966,49 @@ function Profile({ user: userProp }) {
                         Linked to your account Full Name for legal copyright protection. Contact support to change this identity.
                       </small>
                     </div>
+
+                    {/* Copyright Document Upload */}
+                    <div className="profile-input-group" style={{ marginTop: '16px' }}>
+                      <label>Copyright Registration Document (PDF)</label>
+                      <div className="profile-cv-box">
+                        <div className="profile-cv-doc-info">
+                          <span className="profile-cv-icon">📄</span>
+                          <div>
+                            {authorCopyrightDoc ? (
+                              <>
+                                <a
+                                  href={authorCopyrightDoc}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="profile-cv-link"
+                                >
+                                  View Uploaded Copyright Document ↗
+                                </a>
+                                <p className="profile-cv-badge">✓ Active and verified for publishing</p>
+                              </>
+                            ) : (
+                              <span className="profile-cv-empty-text">No document attached. Upload a PDF for copyright verification.</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <label
+                          htmlFor="author-copyright-file-input"
+                          className="profile-cv-upload-btn"
+                          style={{ background: 'var(--mod-purple)', borderColor: 'var(--mod-purple)' }}
+                        >
+                          {cvUploading ? 'Uploading...' : authorCopyrightDoc ? 'Replace Document' : 'Upload PDF'}
+                        </label>
+                        <input
+                          id="author-copyright-file-input"
+                          type="file"
+                          accept="application/pdf,.pdf"
+                          style={{ display: 'none' }}
+                          onChange={handleCvUpload}
+                          disabled={cvUploading}
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -1139,7 +1189,7 @@ function Profile({ user: userProp }) {
               ) : (
                 <form onSubmit={handleSaveNotifSettings}>
                   {[...(ROLE_NOTIFICATION_OPTIONS[roleUpper] || []), ...COMMON_NOTIFICATION_OPTIONS].map(section => {
-                    const options = section.options.filter(option => availableNotifKeys.includes(option.key))
+                    const options = section.options
                     if (options.length === 0) return null
                     return (
                       <div className="profile-notif-group" key={section.title}>
@@ -1150,16 +1200,13 @@ function Profile({ user: userProp }) {
                               <strong>{option.label}</strong>
                               <p>{option.description}</p>
                             </div>
-                            <label className="profile-switch">
+                            <label className="profile-toggle">
                               <input
                                 type="checkbox"
-                                checked={notifSettings[option.key] !== false}
-                                onChange={() => setNotifSettings(prev => ({
-                                  ...prev,
-                                  [option.key]: !(prev[option.key] !== false)
-                                }))}
+                                checked={notifSettings[option.key] || false}
+                                onChange={() => handleToggleNotifSetting(option.key)}
                               />
-                              <span className="profile-slider" />
+                              <span className="profile-toggle-slider" />
                             </label>
                           </div>
                         ))}
