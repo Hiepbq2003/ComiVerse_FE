@@ -155,7 +155,30 @@ function getTimeAgo(date) {
   return date.toLocaleDateString()
 }
 
-function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpenDetails, onQuickTranslate, onOpenEdit, isLeaderMatch, currentPage, totalPages, onPageChange }) {
+function ProjectsListView({
+  teamProjectsList,
+  searchTerm,
+  onSearchChange,
+  sourceLang,
+  onSourceLangChange,
+  targetLang,
+  onTargetLangChange,
+  statusFilter,
+  onStatusFilterChange,
+  roleFilter,
+  onRoleFilterChange,
+  availableSourceLangs,
+  availableTargetLangs,
+  onResetFilters,
+  totalResults,
+  onOpenDetails,
+  onQuickTranslate,
+  onOpenEdit,
+  isLeaderMatch,
+  currentPage,
+  totalPages,
+  onPageChange
+}) {
   const handleExportProjects = () => {
     if (!teamProjectsList || teamProjectsList.length === 0) {
       return
@@ -194,6 +217,8 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
     exportToCsv('ComiVerse_Translation_Projects_Export', headers, rows)
   }
 
+  const hasActiveFilters = Boolean(searchTerm || sourceLang || targetLang || statusFilter || roleFilter)
+
   return (
     <div className="fade-in">
       <div className="translator-page-header">
@@ -205,8 +230,8 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
           <input
             type="text"
             className="trans-form-input"
-            placeholder="Search translation projects..."
-            style={{ width: '250px' }}
+            placeholder="Search comics, teams, leaders..."
+            style={{ width: '280px' }}
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
           />
@@ -239,11 +264,161 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
         </div>
       </div>
 
+      {/* Advanced Filter Toolbar */}
+      <div
+        className="translator-filter-toolbar"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          flexWrap: 'wrap',
+          marginBottom: '20px',
+          padding: '12px 18px',
+          background: 'rgba(255, 255, 255, 0.03)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '16px',
+          backdropFilter: 'blur(10px)'
+        }}
+      >
+        {/* Source Language Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Origin:</span>
+          <select
+            className="trans-form-select"
+            value={sourceLang}
+            onChange={(e) => onSourceLangChange(e.target.value)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '10px',
+              background: 'rgba(10, 6, 18, 0.85)',
+              border: sourceLang ? '1px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.15)',
+              color: sourceLang ? '#c084fc' : '#cbd5e1',
+              fontSize: '13px',
+              cursor: 'pointer',
+              outline: 'none',
+              fontWeight: sourceLang ? '700' : '500'
+            }}
+          >
+            <option value="" style={{ background: '#120d24', color: '#fff' }}>🌐 All Source Languages</option>
+            {availableSourceLangs.map(l => (
+              <option key={l} value={l} style={{ background: '#120d24', color: '#fff' }}>{l}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Target Language Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Target:</span>
+          <select
+            className="trans-form-select"
+            value={targetLang}
+            onChange={(e) => onTargetLangChange(e.target.value)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '10px',
+              background: 'rgba(10, 6, 18, 0.85)',
+              border: targetLang ? '1px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.15)',
+              color: targetLang ? '#c084fc' : '#cbd5e1',
+              fontSize: '13px',
+              cursor: 'pointer',
+              outline: 'none',
+              fontWeight: targetLang ? '700' : '500'
+            }}
+          >
+            <option value="" style={{ background: '#120d24', color: '#fff' }}>🎯 All Target Languages</option>
+            {availableTargetLangs.map(l => (
+              <option key={l} value={l} style={{ background: '#120d24', color: '#fff' }}>{l}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Status / Recruiting Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status:</span>
+          <select
+            className="trans-form-select"
+            value={statusFilter}
+            onChange={(e) => onStatusFilterChange(e.target.value)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '10px',
+              background: 'rgba(10, 6, 18, 0.85)',
+              border: statusFilter ? '1px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.15)',
+              color: statusFilter ? '#c084fc' : '#cbd5e1',
+              fontSize: '13px',
+              cursor: 'pointer',
+              outline: 'none',
+              fontWeight: statusFilter ? '700' : '500'
+            }}
+          >
+            <option value="" style={{ background: '#120d24', color: '#fff' }}>⚡ All Statuses</option>
+            <option value="RECRUITING" style={{ background: '#120d24', color: '#fff' }}>🟢 Open for Recruiting</option>
+            <option value="CLOSED" style={{ background: '#120d24', color: '#fff' }}>🔒 Full / Closed</option>
+            <option value="ACTIVE" style={{ background: '#120d24', color: '#fff' }}>✅ Active Status</option>
+            <option value="PAUSED" style={{ background: '#120d24', color: '#fff' }}>⏸️ Paused</option>
+          </select>
+        </div>
+
+        {/* Role Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Role:</span>
+          <select
+            className="trans-form-select"
+            value={roleFilter}
+            onChange={(e) => onRoleFilterChange(e.target.value)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '10px',
+              background: 'rgba(10, 6, 18, 0.85)',
+              border: roleFilter ? '1px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.15)',
+              color: roleFilter ? '#c084fc' : '#cbd5e1',
+              fontSize: '13px',
+              cursor: 'pointer',
+              outline: 'none',
+              fontWeight: roleFilter ? '700' : '500'
+            }}
+          >
+            <option value="" style={{ background: '#120d24', color: '#fff' }}>👑 All Roles</option>
+            <option value="LEADER" style={{ background: '#120d24', color: '#fff' }}>⭐ Led by Me</option>
+            <option value="MEMBER" style={{ background: '#120d24', color: '#fff' }}>👥 Member Only</option>
+          </select>
+        </div>
+
+        {/* Reset Filter button */}
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={onResetFilters}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '10px',
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              color: '#fca5a5',
+              fontSize: '12px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            ✕ Reset Filters
+          </button>
+        )}
+
+        {/* Total Results Counter */}
+        <div style={{ marginLeft: 'auto', fontSize: '13px', color: '#94a3b8', fontWeight: '600', whiteSpace: 'nowrap' }}>
+          Found: <span style={{ color: '#c084fc', fontWeight: '700' }}>{totalResults}</span> teams
+        </div>
+      </div>
+
       <div className="trans-projects-list">
         {teamProjectsList.length === 0 ? (
           <div className="translator-empty-state">
             <h3>No translation projects found</h3>
-            <p>Change your search filters and try again.</p>
+            <p>Change your search or language filters and try again.</p>
           </div>
         ) : (
           teamProjectsList.map(proj => (
@@ -963,6 +1138,10 @@ function TeamProjects() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [searchTerm, setSearchTerm] = useState('')
+  const [sourceLang, setSourceLang] = useState('')
+  const [targetLang, setTargetLang] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [roleFilter, setRoleFilter] = useState('')
   const ITEMS_PER_PAGE = 4
 
   const auth = getAuth()
@@ -982,8 +1161,6 @@ function TeamProjects() {
         const list = Array.isArray(parsed) ? parsed : (parsed.projects || [])
         if (Array.isArray(list) && list.length > 0) {
           setAllMatchedTeams(list)
-          setProjects(list.slice(0, ITEMS_PER_PAGE))
-          setTotalPages(Math.max(1, Math.ceil(list.length / ITEMS_PER_PAGE)))
           setLoadingProjects(false)
           hasCache = true
         }
@@ -994,14 +1171,121 @@ function TeamProjects() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Fast Instant Paging from memory
+  // Dynamic Available Language Options
+  const availableSourceLangs = useMemo(() => {
+    const langs = new Set(['Korean', 'Japanese', 'Chinese', 'English', 'Vietnamese'])
+    allMatchedTeams.forEach(t => {
+      if (t.sourceLang && t.sourceLang !== '-' && t.sourceLang !== 'Any') {
+        langs.add(t.sourceLang.trim())
+      }
+    })
+    return Array.from(langs).sort()
+  }, [allMatchedTeams])
+
+  const availableTargetLangs = useMemo(() => {
+    const langs = new Set(['Vietnamese', 'English', 'Japanese', 'Chinese', 'Korean'])
+    allMatchedTeams.forEach(t => {
+      if (t.targetLang && t.targetLang !== '-' && t.targetLang !== 'Any') {
+        langs.add(t.targetLang.trim())
+      }
+    })
+    return Array.from(langs).sort()
+  }, [allMatchedTeams])
+
+  // Instant In-Memory Multi-Field Filtering
+  const filteredProjects = useMemo(() => {
+    const cleanSearch = (searchTerm || '').toLowerCase().trim()
+    const currentUserName = (user.fullName || '').toLowerCase().trim()
+    const currentUsername = (user.username || '').toLowerCase().trim()
+    const currentUserId = user.id || user.userId
+
+    return allMatchedTeams.filter(p => {
+      // 1. Search Query
+      if (cleanSearch) {
+        const titleMatch = (p.title || '').toLowerCase().includes(cleanSearch)
+        const teamMatch = (p.team || '').toLowerCase().includes(cleanSearch)
+        const leaderMatch = (p.leaderName || '').toLowerCase().includes(cleanSearch)
+        const comicNameMatch = (p.comicName || '').toLowerCase().includes(cleanSearch)
+        if (!titleMatch && !teamMatch && !leaderMatch && !comicNameMatch) return false
+      }
+
+      // 2. Source Language Filter
+      if (sourceLang) {
+        const sLang = (p.sourceLang || '').toLowerCase().trim()
+        if (sLang !== sourceLang.toLowerCase().trim()) return false
+      }
+
+      // 3. Target Language Filter
+      if (targetLang) {
+        const tLang = (p.targetLang || '').toLowerCase().trim()
+        if (tLang !== targetLang.toLowerCase().trim()) return false
+      }
+
+      // 4. Status Filter
+      if (statusFilter) {
+        if (statusFilter === 'RECRUITING' && !p.isRecruiting) return false
+        if (statusFilter === 'CLOSED' && p.isRecruiting) return false
+        if (statusFilter === 'ACTIVE' && (p.status || 'ACTIVE').toUpperCase() !== 'ACTIVE') return false
+        if (statusFilter === 'PAUSED' && (p.status || '').toUpperCase() !== 'PAUSED') return false
+      }
+
+      // 5. Role Filter
+      if (roleFilter) {
+        const leaderName = (p.leaderName || '').toLowerCase().trim()
+        const leaderId = p.leaderId || p.createdById
+        const isLeader = (currentUserName && leaderName === currentUserName) ||
+                         (currentUsername && leaderName === currentUsername) ||
+                         (currentUserId && leaderId === currentUserId)
+
+        if (roleFilter === 'LEADER' && !isLeader) return false
+        if (roleFilter === 'MEMBER' && isLeader) return false
+      }
+
+      return true
+    })
+  }, [allMatchedTeams, searchTerm, sourceLang, targetLang, statusFilter, roleFilter, user])
+
+  // Sync Paging State instantly
   useEffect(() => {
-    if (allMatchedTeams.length > 0) {
-      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
-      const pageSlice = allMatchedTeams.slice(startIndex, startIndex + ITEMS_PER_PAGE)
-      setProjects(pageSlice)
-    }
-  }, [currentPage, allMatchedTeams])
+    const totalPagesCalc = Math.max(1, Math.ceil(filteredProjects.length / ITEMS_PER_PAGE))
+    setTotalPages(totalPagesCalc)
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+    setProjects(filteredProjects.slice(startIndex, startIndex + ITEMS_PER_PAGE))
+  }, [filteredProjects, currentPage])
+
+  const handleResetFilters = () => {
+    setSearchTerm('')
+    setSourceLang('')
+    setTargetLang('')
+    setStatusFilter('')
+    setRoleFilter('')
+    setCurrentPage(1)
+  }
+
+  const handleSearchChange = (val) => {
+    setSearchTerm(val)
+    setCurrentPage(1)
+  }
+
+  const handleSourceLangChange = (val) => {
+    setSourceLang(val)
+    setCurrentPage(1)
+  }
+
+  const handleTargetLangChange = (val) => {
+    setTargetLang(val)
+    setCurrentPage(1)
+  }
+
+  const handleStatusFilterChange = (val) => {
+    setStatusFilter(val)
+    setCurrentPage(1)
+  }
+
+  const handleRoleFilterChange = (val) => {
+    setRoleFilter(val)
+    setCurrentPage(1)
+  }
 
   const fetchProjects = async (silent = false) => {
     try {
@@ -1049,7 +1333,6 @@ function TeamProjects() {
       const currentUserName = (user.fullName || '').toLowerCase().trim();
       const currentUsername = (user.username || '').toLowerCase().trim();
       const currentUserId = user.id || user.userId;
-      const cleanSearch = (searchTerm || '').toLowerCase().trim();
 
       const filtered = allTeams.filter(p => {
         const leaderName = (p.leaderName || '').toLowerCase().trim();
@@ -1069,19 +1352,8 @@ function TeamProjects() {
           return (currentUserName && mn === currentUserName) || (currentUsername && mn === currentUsername);
         }) || (Array.isArray(p.members) && p.members.some(m => m.userId === currentUserId || (m.name || '').toLowerCase().trim() === currentUserName));
 
-        const userMatched = isLeader || isApprovedMember;
-        if (!userMatched) return false;
-
-        if (cleanSearch) {
-          const titleMatch = (p.title || p.name || '').toLowerCase().includes(cleanSearch);
-          const comicMatch = (p.comicName || p.comicTitle || '').toLowerCase().includes(cleanSearch);
-          return titleMatch || comicMatch;
-        }
-        return true;
+        return isLeader || isApprovedMember;
       });
-
-      const totalCalculatedPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
-      setTotalPages(totalCalculatedPages);
 
       const allMapped = filtered.map(p => {
         const realCount = Math.max(1, p.membersCount || 0);
@@ -1112,8 +1384,6 @@ function TeamProjects() {
       });
 
       setAllMatchedTeams(allMapped);
-      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-      setProjects(allMapped.slice(startIndex, startIndex + ITEMS_PER_PAGE));
 
       // Cache to sessionStorage for instantaneous future tab switches
       try {
@@ -1125,13 +1395,6 @@ function TeamProjects() {
       setLoadingProjects(false)
     }
   }
-
-  useEffect(() => {
-    if (searchTerm) {
-      fetchProjects(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm])
 
   const [selectedDetails, setSelectedDetails] = useState(null)
   const [selectedEdit, setSelectedEdit] = useState(null)
@@ -2399,70 +2662,92 @@ function TeamProjects() {
         announcements={announcements}
         onLikePost={handleLikePost}
         onTogglePinPost={handleTogglePinPost}
-        onDeletePost={handleDeletePost}
-        onEditPost={handleEditPost}
-        onAddComment={handleAddComment}
-        onLikeComment={handleLikeComment}
-        onEditComment={handleEditComment}
-        onDeleteComment={handleDeleteComment}
-        comicName={comicName}
-        tasks={boardTasks}
-        activeTasks={activeTasks}
-        pausedTasks={pausedTasks}
-        lockedColumns={lockedColumns}
-        setLockedColumns={setLockedColumns}
-        highlightedColumns={highlightedColumns}
-        setHighlightedColumns={setHighlightedColumns}
-        sortedColumns={sortedColumns}
-        setSortedColumns={setSortedColumns}
-        openDropdownCol={openDropdownCol}
-        setOpenDropdownCol={setOpenDropdownCol}
-        onCreateTaskClick={openCreateTaskModal}
-        onMoveAllToDone={handleMoveAllToDone}
-        onMoveTask={handleMoveTask}
-        onOpenTaskDetails={handleOpenTaskDetails}
-        getAssigneeInitials={getAssigneeInitials}
-        showCreateTask={showCreateTask}
-        newTaskData={newTaskData}
-        setNewTaskData={setNewTaskData}
-        chapterOptions={chapterOptions}
-        teamMembersForAssign={teamMembersForAssign}
-        onCancelCreateTask={() => setShowCreateTask(false)}
-        onCreateTask={handleCreateTask}
-        selectedTask={selectedTask}
-        editTaskData={editTaskData}
-        setEditTaskData={setEditTaskData}
-        onCancelEditTask={() => setSelectedTask(null)}
-        onSaveEditTask={handleSaveEditTask}
-        onContinueToWorkspace={() => navigate(`/translator/translate-workspace/task/${selectedTask.id}`)}
-        onContinueToReviewWorkspace={() => navigate(`/translator/review-workspace/task/${selectedTask.id}`)}
-        onSaveWorkspaceSettings={handleSaveWorkspaceSettings}
-      />
-      {banModalData && (
-        <BanUserModal
-          modalData={banModalData}
-          teamName={selectedDetails?.teamName || selectedDetails?.title || 'this team'}
-          onClose={() => setBanModalData(null)}
-          onConfirm={handleConfirmBanUser}
+        <ProjectWorkspace
+          selectedDetails={selectedDetails}
+          onBack={() => {
+            setSelectedDetails(null);
+            setWorkspaceTab('home');
+          }}
+          workspaceTab={workspaceTab}
+          setWorkspaceTab={setWorkspaceTab}
+          loadingWorkspace={loadingWorkspace}
+          userFullName={userFullName}
+          authUser={authUser}
+          announcements={announcements}
+          newPostText={newPostText}
+          setNewPostText={setNewPostText}
+          onPostAnnouncement={handlePostAnnouncement}
+          onTogglePinPost={handleTogglePinPost}
+          onEditPost={handleEditPost}
+          onDeletePost={handleDeletePost}
+          onAddComment={handleAddComment}
+          onLikeComment={handleLikeComment}
+          onEditComment={handleEditComment}
+          onDeleteComment={handleDeleteComment}
+          joinRequests={joinRequests}
+          onAcceptJoinRequest={handleAcceptJoinRequest}
+          onRejectJoinRequest={handleRejectJoinRequest}
+          onBanUserFromRequest={handleOpenBanModal}
+          members={members}
+          onRemoveMember={handleRemoveMember}
+          onBanMember={handleOpenBanModal}
+          onUnbanUser={handleOpenUnbanModal}
+          bannedUsers={bannedUsers}
+          memberSearch={memberSearch}
+          setMemberSearch={setMemberSearch}
+          tasksLoading={tasksLoading}
+          tasks={tasks}
+          lockedColumns={lockedColumns}
+          setLockedColumns={setLockedColumns}
+          highlightedColumns={highlightedColumns}
+          setHighlightedColumns={setHighlightedColumns}
+          sortedColumns={sortedColumns}
+          setSortedColumns={setSortedColumns}
+          openDropdownCol={openDropdownCol}
+          setOpenDropdownCol={setOpenDropdownCol}
+          onCreateTaskClick={openCreateTaskModal}
+          onMoveAllToDone={handleMoveAllToDone}
+          onMoveTask={handleMoveTask}
+          onOpenTaskDetails={handleOpenTaskDetails}
+          getAssigneeInitials={getAssigneeInitials}
+          showCreateTask={showCreateTask}
+          newTaskData={newTaskData}
+          setNewTaskData={setNewTaskData}
+          chapterOptions={chapterOptions}
+          teamMembersForAssign={teamMembersForAssign}
+          onCancelCreateTask={() => setShowCreateTask(false)}
+          onCreateTask={handleCreateTask}
+          selectedTask={selectedTask}
+          editTaskData={editTaskData}
+          setEditTaskData={setEditTaskData}
+          onCancelEditTask={() => setSelectedTask(null)}
+          onSaveEditTask={handleSaveEditTask}
+          onContinueToWorkspace={() => navigate(`/translator/translate-workspace/task/${selectedTask.id}`)}
+          onContinueToReviewWorkspace={() => navigate(`/translator/review-workspace/task/${selectedTask.id}`)}
+          onSaveWorkspaceSettings={handleSaveWorkspaceSettings}
         />
-      )}
-      {unbanModalData && (
-        <UnbanUserModal
-          modalData={unbanModalData}
-          teamName={selectedDetails?.teamName || selectedDetails?.title || 'this team'}
-          onClose={() => setUnbanModalData(null)}
-          onConfirm={handleConfirmUnbanUser}
-        />
-      )}
-    </>
-  )
-}
+        {banModalData && (
+          <BanUserModal
+            modalData={banModalData}
+            teamName={selectedDetails?.teamName || selectedDetails?.title || 'this team'}
+            onClose={() => setBanModalData(null)}
+            onConfirm={handleConfirmBanUser}
+          />
+        )}
+        {unbanModalData && (
+          <UnbanUserModal
+            modalData={unbanModalData}
+            teamName={selectedDetails?.teamName || selectedDetails?.title || 'this team'}
+            onClose={() => setUnbanModalData(null)}
+            onConfirm={handleConfirmUnbanUser}
+          />
+        )}
+      </>
+    )
+  }
 
   const handleQuickTranslate = async (proj) => {
     try {
-      // Always fetch the live task list from the API — tasks are no longer
-      // cached in localStorage/sessionStorage, so this always reflects the
-      // current database state.
       let taskList = [];
       try {
         const tRes = await getTeamTasksApi(proj.id);
@@ -2476,7 +2761,6 @@ function TeamProjects() {
 
       const targetTaskId = targetTask?.id || `task-${proj.id}`;
 
-      // Pre-warm workspace cache to avoid 0-page flickering
       const rawComicTitle = proj.comicName || proj.title || 'Comic';
       const cleanTitle = targetTask?.title || `${rawComicTitle} - Chapter 1 - Translation`;
       const chId = targetTask?.chapterId || `ch-${proj.id}-1`;
@@ -2518,7 +2802,19 @@ function TeamProjects() {
       <ProjectsListView
         teamProjectsList={teamProjectsList}
         searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
+        onSearchChange={handleSearchChange}
+        sourceLang={sourceLang}
+        onSourceLangChange={handleSourceLangChange}
+        targetLang={targetLang}
+        onTargetLangChange={handleTargetLangChange}
+        statusFilter={statusFilter}
+        onStatusFilterChange={handleStatusFilterChange}
+        roleFilter={roleFilter}
+        onRoleFilterChange={handleRoleFilterChange}
+        availableSourceLangs={availableSourceLangs}
+        availableTargetLangs={availableTargetLangs}
+        onResetFilters={handleResetFilters}
+        totalResults={filteredProjects.length}
         onOpenDetails={handleOpenDetails}
         onQuickTranslate={handleQuickTranslate}
         onOpenEdit={handleOpenEdit}
