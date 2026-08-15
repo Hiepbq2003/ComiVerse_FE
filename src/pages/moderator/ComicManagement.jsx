@@ -119,8 +119,8 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
             const updateDate = new Date(targetTime);
             const now = new Date();
             if (comicTimeFilter === 'Updated Today') {
-              const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-              matchesTime = updateDate >= oneDayAgo;
+              const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+              matchesTime = updateDate >= startOfToday;
             } else if (comicTimeFilter === 'Updated Last 7 Days') {
               const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
               matchesTime = updateDate >= sevenDaysAgo;

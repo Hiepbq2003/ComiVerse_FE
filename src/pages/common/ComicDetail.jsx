@@ -350,75 +350,23 @@ function ComicDetail() {
   return (
     <HomeLayout>
       {/* BACKGROUND BANNER */}
-      <div
-        className="comic-detail-hero"
-        style={{
-          position: 'relative',
-          minHeight: '380px',
-          display: 'flex',
-          alignItems: 'flex-end',
-          padding: '40px 10%',
-          overflow: 'hidden',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
-        }}
-      >
+      <div className="comic-detail-hero comic-detail-wrapper">
         {isEmoji(displayCover) ? (
           <div className="hero-banner-bg-emoji-fallback" style={{ zIndex: 0 }}>{displayCover}</div>
         ) : (
           <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              backgroundImage: `url(${displayCover})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center 25%',
-              filter: 'brightness(0.15) blur(10px)',
-              transform: 'scale(1.1)',
-              zIndex: 0
-            }}
+            className="hero-banner-bg-img"
+            style={{ backgroundImage: `url(${displayCover})` }}
           />
         )}
-        <div
-          className="detail-banner-gradient"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'linear-gradient(to top, var(--color-bg-dark) 0%, transparent 100%)',
-            zIndex: 1
-          }}
-        />
+        <div className="hero-banner-gradient" />
 
         {/* COMIC MAIN METADATA CARD */}
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 2,
-            display: 'flex',
-            gap: '40px',
-            width: '100%',
-            alignItems: 'center',
-            flexWrap: 'wrap'
-          }}
-        >
+        <div className="comic-detail-main-card">
           {/* Cover */}
-          <div
-            className="comic-detail-cover"
-            style={{
-              width: '200px',
-              height: '280px',
-              borderRadius: '16px',
-              overflow: 'hidden',
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(168, 85, 247, 0.15)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'rgba(255, 255, 255, 0.03)'
-            }}
-          >
+          <div className="comic-detail-cover">
             {isEmoji(displayCover) ? (
-              <div style={{ fontSize: '7rem', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at center, rgba(168, 85, 247, 0.2) 0%, rgba(13, 9, 25, 0.98) 100%)' }}>{displayCover}</div>
+              <div style={{ fontSize: '7rem', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at center, rgba(168, 85, 247, 0.2) 0%, var(--reader-bg) 100%)' }}>{displayCover}</div>
             ) : (
               <img src={displayCover} alt={displayTitle} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             )}
@@ -427,90 +375,44 @@ function ComicDetail() {
           {/* Details */}
           <div style={{ flex: '1', minWidth: '300px' }}>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-              <span
-                style={{
-                  background: 'rgba(168, 85, 247, 0.15)',
-                  border: '1px solid rgba(168, 85, 247, 0.3)',
-                  color: '#c084fc',
-                  padding: '4px 12px',
-                  borderRadius: '12px',
-                  fontSize: '12px',
-                  fontWeight: '600'
-                }}
-              >
+              <span className="detail-status-badge">
                 {displayStatus}
               </span>
               {displayGenres.map((genre, idx) => (
-                <span
-                  key={idx}
-                  className="detail-genre-tag"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.06)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                    color: '#cbd5e1',
-                    padding: '4px 12px',
-                    borderRadius: '12px',
-                    fontSize: '12px',
-                    fontWeight: '500'
-                  }}
-                >
+                <span key={idx} className="detail-genre-tag">
                   {genre}
                 </span>
               ))}
             </div>
 
-            <h1
-              className="detail-title"
-              style={{
-                fontFamily: 'var(--font-serif)',
-                fontSize: '42px',
-                fontWeight: '700',
-                margin: '0 0 8px',
-                color: 'white',
-                lineHeight: '1.2'
-              }}
-            >
+            <h1 className="detail-title">
               {displayTitle}
             </h1>
 
-            <p className="detail-author-artist" style={{ margin: '0 0 16px', color: '#94a3b8', fontSize: '15px' }}>
-              Story by <strong style={{ color: 'white' }}>{displayAuthor}</strong>  •  Art by <strong style={{ color: 'white' }}>{displayArtist}</strong>
+            <p className="detail-author-artist">
+              Story by <strong>{displayAuthor}</strong>  •  Art by <strong>{displayArtist}</strong>
             </p>
 
             {/* Stats Row */}
-            <div
-              className="detail-stats-card"
-              style={{
-                display: 'flex',
-                gap: '24px',
-                marginBottom: '24px',
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid rgba(255, 255, 255, 0.05)',
-                padding: '12px 20px',
-                borderRadius: '12px',
-                width: 'max-content',
-                maxWidth: '100%',
-                boxSizing: 'border-box'
-              }}
-            >
+            <div className="detail-stats-card">
               <div style={{ textAlign: 'center' }}>
-                <span className="detail-stats-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Rating</span>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#fbbf24' }}>⭐ {displayRating}</span>
+                <span className="detail-stats-label">Rating</span>
+                <span className="detail-stats-value" style={{ color: '#fbbf24' }}>⭐ {displayRating}</span>
               </div>
-              <div className="detail-stats-divider" style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+              <div className="detail-stats-divider" />
               <div style={{ textAlign: 'center' }}>
-                <span className="detail-stats-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Views</span>
-                <span className="detail-stats-value" style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>👁️ {displayViews}</span>
+                <span className="detail-stats-label">Views</span>
+                <span className="detail-stats-value">👁️ {displayViews}</span>
               </div>
-              <div className="detail-stats-divider" style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+              <div className="detail-stats-divider" />
               <div style={{ textAlign: 'center' }}>
-                <span className="detail-stats-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Likes</span>
-                <span className="detail-stats-value" style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>❤️ {displayLikes}</span>
+                <span className="detail-stats-label">Likes</span>
+                <span className="detail-stats-value">❤️ {displayLikes}</span>
               </div>
-              <div className="detail-stats-divider" style={{ width: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+              <div className="detail-stats-divider" />
               <div style={{ textAlign: 'center' }}>
-                <span className="detail-stats-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Bookmarks</span>
-                <span className="detail-stats-value" style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>🔖 {displayBookmarks}</span>
+                <span className="detail-stats-label">Bookmarks</span>
+                <span className="detail-stats-value">🔖 {displayBookmarks}</span>
               </div>
             </div>
 
@@ -525,35 +427,22 @@ function ComicDetail() {
               </button>
               <button
                 onClick={handleAddToLibrary}
-                className="btn-hero-outline detail-action-btn"
-                style={{ padding: '12px 24px', fontSize: '15px', borderColor: inLibrary ? '#10b981' : 'rgba(255, 255, 255, 0.15)', color: inLibrary ? '#10b981' : 'white' }}
+                className="detail-action-btn"
+                style={{ borderColor: inLibrary ? 'var(--reader-green)' : '', color: inLibrary ? 'var(--reader-green)' : '' }}
               >
                 {inLibrary ? '✓ Saved to Library' : '🔖 Add to Library'}
               </button>
               <button
                 onClick={handleToggleLike}
-                className="btn-hero-outline detail-action-btn"
-                style={{
-                  padding: '12px 24px',
-                  fontSize: '15px',
-                  borderColor: isLiked ? '#ec4899' : 'rgba(255, 255, 255, 0.15)',
-                  color: isLiked ? '#ec4899' : 'white'
-                }}
+                className="detail-action-btn"
+                style={{ borderColor: isLiked ? 'var(--reader-pink)' : '', color: isLiked ? 'var(--reader-pink)' : '' }}
               >
                 {isLiked ? '❤️ Liked' : '🤍 Like'}
               </button>
               <button
                 onClick={() => setShowReportModal(true)}
-                className="btn-hero-outline detail-action-btn"
-                style={{
-                  padding: '12px 20px',
-                  fontSize: '15px',
-                  borderColor: 'rgba(239, 68, 68, 0.3)',
-                  color: '#f87171',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
+                className="detail-action-btn"
+                style={{ borderColor: 'rgba(239, 68, 68, 0.3)', color: '#f87171', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
                 title="Report issues with this comic or upload"
               >
                 <Flag size={16} /> Report
@@ -584,58 +473,29 @@ function ComicDetail() {
       </div>
 
       {/* CONTENT BODY */}
-      <div className="home-sections-container" style={{ padding: '40px 10%' }}>
+      <div className="home-sections-container comic-detail-wrapper" style={{ padding: '40px 10%' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr', gap: '40px' }}>
 
           {/* Left Column: Description + Chapters / Reviews */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
 
             {/* Synopsis */}
-            <div className="detail-synopsis-card" style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', padding: '24px', borderRadius: '16px' }}>
-              <h3 className="detail-section-title" style={{ margin: '0 0 12px', fontSize: '18px', color: 'white' }}>Synopsis</h3>
-              <p className="detail-synopsis-text" style={{ margin: 0, fontSize: '15px', color: '#cbd5e1', lineHeight: '1.6' }}>{displaySummary}</p>
+            <div className="detail-synopsis-card">
+              <h3 className="detail-section-title">Synopsis</h3>
+              <p className="detail-synopsis-text">{displaySummary}</p>
             </div>
 
             {/* Tabs Selector */}
-            <div
-              className="detail-tabs-selector"
-              style={{
-                display: 'flex',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-                gap: '24px'
-              }}
-            >
+            <div className="detail-tabs-selector">
               <button
                 onClick={() => setActiveTab('chapters')}
                 className={`detail-tab-btn ${activeTab === 'chapters' ? 'active' : ''}`}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: activeTab === 'chapters' ? '2px solid #a855f7' : '2px solid transparent',
-                  color: activeTab === 'chapters' ? 'white' : '#94a3b8',
-                  padding: '12px 8px',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
               >
                 Chapters ({chapters.length})
               </button>
               <button
                 onClick={() => setActiveTab('comments')}
                 className={`detail-tab-btn ${activeTab === 'comments' ? 'active' : ''}`}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: activeTab === 'comments' ? '2px solid #a855f7' : '2px solid transparent',
-                  color: activeTab === 'comments' ? 'white' : '#94a3b8',
-                  padding: '12px 8px',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
               >
                 Comments
               </button>
@@ -682,25 +542,6 @@ function ComicDetail() {
                     <div
                       key={ch.id || ch.chapterNumber}
                       className={`detail-chapter-row ${isRead ? 'read' : ''} ${isPremium ? 'premium' : ''}`}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '15.5px 20px',
-                        background: isRead
-                          ? 'rgba(168, 85, 247, 0.04)'
-                          : isPremium
-                          ? 'rgba(245, 158, 11, 0.05)'
-                          : 'rgba(255, 255, 255, 0.02)',
-                        border: isRead
-                          ? '1px solid rgba(168, 85, 247, 0.25)'
-                          : isPremium
-                          ? '1px solid rgba(245, 158, 11, 0.3)'
-                          : '1px solid rgba(255, 255, 255, 0.04)',
-                        borderRadius: '10px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
                       onClick={() => {
                         if (isPremium) {
                           const auth = getAuth()
@@ -804,43 +645,27 @@ function ComicDetail() {
 
           {/* Right Column: Sidebar (About / Artist / Info) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div
-              className="detail-info-card"
-              style={{
-                background: 'var(--reader-card-bg)',
-                border: '1px solid var(--reader-card-border)',
-                padding: '24px',
-                borderRadius: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px'
-              }}
-            >
-              <h3 className="detail-info-title" style={{ margin: 0, fontSize: '16px', color: 'white', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '8px' }}>Comic Info</h3>
-
-              <div>
-                <span className="detail-info-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Author</span>
-                <span className="detail-info-value" style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayAuthor}</span>
+            <div className="detail-info-card">
+              <h3 className="detail-section-title" style={{ borderBottom: '1px solid var(--reader-border)', paddingBottom: '12px' }}>Comic Info</h3>
+              <div className="detail-info-item">
+                <span>Author</span>
+                <strong>{displayAuthor}</strong>
               </div>
-
-              <div>
-                <span className="detail-info-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Artist</span>
-                <span className="detail-info-value" style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayArtist}</span>
+              <div className="detail-info-item">
+                <span>Artist</span>
+                <strong>{displayArtist}</strong>
               </div>
-
-              <div>
-                <span className="detail-info-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Original Language</span>
-                <span className="detail-info-value" style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayLanguage}</span>
+              <div className="detail-info-item">
+                <span>Original Language</span>
+                <strong>{displayLanguage}</strong>
               </div>
-
-              <div>
-                <span className="detail-info-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Status</span>
-                <span className="detail-info-value" style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{displayStatus}</span>
+              <div className="detail-info-item">
+                <span>Status</span>
+                <strong>{displayStatus}</strong>
               </div>
-
-              <div>
-                <span className="detail-info-label" style={{ display: 'block', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Publish Date</span>
-                <span className="detail-info-value" style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>Jan 12, 2025</span>
+              <div className="detail-info-item">
+                <span>Publish Date</span>
+                <strong>Jan 12, 2025</strong>
               </div>
             </div>
           </div>
