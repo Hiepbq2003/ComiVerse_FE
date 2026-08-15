@@ -60,152 +60,7 @@ const ROLE_NOTIFICATION_OPTIONS = {
   ] }],
 }
 
-// ── ROLE-SPECIFIC STATISTICS COMPONENTS ────────────────────────────
 
-function ReaderStats({ stats, loading }) {
-  if (loading) {
-    return (
-      <div className="profile-stats-list">
-        <div style={{ color: 'var(--profile-text-muted)', fontSize: '13px', textAlign: 'center', padding: '8px 0' }}>
-          Loading stats...
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="profile-stats-list">
-      <div className="profile-stats-row">
-        <span>Comics liked</span>
-        <span className="profile-stats-value">{(stats?.likedCount ?? 0).toLocaleString()}</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Comics saved</span>
-        <span className="profile-stats-value">{(stats?.savedCount ?? 0).toLocaleString()}</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Comics read</span>
-        <span className="profile-stats-value">{(stats?.readCount ?? 0).toLocaleString()}</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Comics rated</span>
-        <span className="profile-stats-value">{(stats?.ratingCount ?? 0).toLocaleString()}</span>
-      </div>
-    </div>
-  )
-}
-
-function TranslatorStats({ teams = [], loading = false }) {
-  if (loading) {
-    return (
-      <div className="profile-stats-list">
-        <div className="profile-stats-row"><span>Comics translated</span><span className="profile-stats-value">...</span></div>
-        <div className="profile-stats-row"><span>Chapters translated</span><span className="profile-stats-value">...</span></div>
-        <div className="profile-stats-row"><span>Group members</span><span className="profile-stats-value">...</span></div>
-      </div>
-    )
-  }
-
-  const uniqueComics = new Set(teams.map(t => (t.comicName || t.comic_name || t.title || '').toLowerCase().trim()).filter(Boolean)).size
-  const totalChapters = teams.reduce((acc, t) => acc + (Number(t.chaptersCount || t.chapters_count) || 0), 0)
-  const totalMembers = teams.reduce((acc, t) => acc + (Number(t.membersCount || t.members_count) || 1), 0)
-
-  return (
-    <div className="profile-stats-list">
-      <div className="profile-stats-row">
-        <span>Comics translated</span>
-        <span className="profile-stats-value">{uniqueComics}</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Chapters translated</span>
-        <span className="profile-stats-value">{totalChapters}</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Group members</span>
-        <span className="profile-stats-value">{totalMembers}</span>
-      </div>
-    </div>
-  )
-}
-
-function ProjectLeaderStats({ teams = [], loading = false }) {
-  if (loading) {
-    return (
-      <div className="profile-stats-list">
-        <div className="profile-stats-row"><span>Projects led</span><span className="profile-stats-value">...</span></div>
-        <div className="profile-stats-row"><span>Active teams</span><span className="profile-stats-value">...</span></div>
-        <div className="profile-stats-row"><span>Chapters delivered</span><span className="profile-stats-value">...</span></div>
-      </div>
-    )
-  }
-
-  const projectsLed = teams.length
-  const activeTeams = teams.filter(t => (t.status || 'Active').toLowerCase() === 'active').length
-  const totalChaptersDelivered = teams.reduce((acc, t) => acc + (Number(t.chaptersCount || t.chapters_count) || 0), 0)
-
-  return (
-    <div className="profile-stats-list">
-      <div className="profile-stats-row">
-        <span>Projects led</span>
-        <span className="profile-stats-value">{projectsLed}</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Active teams</span>
-        <span className="profile-stats-value">{activeTeams}</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Chapters delivered</span>
-        <span className="profile-stats-value">{totalChaptersDelivered}</span>
-      </div>
-    </div>
-  )
-}
-
-function AuthorStats() {
-  return (
-    <div className="profile-stats-list">
-      <div className="profile-stats-row">
-        <span className="profile-stats-value" style={{ fontSize: '14px', color: 'var(--text)' }}>No statistics available yet.</span>
-      </div>
-    </div>
-  )
-}
-
-function ModeratorStats({ assignedLanguages = [], user }) {
-  const langs = Array.isArray(assignedLanguages) ? assignedLanguages : [];
-
-  const isGlobal = isScopeGlobal(langs, user);
-
-  return (
-    <div className="profile-stats-list">
-      <div className="profile-stats-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '6px' }}>
-        <span>Assigned Scope</span>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-          {isGlobal ? (
-            <span className="profile-lang-chip">🌐 All Languages</span>
-          ) : langs.length > 0 ? (
-            langs.map(l => (
-              <span key={l} className="profile-lang-chip">🌐 {l}</span>
-            ))
-          ) : (
-            <span className="profile-lang-chip" style={{ opacity: 0.7 }}>Not Assigned</span>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function AdminStats() {
-  return (
-    <div className="profile-stats-list">
-      <div className="profile-stats-row">
-        <span>Assigned Scope</span>
-        <span className="profile-stats-value">Full System</span>
-      </div>
-    </div>
-  )
-}
 
 // Main profile page
 
@@ -637,25 +492,7 @@ function Profile({ user: userProp }) {
     }
   }
 
-  // Render stats dynamically based on role
-  const renderStats = () => {
-    switch (roleUpper) {
-      case 'ADMIN':
-        return <AdminStats />
-      case 'AUTHOR':
-        return <AuthorStats />
-      case 'MODERATOR':
-        return <ModeratorStats assignedLanguages={assignedLanguages} user={user} />
-      case 'TRANSLATOR':
-        return <TranslatorStats teams={projectTeams} loading={projectTeamsLoading} />
-      case 'PROJECT_LEADER':
-        return <ProjectLeaderStats teams={projectTeams} loading={projectTeamsLoading} />
-      case 'READER':
-      case 'USER':
-      default:
-        return <ReaderStats stats={interactionCounts} loading={statsLoading} />
-    }
-  }
+
 
   // Helper for role details
   const getRoleInfo = () => {
@@ -810,11 +647,7 @@ function Profile({ user: userProp }) {
               )}
             </div>
 
-            {/* Stats Block */}
-            <div className="profile-stats-card">
-              <h4 className="profile-stats-title">Stats</h4>
-              {renderStats()}
-            </div>
+
           </div>
         </div>
 

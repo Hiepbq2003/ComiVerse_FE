@@ -1093,12 +1093,27 @@ function TeamProjects() {
       if (updated) setSelectedDetails(updated)
     } else if (projects && projects.length > 0) {
       const stateTeamId = location.state?.teamId
-      const targetId = stateTeamId || localStorage.getItem('comiverse_active_project_id')
-      if (targetId) {
-        const matching = projects.find(p => String(p.id) === String(targetId))
-        if (matching) {
-          handleOpenDetails(matching, location.state?.tab || 'home')
+      const stateTeamName = location.state?.teamName
+      let matching = null;
+      if (stateTeamId) {
+        matching = projects.find(p => String(p.id) === String(stateTeamId))
+      } else if (stateTeamName) {
+        const matchName = stateTeamName.toLowerCase().trim();
+        matching = projects.find(p => {
+          const pTitle = p.title ? p.title.toLowerCase().trim() : '';
+          const pComicName = p.comicName ? p.comicName.toLowerCase().trim() : '';
+          return pTitle === matchName || pComicName === matchName;
+        })
+      }
+      if (!matching) {
+        const targetId = localStorage.getItem('comiverse_active_project_id')
+        if (targetId) {
+          matching = projects.find(p => String(p.id) === String(targetId))
         }
+      }
+      
+      if (matching) {
+        handleOpenDetails(matching, location.state?.tab || 'home')
       }
     }
   }, [projects, location.state])
@@ -1448,9 +1463,15 @@ function TeamProjects() {
   useEffect(() => {
     if (loadingProjects) return
     const targetTeamId = location.state?.teamId
-    if (!targetTeamId) return
-
-    const targetProject = projects.find(p => p.id === targetTeamId)
+    const targetTeamName = location.state?.teamName
+    const targetProject = projects.find(p => {
+      if (p.id === targetTeamId) return true;
+      if (!targetTeamName) return false;
+      const matchName = targetTeamName.toLowerCase().trim();
+      const pTitle = p.title ? p.title.toLowerCase().trim() : '';
+      const pComicName = p.comicName ? p.comicName.toLowerCase().trim() : '';
+      return pTitle === matchName || pComicName === matchName;
+    });
     if (targetProject) {
       handleOpenDetails(targetProject).then(() => {
         const targetTab = location.state?.tab || 'home';

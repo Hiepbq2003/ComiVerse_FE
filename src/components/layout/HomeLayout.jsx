@@ -75,16 +75,28 @@ function HomeLayout({ children }) {
     try {
       await handleMarkAsRead(notification.id, notification.isRead)
     } finally {
-      if (isTeamNotif) {
-        setShowNotificationDropdown(false)
-        if (user?.role === 'PROJECT_LEADER' || user?.role === 'TRANSLATOR') {
-          navigate('/translator/project-teams');
-        } else {
-          navigate('/admin/project-teams');
-        }
-      } else if (hasNavigation) {
+      if (hasNavigation) {
         setShowNotificationDropdown(false)
         navigate(actionUrl)
+      } else if (isTeamNotif) {
+        setShowNotificationDropdown(false)
+        
+        let teamName = null;
+        const messageRaw = notification.message || '';
+        if (text.includes('assigned as project leader')) {
+          const match = messageRaw.match(/responsible for (.*?)(?: \([^)]+\))?\.$/i);
+          if (match) teamName = match[1].trim();
+        } else if (text.includes('team join request')) {
+          const match = messageRaw.match(/requested to join (.*?)\.$/i);
+          if (match) teamName = match[1].trim();
+        }
+
+        if (user?.role === 'PROJECT_LEADER' || user?.role === 'TRANSLATOR') {
+          navigate('/translator/project-teams', { state: { teamName } });
+        } else {
+          // Fallback if other roles somehow get this notification
+          navigate('/translator/project-teams', { state: { teamName } });
+        }
       }
     }
   }

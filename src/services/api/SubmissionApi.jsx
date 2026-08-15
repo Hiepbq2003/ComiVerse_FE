@@ -27,3 +27,11 @@ export const getSubmissionCommentsApi = (id) => {
 export const saveSubmissionCommentsApi = (id, comments) => {
   return AxiosClient.post(`/submissions/${id}/comments`, { comments });
 };
+
+export const claimSubmissionApi = (id) => {
+  return AxiosClient.put(`/submissions/${id}/claim`);
+};
+
+export const releaseSubmissionApi = (id) => {
+  return AxiosClient.put(`/submissions/${id}/release`);
+};

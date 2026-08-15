@@ -41,14 +41,26 @@ function TranslatorLayout({ children }) {
     } else {
       if (action.unread) await markAsRead(action.id)
 
-      const text = `${action.title || ''} ${action.message || ''}`.toLowerCase();
-      if (text.includes('assigned as project leader') || text.includes('team join request')) {
-        navigate('/translator/project-teams');
+      if (action.actionUrl?.startsWith('/') && !action.actionUrl.startsWith('//')) {
+        navigate(action.actionUrl);
         return;
       }
 
-      if (action.actionUrl?.startsWith('/') && !action.actionUrl.startsWith('//')) {
-        navigate(action.actionUrl)
+      const text = `${action.title || ''} ${action.message || ''}`.toLowerCase();
+      const messageRaw = action.message || '';
+      
+      if (text.includes('assigned as project leader')) {
+        const match = messageRaw.match(/responsible for (.*?)(?: \([^)]+\))?\.$/i);
+        const teamName = match ? match[1].trim() : null;
+        navigate('/translator/project-teams', { state: { teamName } });
+        return;
+      }
+      
+      if (text.includes('team join request')) {
+        const match = messageRaw.match(/requested to join (.*?)\.$/i);
+        const teamName = match ? match[1].trim() : null;
+        navigate('/translator/project-teams', { state: { teamName } });
+        return;
       }
     }
   }

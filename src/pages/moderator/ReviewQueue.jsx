@@ -19,6 +19,7 @@ import { exportToCsv } from '../../utils/exportToCsv'
 import { toast } from 'react-toastify'
 import { getAuth } from '../../utils/Auth'
 import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
+import { claimSubmissionApi, releaseSubmissionApi } from '../../services/api/SubmissionApi'
 
 const cleanReasonText = (reason) => {
   if (!reason) return '';
@@ -1044,6 +1045,25 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     return groupedItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
   }, [groupedItems, currentPage]);
 
+  // ── Release claim when closing review modal without approve/reject ──
+  const handleCloseReviewModal = useCallback(async () => {
+    if (selectedReview && selectedReview.status === 'pending') {
+      const submissionIds = selectedReview.subItems
+        ? selectedReview.subItems.map(si => si.id || si.submissionId).filter(Boolean)
+        : [selectedReview.id || selectedReview.submissionId].filter(Boolean);
+      const firstValidId = submissionIds.find(sid => sid && !String(sid).startsWith('comic-') && !String(sid).startsWith('group-'));
+      if (firstValidId) {
+        try {
+          await releaseSubmissionApi(firstValidId);
+        } catch (err) {
+          console.warn('[Release API] Non-blocking error:', err?.message);
+        }
+      }
+    }
+    setSelectedReview(null);
+    setSelectedChapter(null);
+  }, [selectedReview])
+
   const onApproveClick = (groupOrItem) => {
     const targetId = typeof groupOrItem === 'string' ? groupOrItem : (groupOrItem.id || groupOrItem);
     const itemsToApprove = typeof groupOrItem === 'object' && groupOrItem.subItems ? groupOrItem.subItems : [{ id: targetId, ...groupOrItem }];
@@ -1603,6 +1623,33 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
   }, [paginatedItems]);
 
   const handleOpenReviewModal = async (item) => {
+    // ── Claim Ticket: try to claim this submission before reviewing ──
+    if (item.status === 'pending') {
+      const submissionIds = item.subItems
+        ? item.subItems.map(si => si.id || si.submissionId).filter(Boolean)
+        : [item.id || item.submissionId].filter(Boolean);
+      
+      const firstValidId = submissionIds.find(sid => sid && !String(sid).startsWith('comic-') && !String(sid).startsWith('group-'));
+      if (firstValidId) {
+        try {
+          const claimRes = await claimSubmissionApi(firstValidId);
+          if (claimRes?.data?.success === false || claimRes?.success === false) {
+            const msg = claimRes?.data?.message || claimRes?.message || 'This submission is being reviewed by another moderator.';
+            toast.warning(msg);
+            return; // Don't open the modal
+          }
+        } catch (claimErr) {
+          if (claimErr?.response?.status === 409) {
+            const msg = claimErr?.response?.data?.message || 'This submission is currently being reviewed by another moderator.';
+            toast.warning(msg);
+            return; // Don't open the modal
+          }
+          // Non-409 errors (e.g. network) — proceed anyway as a fallback
+          console.warn('[Claim API] Non-blocking error:', claimErr?.message);
+        }
+      }
+    }
+
     setSelectedReview(item);
     setPageIndex(0);
     setFetchingChapters(true);
@@ -2005,37 +2052,62 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
 
               <div className="submission-right-side">
                 <div className="submission-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <ModernButton 
-                    variant={2} 
-                    label={item.isComicAppealItem ? "📄 Review Appeal" : (item.status === 'rejected' ? "👁 View Evidence" : "👁 View Content")} 
-                    className="btn-review"
-                    onClick={() => {
-                      if (item.isComicAppealItem) {
-                        setSelectedAppealComic(item);
-                        setIsAppealModalOpen(true);
-                      } else {
-                        handleOpenReviewModal(item);
-                      }
-                    }} 
-                  />
+                  {(() => {
+                    const currentUser = getAuth()?.user;
+                    // Note: If reviewerId exists and is not the current user, it's claimed by someone else.
+                    // We assume it's valid if it's returned by the backend (backend handles the 30min expiry).
+                    const isClaimedByOther = item.reviewerId && item.reviewerId !== currentUser?.id;
+                    const isClaimedByMe = item.reviewerId && item.reviewerId === currentUser?.id;
 
-                  {item.status === 'pending' && (
-                    <>
-                      <ModernButton 
-                        variant={2} 
-                        label="✓ Approve All" 
-                        className="btn-approve"
-                        onClick={() => onApproveClick(item)} 
-                      />
+                    if (isClaimedByOther && item.status === 'pending') {
+                      return (
+                        <div style={{ padding: '8px 12px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#f59e0b', borderRadius: '8px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '16px' }}>🔒</span> Reviewing: {item.reviewerName || 'Another Mod'}
+                        </div>
+                      );
+                    }
 
-                      <ModernButton 
-                        variant={2} 
-                        label="✗ Reject All" 
-                        className="btn-reject"
-                        onClick={() => onOpenReject(item)} 
-                      />
-                    </>
-                  )}
+                    return (
+                      <>
+                        {isClaimedByMe && item.status === 'pending' && (
+                          <div style={{ padding: '6px 10px', background: 'rgba(139, 92, 246, 0.1)', color: 'var(--author-primary, #8b5cf6)', borderRadius: '6px', fontSize: '12px', fontWeight: '700', marginRight: '4px' }}>
+                            Your Claim
+                          </div>
+                        )}
+                        <ModernButton 
+                          variant={2} 
+                          label={item.isComicAppealItem ? "📄 Review Appeal" : (item.status === 'rejected' ? "👁 View Evidence" : "👁 View Content")} 
+                          className="btn-review"
+                          onClick={() => {
+                            if (item.isComicAppealItem) {
+                              setSelectedAppealComic(item);
+                              setIsAppealModalOpen(true);
+                            } else {
+                              handleOpenReviewModal(item);
+                            }
+                          }} 
+                        />
+
+                        {item.status === 'pending' && (
+                          <>
+                            <ModernButton 
+                              variant={2} 
+                              label="✓ Approve All" 
+                              className="btn-approve"
+                              onClick={() => onApproveClick(item)} 
+                            />
+
+                            <ModernButton 
+                              variant={2} 
+                              label="✗ Reject All" 
+                              className="btn-reject"
+                              onClick={() => onOpenReject(item)} 
+                            />
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -2117,7 +2189,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
 
                   <button 
                     className="mod-inspector-close-btn" 
-                    onClick={() => { setSelectedReview(null); setSelectedChapter(null); }}
+                    onClick={handleCloseReviewModal}
                     title="Close Viewer"
                   >
                     ×
@@ -2438,7 +2510,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                           <ModernButton 
                             variant={2} 
                             label="Close Viewer" 
-                            onClick={() => { setSelectedReview(null); setSelectedChapter(null); }}
+                            onClick={handleCloseReviewModal}
                           />
                         </div>
                       </div>
