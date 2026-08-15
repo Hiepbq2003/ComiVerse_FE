@@ -17,6 +17,7 @@ import { useAuth } from '../../context/AuthContext'
 import SubscriptionPlanModal from '../../components/common/SubscriptionPlanModal'
 import ReportSubmitModal from '../../components/report/ReportSubmitModal'
 import { Flag } from 'lucide-react'
+import '../../assets/style/reader/comic-detail.css'
 
 // Import assets
 import comicAction from '../../assets/comic_action.png'
@@ -349,33 +350,33 @@ function ComicDetail() {
 
   return (
     <HomeLayout>
-      {/* BACKGROUND BANNER */}
-      <div className="comic-detail-hero comic-detail-wrapper">
-        {isEmoji(displayCover) ? (
-          <div className="hero-banner-bg-emoji-fallback" style={{ zIndex: 0 }}>{displayCover}</div>
-        ) : (
+      {/* HERO BANNER SECTION */}
+      <div className="comic-detail-hero-section">
+        {/* Blurred Backdrop Image */}
+        {displayCover && !isEmoji(displayCover) && (
           <div
-            className="hero-banner-bg-img"
+            className="hero-backdrop-img"
             style={{ backgroundImage: `url(${displayCover})` }}
           />
         )}
-        <div className="hero-banner-gradient" />
+        <div className="hero-backdrop-overlay" />
 
-        {/* COMIC MAIN METADATA CARD */}
-        <div className="comic-detail-main-card">
+        {/* HERO CONTENT */}
+        <div className="comic-detail-hero-content">
           {/* Cover */}
-          <div className="comic-detail-cover">
+          <div className="comic-detail-cover-wrapper">
             {isEmoji(displayCover) ? (
-              <div style={{ fontSize: '7rem', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at center, rgba(168, 85, 247, 0.2) 0%, var(--reader-bg) 100%)' }}>{displayCover}</div>
+              <div className="comic-detail-emoji-cover">{displayCover}</div>
             ) : (
-              <img src={displayCover} alt={displayTitle} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={displayCover} alt={displayTitle} />
             )}
           </div>
 
-          {/* Details */}
-          <div style={{ flex: '1', minWidth: '300px' }}>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-              <span className="detail-status-badge">
+          {/* Info Block */}
+          <div className="hero-info-block">
+            {/* Badges Row */}
+            <div className="hero-badges-row">
+              <span className="hero-status-badge">
                 {displayStatus}
               </span>
               {displayGenres.map((genre, idx) => (
@@ -385,64 +386,62 @@ function ComicDetail() {
               ))}
             </div>
 
-            <h1 className="detail-title">
+            {/* Title */}
+            <h1 className="hero-comic-title">
               {displayTitle}
             </h1>
 
-            <p className="detail-author-artist">
-              Story by <strong>{displayAuthor}</strong>  •  Art by <strong>{displayArtist}</strong>
+            {/* Credits */}
+            <p className="hero-comic-credits">
+              Story by <strong>{displayAuthor}</strong> • Art by <strong>{displayArtist}</strong>
             </p>
 
-            {/* Stats Row */}
-            <div className="detail-stats-card">
-              <div style={{ textAlign: 'center' }}>
-                <span className="detail-stats-label">Rating</span>
-                <span className="detail-stats-value" style={{ color: '#fbbf24' }}>⭐ {displayRating}</span>
+            {/* Stats Bar */}
+            <div className="hero-stats-glass-bar">
+              <div className="hero-stat-item">
+                <span className="hero-stat-label">Rating</span>
+                <span className="hero-stat-val rating">⭐ {displayRating}</span>
               </div>
-              <div className="detail-stats-divider" />
-              <div style={{ textAlign: 'center' }}>
-                <span className="detail-stats-label">Views</span>
-                <span className="detail-stats-value">👁️ {displayViews}</span>
+              <div className="hero-stat-divider" />
+              <div className="hero-stat-item">
+                <span className="hero-stat-label">Views</span>
+                <span className="hero-stat-val">👁️ {displayViews}</span>
               </div>
-              <div className="detail-stats-divider" />
-              <div style={{ textAlign: 'center' }}>
-                <span className="detail-stats-label">Likes</span>
-                <span className="detail-stats-value">❤️ {displayLikes}</span>
+              <div className="hero-stat-divider" />
+              <div className="hero-stat-item">
+                <span className="hero-stat-label">Likes</span>
+                <span className="hero-stat-val">❤️ {displayLikes}</span>
               </div>
-              <div className="detail-stats-divider" />
-              <div style={{ textAlign: 'center' }}>
-                <span className="detail-stats-label">Bookmarks</span>
-                <span className="detail-stats-value">🔖 {displayBookmarks}</span>
+              <div className="hero-stat-divider" />
+              <div className="hero-stat-item">
+                <span className="hero-stat-label">Bookmarks</span>
+                <span className="hero-stat-val">🔖 {displayBookmarks}</span>
               </div>
             </div>
 
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            {/* Action Buttons */}
+            <div className="hero-actions-group">
               <button
                 onClick={handleReadChapter1}
-                className="btn-home-primary"
-                style={{ padding: '12px 30px', fontSize: '15px' }}
+                className="hero-btn-primary"
               >
-                Read Chapter 1
+                <span>📖</span> Read Chapter 1
               </button>
               <button
                 onClick={handleAddToLibrary}
-                className="detail-action-btn"
-                style={{ borderColor: inLibrary ? 'var(--reader-green)' : '', color: inLibrary ? 'var(--reader-green)' : '' }}
+                className={`hero-btn-glass ${inLibrary ? 'active-saved' : ''}`}
               >
                 {inLibrary ? '✓ Saved to Library' : '🔖 Add to Library'}
               </button>
               <button
                 onClick={handleToggleLike}
-                className="detail-action-btn"
-                style={{ borderColor: isLiked ? 'var(--reader-pink)' : '', color: isLiked ? 'var(--reader-pink)' : '' }}
+                className={`hero-btn-glass ${isLiked ? 'active-liked' : ''}`}
               >
                 {isLiked ? '❤️ Liked' : '🤍 Like'}
               </button>
               <button
                 onClick={() => setShowReportModal(true)}
-                className="detail-action-btn"
-                style={{ borderColor: 'rgba(239, 68, 68, 0.3)', color: '#f87171', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                className="hero-btn-glass hero-btn-report"
                 title="Report issues with this comic or upload"
               >
                 <Flag size={16} /> Report
@@ -450,7 +449,7 @@ function ComicDetail() {
             </div>
 
             {/* Interactive Star Rating */}
-            <div style={{ marginTop: '20px' }}>
+            <div className="hero-rating-box">
               <StarRating
                 comicId={id}
                 user={user}
@@ -467,211 +466,177 @@ function ComicDetail() {
                 }}
               />
             </div>
-
           </div>
         </div>
       </div>
 
-      {/* CONTENT BODY */}
-      <div className="home-sections-container comic-detail-wrapper" style={{ padding: '40px 10%' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr', gap: '40px' }}>
+      {/* BODY CONTENT */}
+      <div className="comic-detail-body-container">
+        <div className="comic-detail-main-grid">
 
-          {/* Left Column: Description + Chapters / Reviews */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+          {/* Left Column: Description + Chapters / Comments */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '36px' }}>
 
             {/* Synopsis */}
             <div className="detail-synopsis-card">
-              <h3 className="detail-section-title">Synopsis</h3>
+              <h3 className="detail-section-title">
+                <span>📖</span> Synopsis
+              </h3>
               <p className="detail-synopsis-text">{displaySummary}</p>
             </div>
 
             {/* Tabs Selector */}
-            <div className="detail-tabs-selector">
-              <button
-                onClick={() => setActiveTab('chapters')}
-                className={`detail-tab-btn ${activeTab === 'chapters' ? 'active' : ''}`}
-              >
-                Chapters ({chapters.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('comments')}
-                className={`detail-tab-btn ${activeTab === 'comments' ? 'active' : ''}`}
-              >
-                Comments
-              </button>
-            </div>
-
-            {/* TAB CONTENT: CHAPTERS LIST */}
-            {activeTab === 'chapters' && (
-              <div>
-                {availableLanguages.length > 0 && (
-                  <ReadingLanguageSelector
-                    languages={availableLanguages}
-                    selectedLanguage={selectedLanguage}
-                    onChange={setSelectedLanguage}
-                  />
-                )}
-
-                <div
-                  className="comic-detail-chapter-list"
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                    maxHeight: '600px',
-                    overflowY: 'auto',
-                    paddingRight: '8px'
-                  }}
+            <div>
+              <div className="detail-tabs-header">
+                <button
+                  onClick={() => setActiveTab('chapters')}
+                  className={`detail-tab-button ${activeTab === 'chapters' ? 'active' : ''}`}
                 >
-                {visibleChapters.length === 0 ? (
-                  <p style={{ color: '#94a3b8', fontSize: '14px', padding: '24px 8px', margin: 0 }}>
-                    {selectedLanguage
-                      ? 'No translated chapters are available in this language yet. Try Original, or wait until the translation is published.'
-                      : 'No chapters available for this comic yet.'}
-                  </p>
-                ) : visibleChapters.map((ch) => {
-                  const chNumber = ch.chapterNumber || '0'
-                  const chTitle = ch.title || `Chapter ${chNumber}`
-                  const chViewsStr = formatViews(ch.viewCount || 0)
-                  const chDateStr = formatTimeAgo(ch.createdAt)
-
-                  const isRead = readChapterIds.includes(ch.id)
-                  const isPremium = Boolean(ch.isPremium === true || ch.isPremium === 'true' || ch.isPremium === 1)
-
-                  return (
-                    <div
-                      key={ch.id || ch.chapterNumber}
-                      className={`detail-chapter-row ${isRead ? 'read' : ''} ${isPremium ? 'premium' : ''}`}
-                      onClick={() => {
-                        if (isPremium) {
-                          const auth = getAuth()
-                          const activeUser = authUser || auth?.user || user
-                          const loggedIn = isLoggedIn || !!(auth && auth.user && auth.token)
-
-                          if (!loggedIn || !activeUser) {
-                            toast.info('Please sign in to read this Premium chapter.')
-                            navigate('/auth?mode=signin', { state: { from: location } })
-                            return
-                          }
-
-                          const roleStr = String(activeUser.role || activeUser.roleName || activeUser.role?.roleName || '').toUpperCase()
-                          const isVip = Boolean(
-                            activeUser.premiumActive ||
-                            activeUser.isVip ||
-                            activeUser.isPremium ||
-                            roleStr === 'ADMIN' ||
-                            roleStr === 'MODERATOR'
-                          )
-
-                          if (!isVip) {
-                            setShowSubscriptionModal(true)
-                            return
-                          }
-                        }
-
-                        const langQuery = chapterLangQuery
-                        navigate(`/comic/${id}/chapter/${ch.id}${langQuery}`)
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = isPremium
-                          ? 'rgba(245, 158, 11, 0.12)'
-                          : 'rgba(168, 85, 247, 0.08)'
-                        e.currentTarget.style.borderColor = isPremium
-                          ? 'rgba(245, 158, 11, 0.55)'
-                          : 'rgba(168, 85, 247, 0.4)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = isRead
-                          ? 'rgba(168, 85, 247, 0.04)'
-                          : isPremium
-                          ? 'rgba(245, 158, 11, 0.05)'
-                          : 'rgba(255, 255, 255, 0.02)'
-                        e.currentTarget.style.borderColor = isRead
-                          ? 'rgba(168, 85, 247, 0.25)'
-                          : isPremium
-                          ? '1px solid rgba(245, 158, 11, 0.3)'
-                          : 'rgba(255, 255, 255, 0.04)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span className="detail-chapter-title" style={{
-                          fontWeight: '600',
-                          color: isRead ? '#c084fc' : 'white',
-                          fontSize: '14px'
-                        }}>
-                          {chTitle}
-                        </span>
-
-                        {isPremium && (
-                          <span style={{
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                            color: '#ffffff',
-                            padding: '2px 9px',
-                            borderRadius: '12px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            boxShadow: '0 2px 8px rgba(245, 158, 11, 0.35)',
-                            letterSpacing: '0.3px'
-                          }}>
-                            🔒 Premium
-                          </span>
-                        )}
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <span style={{ fontSize: '11px', color: '#64748b' }}>Views: {chViewsStr}</span>
-                        <span className="detail-chapter-date" style={{ fontSize: '12px', color: '#94a3b8' }}>{chDateStr}</span>
-                      </div>
-                    </div>
-                  )
-                })}
-                </div>
+                  Chapters ({chapters.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab('comments')}
+                  className={`detail-tab-button ${activeTab === 'comments' ? 'active' : ''}`}
+                >
+                  Comments
+                </button>
               </div>
-            )}
 
-            {/* TAB CONTENT: COMMENTS FEED */}
-            {activeTab === 'comments' && (
-              <CommentSection
-                targetType="comic"
-                targetId={id}
-                user={user}
-                targetCommentIdFromUrl={targetCommentIdFromUrl}
-              />
-            )}
+              {/* TAB CONTENT: CHAPTERS LIST */}
+              {activeTab === 'chapters' && (
+                <div>
+                  {availableLanguages.length > 0 && (
+                    <div style={{ marginBottom: '16px' }}>
+                      <ReadingLanguageSelector
+                        languages={availableLanguages}
+                        selectedLanguage={selectedLanguage}
+                        onChange={setSelectedLanguage}
+                      />
+                    </div>
+                  )}
+
+                  <div className="detail-chapters-list">
+                    {visibleChapters.length === 0 ? (
+                      <div className="detail-no-chapters">
+                        <p style={{ margin: 0 }}>
+                          {selectedLanguage
+                            ? 'No translated chapters are available in this language yet. Try Original, or wait until the translation is published.'
+                            : 'No chapters available for this comic yet.'}
+                        </p>
+                      </div>
+                    ) : (
+                      visibleChapters.map((ch) => {
+                        const chNumber = ch.chapterNumber || '0'
+                        const chTitle = ch.title || `Chapter ${chNumber}`
+                        const chViewsStr = formatViews(ch.viewCount || 0)
+                        const chDateStr = formatTimeAgo(ch.createdAt)
+
+                        const isRead = readChapterIds.includes(ch.id)
+                        const isPremium = Boolean(ch.isPremium === true || ch.isPremium === 'true' || ch.isPremium === 1)
+
+                        return (
+                          <div
+                            key={ch.id || ch.chapterNumber}
+                            className={`detail-chapter-card ${isRead ? 'read' : ''} ${isPremium ? 'premium' : ''}`}
+                            onClick={() => {
+                              if (isPremium) {
+                                const auth = getAuth()
+                                const activeUser = authUser || auth?.user || user
+                                const loggedIn = isLoggedIn || !!(auth && auth.user && auth.token)
+
+                                if (!loggedIn || !activeUser) {
+                                  toast.info('Please sign in to read this Premium chapter.')
+                                  navigate('/auth?mode=signin', { state: { from: location } })
+                                  return
+                                }
+
+                                const roleStr = String(activeUser.role || activeUser.roleName || activeUser.role?.roleName || '').toUpperCase()
+                                const isVip = Boolean(
+                                  activeUser.premiumActive ||
+                                  activeUser.isVip ||
+                                  activeUser.isPremium ||
+                                  roleStr === 'ADMIN' ||
+                                  roleStr === 'MODERATOR'
+                                )
+
+                                if (!isVip) {
+                                  setShowSubscriptionModal(true)
+                                  return
+                                }
+                              }
+
+                              const langQuery = chapterLangQuery
+                              navigate(`/comic/${id}/chapter/${ch.id}${langQuery}`)
+                            }}
+                          >
+                            <div className="detail-chapter-name">
+                              {isRead && <span className="read-status-pill">Read</span>}
+                              <span>{chTitle}</span>
+                              {isPremium && (
+                                <span className="premium-badge-pill">
+                                  🔒 Premium
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="detail-chapter-meta">
+                              <span>👁️ {chViewsStr}</span>
+                              <span className="detail-chapter-date">{chDateStr}</span>
+                            </div>
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB CONTENT: COMMENTS FEED */}
+              {activeTab === 'comments' && (
+                <CommentSection
+                  targetType="comic"
+                  targetId={id}
+                  user={user}
+                  targetCommentIdFromUrl={targetCommentIdFromUrl}
+                />
+              )}
+            </div>
           </div>
 
-          {/* Right Column: Sidebar (About / Artist / Info) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div className="detail-info-card">
-              <h3 className="detail-section-title" style={{ borderBottom: '1px solid var(--reader-border)', paddingBottom: '12px' }}>Comic Info</h3>
-              <div className="detail-info-item">
-                <span>Author</span>
-                <strong>{displayAuthor}</strong>
-              </div>
-              <div className="detail-info-item">
-                <span>Artist</span>
-                <strong>{displayArtist}</strong>
-              </div>
-              <div className="detail-info-item">
-                <span>Original Language</span>
-                <strong>{displayLanguage}</strong>
-              </div>
-              <div className="detail-info-item">
-                <span>Status</span>
-                <strong>{displayStatus}</strong>
-              </div>
-              <div className="detail-info-item">
-                <span>Publish Date</span>
-                <strong>Jan 12, 2025</strong>
+          {/* Right Column: Sidebar */}
+          <div>
+            <div className="detail-sidebar-info-card">
+              <h3 className="detail-section-title">
+                <span>ℹ️</span> Comic Info
+              </h3>
+              <div className="detail-info-list">
+                <div className="detail-info-item">
+                  <span className="info-item-label">Author</span>
+                  <span className="info-item-val">{displayAuthor}</span>
+                </div>
+                <div className="detail-info-item">
+                  <span className="info-item-label">Artist</span>
+                  <span className="info-item-val">{displayArtist}</span>
+                </div>
+                <div className="detail-info-item">
+                  <span className="info-item-label">Original Language</span>
+                  <span className="info-item-val">{displayLanguage}</span>
+                </div>
+                <div className="detail-info-item">
+                  <span className="info-item-label">Publication Status</span>
+                  <span className="info-item-val">{displayStatus}</span>
+                </div>
+                <div className="detail-info-item">
+                  <span className="info-item-label">Total Chapters</span>
+                  <span className="info-item-val">{chapters.length} Chapters</span>
+                </div>
               </div>
             </div>
           </div>
 
         </div>
       </div>
+
       <SubscriptionPlanModal
         open={showSubscriptionModal}
         onClose={() => setShowSubscriptionModal(false)}
