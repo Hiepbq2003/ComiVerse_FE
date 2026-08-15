@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import '../../assets/style/moderator/genre-management.css'
 import { getAllGenresApi, createGenreApi, updateGenreApi, deleteGenreApi } from '../../services/api/GenreApi'
@@ -128,7 +128,7 @@ function GenreManagement({ comics }) {
   }
 
   // Calculate statistics metrics using useMemo to avoid O(N*M) recalculations on every render
-  const { genreCountsMap, mostPopularGenreLabel } = React.useMemo(() => {
+  const { genreCountsMap, mostPopularGenreLabel } = useMemo(() => {
     const counts = new Map();
     if (comics && comics.length > 0) {
       comics.forEach(c => {
