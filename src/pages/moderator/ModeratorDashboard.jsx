@@ -196,7 +196,7 @@ function ModeratorDashboard() {
         const coverVal = getComicCover(sub);
         if (existingIdx !== -1) {
           const finalCover = getComicCover(result[existingIdx]) || coverVal;
-          const subChapsCount = Array.isArray(sub.allChapters) ? sub.allChapters.length : (Array.isArray(sub.chapters) ? sub.chapters.length : 0);
+          const subChapsCount = Array.isArray(sub.allChapters) ? sub.allChapters.length : (Array.isArray(sub.chapters) ? sub.chapters.length : (sub.chapterNumber || sub.number || 0));
           const currentChapsCount = result[existingIdx].chapterCount || result[existingIdx].chapters || 0;
           result[existingIdx] = {
             ...result[existingIdx],
