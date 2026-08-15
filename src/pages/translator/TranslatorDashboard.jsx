@@ -214,18 +214,12 @@ function TranslatorDashboard() {
     ]
 
     const rows = filteredProjects.map(p => {
-      const pStats = teamStats[p.id] || { tasks: [], chapters: [] }
-      let backlog = 0, inProgress = 0, review = 0, done = 0
-
-      pStats.tasks.forEach(t => {
-        const col = (t.column || t.status || '').toLowerCase()
-        if (col.includes('done') || col.includes('completed')) done++
-        else if (col.includes('progress') || col.includes('doing')) inProgress++
-        else if (col.includes('review')) review++
-        else backlog++
-      })
-
-      const totalTasks = backlog + inProgress + review + done
+      const pStats = teamStats[p.id] || { totalTasks: 0, backlog: 0, inProgress: 0, review: 0, done: 0, totalChapters: 0 }
+      const backlog = pStats.backlog || 0
+      const inProgress = pStats.inProgress || 0
+      const review = pStats.review || 0
+      const done = pStats.done || 0
+      const totalTasks = pStats.totalTasks || (backlog + inProgress + review + done)
 
       return [
         p.team || p.title || 'Unnamed Team',
@@ -234,7 +228,7 @@ function TranslatorDashboard() {
         p.status || 'ACTIVE',
         `${p.sourceLang || 'Any'} -> ${p.targetLang || 'Vietnamese'}`,
         p.membersCount || 1,
-        pStats.chapters?.length || 0,
+        pStats.totalChapters || 0,
         backlog,
         inProgress,
         review,
@@ -462,17 +456,11 @@ function TranslatorDashboard() {
                 </p>
               ) : (
                 paginatedProjects.map(team => {
-                  const pStats = teamStats[team.id] || { tasks: [] }
+                  const pStats = teamStats[team.id] || { totalTasks: 0, backlog: 0, inProgress: 0, review: 0, done: 0, totalChapters: 0 }
 
                   let statusDisplay = (team.status || 'Active').toUpperCase()
-                  const hasInProgress = pStats.tasks.some(t => {
-                    const col = (t.column || t.status || '').toLowerCase()
-                    return col.includes('progress') || col.includes('doing')
-                  })
-                  const hasReview = pStats.tasks.some(t => {
-                    const col = (t.column || t.status || '').toLowerCase()
-                    return col.includes('review') || col.includes('testing')
-                  })
+                  const hasInProgress = (pStats.inProgress || 0) > 0
+                  const hasReview = (pStats.review || 0) > 0
 
                   if (hasInProgress) statusDisplay = 'IN PROGRESS'
                   else if (hasReview) statusDisplay = 'UNDER REVIEW'
