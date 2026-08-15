@@ -15,7 +15,6 @@ function TranslatorDashboard() {
   const [projects, setProjects] = useState([])
   const [teamStats, setTeamStats] = useState({})
   const [loading, setLoading] = useState(true)
-  const [filterRole, setFilterRole] = useState('ALL') // 'ALL', 'LED_BY_ME'
 
   // Pagination states
   const [projectsPage, setProjectsPage] = useState(1)
@@ -42,10 +41,6 @@ function TranslatorDashboard() {
     fetchDashboardData(hasCache);
   }, [])
 
-  useEffect(() => {
-    setProjectsPage(1)
-    setTasksPage(1)
-  }, [filterRole])
 
   const fetchDashboardData = async (silent = false) => {
     try {
@@ -198,11 +193,8 @@ function TranslatorDashboard() {
 
   // Filtered Projects List
   const filteredProjects = useMemo(() => {
-    if (filterRole === 'LED_BY_ME') {
-      return projects.filter(p => p.isLeader)
-    }
     return projects
-  }, [projects, filterRole])
+  }, [projects])
 
   // Calculated 100% Real Statistics
   const overallStats = useMemo(() => {
@@ -322,9 +314,7 @@ function TranslatorDashboard() {
       ]
     })
 
-    const prefix = filterRole === 'LED_BY_ME'
-      ? 'ComiVerse_Project_Leader_Workload_Report'
-      : 'ComiVerse_Translator_Dashboard_Report'
+    const prefix = 'ComiVerse_Translator_Dashboard_Report'
 
     exportToCsv(prefix, headers, rows)
     toast.success('Workload report exported successfully!')
@@ -370,21 +360,6 @@ function TranslatorDashboard() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          {/* Workspace Filter Pills */}
-          <div className="dashboard-filter-pills">
-            <button
-              className={`dashboard-filter-btn ${filterRole === 'ALL' ? 'active' : ''}`}
-              onClick={() => setFilterRole('ALL')}
-            >
-              All Workspaces ({projects.length})
-            </button>
-            <button
-              className={`dashboard-filter-btn ${filterRole === 'LED_BY_ME' ? 'active' : ''}`}
-              onClick={() => setFilterRole('LED_BY_ME')}
-            >
-              👑 Led by Me ({projects.filter(p => p.isLeader).length})
-            </button>
-          </div>
 
           <button
             type="button"
