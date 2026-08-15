@@ -56,6 +56,7 @@ function ChapterDetail() {
   const [loading, setLoading] = useState(true)
   const [isMockData, setIsMockData] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false)
   const [isDevToolsOpen, setIsDevToolsOpen] = useState(false)
   const [translations, setTranslations] = useState([])
   const [selectedLanguage, setSelectedLanguage] = useState(searchParams.get('lang') || '')
@@ -68,6 +69,7 @@ function ChapterDetail() {
   const { user, refreshSubscription } = useAuth()
 
   const dropdownRef = useRef(null)
+  const layoutDropdownRef = useRef(null)
 
   // Enforce client-side copy-protection security
   useReaderSecurity({
@@ -93,11 +95,14 @@ function ChapterDetail() {
     setPageIndex(0)
   }, [chapterId])
 
-  // Close dropdown on click outside
+  // Close dropdowns on click outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsDropdownOpen(false)
+      }
+      if (layoutDropdownRef.current && !layoutDropdownRef.current.contains(event.target)) {
+        setIsLayoutDropdownOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -468,22 +473,69 @@ function ChapterDetail() {
                 />
               )}
 
-              {/* Layout Toggle */}
-              <div className="reader-layout-toggle">
-                <button 
-                  className={`btn-layout-toggle ${readerLayout === 'vertical' ? 'active' : ''}`}
-                  onClick={() => setReaderLayout('vertical')}
-                  data-tooltip="Vertical scroll"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
-                </button>
-                <button 
-                  className={`btn-layout-toggle ${readerLayout === 'single' ? 'active' : ''}`}
-                  onClick={() => setReaderLayout('single')}
-                  data-tooltip="Single page"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
-                </button>
+              {/* Layout Dropdown */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--chapter-heading)' }}>
+                  Reader Layout:
+                </span>
+                <div className="reader-chapter-dropdown-container" ref={layoutDropdownRef} style={{ minWidth: '160px' }}>
+                  <div
+                    className={`reader-chapter-dropdown-trigger ${isLayoutDropdownOpen ? 'active' : ''}`}
+                    onClick={() => setIsLayoutDropdownOpen(!isLayoutDropdownOpen)}
+                    style={{ padding: '8px 14px', borderRadius: '999px', color: 'var(--reader-purple)', borderColor: 'rgba(168, 85, 247, 0.5)' }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {readerLayout === 'single' ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+                      )}
+                      {readerLayout === 'single' ? 'Single Page' : 'Vertical Scroll'}
+                    </span>
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="dropdown-chevron"
+                    >
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </div>
+
+                  {isLayoutDropdownOpen && (
+                    <div className="reader-chapter-dropdown-menu">
+                      <div
+                        className={`reader-chapter-dropdown-item ${readerLayout === 'single' ? 'selected' : ''}`}
+                        onClick={() => {
+                          setReaderLayout('single')
+                          setIsLayoutDropdownOpen(false)
+                        }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
+                          Single Page
+                        </span>
+                      </div>
+                      <div
+                        className={`reader-chapter-dropdown-item ${readerLayout === 'vertical' ? 'selected' : ''}`}
+                        onClick={() => {
+                          setReaderLayout('vertical')
+                          setIsLayoutDropdownOpen(false)
+                        }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fcd34d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="16" y2="10"></line><line x1="8" y1="14" x2="16" y2="14"></line><line x1="8" y1="18" x2="16" y2="18"></line></svg>
+                          Continuous Vertical Scroll
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <button
