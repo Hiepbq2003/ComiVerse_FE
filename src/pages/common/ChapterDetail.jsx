@@ -487,16 +487,9 @@ function ChapterDetail() {
               </div>
 
               <button
-                className="btn-reader-nav"
+                className="btn-reader-report"
                 onClick={() => setShowReportModal(true)}
-                title="Report issue with this chapter or translation"
-                style={{
-                  color: '#f87171',
-                  borderColor: 'rgba(239, 68, 68, 0.35)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
+                data-tooltip="Report an issue"
               >
                 <Flag size={14} /> Report
               </button>

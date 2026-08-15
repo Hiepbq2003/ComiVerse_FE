@@ -98,18 +98,21 @@ html.light {
   border: 1px solid var(--chapter-border);
   color: var(--chapter-text);
   padding: 8px 16px;
-  border-radius: 8px;
+  border-radius: 999px; /* Pill shape */
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   text-decoration: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .btn-reader-back:hover {
-  background: rgba(168, 85, 247, 0.15);
-  border-color: rgba(168, 85, 247, 0.3);
-  color: #c084fc;
+  background: var(--chapter-surface);
+  border-color: rgba(168, 85, 247, 0.4);
+  color: var(--reader-purple);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.15);
+  transform: translateY(-1px);
 }
 
 .reader-comic-title-info {
@@ -148,24 +151,55 @@ html.light {
   background: var(--chapter-control-bg);
   border: 1px solid var(--chapter-border);
   color: var(--chapter-heading);
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 8px 20px;
+  border-radius: 999px; /* Pill shape */
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  gap: 6px;
 }
 
 .btn-reader-nav:hover:not(:disabled) {
-  background: rgba(168, 85, 247, 0.15);
-  border-color: rgba(168, 85, 247, 0.3);
-  color: #c084fc;
+  background: var(--chapter-surface);
+  border-color: rgba(168, 85, 247, 0.4);
+  color: var(--reader-purple);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.15);
+  transform: translateY(-1px);
 }
 
 .btn-reader-nav:disabled {
-  opacity: 0.35;
+  opacity: 0.4;
   cursor: not-allowed;
   color: var(--chapter-disabled);
+  box-shadow: none;
+  background: var(--chapter-bg);
+}
+
+/* Premium Report Button */
+.btn-reader-report {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-reader-report:hover {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  transform: translateY(-1px);
 }
 
 /* Custom Dropdown Styles */
