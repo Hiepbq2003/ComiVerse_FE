@@ -500,6 +500,20 @@ html.light .btn-author-action:hover {
   transform: translateY(-1px);
 }
 
+html.light .author-genre-pill {
+  color: var(--author-accent-hover) !important;
+  background: rgba(168, 85, 247, 0.12) !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
+  box-shadow: none !important;
+}
+
+html.light .author-genre-pill:hover {
+  background: var(--author-accent) !important;
+  color: #ffffff !important;
+  border-color: var(--author-accent) !important;
+  box-shadow: 0 4px 12px rgba(170, 59, 255, 0.2) !important;
+}
+
 .author-genre-pills.selectable .author-genre-pill {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.2);
@@ -507,11 +521,23 @@ html.light .btn-author-action:hover {
   cursor: pointer;
 }
 
+html.light .author-genre-pills.selectable .author-genre-pill {
+  background: var(--author-hover-bg) !important;
+  border-color: var(--author-border) !important;
+  color: var(--author-text-secondary) !important;
+}
+
 .author-genre-pills.selectable .author-genre-pill.selected {
   background: rgba(168, 85, 247, 0.25) !important;
   color: #ffffff !important;
   border-color: #c084fc !important;
   box-shadow: 0 2px 12px rgba(168, 85, 247, 0.35);
+}
+
+html.light .author-genre-pills.selectable .author-genre-pill.selected {
+  background: var(--author-accent) !important;
+  color: #ffffff !important;
+  border-color: var(--author-accent) !important;
 }
 
 .author-comic-card-actions {
