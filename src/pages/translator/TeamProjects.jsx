@@ -267,120 +267,64 @@ function ProjectsListView({
       {/* Advanced Filter Toolbar */}
       <div
         className="translator-filter-toolbar"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          flexWrap: 'wrap',
-          marginBottom: '20px',
-          padding: '12px 18px',
-          background: 'rgba(255, 255, 255, 0.03)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          borderRadius: '16px',
-          backdropFilter: 'blur(10px)'
-        }}
-      >
+      <div className="trans-filter-bar">
         {/* Source Language Filter */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Origin:</span>
+          <span className="trans-filter-label">Origin:</span>
           <select
-            className="trans-form-select"
+            className={`trans-form-select ${sourceLang ? 'active' : ''}`}
             value={sourceLang}
             onChange={(e) => onSourceLangChange(e.target.value)}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '10px',
-              background: 'rgba(10, 6, 18, 0.85)',
-              border: sourceLang ? '1px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.15)',
-              color: sourceLang ? '#c084fc' : '#cbd5e1',
-              fontSize: '13px',
-              cursor: 'pointer',
-              outline: 'none',
-              fontWeight: sourceLang ? '700' : '500'
-            }}
           >
-            <option value="" style={{ background: '#120d24', color: '#fff' }}>🌐 All Source Languages</option>
+            <option value="">🌐 All Source Languages</option>
             {availableSourceLangs.map(l => (
-              <option key={l} value={l} style={{ background: '#120d24', color: '#fff' }}>{l}</option>
+              <option key={l} value={l}>{l}</option>
             ))}
           </select>
         </div>
 
         {/* Target Language Filter */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Target:</span>
+          <span className="trans-filter-label">Target:</span>
           <select
-            className="trans-form-select"
+            className={`trans-form-select ${targetLang ? 'active' : ''}`}
             value={targetLang}
             onChange={(e) => onTargetLangChange(e.target.value)}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '10px',
-              background: 'rgba(10, 6, 18, 0.85)',
-              border: targetLang ? '1px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.15)',
-              color: targetLang ? '#c084fc' : '#cbd5e1',
-              fontSize: '13px',
-              cursor: 'pointer',
-              outline: 'none',
-              fontWeight: targetLang ? '700' : '500'
-            }}
           >
-            <option value="" style={{ background: '#120d24', color: '#fff' }}>🎯 All Target Languages</option>
+            <option value="">🎯 All Target Languages</option>
             {availableTargetLangs.map(l => (
-              <option key={l} value={l} style={{ background: '#120d24', color: '#fff' }}>{l}</option>
+              <option key={l} value={l}>{l}</option>
             ))}
           </select>
         </div>
 
         {/* Status / Recruiting Filter */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status:</span>
+          <span className="trans-filter-label">Status:</span>
           <select
-            className="trans-form-select"
+            className={`trans-form-select ${statusFilter ? 'active' : ''}`}
             value={statusFilter}
             onChange={(e) => onStatusFilterChange(e.target.value)}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '10px',
-              background: 'rgba(10, 6, 18, 0.85)',
-              border: statusFilter ? '1px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.15)',
-              color: statusFilter ? '#c084fc' : '#cbd5e1',
-              fontSize: '13px',
-              cursor: 'pointer',
-              outline: 'none',
-              fontWeight: statusFilter ? '700' : '500'
-            }}
           >
-            <option value="" style={{ background: '#120d24', color: '#fff' }}>⚡ All Statuses</option>
-            <option value="RECRUITING" style={{ background: '#120d24', color: '#fff' }}>🟢 Open for Recruiting</option>
-            <option value="CLOSED" style={{ background: '#120d24', color: '#fff' }}>🔒 Full / Closed</option>
-            <option value="ACTIVE" style={{ background: '#120d24', color: '#fff' }}>✅ Active Status</option>
-            <option value="PAUSED" style={{ background: '#120d24', color: '#fff' }}>⏸️ Paused</option>
+            <option value="">⚡ All Statuses</option>
+            <option value="RECRUITING">🟢 Open for Recruiting</option>
+            <option value="CLOSED">🔒 Full / Closed</option>
+            <option value="ACTIVE">✅ Active Status</option>
+            <option value="PAUSED">⏸️ Paused</option>
           </select>
         </div>
 
         {/* Role Filter */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Role:</span>
+          <span className="trans-filter-label">Role:</span>
           <select
-            className="trans-form-select"
+            className={`trans-form-select ${roleFilter ? 'active' : ''}`}
             value={roleFilter}
             onChange={(e) => onRoleFilterChange(e.target.value)}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '10px',
-              background: 'rgba(10, 6, 18, 0.85)',
-              border: roleFilter ? '1px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.15)',
-              color: roleFilter ? '#c084fc' : '#cbd5e1',
-              fontSize: '13px',
-              cursor: 'pointer',
-              outline: 'none',
-              fontWeight: roleFilter ? '700' : '500'
-            }}
           >
-            <option value="" style={{ background: '#120d24', color: '#fff' }}>👑 All Roles</option>
-            <option value="LEADER" style={{ background: '#120d24', color: '#fff' }}>⭐ Led by Me</option>
-            <option value="MEMBER" style={{ background: '#120d24', color: '#fff' }}>👥 Member Only</option>
+            <option value="">👑 All Roles</option>
+            <option value="LEADER">⭐ Led by Me</option>
+            <option value="MEMBER">👥 Member Only</option>
           </select>
         </div>
 
@@ -409,7 +353,7 @@ function ProjectsListView({
         )}
 
         {/* Total Results Counter */}
-        <div style={{ marginLeft: 'auto', fontSize: '13px', color: '#94a3b8', fontWeight: '600', whiteSpace: 'nowrap' }}>
+        <div className="trans-filter-results">
           Found: <span style={{ color: '#c084fc', fontWeight: '700' }}>{totalResults}</span> teams
         </div>
       </div>
