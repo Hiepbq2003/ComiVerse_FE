@@ -973,18 +973,72 @@ function TeamProjects() {
   const fetchProjects = async (silent = false) => {
     try {
       if (!silent && projects.length === 0) setLoadingProjects(true)
-      const [pageRes, allComicsRes, submissionsRes] = await Promise.all([
-        getMyProjectTeamsPageApi(currentPage, ITEMS_PER_PAGE, searchTerm).catch(() => ({ data: { data: { content: [], totalPages: 1 } } })),
+      const [pageRes, allComicsRes, submissionsRes, allTeamsRes, myTeamsRes] = await Promise.all([
+        getMyProjectTeamsPageApi(currentPage, ITEMS_PER_PAGE, searchTerm).catch(() => null),
         getAllComicsApi().catch(() => []),
-        getAllSubmissionsApi().catch(() => [])
+        getAllSubmissionsApi().catch(() => []),
+        getAllProjectTeamsApi().catch(() => []),
+        getMyProjectTeamsApi().catch(() => [])
       ])
 
       const dbComics = allComicsRes?.data?.data || allComicsRes?.data || (Array.isArray(allComicsRes) ? allComicsRes : []);
       const dbSubs = submissionsRes?.data?.data || submissionsRes?.data || (Array.isArray(submissionsRes) ? submissionsRes : []);
 
-      const pageData = pageRes?.data?.data || pageRes?.data;
-      const fetchedProjects = pageData?.content || [];
-      const fetchedTotalPages = pageData?.totalPages || 1;
+      const pageData = pageRes?.data?.data || pageRes?.data || pageRes;
+      let fetchedProjects = pageData?.content || (Array.isArray(pageData) ? pageData : []);
+      let fetchedTotalPages = pageData?.totalPages || 1;
+
+      // Fallback: If server pagination returns 0 items or fails, retrieve and filter from all available teams
+      if (!fetchedProjects || fetchedProjects.length === 0) {
+        let allTeams = [];
+        if (Array.isArray(allTeamsRes)) {
+          allTeams = allTeamsRes;
+        } else if (allTeamsRes?.data?.data || allTeamsRes?.data || allTeamsRes?.content) {
+          allTeams = allTeamsRes.data?.data || allTeamsRes.data || allTeamsRes.content || [];
+        } else if (Array.isArray(myTeamsRes)) {
+          allTeams = myTeamsRes;
+        } else if (myTeamsRes?.data?.data || myTeamsRes?.data || myTeamsRes?.content) {
+          allTeams = myTeamsRes.data?.data || myTeamsRes.data || myTeamsRes.content || [];
+        }
+
+        const currentUserName = (user.fullName || '').toLowerCase().trim();
+        const currentUsername = (user.username || '').toLowerCase().trim();
+        const currentUserId = user.id || user.userId;
+        const cleanSearch = (searchTerm || '').toLowerCase().trim();
+
+        const filtered = allTeams.filter(p => {
+          const leaderName = (p.leaderName || '').toLowerCase().trim();
+          const leaderId = p.leaderId || p.createdById;
+          const isLeader = (currentUserName && leaderName === currentUserName) ||
+                           (currentUsername && leaderName === currentUsername) ||
+                           (currentUserId && leaderId === currentUserId);
+
+          const localApprovedKey = `comiverse_approved_members_${p.id}`;
+          let savedMems = [];
+          try {
+            savedMems = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
+          } catch (e) {}
+
+          const isApprovedMember = savedMems.some(m => {
+            const mn = (m.name || m.username || '').toLowerCase().trim();
+            return (currentUserName && mn === currentUserName) || (currentUsername && mn === currentUsername);
+          }) || (Array.isArray(p.members) && p.members.some(m => m.userId === currentUserId || (m.name || '').toLowerCase().trim() === currentUserName));
+
+          const userMatched = isLeader || isApprovedMember;
+          if (!userMatched) return false;
+
+          if (cleanSearch) {
+            const titleMatch = (p.title || p.name || '').toLowerCase().includes(cleanSearch);
+            const comicMatch = (p.comicName || p.comicTitle || '').toLowerCase().includes(cleanSearch);
+            return titleMatch || comicMatch;
+          }
+          return true;
+        });
+
+        fetchedTotalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        fetchedProjects = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+      }
       
       setTotalPages(fetchedTotalPages);
 
@@ -1008,8 +1062,8 @@ function TeamProjects() {
 
         return {
           ...p,
-          team: p.title,
-          title: p.comicName,
+          team: p.title || p.name || 'Unnamed Team',
+          title: p.comicName || p.title || 'Untitled Comic',
           cover: getProjectCover(p, dbComics, dbSubs),
           membersCount: realCount,
           isRecruiting: isRecruiting
@@ -1464,6 +1518,10 @@ function TeamProjects() {
     if (loadingProjects) return
     const targetTeamId = location.state?.teamId
     const targetTeamName = location.state?.teamName
+    const hasRoutingState = targetTeamId || targetTeamName || location.state?.openCreateTask || location.state?.tab
+
+    if (!hasRoutingState) return
+
     const targetProject = projects.find(p => {
       if (p.id === targetTeamId) return true;
       if (!targetTeamName) return false;

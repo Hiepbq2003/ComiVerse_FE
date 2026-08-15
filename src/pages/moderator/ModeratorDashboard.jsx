@@ -661,7 +661,24 @@ function ModeratorDashboard() {
   const fetchChatFlagsData = async () => {
     try {
       const data = await getAllChatFlagsApi()
-      setChatFlags(data || [])
+      const serverFlags = data || []
+      
+      let localFlags = []
+      try {
+        const raw = localStorage.getItem('comiverse_moderator_flags')
+        localFlags = raw ? JSON.parse(raw) : []
+      } catch (e) {}
+
+      const flagMap = new Map()
+      serverFlags.forEach(f => flagMap.set(f.id, f))
+      localFlags.forEach(f => {
+        if (flagMap.has(f.id) || (f.status && f.status !== 'pending') || f.isLocal) {
+          flagMap.set(f.id, { ...(flagMap.get(f.id) || {}), ...f })
+        }
+      })
+      const merged = Array.from(flagMap.values()).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+      
+      setChatFlags(merged)
     } catch (err) {
       console.error('Failed to fetch chat flags:', err)
     }
@@ -689,7 +706,24 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       withTimeout(getAllChatFlagsApi(), [])
     ]).then(([comicsData, teamsData, submissionsData, chatData]) => {
       const authUser = getAuth()?.user;
-      setChatFlags(chatData || []);
+      const serverFlags = chatData || []
+      
+      let localFlags = []
+      try {
+        const raw = localStorage.getItem('comiverse_moderator_flags')
+        localFlags = raw ? JSON.parse(raw) : []
+      } catch (e) {}
+
+      const flagMap = new Map()
+      serverFlags.forEach(f => flagMap.set(f.id, f))
+      localFlags.forEach(f => {
+        if (flagMap.has(f.id) || (f.status && f.status !== 'pending') || f.isLocal) {
+          flagMap.set(f.id, { ...(flagMap.get(f.id) || {}), ...f })
+        }
+      })
+      const mergedChatFlags = Array.from(flagMap.values()).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+      
+      setChatFlags(mergedChatFlags);
       
       const mergedSubmissionsData = [...(submissionsData || [])].filter(s => {
         // Determine if this submission is a chapter submission
