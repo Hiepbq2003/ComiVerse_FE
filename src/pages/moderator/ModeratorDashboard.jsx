@@ -2283,7 +2283,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                           return v;
                         };
                         return getV(b) - getV(a);
-                      }).slice(0, 4).map((c, idx) => {
+                      }).slice(0, 5).map((c, idx) => {
                         const getV = x => {
                           let v = x.viewCount || x.views || x.totalViews || 0;
                           if (typeof v === 'string') {
@@ -2301,7 +2301,13 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                         const chaps = c.chapterCount || c.chapters || c.chaptersCount || 0;
 
                         return (
-                          <div key={c.id} className="mod-rank-item">
+                          <div 
+                            key={c.id} 
+                            className="mod-rank-item"
+                            onClick={() => setActiveNav('comic-management')}
+                            style={{ cursor: 'pointer' }}
+                            title="Click to view in Comic Management"
+                          >
                             <div className="mod-rank-left">
                               <span className="mod-rank-number">#{idx + 1}</span>
                               <div className="mod-rank-details">
