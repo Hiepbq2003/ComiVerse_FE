@@ -377,12 +377,14 @@ html.dark .comic-detail-body-container,
 :root:not(.light) .comic-detail-body-container {
   background: #090514;
   color: #f1f5f9;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* Light Mode Body Canvas (Clean contrastive canvas) */
 html.light .comic-detail-body-container {
   background: #f1f5f9;
   color: #0f172a;
+  border-bottom: 1.5px solid #cbd5e1;
 }
 
 .comic-detail-main-grid {

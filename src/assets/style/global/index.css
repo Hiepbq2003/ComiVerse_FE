@@ -306,8 +306,8 @@ html.light .home-user-menu-divider {
 
 /* Footer overrides */
 html.light .home-footer {
-  background-color: #f1f5f9 !important;
-  border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
+  background-color: #ffffff !important;
+  border-top: 1.5px solid #cbd5e1 !important;
   color: #475569 !important;
 }
 
