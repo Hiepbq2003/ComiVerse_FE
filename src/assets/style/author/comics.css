@@ -688,15 +688,18 @@ html.light .btn-author-action:hover {
 .author-chapter-table th,
 .author-chapter-table td {
   padding: 16px 18px;
-  border-bottom: 1px solid #eeeeee;
+  border-bottom: 1px solid var(--author-border);
   text-align: left;
   font-size: 14px;
 }
 
 .author-chapter-table th {
-  background: #fafafa;
-  color: #7a7a7a;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--author-text-secondary);
   font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
 }
 
 .author-chapter-table tr:last-child td {
@@ -704,7 +707,7 @@ html.light .btn-author-action:hover {
 }
 
 .author-chapter-table .chapter-no {
-  color: #020617;
+  color: var(--author-text-primary);
   font-weight: 800;
 }
 
