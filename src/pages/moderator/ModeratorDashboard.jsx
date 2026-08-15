@@ -463,17 +463,13 @@ function ModeratorDashboard() {
             (t.comicId && String(c.id) === String(t.comicId))
           );
 
-          const publishedChaps = chapters.filter(c => {
-            const s = String(c.status || c.moderationStatus || '').toUpperCase();
-            return s === 'PUBLISHED' || s === 'APPROVED' || s === 'COMPLETED' || s === 'DONE';
-          }).length;
+          const totalDone = Math.max(completedTasks.length, t.completedTasksCount || 0, t.totalCompletedTasks || 0);
 
-          const totalDone = Math.max(completedTasks.length, publishedChaps, t.completedTasksCount || 0, t.totalCompletedTasks || 0, t.progress ? Math.round((t.progress / 100) * (chapters.length || matchedComic?.chapterCount || 1)) : 0);
-
-          if (totalDone > 0) {
-            if (tasksMonth === 0) tasksMonth = totalDone;
-            if (tasksWeek === 0) tasksWeek = Math.min(tasksMonth, totalDone);
-            if (tasksToday === 0 && tasksWeek > 0) tasksToday = Math.min(tasksWeek, totalDone);
+          if (completedTasks.length === 0 && totalDone > 0) {
+            // Only fallback to backend stats if task array wasn't loaded
+            tasksToday = t.tasksToday || 0;
+            tasksWeek = t.tasksWeek || 0;
+            tasksMonth = t.tasksMonth || totalDone;
           }
 
           const totalChapters = chapters.length > 0 ? chapters.length : (matchedComic?.chapterCount || matchedComic?.chaptersCount || t.chaptersCount || t.chapterCount || 0);
