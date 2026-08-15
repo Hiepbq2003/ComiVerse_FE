@@ -180,19 +180,36 @@ function ModeratorDashboard() {
   };
 
   const syncApprovedComics = (initialComics, subsList) => {
-    const result = (initialComics || []).map(c => {
+    const result = [...(initialComics || [])];
+    
+    // Build index maps for fast lookups
+    const titleMap = new Map();
+    const idMap = new Map();
+    result.forEach((c, idx) => {
       const cCover = getComicCover(c);
-      return {
-        ...c,
-        cover: cCover,
-        coverImage: cCover,
-        coverImageUrl: cCover
-      };
+      c.cover = cCover;
+      c.coverImage = cCover;
+      c.coverImageUrl = cCover;
+      
+      const cleanTitle = c.title ? String(c.title).trim().toLowerCase().replace(/[^a-z0-9]/gi, '').replace(/s$/, '') : '';
+      if (cleanTitle) titleMap.set(cleanTitle, idx);
+      if (c.id) idMap.set(String(c.id), idx);
     });
+
+    const newComics = [];
+
     (subsList || []).forEach(sub => {
       if (sub.status === 'approved' && (sub.title || sub.comicName || sub.comicTitle)) {
         const comicTitle = (sub.title || sub.comicName || sub.comicTitle).trim();
-        const existingIdx = result.findIndex(c => isTitleMatch(c.title, comicTitle) || (sub.comicId && String(c.id) === String(sub.comicId)));
+        const cleanSubTitle = comicTitle.toLowerCase().replace(/[^a-z0-9]/gi, '').replace(/s$/, '');
+        
+        let existingIdx = -1;
+        if (sub.comicId && idMap.has(String(sub.comicId))) {
+          existingIdx = idMap.get(String(sub.comicId));
+        } else if (titleMap.has(cleanSubTitle)) {
+          existingIdx = titleMap.get(cleanSubTitle);
+        }
+
         const coverVal = getComicCover(sub);
         if (existingIdx !== -1) {
           const finalCover = getComicCover(result[existingIdx]) || coverVal;
@@ -208,6 +225,7 @@ function ModeratorDashboard() {
             chapterCount: Math.max(currentChapsCount, subChapsCount),
             chapters: Math.max(currentChapsCount, subChapsCount)
           };
+
         } else {
           const authorNameClean = formatSubmitterName(sub.submittedBy || sub.author || sub.submittedByEmail || sub.authorName || 'Unknown Author').replace(/^Author:\s*/i, '');
           const stableId = sub.comicId || (sub.id ? `comic-${sub.id}` : (sub.submissionId ? `comic-${sub.submissionId}` : `comic-${comicTitle.replace(/\s+/g, '-').toLowerCase()}`));
@@ -229,7 +247,7 @@ function ModeratorDashboard() {
             const subChapsCount = Array.isArray(sub.allChapters) ? sub.allChapters.length : (Array.isArray(sub.chapters) ? sub.chapters.length : 0);
             const initialChaps = subChapsCount > 0 ? subChapsCount : (sub.chapterCount || sub.chapters || sub.chapterNumber || sub.number || 0);
 
-            result.unshift({
+            newComics.push({
               id: stableId,
               title: comicTitle,
               authorName: authorNameClean,

@@ -368,21 +368,30 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     setCurrentPage(1)
   }, [activeTab, sortFilter, searchQuery])
 
+  // 0. High-Performance Maps for fast lookups
+  const { comicIdMap, comicTitleMap } = useMemo(() => {
+    const idMap = new Map();
+    const titleMap = new Map();
+    (comics || []).forEach(c => {
+      if (c.id) idMap.set(String(c.id), c);
+      if (c.title) titleMap.set(c.title.trim().toLowerCase(), c);
+    });
+    return { comicIdMap: idMap, comicTitleMap: titleMap };
+  }, [comics]);
+
   // Helper to find matching comic from comics list prop by ID or Title
-  const findMatchingComic = (item) => {
-    if (!item || !Array.isArray(comics) || comics.length === 0) return null;
+  const findMatchingComic = useCallback((item) => {
+    if (!item) return null;
     const itemComicId = item.comicId || item.comic_id || item.comic?.id;
-    if (itemComicId) {
-      const match = comics.find(c => String(c.id) === String(itemComicId));
-      if (match) return match;
+    if (itemComicId && comicIdMap.has(String(itemComicId))) {
+      return comicIdMap.get(String(itemComicId));
     }
     const itemTitle = (item.title || item.comicTitle || item.comicName || '').trim().toLowerCase();
-    if (itemTitle) {
-      const match = comics.find(c => (c.title || '').trim().toLowerCase() === itemTitle);
-      if (match) return match;
+    if (itemTitle && comicTitleMap.has(itemTitle)) {
+      return comicTitleMap.get(itemTitle);
     }
     return null;
-  };
+  }, [comicIdMap, comicTitleMap]);
 
   const normalizeChapter = (chap, idx) => {
     const pages = Array.isArray(chap.pages) && chap.pages.length > 0
