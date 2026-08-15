@@ -662,16 +662,15 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       setLoadingPhase2(true);
     }
     
-    // Phase 1: Core Dashboard Data (Comics, Teams, Submissions, Genres) with 2s max timeout
+    // Phase 1: Core Dashboard Data (Comics, Teams, Submissions, Chat Flags) with 2s max timeout
     Promise.all([
       withTimeout(getAllComicsApi(), []),
       withTimeout(getAllProjectTeamsApi(), []),
       withTimeout(getAllSubmissionsApi(), []),
-      withTimeout(getAllGenresApi(), []),
-      withTimeout(getComicLeaderboardApi({ timeframe: 'month' }), [])
-    ]).then(([comicsData, teamsData, submissionsData, genresData, leaderboardData]) => {
+      withTimeout(getAllChatFlagsApi(), [])
+    ]).then(([comicsData, teamsData, submissionsData, chatData]) => {
       const authUser = getAuth()?.user;
-      setTopComics(leaderboardData?.data || leaderboardData?.content || leaderboardData || []);
+      setChatFlags(chatData || []);
       
       const mergedSubmissionsData = [...(submissionsData || [])].filter(s => {
         // Determine if this submission is a chapter submission
@@ -786,7 +785,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       });
       const initialTeams = Array.from(mergedTeamsMap.values());
       setProjectTeams(initialTeams);
-      setGenres(genresData?.data || (Array.isArray(genresData) ? genresData : []));
 
       // Asynchronously enrich teams with live tasks, members, and completed counts
       enrichProjectTeamsWithTasks(initialTeams, mappedComics).then(enriched => {
@@ -799,13 +797,15 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       setLoadingPhase1(false);
     });
 
-    // Phase 2: Secondary Background Data (Forum threads & Chat flags) with timeout
+    // Phase 2: Secondary Background Data (Forum threads, Genres, Leaderboard) with timeout
     Promise.all([
       withTimeout(getAllForumThreadsApi(), []),
-      withTimeout(getAllChatFlagsApi(), [])
-    ]).then(([forumData, chatData]) => {
+      withTimeout(getAllGenresApi(), []),
+      withTimeout(getComicLeaderboardApi({ timeframe: 'month' }), [])
+    ]).then(([forumData, genresData, leaderboardData]) => {
       setForumThreads(forumData || []);
-      setChatFlags(chatData || []);
+      setGenres(genresData?.data || (Array.isArray(genresData) ? genresData : []));
+      setTopComics(leaderboardData?.data || leaderboardData?.content || leaderboardData || []);
     }).catch(err => {
       console.error(err);
     }).finally(() => {
