@@ -360,9 +360,16 @@ html.light .author-comic-detail-page .author-detail-hero {
 }
 
 html.light .author-comic-detail-page .author-detail-stat-card {
-  background: var(--author-card-bg);
-  border: 1px solid var(--author-border);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  background: var(--author-card-bg) !important;
+  border: 1px solid var(--author-border) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .author-comic-detail-page .author-detail-stat-card:hover {
+  background: var(--author-hover-bg) !important;
+  border-color: var(--author-accent) !important;
+  box-shadow: 0 6px 16px rgba(170, 59, 255, 0.12) !important;
+  transform: translateY(-2px);
 }
 
 .author-comic-detail-page .author-detail-stat-card span {
