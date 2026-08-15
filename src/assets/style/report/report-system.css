@@ -692,10 +692,17 @@ html.light .rep-guideline-body {
   padding: 7px 10px;
   font-size: 13px;
   outline: none;
+  cursor: pointer;
+  color-scheme: dark; /* ensures browser renders white calendar icon in dark mode */
+}
+
+.rep-date-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
 }
 
 html.light .rep-date-input {
   background: #ffffff;
+  color-scheme: light;
 }
 
 /* Badges */
