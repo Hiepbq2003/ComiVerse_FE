@@ -75,13 +75,13 @@ html.light {
 }
 
 .reader-header-inner {
-  max-width: 1200px;
+  max-width: 1600px;
   width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .reader-header-left {
@@ -142,6 +142,12 @@ html.light {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.reader-nav-controls::-webkit-scrollbar {
+  display: none;
 }
 
 .btn-reader-nav {
