@@ -1879,7 +1879,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               {/* Data Visualization Section */}
               <div className="mod-charts-grid">
                 {/* Area Curve Line Chart (7 Day Submissions Trend) */}
-                <div className="mod-chart-card">
+                <div className="mod-chart-card" onClick={() => setActiveNav('review-queue')} style={{ cursor: 'pointer' }}>
                   <div className="mod-chart-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <h3 className="mod-chart-title">Submission Activity</h3>
@@ -1889,13 +1889,13 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                     </div>
                     <div className="timeframe-toggles">
                       <button 
-                        onClick={() => { setChartTimeframe('week'); setPinnedPoint(null); setHoveredPoint(null); }}
+                        onClick={(e) => { e.stopPropagation(); setChartTimeframe('week'); setPinnedPoint(null); setHoveredPoint(null); }}
                         className={`timeframe-btn ${chartTimeframe === 'week' ? 'active' : ''}`}
                       >
                         Week
                       </button>
                       <button 
-                        onClick={() => { setChartTimeframe('month'); setPinnedPoint(null); setHoveredPoint(null); }}
+                        onClick={(e) => { e.stopPropagation(); setChartTimeframe('month'); setPinnedPoint(null); setHoveredPoint(null); }}
                         className={`timeframe-btn ${chartTimeframe === 'month' ? 'active' : ''}`}
                       >
                         Month
@@ -2147,7 +2147,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 </div>
 
                 {/* Genre Breakdown Bar Chart */}
-                <div className="mod-chart-card">
+                <div className="mod-chart-card" onClick={() => setActiveNav('genre-management')} style={{ cursor: 'pointer' }}>
                   <div className="mod-chart-header">
                     <div>
                       <h3 className="mod-chart-title">Top Genres</h3>
