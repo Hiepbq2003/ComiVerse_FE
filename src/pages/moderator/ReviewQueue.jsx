@@ -1925,11 +1925,39 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           hydratedItems.map(item => (
             <div className="submission-card" key={item.id}>
               <div className="submission-cover-placeholder">
-                {item.cover && (item.cover.startsWith('http') || item.cover.includes('/')) ? (
-                  <img src={item.cover} alt={item.title} className="submission-cover-img" />
-                ) : (
-                  item.cover || '📚'
-                )}
+                {(() => {
+                  const coverSrc = item.cover || item.coverImageUrl || item.coverImage || item.coverUrl || item.imageUrl || item.comic?.cover || item.comic?.coverImageUrl || '';
+                  return coverSrc ? (
+                    <img 
+                      src={coverSrc} 
+                      alt={item.title} 
+                      className="submission-cover-img"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        const fallback = e.target.nextElementSibling;
+                        if (fallback) fallback.style.display = 'flex';
+                      }}
+                    />
+                  ) : null;
+                })()}
+                <div 
+                  className="submission-cover-fallback"
+                  style={{ 
+                    display: (item.cover || item.coverImageUrl || item.coverImage) ? 'none' : 'flex',
+                    width: '100%',
+                    height: '100%',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#a855f7',
+                    opacity: 0.8
+                  }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/>
+                    <path d="M6 6h10"/>
+                    <path d="M6 10h10"/>
+                  </svg>
+                </div>
               </div>
 
               <div className="submission-info">
@@ -2520,15 +2548,41 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                             overflow: 'hidden',
                             boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
                             border: '1px solid rgba(148,163,184,0.2)',
-                            flexShrink: 0
+                            flexShrink: 0,
+                            position: 'relative'
                           }}>
-                            {selectedReview.cover && (selectedReview.cover.startsWith('http') || selectedReview.cover.includes('/')) ? (
-                              <img src={selectedReview.cover} alt={selectedReview.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '48px', color: '#7c3aed' }}>
-                                {selectedReview.cover || '📚'}
-                              </div>
-                            )}
+                            {(() => {
+                              const revCover = selectedReview.cover || selectedReview.coverImageUrl || selectedReview.coverImage || selectedReview.comic?.cover || selectedReview.comic?.coverImageUrl || '';
+                              return revCover ? (
+                                <img 
+                                  src={revCover} 
+                                  alt={selectedReview.title} 
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    const fallback = e.target.nextElementSibling;
+                                    if (fallback) fallback.style.display = 'flex';
+                                  }}
+                                />
+                              ) : null;
+                            })()}
+                            <div 
+                              style={{ 
+                                display: (selectedReview.cover || selectedReview.coverImageUrl || selectedReview.coverImage) ? 'none' : 'flex', 
+                                width: '100%', 
+                                height: '100%', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                color: '#7c3aed',
+                                background: 'rgba(168, 85, 247, 0.08)'
+                              }}
+                            >
+                              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/>
+                                <path d="M6 6h10"/>
+                                <path d="M6 10h10"/>
+                              </svg>
+                            </div>
                           </div>
 
                           {/* Core Input Fields */}

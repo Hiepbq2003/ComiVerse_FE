@@ -600,13 +600,17 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
           normalizedStatus = 'rejected';
         }
 
+        const resolvedCover = getComicCover(baseObj) || getComicCover(s) || getComicCover(matchComic) || getComicCover(s.comic) || '';
+
         return {
           ...baseObj,
           id: s.id || `sub-${Date.now()}-${Math.random()}`,
           originalId: s.id,
           comicId: baseObj.comicId || baseObj.id,
           title: baseObj.title || baseObj.comicTitle || s.title || 'Untitled',
-          cover: baseObj.coverImageUrl || baseObj.cover || s.cover || '',
+          cover: resolvedCover,
+          coverImage: resolvedCover,
+          coverImageUrl: resolvedCover,
           type: (s.submissionType || s.type || 'NEW_COMIC').toUpperCase(),
           status: normalizedStatus,
           author: baseObj.authorName || baseObj.author || s.submittedBy || 'Unknown',
@@ -2116,15 +2120,44 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                     <div className="mod-submission-list">
                       {submissions.filter(s => s.status === 'pending').slice(0, 4).map(s => {
                         const isAuthor = s.queueType === 'author';
+                        const coverSrc = getComicCover(s) || getComicCover(s.comic) || (comics.find(c => String(c.id) === String(s.comicId) || (s.title && c.title && c.title.toLowerCase().trim() === s.title.toLowerCase().trim())) && getComicCover(comics.find(c => String(c.id) === String(s.comicId) || (s.title && c.title && c.title.toLowerCase().trim() === s.title.toLowerCase().trim())))) || '';
+
                         return (
-                          <div key={s.id} className="mod-submission-item">
+                          <div 
+                            key={s.id} 
+                            className="mod-submission-item"
+                            onClick={() => setActiveNav('review-queue')}
+                            style={{ cursor: 'pointer' }}
+                            title="Click to review submission in Review Queue"
+                          >
                             <div className="mod-sub-thumb">
-                              {s.title.toLowerCase().includes('sword') ? '⚔️' : s.title.toLowerCase().includes('spirit') ? '🔮' : s.title.toLowerCase().includes('demon') ? '👑' : '📚'}
+                              {coverSrc ? (
+                                <img 
+                                  src={coverSrc} 
+                                  alt={s.title || 'Comic Cover'} 
+                                  className="mod-sub-thumb-img"
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    const fallback = e.target.nextElementSibling;
+                                    if (fallback) fallback.style.display = 'flex';
+                                  }}
+                                />
+                              ) : null}
+                              <div 
+                                className="mod-sub-thumb-fallback"
+                                style={{ display: coverSrc ? 'none' : 'flex' }}
+                              >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/>
+                                  <path d="M6 6h10"/>
+                                  <path d="M6 10h10"/>
+                                </svg>
+                              </div>
                             </div>
                             <div className="mod-sub-details">
                               <div className="mod-sub-title" title={s.title}>{s.title}</div>
                               <div className="mod-sub-meta">
-                                {isAuthor ? 'New Comic Upload' : `Chapter ${s.chapter}`} · {s.submittedBy || 'Author'}
+                                {isAuthor ? 'New Comic Upload' : (s.chapter ? `Chapter ${s.chapter}` : (s.chapterNumber ? `Chapter ${s.chapterNumber}` : 'New Comic Upload'))} · {formatSubmitterName(s.submittedBy || s.author || 'Author')}
                               </div>
                             </div>
                             <span className={`priority-badge ${(s.priority || 'Medium').toLowerCase()}`}>
@@ -2171,7 +2204,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 <div className="mod-overview-col">
                   <div className="mod-overview-card">
                     <div className="mod-overview-card-header">
-                      <h3 className="mod-overview-card-title">Project Teams</h3>
+                      <h3 className="mod-overview-card-title">Best Performing Teams</h3>
                       <span className="mod-overview-link" onClick={() => setActiveNav('project-teams')}>Manage teams</span>
                     </div>
                     <div className="mod-team-cards-row">
@@ -2182,7 +2215,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                         const timeA = new Date(a.createdAt || a.updatedAt || 0).getTime();
                         const timeB = new Date(b.createdAt || b.updatedAt || 0).getTime();
                         return timeB - timeA;
-                      }).slice(0, 6).map(t => (
+                      }).slice(0, 4).map(t => (
                         <div 
                           key={t.id} 
                           className="mod-team-dashboard-card"

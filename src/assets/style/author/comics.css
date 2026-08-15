@@ -547,26 +547,45 @@ html.light .btn-author-action:hover {
 
 .author-detail-hero {
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
-  gap: 26px;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 32px;
   align-items: start;
+  background: var(--author-card-bg);
+  border: 1.5px solid var(--author-border);
+  border-radius: 18px;
+  padding: 28px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .author-detail-cover {
-  width: 250px;
-  height: 376px;
-  border-radius: 12px;
-  background: var(--author-card-bg);
-  border: 1px solid var(--author-border);
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7), 0 0 25px rgba(168, 85, 247, 0.3);
   color: var(--author-text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+.author-detail-cover:hover {
+  transform: translateY(-4px);
+  border-color: rgba(168, 85, 247, 0.6);
+}
+
+.author-detail-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .author-detail-info {
-  padding-top: 4px;
+  padding-top: 2px;
 }
 
 .author-detail-title-row {
@@ -580,50 +599,65 @@ html.light .btn-author-action:hover {
 .author-detail-title-row h1 {
   margin: 0;
   color: var(--author-text-primary);
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 800;
   letter-spacing: -0.5px;
 }
 
 .author-detail-info p {
   color: var(--author-text-secondary);
-  font-size: 16px;
+  font-size: 15px;
   margin: 0 0 18px;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .author-detail-stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 14px;
-  margin-top: 18px;
+  margin-top: 22px;
 }
 
 .author-detail-stat-card {
-  background: var(--author-card-bg);
-  border: 1px solid var(--author-border);
-  border-radius: 8px;
-  padding: 16px 18px;
+  background: rgba(22, 16, 38, 0.85);
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  padding: 16px 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.author-detail-stat-card:hover {
+  border-color: rgba(168, 85, 247, 0.6);
+  transform: translateY(-2px);
+  background: rgba(28, 20, 48, 0.95);
+  box-shadow: 0 8px 24px rgba(168, 85, 247, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .author-detail-stat-card span {
   display: block;
-  color: var(--author-text-secondary);
-  font-size: 13px;
-  margin-bottom: 8px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 6px;
 }
 
 .author-detail-stat-card strong {
-  color: var(--author-text-primary);
-  font-size: 22px;
+  color: #ffffff;
+  font-size: 24px;
   font-weight: 800;
+  letter-spacing: -0.5px;
 }
 
 .author-chapter-section-card {
   background: var(--author-card-bg);
-  border: 1px solid var(--author-border);
-  border-radius: 12px;
+  border: 1.5px solid var(--author-border);
+  border-radius: 16px;
   overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  margin-top: 28px;
 }
 
 .author-chapter-section-head {
@@ -631,8 +665,8 @@ html.light .btn-author-action:hover {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 18px 22px;
-  border-bottom: 1px solid var(--author-border);
+  padding: 20px 24px;
+  border-bottom: 1.5px solid var(--author-border);
 }
 
 .author-chapter-section-head h2 {

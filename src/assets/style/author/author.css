@@ -5,22 +5,22 @@
   --author-topbar-h: 64px;
 
   /* Colors (Default Dark Theme) */
-  --author-bg: #0d0919;
-  --author-sidebar-bg: #0a0714;
+  --author-bg: #0b0716;
+  --author-sidebar-bg: #090512;
   --author-sidebar-hover: #1b1429;
   --author-sidebar-active: #2b223c;
-  --author-topbar-bg: #110d21;
-  --author-card-bg: #151125;
-  --author-text-primary: #f1f5f9;
+  --author-topbar-bg: #100a1f;
+  --author-card-bg: #140d24;
+  --author-text-primary: #f8fafc;
   --author-text-secondary: #94a3b8;
   --author-text-light: #64748b;
   --author-text-muted: #475569;
   --author-accent: #aa3bff; /* From index.css */
   --author-accent-hover: #c084fc;
-  --author-border: rgba(255, 255, 255, 0.08);
-  --author-border-hover: rgba(255, 255, 255, 0.16);
-  --author-hover-bg: rgba(255, 255, 255, 0.05);
-  --author-workspace-label-bg: rgba(255, 255, 255, 0.06);
+  --author-border: rgba(255, 255, 255, 0.15);
+  --author-border-hover: rgba(168, 85, 247, 0.55);
+  --author-hover-bg: rgba(255, 255, 255, 0.06);
+  --author-workspace-label-bg: rgba(168, 85, 247, 0.18);
 
   /* Statuses */
   --status-published: #10b981;
