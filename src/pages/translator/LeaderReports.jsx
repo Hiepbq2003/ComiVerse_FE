@@ -207,7 +207,7 @@ export default function LeaderReports() {
       {/* ── HEADER ── */}
       <div className="rep-header">
         <div className="rep-title-group">
-          <h1>Translation Review & Reports Dashboard (Project Leader)</h1>
+          <h1>Translation Review & Reports Dashboard</h1>
           <p>Side-by-Side Split View translation review, synchronized scroll verification, typo and typeset resolution.</p>
         </div>
 
