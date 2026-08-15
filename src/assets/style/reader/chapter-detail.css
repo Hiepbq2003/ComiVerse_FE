@@ -143,11 +143,6 @@ html.light {
   align-items: center;
   gap: 12px;
   flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.reader-nav-controls::-webkit-scrollbar {
-  display: none;
 }
 
 .btn-reader-nav {
