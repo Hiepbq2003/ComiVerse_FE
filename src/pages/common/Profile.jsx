@@ -770,7 +770,6 @@ function Profile({ user: userProp }) {
             </div>
 
             <h3 className="profile-sidebar-name">{displayUserName}</h3>
-            <span className="profile-sidebar-joined">Member since 2023</span>
 
             <span className={`profile-role-badge ${roleInfo.className}`}>
               {roleInfo.icon} {roleInfo.label}
