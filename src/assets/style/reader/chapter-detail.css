@@ -69,8 +69,7 @@ html.light {
 }
 
 .home-header.hidden ~ main .reader-control-header {
-  transform: translateY(-100%);
-  top: 0;
+  top: -100px;
   pointer-events: none;
 }
 
