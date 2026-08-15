@@ -760,6 +760,7 @@ html.light .mod-genre-chart-item:hover {
 .mod-report-item.high { border-left-color: var(--mod-red); }
 .mod-report-item.medium { border-left-color: #f59e0b; }
 .mod-report-item.low { border-left-color: var(--mod-green); }
+.mod-report-item.normal { border-left-color: #a855f7; }
 
 .mod-report-title {
   font-size: 13.5px;

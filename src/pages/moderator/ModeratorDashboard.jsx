@@ -2176,23 +2176,74 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 <div className="mod-overview-col">
                   <div className="mod-overview-card">
                     <div className="mod-overview-card-header">
-                      <h3 className="mod-overview-card-title">Forum Reports</h3>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h3 className="mod-overview-card-title">Forum Activity & Reports</h3>
+                        {forumThreads.filter(t => t.isReported).length > 0 && (
+                          <span className="priority-badge high" style={{ fontSize: '10px', padding: '2px 7px' }}>
+                            {forumThreads.filter(t => t.isReported).length} Reported
+                          </span>
+                        )}
+                      </div>
                       <span className="mod-overview-link" onClick={() => setActiveNav('forum')}>View all</span>
                     </div>
                     <div className="mod-report-list">
-                      {forumThreads.filter(t => t.isReported).slice(0, 3).map(t => {
-                        const reason = t.reportReason || 'Violation of community guidelines';
-                        const level = reason.toLowerCase().includes('hate') || reason.toLowerCase().includes('harassment') ? 'high' : reason.toLowerCase().includes('spoiler') ? 'low' : 'medium';
+                      {[...forumThreads].sort((a, b) => {
+                        if (a.isReported && !b.isReported) return -1;
+                        if (!a.isReported && b.isReported) return 1;
+                        if (a.isPinned && !b.isPinned) return -1;
+                        if (!a.isPinned && b.isPinned) return 1;
+                        const timeA = new Date(a.createdAt || a.timestamp || 0).getTime();
+                        const timeB = new Date(b.createdAt || b.timestamp || 0).getTime();
+                        return timeB - timeA;
+                      }).slice(0, 4).map(t => {
+                        const reason = t.reportReason || (t.isReported ? 'Flagged for Moderator Review' : '');
+                        const level = t.isReported 
+                          ? (reason.toLowerCase().includes('hate') || reason.toLowerCase().includes('harassment') ? 'high' : reason.toLowerCase().includes('spoiler') ? 'low' : 'medium')
+                          : 'normal';
+                        const authorName = typeof t.author === 'object' ? (t.author?.username || t.author?.name || 'User') : (t.author || 'User');
+                        const repliesCount = t.replies ?? t.replyCount ?? 0;
+
                         return (
-                          <div key={t.id} className={`mod-report-item ${level}`}>
-                            <h4 className="mod-report-title">{t.title}</h4>
-                            <span className="mod-report-reason">{reason}</span>
-                            <span className="mod-report-time">{formatTimeAgo(t.createdAt || t.timestamp)}</span>
+                          <div 
+                            key={t.id} 
+                            className={`mod-report-item ${level}`}
+                            onClick={() => setActiveNav('forum')}
+                            style={{ cursor: 'pointer' }}
+                            title="Click to manage thread in Forum workspace"
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1 }}>
+                                {t.isPinned && <span title="Pinned thread" style={{ fontSize: '12px', flexShrink: 0 }}>📌</span>}
+                                {t.isLocked && <span title="Locked thread" style={{ fontSize: '12px', flexShrink: 0 }}>🔒</span>}
+                                <h4 className="mod-report-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.title}</h4>
+                              </div>
+                              {t.isReported ? (
+                                <span className={`priority-badge ${level}`} style={{ fontSize: '10px', padding: '2px 6px', flexShrink: 0 }}>REPORTED</span>
+                              ) : (
+                                <span className="mod-forum-cat-badge" style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '6px', background: 'rgba(168, 85, 247, 0.12)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.25)', flexShrink: 0 }}>
+                                  {t.category || 'General'}
+                                </span>
+                              )}
+                            </div>
+                            
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11.5px', color: 'var(--mod-text-secondary)', marginTop: '2px' }}>
+                              <span>By <strong style={{ color: 'var(--mod-text-primary)', fontWeight: 600 }}>{authorName}</strong></span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span>💬 {repliesCount} {repliesCount === 1 ? 'reply' : 'replies'}</span>
+                                <span className="mod-report-time">{formatTimeAgo(t.createdAt || t.timestamp)}</span>
+                              </div>
+                            </div>
+
+                            {t.isReported && reason && (
+                              <div style={{ fontSize: '11px', color: '#f87171', background: 'rgba(239, 68, 68, 0.1)', padding: '3px 8px', borderRadius: '4px', marginTop: '4px' }}>
+                                ⚠️ Reason: {reason}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
-                      {forumThreads.filter(t => t.isReported).length === 0 && (
-                        <p style={{ fontStyle: 'italic', fontSize: '13px', color: 'var(--mod-text-muted)', margin: 0 }}>No reported forum threads.</p>
+                      {forumThreads.length === 0 && (
+                        <p style={{ fontStyle: 'italic', fontSize: '13px', color: 'var(--mod-text-muted)', margin: 0 }}>No forum discussions found.</p>
                       )}
                     </div>
                   </div>
