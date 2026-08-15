@@ -1717,7 +1717,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               {/* Core Metrics Grid */}
               <div className="mod-core-metrics-grid">
                 {/* Pending Reviews */}
-                <div className="mod-core-card" style={{ borderLeft: '4px solid var(--mod-purple)' }}>
+                <div className="mod-core-card" style={{ borderLeft: '4px solid var(--mod-purple)' }} onClick={() => setActiveNav('review-queue')}>
                   <div className="mod-core-header">
                     <span className="mod-core-title">Pending Reviews</span>
                     <span className="mod-core-icon" style={{ background: 'rgba(168, 85, 247, 0.12)', color: 'var(--mod-purple)' }}>⏳</span>
@@ -1737,7 +1737,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 </div>
 
                 {/* Total Comics */}
-                <div className="mod-core-card" style={{ borderLeft: '4px solid #3b82f6' }}>
+                <div className="mod-core-card" style={{ borderLeft: '4px solid #3b82f6' }} onClick={() => setActiveNav('comic-management')}>
                   <div className="mod-core-header">
                     <span className="mod-core-title">Total Comics</span>
                     <span className="mod-core-icon" style={{ background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6' }}>📚</span>
@@ -1757,7 +1757,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 </div>
 
                 {/* Active Teams */}
-                <div className="mod-core-card" style={{ borderLeft: '4px solid var(--mod-green)' }}>
+                <div className="mod-core-card" style={{ borderLeft: '4px solid var(--mod-green)' }} onClick={() => setActiveNav('project-teams')}>
                   <div className="mod-core-header">
                     <span className="mod-core-title">Active Teams</span>
                     <span className="mod-core-icon" style={{ background: 'rgba(16, 185, 129, 0.12)', color: 'var(--mod-green)' }}>⚡</span>
@@ -1777,7 +1777,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 </div>
 
                 {/* Flagged Messages */}
-                <div className="mod-core-card" style={{ borderLeft: '4px solid var(--mod-red)' }}>
+                <div className="mod-core-card" style={{ borderLeft: '4px solid var(--mod-red)' }} onClick={() => setActiveNav('chat-monitor')}>
                   <div className="mod-core-header">
                     <span className="mod-core-title">Flagged Chats</span>
                     <span className="mod-core-icon" style={{ background: 'rgba(239, 68, 68, 0.12)', color: 'var(--mod-red)' }}>💬</span>
