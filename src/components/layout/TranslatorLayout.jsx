@@ -197,10 +197,10 @@ function TranslatorLayout({ children }) {
         {/* Topbar */}
         <header className="translator-topbar">
           <div className="translator-topbar-left">
-            <span style={{ color: 'var(--trans-text-secondary)' }}>Workspace:</span>
-            <span className="workspace-label" style={{ fontWeight: '600', color: 'var(--trans-text-primary)' }}>
+            <span className="workspace-prefix">Workspace</span>
+            <div className="workspace-tag" style={{ marginTop: 0, fontSize: '12px', padding: '6px 12px' }}>
               {roleUpper === 'PROJECT_LEADER' ? 'Project Leader' : 'Translator'}
-            </span>
+            </div>
           </div>
 
           <div className="translator-topbar-right">
