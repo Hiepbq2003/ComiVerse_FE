@@ -347,10 +347,22 @@ html.light .author-bank-security-badge {
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
+html.light .author-comic-detail-page .author-detail-hero {
+  background: var(--author-card-bg);
+  border: 1px solid var(--author-border);
+  box-shadow: var(--author-shadow-lg);
+}
+
 .author-comic-detail-page .author-detail-stat-card {
   background: linear-gradient(145deg, rgba(32, 22, 60, 0.95) 0%, rgba(19, 13, 36, 0.98) 100%);
   border: 1.5px solid rgba(168, 85, 247, 0.45);
   border-radius: 14px;
+}
+
+html.light .author-comic-detail-page .author-detail-stat-card {
+  background: var(--author-card-bg);
+  border: 1px solid var(--author-border);
+  box-shadow: var(--author-shadow);
 }
 
 .author-comic-detail-page .author-detail-stat-card span {
@@ -361,10 +373,18 @@ html.light .author-bank-security-badge {
   letter-spacing: 1px;
 }
 
+html.light .author-comic-detail-page .author-detail-stat-card span {
+  color: var(--author-text-secondary);
+}
+
 .author-comic-detail-page .author-detail-stat-card strong {
   color: #ffffff;
   font-weight: 800;
   font-size: 26px;
+}
+
+html.light .author-comic-detail-page .author-detail-stat-card strong {
+  color: var(--author-text-primary);
 }
 
 .author-comic-detail-page .author-chapter-section-card {
@@ -372,6 +392,11 @@ html.light .author-bank-security-badge {
   border: 1.5px solid rgba(255, 255, 255, 0.18);
   border-radius: var(--author-radius-lg, 16px);
   overflow: hidden;
+}
+
+html.light .author-comic-detail-page .author-chapter-section-card {
+  background: var(--author-card-bg);
+  border: 1px solid var(--author-border);
 }
 
 .author-comic-detail-page .author-chapter-section-head {
@@ -395,9 +420,17 @@ html.light .author-bank-security-badge {
   font-weight: 600;
 }
 
+html.light .author-comic-detail-page .author-chapter-table thead th {
+  background: var(--author-hover-bg);
+}
+
 .author-comic-detail-page .author-chapter-table tbody tr {
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
   transition: background var(--author-transition);
+}
+
+html.light .author-comic-detail-page .author-chapter-table tbody tr {
+  border-bottom: 1px solid var(--author-border);
 }
 
 .author-comic-detail-page .author-chapter-table tbody tr:hover {
