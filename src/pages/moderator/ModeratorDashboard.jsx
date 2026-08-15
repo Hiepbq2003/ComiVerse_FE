@@ -552,12 +552,31 @@ function ModeratorDashboard() {
       ])
       const authUser = getAuth()?.user;
       const rawComics = comicsData || [];
+      const teamsList = teamsData || [];
+
+      // Build Map for fast comic title lookups
+      const comicTitleMap = new Map();
+      rawComics.forEach(c => {
+        if (c && c.title) {
+          const clean = String(c.title).trim().toLowerCase().replace(/[^a-z0-9]/gi, '').replace(/s$/, '');
+          comicTitleMap.set(clean, c);
+        }
+      });
+
+      // Build Map for fast team comicName lookups
+      const teamComicNameMap = new Map();
+      teamsList.forEach(t => {
+        if (t && t.comicName) {
+          teamComicNameMap.set(t.comicName.toLowerCase(), t);
+        }
+      });
       
       // Auto-link submissions to real DB IDs if titles match
       setSubmissions(prevSubs => (prevSubs || []).map(sub => {
         if (!sub) return sub;
         const subTitle = sub.title || sub.comicName || sub.comicTitle;
-        const dbMatch = rawComics.find(c => c && isTitleMatch(c.title, subTitle));
+        const cleanSubTitle = subTitle ? String(subTitle).trim().toLowerCase().replace(/[^a-z0-9]/gi, '').replace(/s$/, '') : '';
+        const dbMatch = comicTitleMap.get(cleanSubTitle);
         if (dbMatch) {
           return {
             ...sub,
@@ -568,9 +587,9 @@ function ModeratorDashboard() {
       }));
 
       const mappedComics = syncApprovedComics(
-        (rawComics || []).filter(c => c.moderationStatus === 'PUBLISHED' || c.moderationStatus === 'UNPUBLISHED').map(c => {
+        rawComics.filter(c => c.moderationStatus === 'PUBLISHED' || c.moderationStatus === 'UNPUBLISHED').map(c => {
           const merged = syncComicWithLocalOverride(c);
-          const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === merged.title.toLowerCase())
+          const team = merged.title ? teamComicNameMap.get(merged.title.toLowerCase()) : undefined;
           const cCover = getComicCover(merged);
           return {
             ...merged,
@@ -1841,7 +1860,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
               {/* Secondary Metrics Row */}
               <div className="mod-sec-metrics-grid">
-                <div className="mod-sec-card">
+                <div className="mod-sec-card" style={{ cursor: 'pointer' }} onClick={() => setActiveNav('project-teams')}>
                   <span className="mod-sec-icon-circle">🏢</span>
                   <div className="mod-sec-details">
                     <span className="mod-sec-value">
@@ -1881,7 +1900,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                   </div>
                 </div>
 
-                <div className="mod-sec-card">
+                <div className="mod-sec-card" style={{ cursor: 'pointer' }} onClick={() => setActiveNav('reports')}>
                   <span className="mod-sec-icon-circle">🚩</span>
                   <div className="mod-sec-details">
                     <span className="mod-sec-value">
