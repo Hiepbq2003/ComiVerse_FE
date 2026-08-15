@@ -4,16 +4,24 @@ if (typeof window !== 'undefined' && !window.global) {
 
 // Global handler for Vite dynamic import chunk loading errors (e.g., after a new deployment on Vercel)
 window.addEventListener('vite:preloadError', (event) => {
-  console.warn('Vite preload error (likely due to new deployment), reloading page...');
-  window.location.reload();
+  console.warn('Vite preload error (likely due to new deployment), reloading page with cache busting...');
+  const currentUrl = new URL(window.location.href);
+  if (!currentUrl.searchParams.has('cb')) {
+    currentUrl.searchParams.set('cb', Date.now());
+    window.location.replace(currentUrl.toString());
+  }
 });
 
 // Fallback for general unhandled promise rejections related to dynamic imports
 window.addEventListener('unhandledrejection', (event) => {
   if (event.reason && event.reason.message && event.reason.message.includes('Failed to fetch dynamically imported module')) {
-    console.warn('Dynamic import failed (likely due to new deployment), reloading page...');
+    console.warn('Dynamic import failed (likely due to new deployment), reloading page with cache busting...');
     event.preventDefault();
-    window.location.reload();
+    const currentUrl = new URL(window.location.href);
+    if (!currentUrl.searchParams.has('cb')) {
+      currentUrl.searchParams.set('cb', Date.now());
+      window.location.replace(currentUrl.toString());
+    }
   }
 });
 

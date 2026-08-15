@@ -14,7 +14,7 @@ function TranslatorLayout({ children }) {
   const { theme, toggleTheme } = useTheme()
   const userName = user?.fullName || user?.username || 'Translator'
   const roleUpper = (user?.role || '').toUpperCase().replace(/[\s-]+/g, '_')
-  const workspaceLabel = roleUpper === 'PROJECT_LEADER' ? 'Project Leader' : 'Translator'
+  const workspaceLabel = 'Translator'
 
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification()
 
@@ -198,10 +198,10 @@ function TranslatorLayout({ children }) {
         {/* Topbar */}
         <header className="translator-topbar">
           <div className="translator-topbar-left">
-            <span className="workspace-prefix">Workspace</span>
-            <div className="workspace-tag" style={{ marginTop: 0, fontSize: '12px', padding: '6px 12px' }}>
+            <span style={{ color: 'var(--trans-text-secondary)' }}>Workspace:</span>
+            <span className="workspace-label" style={{ fontWeight: '600', color: 'var(--trans-text-primary)' }}>
               {workspaceLabel}
-            </div>
+            </span>
           </div>
 
           <div className="translator-topbar-right">
