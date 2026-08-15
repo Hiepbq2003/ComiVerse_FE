@@ -439,13 +439,15 @@ function ComicDetail() {
               >
                 <Heart size={18} fill={isLiked ? '#f472b6' : 'none'} color={isLiked ? '#f472b6' : '#ffffff'} /> {isLiked ? 'Liked' : 'Like'}
               </button>
-              <button
-                onClick={() => setShowReportModal(true)}
-                className="hero-btn-glass hero-btn-report"
-                title="Report issues with this comic or upload"
-              >
-                <Flag size={18} /> Report
-              </button>
+              {(!user || (user.role?.toUpperCase() !== 'MODERATOR' && user.role?.toUpperCase() !== 'ADMIN')) && (
+                <button
+                  onClick={() => setShowReportModal(true)}
+                  className="hero-btn-glass hero-btn-report"
+                  title="Report issues with this comic or upload"
+                >
+                  <Flag size={18} /> Report
+                </button>
+              )}
             </div>
 
             {/* Interactive Star Rating */}
