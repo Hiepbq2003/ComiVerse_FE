@@ -228,6 +228,11 @@
   color: var(--text-h, #08060d);
 }
 
+html.light .author-tab-btn:hover {
+  background: rgba(170, 59, 255, 0.08);
+  color: var(--author-accent);
+}
+
 .author-tab-btn.active {
   background: var(--author-primary, #8b5cf6);
   color: #ffffff;

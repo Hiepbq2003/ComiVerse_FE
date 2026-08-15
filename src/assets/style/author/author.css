@@ -69,7 +69,7 @@ html.light {
   --author-accent-hover: #8e2bde;
   --author-border: #e2e8f0;
   --author-border-hover: #cbd5e1;
-  --author-hover-bg: #f1f5f9;
+  --author-hover-bg: rgba(170, 59, 255, 0.08);
   --author-workspace-label-bg: #f1f5f9;
 
   /* Statuses */

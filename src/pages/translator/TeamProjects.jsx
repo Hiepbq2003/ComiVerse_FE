@@ -1087,9 +1087,10 @@ function TeamProjects() {
   const ITEMS_PER_PAGE = 4
 
   const auth = getAuth()
-  const authUser = auth?.user
-  const userFullName = authUser?.fullName || authUser?.username || 'Translator'
-  const user = authUser || {}
+  const currentUserName = (auth?.user?.fullName || '').toLowerCase().trim()
+  const currentUsername = (auth?.user?.username || '').toLowerCase().trim()
+  const currentUserId = auth?.user?.id || auth?.user?.userId
+  const user = auth?.user || {}
 
   const [allMatchedTeams, setAllMatchedTeams] = useState([])
 
@@ -1137,9 +1138,6 @@ function TeamProjects() {
   // Instant In-Memory Multi-Field Filtering
   const filteredProjects = useMemo(() => {
     const cleanSearch = (searchTerm || '').toLowerCase().trim()
-    const currentUserName = (user.fullName || '').toLowerCase().trim()
-    const currentUsername = (user.username || '').toLowerCase().trim()
-    const currentUserId = user.id || user.userId
 
     return allMatchedTeams.filter(p => {
       // 1. Search Query
@@ -1185,7 +1183,8 @@ function TeamProjects() {
 
       return true
     })
-  }, [allMatchedTeams, searchTerm, sourceLang, targetLang, statusFilter, roleFilter, user])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allMatchedTeams, searchTerm, sourceLang, targetLang, statusFilter, roleFilter, currentUserName, currentUsername, currentUserId])
 
   // Sync Paging State instantly
   useEffect(() => {
