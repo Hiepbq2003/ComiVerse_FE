@@ -2634,69 +2634,44 @@ function TeamProjects() {
     return (
       <>
         <WorkspaceDetailView
-        selectedDetails={selectedDetails}
-        setSelectedDetails={setSelectedDetails}
-        tasksLoading={tasksLoading}
-        onBackToProjects={() => {
-          localStorage.removeItem('comiverse_active_project_id');
-          setSelectedDetails(null);
-        }}
-        workspaceTab={workspaceTab}
-        setWorkspaceTab={setWorkspaceTab}
-        isCurrentLeader={isCurrentLeader}
-        members={members}
-        memberSearch={memberSearch}
-        setMemberSearch={setMemberSearch}
-        onMembersLoaded={setMembers}
-        onLeaveTeam={handleLeaveTeam}
-        onRemoveMember={handleRemoveMember}
-        bannedUsers={bannedUsers}
-        onUnbanUser={handleUnbanUser}
-        joinRequests={joinRequests}
-        onApproveRequest={handleApproveRequest}
-        onRejectRequest={handleRejectRequest}
-        onBanUser={handleBanUser}
-        newPostText={newPostText}
-        setNewPostText={setNewPostText}
-        onPostAnnouncement={handlePostAnnouncement}
-        announcements={announcements}
-        onLikePost={handleLikePost}
-        onTogglePinPost={handleTogglePinPost}
-        <ProjectWorkspace
           selectedDetails={selectedDetails}
-          onBack={() => {
+          setSelectedDetails={setSelectedDetails}
+          tasksLoading={tasksLoading}
+          onBackToProjects={() => {
+            localStorage.removeItem('comiverse_active_project_id');
             setSelectedDetails(null);
-            setWorkspaceTab('home');
           }}
           workspaceTab={workspaceTab}
           setWorkspaceTab={setWorkspaceTab}
-          loadingWorkspace={loadingWorkspace}
-          userFullName={userFullName}
-          authUser={authUser}
-          announcements={announcements}
+          isCurrentLeader={isCurrentLeader}
+          members={members}
+          memberSearch={memberSearch}
+          setMemberSearch={setMemberSearch}
+          onMembersLoaded={setMembers}
+          onLeaveTeam={handleLeaveTeam}
+          onRemoveMember={handleRemoveMember}
+          bannedUsers={bannedUsers}
+          onUnbanUser={handleUnbanUser}
+          joinRequests={joinRequests}
+          onApproveRequest={handleApproveRequest}
+          onRejectRequest={handleRejectRequest}
+          onBanUser={handleBanUser}
           newPostText={newPostText}
           setNewPostText={setNewPostText}
           onPostAnnouncement={handlePostAnnouncement}
+          announcements={announcements}
+          onLikePost={handleLikePost}
           onTogglePinPost={handleTogglePinPost}
-          onEditPost={handleEditPost}
           onDeletePost={handleDeletePost}
+          onEditPost={handleEditPost}
           onAddComment={handleAddComment}
           onLikeComment={handleLikeComment}
           onEditComment={handleEditComment}
           onDeleteComment={handleDeleteComment}
-          joinRequests={joinRequests}
-          onAcceptJoinRequest={handleAcceptJoinRequest}
-          onRejectJoinRequest={handleRejectJoinRequest}
-          onBanUserFromRequest={handleOpenBanModal}
-          members={members}
-          onRemoveMember={handleRemoveMember}
-          onBanMember={handleOpenBanModal}
-          onUnbanUser={handleOpenUnbanModal}
-          bannedUsers={bannedUsers}
-          memberSearch={memberSearch}
-          setMemberSearch={setMemberSearch}
-          tasksLoading={tasksLoading}
-          tasks={tasks}
+          comicName={comicName}
+          tasks={boardTasks}
+          activeTasks={activeTasks}
+          pausedTasks={pausedTasks}
           lockedColumns={lockedColumns}
           setLockedColumns={setLockedColumns}
           highlightedColumns={highlightedColumns}
