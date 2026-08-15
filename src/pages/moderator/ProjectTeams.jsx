@@ -566,7 +566,7 @@ function ProjectTeams({
                     <span className="stat-pill">👥 {team.membersCount || 1} members</span>
                     <span className="stat-pill">📖 {team.chaptersCount || 0} chs</span>
                     <span className="stat-pill" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                      ✅ {team.completedTasksCount || 0} done
+                      ✅ {team.completedTasksCount ?? team.totalCompletedTasks ?? 0} done
                     </span>
                     <span className="stat-pill" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
                       ⏳ {team.inProgressTasksCount || 0} ongoing tasks

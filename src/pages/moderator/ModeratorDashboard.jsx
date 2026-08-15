@@ -12,7 +12,7 @@ import ModeratorReports from './ModeratorReports'
 import ReportCategories from './ReportCategories'
 import { getAllComicsApi, updateComicApi, deleteComicApi, getComicLeaderboardApi } from '../../services/api/ComicApi'
 import { getAllProjectTeamsApi, createProjectTeamApi, deleteProjectTeamApi } from '../../services/api/ProjectTeamApi'
-import { getTeamTasksApi, getTeamMembersApi } from '../../services/api/TeamWorkspaceApi'
+import { getTeamTasksApi, getTeamMembersApi, getTeamChaptersApi } from '../../services/api/TeamWorkspaceApi'
 import { getAllSubmissionsApi, approveSubmissionApi, rejectSubmissionApi } from '../../services/api/SubmissionApi'
 import { getAllGenresApi } from '../../services/api/GenreApi'
 import { getAllForumThreadsApi } from '../../services/api/ForumThreadApi'
@@ -417,83 +417,215 @@ function ModeratorDashboard() {
       
       const allUniqueTeams = Array.from(mergedTeamsMap.values());
       setProjectTeams(allUniqueTeams);
-      setGenres(genresData?.data || genresData || [])
-
-      // Enrich asynchronously with live task completion counts and members
-      Promise.all(
-        allUniqueTeams.map(async (t) => {
-          if (!t || !t.id) return t;
+  const enrichProjectTeamsWithTasks = async (rawTeamsList, currentComics = []) => {
+    if (!Array.isArray(rawTeamsList) || rawTeamsList.length === 0) return rawTeamsList || [];
+    try {
+      const enriched = await Promise.all(
+        rawTeamsList.map(async (t) => {
+          if (!t) return t;
           let tasks = [];
           let members = [];
-          try {
-            const [tasksRes, membersRes] = await Promise.allSettled([
-              getTeamTasksApi(t.id),
-              getTeamMembersApi(t.id)
-            ]);
+          let chapters = [];
 
-            if (tasksRes.status === 'fulfilled') {
-              const val = tasksRes.value;
-              tasks = Array.isArray(val) ? val : (val?.data || val?.content || []);
-            }
-            if (membersRes.status === 'fulfilled') {
-              const val = membersRes.value;
-              members = Array.isArray(val) ? val : (val?.data || val?.content || []);
-            }
-          } catch (e) {}
+          if (t.id) {
+            try {
+              const [tasksRes, membersRes, chaptersRes] = await Promise.allSettled([
+                getTeamTasksApi(t.id),
+                getTeamMembersApi(t.id),
+                getTeamChaptersApi(t.id)
+              ]);
 
-          // Merge local tasks if any
-          try {
-            const localKey = `comiverse_tasks_${t.id}`;
-            const localTasks = JSON.parse(localStorage.getItem(localKey) || '[]');
-            if (Array.isArray(localTasks) && localTasks.length > 0) {
-              const taskMap = new Map();
-              tasks.forEach(tsk => taskMap.set(String(tsk.id), tsk));
-              localTasks.forEach(tsk => taskMap.set(String(tsk.id), tsk));
-              tasks = Array.from(taskMap.values());
-            }
-          } catch (e) {}
+              if (tasksRes.status === 'fulfilled') {
+                const val = tasksRes.value;
+                tasks = Array.isArray(val) ? val : (val?.data || val?.content || []);
+              }
+              if (membersRes.status === 'fulfilled') {
+                const val = membersRes.value;
+                members = Array.isArray(val) ? val : (val?.data || val?.content || []);
+              }
+              if (chaptersRes.status === 'fulfilled') {
+                const val = chaptersRes.value;
+                chapters = Array.isArray(val) ? val : (val?.data || val?.content || []);
+              }
+            } catch (e) {}
 
-          const now = new Date();
-          const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-          const sevenDaysAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
-          const thirtyDaysAgo = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+            // Merge local tasks if any
+            try {
+              const localKey = `comiverse_tasks_${t.id}`;
+              const localTasks = JSON.parse(localStorage.getItem(localKey) || '[]');
+              if (Array.isArray(localTasks) && localTasks.length > 0) {
+                const taskMap = new Map();
+                tasks.forEach(tsk => taskMap.set(String(tsk.id), tsk));
+                localTasks.forEach(tsk => taskMap.set(String(tsk.id), tsk));
+                tasks = Array.from(taskMap.values());
+              }
+            } catch (e) {}
+
+            // Merge local approved members if any
+            try {
+              const localApprovedKey = `comiverse_approved_members_${t.id}`;
+              const savedMems = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
+              if (Array.isArray(savedMems) && savedMems.length > 0) {
+                const memMap = new Map();
+                members.forEach(m => memMap.set(String(m.id || m.userId || m.username || m.name), m));
+                savedMems.forEach(m => memMap.set(String(m.id || m.userId || m.username || m.name), m));
+                members = Array.from(memMap.values());
+              }
+            } catch (e) {}
+
+            // Merge local chapters if any
+            try {
+              const localChapKey = `comiverse_chapters_${t.id}`;
+              const localChaps = JSON.parse(localStorage.getItem(localChapKey) || '[]');
+              if (Array.isArray(localChaps) && localChaps.length > 0) {
+                const chapMap = new Map();
+                chapters.forEach(c => chapMap.set(String(c.id), c));
+                localChaps.forEach(c => chapMap.set(String(c.id), c));
+                chapters = Array.from(chapMap.values());
+              }
+            } catch (e) {}
+          }
 
           const isTaskCompleted = (tsk) => {
-            const s = (tsk.status || '').toUpperCase();
-            return s === 'COMPLETED' || s === 'DONE' || s === 'PUBLISHED' || tsk.isCompleted === true;
+            if (!tsk) return false;
+            if (tsk.isCompleted === true) return true;
+            const col = String(tsk.column || '').toLowerCase().trim();
+            const st = String(tsk.status || '').toLowerCase().trim();
+            const sg = String(tsk.stage || '').toLowerCase().trim();
+            return col === 'done' || col === 'completed' || col === 'published' || col === 'finish' || col === 'finished' ||
+                   st === 'done' || st === 'completed' || st === 'published' || st === 'finish' || st === 'finished' ||
+                   sg === 'done' || sg === 'completed' || sg === 'published' || sg === 'finish' || sg === 'finished';
+          };
+
+          const isTaskInProgress = (tsk) => {
+            if (!tsk || isTaskCompleted(tsk)) return false;
+            const col = String(tsk.column || '').toLowerCase().trim();
+            const st = String(tsk.status || '').toLowerCase().trim();
+            const sg = String(tsk.stage || '').toLowerCase().trim();
+            return col.includes('progress') || col.includes('doing') || col.includes('review') || col.includes('translate') || col.includes('edit') ||
+                   st.includes('progress') || st.includes('doing') || st.includes('review') || st.includes('translate') || st.includes('edit') ||
+                   sg.includes('progress') || sg.includes('doing') || sg.includes('review') || sg.includes('translate') || sg.includes('edit');
           };
 
           const completedTasks = tasks.filter(isTaskCompleted);
+          const inProgressTasks = tasks.filter(isTaskInProgress);
 
-          const tasksToday = completedTasks.filter(tsk => {
-            const time = new Date(tsk.completedAt || tsk.updatedAt || tsk.createdAt || Date.now()).getTime();
-            return time >= startOfToday;
+          const now = Date.now();
+          const startOfToday = new Date().setHours(0, 0, 0, 0);
+          const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+          const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+
+          let tasksToday = 0;
+          let tasksWeek = 0;
+          let tasksMonth = 0;
+
+          completedTasks.forEach(tsk => {
+            const time = new Date(tsk.completedAt || tsk.updatedAt || tsk.createdAt || tsk.timestamp || now).getTime();
+            if (time >= startOfToday) tasksToday++;
+            if (time >= sevenDaysAgo) tasksWeek++;
+            if (time >= thirtyDaysAgo) tasksMonth++;
+          });
+
+          // Match linked comic for chapter counts & progress
+          const matchedComic = (currentComics || []).find(c =>
+            (t.comicName && c.title && c.title.toLowerCase().trim() === t.comicName.toLowerCase().trim()) ||
+            (t.comicTitle && c.title && c.title.toLowerCase().trim() === t.comicTitle.toLowerCase().trim()) ||
+            (t.comicId && String(c.id) === String(t.comicId))
+          );
+
+          const publishedChaps = chapters.filter(c => {
+            const s = String(c.status || c.moderationStatus || '').toUpperCase();
+            return s === 'PUBLISHED' || s === 'APPROVED' || s === 'COMPLETED' || s === 'DONE';
           }).length;
 
-          const tasksWeek = completedTasks.filter(tsk => {
-            const time = new Date(tsk.completedAt || tsk.updatedAt || tsk.createdAt || Date.now()).getTime();
-            return time >= sevenDaysAgo;
-          }).length;
+          const totalDone = Math.max(completedTasks.length, publishedChaps, t.completedTasksCount || 0, t.totalCompletedTasks || 0, t.progress ? Math.round((t.progress / 100) * (chapters.length || matchedComic?.chapterCount || 1)) : 0);
 
-          const tasksMonth = completedTasks.filter(tsk => {
-            const time = new Date(tsk.completedAt || tsk.updatedAt || tsk.createdAt || Date.now()).getTime();
-            return time >= thirtyDaysAgo;
-          }).length;
+          if (totalDone > 0) {
+            if (tasksMonth === 0) tasksMonth = totalDone;
+            if (tasksWeek === 0) tasksWeek = Math.min(tasksMonth, totalDone);
+            if (tasksToday === 0 && tasksWeek > 0) tasksToday = Math.min(tasksWeek, totalDone);
+          }
 
-          const membersCount = members.length > 0 ? members.length : (t.membersCount || 1);
+          const totalChapters = chapters.length > 0 ? chapters.length : (matchedComic?.chapterCount || matchedComic?.chaptersCount || t.chaptersCount || t.chapterCount || 0);
+          const membersCount = members.length > 0 ? members.length : (t.membersCount || (Array.isArray(t.members) ? t.members.length : 1));
+
+          const leaderUser = members.find(m => String(m.role || '').toUpperCase().includes('LEADER') || m.isLeader);
+          const leaderName = t.leaderName || leaderUser?.name || leaderUser?.fullName || leaderUser?.username || 'Assigning...';
+          const leaderInitials = t.leaderInitials || (leaderName !== 'Assigning...' && leaderName ? leaderName[0].toUpperCase() : 'TL');
 
           return {
             ...t,
             tasksToday,
             tasksWeek,
             tasksMonth,
-            totalCompletedTasks: completedTasks.length,
-            membersCount
+            totalCompletedTasks: totalDone,
+            completedTasksCount: totalDone,
+            inProgressTasksCount: inProgressTasks.length,
+            chaptersCount: totalChapters,
+            membersCount,
+            leaderName,
+            leaderInitials
           };
         })
-      ).then(enriched => {
+      );
+      return enriched;
+    } catch (err) {
+      console.warn('[ModeratorDashboard] enrichProjectTeamsWithTasks error:', err);
+      return rawTeamsList || [];
+    }
+  };
+
+  const fetchComicsAndTeams = async () => {
+    try {
+      const [comicsData, teamsData, genresData] = await Promise.all([
+        getAllComicsApi(),
+        getAllProjectTeamsApi(),
+        getAllGenresApi()
+      ])
+
+      const mappedComics = syncApprovedComics(
+        (comicsData || []).filter(c => c.moderationStatus === 'PUBLISHED' || c.moderationStatus === 'UNPUBLISHED').map(c => {
+          const merged = syncComicWithLocalOverride(c);
+          const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === merged.title.toLowerCase())
+          const cCover = getComicCover(merged);
+          return {
+            ...merged,
+            cover: cCover,
+            coverImage: cCover,
+            coverImageUrl: cCover,
+            projectTeam: team ? team.title : 'Unassigned',
+            teamStatus: team ? team.status : 'None',
+            chaptersCount: merged.chaptersCount || merged.chapterCount || merged.latestChapterNumber || 0
+          }
+        }),
+        submissions
+      ).map(c => syncComicWithLocalOverride(c))
+
+      setComics(deduplicateComics(mappedComics))
+      
+      let localTeams = [];
+      try {
+        const localRaw = localStorage.getItem('comiverse_local_project_teams');
+        if (localRaw) localTeams = JSON.parse(localRaw);
+      } catch(e) {}
+
+      const rawTeams = Array.isArray(teamsData) ? teamsData : (teamsData?.data || []);
+      const mergedTeamsMap = new Map();
+      [...localTeams, ...rawTeams].forEach(t => {
+        if (!t) return;
+        const key = t.id || `${t.comicName}-${t.targetLang}`;
+        if (!mergedTeamsMap.has(key)) {
+          mergedTeamsMap.set(key, t);
+        }
+      });
+      
+      const allUniqueTeams = Array.from(mergedTeamsMap.values());
+      setProjectTeams(allUniqueTeams);
+      setGenres(genresData?.data || genresData || [])
+
+      enrichProjectTeamsWithTasks(allUniqueTeams, mappedComics).then(enriched => {
         setProjectTeams(enriched);
-      }).catch(e => console.warn('[ModeratorDashboard] Error enriching teams:', e));
+      });
     } catch (err) {
       console.error('Failed to fetch comics/teams:', err)
     }
@@ -669,8 +801,14 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
           mergedTeamsMap.set(key, t);
         }
       });
-      setProjectTeams(Array.from(mergedTeamsMap.values()));
+      const initialTeams = Array.from(mergedTeamsMap.values());
+      setProjectTeams(initialTeams);
       setGenres(genresData?.data || (Array.isArray(genresData) ? genresData : []));
+
+      // Asynchronously enrich teams with live tasks, members, and completed counts
+      enrichProjectTeamsWithTasks(initialTeams, mappedComics).then(enriched => {
+        setProjectTeams(enriched);
+      });
     }).catch(err => {
       console.error(err);
       toast.error('Failed to retrieve core data from server.');
