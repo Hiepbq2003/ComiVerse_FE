@@ -499,9 +499,9 @@ function TranslatorDashboard() {
               📖
             </div>
           </div>
-          <div className="val">{overallStats.totalChaptersCount} {overallStats.totalChaptersCount === 1 ? 'Chapter' : 'Chapters'}</div>
+          <div className="val">{overallStats.doneCount} {overallStats.doneCount === 1 ? 'Chapter' : 'Chapters'}</div>
           <div className="sub">
-            <span>Total published across assigned series</span>
+            <span>{overallStats.doneCount} completed of {overallStats.totalChaptersCount} total chapters in series</span>
           </div>
         </div>
       </div>
