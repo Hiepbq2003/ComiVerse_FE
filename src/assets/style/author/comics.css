@@ -479,26 +479,39 @@ html.light .btn-author-action:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 24px;
-  padding: 4px 10px;
-  border-radius: 5px;
-  background: #f1f1f1;
-  color: #3f3f46;
-  border: 1px solid transparent;
+  min-height: 28px;
+  padding: 5px 14px;
+  border-radius: 8px;
+  background: rgba(168, 85, 247, 0.16) !important;
+  color: #f3e8ff !important;
+  border: 1.5px solid rgba(168, 85, 247, 0.5) !important;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 10px rgba(168, 85, 247, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.author-genre-pill:hover {
+  background: rgba(168, 85, 247, 0.28) !important;
+  border-color: #c084fc !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 16px rgba(168, 85, 247, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
 }
 
 .author-genre-pills.selectable .author-genre-pill {
-  background: #ffffff;
-  border-color: #e5e7eb;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--author-text-secondary);
   cursor: pointer;
 }
 
 .author-genre-pills.selectable .author-genre-pill.selected {
-  background: #09090b;
-  color: #ffffff;
-  border-color: #09090b;
+  background: rgba(168, 85, 247, 0.25) !important;
+  color: #ffffff !important;
+  border-color: #c084fc !important;
+  box-shadow: 0 2px 12px rgba(168, 85, 247, 0.35);
 }
 
 .author-comic-card-actions {
@@ -619,36 +632,37 @@ html.light .btn-author-action:hover {
 }
 
 .author-detail-stat-card {
-  background: rgba(22, 16, 38, 0.85);
-  border: 1.5px solid rgba(255, 255, 255, 0.16);
-  border-radius: 14px;
-  padding: 16px 20px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(145deg, rgba(32, 22, 60, 0.95) 0%, rgba(19, 13, 36, 0.98) 100%) !important;
+  border: 1.5px solid rgba(168, 85, 247, 0.45) !important;
+  border-radius: 14px !important;
+  padding: 18px 22px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 .author-detail-stat-card:hover {
-  border-color: rgba(168, 85, 247, 0.6);
+  border-color: #c084fc !important;
   transform: translateY(-2px);
-  background: rgba(28, 20, 48, 0.95);
-  box-shadow: 0 8px 24px rgba(168, 85, 247, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  background: linear-gradient(145deg, rgba(44, 30, 80, 0.98) 0%, rgba(26, 17, 48, 1) 100%) !important;
+  box-shadow: 0 12px 30px rgba(168, 85, 247, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
 }
 
 .author-detail-stat-card span {
-  display: block;
-  color: #94a3b8;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  margin-bottom: 6px;
+  display: block !important;
+  color: #cbd5e1 !important;
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  margin-bottom: 8px !important;
 }
 
 .author-detail-stat-card strong {
-  color: #ffffff;
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
+  color: #ffffff !important;
+  font-size: 26px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.5px !important;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 .author-chapter-section-card {

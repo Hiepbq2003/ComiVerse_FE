@@ -347,76 +347,6 @@ function ModeratorDashboard() {
     return comic;
   };
 
-  const fetchComicsAndTeams = async () => {
-    try {
-      const [comicsData, teamsData, genresData] = await Promise.all([
-        getAllComicsApi().catch(err => {
-          console.warn('[ModeratorDashboard] getAllComicsApi fallback:', err?.message || err)
-          return []
-        }),
-        getAllProjectTeamsApi().catch(err => {
-          console.warn('[ModeratorDashboard] getAllProjectTeamsApi fallback:', err?.message || err)
-          return []
-        }),
-        getAllGenresApi().catch(err => {
-          console.warn('[ModeratorDashboard] getAllGenresApi fallback:', err?.message || err)
-          return []
-        })
-      ])
-      const authUser = getAuth()?.user;
-      const rawComics = comicsData || [];
-      
-      // Auto-link submissions to real DB IDs if titles match
-      setSubmissions(prevSubs => (prevSubs || []).map(sub => {
-        if (!sub) return sub;
-        const subTitle = sub.title || sub.comicName || sub.comicTitle;
-        const dbMatch = rawComics.find(c => c && isTitleMatch(c.title, subTitle));
-        if (dbMatch) {
-          return {
-            ...sub,
-            comicId: dbMatch.id
-          };
-        }
-        return sub;
-      }));
-
-      const mappedComics = syncApprovedComics(
-        rawComics.map(c => {
-          const merged = syncComicWithLocalOverride(c);
-          const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === merged.title.toLowerCase())
-          const cCover = getComicCover(merged);
-          return {
-            ...merged,
-            cover: cCover,
-            coverImage: cCover,
-            coverImageUrl: cCover,
-            projectTeam: team ? team.title : 'Unassigned',
-            teamStatus: team ? team.status : 'None',
-            chaptersCount: merged.chaptersCount || merged.chapterCount || merged.latestChapterNumber || 0
-          }
-        }).filter(c => isLanguageInModeratorScope(c.language || c.rawLanguage || c.originalLanguage, authUser)),
-        submissions
-      ).map(c => syncComicWithLocalOverride(c));
-      setComics(deduplicateComics(mappedComics))
-      
-      let localTeams = [];
-      try {
-        const localRaw = localStorage.getItem('comiverse_local_project_teams');
-        if (localRaw) localTeams = JSON.parse(localRaw);
-      } catch(e) {}
-
-      const rawTeams = Array.isArray(teamsData) ? teamsData : (teamsData?.data || []);
-      const mergedTeamsMap = new Map();
-      [...localTeams, ...rawTeams].forEach(t => {
-        if (!t) return;
-        const key = t.id || `${t.comicName}-${t.targetLang}`;
-        if (!mergedTeamsMap.has(key)) {
-          mergedTeamsMap.set(key, t);
-        }
-      });
-      
-      const allUniqueTeams = Array.from(mergedTeamsMap.values());
-      setProjectTeams(allUniqueTeams);
   const enrichProjectTeamsWithTasks = async (rawTeamsList, currentComics = []) => {
     if (!Array.isArray(rawTeamsList) || rawTeamsList.length === 0) return rawTeamsList || [];
     try {
@@ -578,13 +508,38 @@ function ModeratorDashboard() {
   const fetchComicsAndTeams = async () => {
     try {
       const [comicsData, teamsData, genresData] = await Promise.all([
-        getAllComicsApi(),
-        getAllProjectTeamsApi(),
-        getAllGenresApi()
+        getAllComicsApi().catch(err => {
+          console.warn('[ModeratorDashboard] getAllComicsApi fallback:', err?.message || err)
+          return []
+        }),
+        getAllProjectTeamsApi().catch(err => {
+          console.warn('[ModeratorDashboard] getAllProjectTeamsApi fallback:', err?.message || err)
+          return []
+        }),
+        getAllGenresApi().catch(err => {
+          console.warn('[ModeratorDashboard] getAllGenresApi fallback:', err?.message || err)
+          return []
+        })
       ])
+      const authUser = getAuth()?.user;
+      const rawComics = comicsData || [];
+      
+      // Auto-link submissions to real DB IDs if titles match
+      setSubmissions(prevSubs => (prevSubs || []).map(sub => {
+        if (!sub) return sub;
+        const subTitle = sub.title || sub.comicName || sub.comicTitle;
+        const dbMatch = rawComics.find(c => c && isTitleMatch(c.title, subTitle));
+        if (dbMatch) {
+          return {
+            ...sub,
+            comicId: dbMatch.id
+          };
+        }
+        return sub;
+      }));
 
       const mappedComics = syncApprovedComics(
-        (comicsData || []).filter(c => c.moderationStatus === 'PUBLISHED' || c.moderationStatus === 'UNPUBLISHED').map(c => {
+        (rawComics || []).filter(c => c.moderationStatus === 'PUBLISHED' || c.moderationStatus === 'UNPUBLISHED').map(c => {
           const merged = syncComicWithLocalOverride(c);
           const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === merged.title.toLowerCase())
           const cCover = getComicCover(merged);
@@ -597,10 +552,9 @@ function ModeratorDashboard() {
             teamStatus: team ? team.status : 'None',
             chaptersCount: merged.chaptersCount || merged.chapterCount || merged.latestChapterNumber || 0
           }
-        }),
+        }).filter(c => isLanguageInModeratorScope(c.language || c.rawLanguage || c.originalLanguage, authUser)),
         submissions
-      ).map(c => syncComicWithLocalOverride(c))
-
+      ).map(c => syncComicWithLocalOverride(c));
       setComics(deduplicateComics(mappedComics))
       
       let localTeams = [];
