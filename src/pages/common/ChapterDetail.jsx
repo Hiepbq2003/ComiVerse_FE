@@ -104,29 +104,7 @@ function ChapterDetail() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Keyboard navigation for Single Page Mode
-  useEffect(() => {
-    if (readerLayout !== 'single') return
-    const handleKeyDown = (e) => {
-      if (e.key === 'ArrowRight' || e.key === 'd') {
-        if (pageIndex < pages.length - 1) {
-          setPageIndex((p) => p + 1)
-          window.scrollTo({ top: 0, behavior: 'smooth' })
-        } else if (hasNextChapter) {
-          handleGoToNextChapter()
-        }
-      } else if (e.key === 'ArrowLeft' || e.key === 'a') {
-        if (pageIndex > 0) {
-          setPageIndex((p) => p - 1)
-          window.scrollTo({ top: 0, behavior: 'smooth' })
-        } else if (hasPrevChapter) {
-          handleGoToPrevChapter()
-        }
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [readerLayout, pageIndex, pages.length, hasNextChapter, hasPrevChapter])
+
 
   // Fetch API details or fall back to mock
   useEffect(() => {
@@ -267,6 +245,31 @@ function ChapterDetail() {
       openChapter(targetChapter)
     }
   }
+
+  // Keyboard navigation for Single Page Mode
+  useEffect(() => {
+    if (readerLayout !== 'single') return
+    const handleKeyDown = (e) => {
+      const pagesLen = currentChapter?.images?.length || 0
+      if (e.key === 'ArrowRight' || e.key === 'd') {
+        if (pageIndex < pagesLen - 1) {
+          setPageIndex((p) => p + 1)
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        } else if (hasNextChapter) {
+          handleGoToNextChapter()
+        }
+      } else if (e.key === 'ArrowLeft' || e.key === 'a') {
+        if (pageIndex > 0) {
+          setPageIndex((p) => p - 1)
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        } else if (hasPrevChapter) {
+          handleGoToPrevChapter()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [readerLayout, pageIndex, currentChapter, hasNextChapter, hasPrevChapter])
 
   if (isDevToolsOpen) {
     return (
