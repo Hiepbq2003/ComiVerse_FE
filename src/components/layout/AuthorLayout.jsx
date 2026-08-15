@@ -66,7 +66,7 @@ function AuthorLayout({ children }) {
     { id: 'comics', label: 'My Comics', path: '/author/comics', icon: 'comics' },
     { id: 'revenue', label: 'Revenue', path: '/author/revenue', icon: 'revenue' },
     { id: 'payout', label: 'Payout', path: '/author/payout', icon: 'payout' },
-    { id: 'settings', label: 'Settings', path: '/author/settings', icon: 'settings' },
+    { id: 'settings', label: 'Payout Settings', path: '/author/settings', icon: 'settings' },
   ]
 
   const renderNavIcon = (icon) => {
