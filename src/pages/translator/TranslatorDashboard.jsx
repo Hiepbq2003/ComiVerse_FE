@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import TranslatorLayout from '../../components/layout/TranslatorLayout'
 import '../../assets/style/translator/dashboard.css'
-import { getAllProjectTeamsApi, getMyProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
-import { getTeamTasksApi, getTeamChaptersApi } from '../../services/api/TeamWorkspaceApi'
+import { getTranslatorDashboardApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getAuth } from '../../utils/Auth'
 import { exportToCsv } from '../../utils/exportToCsv'
 import { toast } from 'react-toastify'
@@ -14,6 +14,7 @@ function TranslatorDashboard() {
   const navigate = useNavigate()
   const [projects, setProjects] = useState([])
   const [teamStats, setTeamStats] = useState({})
+  const [activeTasks, setActiveTasks] = useState([])
   const [loading, setLoading] = useState(true)
 
   // Pagination states
@@ -46,100 +47,39 @@ function TranslatorDashboard() {
     try {
       if (!silent && projects.length === 0) setLoading(true)
 
-      // 1. Parallelize Project Teams fetching
-      const [allTeamsRes, myTeamsRes] = await Promise.allSettled([
-        getAllProjectTeamsApi(),
-        getMyProjectTeamsApi()
-      ])
+      // Fetch aggregated dashboard data in exactly 1 API call instead of 2 * N + 2
+      const res = await getTranslatorDashboardApi()
+      const data = res.data || res
+      
+      const mappedProjects = (data.projects || []).map(p => {
+        const currentUserName = (user.fullName || '').toLowerCase().trim();
+        const currentUsername = (user.username || '').toLowerCase().trim();
+        const currentUserId = user.id || user.userId;
+        const leaderName = (p.leaderName || '').toLowerCase().trim();
+        const leaderId = p.leaderId || p.createdById;
+        const isLeader = (currentUserName && leaderName === currentUserName) || (currentUsername && leaderName === currentUsername) || (currentUserId && leaderId === currentUserId);
 
-      let teamsData = []
-      if (allTeamsRes.status === 'fulfilled' && Array.isArray(allTeamsRes.value)) {
-        teamsData = allTeamsRes.value
-      } else if (allTeamsRes.status === 'fulfilled' && (allTeamsRes.value?.data || allTeamsRes.value?.content)) {
-        teamsData = allTeamsRes.value.data || allTeamsRes.value.content
-      } else if (myTeamsRes.status === 'fulfilled') {
-        const val = myTeamsRes.value
-        teamsData = Array.isArray(val) ? val : (val?.data || val?.content || [])
-      }
-
-      const currentUserName = (user.fullName || '').toLowerCase().trim();
-      const currentUsername = (user.username || '').toLowerCase().trim();
-      const currentUserId = user.id || user.userId;
-
-      const mappedProjects = (teamsData || [])
-        .filter(p => {
-          const leaderName = (p.leaderName || '').toLowerCase().trim();
-          const leaderId = p.leaderId || p.createdById;
-          const isLeader = (currentUserName && leaderName === currentUserName) || (currentUsername && leaderName === currentUsername) || (currentUserId && leaderId === currentUserId);
-
-          const localApprovedKey = `comiverse_approved_members_${p.id}`;
-          let savedMems = [];
-          try {
-            savedMems = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
-          } catch (e) {}
-
-          const isApprovedMember = savedMems.some(m => {
-            const mn = (m.name || m.username || '').toLowerCase().trim();
-            return (currentUserName && mn === currentUserName) || (currentUsername && mn === currentUsername);
-          }) || (Array.isArray(p.members) && p.members.some(m => m.userId === currentUserId || (m.name || '').toLowerCase().trim() === currentUserName));
-
-          return isLeader || isApprovedMember;
-        })
-        .map(p => {
-          const leaderName = (p.leaderName || '').toLowerCase().trim();
-          const leaderId = p.leaderId || p.createdById;
-          const isLeader = (currentUserName && leaderName === currentUserName) || (currentUsername && leaderName === currentUsername) || (currentUserId && leaderId === currentUserId);
-
-          return {
-            ...p,
-            team: p.title || p.name || 'Unnamed Team',
-            title: p.comicName || p.title || 'Untitled Comic',
-            isLeader
-          }
-        })
+        return {
+          ...p,
+          team: p.title || p.name || 'Unnamed Team',
+          title: p.comicName || p.title || 'Untitled Comic',
+          isLeader
+        }
+      })
 
       setProjects(mappedProjects)
 
-      // 2. Parallelize Task & Chapter Queries for All Teams
-      const statsMap = {}
-      await Promise.allSettled(
-        mappedProjects.map(async (team) => {
-          const [tasksRes, chaptersRes] = await Promise.allSettled([
-            getTeamTasksApi(team.id),
-            getTeamChaptersApi(team.id)
-          ])
-
-          let tasks = tasksRes.status === 'fulfilled'
-            ? (Array.isArray(tasksRes.value) ? tasksRes.value : (tasksRes.value?.data || tasksRes.value?.content || []))
-            : []
-
-          let chapters = chaptersRes.status === 'fulfilled'
-            ? (Array.isArray(chaptersRes.value) ? chaptersRes.value : (chaptersRes.value?.data || chaptersRes.value?.content || []))
-            : []
-
-          // Fast Sync LocalStorage Tasks if present
-          try {
-            const localKey = `comiverse_tasks_${team.id}`
-            const localTasks = JSON.parse(localStorage.getItem(localKey) || '[]')
-            if (Array.isArray(localTasks) && localTasks.length > 0) {
-              const taskMap = new Map()
-              tasks.forEach(t => taskMap.set(String(t.id), t))
-              localTasks.forEach(t => taskMap.set(String(t.id), t))
-              tasks = Array.from(taskMap.values())
-            }
-          } catch (e) { /* ignore */ }
-
-          statsMap[team.id] = { tasks, chapters }
-        })
-      )
-
+      // Fast Sync LocalStorage Tasks if present
+      const statsMap = data.teamStats || {}
+      
       setTeamStats(statsMap)
-
-      // Cache to sessionStorage for instantaneous (<10ms) future tab navigation
+      setActiveTasks(data.activeTasks || [])
+      
       try {
         sessionStorage.setItem('comiverse_dash_cache', JSON.stringify({
           projects: mappedProjects,
-          teamStats: statsMap
+          teamStats: statsMap,
+          activeTasks: data.activeTasks || []
         }));
       } catch (e) {}
     } catch (err) {
@@ -206,19 +146,14 @@ function TranslatorDashboard() {
     let totalChaptersCount = 0
 
     filteredProjects.forEach(p => {
-      const pStats = teamStats[p.id] || { tasks: [], chapters: [] }
-
-      // Real Task counts
-      pStats.tasks.forEach(t => {
-        totalTasksCount++
-        const col = (t.column || t.status || '').toLowerCase()
-        if (col.includes('done') || col.includes('completed')) doneCount++
-        else if (col.includes('progress') || col.includes('doing')) inProgressCount++
-        else if (col.includes('review')) reviewCount++
-        else backlogCount++
-      })
-
-      totalChaptersCount += pStats.chapters.length
+      const pStats = teamStats[p.id] || { totalTasks: 0, backlog: 0, inProgress: 0, review: 0, done: 0, totalChapters: 0 }
+      
+      totalTasksCount += pStats.totalTasks || 0
+      backlogCount += pStats.backlog || 0
+      inProgressCount += pStats.inProgress || 0
+      reviewCount += pStats.review || 0
+      doneCount += pStats.done || 0
+      totalChaptersCount += pStats.totalChapters || 0
     })
 
     return {
@@ -244,23 +179,17 @@ function TranslatorDashboard() {
 
   // Active Real Tasks Activity (Ongoing / Unfinished Tasks)
   const allActiveTasks = useMemo(() => {
-    const list = []
-    filteredProjects.forEach(p => {
-      const pStats = teamStats[p.id] || { tasks: [] }
-      pStats.tasks.forEach(t => {
-        const col = (t.column || t.status || '').toLowerCase()
-        if (!col.includes('done') && !col.includes('completed')) {
-          list.push({
-            ...t,
-            teamTitle: p.team,
-            comicTitle: p.title,
-            teamId: p.id
-          })
-        }
-      })
+    // Map with team/comic titles
+    return activeTasks.map(t => {
+      const p = filteredProjects.find(proj => proj.id === t.projectTeamId) || {}
+      return {
+        ...t,
+        teamTitle: p.team || 'Unknown Team',
+        comicTitle: p.title || 'Unknown Comic',
+        teamId: t.projectTeamId
+      }
     })
-    return list
-  }, [filteredProjects, teamStats])
+  }, [filteredProjects, activeTasks])
 
   // Export Statistics & Workload to Excel CSV
   const handleExportDashboard = () => {

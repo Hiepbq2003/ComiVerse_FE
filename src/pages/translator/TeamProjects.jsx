@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import '../../assets/style/translator/team-projects.css'
 import ModernButton from '../../components/common/ModernButton'
 import ModernPagination from '../../components/common/ModernPagination'
-import { getMyProjectTeamsApi, getMyProjectTeamsPageApi, getAllProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
+import { getMyProjectTeamsApi, getMyProjectTeamsPageApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getAllSubmissionsApi } from '../../services/api/SubmissionApi'
 import { getAllComicsApi, getComicsPageApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi } from '../../services/api/ChapterApi'
@@ -1245,8 +1245,7 @@ function TeamProjects() {
       const fetchComicsPromise = cachedComics.length > 0 ? Promise.resolve(cachedComics) : getAllComicsApi().catch(() => [])
       const fetchSubsPromise = cachedSubs.length > 0 ? Promise.resolve(cachedSubs) : getAllSubmissionsApi().catch(() => [])
 
-      const [allTeamsRes, myTeamsRes, allComicsRes, submissionsRes] = await Promise.all([
-        getAllProjectTeamsApi().catch(() => []),
+      const [myTeamsRes, allComicsRes, submissionsRes] = await Promise.all([
         getMyProjectTeamsApi().catch(() => []),
         fetchComicsPromise,
         fetchSubsPromise
@@ -1261,42 +1260,25 @@ function TeamProjects() {
       } catch (e) {}
 
       let allTeams = [];
-      if (Array.isArray(allTeamsRes)) {
-        allTeams = allTeamsRes;
-      } else if (allTeamsRes?.data?.data || allTeamsRes?.data || allTeamsRes?.content) {
-        allTeams = allTeamsRes.data?.data || allTeamsRes.data || allTeamsRes.content || [];
-      } else if (Array.isArray(myTeamsRes)) {
+      if (Array.isArray(myTeamsRes)) {
         allTeams = myTeamsRes;
       } else if (myTeamsRes?.data?.data || myTeamsRes?.data || myTeamsRes?.content) {
         allTeams = myTeamsRes.data?.data || myTeamsRes.data || myTeamsRes.content || [];
+      } else if (Array.isArray(myTeamsRes.data)) {
+        allTeams = myTeamsRes.data;
       }
 
       const currentUserName = (user.fullName || '').toLowerCase().trim();
       const currentUsername = (user.username || '').toLowerCase().trim();
       const currentUserId = user.id || user.userId;
 
-      const filtered = allTeams.filter(p => {
+      const allMapped = allTeams.map(p => {
         const leaderName = (p.leaderName || '').toLowerCase().trim();
         const leaderId = p.leaderId || p.createdById;
-        const isLeader = (currentUserName && leaderName === currentUserName) ||
+        const isLeaderMatch = (currentUserName && leaderName === currentUserName) ||
                          (currentUsername && leaderName === currentUsername) ||
                          (currentUserId && leaderId === currentUserId);
 
-        const localApprovedKey = `comiverse_approved_members_${p.id}`;
-        let savedMems = [];
-        try {
-          savedMems = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
-        } catch (e) {}
-
-        const isApprovedMember = savedMems.some(m => {
-          const mn = (m.name || m.username || '').toLowerCase().trim();
-          return (currentUserName && mn === currentUserName) || (currentUsername && mn === currentUsername);
-        }) || (Array.isArray(p.members) && p.members.some(m => m.userId === currentUserId || (m.name || '').toLowerCase().trim() === currentUserName));
-
-        return isLeader || isApprovedMember;
-      });
-
-      const allMapped = filtered.map(p => {
         const realCount = Math.max(1, p.membersCount || 0);
         const maxCap = (Number(p.maxMembers) || 5) + 1;
 
@@ -1320,7 +1302,8 @@ function TeamProjects() {
           title: p.comicName || p.title || 'Untitled Comic',
           cover: getProjectCover(p, dbComics, dbSubs),
           membersCount: realCount,
-          isRecruiting: isRecruiting
+          isRecruiting: isRecruiting,
+          isLeaderMatch
         };
       });
 

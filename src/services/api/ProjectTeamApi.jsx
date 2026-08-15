@@ -11,6 +11,10 @@ export const getMyProjectTeamsApi = () => {
   return AxiosClient.get('/project-teams/myprojects');
 };
 
+export const getTranslatorDashboardApi = () => {
+  return AxiosClient.get('/project-teams/myprojects/dashboard');
+};
+
 export const getMyProjectTeamsPageApi = (page = 1, size = 4, search = '') => {
   return AxiosClient.get('/project-teams/myprojects/page', { params: { page, size, search } });
 };
