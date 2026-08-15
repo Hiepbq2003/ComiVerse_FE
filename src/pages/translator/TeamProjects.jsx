@@ -2521,8 +2521,8 @@ function TeamProjects() {
   const isLeaderMatch = (leaderName) => {
     if (!leaderName) return false
     const ln = leaderName.toLowerCase().trim()
-    const username = (authUser?.username || '').toLowerCase().trim()
-    const fullName = (authUser?.fullName || '').toLowerCase().trim()
+    const username = (user?.username || '').toLowerCase().trim()
+    const fullName = (user?.fullName || '').toLowerCase().trim()
     return ln === username || ln === fullName
   }
 
