@@ -303,6 +303,12 @@ html.light .author-sort-select:focus {
 html.light .btn-author-action.black {
   background-color: var(--author-accent, #aa3bff);
   border-color: var(--author-accent, #aa3bff);
+  color: #ffffff !important;
+}
+
+html.light .btn-author-action.primary,
+html.light .btn-author-action.danger {
+  color: #ffffff !important;
 }
 
 .btn-author-action.black:hover {
