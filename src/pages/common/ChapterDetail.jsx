@@ -74,7 +74,6 @@ function ChapterDetail() {
 
   const scrollToViewer = useCallback((behavior = 'smooth') => {
     if (viewportRef.current) {
-      window.dispatchEvent(new Event('force-hide-header'))
       const y = viewportRef.current.getBoundingClientRect().top + window.scrollY - 10
       window.scrollTo({ top: y, behavior })
     } else {

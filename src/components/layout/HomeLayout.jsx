@@ -191,25 +191,10 @@ function HomeLayout({ children }) {
 
   const [isHeaderVisible, setIsHeaderVisible] = useState(true)
   const lastScrollY = useRef(0)
-  const ignoreScrollUntil = useRef(0)
-
-  useEffect(() => {
-    const handleForceHide = () => {
-      setIsHeaderVisible(false)
-      ignoreScrollUntil.current = Date.now() + 1000 // ignore scrolls for 1 second during smooth scroll
-    }
-    window.addEventListener('force-hide-header', handleForceHide)
-    return () => window.removeEventListener('force-hide-header', handleForceHide)
-  }, [])
 
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY
-      if (Date.now() < ignoreScrollUntil.current) {
-        lastScrollY.current = currentScrollY
-        return
-      }
-
       if (currentScrollY > lastScrollY.current && currentScrollY > 80) {
         setIsHeaderVisible(false)
       } else {
