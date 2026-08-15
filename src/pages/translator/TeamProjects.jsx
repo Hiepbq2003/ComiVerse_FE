@@ -265,8 +265,6 @@ function ProjectsListView({
       </div>
 
       {/* Advanced Filter Toolbar */}
-      <div
-        className="translator-filter-toolbar"
       <div className="trans-filter-bar">
         {/* Source Language Filter */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
