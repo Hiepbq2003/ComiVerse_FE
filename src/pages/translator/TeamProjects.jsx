@@ -165,8 +165,6 @@ function ProjectsListView({
   onTargetLangChange,
   statusFilter,
   onStatusFilterChange,
-  roleFilter,
-  onRoleFilterChange,
   availableSourceLangs,
   availableTargetLangs,
   onResetFilters,
@@ -217,7 +215,7 @@ function ProjectsListView({
     exportToCsv('ComiVerse_Translation_Projects_Export', headers, rows)
   }
 
-  const hasActiveFilters = Boolean(searchTerm || sourceLang || targetLang || statusFilter || roleFilter)
+  const hasActiveFilters = Boolean(searchTerm || sourceLang || targetLang || statusFilter)
 
   return (
     <div className="fade-in">
@@ -309,20 +307,6 @@ function ProjectsListView({
             <option value="CLOSED">🔒 Full / Closed</option>
             <option value="ACTIVE">✅ Active Status</option>
             <option value="PAUSED">⏸️ Paused</option>
-          </select>
-        </div>
-
-        {/* Role Filter */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span className="trans-filter-label">Role:</span>
-          <select
-            className={`trans-form-select ${roleFilter ? 'active' : ''}`}
-            value={roleFilter}
-            onChange={(e) => onRoleFilterChange(e.target.value)}
-          >
-            <option value="">👑 All Roles</option>
-            <option value="LEADER">⭐ Led by Me</option>
-            <option value="MEMBER">👥 Member Only</option>
           </select>
         </div>
 
@@ -1083,7 +1067,6 @@ function TeamProjects() {
   const [sourceLang, setSourceLang] = useState('')
   const [targetLang, setTargetLang] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const [roleFilter, setRoleFilter] = useState('')
   const ITEMS_PER_PAGE = 4
 
   const auth = getAuth()
@@ -1171,21 +1154,9 @@ function TeamProjects() {
         if (statusFilter === 'PAUSED' && (p.status || '').toUpperCase() !== 'PAUSED') return false
       }
 
-      // 5. Role Filter
-      if (roleFilter) {
-        const leaderName = (p.leaderName || '').toLowerCase().trim()
-        const leaderId = p.leaderId || p.createdById
-        const isLeader = (currentUserName && leaderName === currentUserName) ||
-                         (currentUsername && leaderName === currentUsername) ||
-                         (currentUserId && leaderId === currentUserId)
-
-        if (roleFilter === 'LEADER' && !isLeader) return false
-        if (roleFilter === 'MEMBER' && isLeader) return false
-      }
-
       return true
     })
-  }, [allMatchedTeams, searchTerm, sourceLang, targetLang, statusFilter, roleFilter, user])
+  }, [allMatchedTeams, searchTerm, sourceLang, targetLang, statusFilter, user])
 
   // Sync Paging State instantly
   useEffect(() => {
@@ -1200,7 +1171,6 @@ function TeamProjects() {
     setSourceLang('')
     setTargetLang('')
     setStatusFilter('')
-    setRoleFilter('')
     setCurrentPage(1)
   }
 
@@ -1221,11 +1191,6 @@ function TeamProjects() {
 
   const handleStatusFilterChange = (val) => {
     setStatusFilter(val)
-    setCurrentPage(1)
-  }
-
-  const handleRoleFilterChange = (val) => {
-    setRoleFilter(val)
     setCurrentPage(1)
   }
 
@@ -2726,8 +2691,6 @@ function TeamProjects() {
         onTargetLangChange={handleTargetLangChange}
         statusFilter={statusFilter}
         onStatusFilterChange={handleStatusFilterChange}
-        roleFilter={roleFilter}
-        onRoleFilterChange={handleRoleFilterChange}
         availableSourceLangs={availableSourceLangs}
         availableTargetLangs={availableTargetLangs}
         onResetFilters={handleResetFilters}
