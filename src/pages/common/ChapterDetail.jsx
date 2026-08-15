@@ -70,6 +70,18 @@ function ChapterDetail() {
 
   const dropdownRef = useRef(null)
   const layoutDropdownRef = useRef(null)
+  const viewportRef = useRef(null)
+
+  const scrollToViewer = useCallback((behavior = 'smooth') => {
+    if (viewportRef.current) {
+      window.dispatchEvent(new Event('force-hide-header'))
+      // Offset by 82px (72px for the sticky reader-control-header + 10px padding)
+      const y = viewportRef.current.getBoundingClientRect().top + window.scrollY - 82
+      window.scrollTo({ top: y, behavior })
+    } else {
+      window.scrollTo({ top: 0, behavior })
+    }
+  }, [])
 
   // Enforce client-side copy-protection security
   useReaderSecurity({
@@ -91,9 +103,9 @@ function ChapterDetail() {
 
   // Scroll to top on chapter change
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' })
+    scrollToViewer('instant')
     setPageIndex(0)
-  }, [chapterId])
+  }, [chapterId, scrollToViewer])
 
   // Close dropdowns on click outside
   useEffect(() => {
@@ -259,14 +271,14 @@ function ChapterDetail() {
       if (e.key === 'ArrowRight' || e.key === 'd') {
         if (pageIndex < pagesLen - 1) {
           setPageIndex((p) => p + 1)
-          window.scrollTo({ top: 0, behavior: 'smooth' })
+          scrollToViewer('smooth')
         } else if (hasNextChapter) {
           handleGoToNextChapter()
         }
       } else if (e.key === 'ArrowLeft' || e.key === 'a') {
         if (pageIndex > 0) {
           setPageIndex((p) => p - 1)
-          window.scrollTo({ top: 0, behavior: 'smooth' })
+          scrollToViewer('smooth')
         } else if (hasPrevChapter) {
           handleGoToPrevChapter()
         }
@@ -550,7 +562,7 @@ function ChapterDetail() {
         </div>
 
         {/* Comic Pages Viewport */}
-        <div className="chapter-pages-viewport" id="secure-comic-reader">
+        <div className="chapter-pages-viewport" id="secure-comic-reader" ref={viewportRef}>
           {isPremiumLocked ? (
             <div style={{
               width: 'min(680px, calc(100% - 32px))',
@@ -594,7 +606,7 @@ function ChapterDetail() {
                 onClick={() => {
                   if (pageIndex > 0) {
                     setPageIndex(p => Math.max(0, p - 1))
-                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                    scrollToViewer('smooth')
                   } else if (hasPrevChapter) {
                     handleGoToPrevChapter()
                   }
@@ -621,7 +633,7 @@ function ChapterDetail() {
                 onClick={() => {
                   if (pageIndex < pages.length - 1) {
                     setPageIndex(p => Math.min(pages.length - 1, p + 1))
-                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                    scrollToViewer('smooth')
                   } else if (hasNextChapter) {
                     handleGoToNextChapter()
                   }
