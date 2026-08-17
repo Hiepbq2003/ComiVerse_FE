@@ -1,5 +1,5 @@
 ﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Home from '../../../../pages/common/Home';
 import { ThemeProvider } from '../../../../context/ThemeContext';
@@ -75,5 +75,51 @@ describe('Reader - Home Page Tests', () => {
     });
 
     consoleSpy.mockRestore();
+  });
+
+  it('should navigate spotlight comics with arrows and dots', async () => {
+    ComicApi.getComicRecommendationsApi.mockResolvedValue({ data: mockComics });
+    ComicApi.getComicLeaderboardApi.mockResolvedValue({ data: mockComics });
+    ComicApi.getExploreComicsApi.mockResolvedValue({ data: [] });
+
+    renderHome();
+    const spotlight = screen.getByRole('region', { name: 'Spotlight comics' });
+
+    await waitFor(() => {
+      expect(within(spotlight).getByRole('heading', { name: 'Solo Leveling' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next spotlight comic' }));
+    expect(within(spotlight).getByRole('heading', { name: 'Omniscient Reader' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Previous spotlight comic' }));
+    expect(within(spotlight).getByRole('heading', { name: 'Solo Leveling' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show spotlight 2: Omniscient Reader' }));
+    expect(within(spotlight).getByRole('heading', { name: 'Omniscient Reader' })).toBeInTheDocument();
+  });
+
+  it('should automatically advance the spotlight after six seconds', async () => {
+    vi.useFakeTimers();
+    ComicApi.getComicRecommendationsApi.mockResolvedValue({ data: mockComics });
+    ComicApi.getComicLeaderboardApi.mockResolvedValue({ data: mockComics });
+    ComicApi.getExploreComicsApi.mockResolvedValue({ data: [] });
+
+    renderHome();
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const spotlight = screen.getByRole('region', { name: 'Spotlight comics' });
+    expect(within(spotlight).getByRole('heading', { name: 'Solo Leveling' })).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6000);
+    });
+
+    expect(within(spotlight).getByRole('heading', { name: 'Omniscient Reader' })).toBeInTheDocument();
+    vi.useRealTimers();
   });
 });
