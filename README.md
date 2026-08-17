@@ -1,5 +1,7 @@
 # ComiVerse
 
+🌍 **Live Demo:** [https://comi-verse.vercel.app/](https://comi-verse.vercel.app/)
+
 ![ComiVerse Hero](./src/assets/comic_action.png)
 
 **ComiVerse** is a modern, premium comic and manga reading platform featuring dynamic workflows for readers, independent authors, crowdsourced translation teams, and content moderators. Built with high aesthetic standards (glassmorphism, modern typography, fluid animations), it bridges the gap between content creators and international audiences through its built-in translation and moderation hubs.
