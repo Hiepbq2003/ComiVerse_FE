@@ -1821,7 +1821,6 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                 )}
               </div>
 
-
               <div className="trans-form-group">
                 <label className="trans-form-label">Due Date *</label>
                 <CustomDatePicker
