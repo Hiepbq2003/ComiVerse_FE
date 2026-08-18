@@ -54,9 +54,9 @@ describe('MobileAppBanner', () => {
 
     act(() => vi.advanceTimersByTime(MOBILE_APP_BANNER_DELAY_MS + 1))
 
-    const action = screen.getByRole('link', { name: /tải cho android/i })
+    const action = screen.getByRole('link', { name: /download for android/i })
     expect(action).toHaveAttribute('href', expect.stringMatching(/\.apk$/))
-    expect(screen.getByText('ComiVerse tốt hơn trên ứng dụng')).toBeInTheDocument()
+    expect(screen.getByText('ComiVerse is better on the app')).toBeInTheDocument()
   })
 
   it('uses the iOS guide and reader-specific copy on a chapter page', () => {
@@ -65,8 +65,8 @@ describe('MobileAppBanner', () => {
 
     act(() => vi.advanceTimersByTime(MOBILE_APP_BANNER_DELAY_MS + 1))
 
-    expect(screen.getByRole('link', { name: /cài trên iphone/i })).toHaveAttribute('href', '/download/ios')
-    expect(screen.getByText('Đọc truyện thoải mái hơn với ComiVerse App')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /install on iphone/i })).toHaveAttribute('href', '/download/ios')
+    expect(screen.getByText('Enjoy a better reading experience on the ComiVerse App')).toBeInTheDocument()
   })
 
   it('remembers a dismissal and allows the banner again after seven days', () => {
@@ -74,7 +74,7 @@ describe('MobileAppBanner', () => {
     renderBanner()
     act(() => vi.advanceTimersByTime(MOBILE_APP_BANNER_DELAY_MS + 1))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Để sau' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
     const dismissedAt = Number(window.localStorage.getItem(MOBILE_APP_BANNER_STORAGE_KEY))
 
     expect(dismissedAt).toBeGreaterThan(0)

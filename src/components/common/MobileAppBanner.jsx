@@ -66,12 +66,12 @@ function MobileAppBanner() {
   if (!isVisible || !platform) return null
 
   const title = isReading
-    ? 'Đọc truyện thoải mái hơn với ComiVerse App'
-    : 'ComiVerse tốt hơn trên ứng dụng'
+    ? 'Enjoy a better reading experience on the ComiVerse App'
+    : 'ComiVerse is better on the app'
   const description = isReading
-    ? 'Tải chương để đọc offline và tiếp tục đúng vị trí đang đọc.'
-    : 'Đọc truyện mượt hơn, tải truyện offline và nhận thông báo.'
-  const actionLabel = platform === 'android' ? 'Tải cho Android' : 'Cài trên iPhone'
+    ? 'Download chapters to read offline and resume right where you left off.'
+    : 'Read smoothly, download chapters offline, and get notified.'
+  const actionLabel = platform === 'android' ? 'Download for Android' : 'Install on iPhone'
 
   return (
     <aside
@@ -83,7 +83,7 @@ function MobileAppBanner() {
         type="button"
         className="mobile-app-banner__close"
         onClick={dismiss}
-        aria-label="Đóng gợi ý tải ứng dụng"
+        aria-label="Dismiss app download banner"
       >
         <X size={18} />
       </button>
@@ -121,7 +121,7 @@ function MobileAppBanner() {
           </Link>
         )}
         <button type="button" className="mobile-app-banner__later" onClick={dismiss}>
-          Để sau
+          Not now
         </button>
       </div>
     </aside>
