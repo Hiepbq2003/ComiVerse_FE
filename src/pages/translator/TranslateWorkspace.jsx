@@ -2045,7 +2045,7 @@ function getTaskFallbackData(taskId) {
 
   const rawTitle = foundTask?.title || 'Chapter 1 - Translation';
   const cleanTitleMatch = rawTitle.match(/^\[(URGENT|HIGH|MEDIUM|LOW)\]\s*(?:\[([^\]]+)\])?\s*(.*)$/i);
-  const comicTitle = cleanTitleMatch?.[2] || foundTask?.comicTitle || 'Tạm biệt Long tóc đỏ';
+  const comicTitle = cleanTitleMatch?.[2] || foundTask?.comicTitle || '';
   const chapterName = cleanTitleMatch?.[3] || rawTitle;
 
   const chapterId = foundTask?.chapterId || `ch-${taskId}`;
@@ -2287,9 +2287,9 @@ async function fetchPagesForTask(taskId, signal) {
       const list = Array.isArray(allComics) ? allComics : (allComics?.data || allComics?.content || []);
       const cleanQuery = (comicTitle || '').toLowerCase().trim();
 
-      const foundComic = list.find(c =>
-        c.title && (c.title.toLowerCase().includes(cleanQuery) || cleanQuery.includes(c.title.toLowerCase()))
-      ) || list.find(c => c.title && c.title.toLowerCase().includes('long tóc đỏ')) || list[0];
+      const foundComic = cleanQuery
+        ? list.find(c => c.title && (c.title.toLowerCase().includes(cleanQuery) || cleanQuery.includes(c.title.toLowerCase())))
+        : null;
 
       if (foundComic?.id) {
         let chapList = [];
