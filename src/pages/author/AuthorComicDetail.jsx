@@ -23,6 +23,8 @@ import {
 } from '../../services/api/AuthorComicApi'
 import { getChapterDetailApi } from '../../services/api/ChapterApi'
 import { buildChapterFolderFormData, validateChapterFolder } from '../../utils/chapterFolderUpload'
+import { getAllGenresApi } from '../../services/api/GenreApi'
+import { uploadImageApi } from '../../services/api/UploadApi'
 
 const normalizeArrayResponse = (payload) => {
   if (Array.isArray(payload)) return payload
@@ -450,6 +452,39 @@ function EditComicModal({ comic, onClose, onSaved }) {
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [systemGenres, setSystemGenres] = useState([])
+  const [uploadingCover, setUploadingCover] = useState(false)
+  const coverInputRef = useRef(null)
+
+  useEffect(() => {
+    getAllGenresApi().then(res => {
+      if (res && (Array.isArray(res) || Array.isArray(res.data))) {
+        setSystemGenres(res.data || res)
+      }
+    }).catch(console.error)
+  }, [])
+
+  const handleCoverUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingCover(true)
+    const uploadToast = toast.info('Uploading cover image...', { autoClose: false })
+    try {
+      const uploadedUrl = await uploadImageApi(file)
+      toast.dismiss(uploadToast)
+      if (uploadedUrl) {
+        updateField('cover', uploadedUrl)
+        toast.success('Cover uploaded successfully')
+      }
+    } catch (err) {
+      toast.dismiss(uploadToast)
+      toast.error('Failed to upload cover image')
+      console.error(err)
+    } finally {
+      setUploadingCover(false)
+      if (coverInputRef.current) coverInputRef.current.value = ''
+    }
+  }
 
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }))
@@ -540,15 +575,76 @@ function EditComicModal({ comic, onClose, onSaved }) {
           </label>
         </div>
 
-        <label className="author-form-label">
+        <div className="author-form-label">
           Cover Image URL
-          <input className="author-input" value={form.cover} onChange={(event) => updateField('cover', event.target.value)} />
-        </label>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input className="author-input" style={{ flex: 1 }} value={form.cover} onChange={(event) => updateField('cover', event.target.value)} />
+            <label className="author-primary-btn" style={{ cursor: 'pointer', whiteSpace: 'nowrap', opacity: uploadingCover ? 0.7 : 1 }}>
+              {uploadingCover ? 'Uploading...' : 'Upload Image'}
+              <input type="file" style={{ display: 'none' }} accept="image/*" ref={coverInputRef} onChange={handleCoverUpload} disabled={uploadingCover} />
+            </label>
+          </div>
+        </div>
 
-        <label className="author-form-label">
-          Genres
-          <input className="author-input" value={form.genres} onChange={(event) => updateField('genres', event.target.value)} placeholder="Action, Fantasy" />
-        </label>
+        <div className="author-form-label">
+          Genres (Comma separated)
+          <input 
+            className="author-input" 
+            value={Array.isArray(form.genres) ? form.genres.map(g => typeof g === 'object' ? (g.name || g.title) : g).join(', ') : (form.genres || '')}
+            onChange={(e) => {
+              const val = e.target.value;
+              const arr = val.split(',').map(s => s.trim()).filter(Boolean);
+              updateField('genres', arr.join(', '));
+            }}
+            placeholder="Action, Fantasy, Romance..." 
+          />
+        </div>
+
+        <div className="author-form-label" style={{ marginTop: '16px' }}>
+          <span style={{ fontSize: '13px', color: 'var(--author-text-secondary)', fontWeight: 500 }}>
+            Or select from registered genres (Click to toggle):
+          </span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+            {(systemGenres.length > 0 ? systemGenres : [
+              { name: 'Sci-Fi' }, { name: 'Horror' }, { name: 'Comedy' }, { name: 'Drama' }, 
+              { name: 'Cultivation' }, { name: 'Mystery' }, { name: 'Romance' }, 
+              { name: 'Fantasy' }, { name: 'Adventure' }, { name: 'Action' }
+            ]).map(g => {
+              const gName = typeof g === 'string' ? g : (g.name || g.genreName || g.title);
+              const currentList = Array.isArray(form.genres) 
+                ? form.genres.map(sel => typeof sel === 'object' ? (sel.name || sel.title) : sel) 
+                : (typeof form.genres === 'string' ? form.genres.split(',').map(s => s.trim()).filter(Boolean) : []);
+              
+              const isSelected = currentList.some(item => item.toLowerCase() === gName.toLowerCase());
+
+              return (
+                <button
+                  key={g.id || gName}
+                  type="button"
+                  onClick={() => {
+                    let updated;
+                    if (isSelected) {
+                      updated = currentList.filter(item => item.toLowerCase() !== gName.toLowerCase());
+                    } else {
+                      updated = [...currentList, gName];
+                    }
+                    updateField('genres', updated.join(', '));
+                  }}
+                  style={{
+                    padding: '6px 14px', borderRadius: '20px', fontSize: '13px', cursor: 'pointer',
+                    fontWeight: '600', transition: 'all 0.2s ease', border: '1px solid',
+                    ...(isSelected 
+                      ? { background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', borderColor: '#c084fc' }
+                      : { background: 'var(--author-upload-zone-bg)', color: 'var(--author-text-primary)', borderColor: 'transparent' }
+                    )
+                  }}
+                >
+                  {gName}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <label className="author-form-label">
           Description
@@ -757,7 +853,11 @@ function AuthorComicDetail() {
 
   useEffect(() => {
     if (searchParams.get('appeal') === 'true' && comic) {
-      setShowAppealModal(true)
+      if (comic.isModEdited) {
+        setShowModEditModal(true)
+      } else {
+        setShowAppealModal(true)
+      }
       // Clear the URL param immediately so the modal won't reopen on re-render
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev)

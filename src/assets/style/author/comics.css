@@ -848,8 +848,9 @@ html.light .author-detail-cover {
 }
 
 .author-modal.author-chapter-modal,
-.author-modal.author-comic-modal {
-  width: min(720px, 100%);
+.author-modal.author-comic-modal,
+.author-modal.author-upload-guide-modal {
+  width: min(840px, 100%);
 }
 
 .author-modal-head {
@@ -3189,7 +3190,8 @@ html.light .author-comic-detail-page .author-detail-stat-card:hover {
 }
 
 html.light .author-comic-detail-page .author-detail-stat-card span {
-  color: var(--author-text-secondary);
+  color: var(--author-text-secondary) !important;
+  text-shadow: none !important;
 }
 
 .author-comic-detail-page .author-detail-stat-card strong {
@@ -3199,7 +3201,8 @@ html.light .author-comic-detail-page .author-detail-stat-card span {
 }
 
 html.light .author-comic-detail-page .author-detail-stat-card strong {
-  color: var(--author-text-primary);
+  color: var(--author-text-primary) !important;
+  text-shadow: none !important;
 }
 
 .author-comic-detail-page .author-chapter-section-card {
