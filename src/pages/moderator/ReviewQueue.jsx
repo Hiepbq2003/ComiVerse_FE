@@ -1566,7 +1566,11 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         return !status || status === 'APPROVED' || status === 'PUBLISHED' || status === 'SUBMITTED_FOR_REVIEW' || status === 'REJECTED' || status === 'PREVIEW_READY';
       });
 
-      if (list.length === 0) return [];
+      if (list.length === 0) {
+        chapterCacheRef.current.set(`shallow_${comicId}`, []);
+        chapterCacheRef.current.set(`full_${comicId}`, []);
+        return [];
+      }
 
       if (!fetchDetails) {
         const shallowResult = list.map((ch, idx) => normalizeChapter(ch, idx));
