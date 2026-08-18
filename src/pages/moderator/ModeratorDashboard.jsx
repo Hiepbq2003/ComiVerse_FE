@@ -377,10 +377,15 @@ function ModeratorDashboard() {
     });
 
     try {
-      const enriched = await Promise.all(
-        rawTeamsList.map(async (t) => {
-          if (!t) return t;
-          let tasks = [];
+      const enriched = [];
+      const CHUNK_SIZE = 3;
+      
+      for (let i = 0; i < rawTeamsList.length; i += CHUNK_SIZE) {
+        const chunk = rawTeamsList.slice(i, i + CHUNK_SIZE);
+        const chunkResults = await Promise.all(
+          chunk.map(async (t) => {
+            if (!t) return t;
+            let tasks = [];
           let members = [];
           let chapters = [];
 
@@ -525,8 +530,10 @@ function ModeratorDashboard() {
             leaderName,
             leaderInitials
           };
-        })
-      );
+          })
+        );
+        enriched.push(...chunkResults);
+      }
       return enriched;
     } catch (err) {
       console.warn('[ModeratorDashboard] enrichProjectTeamsWithTasks error:', err);
