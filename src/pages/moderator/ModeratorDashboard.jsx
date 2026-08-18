@@ -2340,7 +2340,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                             <div className="mod-sub-details">
                               <div className="mod-sub-title" title={s.title}>{s.title}</div>
                               <div className="mod-sub-meta">
-                                {isAuthor ? 'New Comic Upload' : (s.chapter ? `Chapter ${s.chapter}` : (s.chapterNumber ? `Chapter ${s.chapterNumber}` : 'New Comic Upload'))} · {formatSubmitterName(s.submittedBy || s.author || 'Author')}
+                                {s.chapter || s.chapterNumber ? `Chapter ${s.chapter || s.chapterNumber}` : 'New Comic Upload'} · {formatSubmitterName(s.submittedBy || s.author || 'Author')}
                               </div>
                             </div>
                             <span className={`priority-badge ${(s.priority || 'Medium').toLowerCase()}`}>
