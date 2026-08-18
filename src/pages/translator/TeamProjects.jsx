@@ -2661,11 +2661,16 @@ function TeamProjects() {
         return col.includes('progress') || col.includes('doing');
       }) || taskList[0];
 
-      const targetTaskId = targetTask?.id || `task-${proj.id}`;
+      if (!targetTask) {
+        toast.info('This team has no active tasks yet. Please create a task first.');
+        return;
+      }
+
+      const targetTaskId = targetTask.id;
 
       const rawComicTitle = proj.comicName || proj.title || 'Comic';
-      const cleanTitle = targetTask?.title || `${rawComicTitle} - Chapter 1 - Translation`;
-      const chId = targetTask?.chapterId || `ch-${proj.id}-1`;
+      const cleanTitle = targetTask.title || `${rawComicTitle} - Chapter 1 - Translation`;
+      const chId = targetTask.chapterId || `ch-${proj.id}-1`;
 
       const cacheKey = `comiverse_ws_cache_${targetTaskId}`;
       if (!sessionStorage.getItem(cacheKey)) {
@@ -2674,7 +2679,7 @@ function TeamProjects() {
           let pages = [];
           if (cachedPages) {
             pages = JSON.parse(cachedPages);
-          } else if (Array.isArray(targetTask?.pages) && targetTask.pages.length > 0) {
+          } else if (Array.isArray(targetTask.pages) && targetTask.pages.length > 0) {
             pages = targetTask.pages;
           }
 
@@ -2700,7 +2705,7 @@ function TeamProjects() {
 
       navigate(`/translator/translate-workspace/task/${targetTaskId}`);
     } catch (err) {
-      navigate(`/translator/translate-workspace/task/task-${proj.id}`);
+      toast.error('Unable to open workspace. Please try again.');
     }
   };
 
