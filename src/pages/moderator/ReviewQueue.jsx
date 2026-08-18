@@ -828,14 +828,29 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         }
         return true;
       });
-      const uniqueKeys = new Set();
+      // Group items by key to match the display logic
+      const groupedByKey = new Map();
       itemsInTab.forEach(item => {
         const titleClean = (item.title || '').toLowerCase().trim();
         const submitterClean = (item.submittedBy || '').toLowerCase().trim();
         const key = item.comicId ? `comic-${item.comicId}` : `group-${titleClean}_${submitterClean}`;
-        uniqueKeys.add(key);
+        if (!groupedByKey.has(key)) {
+          groupedByKey.set(key, []);
+        }
+        groupedByKey.get(key).push(item);
       });
-      counts[tabStatus] = uniqueKeys.size;
+
+      if (tabStatus === 'pending') {
+        // For pending tab, only count groups that have at least one real chapter submission
+        let pendingCount = 0;
+        groupedByKey.forEach((items) => {
+          const hasRealChapter = items.some(isRealChapterSubmission);
+          if (hasRealChapter) pendingCount++;
+        });
+        counts[tabStatus] = pendingCount;
+      } else {
+        counts[tabStatus] = groupedByKey.size;
+      }
     });
 
     const ticketTargetIds = new Set(appealTickets.map(t => String(t.targetId || t.id)));
