@@ -26,6 +26,7 @@ import { getMyProjectTeamsApi, getAllProjectTeamsApi } from '../../services/api/
 import { getModeratorScope, isScopeGlobal } from '../../utils/moderatorScope'
 import { getMyTranslatorProfileApi, updateMyTranslatorProfileApi } from '../../services/api/TranslatorApi'
 import { uploadFileApi } from '../../services/api/UploadApi'
+import { uploadAuthorLicenseApi } from '../../services/api/AuthorProfileApi'
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 const COMMON_NOTIFICATION_OPTIONS = [
   {
@@ -289,20 +290,21 @@ function Profile({ user: userProp }) {
     }
     try {
       setCvUploading(true)
-      const uploadResult = await uploadFileApi(file)
-      const uploadedUrl = typeof uploadResult === 'string' ? uploadResult : uploadResult?.url || uploadResult?.fileUrl || null
-      if (uploadedUrl) {
-        if (roleUpper === 'AUTHOR') {
-          setAuthorCopyrightDoc(uploadedUrl)
-          toast.success('Copyright document uploaded successfully!')
-        } else {
+      if (roleUpper === 'AUTHOR') {
+        const result = await uploadAuthorLicenseApi(file)
+        setAuthorCopyrightDoc(result?.licenseUrl || result?.data?.licenseUrl || 'uploaded')
+        toast.success('Copyright document uploaded and is now pending verification!')
+      } else {
+        const uploadResult = await uploadFileApi(file)
+        const uploadedUrl = typeof uploadResult === 'string' ? uploadResult : uploadResult?.url || uploadResult?.fileUrl || null
+        if (uploadedUrl) {
           setTransCvUrl(uploadedUrl)
           toast.success('CV / Resume document uploaded successfully!')
         }
       }
     } catch (err) {
       console.error('Upload error:', err)
-      toast.error('Failed to upload document.')
+      toast.error(err.response?.data?.message || 'Failed to upload document.')
     } finally {
       setCvUploading(false)
     }

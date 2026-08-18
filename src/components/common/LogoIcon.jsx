@@ -1,8 +1,12 @@
-function LogoIcon({ size = 32, className = '', color = null }) {
+function LogoIcon({ size = 32, width = null, height = null, className = '', color = null }) {
+  const svgHeight = height || size;
+  const svgWidth = width || (size ? Math.round(size * 6) : 240);
+
   return (
     <svg 
       viewBox="0 0 240 40" 
-      height={size} 
+      height={svgHeight} 
+      width={svgWidth}
       className={`comiverse-full-logo ${className}`} 
       xmlns="http://www.w3.org/2000/svg"
     >
@@ -31,19 +35,34 @@ function LogoIcon({ size = 32, className = '', color = null }) {
             font-size: 28px; 
             font-weight: 900; 
             font-style: italic;
-            fill: #ffffff;
+            fill: var(--logo-comi-color, #ffffff);
             letter-spacing: -0.5px;
           }
-          html.light .logo-comi {
+          html.light .logo-comi,
+          .light .logo-comi,
+          [data-theme="light"] .logo-comi {
             fill: #0f172a !important;
+          }
+          html.dark .logo-comi,
+          .dark .logo-comi,
+          [data-theme="dark"] .logo-comi {
+            fill: #ffffff !important;
           }
           .logo-slash-secondary {
-            fill: #ffffff;
+            fill: var(--logo-slash-color, #ffffff);
             opacity: 0.9;
           }
-          html.light .logo-slash-secondary {
+          html.light .logo-slash-secondary,
+          .light .logo-slash-secondary,
+          [data-theme="light"] .logo-slash-secondary {
             fill: #0f172a !important;
             opacity: 0.85;
+          }
+          html.dark .logo-slash-secondary,
+          .dark .logo-slash-secondary,
+          [data-theme="dark"] .logo-slash-secondary {
+            fill: #ffffff !important;
+            opacity: 0.9;
           }
           .logo-verse { 
             font-family: 'Outfit', system-ui, sans-serif; 

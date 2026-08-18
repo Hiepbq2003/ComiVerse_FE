@@ -2023,9 +2023,29 @@ function getTaskFallbackData(taskId) {
     }
   } catch (e) {}
 
+  if (!foundTask) {
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        const cachedSession = sessionStorage.getItem(`comiverse_ws_cache_${taskId}`);
+        if (cachedSession) {
+          const parsed = JSON.parse(cachedSession);
+          if (parsed?.task) foundTask = parsed.task;
+          else if (parsed?.chapter) {
+            foundTask = {
+              id: taskId,
+              title: parsed.chapter.title,
+              chapterId: parsed.chapter.id,
+              pages: parsed.pages || []
+            };
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
   const rawTitle = foundTask?.title || 'Chapter 1 - Translation';
   const cleanTitleMatch = rawTitle.match(/^\[(URGENT|HIGH|MEDIUM|LOW)\]\s*(?:\[([^\]]+)\])?\s*(.*)$/i);
-  const comicTitle = cleanTitleMatch?.[2] || 'Tạm biệt Long tóc đỏ';
+  const comicTitle = cleanTitleMatch?.[2] || foundTask?.comicTitle || '';
   const chapterName = cleanTitleMatch?.[3] || rawTitle;
 
   const chapterId = foundTask?.chapterId || `ch-${taskId}`;
@@ -2238,7 +2258,7 @@ async function fetchPagesForTask(taskId, signal) {
   const fallback = getTaskFallbackData(taskId);
   const foundTask = fallback.task;
   const chapterId = foundTask?.chapterId || fallback.chapter?.id;
-  const comicTitle = fallback.chapter?.comicTitle || foundTask?.title || '';
+  const comicTitle = fallback.chapter?.comicTitle || foundTask?.comicTitle || foundTask?.title || '';
 
   if (rawPages.length === 0 && foundTask) {
     if (Array.isArray(foundTask.pages) && foundTask.pages.length > 0) {
@@ -2267,9 +2287,9 @@ async function fetchPagesForTask(taskId, signal) {
       const list = Array.isArray(allComics) ? allComics : (allComics?.data || allComics?.content || []);
       const cleanQuery = (comicTitle || '').toLowerCase().trim();
 
-      const foundComic = list.find(c =>
-        c.title && (c.title.toLowerCase().includes(cleanQuery) || cleanQuery.includes(c.title.toLowerCase()))
-      ) || list.find(c => c.title && c.title.toLowerCase().includes('long tóc đỏ')) || list[0];
+      const foundComic = cleanQuery
+        ? list.find(c => c.title && (c.title.toLowerCase().includes(cleanQuery) || cleanQuery.includes(c.title.toLowerCase())))
+        : null;
 
       if (foundComic?.id) {
         let chapList = [];
