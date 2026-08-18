@@ -1005,6 +1005,7 @@ function WorkspaceDetailView({
             </div>
           ) : (
             <TasksTab
+              isTeamPaused={String(selectedDetails?.status).toLowerCase() === 'paused'}
               comicName={comicName}
               comicId={selectedDetails?.comicId}
               tasks={tasks}

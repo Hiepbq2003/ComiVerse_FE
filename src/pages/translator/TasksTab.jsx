@@ -366,7 +366,8 @@ function TasksTab({
   isCurrentLeader,
   chapterOptions = [],
   onOpenCreateTaskWithChapter,
-  onCreateTask
+  onCreateTask,
+  isTeamPaused
 }) {
   const [inspectingChapter, setInspectingChapter] = useState(null);
   const [isBacklogCollapsed, setIsBacklogCollapsed] = useState(false);
@@ -455,7 +456,7 @@ function TasksTab({
             </div>
           </div>
 
-          {isCurrentLeader && (
+          {isCurrentLeader && !isTeamPaused && (
             <button
               type="button"
               className="trans-btn primary"
@@ -921,7 +922,7 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, flexWrap: 'wrap' }}>
-          {onCreateTask && isCurrentLeader && (
+          {onCreateTask && isCurrentLeader && !isTeamPaused && (
             <button
               type="button"
               className="mod-mode-tab active"
