@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   StepForward,
@@ -1318,6 +1318,93 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
   );
 }
 
+function ChapterDropdownPicker({ options, selectedId, onChange, disabled, emptyLabel }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => String(o.id) === String(selectedId));
+  const getCover = (ch) => ch?.cover || ch?.coverUrl || ch?.thumbnail || ch?.coverImage || 'https://via.placeholder.com/32x48?text=No+Cover';
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', width: '100%', outline: 'none' }}>
+      <div 
+        className={`trans-form-input ${disabled ? 'disabled' : ''}`}
+        style={{ 
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
+          cursor: disabled ? 'not-allowed' : 'pointer', userSelect: 'none',
+          padding: '8px 12px', minHeight: '44px',
+          ...(isOpen && !disabled ? { borderColor: '#a855f7', boxShadow: '0 0 0 1px rgba(168, 85, 247, 0.4)' } : {})
+        }}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        tabIndex={disabled ? -1 : 0}
+        onKeyDown={(e) => {
+          if (disabled) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsOpen(!isOpen);
+          }
+        }}
+      >
+        {selectedOption ? (
+           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+             <img src={getCover(selectedOption)} alt="cover" style={{ width: '24px', height: '36px', objectFit: 'cover', borderRadius: '4px' }} />
+             <span>{selectedOption.title}{selectedOption.pagesCount > 0 ? ` (${selectedOption.pagesCount} pages)` : ''}{selectedOption.revision ? ' — Revision' : ''}</span>
+           </div>
+        ) : (
+           <span style={{ color: 'var(--trans-text-muted)' }}>{options.length === 0 ? (emptyLabel || 'No available chapters') : 'Select a chapter...'}</span>
+        )}
+        <span style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s', fontSize: '12px' }}>▼</span>
+      </div>
+      
+      {isOpen && !disabled && (
+        <div style={{ 
+          position: 'absolute', top: '100%', left: 0, right: 0, 
+          background: '#1e1b2e', border: '1px solid rgba(168, 85, 247, 0.35)', 
+          borderRadius: '8px', marginTop: '6px', zIndex: 100, 
+          maxHeight: '280px', overflowY: 'auto', boxShadow: '0 6px 24px rgba(0,0,0,0.6)'
+        }}>
+          {options.map(ch => (
+            <div 
+              key={ch.id}
+              onClick={() => { onChange(ch.id); setIsOpen(false); }}
+              style={{ 
+                padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '12px',
+                cursor: 'pointer', borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                background: String(selectedId) === String(ch.id) ? 'rgba(168, 85, 247, 0.15)' : 'transparent',
+                transition: 'background 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                if (String(selectedId) !== String(ch.id)) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+              }}
+              onMouseLeave={(e) => {
+                if (String(selectedId) !== String(ch.id)) e.currentTarget.style.background = 'transparent';
+              }}
+            >
+               <img src={getCover(ch)} alt="cover" style={{ width: '32px', height: '48px', objectFit: 'cover', borderRadius: '4px' }} />
+               <div style={{ display: 'flex', flexDirection: 'column' }}>
+                 <span style={{ fontSize: '14px', color: '#fff', fontWeight: String(selectedId) === String(ch.id) ? '600' : '400' }}>
+                   {ch.title}{ch.revision ? ' — Revision' : ''}
+                 </span>
+                 {ch.pagesCount > 0 && <span style={{ fontSize: '12px', color: 'var(--trans-text-muted)' }}>{ch.pagesCount} pages</span>}
+               </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, readOnly = false, allowEmpty = false }) {
   // Allow all members, including leaders, to be selected as assignees
   const assignableCandidates = candidates || [];
@@ -1519,34 +1606,26 @@ export function CreateTaskModal({
           <div className="trans-form-group" style={{ marginTop: '14px' }}>
             <label className="trans-form-label">Chapter *</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <select required
-                className="trans-form-input"
-                style={{ flex: 1, ...errorBorder('chapterId') }}
-                value={newTaskData.chapterId || ''}
-                onChange={(e) => {
-                  const chId = e.target.value || null;
-                  const foundCh = availableChapterOptions.find(c => String(c.id) === String(chId));
-                  const isRevision = !!foundCh?.revision;
-                  setNewTaskData(prev => ({
-                    ...prev,
-                    chapterId: chId,
-                    taskType: isRevision ? 'REVISION' : (prev.taskType === 'REVISION' ? 'REGULAR' : (prev.taskType || 'REGULAR')),
-                    title: (!prev.title.trim() && foundCh)
-                      ? `${foundCh.title} - ${isRevision ? 'Revision' : 'Translation & Proofreading'}`
-                      : prev.title
-                  }));
-                }}
-                disabled={availableChapterOptions.length === 0}
-              >
-                <option value="">
-                  {availableChapterOptions.length === 0 ? 'No available chapters (all already have a task)' : 'Select a chapter…'}
-                </option>
-                {availableChapterOptions.map((ch) => (
-                  <option key={ch.id} value={ch.id}>
-                    📖 {ch.title}{ch.pagesCount > 0 ? ` (${ch.pagesCount} pages)` : ''}{ch.revision ? ' — Revision' : ''}
-                  </option>
-                ))}
-              </select>
+              <div style={{ flex: 1, ...errorBorder('chapterId') }}>
+                <ChapterDropdownPicker
+                  options={availableChapterOptions}
+                  selectedId={newTaskData.chapterId || ''}
+                  disabled={availableChapterOptions.length === 0}
+                  emptyLabel="No available chapters (all already have a task)"
+                  onChange={(chId) => {
+                    const foundCh = availableChapterOptions.find(c => String(c.id) === String(chId));
+                    const isRevision = !!foundCh?.revision;
+                    setNewTaskData(prev => ({
+                      ...prev,
+                      chapterId: chId,
+                      taskType: isRevision ? 'REVISION' : (prev.taskType === 'REVISION' ? 'REGULAR' : (prev.taskType || 'REGULAR')),
+                      title: (!prev.title.trim() && foundCh)
+                        ? `${foundCh.title} - ${isRevision ? 'Revision' : 'Translation & Proofreading'}`
+                        : prev.title
+                    }));
+                  }}
+                />
+              </div>
 
               {/* 👁️ Nút xem chapter trước khi tạo task */}
               {newTaskData.chapterId && (() => {
