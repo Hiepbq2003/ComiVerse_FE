@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import '../../assets/style/moderator/project-teams.css'
 import { toast } from 'react-toastify'
@@ -53,6 +53,18 @@ function ProjectTeams({
   const [dateApprovedFilter, setDateApprovedFilter] = useState('today') // 'today' | '7days' | '30days' | 'all'
   const [selectedGenre, setSelectedGenre] = useState('all')
   const [comicSearchQuery, setComicSearchQuery] = useState('')
+  const [isComicDropdownOpen, setIsComicDropdownOpen] = useState(false)
+  const comicDropdownRef = useRef(null)
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (comicDropdownRef.current && !comicDropdownRef.current.contains(event.target)) {
+        setIsComicDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const existingTargetLangsForSelectedComic = useMemo(() => {
     if (!createTeamForm.comicName) return new Set();
@@ -100,6 +112,7 @@ function ProjectTeams({
       .map(s => ({
         id: s.id,
         title: s.title,
+        cover: s.cover || s.coverImage || s.thumbnail || s.coverUrl || '',
         language: s.language || s.rawLanguage || 'Japanese',
         genre: s.genre || s.genres?.[0] || 'General',
         genres: s.genres || [s.genre || 'General'],
@@ -699,25 +712,67 @@ function ProjectTeams({
                       Select Approved Comic *
                     </label>
                     
-                    <select
-                      id="approved-comic-select"
-                      className="mod-input select"
-                      value={createTeamForm.comicName}
-                      onChange={(e) => handleSelectApprovedComic(e.target.value)}
-                    >
-                      {availableComicsDropdown.length === 0 ? (
-                        <option value="">-- No Approved Comics Found for Selected Filters --</option>
-                      ) : (
-                        <>
-                          <option value="">-- Choose Approved Comic ({availableComicsDropdown.length} Available) --</option>
-                          {availableComicsDropdown.map((c) => (
-                            <option key={c.id} value={c.title}>
-                              📚 {c.title} · {c.language || 'Japanese'}
-                            </option>
-                          ))}
-                        </>
+                    <div className="custom-comic-select" ref={comicDropdownRef} style={{ position: 'relative' }}>
+                      <div 
+                        className="mod-input select" 
+                        style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px', height: 'auto', minHeight: '44px', padding: '6px 14px' }}
+                        onClick={() => setIsComicDropdownOpen(!isComicDropdownOpen)}
+                      >
+                        {createTeamForm.comicName ? (
+                          <>
+                            {(() => {
+                              const sel = availableComicsDropdown.find(c => c.title === createTeamForm.comicName);
+                              const cover = sel?.cover || sel?.coverImage || 'https://placehold.co/40x55/2a2a35/94a3b8?text=No+Cover';
+                              return <img src={cover} alt="cover" style={{ width: '28px', height: '38px', objectFit: 'cover', borderRadius: '4px', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
+                            })()}
+                            <span style={{ fontWeight: '500' }}>{createTeamForm.comicName}</span>
+                          </>
+                        ) : (
+                          <span style={{ color: '#94a3b8' }}>-- Choose Approved Comic ({availableComicsDropdown.length} Available) --</span>
+                        )}
+                        <span style={{ marginLeft: 'auto', opacity: 0.5 }}>▼</span>
+                      </div>
+
+                      {isComicDropdownOpen && (
+                        <div className="custom-dropdown-menu" style={{ 
+                          position: 'absolute', top: '100%', left: 0, right: 0, 
+                          background: 'var(--mod-card-bg)', border: '1px solid var(--mod-border)', 
+                          borderRadius: '8px', marginTop: '6px', maxHeight: '280px', overflowY: 'auto', zIndex: 50,
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
+                        }}>
+                          {availableComicsDropdown.length === 0 ? (
+                            <div style={{ padding: '12px 16px', color: '#94a3b8' }}>-- No Approved Comics Found for Selected Filters --</div>
+                          ) : (
+                            availableComicsDropdown.map(c => {
+                              const cover = c.cover || c.coverImage || 'https://placehold.co/40x55/2a2a35/94a3b8?text=No+Cover';
+                              return (
+                                <div 
+                                  key={c.id || c.title}
+                                  style={{ 
+                                    padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '12px', 
+                                    cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                    background: createTeamForm.comicName === c.title ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                                    transition: 'background 0.2s'
+                                  }}
+                                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)'}
+                                  onMouseLeave={(e) => e.currentTarget.style.background = createTeamForm.comicName === c.title ? 'rgba(99, 102, 241, 0.15)' : 'transparent'}
+                                  onClick={() => {
+                                    handleSelectApprovedComic(c.title);
+                                    setIsComicDropdownOpen(false);
+                                  }}
+                                >
+                                  <img src={cover} alt="" style={{ width: '32px', height: '44px', objectFit: 'cover', borderRadius: '4px', boxShadow: '0 2px 4px rgba(0,0,0,0.3)' }} />
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    <div style={{ fontWeight: 600, color: 'var(--mod-text-primary)', fontSize: '14px' }}>{c.title}</div>
+                                    <div style={{ fontSize: '12px', color: 'var(--mod-text-secondary)' }}>🌍 {c.language || 'Japanese'}</div>
+                                  </div>
+                                </div>
+                              )
+                            })
+                          )}
+                        </div>
                       )}
-                    </select>
+                    </div>
                   </div>
 
                   {/* Source Language & Target Language Selector */}
