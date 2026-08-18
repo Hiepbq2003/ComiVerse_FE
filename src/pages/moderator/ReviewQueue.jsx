@@ -1037,7 +1037,19 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       group.genres = getSubmissionGenres(group);
     });
 
-    return Array.from(groupsMap.values());
+    // Filter out comic-profile-only groups with 0 pending chapters in the Pending tab.
+    // After approving all chapters, only the comic catalog profile submission remains
+    // — showing it as "0 Chapters" is confusing, so auto-hide it.
+    const result = Array.from(groupsMap.values()).filter(group => {
+      if (activeTab !== 'pending') return true;
+      const chaps = getSubmissionChapters(group);
+      if (chaps.length > 0) return true;
+      // If the group has only non-chapter subItems (comic profile submissions),
+      // check if ANY subItem is a real chapter submission. If none, hide it.
+      const hasRealChapter = (group.subItems || []).some(isRealChapterSubmission);
+      return hasRealChapter;
+    });
+    return result;
   }, [filteredItems]);
 
   const totalPages = Math.ceil(groupedItems.length / ITEMS_PER_PAGE)
