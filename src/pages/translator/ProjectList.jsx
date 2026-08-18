@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Filter, BookOpen, Users, Calendar, User, AlertCircle } from 'lucide-react';
+import { Navigate } from 'react-router-dom';
+import { Search, Filter, BookOpen, Users, Calendar, User, AlertCircle, ClipboardList } from 'lucide-react';
 import { toast } from 'react-toastify';
 import '../../assets/style/translator/project-list.css';
 import { getAllProjectTeamsApi, getMyProjectTeamsApi } from '../../services/api/ProjectTeamApi';
@@ -9,7 +10,7 @@ import { getMyTranslatorProfileApi } from '../../services/api/TranslatorApi';
 import { getAuth } from '../../utils/Auth';
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages';
 
-const MAX_ACTIVE_PROJECTS = 5;
+const MAX_ACTIVE_PROJECTS = 20;
 
 function ProjectList() {
   const [projects, setProjects] = useState([]);
@@ -241,7 +242,7 @@ function ProjectList() {
     }
 
     if (atProjectLimit) {
-      toast.warn(`Bạn đang tham gia ${activeProjectsCount} dự án cùng lúc (tối đa ${MAX_ACTIVE_PROJECTS}). Hãy hoàn thành hoặc rời khỏi một dự án trước.`);
+      toast.warn(`Bạn đang tham gia ${activeProjectsCount} project ongoing (tối đa ${MAX_ACTIVE_PROJECTS}). Hãy hoàn thành hoặc rời khỏi một dự án trước.`);
       return;
     }
     setSelectedProject(project);
@@ -285,7 +286,7 @@ function ProjectList() {
 
     // Client-side slot check
     if (appStatus && appStatus.availableSlots <= 0) {
-      toast.error(`You have reached the maximum of ${appStatus.maxSlots} active teams/applications.`);
+      toast.error(`You have reached the maximum of ${appStatus.maxSlots} ongoing projects/applications.`);
       return;
     }
 
@@ -370,6 +371,10 @@ function ProjectList() {
     }
   };
 
+  if (isUserProjectLeader) {
+    return <Navigate to="/translator/project-teams" replace />;
+  }
+
   if (loading) {
     return (
       <div className="translator-project-list-container container-fluid py-4" style={{ padding: '24px' }}>
@@ -413,41 +418,117 @@ function ProjectList() {
         </p>
       </div>
 
-      {/* Slot Counter & Cooldown Banner (Only for Translators, hidden for Project Leaders) */}
+      {/* Capacity: projects joined + tasks assigned */}
       {!isUserProjectLeader && appStatus ? (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '16px',
-          marginBottom: '16px',
-          padding: '14px 20px',
-          borderRadius: '12px',
-          background: appStatus.availableSlots <= 0
-            ? 'rgba(239, 68, 68, 0.08)'
-            : appStatus.availableSlots <= 2
-              ? 'rgba(245, 158, 11, 0.08)'
-              : 'rgba(16, 185, 129, 0.06)',
-          border: `1px solid ${appStatus.availableSlots <= 0 ? 'rgba(239, 68, 68, 0.2)' : appStatus.availableSlots <= 2 ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.15)'}`,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '20px' }}>{appStatus.availableSlots <= 0 ? '🚫' : appStatus.availableSlots <= 2 ? '⚠️' : '✅'}</span>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--trans-text-primary)' }}>
-                Application Slots: <span style={{ color: appStatus.availableSlots <= 0 ? '#ef4444' : appStatus.availableSlots <= 2 ? '#f59e0b' : '#10b981' }}>{appStatus.availableSlots}</span> / {appStatus.maxSlots} available
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--trans-text-secondary)', marginTop: '2px' }}>
-                {appStatus.joinedTeams} team{appStatus.joinedTeams !== 1 ? 's' : ''} joined · {appStatus.pendingApplications} pending application{appStatus.pendingApplications !== 1 ? 's' : ''}
-              </div>
-            </div>
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: '12px',
+            marginBottom: appStatus.cooldownUntil && appStatus.cooldownUntil !== '' && new Date(appStatus.cooldownUntil) > new Date() ? '12px' : 0
+          }}>
+            {(() => {
+              const joined = Number(appStatus.joinedTeams || 0);
+              const pending = Number(appStatus.pendingApplications || 0);
+              const maxProjects = Number(appStatus.maxSlots || MAX_ACTIVE_PROJECTS);
+              const usedProjects = joined + pending;
+              const tasks = Number(appStatus.activeTasks ?? 0);
+              const maxTasks = Number(appStatus.maxTasks ?? 10);
+              const projectAtLimit = usedProjects >= maxProjects;
+              const projectNearLimit = !projectAtLimit && usedProjects >= maxProjects - 3;
+              const taskAtLimit = tasks >= maxTasks;
+              const taskNearLimit = !taskAtLimit && tasks >= maxTasks - 3;
+
+              const tone = (atLimit, nearLimit) => ({
+                background: atLimit
+                  ? 'rgba(239, 68, 68, 0.08)'
+                  : nearLimit
+                    ? 'rgba(245, 158, 11, 0.08)'
+                    : 'rgba(16, 185, 129, 0.06)',
+                border: `1px solid ${atLimit ? 'rgba(239, 68, 68, 0.22)' : nearLimit ? 'rgba(245, 158, 11, 0.22)' : 'rgba(16, 185, 129, 0.18)'}`,
+                value: atLimit ? '#ef4444' : nearLimit ? '#f59e0b' : '#10b981',
+                iconBg: atLimit ? 'rgba(239, 68, 68, 0.15)' : nearLimit ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)'
+              });
+
+              const projectTone = tone(projectAtLimit, projectNearLimit);
+              const taskTone = tone(taskAtLimit, taskNearLimit);
+
+              return (
+                <>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    padding: '16px 18px',
+                    borderRadius: '14px',
+                    background: projectTone.background,
+                    border: projectTone.border
+                  }}>
+                    <div style={{
+                      width: 44, height: 44, borderRadius: '12px', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: projectTone.iconBg, color: projectTone.value
+                    }}>
+                      <Users size={22} />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--trans-text-muted)', marginBottom: '4px' }}>
+                        Projects joined
+                      </div>
+                      <div style={{ fontSize: '22px', fontWeight: 800, lineHeight: 1.1, color: 'var(--trans-text-primary)' }}>
+                        <span style={{ color: projectTone.value }}>{joined}</span>
+                        <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--trans-text-secondary)' }}> / {maxProjects}</span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--trans-text-secondary)', marginTop: '4px' }}>
+                        {pending > 0
+                          ? `${pending} pending application${pending !== 1 ? 's' : ''} · ${Math.max(0, maxProjects - usedProjects)} slots left`
+                          : `${Math.max(0, maxProjects - usedProjects)} application slots left`}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    padding: '16px 18px',
+                    borderRadius: '14px',
+                    background: taskTone.background,
+                    border: taskTone.border
+                  }}>
+                    <div style={{
+                      width: 44, height: 44, borderRadius: '12px', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: taskTone.iconBg, color: taskTone.value
+                    }}>
+                      <ClipboardList size={22} />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--trans-text-muted)', marginBottom: '4px' }}>
+                        Tasks assigned
+                      </div>
+                      <div style={{ fontSize: '22px', fontWeight: 800, lineHeight: 1.1, color: 'var(--trans-text-primary)' }}>
+                        <span style={{ color: taskTone.value }}>{tasks}</span>
+                        <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--trans-text-secondary)' }}> / {maxTasks}</span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--trans-text-secondary)', marginTop: '4px' }}>
+                        {taskAtLimit
+                          ? 'At the incomplete-task limit. Finish a task before applying or taking more work.'
+                          : `${Math.max(0, maxTasks - tasks)} incomplete task${maxTasks - tasks !== 1 ? 's' : ''} remaining`}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
           {appStatus.cooldownUntil && appStatus.cooldownUntil !== '' && new Date(appStatus.cooldownUntil) > new Date() && (
             <div style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              padding: '6px 14px',
-              borderRadius: '8px',
+              padding: '8px 14px',
+              borderRadius: '10px',
               background: 'rgba(239, 68, 68, 0.1)',
               border: '1px solid rgba(239, 68, 68, 0.2)',
               fontSize: '12px',
@@ -472,10 +553,10 @@ function ProjectList() {
           <AlertCircle size={20} style={{ color: '#eab308', flexShrink: 0 }} />
           <div>
             <p style={{ margin: 0, fontWeight: '700', fontSize: '14px', color: '#fde047' }}>
-              Bạn đang xử lý tối đa {MAX_ACTIVE_PROJECTS} công việc cùng lúc
+              Bạn đang tham gia tối đa {MAX_ACTIVE_PROJECTS} project ongoing
             </p>
             <p style={{ margin: '3px 0 0 0', fontSize: '12.5px', color: '#ca8a04' }}>
-              Hoàn thành các công việc hiện tại (dịch/nộp bài) để tiếp tục đăng ký dự án mới.
+              Hoàn thành hoặc rời một dự án trước khi đăng ký dự án mới.
             </p>
           </div>
         </div>

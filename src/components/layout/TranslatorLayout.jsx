@@ -76,7 +76,9 @@ function TranslatorLayout({ children }) {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', path: '/translator/dashboard' },
-    { id: 'project-list', label: 'Project List', icon: 'list', path: '/translator/project-list' },
+    ...(roleUpper === 'TRANSLATOR'
+      ? [{ id: 'project-list', label: 'Project List', icon: 'list', path: '/translator/project-list' }]
+      : []),
     { id: 'project-teams', label: 'Project Teams', icon: 'comics', path: '/translator/project-teams' },
     ...(roleUpper === 'PROJECT_LEADER'
       ? [{ id: 'reports', label: 'Translation Reports', icon: 'reports', path: '/leader/reports' }]

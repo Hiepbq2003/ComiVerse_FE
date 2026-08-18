@@ -124,7 +124,7 @@ import HomeTab from './HomeTab'
 import MembersTab from './MembersTab'
 import RequestsTab from './RequestsTab'
 import TasksTab, { CreateTaskModal, EditTaskModal, parseTaskTitle, getTaskColumn } from './TasksTab'
-import SettingsTab from './SettingsTab'
+import SettingsTab, { normalizeProjectStatus } from './SettingsTab'
 
 function parseCompletedPageNumbers(value) {
   const result = new Set()
@@ -282,7 +282,9 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
                   </span>
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                  <span className={`status-badge ${proj.status.toLowerCase()}`}>{proj.status}</span>
+                  <span className={`status-badge ${normalizeProjectStatus(proj.status)}`}>
+                    {normalizeProjectStatus(proj.status) === 'completed' ? 'Completed' : 'Ongoing'}
+                  </span>
                   {isLeaderMatch(proj.leaderName) ? (
                     <span className="status-badge leader">⭐ Led by Me</span>
                   ) : (
@@ -341,11 +343,11 @@ function EditProjectModal({ editForm, setEditForm, onCancel, onSave }) {
             <label className="trans-form-label">Project Status</label>
             <select
               className="trans-form-input"
-              value={editForm.status}
+              value={normalizeProjectStatus(editForm.status)}
               onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
             >
-              <option value="Active">Active</option>
-              <option value="Paused">Paused</option>
+              <option value="ongoing">Ongoing</option>
+              <option value="completed">Completed</option>
             </select>
           </div>
 
@@ -1047,7 +1049,7 @@ function TeamProjects() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDetails, setSelectedDetails] = useState(null)
   const [selectedEdit, setSelectedEdit] = useState(null)
-  const [editForm, setEditForm] = useState({ description: '', status: 'Active', team: '' })
+  const [editForm, setEditForm] = useState({ description: '', status: 'ongoing', team: '' })
 
   const [workspaceTab, setWorkspaceTab] = useState('home')
   const [loadingWorkspace, setLoadingWorkspace] = useState(false)
@@ -1495,7 +1497,7 @@ function TeamProjects() {
     setSelectedEdit(project)
     setEditForm({
       description: project.description || '',
-      status: project.status || 'Active',
+      status: normalizeProjectStatus(project.status),
       team: project.title || ''
     })
   }
@@ -1507,7 +1509,7 @@ function TeamProjects() {
         id: selectedEdit.id,
         title: editForm.team,
         comicName: selectedEdit.title,
-        status: editForm.status,
+        status: normalizeProjectStatus(editForm.status),
         description: editForm.description,
         deadline: selectedEdit.deadline,
         sourceLang: selectedEdit.sourceLang,
@@ -1555,7 +1557,7 @@ function TeamProjects() {
         id: selectedDetails.id,
         title: selectedDetails.team,
         comicName: selectedDetails.title,
-        status: selectedDetails.status,
+        status: normalizeProjectStatus(selectedDetails.status),
         description: selectedDetails.description,
         deadline: selectedDetails.deadline,
         sourceLang: selectedDetails.sourceLang,
@@ -1572,7 +1574,7 @@ function TeamProjects() {
         assignedToMe: selectedDetails.assignedToMe,
         notes: selectedDetails.description || selectedDetails.notes || ''
       })
-      const mappedUpdated = { ...selectedDetails, ...updated, team: updated.title || selectedDetails.team, title: updated.comicName || selectedDetails.title, isRecruiting: finalIsRecruiting }
+      const mappedUpdated = { ...selectedDetails, ...updated, team: updated.title || selectedDetails.team, title: updated.comicName || selectedDetails.title, isRecruiting: finalIsRecruiting, status: updated.status || normalizeProjectStatus(selectedDetails.status) }
       setProjects(prev => {
         const newList = prev.map(proj => (proj.id === selectedDetails.id ? mappedUpdated : proj));
         return newList;
@@ -2095,6 +2097,17 @@ function TeamProjects() {
     const updatedTasks = [...tasks, taskToSave]
     setTasks(updatedTasks)
 
+    const createdChapterId = String(
+      taskToSave.chapterId || taskToSave.chapter_id || taskToSave.chapter?.id || data.chapterId || ''
+    )
+    if (createdChapterId) {
+      setChapterOptions(prev => prev.map(ch =>
+        String(ch.id || ch.chapterId) === createdChapterId
+          ? { ...ch, canCreateTask: false, revision: false }
+          : ch
+      ))
+    }
+
     if (!customData) {
       setNewTaskData({ title: '', column: 'backlog', assigneeId: null, dueDate: '', priority: 'Medium', chapterId: null, chapterRewardUsd: '', taskType: 'REGULAR' })
       setShowCreateTask(false)
@@ -2321,8 +2334,8 @@ function TeamProjects() {
         setEditTaskData={setEditTaskData}
         onCancelEditTask={() => setSelectedTask(null)}
         onSaveEditTask={handleSaveEditTask}
-        onContinueToWorkspace={() => navigate(`/translator/translate-workspace/task/${selectedTask.id}`)}
-        onContinueToReviewWorkspace={() => navigate(`/translator/review-workspace/task/${selectedTask.id}`)}
+        onContinueToWorkspace={() => navigate(`/translator/translate-workspace/task/${selectedTask.id || selectedTask._id || selectedTask.taskId}`)}
+        onContinueToReviewWorkspace={() => navigate(`/translator/review-workspace/task/${selectedTask.id || selectedTask._id || selectedTask.taskId}`)}
         onSaveWorkspaceSettings={handleSaveWorkspaceSettings}
       />
       {banModalData && (

@@ -134,7 +134,7 @@ function RequestsTab({ joinRequests = [], onApprove, onReject, onBan }) {
                       <path d="M3 15h6" />
                       <path d="M3 18h6" />
                     </svg>
-                    <span>Active Projects: <strong style={{color: ((req.activeProjectsCount || 0) > 3) ? '#f59e0b' : (isLight ? '#0f172a' : '#fff')}}>{req.activeProjectsCount || 0}</strong></span>
+                    <span>Ongoing projects: <strong style={{color: ((req.activeProjectsCount || 0) >= 20) ? '#ef4444' : ((req.activeProjectsCount || 0) > 15) ? '#f59e0b' : (isLight ? '#0f172a' : '#fff')}}>{req.activeProjectsCount || 0} / 20</strong></span>
                   </div>
                   <div style={{
                     display: 'flex',
@@ -151,7 +151,7 @@ function RequestsTab({ joinRequests = [], onApprove, onReject, onBan }) {
                       <polyline points="9 11 12 14 22 4"></polyline>
                       <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
                     </svg>
-                    <span>Active Tasks: <strong style={{color: ((req.activeTasksCount || 0) > 10) ? '#ef4444' : ((req.activeTasksCount || 0) > 5 ? '#f59e0b' : (isLight ? '#0f172a' : '#fff'))}}>{req.activeTasksCount || 0}</strong></span>
+                    <span>Incomplete tasks: <strong style={{color: ((req.activeTasksCount || 0) >= 10) ? '#ef4444' : ((req.activeTasksCount || 0) > 7) ? '#f59e0b' : (isLight ? '#0f172a' : '#fff')}}>{req.activeTasksCount || 0} / 10</strong></span>
                   </div>
                 </div>
 
