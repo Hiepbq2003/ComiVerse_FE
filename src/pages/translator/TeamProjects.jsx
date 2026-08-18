@@ -410,22 +410,24 @@ function ProjectsListView({
               </div>
               <div className="trans-project-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <ModernButton variant={2} label="Workspace" onClick={() => onOpenDetails(proj)} />
-                <button
-                  className="dash-quick-action-btn"
-                  style={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
-                    padding: '8px 14px',
-                    fontSize: '12.5px'
-                  }}
-                  title="Open Translation Editor Directly"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (onQuickTranslate) onQuickTranslate(proj)
-                  }}
-                >
-                  Translate
-                </button>
+                {proj.status?.toLowerCase() !== 'paused' && (
+                  <button
+                    className="dash-quick-action-btn"
+                    style={{
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                      padding: '8px 14px',
+                      fontSize: '12.5px'
+                    }}
+                    title="Open Translation Editor Directly"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (onQuickTranslate) onQuickTranslate(proj)
+                    }}
+                  >
+                    Translate
+                  </button>
+                )}
               </div>
             </div>
           ))
