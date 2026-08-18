@@ -1333,7 +1333,7 @@ function ChapterDropdownPicker({ options, selectedId, onChange, disabled, emptyL
   }, []);
 
   const selectedOption = options.find(o => String(o.id) === String(selectedId));
-  const defaultCover = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="48" viewBox="0 0 32 48"><rect width="32" height="48" fill="%232d2844"/><text x="16" y="26" font-family="sans-serif" font-size="10" fill="%236b6375" text-anchor="middle">No</text><text x="16" y="38" font-family="sans-serif" font-size="10" fill="%236b6375" text-anchor="middle">Cover</text></svg>';
+  const defaultCover = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='48' viewBox='0 0 32 48'%3E%3Crect width='32' height='48' fill='%232d2844'/%3E%3Ctext x='16' y='26' font-family='sans-serif' font-size='10' fill='%236b6375' text-anchor='middle'%3ENo%3C/text%3E%3Ctext x='16' y='38' font-family='sans-serif' font-size='10' fill='%236b6375' text-anchor='middle'%3ECover%3C/text%3E%3C/svg%3E";
   const getCover = (ch) => ch?.cover || ch?.coverUrl || ch?.thumbnail || ch?.coverImage || defaultCover;
 
   const handleImageError = (e) => {
