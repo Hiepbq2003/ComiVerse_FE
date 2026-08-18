@@ -2678,18 +2678,23 @@ function TeamProjects() {
             pages = targetTask.pages;
           }
 
-          if (pages.length > 0) {
-            sessionStorage.setItem(cacheKey, JSON.stringify({
-              chapter: {
-                id: chId,
-                title: cleanTitle,
-                comicTitle: rawComicTitle,
-                pagesCount: pages.length,
-                pages: pages
-              },
+          sessionStorage.setItem(cacheKey, JSON.stringify({
+            task: {
+              id: targetTaskId,
+              title: cleanTitle,
+              comicTitle: rawComicTitle,
+              chapterId: chId,
               pages: pages
-            }));
-          }
+            },
+            chapter: {
+              id: chId,
+              title: cleanTitle,
+              comicTitle: rawComicTitle,
+              pagesCount: pages.length,
+              pages: pages
+            },
+            pages: pages
+          }));
         } catch (e) {}
       }
 
