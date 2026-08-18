@@ -879,7 +879,18 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       const lang = item.language || item.rawLanguage || item.originalLanguage || item.lang || 'Original Raw';
       return isLanguageInModeratorScope(lang, authUser);
     });
-    const itemsInTab = scopedSubmissions.filter(item => item.status === 'pending' || !item.status);
+    const itemsInTab = scopedSubmissions.filter(item => {
+      if (item.status !== 'pending' && item.status) return false;
+      
+      // Filter out items with 0 pending chapters to match ReviewQueue logic
+      const chaps = item.allChapters || item.chaptersData || item.chapters || [];
+      const pendingChaps = (Array.isArray(chaps) ? chaps : []).filter(c => {
+        const s = (c.status || c.moderationStatus || '').toLowerCase();
+        return s.includes('pending') || s.includes('submitted') || s === 'new' || !s;
+      });
+      
+      return pendingChaps.length > 0;
+    });
     const uniqueKeys = new Set();
     itemsInTab.forEach(item => {
       const titleClean = (item.title || item.comicTitle || item.comicName || '').toLowerCase().trim();
