@@ -4,8 +4,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--bg, #08060d);
-  z-index: 9999;
+  background-color: #08060d;
+  z-index: 99999;
+  transition: background-color 0.25s ease;
+}
+
+html.light .full-screen-loader-overlay,
+.light .full-screen-loader-overlay,
+[data-theme="light"] .full-screen-loader-overlay {
+  background-color: #fdfbf7;
+}
+
+html.dark .full-screen-loader-overlay,
+.dark .full-screen-loader-overlay,
+[data-theme="dark"] .full-screen-loader-overlay {
+  background-color: #08060d;
 }
 
 .full-screen-loader-content {
@@ -33,8 +46,35 @@
 }
 
 .full-screen-loader-logo {
-  opacity: 0.8;
+  opacity: 0.95;
   animation: pulse-opacity 2s ease-in-out infinite;
+}
+
+/* Explicit theme overrides for logo inside full-screen-loader */
+html.light .full-screen-loader-overlay .logo-comi,
+.light .full-screen-loader-overlay .logo-comi,
+[data-theme="light"] .full-screen-loader-overlay .logo-comi {
+  fill: #0f172a !important;
+}
+
+html.light .full-screen-loader-overlay .logo-slash-secondary,
+.light .full-screen-loader-overlay .logo-slash-secondary,
+[data-theme="light"] .full-screen-loader-overlay .logo-slash-secondary {
+  fill: #0f172a !important;
+  opacity: 0.9 !important;
+}
+
+html.dark .full-screen-loader-overlay .logo-comi,
+.dark .full-screen-loader-overlay .logo-comi,
+[data-theme="dark"] .full-screen-loader-overlay .logo-comi {
+  fill: #ffffff !important;
+}
+
+html.dark .full-screen-loader-overlay .logo-slash-secondary,
+.dark .full-screen-loader-overlay .logo-slash-secondary,
+[data-theme="dark"] .full-screen-loader-overlay .logo-slash-secondary {
+  fill: #ffffff !important;
+  opacity: 0.9 !important;
 }
 
 @keyframes spinner-rotate {
@@ -60,7 +100,7 @@
 
 @keyframes pulse-opacity {
   0%, 100% {
-    opacity: 0.6;
+    opacity: 0.8;
   }
   50% {
     opacity: 1;

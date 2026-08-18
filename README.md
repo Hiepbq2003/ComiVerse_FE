@@ -11,38 +11,38 @@
 ## 🌟 Main Workflows & Features by Role
 
 ### 📖 1. Reader (Public User)
-**Luồng chính (Main Workflow):** Khám phá truyện -> Đọc truyện -> Tương tác -> Mua Premium.
-- **Immersive Reading Experience**: Cung cấp chế độ đọc Full-screen, tự động ẩn thanh điều hướng (Smart-scroll) để tối đa hoá diện tích hiển thị truyện. Hỗ trợ thay đổi giao diện (Dark/Light) và bố cục (Vertical/Single page).
-- **Zero-Latency Preloading**: Ảnh của 3 trang tiếp theo luôn được tải ngầm (preload) giúp người dùng chuyển trang mượt mà không bao giờ gặp hiệu ứng tải (loading spinner).
-- **Personalized Library & Reading History**: Tự động lưu lịch sử đọc theo từng chương, từng trang. Hệ thống Bookmark và "Save" giúp quản lý kho truyện cá nhân.
-- **Community & Social Interaction**: Hệ thống Forum thảo luận theo chủ đề, Comment realtime từng chương truyện, và hệ thống đánh giá 5 sao có ảnh hưởng đến bảng xếp hạng thuật toán của ComiVerse.
-- **Premium Purchases**: Mở khoá các chương tính phí trực tiếp bằng số dư ví.
+**Main Workflow:** Explore Comics -> Read Chapters -> Engage with Community -> Purchase Premium Content.
+- **Immersive Reading Experience**: Full-screen reading mode with a smart-scroll behavior that auto-hides navigation headers to maximize screen real estate. Supports theme switching (Dark/Light) and layout toggles (Vertical/Single page).
+- **Zero-Latency Preloading**: The next 3 image pages are silently preloaded in the background, ensuring users never encounter a loading spinner while flipping pages.
+- **Personalized Library & Reading History**: Automatically tracks reading progress down to the exact page. Robust bookmarking and "save" mechanisms for managing personal libraries.
+- **Community & Social Interaction**: Integrated forum discussions, real-time chapter comments, and a 5-star rating system that directly impacts the platform's ranking algorithms.
+- **Premium Purchases**: Unlock premium-locked chapters directly using account wallet balances.
 
 ### ✍️ 2. Author (Content Creator)
-**Luồng chính (Main Workflow):** Sáng tác/Upload -> Kiểm duyệt -> Xuất bản -> Nhận doanh thu.
-- **Creator Studio Dashboard**: Không gian làm việc riêng biệt. Theo dõi biểu đồ doanh thu, lượt view, lượt follow theo thời gian thực (tích hợp Recharts).
-- **Comic & Chapter Management**: Upload hàng loạt ảnh truyện, hỗ trợ tính năng tự động sắp xếp theo tên file. Có thể cài đặt chương truyện là miễn phí (Free) hoặc trả phí (Premium).
-- **Publication Workflow**: Thiết lập trạng thái truyện (Ongoing, Completed, Hiatus). Quản lý yêu cầu cấp phép bản quyền cho từng bộ truyện.
-- **Monetization & Payouts**: Hệ thống tự động tính toán doanh thu (Ledger) dựa trên lượt đọc (View-unit rate) và lượt mua. Author có thể rút tiền (Payout) trực tiếp về tài khoản ngân hàng thông qua tích hợp **Stripe Connect**.
+**Main Workflow:** Create/Upload -> Publication Configuration -> Engage Readers -> Earn Revenue.
+- **Creator Studio Dashboard**: Dedicated workspace featuring real-time charts for revenue, views, and followers (integrated with Recharts).
+- **Comic & Chapter Management**: Bulk image upload support with automatic file-name sorting. Authors can configure chapters as Free or Premium.
+- **Publication Workflow**: Set comic statuses (Ongoing, Completed, Hiatus) and manage copyright licensing requests for each series.
+- **Monetization & Payouts**: Automated revenue calculation (Ledger) based on unique chapter views (View-unit rate) and premium purchases. Authors can request direct bank withdrawals via **Stripe Connect**.
 
 ### 🌐 3. Translator & Project Leader (Localization Team)
-**Luồng chính (Main Workflow):** Nhận project -> Phân chia Task -> Dịch & Review -> Xuất bản bản dịch -> Nhận tiền theo số trang.
-- **Kanban Task Breakdown**: Project Leader nhận các dự án dịch, sau đó giao việc cho thành viên dưới dạng các Task thẻ Kanban (To Do -> In Progress -> Review Queue -> Completed).
-- **Split-Screen Translation Workspace**: Không gian dịch thuật chia đôi màn hình: Trái là bản gốc (Raw), Phải là công cụ nhập text cho bản dịch, giúp Translator làm việc trực tiếp trên nền tảng mà không cần phần mềm bên thứ 3.
-- **Approval & Quality Control**: Project Leader duyệt (Approve) hoặc từ chối (Reject) bản dịch của nhân viên với tính năng để lại feedback trực tiếp.
-- **Translator Payout Ledger**: Hệ thống tự động tính tiền công cho Translator dựa trên **số lượng trang đã dịch hoàn tất**. Cấu hình mức giá cố định (vd: 3.50$/trang) và giới hạn rút tiền hàng tháng.
+**Main Workflow:** Receive Project -> Delegate Tasks -> Translate & Review -> Publish -> Earn Page-based Payouts.
+- **Kanban Task Breakdown**: Project Leaders receive translation projects and delegate chapters to team members using a Kanban board (To Do -> In Progress -> Review Queue -> Completed).
+- **Split-Screen Translation Workspace**: A side-by-side workspace: Original (Raw) content on the left, Translation input on the right. Allows translators to work directly on the platform without external software.
+- **Approval & Quality Control**: Project Leaders can Approve or Reject translations, leaving direct contextual feedback for the translators.
+- **Translator Payout Ledger**: System automatically calculates compensation based on the **number of successfully translated pages**. Configurable fixed rates (e.g., $3.50/page) and monthly withdrawal limits.
 
 ### 🛡️ 4. Moderator (Content & Community Police)
-**Luồng chính (Main Workflow):** Nhận ticket Report -> Điều tra bằng chứng -> Đưa ra hình phạt.
-- **Content Review Queue**: Hệ thống tự động phân phối các báo cáo (Report) từ người dùng (Vd: Bạo lực, Bản quyền, Spam). Moderator sẽ kiểm duyệt nội dung của Author hoặc Translator.
-- **Split-Screen Inspection**: Tính năng đặc biệt cho phép Moderator so sánh trực tiếp nội dung bị report (bản dịch) và bản gốc để bắt lỗi vi phạm hoặc dịch sai.
-- **Takedown & Account Strikes**: Áp dụng hệ thống Cảnh cáo (Strikes). Ban/Mute tài khoản vi phạm, hoặc gỡ bỏ toàn bộ chương truyện (DMCA Takedown) kèm theo hệ thống gửi email cảnh báo tự động.
+**Main Workflow:** Receive Tickets -> Investigate Evidence -> Issue Penalties.
+- **Content Review Queue**: Automated distribution of user reports (e.g., Violence, Copyright, Spam). Moderators review flagged content from Authors or Translators.
+- **Split-Screen Inspection**: Specialized tool allowing Moderators to directly compare a reported translation against the original raw chapter to catch translation errors or policy violations.
+- **Takedown & Account Strikes**: Enforce the Strike System. Ability to Mute or Ban violating accounts, or execute DMCA Takedowns on entire chapters, triggering automated warning emails.
 
 ### ⚙️ 5. Administrator (Super User)
-**Luồng chính (Main Workflow):** Giám sát toàn hệ thống -> Cấu hình tham số -> Phê duyệt dòng tiền.
-- **System Command Dashboard**: Thống kê toàn cảnh về sự tăng trưởng người dùng, doanh thu nền tảng, và tình trạng server.
-- **Financial & Payout Approvals**: Quản lý toàn bộ yêu cầu rút tiền của Creator và Translator. Admin có quyền Approval cuối cùng trước khi gọi API Stripe để chuyển tiền thật.
-- **Global Configuration**: Cấu hình tỷ lệ chia sẻ doanh thu (Revenue split), giá tiền cho mỗi lượt view, và cấu hình thông báo toàn hệ thống (Global Broadcasts).
+**Main Workflow:** Monitor System -> Configure Parameters -> Approve Financial Flows.
+- **System Command Dashboard**: Comprehensive bird's-eye view of user growth, platform revenue, and server health.
+- **Financial & Payout Approvals**: Manage all withdrawal requests from Creators and Translators. Admins have final Approval authority before triggering actual bank transfers via the Stripe API.
+- **Global Configuration**: Configure platform-wide parameters such as revenue splits, view-unit pricing, and Global System Broadcasts.
 
 ---
 

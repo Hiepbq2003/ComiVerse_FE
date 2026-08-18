@@ -26,6 +26,10 @@ function ResolveAppealModal({ isOpen, onClose, ticket, onSuccess }) {
           const existing = JSON.parse(localStorage.getItem('appealedComics') || '[]')
           const updated = existing.filter((id) => String(id) !== String(comicId))
           localStorage.setItem('appealedComics', JSON.stringify(updated))
+          
+          // CRITICAL: Clear localStorage comic cache so restored data from backend is displayed
+          localStorage.removeItem('comiverse_local_comic_' + comicId)
+          
           window.dispatchEvent(new Event('appealStateChanged'))
         }
       } catch (e) {
