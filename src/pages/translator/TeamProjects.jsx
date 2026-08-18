@@ -1037,6 +1037,7 @@ function WorkspaceDetailView({
           {showCreateTask && (
             <CreateTaskModal
               comicName={comicName}
+              comicCover={selectedDetails?.cover || selectedDetails?.coverImage || selectedDetails?.coverUrl}
               newTaskData={newTaskData}
               setNewTaskData={setNewTaskData}
               chapterOptions={chapterOptions}
