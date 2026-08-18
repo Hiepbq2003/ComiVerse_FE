@@ -202,8 +202,15 @@ function AuthorDashboard() {
       const v = views[idx] // use the globally backfilled views
       return rev > 0 ? rev : (v * 0.05)
     })
-    const maxValRaw = Math.max(1, ...views, ...followers, ...revenue)
-    const scaleMax = Math.ceil(maxValRaw * 1.1)
+    
+    const maxView = Math.max(1, ...views)
+    const maxFol = Math.max(1, ...followers)
+    const maxRev = Math.max(1, ...revenue)
+
+    const scaleMax = Math.ceil(Math.max(maxView, maxFol, maxRev) * 1.1)
+    const scaleView = Math.ceil(maxView * 1.1)
+    const scaleFol = Math.ceil(maxFol * 1.1)
+    const scaleRev = Math.ceil(maxRev * 1.1)
 
     return {
       chartW,
@@ -211,12 +218,15 @@ function AuthorDashboard() {
       padX,
       padY,
       maxVal: scaleMax,
+      scaleView,
+      scaleFol,
+      scaleRev,
       views,
       revenue,
       followers,
-      viewPath: buildLinePath(views, scaleMax, chartW, chartH, padX, padY),
-      revenuePath: buildLinePath(revenue, scaleMax, chartW, chartH, padX, padY),
-      followerPath: buildLinePath(followers, scaleMax, chartW, chartH, padX, padY),
+      viewPath: buildLinePath(views, scaleView, chartW, chartH, padX, padY),
+      revenuePath: buildLinePath(revenue, scaleRev, chartW, chartH, padX, padY),
+      followerPath: buildLinePath(followers, scaleFol, chartW, chartH, padX, padY),
     }
   }, [monthlyMetrics])
 
@@ -380,9 +390,9 @@ function AuthorDashboard() {
             {lineChart.views.map((value, index) => {
               const denominator = Math.max(1, lineChart.views.length - 1)
               const x = lineChart.padX + (index / denominator) * (lineChart.chartW - lineChart.padX * 2)
-              const vy = lineChart.padY + (1 - value / lineChart.maxVal) * (lineChart.chartH - lineChart.padY * 2)
-              const ry = lineChart.padY + (1 - lineChart.revenue[index] / lineChart.maxVal) * (lineChart.chartH - lineChart.padY * 2)
-              const fy = lineChart.padY + (1 - lineChart.followers[index] / lineChart.maxVal) * (lineChart.chartH - lineChart.padY * 2)
+              const vy = lineChart.padY + (1 - value / Math.max(1, lineChart.scaleView)) * (lineChart.chartH - lineChart.padY * 2)
+              const ry = lineChart.padY + (1 - lineChart.revenue[index] / Math.max(1, lineChart.scaleRev)) * (lineChart.chartH - lineChart.padY * 2)
+              const fy = lineChart.padY + (1 - lineChart.followers[index] / Math.max(1, lineChart.scaleFol)) * (lineChart.chartH - lineChart.padY * 2)
               
               const isHovered = lineHoverData?.index === index
               const r = isHovered ? "6" : "4"
