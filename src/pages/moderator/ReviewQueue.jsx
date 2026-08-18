@@ -1990,8 +1990,14 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="moderator-empty-state">
-            <h3>No submissions found</h3>
-            <p>There are no raw comic submissions matching your active filters.</p>
+            <h3>{activeTab === 'pending' && !searchQuery ? 'All caught up!' : 'No submissions found'}</h3>
+            <p>
+              {activeTab === 'pending' && !searchQuery 
+                ? 'There are no chapters or comic profiles currently waiting for your review.' 
+                : searchQuery 
+                  ? `No ${activeTab} submissions match your search "${searchQuery}".` 
+                  : `There are no ${activeTab} submissions matching your active filters.`}
+            </p>
           </div>
         ) : isHydrating ? (
           <div className="skeleton-comic-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
