@@ -3283,3 +3283,64 @@ html.light .author-comic-detail-page .author-chapter-table tbody tr {
   border-color: var(--author-upload-zone-border);
 }
 
+/* Enhanced Hover Effects for Inputs & Modals */
+.author-input:hover,
+.author-textarea:hover,
+.form-control-premium:hover {
+  border-color: rgba(168, 85, 247, 0.35);
+  background: rgba(168, 85, 247, 0.02);
+}
+
+html.light .author-input:hover,
+html.light .author-textarea:hover,
+html.light .form-control-premium:hover {
+  border-color: rgba(168, 85, 247, 0.4);
+  background: rgba(170, 59, 255, 0.03);
+}
+
+/* Enhanced Genre Pill Buttons */
+.genre-pill-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--author-card-bg);
+  color: var(--author-text-primary);
+  border: 1px solid var(--author-border);
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  user-select: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.genre-pill-btn:hover {
+  border-color: var(--author-accent);
+  color: var(--author-accent);
+  background: rgba(168, 85, 247, 0.06);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(168, 85, 247, 0.15);
+}
+
+.genre-pill-btn.selected {
+  background: rgba(168, 85, 247, 0.15);
+  color: var(--author-accent);
+  border-color: var(--author-accent);
+  font-weight: 600;
+  box-shadow: 0 2px 5px rgba(168, 85, 247, 0.2);
+}
+
+.genre-pill-btn.selected:hover {
+  background: rgba(168, 85, 247, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(168, 85, 247, 0.3);
+}
+
+html.light .genre-pill-btn.selected {
+  background: var(--author-accent);
+  color: #fff;
+  border-color: transparent;
+}
+html.light .genre-pill-btn.selected:hover {
+  background: #9d2ae8;
+}
+

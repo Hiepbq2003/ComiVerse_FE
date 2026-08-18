@@ -621,6 +621,7 @@ function EditComicModal({ comic, onClose, onSaved }) {
                 <button
                   key={g.id || gName}
                   type="button"
+                  className={`genre-pill-btn ${isSelected ? 'selected' : ''}`}
                   onClick={() => {
                     let updated;
                     if (isSelected) {
@@ -629,14 +630,6 @@ function EditComicModal({ comic, onClose, onSaved }) {
                       updated = [...currentList, gName];
                     }
                     updateField('genres', updated.join(', '));
-                  }}
-                  style={{
-                    padding: '6px 14px', borderRadius: '20px', fontSize: '13px', cursor: 'pointer',
-                    fontWeight: '600', transition: 'all 0.2s ease', border: '1px solid',
-                    ...(isSelected 
-                      ? { background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', borderColor: '#c084fc' }
-                      : { background: 'var(--author-upload-zone-bg)', color: 'var(--author-text-primary)', borderColor: 'transparent' }
-                    )
                   }}
                 >
                   {gName}
