@@ -1333,7 +1333,13 @@ function ChapterDropdownPicker({ options, selectedId, onChange, disabled, emptyL
   }, []);
 
   const selectedOption = options.find(o => String(o.id) === String(selectedId));
-  const getCover = (ch) => ch?.cover || ch?.coverUrl || ch?.thumbnail || ch?.coverImage || 'https://via.placeholder.com/32x48?text=No+Cover';
+  const defaultCover = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="48" viewBox="0 0 32 48"><rect width="32" height="48" fill="%232d2844"/><text x="16" y="26" font-family="sans-serif" font-size="10" fill="%236b6375" text-anchor="middle">No</text><text x="16" y="38" font-family="sans-serif" font-size="10" fill="%236b6375" text-anchor="middle">Cover</text></svg>';
+  const getCover = (ch) => ch?.cover || ch?.coverUrl || ch?.thumbnail || ch?.coverImage || defaultCover;
+
+  const handleImageError = (e) => {
+    e.currentTarget.onerror = null;
+    e.currentTarget.src = defaultCover;
+  };
 
   return (
     <div ref={dropdownRef} style={{ position: 'relative', width: '100%', outline: 'none' }}>
@@ -1357,7 +1363,7 @@ function ChapterDropdownPicker({ options, selectedId, onChange, disabled, emptyL
       >
         {selectedOption ? (
            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-             <img src={getCover(selectedOption)} alt="cover" style={{ width: '24px', height: '36px', objectFit: 'cover', borderRadius: '4px' }} />
+             <img src={getCover(selectedOption)} alt="cover" onError={handleImageError} style={{ width: '24px', height: '36px', objectFit: 'cover', borderRadius: '4px' }} />
              <span>{selectedOption.title}{selectedOption.pagesCount > 0 ? ` (${selectedOption.pagesCount} pages)` : ''}{selectedOption.revision ? ' — Revision' : ''}</span>
            </div>
         ) : (
@@ -1390,7 +1396,7 @@ function ChapterDropdownPicker({ options, selectedId, onChange, disabled, emptyL
                 if (String(selectedId) !== String(ch.id)) e.currentTarget.style.background = 'transparent';
               }}
             >
-               <img src={getCover(ch)} alt="cover" style={{ width: '32px', height: '48px', objectFit: 'cover', borderRadius: '4px' }} />
+               <img src={getCover(ch)} alt="cover" onError={handleImageError} style={{ width: '32px', height: '48px', objectFit: 'cover', borderRadius: '4px' }} />
                <div style={{ display: 'flex', flexDirection: 'column' }}>
                  <span style={{ fontSize: '14px', color: '#fff', fontWeight: String(selectedId) === String(ch.id) ? '600' : '400' }}>
                    {ch.title}{ch.revision ? ' — Revision' : ''}
