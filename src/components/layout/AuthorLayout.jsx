@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom'
+import { Menu, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
@@ -8,6 +10,7 @@ import '../../assets/style/author/author.css'
 
 function AuthorLayout({ children }) {
   const navigate = useNavigate()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { isLoggedIn, user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification()
@@ -66,7 +69,7 @@ function AuthorLayout({ children }) {
     { id: 'comics', label: 'My Comics', path: '/author/comics', icon: 'comics' },
     { id: 'revenue', label: 'Revenue', path: '/author/revenue', icon: 'revenue' },
     { id: 'payout', label: 'Payout', path: '/author/payout', icon: 'payout' },
-    { id: 'settings', label: 'Settings', path: '/author/settings', icon: 'settings' },
+    { id: 'settings', label: 'Payout Settings', path: '/author/settings', icon: 'settings' },
   ]
 
   const renderNavIcon = (icon) => {
@@ -114,9 +117,15 @@ function AuthorLayout({ children }) {
   }
 
   return (
-    <div className="author-layout">
+    <div className={`author-layout ${isMobileMenuOpen ? 'mobile-menu-open' : ''}`}>
+      <button
+        type="button"
+        className={`author-mobile-overlay ${isMobileMenuOpen ? 'show' : ''}`}
+        onClick={() => setIsMobileMenuOpen(false)}
+        aria-label="Close author navigation"
+      />
       {/* Sidebar */}
-      <aside className="author-sidebar">
+      <aside className={`author-sidebar ${isMobileMenuOpen ? 'open' : ''}`}>
         <div className="author-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px' }}>
           <Link to="/" style={{ display: 'block', textDecoration: 'none', marginLeft: '38px' }}>
             <LogoIcon size={26} />
@@ -129,6 +138,7 @@ function AuthorLayout({ children }) {
               key={item.id}
               to={item.path}
               className={({ isActive }) => `author-nav-item ${isActive ? 'active' : ''}`}
+              onClick={() => setIsMobileMenuOpen(false)}
             >
               {renderNavIcon(item.icon)}
               {item.label}
@@ -151,6 +161,15 @@ function AuthorLayout({ children }) {
         {/* Topbar */}
         <header className="author-topbar">
           <div className="author-topbar-left">
+            <button
+              type="button"
+              className="author-mobile-toggle"
+              onClick={() => setIsMobileMenuOpen((current) => !current)}
+              aria-label={isMobileMenuOpen ? 'Close author navigation' : 'Open author navigation'}
+              aria-expanded={isMobileMenuOpen}
+            >
+              {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
             <span className="workspace-prefix">Workspace</span>
             <div className="workspace-tag" style={{ marginTop: 0, fontSize: '12px', padding: '6px 12px' }}>
               Author Studio

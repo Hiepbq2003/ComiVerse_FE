@@ -14,9 +14,9 @@ import AppleIcon from '../common/AppleIcon'
 import DiscordIcon from '../common/DiscordIcon'
 import XIcon from '../common/XIcon'
 import FacebookIcon from '../common/FacebookIcon'
-import { Crown, Download } from 'lucide-react'
-
-const COMIVERSE_APK_URL = 'https://pub-a7dc2066b937452cb00d7263b29ee9e5.r2.dev/comiverse-latest.apk'
+import MobileAppBanner from '../common/MobileAppBanner'
+import { COMIVERSE_ANDROID_URL } from '../../constants/mobileApp'
+import { Crown, Menu, Search, X } from 'lucide-react'
 
 function HomeLayout({ children }) {
   const navigate = useNavigate()
@@ -31,6 +31,7 @@ function HomeLayout({ children }) {
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showSignoutConfirm, setShowSignoutConfirm] = useState(false)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+  const [showMobileMenu, setShowMobileMenu] = useState(false)
   const userMenuRef = useRef(null)
   const closeSubscriptionModal = useCallback(() => setShowSubscriptionModal(false), [])
   const isReader = isLoggedIn && (user?.role || '').toUpperCase() === 'READER'
@@ -75,16 +76,28 @@ function HomeLayout({ children }) {
     try {
       await handleMarkAsRead(notification.id, notification.isRead)
     } finally {
-      if (isTeamNotif) {
-        setShowNotificationDropdown(false)
-        if (user?.role === 'PROJECT_LEADER' || user?.role === 'TRANSLATOR') {
-          navigate('/translator/project-teams');
-        } else {
-          navigate('/admin/project-teams');
-        }
-      } else if (hasNavigation) {
+      if (hasNavigation) {
         setShowNotificationDropdown(false)
         navigate(actionUrl)
+      } else if (isTeamNotif) {
+        setShowNotificationDropdown(false)
+        
+        let teamName = null;
+        const messageRaw = notification.message || '';
+        if (text.includes('assigned as project leader')) {
+          const match = messageRaw.match(/responsible for (.*?)(?: \([^)]+\))?\.$/i);
+          if (match) teamName = match[1].trim();
+        } else if (text.includes('team join request')) {
+          const match = messageRaw.match(/requested to join (.*?)\.$/i);
+          if (match) teamName = match[1].trim();
+        }
+
+        if (user?.role === 'PROJECT_LEADER' || user?.role === 'TRANSLATOR') {
+          navigate('/translator/project-teams', { state: { teamName } });
+        } else {
+          // Fallback if other roles somehow get this notification
+          navigate('/translator/project-teams', { state: { teamName } });
+        }
       }
     }
   }
@@ -98,8 +111,13 @@ function HomeLayout({ children }) {
 
   const handleMenuNavigate = (path) => {
     setShowUserMenu(false)
+    setShowMobileMenu(false)
     navigate(path)
   }
+
+  useEffect(() => {
+    setShowMobileMenu(false)
+  }, [location.pathname, location.search])
 
 
 
@@ -191,10 +209,39 @@ function HomeLayout({ children }) {
 
   const [isHeaderVisible, setIsHeaderVisible] = useState(true)
   const lastScrollY = useRef(0)
+  const isProgrammaticScroll = useRef(false)
+
+  useEffect(() => {
+    const handleProgStart = () => {
+      setIsHeaderVisible(false)
+      isProgrammaticScroll.current = true
+      // Safety timeout in case scrollend is not fired (e.g. already at target)
+      setTimeout(() => {
+        isProgrammaticScroll.current = false
+      }, 1000)
+    }
+
+    const handleScrollEnd = () => {
+      isProgrammaticScroll.current = false
+    }
+
+    window.addEventListener('programmatic-scroll-start', handleProgStart)
+    window.addEventListener('scrollend', handleScrollEnd)
+
+    return () => {
+      window.removeEventListener('programmatic-scroll-start', handleProgStart)
+      window.removeEventListener('scrollend', handleScrollEnd)
+    }
+  }, [])
 
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY
+      if (isProgrammaticScroll.current) {
+        lastScrollY.current = currentScrollY
+        return
+      }
+      
       if (currentScrollY > lastScrollY.current && currentScrollY > 80) {
         setIsHeaderVisible(false)
       } else {
@@ -209,7 +256,7 @@ function HomeLayout({ children }) {
   return (
     <div className="home-layout-container">
       {/* HEADER */}
-      <header className={`home-header ${!isHeaderVisible ? 'hidden' : ''}`}>
+      <header className={`home-header ${!isHeaderVisible && !showMobileMenu ? 'hidden' : ''}`}>
         <div className="home-header-left">
           {/* Logo */}
           <Link to="/" className="home-brand" style={{ display: 'flex', alignItems: 'center' }}>
@@ -569,6 +616,62 @@ function HomeLayout({ children }) {
               </Link>
             </>
           )}
+
+          <button
+            type="button"
+            className="home-mobile-menu-toggle"
+            onClick={() => setShowMobileMenu((current) => !current)}
+            aria-label={showMobileMenu ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={showMobileMenu}
+            aria-controls="home-mobile-navigation"
+          >
+            {showMobileMenu ? <X size={21} /> : <Menu size={21} />}
+          </button>
+        </div>
+
+        <div
+          id="home-mobile-navigation"
+          className={`home-mobile-navigation ${showMobileMenu ? 'open' : ''}`}
+        >
+          <form
+            className="home-mobile-search"
+            onSubmit={(event) => {
+              event.preventDefault()
+              triggerSearch()
+              setShowMobileMenu(false)
+            }}
+          >
+            <Search size={18} aria-hidden="true" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search comics, manga, authors..."
+              aria-label="Search comics"
+            />
+            <button type="submit" disabled={!searchQuery.trim()}>Search</button>
+          </form>
+
+          <nav className="home-mobile-nav-links" aria-label="Mobile navigation">
+            <Link to="/" className={location.pathname === '/' ? 'active' : ''}>Home</Link>
+            <Link to="/explore" className={location.pathname === '/explore' ? 'active' : ''}>Explore</Link>
+            <Link to="/ranking" className={location.pathname === '/ranking' ? 'active' : ''}>Ranking</Link>
+            {isLoggedIn && (
+              <Link to="/forum" className={location.pathname.startsWith('/forum') ? 'active' : ''}>Forum</Link>
+            )}
+            {isLoggedIn && <Link to="/library">Library</Link>}
+            {isReader && (
+              <button type="button" onClick={() => {
+                setShowMobileMenu(false)
+                setShowSubscriptionModal(true)
+              }}>
+                <Crown size={17} />
+                {user?.premiumActive ? 'Manage Premium' : 'Premium'}
+              </button>
+            )}
+            {!isLoggedIn && <Link to="/auth?mode=signin">Sign In</Link>}
+            {!isLoggedIn && <Link to="/auth?mode=signup">Sign Up Free</Link>}
+          </nav>
         </div>
       </header>
 
@@ -598,6 +701,8 @@ function HomeLayout({ children }) {
 
       {/* FLOATING CHAT WIDGET */}
       {isLoggedIn && <ChatWidget />}
+
+      <MobileAppBanner />
 
       {/* FOOTER */}
       <footer className="home-footer">
@@ -647,7 +752,7 @@ function HomeLayout({ children }) {
               <div className="footer-app-badges">
                 <a
                   className="footer-app-badge footer-app-badge--android"
-                  href={COMIVERSE_APK_URL}
+                  href={COMIVERSE_ANDROID_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   download="comiverse-latest.apk"

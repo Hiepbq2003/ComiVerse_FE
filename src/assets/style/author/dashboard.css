@@ -38,8 +38,8 @@
   background-color: var(--author-card-bg);
   padding: 24px;
   border-radius: var(--author-radius);
-  box-shadow: var(--author-shadow);
-  border: 1px solid var(--author-border);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border: 1.5px solid var(--author-border);
   transition: var(--author-transition);
   position: relative;
   overflow: hidden;
@@ -47,8 +47,8 @@
 
 .author-stat-card:hover {
   transform: translateY(-4px);
-  box-shadow: var(--author-shadow-lg);
-  border-color: rgba(170, 59, 255, 0.3);
+  box-shadow: 0 10px 30px rgba(168, 85, 247, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  border-color: rgba(170, 59, 255, 0.55);
 }
 
 .author-stat-label {

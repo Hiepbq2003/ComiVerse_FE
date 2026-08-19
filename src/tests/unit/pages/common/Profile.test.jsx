@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Profile from '../../../../pages/common/Profile'
 import * as AuthApi from '../../../../services/api/AuthApi'
 import * as NotificationApi from '../../../../services/api/NotificationApi'
+import * as AuthorProfileApi from '../../../../services/api/AuthorProfileApi'
+import * as UploadApi from '../../../../services/api/UploadApi'
 
 const contextMocks = vi.hoisted(() => ({ updateUser: vi.fn() }))
 
@@ -27,6 +29,26 @@ vi.mock('../../../../services/api/RatingApi', () => ({
 vi.mock('../../../../services/api/NotificationApi', () => ({
   getNotificationPreferencesApi: vi.fn(),
   updateNotificationPreferencesApi: vi.fn(),
+}))
+
+vi.mock('../../../../services/api/AuthorProfileApi', () => ({
+  getAuthorProfileApi: vi.fn().mockResolvedValue(null),
+  saveAuthorProfileApi: vi.fn(),
+  uploadAuthorLicenseApi: vi.fn(),
+}))
+
+vi.mock('../../../../services/api/UploadApi', () => ({
+  uploadFileApi: vi.fn(),
+}))
+
+vi.mock('../../../../services/api/TranslatorApi', () => ({
+  getMyTranslatorProfileApi: vi.fn().mockRejectedValue(new Error('not a translator')),
+  updateMyTranslatorProfileApi: vi.fn(),
+}))
+
+vi.mock('../../../../services/api/ProjectTeamApi', () => ({
+  getMyProjectTeamsApi: vi.fn().mockResolvedValue([]),
+  getAllProjectTeamsApi: vi.fn().mockResolvedValue([]),
 }))
 
 vi.mock('../../../../components/layout/HomeLayout', () => ({ default: ({ children }) => <>{children}</> }))
@@ -187,4 +209,80 @@ describe('Profile API integration', () => {
       })
     })
   })
+
+  it('loads and saves Author-only display name and author type through AuthorProfile API', async () => {
+    const author = { ...baseUser, role: 'AUTHOR', fullName: 'Legal Author Name' }
+    prepareApi(author)
+    AuthApi.updateProfileApi.mockResolvedValue(author)
+    AuthorProfileApi.getAuthorProfileApi.mockResolvedValue({
+      id: 'author-entity-1',
+      userId: author.userId,
+      displayName: 'Old Pen Name',
+      authorType: 'INDIVIDUAL',
+      contactEmail: author.email,
+      licenseStatus: 'PENDING_LICENSE',
+      canUploadLicense: true,
+    })
+    AuthorProfileApi.saveAuthorProfileApi.mockResolvedValue({
+      id: 'author-entity-1',
+      userId: author.userId,
+      displayName: 'New Pen Name',
+      authorType: 'STUDIO',
+      contactEmail: author.email,
+      licenseStatus: 'PENDING_LICENSE',
+      canUploadLicense: true,
+    })
+
+    renderProfile(author)
+    fireEvent.click(await screen.findByRole('button', { name: /Workspace Profile/i }))
+
+    const displayNameInput = await screen.findByDisplayValue('Old Pen Name')
+    fireEvent.change(displayNameInput, { target: { value: 'New Pen Name' } })
+    fireEvent.change(screen.getByLabelText('Author Type'), { target: { value: 'STUDIO' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save Workspace Profile' }))
+
+    await waitFor(() => {
+      expect(AuthorProfileApi.saveAuthorProfileApi).toHaveBeenCalledWith(expect.objectContaining({
+        displayName: 'New Pen Name',
+        authorType: 'STUDIO',
+      }))
+    })
+  })
+
+  it('uploads Author license through /author/profile/license flow instead of generic upload', async () => {
+    const author = { ...baseUser, role: 'AUTHOR', fullName: 'Author One' }
+    prepareApi(author)
+    AuthorProfileApi.getAuthorProfileApi.mockResolvedValue({
+      id: 'author-entity-1',
+      userId: author.userId,
+      displayName: 'Author One',
+      authorType: 'INDIVIDUAL',
+      licenseStatus: 'PENDING_LICENSE',
+      licenseUrl: null,
+      canUploadLicense: true,
+    })
+    AuthorProfileApi.uploadAuthorLicenseApi.mockResolvedValue({
+      authorId: 'author-entity-1',
+      userId: author.userId,
+      status: 'PENDING_VERIFICATION',
+      licenseUrl: 'https://cdn.example.com/author-license.pdf',
+      licenseOriginalFilename: 'license.pdf',
+      canUploadLicense: false,
+      canPublishComic: false,
+      canRequestAuthorPayout: false,
+    })
+
+    const { container } = renderProfile(author)
+    fireEvent.click(await screen.findByRole('button', { name: /Workspace Profile/i }))
+
+    await screen.findByText(/No document attached/i)
+    const file = new File(['%PDF-1.4 test'], 'license.pdf', { type: 'application/pdf' })
+    const input = container.querySelector('#author-copyright-file-input')
+    fireEvent.change(input, { target: { files: [file] } })
+
+    await waitFor(() => expect(AuthorProfileApi.uploadAuthorLicenseApi).toHaveBeenCalledWith(file))
+    expect(UploadApi.uploadFileApi).not.toHaveBeenCalled()
+    expect(await screen.findByText(/Waiting for administrator verification/i)).toBeInTheDocument()
+  })
+
 })

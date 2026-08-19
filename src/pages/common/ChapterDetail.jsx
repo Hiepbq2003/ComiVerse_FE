@@ -4,7 +4,7 @@ import HomeLayout from '../../components/layout/HomeLayout'
 import { getComicByIdApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi, getChapterDetailApi, getChapterTranslationsApi } from '../../services/api/ChapterApi'
 import { toast } from 'react-toastify'
-import useReaderSecurity from '../../hooks/useReaderSecurity'
+import useReaderSecurity, { isDevToolsOpenSync } from '../../hooks/useReaderSecurity'
 import ComicPageCanvas from '../../components/common/ComicPageCanvas'
 import '../../assets/style/reader/chapter-detail.css'
 import '../../assets/style/reader/comments.css'
@@ -56,16 +56,47 @@ function ChapterDetail() {
   const [loading, setLoading] = useState(true)
   const [isMockData, setIsMockData] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false)
   const [isDevToolsOpen, setIsDevToolsOpen] = useState(false)
   const [translations, setTranslations] = useState([])
   const [selectedLanguage, setSelectedLanguage] = useState(searchParams.get('lang') || '')
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
+  const [readerLayout, setReaderLayout] = useState('vertical') // 'vertical' | 'single'
+  const [pageIndex, setPageIndex] = useState(0)
   const closeSubscriptionModal = useCallback(() => setShowSubscriptionModal(false), [])
 
   const { user, refreshSubscription } = useAuth()
 
   const dropdownRef = useRef(null)
+  const layoutDropdownRef = useRef(null)
+  const viewportRef = useRef(null)
+
+  const scrollToViewer = useCallback((behavior = 'smooth') => {
+    if (viewportRef.current) {
+      window.dispatchEvent(new Event('programmatic-scroll-start'))
+      const y = viewportRef.current.getBoundingClientRect().top + window.scrollY - 10
+      window.scrollTo({ top: y, behavior })
+    } else {
+      window.scrollTo({ top: 0, behavior })
+    }
+  }, [])
+
+  const pages = currentChapter?.images || []
+
+  // Preload next 3 images
+  useEffect(() => {
+    if (!pages || pages.length === 0) return
+
+    const preloadCount = 3
+    for (let i = 1; i <= preloadCount; i++) {
+      const nextIndex = pageIndex + i
+      if (nextIndex < pages.length) {
+        const img = new Image()
+        img.src = pages[nextIndex]
+      }
+    }
+  }, [pageIndex, pages])
 
   // Enforce client-side copy-protection security
   useReaderSecurity({
@@ -76,34 +107,48 @@ function ChapterDetail() {
       setComic(null)
       setChaptersList([])
 
-      toast.error('Security alert: Inspect element or developer tool opened. Reading session is suspended.', {
+      toast.error('Security alert: Developer tools detected. Reading session is suspended.', {
         position: 'top-right',
         autoClose: 5000,
         theme: 'dark'
       })
     },
-    disableDetector: true
+    disableDetector: false
   })
 
   // Scroll to top on chapter change
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' })
-  }, [chapterId])
+    scrollToViewer('instant')
+    setPageIndex(0)
+  }, [chapterId, scrollToViewer])
 
-  // Close dropdown on click outside
+  // Close dropdowns on click outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsDropdownOpen(false)
+      }
+      if (layoutDropdownRef.current && !layoutDropdownRef.current.contains(event.target)) {
+        setIsLayoutDropdownOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+
+
   // Fetch API details or fall back to mock
   useEffect(() => {
     const fetchChapterAndComicInfo = async () => {
+      // Pre-flight check: if DevTools is already open when loading,
+      // prevent leaking API endpoints and image requests in Network panel
+      if (isDevToolsOpenSync()) {
+        setIsDevToolsOpen(true)
+        setLoading(false)
+        return
+      }
+
       try {
         setLoading(true)
 
@@ -233,6 +278,31 @@ function ChapterDetail() {
     }
   }
 
+  // Keyboard navigation for Single Page Mode
+  useEffect(() => {
+    if (readerLayout !== 'single') return
+    const handleKeyDown = (e) => {
+      const pagesLen = currentChapter?.images?.length || 0
+      if (e.key === 'ArrowRight' || e.key === 'd') {
+        if (pageIndex < pagesLen - 1) {
+          setPageIndex((p) => p + 1)
+          scrollToViewer('smooth')
+        } else if (hasNextChapter) {
+          handleGoToNextChapter()
+        }
+      } else if (e.key === 'ArrowLeft' || e.key === 'a') {
+        if (pageIndex > 0) {
+          setPageIndex((p) => p - 1)
+          scrollToViewer('smooth')
+        } else if (hasPrevChapter) {
+          handleGoToPrevChapter()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [readerLayout, pageIndex, currentChapter, hasNextChapter, hasPrevChapter])
+
   if (isDevToolsOpen) {
     return (
       <HomeLayout>
@@ -285,7 +355,6 @@ function ChapterDetail() {
     )
   }
 
-  const pages = currentChapter.images || []
   // The backend decides access by returning chapter images only to authorized users.
   // Do not trust a possibly stale local premium flag when rendering the lock state.
   const isPremiumLocked = Boolean(
@@ -430,17 +499,75 @@ function ChapterDetail() {
                 />
               )}
 
+              {/* Layout Dropdown */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--chapter-heading)' }}>
+                  Reader Layout:
+                </span>
+                <div className="reader-chapter-dropdown-container" ref={layoutDropdownRef} style={{ minWidth: '160px' }}>
+                  <div
+                    className={`reader-chapter-dropdown-trigger ${isLayoutDropdownOpen ? 'active' : ''}`}
+                    onClick={() => setIsLayoutDropdownOpen(!isLayoutDropdownOpen)}
+                    style={{ padding: '8px 14px', borderRadius: '999px', color: 'var(--reader-purple)', borderColor: 'rgba(168, 85, 247, 0.5)' }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {readerLayout === 'single' ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+                      )}
+                      {readerLayout === 'single' ? 'Single Page' : 'Vertical Scroll'}
+                    </span>
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="dropdown-chevron"
+                    >
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </div>
+
+                  {isLayoutDropdownOpen && (
+                    <div className="reader-chapter-dropdown-menu">
+                      <div
+                        className={`reader-chapter-dropdown-item ${readerLayout === 'single' ? 'selected' : ''}`}
+                        onClick={() => {
+                          setReaderLayout('single')
+                          setIsLayoutDropdownOpen(false)
+                        }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
+                          Single Page
+                        </span>
+                      </div>
+                      <div
+                        className={`reader-chapter-dropdown-item ${readerLayout === 'vertical' ? 'selected' : ''}`}
+                        onClick={() => {
+                          setReaderLayout('vertical')
+                          setIsLayoutDropdownOpen(false)
+                        }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fcd34d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="16" y2="10"></line><line x1="8" y1="14" x2="16" y2="14"></line><line x1="8" y1="18" x2="16" y2="18"></line></svg>
+                          Continuous Vertical Scroll
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <button
-                className="btn-reader-nav"
+                className="btn-reader-report"
                 onClick={() => setShowReportModal(true)}
-                title="Report issue with this chapter or translation"
-                style={{
-                  color: '#f87171',
-                  borderColor: 'rgba(239, 68, 68, 0.35)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
+                data-tooltip="Report an issue"
               >
                 <Flag size={14} /> Report
               </button>
@@ -449,7 +576,7 @@ function ChapterDetail() {
         </div>
 
         {/* Comic Pages Viewport */}
-        <div className="chapter-pages-viewport" id="secure-comic-reader">
+        <div className="chapter-pages-viewport" id="secure-comic-reader" ref={viewportRef}>
           {isPremiumLocked ? (
             <div style={{
               width: 'min(680px, calc(100% - 32px))',
@@ -484,6 +611,58 @@ function ChapterDetail() {
             <div style={{ padding: '80px 20px', color: '#64748b', textAlign: 'center' }}>
               <p style={{ fontSize: '36px', margin: '0 0 16px' }}>📖</p>
               <p>This chapter contains no images yet.</p>
+            </div>
+          ) : readerLayout === 'single' ? (
+            <div className="premium-single-page-wrapper">
+              {/* Left Navigation Zone */}
+              <div 
+                className="premium-page-nav-zone left" 
+                onClick={() => {
+                  if (pageIndex > 0) {
+                    setPageIndex(p => Math.max(0, p - 1))
+                    scrollToViewer('smooth')
+                  } else if (hasPrevChapter) {
+                    handleGoToPrevChapter()
+                  }
+                }}
+              >
+                <div className="premium-page-nav-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </div>
+              </div>
+
+              {/* Main Image Canvas */}
+              <ComicPageCanvas
+                key={`single-${pageIndex}`}
+                src={pages[pageIndex]}
+                pageIndex={pageIndex}
+                isEncrypted={false}
+                fallbackSrc="https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&q=80"
+                bubbles={selectedBubblesByPageNumber[pageIndex + 1]}
+              />
+
+              {/* Right Navigation Zone */}
+              <div 
+                className="premium-page-nav-zone right" 
+                onClick={() => {
+                  if (pageIndex < pages.length - 1) {
+                    setPageIndex(p => Math.min(pages.length - 1, p + 1))
+                    scrollToViewer('smooth')
+                  } else if (hasNextChapter) {
+                    handleGoToNextChapter()
+                  }
+                }}
+              >
+                <div className="premium-page-nav-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </div>
+              </div>
+
+              {/* Premium Floating Page Counter */}
+              <div className="premium-page-counter">
+                <span style={{ opacity: 0.7 }}>Page</span>
+                <span>{pageIndex + 1} <span style={{ opacity: 0.5 }}>/</span> {pages.length}</span>
+              </div>
             </div>
           ) : (
             pages.map((imgUrl, index) => (

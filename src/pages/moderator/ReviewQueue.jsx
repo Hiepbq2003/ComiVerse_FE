@@ -19,6 +19,7 @@ import { exportToCsv } from '../../utils/exportToCsv'
 import { toast } from 'react-toastify'
 import { getAuth } from '../../utils/Auth'
 import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
+import { claimSubmissionApi, releaseSubmissionApi } from '../../services/api/SubmissionApi'
 
 const cleanReasonText = (reason) => {
   if (!reason) return '';
@@ -368,21 +369,30 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     setCurrentPage(1)
   }, [activeTab, sortFilter, searchQuery])
 
+  // 0. High-Performance Maps for fast lookups
+  const { comicIdMap, comicTitleMap } = useMemo(() => {
+    const idMap = new Map();
+    const titleMap = new Map();
+    (comics || []).forEach(c => {
+      if (c.id) idMap.set(String(c.id), c);
+      if (c.title) titleMap.set(c.title.trim().toLowerCase(), c);
+    });
+    return { comicIdMap: idMap, comicTitleMap: titleMap };
+  }, [comics]);
+
   // Helper to find matching comic from comics list prop by ID or Title
-  const findMatchingComic = (item) => {
-    if (!item || !Array.isArray(comics) || comics.length === 0) return null;
+  const findMatchingComic = useCallback((item) => {
+    if (!item) return null;
     const itemComicId = item.comicId || item.comic_id || item.comic?.id;
-    if (itemComicId) {
-      const match = comics.find(c => String(c.id) === String(itemComicId));
-      if (match) return match;
+    if (itemComicId && comicIdMap.has(String(itemComicId))) {
+      return comicIdMap.get(String(itemComicId));
     }
     const itemTitle = (item.title || item.comicTitle || item.comicName || '').trim().toLowerCase();
-    if (itemTitle) {
-      const match = comics.find(c => (c.title || '').trim().toLowerCase() === itemTitle);
-      if (match) return match;
+    if (itemTitle && comicTitleMap.has(itemTitle)) {
+      return comicTitleMap.get(itemTitle);
     }
     return null;
-  };
+  }, [comicIdMap, comicTitleMap]);
 
   const normalizeChapter = (chap, idx) => {
     const pages = Array.isArray(chap.pages) && chap.pages.length > 0
@@ -818,14 +828,29 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         }
         return true;
       });
-      const uniqueKeys = new Set();
+      // Group items by key to match the display logic
+      const groupedByKey = new Map();
       itemsInTab.forEach(item => {
         const titleClean = (item.title || '').toLowerCase().trim();
         const submitterClean = (item.submittedBy || '').toLowerCase().trim();
         const key = item.comicId ? `comic-${item.comicId}` : `group-${titleClean}_${submitterClean}`;
-        uniqueKeys.add(key);
+        if (!groupedByKey.has(key)) {
+          groupedByKey.set(key, []);
+        }
+        groupedByKey.get(key).push(item);
       });
-      counts[tabStatus] = uniqueKeys.size;
+
+      if (tabStatus === 'pending') {
+        // For pending tab, only count groups that have at least one real chapter submission
+        let pendingCount = 0;
+        groupedByKey.forEach((items) => {
+          const hasRealChapter = items.some(isRealChapterSubmission);
+          if (hasRealChapter) pendingCount++;
+        });
+        counts[tabStatus] = pendingCount;
+      } else {
+        counts[tabStatus] = groupedByKey.size;
+      }
     });
 
     const ticketTargetIds = new Set(appealTickets.map(t => String(t.targetId || t.id)));
@@ -1027,13 +1052,44 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       group.genres = getSubmissionGenres(group);
     });
 
-    return Array.from(groupsMap.values());
+    // Filter out comic-profile-only groups with 0 pending chapters in the Pending tab.
+    // After approving all chapters, only the comic catalog profile submission remains
+    // — showing it as "0 Chapters" is confusing, so auto-hide it.
+    const result = Array.from(groupsMap.values()).filter(group => {
+      if (activeTab !== 'pending') return true;
+      const chaps = getSubmissionChapters(group);
+      if (chaps.length > 0) return true;
+      // If the group has only non-chapter subItems (comic profile submissions),
+      // check if ANY subItem is a real chapter submission. If none, hide it.
+      const hasRealChapter = (group.subItems || []).some(isRealChapterSubmission);
+      return hasRealChapter;
+    });
+    return result;
   }, [filteredItems]);
 
   const totalPages = Math.ceil(groupedItems.length / ITEMS_PER_PAGE)
   const paginatedItems = useMemo(() => {
     return groupedItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
   }, [groupedItems, currentPage]);
+
+  // ── Release claim when closing review modal without approve/reject ──
+  const handleCloseReviewModal = useCallback(async () => {
+    if (selectedReview && selectedReview.status === 'pending') {
+      const submissionIds = selectedReview.subItems
+        ? selectedReview.subItems.map(si => si.id || si.submissionId).filter(Boolean)
+        : [selectedReview.id || selectedReview.submissionId].filter(Boolean);
+      const firstValidId = submissionIds.find(sid => sid && !String(sid).startsWith('comic-') && !String(sid).startsWith('group-'));
+      if (firstValidId) {
+        try {
+          await releaseSubmissionApi(firstValidId);
+        } catch (err) {
+          console.warn('[Release API] Non-blocking error:', err?.message);
+        }
+      }
+    }
+    setSelectedReview(null);
+    setSelectedChapter(null);
+  }, [selectedReview])
 
   const onApproveClick = (groupOrItem) => {
     const targetId = typeof groupOrItem === 'string' ? groupOrItem : (groupOrItem.id || groupOrItem);
@@ -1510,7 +1566,11 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         return !status || status === 'APPROVED' || status === 'PUBLISHED' || status === 'SUBMITTED_FOR_REVIEW' || status === 'REJECTED' || status === 'PREVIEW_READY';
       });
 
-      if (list.length === 0) return [];
+      if (list.length === 0) {
+        chapterCacheRef.current.set(`shallow_${comicId}`, []);
+        chapterCacheRef.current.set(`full_${comicId}`, []);
+        return [];
+      }
 
       if (!fetchDetails) {
         const shallowResult = list.map((ch, idx) => normalizeChapter(ch, idx));
@@ -1594,6 +1654,33 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
   }, [paginatedItems]);
 
   const handleOpenReviewModal = async (item) => {
+    // ── Claim Ticket: try to claim this submission before reviewing ──
+    if (item.status === 'pending') {
+      const submissionIds = item.subItems
+        ? item.subItems.map(si => si.id || si.submissionId).filter(Boolean)
+        : [item.id || item.submissionId].filter(Boolean);
+      
+      const firstValidId = submissionIds.find(sid => sid && !String(sid).startsWith('comic-') && !String(sid).startsWith('group-'));
+      if (firstValidId) {
+        try {
+          const claimRes = await claimSubmissionApi(firstValidId);
+          if (claimRes?.data?.success === false || claimRes?.success === false) {
+            const msg = claimRes?.data?.message || claimRes?.message || 'This submission is being reviewed by another moderator.';
+            toast.warning(msg);
+            return; // Don't open the modal
+          }
+        } catch (claimErr) {
+          if (claimErr?.response?.status === 409) {
+            const msg = claimErr?.response?.data?.message || 'This submission is currently being reviewed by another moderator.';
+            toast.warning(msg);
+            return; // Don't open the modal
+          }
+          // Non-409 errors (e.g. network) — proceed anyway as a fallback
+          console.warn('[Claim API] Non-blocking error:', claimErr?.message);
+        }
+      }
+    }
+
     setSelectedReview(item);
     setPageIndex(0);
     setFetchingChapters(true);
@@ -1903,8 +1990,14 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="moderator-empty-state">
-            <h3>No submissions found</h3>
-            <p>There are no raw comic submissions matching your active filters.</p>
+            <h3>{activeTab === 'pending' && !searchQuery ? 'All caught up!' : 'No submissions found'}</h3>
+            <p>
+              {activeTab === 'pending' && !searchQuery 
+                ? 'There are no chapters or comic profiles currently waiting for your review.' 
+                : searchQuery 
+                  ? `No ${activeTab} submissions match your search "${searchQuery}".` 
+                  : `There are no ${activeTab} submissions matching your active filters.`}
+            </p>
           </div>
         ) : isHydrating ? (
           <div className="skeleton-comic-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1925,11 +2018,39 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           hydratedItems.map(item => (
             <div className="submission-card" key={item.id}>
               <div className="submission-cover-placeholder">
-                {item.cover && (item.cover.startsWith('http') || item.cover.includes('/')) ? (
-                  <img src={item.cover} alt={item.title} className="submission-cover-img" />
-                ) : (
-                  item.cover || '📚'
-                )}
+                {(() => {
+                  const coverSrc = item.cover || item.coverImageUrl || item.coverImage || item.coverUrl || item.imageUrl || item.comic?.cover || item.comic?.coverImageUrl || '';
+                  return coverSrc ? (
+                    <img 
+                      src={coverSrc} 
+                      alt={item.title} 
+                      className="submission-cover-img"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        const fallback = e.target.nextElementSibling;
+                        if (fallback) fallback.style.display = 'flex';
+                      }}
+                    />
+                  ) : null;
+                })()}
+                <div 
+                  className="submission-cover-fallback"
+                  style={{ 
+                    display: (item.cover || item.coverImageUrl || item.coverImage) ? 'none' : 'flex',
+                    width: '100%',
+                    height: '100%',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#a855f7',
+                    opacity: 0.8
+                  }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/>
+                    <path d="M6 6h10"/>
+                    <path d="M6 10h10"/>
+                  </svg>
+                </div>
               </div>
 
               <div className="submission-info">
@@ -1968,37 +2089,62 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
 
               <div className="submission-right-side">
                 <div className="submission-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <ModernButton 
-                    variant={2} 
-                    label={item.isComicAppealItem ? "📄 Review Appeal" : (item.status === 'rejected' ? "👁 View Evidence" : "👁 View Content")} 
-                    className="btn-review"
-                    onClick={() => {
-                      if (item.isComicAppealItem) {
-                        setSelectedAppealComic(item);
-                        setIsAppealModalOpen(true);
-                      } else {
-                        handleOpenReviewModal(item);
-                      }
-                    }} 
-                  />
+                  {(() => {
+                    const currentUser = getAuth()?.user;
+                    // Note: If reviewerId exists and is not the current user, it's claimed by someone else.
+                    // We assume it's valid if it's returned by the backend (backend handles the 30min expiry).
+                    const isClaimedByOther = item.reviewerId && item.reviewerId !== currentUser?.id;
+                    const isClaimedByMe = item.reviewerId && item.reviewerId === currentUser?.id;
 
-                  {item.status === 'pending' && (
-                    <>
-                      <ModernButton 
-                        variant={2} 
-                        label="✓ Approve All" 
-                        className="btn-approve"
-                        onClick={() => onApproveClick(item)} 
-                      />
+                    if (isClaimedByOther && item.status === 'pending') {
+                      return (
+                        <div style={{ padding: '8px 12px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#f59e0b', borderRadius: '8px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '16px' }}>🔒</span> Reviewing: {item.reviewerName || 'Another Mod'}
+                        </div>
+                      );
+                    }
 
-                      <ModernButton 
-                        variant={2} 
-                        label="✗ Reject All" 
-                        className="btn-reject"
-                        onClick={() => onOpenReject(item)} 
-                      />
-                    </>
-                  )}
+                    return (
+                      <>
+                        {isClaimedByMe && item.status === 'pending' && (
+                          <div style={{ padding: '6px 10px', background: 'rgba(139, 92, 246, 0.1)', color: 'var(--author-primary, #8b5cf6)', borderRadius: '6px', fontSize: '12px', fontWeight: '700', marginRight: '4px' }}>
+                            Your Claim
+                          </div>
+                        )}
+                        <ModernButton 
+                          variant={2} 
+                          label={item.isComicAppealItem ? "📄 Review Appeal" : (item.status === 'rejected' ? "👁 View Evidence" : "👁 View Content")} 
+                          className="btn-review"
+                          onClick={() => {
+                            if (item.isComicAppealItem) {
+                              setSelectedAppealComic(item);
+                              setIsAppealModalOpen(true);
+                            } else {
+                              handleOpenReviewModal(item);
+                            }
+                          }} 
+                        />
+
+                        {item.status === 'pending' && (
+                          <>
+                            <ModernButton 
+                              variant={2} 
+                              label="✓ Approve All" 
+                              className="btn-approve"
+                              onClick={() => onApproveClick(item)} 
+                            />
+
+                            <ModernButton 
+                              variant={2} 
+                              label="✗ Reject All" 
+                              className="btn-reject"
+                              onClick={() => onOpenReject(item)} 
+                            />
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -2080,7 +2226,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
 
                   <button 
                     className="mod-inspector-close-btn" 
-                    onClick={() => { setSelectedReview(null); setSelectedChapter(null); }}
+                    onClick={handleCloseReviewModal}
                     title="Close Viewer"
                   >
                     ×
@@ -2401,7 +2547,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                           <ModernButton 
                             variant={2} 
                             label="Close Viewer" 
-                            onClick={() => { setSelectedReview(null); setSelectedChapter(null); }}
+                            onClick={handleCloseReviewModal}
                           />
                         </div>
                       </div>
@@ -2520,15 +2666,41 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                             overflow: 'hidden',
                             boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
                             border: '1px solid rgba(148,163,184,0.2)',
-                            flexShrink: 0
+                            flexShrink: 0,
+                            position: 'relative'
                           }}>
-                            {selectedReview.cover && (selectedReview.cover.startsWith('http') || selectedReview.cover.includes('/')) ? (
-                              <img src={selectedReview.cover} alt={selectedReview.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '48px', color: '#7c3aed' }}>
-                                {selectedReview.cover || '📚'}
-                              </div>
-                            )}
+                            {(() => {
+                              const revCover = selectedReview.cover || selectedReview.coverImageUrl || selectedReview.coverImage || selectedReview.comic?.cover || selectedReview.comic?.coverImageUrl || '';
+                              return revCover ? (
+                                <img 
+                                  src={revCover} 
+                                  alt={selectedReview.title} 
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    const fallback = e.target.nextElementSibling;
+                                    if (fallback) fallback.style.display = 'flex';
+                                  }}
+                                />
+                              ) : null;
+                            })()}
+                            <div 
+                              style={{ 
+                                display: (selectedReview.cover || selectedReview.coverImageUrl || selectedReview.coverImage) ? 'none' : 'flex', 
+                                width: '100%', 
+                                height: '100%', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                color: '#7c3aed',
+                                background: 'rgba(168, 85, 247, 0.08)'
+                              }}
+                            >
+                              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/>
+                                <path d="M6 6h10"/>
+                                <path d="M6 10h10"/>
+                              </svg>
+                            </div>
                           </div>
 
                           {/* Core Input Fields */}

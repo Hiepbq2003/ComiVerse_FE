@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import '../../assets/style/moderator/genre-management.css'
 import { getAllGenresApi, createGenreApi, updateGenreApi, deleteGenreApi } from '../../services/api/GenreApi'
@@ -127,30 +127,46 @@ function GenreManagement({ comics }) {
     }
   }
 
-  // Calculate statistics metrics
+  // Calculate statistics metrics using useMemo to avoid O(N*M) recalculations on every render
+  const { genreCountsMap, mostPopularGenreLabel } = useMemo(() => {
+    const counts = new Map();
+    if (comics && comics.length > 0) {
+      comics.forEach(c => {
+        (c.genres || []).forEach(g => {
+          const name = typeof g === 'object' && g !== null ? g.name : g;
+          if (name) {
+            const lowerName = name.toLowerCase();
+            counts.set(lowerName, (counts.get(lowerName) || 0) + 1);
+          }
+        });
+      });
+    }
+
+    let maxCount = -1;
+    let popularName = 'None';
+    if (genres && genres.length > 0) {
+      genres.forEach(g => {
+        const lowerName = g.name ? g.name.toLowerCase() : '';
+        const cnt = counts.get(lowerName) || 0;
+        if (cnt > maxCount) {
+          maxCount = cnt;
+          popularName = g.name;
+        }
+      });
+    }
+
+    const popularLabel = maxCount > 0 ? `${popularName} (${maxCount})` : 'None';
+    return { genreCountsMap: counts, mostPopularGenreLabel: popularLabel };
+  }, [comics, genres]);
+
   const getComicCountForGenre = (genreName) => {
-    if (!comics) return 0
-    return comics.filter(c => 
-      (c.genres || []).some(g => {
-        const name = typeof g === 'object' && g !== null ? g.name : g
-        return name && name.toLowerCase() === genreName.toLowerCase()
-      })
-    ).length
-  }
+    if (!genreName) return 0;
+    return genreCountsMap.get(genreName.toLowerCase()) || 0;
+  };
 
   const getMostPopularGenre = () => {
-    if (genres.length === 0 || !comics || comics.length === 0) return 'None'
-    let maxCount = -1
-    let popularName = 'None'
-    for (const g of genres) {
-      const cnt = getComicCountForGenre(g.name)
-      if (cnt > maxCount) {
-        maxCount = cnt
-        popularName = g.name
-      }
-    }
-    return maxCount > 0 ? `${popularName} (${maxCount})` : 'None'
-  }
+    return mostPopularGenreLabel;
+  };
 
   return (
     <div className="fade-in">

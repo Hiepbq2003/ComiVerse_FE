@@ -99,6 +99,7 @@ function ReviewAppealModal({ isOpen, onClose, comic, onSuccess }) {
     try {
       await resolveAppealApi(ticketId, { 
         status: 'APPROVED',
+        resolvedReason: 'Appeal accepted by moderator. Original content restored.',
         note: 'Appeal accepted by moderator. Original content restored.'
       })
       try {
@@ -106,6 +107,11 @@ function ReviewAppealModal({ isOpen, onClose, comic, onSuccess }) {
         const existing = JSON.parse(localStorage.getItem('appealedComics') || '[]')
         const updated = existing.filter((id) => String(id) !== String(comicId))
         localStorage.setItem('appealedComics', JSON.stringify(updated))
+        
+        // CRITICAL: Clear localStorage comic cache so restored data from backend is displayed
+        // Without this, ModeratorComicDetail merges stale mod-edited values over fresh API data
+        localStorage.removeItem('comiverse_local_comic_' + comicId)
+        
         window.dispatchEvent(new Event('appealStateChanged'))
       } catch (e) {
         console.error('Error clearing local appeal state:', e)

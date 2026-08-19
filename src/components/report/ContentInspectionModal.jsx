@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   ExternalLink,
@@ -7,10 +8,16 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Sparkles
+  Sparkles,
+  AlertCircle
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
+import { getComicByIdApi } from '../../services/api/ComicApi';
+import { getChapterDetailApi, getChapterTranslationByIdApi } from '../../services/api/ChapterApi';
+import comicAction from '../../assets/comic_action.png';
+import comicAdventure from '../../assets/comic_adventure.png';
+import comicScifi from '../../assets/comic_scifi.png';
 
 export default function ContentInspectionModal({
   report,
@@ -21,11 +28,107 @@ export default function ContentInspectionModal({
   const [resolutionNote, setResolutionNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [activeImagePreview, setActiveImagePreview] = useState(null);
+  
+  // Real-time target metadata
+  const [targetDetails, setTargetDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchTargetData = async () => {
+      const targetId = report?.target_id || report?.targetId;
+      if (!targetId) return;
+
+      const type = (report?.target_type || report?.targetType || 'COMIC').toUpperCase();
+      setLoadingDetails(true);
+
+      try {
+        if (type === 'COMIC') {
+          const res = await getComicByIdApi(targetId);
+          const data = res?.data || res;
+          if (isMounted && data) {
+            setTargetDetails(data);
+          }
+        } else if (type === 'CHAPTER') {
+          const res = await getChapterDetailApi(targetId);
+          const data = res?.data || res;
+          if (isMounted && data) {
+            setTargetDetails(data);
+          }
+        } else if (type === 'CHAPTER_TRANSLATIONS') {
+          const res = await getChapterTranslationByIdApi(targetId);
+          const data = res?.data || res;
+          if (isMounted && data) {
+            setTargetDetails(data);
+          }
+        }
+      } catch (err) {
+        console.warn('[ContentInspectionModal] Failed to fetch target details:', err);
+      } finally {
+        if (isMounted) setLoadingDetails(false);
+      }
+    };
+
+    fetchTargetData();
+    return () => {
+      isMounted = false;
+    };
+  }, [report]);
 
   if (!report) return null;
 
-  const targetType = (report.target_type || 'COMIC').toUpperCase();
-  const rawPages = report.raw_pages || report.chapter_raw_pages || [];
+  const targetType = (report.target_type || report.targetType || 'COMIC').toUpperCase();
+  const rawPages = targetDetails?.pages || targetDetails?.rawPages || report.raw_pages || report.chapter_raw_pages || [];
+
+  // Resolve comic data (from targetDetails or report.comic_info fallback)
+  const comicObj = targetDetails || report.comic_info || {};
+
+  // Author resolution matching ComicDetail.jsx
+  const resolvedAuthorDisplayName =
+    comicObj.authorName ||
+    comicObj.authorDisplayName ||
+    (typeof comicObj.author === 'object' ? (comicObj.author?.displayName || comicObj.author?.username || comicObj.author?.name) : comicObj.author) ||
+    report.comic_info?.author ||
+    report.comic_info?.authorName ||
+    'Unknown';
+
+  // Cover image resolution with fallbacks
+  const getCoverImage = (coverPath, titleVal, comicId) => {
+    if (coverPath && typeof coverPath === 'string') {
+      return coverPath;
+    }
+    const t = (titleVal || '').toLowerCase();
+    if (t.includes('action') || t.includes('battle')) return comicAction;
+    if (t.includes('adventure') || t.includes('dragon')) return comicAdventure;
+    if (t.includes('sci-fi') || t.includes('neon') || t.includes('cyber')) return comicScifi;
+    const fallbacks = [comicAction, comicAdventure, comicScifi];
+    const idHash = typeof comicId === 'string' ? comicId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : comicId || 0;
+    return fallbacks[idHash % 3] || comicAction;
+  };
+
+  const displayCover = getCoverImage(
+    comicObj.cover || comicObj.coverImage || comicObj.cover_image || comicObj.imageUrl || report.comic_info?.cover_image || report.raw_pages?.[0]?.image_url,
+    comicObj.title || report.target_title,
+    comicObj.id || report.target_id || report.targetId
+  );
+
+  const displayTitle = 
+    comicObj.title || 
+    report.comic_info?.title || 
+    (report.target_title ? report.target_title.replace(/^Comic:\s*/i, '') : '') || 
+    'Untitled Comic';
+
+  const displayGenres = Array.isArray(comicObj.genres)
+    ? comicObj.genres.map(g => (typeof g === 'object' && g !== null ? g.name : g))
+    : (Array.isArray(report.comic_info?.genres) ? report.comic_info.genres : []);
+
+  const displaySummary =
+    comicObj.summary ||
+    comicObj.description ||
+    report.comic_info?.description ||
+    'Comic has been flagged for review regarding content standards or metadata.';
+
+  const comicTargetId = comicObj.id || report.target_id || report.targetId;
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
@@ -50,61 +153,57 @@ export default function ContentInspectionModal({
     }
   };
 
-  return (
+  const modalContent = (
     <div className="rep-modal-backdrop" onClick={onClose}>
       <div
         className="rep-modal-card"
-        style={{ maxWidth: '840px' }}
+        style={{
+          maxWidth: '860px'
+        }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Modal Header */}
+        {/* Modal Header (Fixed) */}
         <div className="rep-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span className="rep-target-badge comic">
+            <span className={`rep-target-badge ${targetType.toLowerCase()}`}>
               <BookOpen size={13} /> {targetType}
             </span>
             <h3>Content Inspection: #{report.id}</h3>
           </div>
-          <button className="rep-tool-btn" onClick={onClose}>
+          <button className="rep-tool-btn" onClick={onClose} title="Close Inspection">
             <X size={18} />
           </button>
         </div>
 
-        {/* Modal Body */}
+        {/* Modal Body (Scrollable with Slim Scrollbar) */}
         <div className="rep-modal-body">
-          {/* Submitter & Report Overview */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.04)',
-            border: '1px solid var(--rep-border)',
-            borderRadius: '12px',
-            padding: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Reporter & Issue Summary Card */}
+          <div className="rep-inspect-card">
+            <div className="rep-inspect-reporter">
+              <div className="rep-inspect-user">
                 <img
-                  src={report.reporter_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&auto=format&fit=crop&q=80'}
+                  src={report.reporter_avatar_url || report.reporter_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&auto=format&fit=crop&q=80'}
                   alt={report.reporter_name}
-                  className="rep-reporter-avatar"
+                  className="rep-inspect-avatar"
                 />
                 <div>
-                  <div className="rep-reporter-name">{report.reporter_name || 'Anonymous Reader'}</div>
-                  <div className="rep-reporter-email">{report.reporter_email || 'reader@comiverse.vn'}</div>
+                  <div className="rep-inspect-username">{report.reporter_name || 'Anonymous Reader'}</div>
+                  <div className="rep-inspect-useremail">{report.reporter_email || 'reader@comiverse.vn'}</div>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--rep-text-muted)', fontSize: '12px' }}>
-                <Clock size={14} /> Reported: {formatTimeAgo(report.created_at)}
+              <div className="rep-inspect-time">
+                <Clock size={14} /> Reported: {formatTimeAgo(report.created_at || report.createdAt)}
               </div>
             </div>
 
-            <div style={{ background: 'rgba(0, 0, 0, 0.2)', padding: '10px 14px', borderRadius: '8px', borderLeft: '3px solid var(--rep-accent)' }}>
-              <strong style={{ fontSize: '13px', color: 'var(--rep-accent)', display: 'block', marginBottom: '2px' }}>
-                {report.category_name || 'Report Category'}:
-              </strong>
-              <p style={{ margin: 0, fontSize: '13.5px', color: 'var(--rep-text-primary)', lineHeight: 1.45 }}>
-                {report.description_text || 'No description provided by user.'}
+            {/* Violation Category & Description Box */}
+            <div className="rep-inspect-desc-box">
+              <div className="rep-inspect-category-title">
+                <AlertCircle size={15} />
+                <span>{report.category_name || report.categoryName || 'General Violation'}:</span>
+              </div>
+              <p className="rep-inspect-desc-text">
+                {report.description_text || report.description || 'No detailed description provided by the reporting user.'}
               </p>
             </div>
           </div>
@@ -113,66 +212,83 @@ export default function ContentInspectionModal({
 
           {/* CASE 1: COMIC INSPECTION */}
           {targetType === 'COMIC' && (
-            <div style={{
-              background: 'rgba(0, 0, 0, 0.2)',
-              border: '1px solid var(--rep-border)',
-              borderRadius: '12px',
-              padding: '16px',
-              display: 'flex',
-              gap: '20px',
-              flexWrap: 'wrap'
-            }}>
-              {report.comic_info?.cover_image || report.raw_pages?.[0]?.image_url ? (
-                <img
-                  src={report.comic_info?.cover_image || report.raw_pages?.[0]?.image_url}
-                  alt="Comic Cover"
-                  style={{ width: '130px', height: '180px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--rep-border)' }}
-                />
-              ) : null}
-              <div style={{ flex: 1, minWidth: '260px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <h4 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--rep-text-primary)' }}>
-                  {report.comic_info?.title || report.target_title}
+            <div className="rep-inspect-target-box">
+              <div className="rep-inspect-cover-wrapper">
+                {loadingDetails ? (
+                  <div style={{ color: 'var(--rep-text-muted)', fontSize: '11px', textAlign: 'center', padding: '10px' }}>
+                    Loading cover...
+                  </div>
+                ) : (
+                  <img
+                    src={displayCover}
+                    alt={displayTitle}
+                    className="rep-inspect-cover-img"
+                  />
+                )}
+              </div>
+
+              <div className="rep-inspect-info">
+                <h4 className="rep-inspect-title">
+                  {displayTitle}
                 </h4>
-                <div style={{ fontSize: '13px', color: 'var(--rep-text-secondary)' }}>
-                  Author / Publisher: <strong>{report.comic_info?.author || 'Unknown'}</strong>
+
+                <div className="rep-inspect-meta-row">
+                  <div className="rep-inspect-author">
+                    Author / Creator: <strong>{resolvedAuthorDisplayName}</strong>
+                  </div>
+
+                  {comicObj.publicationStatus && (
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      background: comicObj.publicationStatus === 'COMPLETED' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                      color: comicObj.publicationStatus === 'COMPLETED' ? '#22c55e' : '#3b82f6'
+                    }}>
+                      {comicObj.publicationStatus}
+                    </span>
+                  )}
                 </div>
-                {Array.isArray(report.comic_info?.genres) && report.comic_info.genres.length > 0 && (
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    {report.comic_info.genres.map((g, idx) => (
-                      <span key={idx} style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc' }}>
+
+                {displayGenres.length > 0 && (
+                  <div className="rep-inspect-genres">
+                    {displayGenres.map((g, idx) => (
+                      <span key={idx} className="rep-inspect-genre-tag">
                         {g}
                       </span>
                     ))}
                   </div>
                 )}
-                <p style={{ fontSize: '12.5px', color: 'var(--rep-text-muted)', lineHeight: 1.4, margin: '4px 0 0 0' }}>
-                  {report.comic_info?.description || 'Comic has been flagged for review regarding content standards or metadata.'}
+
+                <p className="rep-inspect-synopsis">
+                  {displaySummary}
                 </p>
 
-                {report.target_url && (
+                <div style={{ marginTop: 'auto', paddingTop: '8px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                   <a
-                    href={report.target_url}
+                    href={`/comic/${comicTargetId}`}
                     target="_blank"
                     rel="noreferrer"
                     className="rep-btn rep-btn-primary"
-                    style={{ alignSelf: 'flex-start', marginTop: 'auto', textDecoration: 'none' }}
+                    style={{ textDecoration: 'none', padding: '8px 14px', fontSize: '13px' }}
                   >
-                    <ExternalLink size={14} /> Open Comic Page ({report.target_url})
+                    <ExternalLink size={14} /> Open Comic Detail Page
                   </a>
-                )}
+                </div>
               </div>
             </div>
           )}
 
           {/* CASE 2: CHAPTER IMAGE VIEWER (Corrupt / Broken Pages) */}
           {targetType === 'CHAPTER' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div className="rep-inspect-card" style={{ gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <strong style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <ImageIcon size={16} color="#38bdf8" /> Chapter Image Inspector ({rawPages.length} pages)
+                <strong style={{ fontSize: '14.5px', display: 'flex', alignItems: 'center', gap: '7px', color: 'var(--rep-text-primary)' }}>
+                  <ImageIcon size={17} color="#38bdf8" /> Chapter Imagery Inspector ({rawPages.length} pages)
                 </strong>
                 <span style={{ fontSize: '12px', color: 'var(--rep-text-muted)' }}>
-                  Click an image for fullscreen inspection
+                  Click an image to zoom preview
                 </span>
               </div>
 
@@ -181,46 +297,51 @@ export default function ContentInspectionModal({
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
                   gap: '12px',
-                  maxHeight: '280px',
+                  maxHeight: '290px',
                   overflowY: 'auto',
-                  padding: '8px',
-                  background: 'rgba(0, 0, 0, 0.2)',
+                  padding: '10px',
+                  background: 'rgba(0, 0, 0, 0.05)',
                   borderRadius: '10px',
                   border: '1px solid var(--rep-border)'
                 }}>
-                  {rawPages.map((p, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        position: 'relative',
-                        borderRadius: '6px',
-                        overflow: 'hidden',
-                        border: '1px solid var(--rep-border)',
-                        cursor: 'pointer',
-                        background: '#000'
-                      }}
-                      onClick={() => setActiveImagePreview(p.image_url || p.url)}
-                    >
-                      <img
-                        src={p.image_url || p.url}
-                        alt={`Page ${p.page_number || idx + 1}`}
-                        style={{ width: '100%', height: '140px', objectFit: 'cover' }}
-                        loading="lazy"
-                      />
-                      <span style={{
-                        position: 'absolute',
-                        bottom: '4px',
-                        left: '4px',
-                        background: 'rgba(0, 0, 0, 0.7)',
-                        color: '#fff',
-                        fontSize: '10px',
-                        padding: '1px 5px',
-                        borderRadius: '3px'
-                      }}>
-                        Page {p.page_number || idx + 1}
-                      </span>
-                    </div>
-                  ))}
+                  {rawPages.map((p, idx) => {
+                    const imgUrl = p.image_url || p.imageUrl || p.url || p;
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          position: 'relative',
+                          borderRadius: '6px',
+                          overflow: 'hidden',
+                          border: '1px solid var(--rep-border)',
+                          cursor: 'pointer',
+                          background: '#000',
+                          height: '140px'
+                        }}
+                        onClick={() => setActiveImagePreview(imgUrl)}
+                      >
+                        <img
+                          src={imgUrl}
+                          alt={`Page ${p.page_number || p.pageNumber || idx + 1}`}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          loading="lazy"
+                        />
+                        <span style={{
+                          position: 'absolute',
+                          bottom: '4px',
+                          left: '4px',
+                          background: 'rgba(0, 0, 0, 0.75)',
+                          color: '#fff',
+                          fontSize: '10.5px',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          fontWeight: 600
+                        }}>
+                          Page {p.page_number || p.pageNumber || idx + 1}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="rep-empty-state" style={{ padding: '24px' }}>
@@ -232,105 +353,99 @@ export default function ContentInspectionModal({
 
           {/* CASE 3: CHAPTER TRANSLATIONS */}
           {targetType === 'CHAPTER_TRANSLATIONS' && (
-            <div style={{
-              background: 'rgba(0, 0, 0, 0.2)',
-              border: '1px solid var(--rep-border)',
-              borderRadius: '12px',
-              padding: '16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px'
-            }}>
+            <div className="rep-inspect-card" style={{ gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <strong style={{ fontSize: '14px', color: '#f472b6', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Sparkles size={16} /> Translation Quality & Community Standards Inspection
+                <strong style={{ fontSize: '14.5px', color: '#f472b6', display: 'flex', alignItems: 'center', gap: '7px' }}>
+                  <Sparkles size={17} /> Translation Quality & Community Standards Inspection
                 </strong>
                 <span className="rep-badge in_progress">Content Review</span>
               </div>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--rep-text-secondary)', lineHeight: 1.4 }}>
-                Inspecting: <strong>{report.target_title}</strong>. Please check whether the translated pages contain unauthorized advertisements, prohibited links, or community guideline violations.
+              <p style={{ margin: 0, fontSize: '13.5px', color: 'var(--rep-text-secondary)', lineHeight: 1.5 }}>
+                Inspecting: <strong style={{ color: 'var(--rep-text-primary)' }}>{report.target_title}</strong>. Please check whether the translated dialogue contains spam advertisements, prohibited links, or community guideline violations.
               </p>
             </div>
           )}
+        </div>
 
-          {/* ── RESOLUTION FORM SECTION ── */}
-          <div style={{
-            borderTop: '1px solid var(--rep-border)',
-            paddingTop: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}>
-            <label className="rep-form-label">
+        {/* Modal Footer (Pinned Bottom - Action Decision Bar) */}
+        <div className="rep-modal-footer">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--rep-text-primary)' }}>
               Moderator Action Decision:
-            </label>
-
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                type="button"
-                className={`rep-btn ${actionType === 'ACCEPT' ? 'rep-btn-success' : 'rep-btn-ghost'}`}
-                style={{ flex: 1, padding: '12px' }}
-                onClick={() => {
-                  setActionType('ACCEPT');
-                  setResolutionNote('Confirmed violation. Action taken to hide chapter / remove spam.');
-                }}
-              >
-                <CheckCircle2 size={16} /> Accept Report (ACCEPT)
-              </button>
-
-              <button
-                type="button"
-                className={`rep-btn ${actionType === 'REJECT' ? 'rep-btn-danger' : 'rep-btn-ghost'}`}
-                style={{ flex: 1, padding: '12px' }}
-                onClick={() => {
-                  setActionType('REJECT');
-                  setResolutionNote('');
-                }}
-              >
-                <XCircle size={16} /> Reject Report (REJECT)
-              </button>
-            </div>
-
+            </span>
             {actionType && (
-              <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
-                <div className="rep-form-group">
-                  <label className="rep-form-label">
-                    {actionType === 'ACCEPT' ? 'Action Summary / Resolution Note:' : 'Rejection Reason (Sent back to reporter):'}
-                  </label>
-                  <textarea
-                    className="rep-form-textarea"
-                    placeholder={
-                      actionType === 'ACCEPT'
-                        ? 'e.g., Hidden broken chapter, issued warning to publisher regarding spam ads...'
-                        : 'e.g., Verified chapter imagery; pages load properly without errors...'
-                    }
-                    value={resolutionNote}
-                    onChange={e => setResolutionNote(e.target.value)}
-                    required={actionType === 'REJECT'}
-                    autoFocus
-                  />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                  <button
-                    type="button"
-                    className="rep-btn rep-btn-ghost"
-                    onClick={() => setActionType(null)}
-                    disabled={submitting}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className={`rep-btn ${actionType === 'ACCEPT' ? 'rep-btn-success' : 'rep-btn-danger'}`}
-                    disabled={submitting}
-                  >
-                    {submitting ? 'Processing...' : (actionType === 'ACCEPT' ? 'Confirm Action' : 'Confirm Rejection')}
-                  </button>
-                </div>
-              </form>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: actionType === 'ACCEPT' ? '#22c55e' : '#ef4444' }}>
+                Mode: {actionType === 'ACCEPT' ? 'Approving Violation' : 'Rejecting Violation'}
+              </span>
             )}
           </div>
+
+          <div className="rep-inspect-decision-buttons">
+            <button
+              type="button"
+              className={`rep-inspect-dec-btn ${actionType === 'ACCEPT' ? 'accept active' : 'accept'}`}
+              onClick={() => {
+                setActionType('ACCEPT');
+                setResolutionNote('Confirmed violation. Action taken to suspend comic / remove content.');
+              }}
+            >
+              <CheckCircle2 size={17} /> Accept Report (ACCEPT)
+            </button>
+
+            <button
+              type="button"
+              className={`rep-inspect-dec-btn ${actionType === 'REJECT' ? 'reject active' : 'reject'}`}
+              onClick={() => {
+                setActionType('REJECT');
+                setResolutionNote('');
+              }}
+            >
+              <XCircle size={17} /> Reject Report (REJECT)
+            </button>
+          </div>
+
+          {actionType && (
+            <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+              <div className="rep-form-group">
+                <label className="rep-form-label">
+                  {actionType === 'ACCEPT' ? 'Action Summary / Resolution Note:' : 'Rejection Reason (Sent back to reporter):'}
+                </label>
+                <textarea
+                  className="rep-form-textarea"
+                  placeholder={
+                    actionType === 'ACCEPT'
+                      ? 'e.g., Suspended duplicate comic, notified author regarding policy guidelines...'
+                      : 'e.g., Verified content authenticity; no violation found based on submitted report...'
+                  }
+                  value={resolutionNote}
+                  onChange={e => setResolutionNote(e.target.value)}
+                  required={actionType === 'REJECT'}
+                  autoFocus
+                  style={{ minHeight: '75px' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="rep-inspect-dec-btn ghost"
+                  style={{ flex: 'none', padding: '9px 18px', fontSize: '13px' }}
+                  onClick={() => setActionType(null)}
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className={`rep-inspect-dec-btn ${actionType === 'ACCEPT' ? 'accept active' : 'reject active'}`}
+                  style={{ flex: 'none', padding: '9px 22px', fontSize: '13px' }}
+                  disabled={submitting}
+                >
+                  {submitting ? 'Processing...' : (actionType === 'ACCEPT' ? 'Confirm Action' : 'Confirm Rejection')}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
 
         {/* Lightbox zoomed preview */}
@@ -345,4 +460,8 @@ export default function ContentInspectionModal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
+
+

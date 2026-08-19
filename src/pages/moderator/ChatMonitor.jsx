@@ -439,7 +439,17 @@ function ChatMonitor({ loading = false, fetchAllData }) {
     try {
       setLoadingKeywords(true)
       const data = await getBannedKeywordsApi()
-      setKeywords(Array.isArray(data) ? data : (data?.data || []))
+      const rawList = Array.isArray(data) ? data : (data?.data || [])
+      const seen = new Set()
+      const unique = []
+      rawList.forEach(k => {
+        const w = (k?.word || '').trim().toLowerCase()
+        if (w && !seen.has(w)) {
+          seen.add(w)
+          unique.push(k)
+        }
+      })
+      setKeywords(unique)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load banned keywords!')
@@ -651,6 +661,14 @@ function ChatMonitor({ loading = false, fetchAllData }) {
   const handleAddKeyword = async (e) => {
     e.preventDefault()
     if (!newWord.trim() || submitting) return
+    const cleanWord = newWord.trim().toLowerCase()
+
+    // Prevent duplicate entries
+    if (keywords.some(k => (k?.word || '').trim().toLowerCase() === cleanWord)) {
+      toast.warning(`Keyword "${newWord.trim()}" is already in the banned keywords pre-filter!`)
+      return
+    }
+
     try {
       setSubmitting(true)
       let added = null
@@ -663,13 +681,16 @@ function ChatMonitor({ loading = false, fetchAllData }) {
         console.warn('Backend add keyword API unavailable, creating local entry:', apiErr)
         added = {
           id: `kw-${Date.now()}`,
-          word: newWord.trim(),
+          word: cleanWord,
           category: newCategory,
-          severity: newCategory === 'Spam' ? 'HIGH' : (newCategory === 'Adult/NSFW' ? 'CRITICAL' : 'MEDIUM')
+          severity: newCategory === 'Spam / Scam' ? 'CRITICAL' : 'HIGH'
         }
       }
       if (added) {
-        setKeywords(prev => [added, ...prev])
+        setKeywords(prev => {
+          const filtered = prev.filter(k => k.id !== added.id && (k?.word || '').trim().toLowerCase() !== cleanWord)
+          return [added, ...filtered]
+        })
         setNewWord('')
         toast.success(`🚫 Banned keyword "${added.word}" added & updated to Client pre-filter!`)
       }
@@ -686,10 +707,11 @@ function ChatMonitor({ loading = false, fetchAllData }) {
     if (submitting) return
     try {
       setSubmitting(true)
-      await deleteBannedKeywordApi(id).catch((err) => {
+      const cleanWord = (word || '').trim().toLowerCase()
+      await deleteBannedKeywordApi(id, word).catch((err) => {
         console.warn('Backend delete keyword API unavailable, applying optimistic local state:', err?.message || err)
       })
-      setKeywords(prev => prev.filter(k => k.id !== id))
+      setKeywords(prev => prev.filter(k => k.id !== id && (!cleanWord || (k?.word || '').trim().toLowerCase() !== cleanWord)))
       toast.info(`Removed keyword "${word}" from pre-filter.`)
     } catch (err) {
       console.error(err)

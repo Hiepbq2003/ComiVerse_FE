@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import axios from 'axios'
 import HomeLayout from '../../components/layout/HomeLayout'
 import ComicCard from '../../components/common/ComicCard'
@@ -22,6 +23,9 @@ const DEFAULT_SPOTLIGHT = {
   tags: ['Comics', 'Manga']
 }
 
+const SPOTLIGHT_AUTOPLAY_DELAY_MS = 6000
+const MAX_SPOTLIGHT_COMICS = 5
+
 function Home() {
   const navigate = useNavigate()
   const [recommended, setRecommended] = useState([])
@@ -30,6 +34,8 @@ function Home() {
   const [recsLoading, setRecsLoading] = useState(true)
   const [trendingLoading, setTrendingLoading] = useState(true)
   const [updatesLoading, setUpdatesLoading] = useState(true)
+  const [spotlightIndex, setSpotlightIndex] = useState(0)
+  const [isSpotlightPaused, setIsSpotlightPaused] = useState(false)
 
   // Carousel Slider & Prefetch States
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -41,6 +47,7 @@ function Home() {
   const nextCursorRef = useRef(null)
   const nextReferenceIdRef = useRef(null)
   const loadingMoreRef = useRef(false)
+  const spotlightTouchStartXRef = useRef(null)
 
   useEffect(() => {
     isMountedRef.current = true
@@ -363,15 +370,63 @@ function Home() {
     }
   }, [])
 
-  // Spotlight comic (top comic in trending, recommended, or fallback to default welcome banner)
-  const spotlightComic = trending[0] || recommended[0] || DEFAULT_SPOTLIGHT
+  // Keep the hero varied while avoiding duplicate comics returned by different APIs.
+  const spotlightComics = [...trending, ...recommended]
+    .filter((comic, index, comics) => {
+      const comicKey = comic.id || comic.title
+      return comicKey && comics.findIndex((item) => (item.id || item.title) === comicKey) === index
+    })
+    .slice(0, MAX_SPOTLIGHT_COMICS)
+
+  if (spotlightComics.length === 0) {
+    spotlightComics.push(DEFAULT_SPOTLIGHT)
+  }
+
+  const spotlightCount = spotlightComics.length
+  const spotlightComic = spotlightComics[spotlightIndex] || spotlightComics[0]
   const spotlightTitle = spotlightComic.title
-  const spotlightCover = spotlightComic.cover
+  const spotlightCover = spotlightComic.cover || spotlightComic.coverImage || spotlightComic.coverImageUrl || DEFAULT_SPOTLIGHT.cover
   const spotlightRating = spotlightComic.rating !== undefined ? spotlightComic.rating : (spotlightComic.ratingAverage ?? '0.0')
   const spotlightViews = spotlightComic.views || spotlightComic.viewCount || '0'
   const spotlightChapters = spotlightComic.chapters || spotlightComic.chaptersCount || spotlightComic.chapterCount || '0'
   const spotlightTagline = spotlightComic.tagline || spotlightComic.summary || 'Unlock the power within and follow the legacy of legendary warriors.'
   const spotlightTags = spotlightComic.tags || (spotlightComic.genres ? spotlightComic.genres.map(g => typeof g === 'object' ? g.name : g) : ['Action', 'Fantasy'])
+
+  useEffect(() => {
+    setSpotlightIndex((current) => Math.min(current, spotlightCount - 1))
+  }, [spotlightCount])
+
+  useEffect(() => {
+    if (spotlightCount <= 1 || isSpotlightPaused) return undefined
+
+    const timer = window.setTimeout(() => {
+      setSpotlightIndex((current) => (current + 1) % spotlightCount)
+    }, SPOTLIGHT_AUTOPLAY_DELAY_MS)
+
+    return () => window.clearTimeout(timer)
+  }, [spotlightCount, spotlightIndex, isSpotlightPaused])
+
+  const showPreviousSpotlight = () => {
+    setSpotlightIndex((current) => (current - 1 + spotlightCount) % spotlightCount)
+  }
+
+  const showNextSpotlight = () => {
+    setSpotlightIndex((current) => (current + 1) % spotlightCount)
+  }
+
+  const handleSpotlightTouchStart = (event) => {
+    spotlightTouchStartXRef.current = event.changedTouches[0]?.clientX ?? null
+  }
+
+  const handleSpotlightTouchEnd = (event) => {
+    const startX = spotlightTouchStartXRef.current
+    const endX = event.changedTouches[0]?.clientX
+    spotlightTouchStartXRef.current = null
+
+    if (startX === null || endX === undefined || Math.abs(startX - endX) < 48) return
+    if (startX > endX) showNextSpotlight()
+    else showPreviousSpotlight()
+  }
 
   // Helper to determine single genre name
   const getPrimaryGenre = (comic) => {
@@ -387,14 +442,31 @@ function Home() {
   return (
     <HomeLayout>
       {/* HERO SECTION */}
-      <section className="home-hero-section">
+      <section
+        className="home-hero-section"
+        aria-label="Spotlight comics"
+        aria-roledescription="carousel"
+        onMouseEnter={() => setIsSpotlightPaused(true)}
+        onMouseLeave={() => setIsSpotlightPaused(false)}
+        onFocusCapture={() => setIsSpotlightPaused(true)}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setIsSpotlightPaused(false)
+        }}
+        onTouchStart={handleSpotlightTouchStart}
+        onTouchEnd={handleSpotlightTouchEnd}
+      >
         {isEmoji(spotlightCover) ? (
-          <div className="hero-banner-bg-emoji-fallback">{spotlightCover}</div>
+          <div key={`spotlight-bg-${spotlightIndex}`} className="hero-banner-bg-emoji-fallback hero-slide-fade">{spotlightCover}</div>
         ) : (
-          <div className="hero-banner-bg" style={{ backgroundImage: `url(${spotlightCover})` }} />
+          <div key={`spotlight-bg-${spotlightIndex}`} className="hero-banner-bg hero-slide-fade" style={{ backgroundImage: `url(${spotlightCover})` }} />
         )}
         <div className="hero-banner-overlay" />
-        <div className="hero-content">
+        <div
+          key={`spotlight-content-${spotlightComic.id || spotlightIndex}`}
+          className="hero-content hero-slide-content"
+          role="group"
+          aria-label={`${spotlightIndex + 1} of ${spotlightCount}: ${spotlightTitle}`}
+        >
           <div className="hero-text-area">
             <div className="hero-badge-hot">
               <span>🔥 Spotlight</span>
@@ -442,6 +514,41 @@ function Home() {
             </div>
           </div>
         </div>
+
+        {spotlightCount > 1 && (
+          <div className="hero-carousel-controls" aria-label="Spotlight navigation">
+            <button
+              type="button"
+              className="hero-carousel-arrow"
+              onClick={showPreviousSpotlight}
+              aria-label="Previous spotlight comic"
+            >
+              <ChevronLeft size={19} />
+            </button>
+
+            <div className="hero-carousel-dots" role="group" aria-label="Choose a spotlight comic">
+              {spotlightComics.map((comic, index) => (
+                <button
+                  key={comic.id || comic.title || index}
+                  type="button"
+                  className={`hero-carousel-dot ${index === spotlightIndex ? 'active' : ''}`}
+                  onClick={() => setSpotlightIndex(index)}
+                  aria-label={`Show spotlight ${index + 1}: ${comic.title}`}
+                  aria-current={index === spotlightIndex ? 'true' : undefined}
+                />
+              ))}
+            </div>
+
+            <button
+              type="button"
+              className="hero-carousel-arrow"
+              onClick={showNextSpotlight}
+              aria-label="Next spotlight comic"
+            >
+              <ChevronRight size={19} />
+            </button>
+          </div>
+        )}
       </section>
 
       {/* SECTIONS WRAPPER */}

@@ -719,7 +719,33 @@ function AuthorComics() {
         </div>
       )}
 
-      <div className="author-comic-list">
+      {loading && (
+        <div className="author-comic-list">
+          {[...Array(5)].map((_, i) => (
+            <article className="author-comic-list-card" key={`skeleton-${i}`}>
+              <div className="author-comic-cover-box skeleton-shimmer" style={{ width: '82px', height: '112px', border: 'none' }}></div>
+              <div className="author-comic-card-main" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '22px', width: '40%', marginBottom: '4px' }}></div>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '14px', width: '60%' }}></div>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '14px', width: '85%' }}></div>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                  <div className="skeleton-line skeleton-shimmer" style={{ height: '26px', width: '70px', borderRadius: '13px', margin: 0 }}></div>
+                  <div className="skeleton-line skeleton-shimmer" style={{ height: '26px', width: '70px', borderRadius: '13px', margin: 0 }}></div>
+                  <div className="skeleton-line skeleton-shimmer" style={{ height: '26px', width: '85px', borderRadius: '13px', margin: 0 }}></div>
+                </div>
+              </div>
+              <div className="author-comic-card-actions" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '38px', width: '100%', borderRadius: '7px', margin: 0 }}></div>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '38px', width: '100%', borderRadius: '7px', margin: 0 }}></div>
+                <div className="skeleton-line skeleton-shimmer" style={{ height: '38px', width: '100%', borderRadius: '7px', margin: 0 }}></div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {!loading && (
+        <div className="author-comic-list">
         {filteredAndSortedComics.map((comic) => {
           const comicId = getComicId(comic)
           const moderationStatus = comic.moderationStatus
@@ -773,7 +799,8 @@ function AuthorComics() {
             </article>
           )
         })}
-      </div>
+        </div>
+      )}
 
       {showCreateModal && <CreateComicModal onClose={() => setShowCreateModal(false)} onCreated={handleCreated} />}
       {chapterTarget && <AddChapterModal comic={chapterTarget} onClose={() => setChapterTarget(null)} onUploaded={handleChapterUploaded} />}

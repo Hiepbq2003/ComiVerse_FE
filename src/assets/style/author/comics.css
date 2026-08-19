@@ -224,8 +224,13 @@
 }
 
 .author-tab-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--author-text, #f8fafc);
+  background: var(--accent-bg, rgba(128, 128, 128, 0.1));
+  color: var(--text-h, #08060d);
+}
+
+html.light .author-tab-btn:hover {
+  background: rgba(170, 59, 255, 0.08);
+  color: var(--author-accent);
 }
 
 .author-tab-btn.active {
@@ -248,11 +253,16 @@
 }
 
 .author-tab-count {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--accent-bg, rgba(128, 128, 128, 0.15));
   padding: 2px 6px;
   border-radius: 12px;
   font-size: 11px;
   font-weight: 700;
+}
+
+.author-tab-btn.active .author-tab-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
 }
 
 .author-filter-controls {
@@ -303,6 +313,12 @@ html.light .author-sort-select:focus {
 html.light .btn-author-action.black {
   background-color: var(--author-accent, #aa3bff);
   border-color: var(--author-accent, #aa3bff);
+  color: #ffffff !important;
+}
+
+html.light .btn-author-action.primary,
+html.light .btn-author-action.danger {
+  color: #ffffff !important;
 }
 
 .btn-author-action.black:hover {
@@ -479,26 +495,65 @@ html.light .btn-author-action:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 24px;
-  padding: 4px 10px;
-  border-radius: 5px;
-  background: #f1f1f1;
-  color: #3f3f46;
-  border: 1px solid transparent;
+  min-height: 28px;
+  padding: 5px 14px;
+  border-radius: 8px;
+  background: rgba(168, 85, 247, 0.16) !important;
+  color: #f3e8ff !important;
+  border: 1.5px solid rgba(168, 85, 247, 0.5) !important;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 10px rgba(168, 85, 247, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.author-genre-pill:hover {
+  background: rgba(168, 85, 247, 0.28) !important;
+  border-color: #c084fc !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 16px rgba(168, 85, 247, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+html.light .author-genre-pill {
+  color: var(--author-accent-hover) !important;
+  background: rgba(168, 85, 247, 0.12) !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
+  box-shadow: none !important;
+}
+
+html.light .author-genre-pill:hover {
+  background: var(--author-accent) !important;
+  color: #ffffff !important;
+  border-color: var(--author-accent) !important;
+  box-shadow: 0 4px 12px rgba(170, 59, 255, 0.2) !important;
 }
 
 .author-genre-pills.selectable .author-genre-pill {
-  background: #ffffff;
-  border-color: #e5e7eb;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--author-text-secondary);
   cursor: pointer;
 }
 
+html.light .author-genre-pills.selectable .author-genre-pill {
+  background: var(--author-hover-bg) !important;
+  border-color: var(--author-border) !important;
+  color: var(--author-text-secondary) !important;
+}
+
 .author-genre-pills.selectable .author-genre-pill.selected {
-  background: #09090b;
-  color: #ffffff;
-  border-color: #09090b;
+  background: rgba(168, 85, 247, 0.25) !important;
+  color: #ffffff !important;
+  border-color: #c084fc !important;
+  box-shadow: 0 2px 12px rgba(168, 85, 247, 0.35);
+}
+
+html.light .author-genre-pills.selectable .author-genre-pill.selected {
+  background: var(--author-accent) !important;
+  color: #ffffff !important;
+  border-color: var(--author-accent) !important;
 }
 
 .author-comic-card-actions {
@@ -547,26 +602,56 @@ html.light .btn-author-action:hover {
 
 .author-detail-hero {
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
-  gap: 26px;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 32px;
   align-items: start;
+  background: var(--author-card-bg);
+  border: 1.5px solid var(--author-border);
+  border-radius: 18px;
+  padding: 28px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+html.light .author-detail-hero {
+  box-shadow: var(--author-shadow);
+  border: 1px solid var(--author-border);
 }
 
 .author-detail-cover {
-  width: 250px;
-  height: 376px;
-  border-radius: 12px;
-  background: var(--author-card-bg);
-  border: 1px solid var(--author-border);
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7), 0 0 25px rgba(168, 85, 247, 0.3);
   color: var(--author-text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+html.light .author-detail-cover {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid var(--author-border);
+  box-shadow: var(--author-shadow);
+}
+
+.author-detail-cover:hover {
+  transform: translateY(-4px);
+  border-color: rgba(168, 85, 247, 0.6);
+}
+
+.author-detail-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .author-detail-info {
-  padding-top: 4px;
+  padding-top: 2px;
 }
 
 .author-detail-title-row {
@@ -580,50 +665,66 @@ html.light .btn-author-action:hover {
 .author-detail-title-row h1 {
   margin: 0;
   color: var(--author-text-primary);
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 800;
   letter-spacing: -0.5px;
 }
 
 .author-detail-info p {
   color: var(--author-text-secondary);
-  font-size: 16px;
+  font-size: 15px;
   margin: 0 0 18px;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .author-detail-stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 14px;
-  margin-top: 18px;
+  margin-top: 22px;
 }
 
 .author-detail-stat-card {
-  background: var(--author-card-bg);
-  border: 1px solid var(--author-border);
-  border-radius: 8px;
-  padding: 16px 18px;
+  background: linear-gradient(145deg, rgba(32, 22, 60, 0.95) 0%, rgba(19, 13, 36, 0.98) 100%) !important;
+  border: 1.5px solid rgba(168, 85, 247, 0.45) !important;
+  border-radius: 14px !important;
+  padding: 18px 22px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.author-detail-stat-card:hover {
+  border-color: #c084fc !important;
+  transform: translateY(-2px);
+  background: linear-gradient(145deg, rgba(44, 30, 80, 0.98) 0%, rgba(26, 17, 48, 1) 100%) !important;
+  box-shadow: 0 12px 30px rgba(168, 85, 247, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
 }
 
 .author-detail-stat-card span {
-  display: block;
-  color: var(--author-text-secondary);
-  font-size: 13px;
-  margin-bottom: 8px;
+  display: block !important;
+  color: #cbd5e1 !important;
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  margin-bottom: 8px !important;
 }
 
 .author-detail-stat-card strong {
-  color: var(--author-text-primary);
-  font-size: 22px;
-  font-weight: 800;
+  color: #ffffff !important;
+  font-size: 26px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.5px !important;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 .author-chapter-section-card {
   background: var(--author-card-bg);
-  border: 1px solid var(--author-border);
-  border-radius: 12px;
+  border: 1.5px solid var(--author-border);
+  border-radius: 16px;
   overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  margin-top: 28px;
 }
 
 .author-chapter-section-head {
@@ -631,8 +732,8 @@ html.light .btn-author-action:hover {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 18px 22px;
-  border-bottom: 1px solid var(--author-border);
+  padding: 20px 24px;
+  border-bottom: 1.5px solid var(--author-border);
 }
 
 .author-chapter-section-head h2 {
@@ -654,15 +755,18 @@ html.light .btn-author-action:hover {
 .author-chapter-table th,
 .author-chapter-table td {
   padding: 16px 18px;
-  border-bottom: 1px solid #eeeeee;
+  border-bottom: 1px solid var(--author-border);
   text-align: left;
   font-size: 14px;
 }
 
 .author-chapter-table th {
-  background: #fafafa;
-  color: #7a7a7a;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--author-text-secondary);
   font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
 }
 
 .author-chapter-table tr:last-child td {
@@ -670,7 +774,7 @@ html.light .btn-author-action:hover {
 }
 
 .author-chapter-table .chapter-no {
-  color: #020617;
+  color: var(--author-text-primary);
   font-weight: 800;
 }
 
@@ -744,8 +848,9 @@ html.light .btn-author-action:hover {
 }
 
 .author-modal.author-chapter-modal,
-.author-modal.author-comic-modal {
-  width: min(720px, 100%);
+.author-modal.author-comic-modal,
+.author-modal.author-upload-guide-modal {
+  width: min(840px, 100%);
 }
 
 .author-modal-head {
@@ -2943,4 +3048,299 @@ html.light .author-feedback-item-author,
   color: #ffffff;
   font-size: 11.5px;
   font-weight: 800;
-}
+}
+
+.author-comics-page .author-list-header-row,
+.author-comic-detail-page .author-detail-breadcrumb {
+  margin-bottom: 4px;
+}
+
+.author-comics-page .author-list-header-row h1 {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--author-text-primary);
+  letter-spacing: -0.3px;
+}
+
+.author-comics-page .author-list-header-row p {
+  font-size: 13px;
+  color: var(--author-text-muted);
+}
+
+.author-comics-page .btn-author-action.large,
+.author-comic-detail-page .author-chapter-section-head .btn-author-action.black {
+  border-radius: var(--author-radius);
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 44px;
+}
+
+.author-comics-page .author-comic-list {
+  gap: 14px;
+}
+
+.author-comics-page .author-comic-list-card {
+  background: var(--author-card-bg);
+  border: 1px solid var(--author-border);
+  border-radius: var(--author-radius-lg, 14px);
+  padding: 18px 20px;
+  transition: border-color var(--author-transition), background var(--author-transition);
+}
+
+.author-comics-page .author-comic-list-card:hover {
+  background: rgba(168, 85, 247, 0.025);
+  border-color: var(--author-border-hover);
+}
+
+.author-comics-page .author-comic-cover-box,
+.author-comic-detail-page .author-detail-cover {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--author-border);
+  color: var(--author-text-muted);
+}
+
+.author-comics-page .author-comic-title-line h2,
+.author-comic-detail-page .author-detail-title-row h1 {
+  color: var(--author-text-primary);
+  font-weight: 600;
+}
+
+.author-comics-page .author-comic-meta-line,
+.author-comic-detail-page .author-detail-info p {
+  color: var(--author-text-secondary);
+}
+
+.author-comics-page .author-comic-card-actions .btn-author-action,
+.author-comic-detail-page .author-table-actions .btn-table-action,
+.author-comic-detail-page .author-table-actions .btn-table-icon {
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.author-comics-page .author-comic-card-actions .btn-author-action:not(.black),
+.author-comic-detail-page .author-table-actions .btn-table-action,
+.author-comic-detail-page .author-table-actions .btn-table-icon {
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--author-text-secondary);
+  border-color: var(--author-border);
+}
+
+.author-comics-page .author-comic-card-actions .btn-author-action:not(.black):hover,
+.author-comic-detail-page .author-table-actions .btn-table-action:hover,
+.author-comic-detail-page .author-table-actions .btn-table-icon:hover {
+  background: var(--author-hover-bg);
+  color: var(--author-text-primary);
+  border-color: var(--author-border-hover);
+}
+
+.author-comic-detail-page .author-detail-breadcrumb {
+  color: var(--author-text-muted);
+  font-size: 14px;
+}
+
+.author-comic-detail-page .author-detail-breadcrumb a {
+  color: var(--author-text-secondary);
+  font-weight: 600;
+}
+
+.author-comic-detail-page .author-detail-breadcrumb a:hover,
+.author-comic-detail-page .author-detail-breadcrumb strong {
+  color: var(--author-text-primary);
+}
+
+.author-comic-detail-page .author-detail-hero {
+  background: rgba(18, 12, 34, 0.95);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+html.light .author-comic-detail-page .author-detail-hero {
+  background: var(--author-card-bg);
+  border: 1px solid var(--author-border);
+  box-shadow: var(--author-shadow);
+}
+
+.author-comic-detail-page .author-detail-stat-card {
+  background: linear-gradient(145deg, rgba(32, 22, 60, 0.95) 0%, rgba(19, 13, 36, 0.98) 100%);
+  border: 1.5px solid rgba(168, 85, 247, 0.45);
+  border-radius: 14px;
+}
+
+html.light .author-comic-detail-page .author-detail-stat-card {
+  background: var(--author-card-bg) !important;
+  border: 1px solid var(--author-border) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .author-comic-detail-page .author-detail-stat-card:hover {
+  background: var(--author-hover-bg) !important;
+  border-color: var(--author-accent) !important;
+  box-shadow: 0 6px 16px rgba(170, 59, 255, 0.12) !important;
+  transform: translateY(-2px);
+}
+
+.author-comic-detail-page .author-detail-stat-card span {
+  color: #cbd5e1;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+html.light .author-comic-detail-page .author-detail-stat-card span {
+  color: var(--author-text-secondary) !important;
+  text-shadow: none !important;
+}
+
+.author-comic-detail-page .author-detail-stat-card strong {
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 26px;
+}
+
+html.light .author-comic-detail-page .author-detail-stat-card strong {
+  color: var(--author-text-primary) !important;
+  text-shadow: none !important;
+}
+
+.author-comic-detail-page .author-chapter-section-card {
+  background: rgba(18, 12, 34, 0.95);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--author-radius-lg, 16px);
+  overflow: hidden;
+}
+
+html.light .author-comic-detail-page .author-chapter-section-card {
+  background: var(--author-card-bg);
+  border: 1px solid var(--author-border);
+}
+
+.author-comic-detail-page .author-chapter-section-head {
+  border-bottom: 1px solid var(--author-border);
+  padding: 18px 20px;
+}
+
+.author-comic-detail-page .author-chapter-section-head h2 {
+  color: var(--author-text-primary);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.author-comic-detail-page .author-chapter-table thead th {
+  background: rgba(0, 0, 0, 0.15);
+  color: var(--author-text-muted);
+  border-bottom: 1px solid var(--author-border);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+html.light .author-comic-detail-page .author-chapter-table thead th {
+  background: var(--author-hover-bg);
+}
+
+.author-comic-detail-page .author-chapter-table tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  transition: background var(--author-transition);
+}
+
+html.light .author-comic-detail-page .author-chapter-table tbody tr {
+  border-bottom: 1px solid var(--author-border);
+}
+
+.author-comic-detail-page .author-chapter-table tbody tr:hover {
+  background: var(--author-hover-bg);
+}
+
+.author-comic-detail-page .author-chapter-table tbody td {
+  color: var(--author-text-secondary);
+  border-bottom: none;
+}
+
+.author-comic-detail-page .author-chapter-table .chapter-no {
+  color: var(--author-text-primary);
+  font-weight: 600;
+}
+
+.author-modal.author-comic-modal,
+.author-modal.author-chapter-modal {
+  background: var(--author-card-bg);
+  border: 1px solid var(--author-border);
+  border-radius: var(--author-radius-lg, 14px);
+}
+
+.author-modal.author-comic-modal .author-modal-head,
+.author-modal.author-chapter-modal .author-modal-head {
+  border-bottom: 1px solid var(--author-border);
+}
+
+.author-modal.author-comic-modal .author-upload-zone,
+.author-modal.author-chapter-modal .author-upload-zone {
+  background: var(--author-upload-zone-bg);
+  border-color: var(--author-upload-zone-border);
+}
+
+/* Enhanced Hover Effects for Inputs & Modals */
+.author-input:hover,
+.author-textarea:hover,
+.form-control-premium:hover {
+  border-color: rgba(168, 85, 247, 0.35);
+  background: rgba(168, 85, 247, 0.02);
+}
+
+html.light .author-input:hover,
+html.light .author-textarea:hover,
+html.light .form-control-premium:hover {
+  border-color: rgba(168, 85, 247, 0.4);
+  background: rgba(170, 59, 255, 0.03);
+}
+
+/* Enhanced Genre Pill Buttons */
+.genre-pill-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--author-card-bg);
+  color: var(--author-text-primary);
+  border: 1px solid var(--author-border);
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  user-select: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.genre-pill-btn:hover {
+  border-color: var(--author-accent);
+  color: var(--author-accent);
+  background: rgba(168, 85, 247, 0.06);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(168, 85, 247, 0.15);
+}
+
+.genre-pill-btn.selected {
+  background: rgba(168, 85, 247, 0.15);
+  color: var(--author-accent);
+  border-color: var(--author-accent);
+  font-weight: 600;
+  box-shadow: 0 2px 5px rgba(168, 85, 247, 0.2);
+}
+
+.genre-pill-btn.selected:hover {
+  background: rgba(168, 85, 247, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(168, 85, 247, 0.3);
+}
+
+html.light .genre-pill-btn.selected {
+  background: var(--author-accent);
+  color: #fff;
+  border-color: transparent;
+}
+html.light .genre-pill-btn.selected:hover {
+  background: #9d2ae8;
+}
+
