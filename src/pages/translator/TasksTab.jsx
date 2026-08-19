@@ -122,48 +122,26 @@ export function isSupersededTask(task) {
   return status === 'superseded';
 }
 
-export function isCompletedTask(task) {
-  const status = String(task?.status || task?.column || '').toLowerCase().replace(/[-\s]/g, '_');
-  return status === 'completed' || status === 'complete' || status === 'done' || status === 'published';
-}
-
-const MAX_TRANSLATOR_TASKS = 10;
-
-function taskChapterId(task) {
-  return String(task?.chapterId || task?.chapter_id || task?.chapter?.id || '').trim();
-}
-
 export function filterUnassignedChapters(chapterOptions, tasks) {
-  const liveTasks = (tasks || []).filter(t => t && !isSupersededTask(t));
-  const occupyingTasks = liveTasks.filter(t => !isCompletedTask(t));
+  const activeTasks = (tasks || []).filter(t => t && !isSupersededTask(t));
 
-  const occupyingChapterIds = new Set(
-    occupyingTasks
-      .map(taskChapterId)
-      .filter(Boolean)
-  );
   const assignedChapterIds = new Set(
-    liveTasks
-      .map(taskChapterId)
+    activeTasks
+      .map(t => String(t?.chapterId || t?.chapter_id || ''))
       .filter(Boolean)
   );
 
   return (chapterOptions || []).filter(ch => {
     if (!ch) return false;
-    const chapterId = String(ch.id || ch.chapterId || '');
-
-    // Hide immediately once a live (non-completed) task exists — including a just-created revision.
-    if (chapterId && occupyingChapterIds.has(chapterId)) return false;
-
     if (ch.canCreateTask === true || ch.revision === true) return true;
     if (ch.canCreateTask === false) return false;
 
-    if (chapterId && assignedChapterIds.has(chapterId)) return false;
+    if (ch.id && assignedChapterIds.has(String(ch.id))) return false;
 
     const chTitleLower = (ch.title || '').toLowerCase();
     const chNumMatch = chTitleLower.match(/chapter\s*(\d+)/i);
 
-    const isTaskCreated = liveTasks.some(t => {
+    const isTaskCreated = activeTasks.some(t => {
       if (!t || !t.title) return false;
       const tLower = t.title.toLowerCase();
 
@@ -1415,24 +1393,14 @@ function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, read
         const displayName = m.fullName || m.name || m.username || 'User';
         const initial = (m.avatar && m.avatar.length <= 3 ? m.avatar : displayName.charAt(0)).toUpperCase();
         const roleLabel = m.role || (m.isLeader ? 'Leader' : 'Member');
-        const isLeader = /leader/i.test(String(roleLabel));
-        const activeTaskCount = Number(m.activeTaskCount ?? m.active_task_count ?? 0);
-        const atTaskLimit = !isLeader && activeTaskCount >= MAX_TRANSLATOR_TASKS;
-        const disabled = readOnly || atTaskLimit;
 
         return (
           <button
             key={memberId}
             type="button"
             className={`trans-assignee-chip${isSelected ? ' selected' : ''}`}
-            title={atTaskLimit ? `${displayName} already has ${activeTaskCount}/${MAX_TRANSLATOR_TASKS} incomplete tasks` : `${displayName} · ${activeTaskCount}/${MAX_TRANSLATOR_TASKS} incomplete tasks`}
-            onClick={() => !disabled && onSelect && onSelect(isSelected ? (allowEmpty ? null : memberId) : memberId)}
-            disabled={atTaskLimit}
-            style={{
-              ...chipStyle(isSelected),
-              cursor: disabled ? 'not-allowed' : 'pointer',
-              opacity: atTaskLimit ? 0.55 : 1
-            }}
+            onClick={() => !readOnly && onSelect && onSelect(isSelected ? (allowEmpty ? null : memberId) : memberId)}
+            style={chipStyle(isSelected)}
           >
             <span
               style={{
@@ -1462,13 +1430,6 @@ function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, read
                   {roleLabel}
                 </span>
               )}
-              <span style={{
-                fontSize: '10px',
-                fontWeight: 700,
-                color: atTaskLimit ? '#f87171' : (isSelected ? '#e9d5ff' : 'var(--trans-text-muted)')
-              }}>
-                {activeTaskCount}/{MAX_TRANSLATOR_TASKS} tasks
-              </span>
             </span>
 
             {isSelected && (
@@ -1763,12 +1724,13 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   })();
 
   const isEditableByMember = isProjectLeader || isAssigned;
+  const canAccessWorkspace = true;
 
   const assigneeChanged = String(editTaskData.originalAssigneeId || '') !== String(editTaskData.assigneeId || '')
   const parsedFactor = Number(editTaskData.handoverFactor)
 
   const errors = {
-    title: !String(editTaskData.title || '').trim(),
+    title: !editTaskData.title.trim(),
     assigneeId: !editTaskData.assigneeId,
     dueDate: !editTaskData.dueDate,
     handoverReason: assigneeChanged && !String(editTaskData.handoverReason || '').trim(),
@@ -1778,18 +1740,16 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   const errorBorder = (field) => showError(field) ? { borderColor: '#ef4444' } : undefined
 
   const isUnderReview = editTaskData.status === 'under_review'
-  const isCompleted = editTaskData.status === 'completed'
-  const isLocked = isUnderReview || isCompleted
   const canReview = isProjectLeader && isUnderReview
-  const showEditForm = isProjectLeader && !isLocked
+  const isInProgress = editTaskData.status === 'in_progress'
 
   const selectAssignee = (memberId) => {
-    if (!showEditForm) return;
+    if (!isProjectLeader) return;
     setEditTaskData({ ...editTaskData, assigneeId: memberId })
   }
 
   const handleSaveClick = () => {
-    if (!showEditForm) return;
+    if (!isProjectLeader) return;
     setSubmitted(true)
     if (Object.values(errors).some(Boolean)) return
     if (onSave) onSave()
@@ -1801,176 +1761,187 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
 
   const handleReviewClick = () => {
     if (!canReview) return
-    if (onReview) onReview()
+    setSubmitted(true)
+    if (Object.values(errors).some(Boolean)) return
+    if (onSave) onSave()
+    onReview()
   }
 
+  const isTaskUnderReview = editTaskData.status === 'under_review'
+  const isTaskCompleted = editTaskData.status === 'completed'
+  const canEdit = isProjectLeader || (isEditableByMember && !isTaskUnderReview && !isTaskCompleted)
   return (
     <div className="trans-modal-overlay">
       <div className="trans-modal-card">
-  <div className="trans-modal-header">
-    <h3>{showEditForm ? 'Edit Task Details' : (isEditableByMember ? 'Task Information' : 'Task Information (Read Only)')}</h3>
-    <button className="trans-modal-close-btn" onClick={onCancel}>×</button>
-  </div>
-
-  <div className="trans-modal-body">
-    {showEditForm ? (
-      /* ── FULL EDITING FORM FOR GROUP LEADER ───────────── */
-      <>
-        <div className="trans-form-group">
-          <label className="trans-form-label">Comic Project</label>
-          <input type="text" className="trans-form-input" value={editTaskData.comic} disabled />
+        <div className="trans-modal-header">
+          <h3>{isProjectLeader ? 'Edit Task Details' : (isEditableByMember ? 'Task Information' : 'Task Information (Read Only)')}</h3>
+          <button className="trans-modal-close-btn" onClick={onCancel}>×</button>
         </div>
 
-        <div className="trans-form-group">
-          <label className="trans-form-label">Task Name *</label>
-          <input
-            required
-            type="text"
-            className="trans-form-input"
-            style={errorBorder('title')}
-            value={editTaskData.title}
-            onChange={(e) => setEditTaskData({ ...editTaskData, title: e.target.value })}
-          />
-          {showError('title') && (
-            <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>This field is required</p>
-          )}
-        </div>
+        <div className="trans-modal-body">
+          {isProjectLeader ? (
+            /* ── FULL EDITING FORM FOR GROUP LEADER ───────────── */
+            <>
+              <div className="trans-form-group">
+                <label className="trans-form-label">Comic Project</label>
+                <input type="text" className="trans-form-input" value={editTaskData.comic} disabled />
+              </div>
 
-        <div className="trans-form-group">
-          <label className="trans-form-label">Priority</label>
-          <select
-            className="trans-form-input"
-            value={editTaskData.priority}
-            onChange={(e) => setEditTaskData({ ...editTaskData, priority: e.target.value })}
-          >
-            <option value="Urgent">🚨 Urgent</option>
-            <option value="High">🟠 High</option>
-            <option value="Medium">🟣 Medium</option>
-            <option value="Low">⚪ Low</option>
-          </select>
-        </div>
+              <div className="trans-form-group">
+                <label className="trans-form-label">Task Name *</label>
+                <input
+                  required
+                  type="text"
+                  className="trans-form-input"
+                  style={errorBorder('title')}
+                  value={editTaskData.title}
+                  onChange={(e) => setEditTaskData({ ...editTaskData, title: e.target.value })}
+                />
+                {showError('title') && (
+                  <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>This field is required</p>
+                )}
+              </div>
 
-        <div className="trans-form-group">
-          <label className="trans-form-label">Assignee *</label>
-          <AssigneeChipPicker
-            candidates={teamMembersForAssign}
-            selectedId={editTaskData.assigneeId}
-            onSelect={selectAssignee}
-            error={showError('assigneeId')}
-          />
-          {showError('assigneeId') && (
-            <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Assignee is required</p>
-          )}
-        </div>
+              <div className="trans-form-group">
+                <label className="trans-form-label">Priority</label>
+                <select
+                  className="trans-form-input"
+                  value={editTaskData.priority}
+                  onChange={(e) => setEditTaskData({ ...editTaskData, priority: e.target.value })}
+                >
+                  <option value="Urgent">🚨 Urgent</option>
+                  <option value="High">🟠 High</option>
+                  <option value="Medium">🟣 Medium</option>
+                  <option value="Low">⚪ Low</option>
+                </select>
+              </div>
 
-        <div className="trans-form-group">
-          <label className="trans-form-label">Due Date *</label>
-          <CustomDatePicker
-            value={editTaskData.dueDate}
-            onChange={(val) => setEditTaskData({ ...editTaskData, dueDate: val })}
-            placeholder="Select due date"
-            style={errorBorder('dueDate')}
-          />
-          {showError('dueDate') && (
-            <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Due date is required</p>
-          )}
-        </div>
-      </>
-    ) : (
-      /* ── CLEAN READ-ONLY INFORMATION VIEW FOR MEMBERS ──── */
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div className="trans-form-group">
-          <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Comic Project</label>
-          <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--trans-text-primary)' }}>
-            {editTaskData.comic || 'Unknown Project'}
-          </div>
-        </div>
+              <div className="trans-form-group">
+                <label className="trans-form-label">Assignee *</label>
+                <AssigneeChipPicker
+                  candidates={teamMembersForAssign}
+                  selectedId={editTaskData.assigneeId}
+                  onSelect={selectAssignee}
+                  error={showError('assigneeId')}
+                />
+                {showError('assigneeId') && (
+                  <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Assignee is required</p>
+                )}
+              </div>
 
-        <div className="trans-form-group">
-          <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Task Name</label>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--trans-text-primary)', lineHeight: '1.4' }}>
-            {editTaskData.title}
-          </div>
-        </div>
+              <div className="trans-form-group">
+                <label className="trans-form-label">Due Date *</label>
+                <CustomDatePicker
+                  value={editTaskData.dueDate}
+                  onChange={(val) => setEditTaskData({ ...editTaskData, dueDate: val })}
+                  placeholder="Select due date"
+                  style={errorBorder('dueDate')}
+                />
+                {showError('dueDate') && (
+                  <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Due date is required</p>
+                )}
+              </div>
+            </>
+          ) : (
+            /* ── CLEAN READ-ONLY INFORMATION VIEW FOR MEMBERS ──── */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="trans-form-group">
+                <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Comic Project</label>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--trans-text-primary)' }}>
+                  {editTaskData.comic || 'Unknown Project'}
+                </div>
+              </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-          <div className="trans-form-group">
-            <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</label>
-            <div>
-              <span style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', borderRadius: '8px', background: 'rgba(168, 85, 247, 0.12)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.25)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                {editTaskData.status === 'in_progress' ? '🟠 In Progress' : editTaskData.status === 'under_review' ? '🟣 Under Review' : editTaskData.status === 'completed' ? '🟢 Completed' : '⚪ Backlog'}
-              </span>
+              <div className="trans-form-group">
+                <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Task Name</label>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--trans-text-primary)', lineHeight: '1.4' }}>
+                  {editTaskData.title}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div className="trans-form-group">
+                  <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</label>
+                  <div>
+                    <span style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', borderRadius: '8px', background: 'rgba(168, 85, 247, 0.12)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.25)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      {editTaskData.status === 'in_progress' ? '🟠 In Progress' : editTaskData.status === 'under_review' ? '🟣 Under Review' : editTaskData.status === 'completed' ? '🟢 Completed' : '⚪ Backlog'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="trans-form-group">
+                  <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Priority</label>
+                  <div>
+                    <span style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', borderRadius: '8px', background: 'rgba(168, 85, 247, 0.12)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.25)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      {editTaskData.priority === 'Urgent' ? '🚨 Urgent' : editTaskData.priority === 'High' ? '🟠 High' : editTaskData.priority === 'Medium' ? '🟣 Medium' : '⚪ Low'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="trans-form-group">
+                <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assigned Member</label>
+                <AssigneeChipPicker
+                  candidates={teamMembersForAssign}
+                  selectedId={editTaskData.assigneeId}
+                  readOnly={true}
+                  emptyLabel="No assigned member."
+                />
+              </div>
+
+              <div className="trans-form-group">
+                <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Due Date</label>
+                <div style={{ fontSize: '13.5px', fontWeight: '600', color: 'var(--trans-text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  📅 {editTaskData.dueDate ? editTaskData.dueDate : 'No due date'}
+                </div>
+              </div>
+
+              {!isEditableByMember && (
+                <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.25)', color: '#60a5fa', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ℹ️ <strong>Read-Only Mode:</strong> You are not assigned to this task. You can view the task workspace in read-only mode.
+                </div>
+              )}
             </div>
-          </div>
-
-          <div className="trans-form-group">
-            <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Priority</label>
-            <div>
-              <span style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', borderRadius: '8px', background: 'rgba(168, 85, 247, 0.12)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.25)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                {editTaskData.priority === 'Urgent' ? '🚨 Urgent' : editTaskData.priority === 'High' ? '🟠 High' : editTaskData.priority === 'Medium' ? '🟣 Medium' : '⚪ Low'}
-              </span>
-            </div>
-          </div>
+          )}
         </div>
 
-        <div className="trans-form-group">
-          <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assigned Member</label>
-          <AssigneeChipPicker
-            candidates={teamMembersForAssign}
-            selectedId={editTaskData.assigneeId}
-            readOnly={true}
-            emptyLabel="No assigned member."
-          />
-        </div>
+        <div className="trans-modal-footer">
+          <button className="trans-btn secondary" onClick={onCancel}>
+            {isProjectLeader ? 'Cancel' : 'Close'}
+          </button>
 
-        <div className="trans-form-group">
-          <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Due Date</label>
-          <div style={{ fontSize: '13.5px', fontWeight: '600', color: 'var(--trans-text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            📅 {editTaskData.dueDate ? editTaskData.dueDate : 'No due date'}
-          </div>
-        </div>
+          {/* Review: chỉ hiển thị khi task đang under review / completed, và chỉ cho Project Leader */}
+          {(isTaskUnderReview || isTaskCompleted) && isProjectLeader && (
+            <button
+              className="trans-btn secondary"
+              onClick={handleReviewClick}
+              disabled={!isUnderReview}
+              title={isUnderReview ? 'Review this submission' : 'Only available once the task is Under Review'}
+              style={!isUnderReview ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+            >
+              <GitCompare />Review
+            </button>
+          )}
 
-        {!isEditableByMember && (
-          <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.25)', color: '#60a5fa', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            ℹ️ <strong>Read-Only Mode:</strong> You are not assigned to this task. You can view the task workspace in read-only mode.
-          </div>
-        )}
+          {/* Open Workspace: chỉ hiển thị khi KHÔNG phải trạng thái review/completed */}
+          {!(isTaskUnderReview || isTaskCompleted) && !isUnderReview && (
+            <button
+              className="trans-btn primary"
+              onClick={handleOpenWorkspaceClick}
+              title={isEditableByMember ? "Open translate workspace" : "View translate workspace in read-only mode"}
+            >
+              <StepForward />{isEditableByMember ? 'Open Workspace' : 'View Workspace (Read Only)'}
+            </button>
+          )}
+
+          {/* Save: chỉ hiển thị khi KHÔNG phải trạng thái review/completed, và chỉ cho Project Leader */}
+          {!(isTaskUnderReview || isTaskCompleted) && isProjectLeader && (
+            <button className="trans-btn primary" onClick={handleSaveClick}>
+              <Check size={16} />Save
+            </button>
+          )}
+        </div>
       </div>
-    )}
-  </div>
-
-  <div className="trans-modal-footer">
-    <button className="trans-btn secondary" onClick={onCancel}>
-      {showEditForm ? 'Cancel' : 'Close'}
-    </button>
-
-    {canReview && (
-      <button
-        className="trans-btn secondary"
-        onClick={handleReviewClick}
-        title="Review this submission"
-      >
-        <GitCompare />Review
-      </button>
-    )}
-
-    {!isLocked && (
-      <button
-        className="trans-btn primary"
-        onClick={handleOpenWorkspaceClick}
-        title={isEditableByMember ? "Open translate workspace" : "View translate workspace in read-only mode"}
-      >
-        <StepForward />{isEditableByMember ? 'Open Workspace' : 'View Workspace (Read Only)'}
-      </button>
-    )}
-
-    {showEditForm && (
-      <button className="trans-btn primary" onClick={handleSaveClick}>
-        <Check size={16} />Save
-      </button>
-    )}
-  </div>
-</div>
     </div>
   )
 }
