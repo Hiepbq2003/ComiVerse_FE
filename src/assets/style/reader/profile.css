@@ -832,7 +832,8 @@ html.light .profile-role-badge.project-leader {
 }
 
 .profile-input-group input, 
-.profile-input-group textarea, 
+.profile-input-group textarea,
+.profile-input-group select, 
 .profile-background-upload-row input {
   background-color: var(--profile-input-bg);
   border: 1.5px solid var(--profile-border) !important;
@@ -845,8 +846,18 @@ html.light .profile-role-badge.project-leader {
   box-sizing: border-box;
 }
 
+.profile-input-group select {
+  appearance: auto;
+}
+
+.profile-input-group select option {
+  background: var(--profile-input-bg);
+  color: var(--profile-text-primary);
+}
+
 .profile-input-group input:focus, 
 .profile-input-group textarea:focus,
+.profile-input-group select:focus,
 .profile-background-upload-row input:focus {
   border-color: #a855f7 !important;
   background-color: rgba(168, 85, 247, 0.06) !important;
@@ -1054,6 +1065,7 @@ html.light .profile-input-group label {
 
 html.light .profile-input-group input,
 html.light .profile-input-group textarea,
+html.light .profile-input-group select,
 html.light .profile-background-upload-row input {
   background-color: #ffffff !important;
   border: 1.5px solid #cbd5e1 !important;
@@ -1067,7 +1079,8 @@ html.light .profile-input-group textarea::placeholder {
 }
 
 html.light .profile-input-group input:focus,
-html.light .profile-input-group textarea:focus {
+html.light .profile-input-group textarea:focus,
+html.light .profile-input-group select:focus {
   border-color: #a855f7 !important;
   box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.18) !important;
 }

@@ -16,6 +16,9 @@ vi.mock('../../../../services/api/AccountApi', () => ({
   unbanUserApi: vi.fn(),
   resetUserPasswordApi: vi.fn(),
   updateUserApi: vi.fn(),
+  approveAuthorLicenseApi: vi.fn(),
+  rejectAuthorLicenseApi: vi.fn(),
+  reopenAuthorLicenseApi: vi.fn(),
 }));
 
 describe('Admin Account Management Unit & Integration Tests (AccountManagement.jsx)', () => {
@@ -225,6 +228,86 @@ describe('Admin Account Management Unit & Integration Tests (AccountManagement.j
       });
     });
   });
+  it('should review an Author license in a popup and verify strictly with AuthorEntity.id', async () => {
+    AccountApi.getAllAccountsApi.mockResolvedValue({
+      data: [{
+        id: 'user-uuid-author',
+        userId: 'user-uuid-author',
+        authorId: 'author-entity-uuid',
+        fullName: 'Licensed Author',
+        username: 'licensed_author',
+        email: 'author@example.com',
+        role: 'AUTHOR',
+        status: 'ACTIVE',
+        authorLicenseStatus: 'PENDING_VERIFICATION',
+        licenseUrl: 'https://cdn.example.com/license.pdf',
+        licenseOriginalFilename: 'license.pdf',
+        licenseUploadedAt: '2026-08-18T07:00:00Z',
+      }],
+      metadata: { totalPages: 1, totalElements: 1 },
+    });
+    AccountApi.approveAuthorLicenseApi.mockResolvedValue({ data: { success: true } });
+
+    renderAccountManagement();
+
+    await waitFor(() => {
+      expect(screen.getByText('Licensed Author')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: /^verify$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^reject$/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /review/i }));
+
+    expect(screen.getByText(/review author license/i)).toBeInTheDocument();
+    expect(screen.getByTitle(/license document for licensed author/i)).toHaveAttribute(
+      'src',
+      'https://cdn.example.com/license.pdf'
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^verify$/i }));
+
+    await waitFor(() => {
+      expect(AccountApi.approveAuthorLicenseApi).toHaveBeenCalledWith('author-entity-uuid');
+    });
+    expect(AccountApi.approveAuthorLicenseApi).not.toHaveBeenCalledWith('user-uuid-author');
+  });
+
+  it('should require a reason and reject from the Author license review popup', async () => {
+    AccountApi.getAllAccountsApi.mockResolvedValue({
+      data: [{
+        id: 'user-uuid-author',
+        userId: 'user-uuid-author',
+        authorId: 'author-entity-uuid',
+        fullName: 'Licensed Author',
+        username: 'licensed_author',
+        email: 'author@example.com',
+        role: 'AUTHOR',
+        status: 'ACTIVE',
+        authorLicenseStatus: 'PENDING_VERIFICATION',
+        licenseUrl: 'https://cdn.example.com/license.pdf',
+      }],
+      metadata: { totalPages: 1, totalElements: 1 },
+    });
+    AccountApi.rejectAuthorLicenseApi.mockResolvedValue({ data: { success: true } });
+
+    renderAccountManagement();
+    await waitFor(() => expect(screen.getByText('Licensed Author')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /review/i }));
+    fireEvent.change(screen.getByPlaceholderText(/explain what the author needs to correct/i), {
+      target: { value: 'Please upload a complete copyright certificate.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^reject$/i }));
+
+    await waitFor(() => {
+      expect(AccountApi.rejectAuthorLicenseApi).toHaveBeenCalledWith('author-entity-uuid', {
+        reason: 'Please upload a complete copyright certificate.',
+        deadlineDays: 7,
+      });
+    });
+  });
+
   // UNHAPPY PATHS & ERROR GUESSING
   it('Error Guessing: Should handle failure to fetch accounts list on mount', async () => {
     AccountApi.getAllAccountsApi.mockRejectedValueOnce(new Error('Network Error'));
