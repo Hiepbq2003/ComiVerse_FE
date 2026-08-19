@@ -1976,14 +1976,13 @@ function TeamProjects() {
       return
     }
 
-    // Optimistically remove from UI instantly
-    setJoinRequests(prev => prev.filter(req => req.id !== reqId))
-    toast.info(`Rejected request from ${reqName}.`)
-
     try {
       await decideTeamRequestApi(reqId, 'rejected')
+      setJoinRequests(prev => prev.filter(req => req.id !== reqId))
+      toast.info(`Rejected request from ${reqName}.`)
     } catch (err) {
       console.error(err)
+      toast.error(err.response?.data?.message || 'Failed to reject request.')
     }
   }
 

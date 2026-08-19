@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Search, Filter, BookOpen, Users, Calendar, User, AlertCircle, ClipboardList } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -8,9 +8,11 @@ import { createTeamRequestApi, getRequestsByNameApi, cancelTeamRequestApi, getMy
 import { uploadFileApi } from '../../services/api/UploadApi';
 import { getMyTranslatorProfileApi } from '../../services/api/TranslatorApi';
 import { getAuth } from '../../utils/Auth';
+import { useNotification } from '../../context/NotificationContext';
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages';
 
-const MAX_ACTIVE_PROJECTS = 20;
+const MAX_ACTIVE_PROJECTS = 5;
+const MAX_ACTIVE_TASKS = 5;
 
 function ProjectList() {
   const [projects, setProjects] = useState([]);
@@ -42,93 +44,108 @@ function ProjectList() {
   const authUser = auth?.user;
   const userFullName = authUser?.fullName || authUser?.username || 'Translator';
   const isUserProjectLeader = (authUser?.role || '').toUpperCase() === 'PROJECT_LEADER' || (authUser?.role || '').toUpperCase().includes('LEADER');
+  const { notifications } = useNotification();
 
-  const fetchProjectsAndRequests = async (silent = false) => {
-    try {
-      if (!silent && projects.length === 0) setLoading(true);
-      const [projectsData, requestsData, statusData] = await Promise.all([
-        getAllProjectTeamsApi(),
-        getRequestsByNameApi(userFullName).catch(() => []),
-        getMyApplicationStatusApi().catch(() => null)
-      ]);
-      const projList = Array.isArray(projectsData) ? projectsData : [];
-      const requestsList = Array.isArray(requestsData) ? requestsData : [];
+  const applyPendingFromStatus = useCallback((statusData, requestsList = []) => {
+    let appIds = [];
+    const reqMap = {};
 
-      let appIds = [];
-      const reqMap = {};
-
-      if (statusData && Array.isArray(statusData.pendingDetails) && statusData.pendingDetails.length > 0) {
-        statusData.pendingDetails.forEach(item => {
-          if (item.projectTeamId) {
-            appIds.push(item.projectTeamId);
-            if (item.requestId) {
-              reqMap[item.projectTeamId] = item.requestId;
-            }
+    if (statusData && Array.isArray(statusData.pendingDetails)) {
+      statusData.pendingDetails.forEach(item => {
+        if (item.projectTeamId) {
+          appIds.push(item.projectTeamId);
+          if (item.requestId) {
+            reqMap[item.projectTeamId] = item.requestId;
           }
-        });
-      } else {
-        requestsList.forEach(req => {
-          const s = (req.status || '').toUpperCase();
-          if (s === 'PENDING') {
-            appIds.push(req.projectTeamId);
-            reqMap[req.projectTeamId] = req.id;
-          }
-        });
-      }
-
-      setProjects(projList);
-      setAppliedIds(appIds);
-      setAppliedRequestMap(reqMap);
-      if (statusData) setAppStatus(statusData);
-
-      try {
-        sessionStorage.setItem('comiverse_available_projects_cache', JSON.stringify({
-          projects: projList,
-          appliedIds: appIds
-        }));
-      } catch (e) {}
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+        }
+      });
+    } else {
+      requestsList.forEach(req => {
+        const s = (req.status || '').toUpperCase();
+        if (s === 'PENDING') {
+          appIds.push(req.projectTeamId);
+          reqMap[req.projectTeamId] = req.id;
+        }
+      });
     }
-  };
+
+    setAppliedIds(appIds);
+    setAppliedRequestMap(reqMap);
+    if (statusData) setAppStatus(statusData);
+  }, []);
+
+  const refreshApplicationStatus = useCallback(async () => {
+    try {
+      const statusData = await getMyApplicationStatusApi();
+      if (statusData) applyPendingFromStatus(statusData);
+    } catch (e) {}
+  }, [applyPendingFromStatus]);
 
   useEffect(() => {
-    let hasCache = false;
-    try {
-      const cached = sessionStorage.getItem('comiverse_available_projects_cache');
-      if (cached) {
-        const { projects: cProjects, appliedIds: cApplied } = JSON.parse(cached);
-        if (Array.isArray(cProjects) && cProjects.length > 0) {
-          setProjects(cProjects);
-          if (Array.isArray(cApplied)) setAppliedIds(cApplied);
-          setLoading(false);
-          hasCache = true;
-        }
-      }
-    } catch (e) {}
+    let cancelled = false;
 
-    fetchProjectsAndRequests(hasCache);
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [projectsData, requestsData, statusData, myProjects] = await Promise.all([
+          getAllProjectTeamsApi(),
+          getRequestsByNameApi(userFullName).catch(() => []),
+          getMyApplicationStatusApi().catch(() => null),
+          getMyProjectTeamsApi().catch(() => []),
+        ]);
+        if (cancelled) return;
+
+        const projList = Array.isArray(projectsData) ? projectsData : [];
+        const requestsList = Array.isArray(requestsData) ? requestsData : [];
+        const myTeams = Array.isArray(myProjects) ? myProjects : [];
+
+        setProjects(projList);
+        applyPendingFromStatus(statusData, requestsList);
+        setMyProjectTeams(myTeams);
+        setActiveProjectsCount(
+          myTeams.filter(p => p.status && p.status.toUpperCase() !== 'COMPLETED').length
+        );
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
 
     getMyTranslatorProfileApi()
       .then(profile => {
-        if (profile) setTranslatorProfile(profile);
+        if (!cancelled && profile) setTranslatorProfile(profile);
       })
       .catch(() => {});
 
-    // Load số projects user đang tham gia / làm leader để kiểm tra giới hạn
-    getMyProjectTeamsApi()
-      .then(myProjects => {
-        const projList = Array.isArray(myProjects) ? myProjects : [];
-        setMyProjectTeams(projList);
-        const activeCount = projList.filter(
-          p => p.status && p.status.toUpperCase() !== 'COMPLETED'
-        ).length;
-        setActiveProjectsCount(activeCount);
-      })
-      .catch(() => {});
-  }, [userFullName]);
+    return () => {
+      cancelled = true;
+    };
+  }, [userFullName, applyPendingFromStatus]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        refreshApplicationStatus();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [refreshApplicationStatus]);
+
+  useEffect(() => {
+    const latest = notifications?.[0];
+    if (!latest) return;
+    const text = `${latest.title || ''} ${latest.message || ''}`.toLowerCase();
+    if (!text.includes('team request') && !text.includes('application')) return;
+    refreshApplicationStatus();
+  }, [notifications, refreshApplicationStatus]);
 
   // Optimized query filtering with useMemo
   const filteredProjects = useMemo(() => {
@@ -241,10 +258,6 @@ function ProjectList() {
       return;
     }
 
-    if (atProjectLimit) {
-      toast.warn(`Bạn đang tham gia ${activeProjectsCount} project ongoing (tối đa ${MAX_ACTIVE_PROJECTS}). Hãy hoàn thành hoặc rời khỏi một dự án trước.`);
-      return;
-    }
     setSelectedProject(project);
 
     // Auto-populate message from bio or default professional intro
@@ -283,12 +296,6 @@ function ProjectList() {
   const handleSendJoinRequest = async () => {
     if (!selectedProject) return;
     if (uploading) return;
-
-    // Client-side slot check
-    if (appStatus && appStatus.availableSlots <= 0) {
-      toast.error(`You have reached the maximum of ${appStatus.maxSlots} ongoing projects/applications.`);
-      return;
-    }
 
     try {
       setUploading(true);
@@ -431,13 +438,13 @@ function ProjectList() {
               const joined = Number(appStatus.joinedTeams || 0);
               const pending = Number(appStatus.pendingApplications || 0);
               const maxProjects = Number(appStatus.maxSlots || MAX_ACTIVE_PROJECTS);
-              const usedProjects = joined + pending;
+              const usedProjects = joined;
               const tasks = Number(appStatus.activeTasks ?? 0);
-              const maxTasks = Number(appStatus.maxTasks ?? 10);
+              const maxTasks = Number(appStatus.maxTasks ?? MAX_ACTIVE_TASKS);
               const projectAtLimit = usedProjects >= maxProjects;
-              const projectNearLimit = !projectAtLimit && usedProjects >= maxProjects - 3;
+              const projectNearLimit = !projectAtLimit && usedProjects >= maxProjects - 2;
               const taskAtLimit = tasks >= maxTasks;
-              const taskNearLimit = !taskAtLimit && tasks >= maxTasks - 3;
+              const taskNearLimit = !taskAtLimit && tasks >= maxTasks - 2;
 
               const tone = (atLimit, nearLimit) => ({
                 background: atLimit
@@ -481,8 +488,8 @@ function ProjectList() {
                       </div>
                       <div style={{ fontSize: '12px', color: 'var(--trans-text-secondary)', marginTop: '4px' }}>
                         {pending > 0
-                          ? `${pending} pending application${pending !== 1 ? 's' : ''} · ${Math.max(0, maxProjects - usedProjects)} slots left`
-                          : `${Math.max(0, maxProjects - usedProjects)} application slots left`}
+                          ? `${pending} pending application${pending !== 1 ? 's' : ''} · ${Math.max(0, maxProjects - usedProjects)} team slots left`
+                          : `${Math.max(0, maxProjects - usedProjects)} team slots left`}
                       </div>
                     </div>
                   </div>
@@ -513,7 +520,7 @@ function ProjectList() {
                       </div>
                       <div style={{ fontSize: '12px', color: 'var(--trans-text-secondary)', marginTop: '4px' }}>
                         {taskAtLimit
-                          ? 'At the incomplete-task limit. Finish a task before applying or taking more work.'
+                          ? 'At the incomplete-task limit. Finish a task before taking more work.'
                           : `${Math.max(0, maxTasks - tasks)} incomplete task${maxTasks - tasks !== 1 ? 's' : ''} remaining`}
                       </div>
                     </div>
@@ -556,7 +563,7 @@ function ProjectList() {
               Bạn đang tham gia tối đa {MAX_ACTIVE_PROJECTS} project ongoing
             </p>
             <p style={{ margin: '3px 0 0 0', fontSize: '12.5px', color: '#ca8a04' }}>
-              Hoàn thành hoặc rời một dự án trước khi đăng ký dự án mới.
+              Bạn vẫn có thể xem và apply. Leader chỉ accept được khi bạn còn slot team.
             </p>
           </div>
         </div>
@@ -638,15 +645,6 @@ function ProjectList() {
           const recruitedTranslators = Math.max(0, totalMembers - 1); // Exclude the leader
           const limit = Number(project.maxMembers) || 5;
           const spotsLeft = Math.max(0, limit - recruitedTranslators);
-
-          const isDisabled = alreadyApplied || spotsLeft === 0 || atProjectLimit;
-          const btnLabel = alreadyApplied
-            ? 'Applied ✓'
-            : spotsLeft === 0
-            ? 'Team Full'
-            : atProjectLimit
-            ? '⛔ Project Limit Reached'
-            : 'Apply to Join';
 
           return (
             <div key={project.id} className="available-project-card">
@@ -778,16 +776,14 @@ function ProjectList() {
                   return (
                     <button
                       className="available-project-apply-btn"
-                      disabled={spotsLeft === 0 || atProjectLimit || (appStatus && appStatus.availableSlots <= 0) || (appStatus && appStatus.cooldownUntil && new Date(appStatus.cooldownUntil) > new Date())}
+                      disabled={spotsLeft === 0 || (appStatus && appStatus.cooldownUntil && new Date(appStatus.cooldownUntil) > new Date())}
                       onClick={() => handleApplyClick(project)}
                       style={{ flex: 1 }}
                     >
-                      {spotsLeft === 0 
-                        ? 'Team Full' 
-                        : (appStatus && appStatus.availableSlots <= 0) || atProjectLimit
-                        ? 'Max Teams Reached' 
-                        : (appStatus && appStatus.cooldownUntil && new Date(appStatus.cooldownUntil) > new Date()) 
-                        ? '⏳ On Cooldown' 
+                      {spotsLeft === 0
+                        ? 'Team Full'
+                        : (appStatus && appStatus.cooldownUntil && new Date(appStatus.cooldownUntil) > new Date())
+                        ? '⏳ On Cooldown'
                         : 'Apply to Join'}
                     </button>
                   );
