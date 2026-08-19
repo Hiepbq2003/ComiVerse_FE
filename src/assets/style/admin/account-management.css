@@ -56,3 +56,144 @@
     width: 100%;
   }
 }
+
+/* Author license review modal */
+.admin-license-review-modal {
+  max-width: 920px;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-license-review-subtitle {
+  margin: 5px 0 0;
+  color: var(--admin-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.admin-license-review-body {
+  overflow-y: auto;
+}
+
+.admin-license-review-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.admin-license-review-meta-item {
+  padding: 12px 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  min-width: 0;
+}
+
+.admin-license-review-meta-item--wide {
+  grid-column: 1 / -1;
+}
+
+.admin-license-review-meta-item span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--admin-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-license-review-meta-item strong {
+  display: block;
+  color: var(--admin-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.admin-license-review-document {
+  margin-bottom: 18px;
+}
+
+.admin-license-review-frame {
+  display: block;
+  width: 100%;
+  min-height: 420px;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.admin-license-review-open-pdf {
+  display: inline-flex;
+  margin-top: 9px;
+  color: var(--admin-accent, #8b5cf6);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.admin-license-review-open-pdf:hover {
+  text-decoration: underline;
+}
+
+.admin-license-review-missing {
+  padding: 24px;
+  border: 1px dashed var(--admin-border);
+  border-radius: 10px;
+  color: var(--admin-text-secondary);
+  text-align: center;
+}
+
+.admin-license-review-reason {
+  margin-bottom: 0;
+}
+
+.admin-license-review-optional {
+  color: var(--admin-text-secondary);
+  font-weight: 500;
+  text-transform: none;
+}
+
+.admin-license-review-textarea {
+  min-height: 86px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.admin-license-review-footer {
+  flex: 0 0 auto;
+}
+
+.admin-license-review-footer .admin-btn {
+  min-width: 120px;
+}
+
+@media (max-width: 720px) {
+  .admin-license-review-modal {
+    max-height: calc(100vh - 24px);
+  }
+
+  .admin-license-review-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-license-review-meta-item--wide {
+    grid-column: auto;
+  }
+
+  .admin-license-review-frame {
+    min-height: 300px;
+  }
+
+  .admin-license-review-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .admin-license-review-footer .admin-btn {
+    min-width: 0;
+  }
+}

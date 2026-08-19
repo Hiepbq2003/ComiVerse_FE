@@ -26,7 +26,11 @@ import { getMyProjectTeamsApi, getAllProjectTeamsApi } from '../../services/api/
 import { getModeratorScope, isScopeGlobal } from '../../utils/moderatorScope'
 import { getMyTranslatorProfileApi, updateMyTranslatorProfileApi } from '../../services/api/TranslatorApi'
 import { uploadFileApi } from '../../services/api/UploadApi'
-import { uploadAuthorLicenseApi } from '../../services/api/AuthorProfileApi'
+import {
+  getAuthorProfileApi,
+  saveAuthorProfileApi,
+  uploadAuthorLicenseApi,
+} from '../../services/api/AuthorProfileApi'
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 const COMMON_NOTIFICATION_OPTIONS = [
   {
@@ -214,7 +218,12 @@ function Profile({ user: userProp }) {
   const [transBio, setTransBio] = useState('')
   const [isTranslator, setIsTranslator] = useState(false)
   const [cvUploading, setCvUploading] = useState(false)
+  const [authorProfile, setAuthorProfile] = useState(null)
+  const [authorDisplayName, setAuthorDisplayName] = useState('')
+  const [authorType, setAuthorType] = useState('INDIVIDUAL')
   const [authorCopyrightDoc, setAuthorCopyrightDoc] = useState('')
+  const [authorLicenseStatus, setAuthorLicenseStatus] = useState('')
+  const [authorCanUploadLicense, setAuthorCanUploadLicense] = useState(false)
 
   const [notifSettings, setNotifSettings] = useState({})
   const [availableNotifKeys, setAvailableNotifKeys] = useState([])
@@ -243,6 +252,33 @@ function Profile({ user: userProp }) {
       })
     return () => { cancelled = true }
   }, [user?.id, user?.userId])
+
+  // Load Author profile and license state for the shared Profile page.
+  // The AuthorEntity remains the single source of truth for displayName,
+  // authorType and copyright-license verification.
+  useEffect(() => {
+    if (!user || roleUpper !== 'AUTHOR') return
+    let cancelled = false
+
+    getAuthorProfileApi()
+      .then(profile => {
+        if (cancelled || !profile) return
+        setAuthorProfile(profile)
+        setAuthorDisplayName(profile.displayName || user.fullName || user.username || '')
+        setAuthorType(profile.authorType || 'INDIVIDUAL')
+        setAuthorCopyrightDoc(profile.licenseUrl || '')
+        setAuthorLicenseStatus(profile.licenseStatus || '')
+        setAuthorCanUploadLicense(Boolean(profile.canUploadLicense))
+      })
+      .catch(err => {
+        if (!cancelled) {
+          console.error('Failed to load author profile:', err)
+          toast.error(err.response?.data?.message || 'Failed to load author workspace profile.')
+        }
+      })
+
+    return () => { cancelled = true }
+  }, [user?.id, user?.userId, roleUpper])
 
   // Load Translator Profile
   useEffect(() => {
@@ -277,26 +313,49 @@ function Profile({ user: userProp }) {
   const handleCvUpload = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
+
     const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
     if (!isPdf) {
       toast.warn('🚫 Invalid file format! Only PDF documents (.pdf) are accepted.')
       e.target.value = ''
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.warn('File size must be under 5MB.')
+
+    // Author licenses use the dedicated AuthorLicenseService limit (10 MB).
+    // Translator CVs continue to use the existing generic upload limit (5 MB).
+    const maxSizeBytes = roleUpper === 'AUTHOR' ? 10 * 1024 * 1024 : 5 * 1024 * 1024
+    if (file.size > maxSizeBytes) {
+      toast.warn(roleUpper === 'AUTHOR' ? 'License PDF must be under 10MB.' : 'File size must be under 5MB.')
       e.target.value = ''
       return
     }
+
     try {
       setCvUploading(true)
+
       if (roleUpper === 'AUTHOR') {
+        // IMPORTANT: do not use /upload/file here. This endpoint persists the
+        // PDF URL and transitions AuthorEntity -> PENDING_VERIFICATION.
         const result = await uploadAuthorLicenseApi(file)
-        setAuthorCopyrightDoc(result?.licenseUrl || result?.data?.licenseUrl || 'uploaded')
-        toast.success('Copyright document uploaded and is now pending verification!')
+        setAuthorCopyrightDoc(result?.licenseUrl || '')
+        setAuthorLicenseStatus(result?.status || 'PENDING_VERIFICATION')
+        setAuthorCanUploadLicense(Boolean(result?.canUploadLicense))
+        setAuthorProfile(prev => prev ? {
+          ...prev,
+          licenseUrl: result?.licenseUrl || prev.licenseUrl,
+          licenseOriginalFilename: result?.licenseOriginalFilename || file.name,
+          licenseUploadedAt: result?.licenseUploadedAt || prev.licenseUploadedAt,
+          licenseStatus: result?.status || 'PENDING_VERIFICATION',
+          canUploadLicense: Boolean(result?.canUploadLicense),
+          canPublishComic: Boolean(result?.canPublishComic),
+          canRequestAuthorPayout: Boolean(result?.canRequestAuthorPayout),
+        } : prev)
+        toast.success('License uploaded. Waiting for administrator verification.')
       } else {
         const uploadResult = await uploadFileApi(file)
-        const uploadedUrl = typeof uploadResult === 'string' ? uploadResult : uploadResult?.url || uploadResult?.fileUrl || null
+        const uploadedUrl = typeof uploadResult === 'string'
+          ? uploadResult
+          : uploadResult?.url || uploadResult?.fileUrl || null
         if (uploadedUrl) {
           setTransCvUrl(uploadedUrl)
           toast.success('CV / Resume document uploaded successfully!')
@@ -304,9 +363,12 @@ function Profile({ user: userProp }) {
       }
     } catch (err) {
       console.error('Upload error:', err)
-      toast.error(err.response?.data?.message || 'Failed to upload document.')
+      toast.error(err.response?.data?.message || (roleUpper === 'AUTHOR'
+        ? 'Failed to upload author license.'
+        : 'Failed to upload document.'))
     } finally {
       setCvUploading(false)
+      e.target.value = ''
     }
   }
 
@@ -392,8 +454,34 @@ function Profile({ user: userProp }) {
     e.preventDefault()
     setProfileSaving(true)
     try {
+      const authorDisplayNameToSave = roleUpper === 'AUTHOR' ? authorDisplayName.trim() : ''
+      if (roleUpper === 'AUTHOR' && !authorDisplayNameToSave) {
+        throw new Error('Author display name is required.')
+      }
+
       const savedProfile = await updateProfileApi(buildProfilePayload())
       applySavedProfile(savedProfile)
+
+      // Save the two Author-only workspace fields into AuthorEntity.
+      if (roleUpper === 'AUTHOR') {
+        const savedAuthor = await saveAuthorProfileApi({
+          authorType,
+          displayName: authorDisplayNameToSave,
+          // Preserve existing AuthorEntity fields that are not edited on this shared page.
+          legalName: authorProfile?.legalName || null,
+          bio: authorProfile?.bio || null,
+          avatarUrl: authorProfile?.avatarUrl || null,
+          contactEmail: authorProfile?.contactEmail || user?.email || null,
+          externalProfileRef: authorProfile?.externalProfileRef || null,
+          note: authorProfile?.note || null,
+        })
+        setAuthorProfile(savedAuthor)
+        setAuthorDisplayName(savedAuthor?.displayName || authorDisplayNameToSave)
+        setAuthorType(savedAuthor?.authorType || authorType)
+        setAuthorCopyrightDoc(savedAuthor?.licenseUrl || authorCopyrightDoc)
+        setAuthorLicenseStatus(savedAuthor?.licenseStatus || authorLicenseStatus)
+        setAuthorCanUploadLicense(Boolean(savedAuthor?.canUploadLicense))
+      }
 
       // Save Translator Profile if role is TRANSLATOR or has profile
       if (roleUpper === 'TRANSLATOR' || isTranslator) {
@@ -411,9 +499,9 @@ function Profile({ user: userProp }) {
         }
       }
 
-      toast.success('Basic Info and Translator profile updated successfully!')
+      toast.success('Profile updated successfully!')
     } catch (err) {
-      const errMsg = err.response?.data?.message || 'Failed to save changes.'
+      const errMsg = err.response?.data?.message || err.message || 'Failed to save changes.'
       toast.error(errMsg)
     } finally {
       setProfileSaving(false)
@@ -961,17 +1049,39 @@ function Profile({ user: userProp }) {
                       </div>
                     </div>
                     
-                    <div className="profile-input-group">
-                      <label>Copyright Holder / Pen Name</label>
-                      <input
-                        type="text"
-                        value={user.fullName || 'Unknown'}
-                        disabled
-                        style={{ cursor: 'not-allowed', opacity: 0.8 }}
-                      />
-                      <small style={{ color: 'var(--profile-text-muted)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                        Linked to your account Full Name for legal copyright protection. Contact support to change this identity.
-                      </small>
+                    <div className="profile-form-grid">
+                      <div className="profile-input-group">
+                        <label htmlFor="author-display-name">Display Name / Pen Name</label>
+                        <input
+                          id="author-display-name"
+                          type="text"
+                          value={authorDisplayName}
+                          onChange={(e) => setAuthorDisplayName(e.target.value)}
+                          maxLength={150}
+                          placeholder="Public author name"
+                          required
+                        />
+                        <small style={{ color: 'var(--profile-text-muted)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                          Public author identity shown on comics and author-facing content.
+                        </small>
+                      </div>
+
+                      <div className="profile-input-group">
+                        <label htmlFor="author-type">Author Type</label>
+                        <select
+                          id="author-type"
+                          value={authorType}
+                          onChange={(e) => setAuthorType(e.target.value)}
+                        >
+                          <option value="INDIVIDUAL">Individual</option>
+                          <option value="STUDIO">Studio</option>
+                          <option value="PUBLISHER">Publisher</option>
+                          <option value="COMPANY">Company</option>
+                        </select>
+                        <small style={{ color: 'var(--profile-text-muted)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                          Describes the ownership type of this Author profile.
+                        </small>
+                      </div>
                     </div>
 
                     {/* Copyright Document Upload */}
@@ -991,10 +1101,27 @@ function Profile({ user: userProp }) {
                                 >
                                   View Uploaded Copyright Document ↗
                                 </a>
-                                <p className="profile-cv-badge">✓ Active and verified for publishing</p>
+                                <p className="profile-cv-badge">
+                                  {authorLicenseStatus === 'ACTIVE'
+                                    ? '✓ Verified — publishing enabled'
+                                    : authorLicenseStatus === 'PENDING_VERIFICATION'
+                                      ? '⏳ Waiting for administrator verification'
+                                      : authorLicenseStatus === 'REJECTED'
+                                        ? '✕ Rejected — upload a corrected PDF'
+                                        : `Status: ${authorLicenseStatus || 'PENDING_LICENSE'}`}
+                                </p>
+                                {authorLicenseStatus === 'REJECTED' && authorProfile?.licenseRejectionReason && (
+                                  <p className="profile-input-desc" style={{ marginTop: '4px' }}>
+                                    Reason: {authorProfile.licenseRejectionReason}
+                                  </p>
+                                )}
                               </>
                             ) : (
-                              <span className="profile-cv-empty-text">No document attached. Upload a PDF for copyright verification.</span>
+                              <span className="profile-cv-empty-text">
+                                {authorLicenseStatus === 'EXPIRED'
+                                  ? 'License upload deadline expired. Contact an administrator to reopen it.'
+                                  : 'No document attached. Upload a PDF for copyright verification.'}
+                              </span>
                             )}
                           </div>
                         </div>
@@ -1002,9 +1129,22 @@ function Profile({ user: userProp }) {
                         <label
                           htmlFor="author-copyright-file-input"
                           className="profile-cv-upload-btn"
-                          style={{ background: 'var(--mod-purple)', borderColor: 'var(--mod-purple)' }}
+                          style={{
+                            background: 'var(--mod-purple)',
+                            borderColor: 'var(--mod-purple)',
+                            opacity: (!authorCanUploadLicense || cvUploading) ? 0.55 : 1,
+                            pointerEvents: (!authorCanUploadLicense || cvUploading) ? 'none' : 'auto',
+                          }}
                         >
-                          {cvUploading ? 'Uploading...' : authorCopyrightDoc ? 'Replace Document' : 'Upload PDF'}
+                          {cvUploading
+                            ? 'Uploading...'
+                            : authorCanUploadLicense
+                              ? (authorCopyrightDoc ? 'Upload Corrected PDF' : 'Upload PDF')
+                              : authorLicenseStatus === 'PENDING_VERIFICATION'
+                                ? 'Waiting for Review'
+                                : authorLicenseStatus === 'ACTIVE'
+                                  ? 'Verified'
+                                  : 'Upload unavailable'}
                         </label>
                         <input
                           id="author-copyright-file-input"
@@ -1012,7 +1152,7 @@ function Profile({ user: userProp }) {
                           accept="application/pdf,.pdf"
                           style={{ display: 'none' }}
                           onChange={handleCvUpload}
-                          disabled={cvUploading}
+                          disabled={cvUploading || !authorCanUploadLicense}
                         />
                       </div>
                     </div>

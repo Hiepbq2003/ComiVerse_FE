@@ -84,6 +84,8 @@ function AccountManagement() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [confirmAction, setConfirmAction] = useState(null) // { type: 'ban'|'unban'|'reset-pw', account }
+  const [licenseReviewAccount, setLicenseReviewAccount] = useState(null)
+  const [licenseRejectionReason, setLicenseRejectionReason] = useState('')
 
   // MODERATOR SPECIALIZATION LANGUAGES
   const MODERATOR_LANGUAGES = COMIC_LANGUAGE_OPTIONS
@@ -397,13 +399,29 @@ function AccountManagement() {
   }
 
   // ── AUTHOR LICENSE REVIEW ─────────────────────────
+  const openLicenseReview = (account) => {
+    if (!account?.authorId) {
+      showAlert('error', 'Missing AuthorEntity.id for this Author.')
+      return
+    }
+    setLicenseRejectionReason('')
+    setLicenseReviewAccount(account)
+  }
+
+  const closeLicenseReview = () => {
+    if (licenseReviewAccount && actionLoadingId === licenseReviewAccount.id) return
+    setLicenseReviewAccount(null)
+    setLicenseRejectionReason('')
+  }
+
   const handleApproveAuthorLicense = async (account) => {
     if (!account?.authorId) return
-    if (!window.confirm(`Verify license for ${account.fullName}? This will activate comic publishing and Author payout.`)) return
     setActionLoadingId(account.id)
     try {
       await approveAuthorLicenseApi(account.authorId)
       showAlert('success', `License verified. ${account.fullName} is now ACTIVE.`)
+      setLicenseReviewAccount(null)
+      setLicenseRejectionReason('')
       await fetchAccounts()
     } catch (err) {
       showAlert('error', err.response?.data?.message || 'Failed to approve Author license.')
@@ -414,9 +432,7 @@ function AccountManagement() {
 
   const handleRejectAuthorLicense = async (account) => {
     if (!account?.authorId) return
-    const reason = window.prompt('Reason for rejection (Author gets a new 7-day PDF upload deadline):', '')
-    if (reason === null) return
-    const rejectionReason = reason.trim()
+    const rejectionReason = licenseRejectionReason.trim()
     if (!rejectionReason) {
       showAlert('error', 'Rejection reason is required.')
       return
@@ -425,6 +441,8 @@ function AccountManagement() {
     try {
       await rejectAuthorLicenseApi(account.authorId, { reason: rejectionReason, deadlineDays: 7 })
       showAlert('warning', `License rejected. ${account.fullName} can upload a replacement PDF within 7 days.`)
+      setLicenseReviewAccount(null)
+      setLicenseRejectionReason('')
       await fetchAccounts()
     } catch (err) {
       showAlert('error', err.response?.data?.message || 'Failed to reject Author license.')
@@ -655,19 +673,17 @@ function AccountManagement() {
                           </button>
 
                           {normalizeRoleValue(account.role) === 'AUTHOR' && account.authorLicenseStatus === 'PENDING_VERIFICATION' && (
-                            <>
-                              {account.licenseUrl && (
-                                <a className="btn-action-sm btn-action-sm--edit" href={account.licenseUrl} target="_blank" rel="noreferrer">
-                                  <span>PDF</span>
-                                </a>
-                              )}
-                              <button type="button" className="btn-action-sm btn-action-sm--unban" onClick={() => handleApproveAuthorLicense(account)}>
-                                <span>Verify</span>
-                              </button>
-                              <button type="button" className="btn-action-sm btn-action-sm--ban" onClick={() => handleRejectAuthorLicense(account)}>
-                                <span>Reject</span>
-                              </button>
-                            </>
+                            <button
+                              type="button"
+                              className="btn-action-sm btn-action-sm--unban"
+                              onClick={() => openLicenseReview(account)}
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
+                              <span>Review</span>
+                            </button>
                           )}
 
                           {normalizeRoleValue(account.role) === 'AUTHOR' && ['EXPIRED', 'AUTHOR_DISABLED'].includes(account.authorLicenseStatus) && (
@@ -748,6 +764,113 @@ function AccountManagement() {
           </div>
         )}
       </div>
+
+      {/* ═══════════════════════════════════════════════
+          AUTHOR LICENSE REVIEW MODAL
+          ═══════════════════════════════════════════════ */}
+      {licenseReviewAccount && (
+        <div className="admin-modal-overlay" onClick={closeLicenseReview}>
+          <div className="admin-modal admin-license-review-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <div>
+                <h2 className="admin-modal-title">Review Author License</h2>
+                <p className="admin-license-review-subtitle">
+                  Verify the submitted copyright document before activating Author permissions.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="admin-modal-close"
+                onClick={closeLicenseReview}
+                disabled={actionLoadingId === licenseReviewAccount.id}
+                aria-label="Close license review"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="admin-modal-body admin-license-review-body">
+              <div className="admin-license-review-meta">
+                <div className="admin-license-review-meta-item">
+                  <span>Author</span>
+                  <strong>{licenseReviewAccount.fullName || '-'}</strong>
+                </div>
+                <div className="admin-license-review-meta-item">
+                  <span>Email</span>
+                  <strong>{licenseReviewAccount.email || '-'}</strong>
+                </div>
+                <div className="admin-license-review-meta-item">
+                  <span>License status</span>
+                  <strong>{licenseReviewAccount.authorLicenseStatus || '-'}</strong>
+                </div>
+                <div className="admin-license-review-meta-item">
+                  <span>Uploaded</span>
+                  <strong>{formatDate(licenseReviewAccount.licenseUploadedAt)}</strong>
+                </div>
+                <div className="admin-license-review-meta-item admin-license-review-meta-item--wide">
+                  <span>Document</span>
+                  <strong>{licenseReviewAccount.licenseOriginalFilename || 'Author license PDF'}</strong>
+                </div>
+              </div>
+
+              <div className="admin-license-review-document">
+                {licenseReviewAccount.licenseUrl ? (
+                  <>
+                    <iframe
+                      title={`License document for ${licenseReviewAccount.fullName || 'Author'}`}
+                      src={licenseReviewAccount.licenseUrl}
+                      className="admin-license-review-frame"
+                    />
+                    <a
+                      href={licenseReviewAccount.licenseUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="admin-license-review-open-pdf"
+                    >
+                      Open PDF in new tab
+                    </a>
+                  </>
+                ) : (
+                  <div className="admin-license-review-missing">No license document URL was provided by the backend.</div>
+                )}
+              </div>
+
+              <div className="admin-form-group admin-license-review-reason">
+                <label className="admin-form-label" htmlFor="license-rejection-reason">
+                  Rejection reason <span className="admin-license-review-optional">(required only when rejecting)</span>
+                </label>
+                <textarea
+                  id="license-rejection-reason"
+                  className="admin-form-input admin-license-review-textarea"
+                  value={licenseRejectionReason}
+                  onChange={(e) => setLicenseRejectionReason(e.target.value)}
+                  placeholder="Explain what the Author needs to correct before uploading a replacement PDF..."
+                  disabled={actionLoadingId === licenseReviewAccount.id}
+                />
+              </div>
+            </div>
+
+            <div className="admin-modal-footer admin-license-review-footer">
+              <button
+                type="button"
+                className="admin-btn admin-btn--success"
+                onClick={() => handleApproveAuthorLicense(licenseReviewAccount)}
+                disabled={actionLoadingId === licenseReviewAccount.id || !licenseReviewAccount.licenseUrl}
+              >
+                {actionLoadingId === licenseReviewAccount.id ? 'Processing...' : 'Verify'}
+              </button>
+              <button
+                type="button"
+                className="admin-btn admin-btn--danger"
+                onClick={() => handleRejectAuthorLicense(licenseReviewAccount)}
+                disabled={actionLoadingId === licenseReviewAccount.id}
+              >
+                {actionLoadingId === licenseReviewAccount.id ? 'Processing...' : 'Reject'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══════════════════════════════════════════════
           CREATE STAFF MODAL
