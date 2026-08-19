@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, NavLink, Outlet, Link } from 'react-router-dom'
+import { Menu, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
@@ -9,6 +10,7 @@ import '../../assets/style/translator/translator.css'
 
 function TranslatorLayout({ children }) {
   const navigate = useNavigate()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const { isLoggedIn, user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
@@ -152,9 +154,15 @@ function TranslatorLayout({ children }) {
   }
 
   return (
-    <div className="translator-layout">
+    <div className={`translator-layout ${isMobileMenuOpen ? 'mobile-menu-open' : ''}`}>
+      <button
+        type="button"
+        className={`translator-mobile-overlay ${isMobileMenuOpen ? 'show' : ''}`}
+        onClick={() => setIsMobileMenuOpen(false)}
+        aria-label="Close translator navigation"
+      />
       {/* Sidebar */}
-      <aside className="translator-sidebar">
+      <aside className={`translator-sidebar ${isMobileMenuOpen ? 'open' : ''}`}>
         <div className="translator-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px' }}>
           <Link to="/" style={{ display: 'block', textDecoration: 'none', marginLeft: '38px' }}>
             <LogoIcon size={26} />
@@ -167,6 +175,7 @@ function TranslatorLayout({ children }) {
               key={item.id}
               to={item.path}
               className={({ isActive }) => `translator-nav-item ${isActive ? 'active' : ''}`}
+              onClick={() => setIsMobileMenuOpen(false)}
             >
               <span className="translator-nav-label-group">
                 <span className="translator-nav-icon">
@@ -197,6 +206,15 @@ function TranslatorLayout({ children }) {
         {/* Topbar */}
         <header className="translator-topbar">
           <div className="translator-topbar-left">
+            <button
+              type="button"
+              className="translator-mobile-toggle"
+              onClick={() => setIsMobileMenuOpen((current) => !current)}
+              aria-label={isMobileMenuOpen ? 'Close translator navigation' : 'Open translator navigation'}
+              aria-expanded={isMobileMenuOpen}
+            >
+              {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
             <span className="workspace-prefix">WORKSPACE</span>
             <div className="workspace-tag" style={{ marginTop: 0, fontSize: '12px', padding: '6px 12px' }}>
               {roleUpper === 'PROJECT_LEADER' ? 'Project Leader' : 'Translator'}

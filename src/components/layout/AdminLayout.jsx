@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Menu, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
@@ -9,6 +10,7 @@ import '../../assets/style/admin/admin.css'
 
 function AdminLayout({ children, activeNav = 'account-management' }) {
   const navigate = useNavigate()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const { user, isLoggedIn, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
@@ -58,6 +60,10 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
       navigate('/', { replace: true })
     }
   }, [isLoggedIn, user, navigate])
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false)
+  }, [activeNav])
 
   const handleLogout = () => {
     logout()
@@ -132,9 +138,15 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
   }
 
   return (
-    <div className="admin-layout">
+    <div className={`admin-layout ${isMobileMenuOpen ? 'mobile-menu-open' : ''}`}>
+      <button
+        type="button"
+        className={`admin-mobile-overlay ${isMobileMenuOpen ? 'show' : ''}`}
+        onClick={() => setIsMobileMenuOpen(false)}
+        aria-label="Close admin navigation"
+      />
       {/* Sidebar */}
-      <aside className="admin-sidebar">
+      <aside className={`admin-sidebar ${isMobileMenuOpen ? 'open' : ''}`}>
         <div className="admin-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px' }}>
           <Link to="/" style={{ display: 'block', textDecoration: 'none', marginLeft: '38px' }}>
             <LogoIcon size={26} />
@@ -147,6 +159,7 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
               key={item.id}
               to={item.path}
               className={`admin-nav-item ${activeNav === item.id ? 'active' : ''}`}
+              onClick={() => setIsMobileMenuOpen(false)}
             >
               <span className="admin-nav-label-group">
                 <span className="admin-nav-icon">{renderNavIcon(item.icon)}</span>
@@ -175,6 +188,15 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
         {/* Top Bar */}
         <header className="admin-topbar">
           <div className="admin-topbar-left">
+            <button
+              type="button"
+              className="admin-mobile-toggle"
+              onClick={() => setIsMobileMenuOpen((current) => !current)}
+              aria-label={isMobileMenuOpen ? 'Close admin navigation' : 'Open admin navigation'}
+              aria-expanded={isMobileMenuOpen}
+            >
+              {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
             <span className="workspace-prefix">Workspace</span>
             <div className="workspace-tag" style={{ marginTop: 0, fontSize: '12px', padding: '6px 12px' }}>
               System Admin

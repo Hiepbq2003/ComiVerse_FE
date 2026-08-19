@@ -746,3 +746,122 @@ html.dark .info-item-val,
 html.light .info-item-val {
   color: #0f172a;
 }
+
+@media (max-width: 720px) {
+  .comic-detail-hero-section {
+    min-height: auto;
+    padding: 28px 16px 32px;
+    align-items: stretch;
+  }
+
+  .comic-detail-hero-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 22px;
+  }
+
+  .comic-detail-cover-wrapper {
+    width: 142px;
+    height: 202px;
+    margin-inline: auto;
+    border-radius: 8px;
+  }
+
+  .hero-info-block {
+    min-width: 0;
+    width: 100%;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .hero-badges-row,
+  .comic-detail-hero-section .hero-comic-credits,
+  .hero-actions-group {
+    justify-content: center;
+  }
+
+  .comic-detail-hero-section h1.hero-comic-title,
+  html.light .comic-detail-hero-section h1.hero-comic-title,
+  .hero-comic-title {
+    font-size: 29px !important;
+    line-height: 1.2 !important;
+  }
+
+  .comic-detail-hero-section .hero-stats-glass-bar,
+  html.light .comic-detail-hero-section .hero-stats-glass-bar {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+    width: 100% !important;
+    padding: 14px !important;
+    box-sizing: border-box !important;
+  }
+
+  .comic-detail-hero-section .hero-stat-divider,
+  html.light .comic-detail-hero-section .hero-stat-divider {
+    display: none !important;
+  }
+
+  .hero-actions-group > button,
+  .hero-actions-group > a {
+    flex: 1 1 145px;
+    justify-content: center;
+  }
+
+  .hero-rating-box,
+  .comic-detail-hero-section .hero-rating-box .comic-star-rating-container {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .comic-detail-body-container {
+    padding: 28px 16px 56px;
+  }
+
+  .comic-detail-main-grid {
+    gap: 22px;
+  }
+
+  .detail-synopsis-card,
+  .detail-sidebar-info-card {
+    padding: 18px;
+    border-radius: 8px;
+  }
+
+  .detail-sidebar-info-card {
+    position: static;
+  }
+
+  .detail-tabs-header {
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .detail-tabs-header::-webkit-scrollbar {
+    display: none;
+  }
+
+  .detail-tab-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .detail-chapter-card {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 8px;
+  }
+
+  .detail-chapter-name {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .detail-chapter-meta {
+    justify-content: space-between;
+    width: 100%;
+  }
+}

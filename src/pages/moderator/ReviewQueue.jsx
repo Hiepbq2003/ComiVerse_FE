@@ -828,14 +828,29 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         }
         return true;
       });
-      const uniqueKeys = new Set();
+      // Group items by key to match the display logic
+      const groupedByKey = new Map();
       itemsInTab.forEach(item => {
         const titleClean = (item.title || '').toLowerCase().trim();
         const submitterClean = (item.submittedBy || '').toLowerCase().trim();
         const key = item.comicId ? `comic-${item.comicId}` : `group-${titleClean}_${submitterClean}`;
-        uniqueKeys.add(key);
+        if (!groupedByKey.has(key)) {
+          groupedByKey.set(key, []);
+        }
+        groupedByKey.get(key).push(item);
       });
-      counts[tabStatus] = uniqueKeys.size;
+
+      if (tabStatus === 'pending') {
+        // For pending tab, only count groups that have at least one real chapter submission
+        let pendingCount = 0;
+        groupedByKey.forEach((items) => {
+          const hasRealChapter = items.some(isRealChapterSubmission);
+          if (hasRealChapter) pendingCount++;
+        });
+        counts[tabStatus] = pendingCount;
+      } else {
+        counts[tabStatus] = groupedByKey.size;
+      }
     });
 
     const ticketTargetIds = new Set(appealTickets.map(t => String(t.targetId || t.id)));
@@ -1037,7 +1052,19 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       group.genres = getSubmissionGenres(group);
     });
 
-    return Array.from(groupsMap.values());
+    // Filter out comic-profile-only groups with 0 pending chapters in the Pending tab.
+    // After approving all chapters, only the comic catalog profile submission remains
+    // — showing it as "0 Chapters" is confusing, so auto-hide it.
+    const result = Array.from(groupsMap.values()).filter(group => {
+      if (activeTab !== 'pending') return true;
+      const chaps = getSubmissionChapters(group);
+      if (chaps.length > 0) return true;
+      // If the group has only non-chapter subItems (comic profile submissions),
+      // check if ANY subItem is a real chapter submission. If none, hide it.
+      const hasRealChapter = (group.subItems || []).some(isRealChapterSubmission);
+      return hasRealChapter;
+    });
+    return result;
   }, [filteredItems]);
 
   const totalPages = Math.ceil(groupedItems.length / ITEMS_PER_PAGE)
@@ -1539,7 +1566,11 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         return !status || status === 'APPROVED' || status === 'PUBLISHED' || status === 'SUBMITTED_FOR_REVIEW' || status === 'REJECTED' || status === 'PREVIEW_READY';
       });
 
-      if (list.length === 0) return [];
+      if (list.length === 0) {
+        chapterCacheRef.current.set(`shallow_${comicId}`, []);
+        chapterCacheRef.current.set(`full_${comicId}`, []);
+        return [];
+      }
 
       if (!fetchDetails) {
         const shallowResult = list.map((ch, idx) => normalizeChapter(ch, idx));
@@ -1959,8 +1990,14 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="moderator-empty-state">
-            <h3>No submissions found</h3>
-            <p>There are no raw comic submissions matching your active filters.</p>
+            <h3>{activeTab === 'pending' && !searchQuery ? 'All caught up!' : 'No submissions found'}</h3>
+            <p>
+              {activeTab === 'pending' && !searchQuery 
+                ? 'There are no chapters or comic profiles currently waiting for your review.' 
+                : searchQuery 
+                  ? `No ${activeTab} submissions match your search "${searchQuery}".` 
+                  : `There are no ${activeTab} submissions matching your active filters.`}
+            </p>
           </div>
         ) : isHydrating ? (
           <div className="skeleton-comic-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

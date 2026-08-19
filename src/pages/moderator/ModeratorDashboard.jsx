@@ -377,10 +377,15 @@ function ModeratorDashboard() {
     });
 
     try {
-      const enriched = await Promise.all(
-        rawTeamsList.map(async (t) => {
-          if (!t) return t;
-          let tasks = [];
+      const enriched = [];
+      const CHUNK_SIZE = 3;
+      
+      for (let i = 0; i < rawTeamsList.length; i += CHUNK_SIZE) {
+        const chunk = rawTeamsList.slice(i, i + CHUNK_SIZE);
+        const chunkResults = await Promise.all(
+          chunk.map(async (t) => {
+            if (!t) return t;
+            let tasks = [];
           let members = [];
           let chapters = [];
 
@@ -525,8 +530,10 @@ function ModeratorDashboard() {
             leaderName,
             leaderInitials
           };
-        })
-      );
+          })
+        );
+        enriched.push(...chunkResults);
+      }
       return enriched;
     } catch (err) {
       console.warn('[ModeratorDashboard] enrichProjectTeamsWithTasks error:', err);
@@ -872,7 +879,18 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       const lang = item.language || item.rawLanguage || item.originalLanguage || item.lang || 'Original Raw';
       return isLanguageInModeratorScope(lang, authUser);
     });
-    const itemsInTab = scopedSubmissions.filter(item => item.status === 'pending' || !item.status);
+    const itemsInTab = scopedSubmissions.filter(item => {
+      if (item.status !== 'pending' && item.status) return false;
+      
+      // Filter out items with 0 pending chapters to match ReviewQueue logic
+      const chaps = item.allChapters || item.chaptersData || item.chapters || [];
+      const pendingChaps = (Array.isArray(chaps) ? chaps : []).filter(c => {
+        const s = (c.status || c.moderationStatus || '').toLowerCase();
+        return s.includes('pending') || s.includes('submitted') || s === 'new' || !s;
+      });
+      
+      return pendingChaps.length > 0;
+    });
     const uniqueKeys = new Set();
     itemsInTab.forEach(item => {
       const titleClean = (item.title || item.comicTitle || item.comicName || '').toLowerCase().trim();
@@ -2340,7 +2358,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                             <div className="mod-sub-details">
                               <div className="mod-sub-title" title={s.title}>{s.title}</div>
                               <div className="mod-sub-meta">
-                                {isAuthor ? 'New Comic Upload' : (s.chapter ? `Chapter ${s.chapter}` : (s.chapterNumber ? `Chapter ${s.chapterNumber}` : 'New Comic Upload'))} · {formatSubmitterName(s.submittedBy || s.author || 'Author')}
+                                {s.chapter || s.chapterNumber ? `Chapter ${s.chapter || s.chapterNumber}` : 'New Comic Upload'} · {formatSubmitterName(s.submittedBy || s.author || 'Author')}
                               </div>
                             </div>
                             <span className={`priority-badge ${(s.priority || 'Medium').toLowerCase()}`}>

@@ -410,22 +410,24 @@ function ProjectsListView({
               </div>
               <div className="trans-project-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <ModernButton variant={2} label="Workspace" onClick={() => onOpenDetails(proj)} />
-                <button
-                  className="dash-quick-action-btn"
-                  style={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
-                    padding: '8px 14px',
-                    fontSize: '12.5px'
-                  }}
-                  title="Open Translation Editor Directly"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (onQuickTranslate) onQuickTranslate(proj)
-                  }}
-                >
-                  Translate
-                </button>
+                {proj.status?.toLowerCase() !== 'paused' && (
+                  <button
+                    className="dash-quick-action-btn"
+                    style={{
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                      padding: '8px 14px',
+                      fontSize: '12.5px'
+                    }}
+                    title="Open Translation Editor Directly"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (onQuickTranslate) onQuickTranslate(proj)
+                    }}
+                  >
+                    Translate
+                  </button>
+                )}
               </div>
             </div>
           ))
@@ -1005,6 +1007,7 @@ function WorkspaceDetailView({
             </div>
           ) : (
             <TasksTab
+              isTeamPaused={String(selectedDetails?.status).toLowerCase() === 'paused'}
               comicName={comicName}
               comicId={selectedDetails?.comicId}
               tasks={tasks}
@@ -1034,6 +1037,7 @@ function WorkspaceDetailView({
           {showCreateTask && (
             <CreateTaskModal
               comicName={comicName}
+              comicCover={selectedDetails?.cover || selectedDetails?.coverImage || selectedDetails?.coverUrl}
               newTaskData={newTaskData}
               setNewTaskData={setNewTaskData}
               chapterOptions={chapterOptions}
@@ -2658,11 +2662,16 @@ function TeamProjects() {
         return col.includes('progress') || col.includes('doing');
       }) || taskList[0];
 
-      const targetTaskId = targetTask?.id || `task-${proj.id}`;
+      if (!targetTask) {
+        toast.info('This team has no active tasks yet. Please create a task first.');
+        return;
+      }
+
+      const targetTaskId = targetTask.id;
 
       const rawComicTitle = proj.comicName || proj.title || 'Comic';
-      const cleanTitle = targetTask?.title || `${rawComicTitle} - Chapter 1 - Translation`;
-      const chId = targetTask?.chapterId || `ch-${proj.id}-1`;
+      const cleanTitle = targetTask.title || `${rawComicTitle} - Chapter 1 - Translation`;
+      const chId = targetTask.chapterId || `ch-${proj.id}-1`;
 
       const cacheKey = `comiverse_ws_cache_${targetTaskId}`;
       if (!sessionStorage.getItem(cacheKey)) {
@@ -2671,28 +2680,33 @@ function TeamProjects() {
           let pages = [];
           if (cachedPages) {
             pages = JSON.parse(cachedPages);
-          } else if (Array.isArray(targetTask?.pages) && targetTask.pages.length > 0) {
+          } else if (Array.isArray(targetTask.pages) && targetTask.pages.length > 0) {
             pages = targetTask.pages;
           }
 
-          if (pages.length > 0) {
-            sessionStorage.setItem(cacheKey, JSON.stringify({
-              chapter: {
-                id: chId,
-                title: cleanTitle,
-                comicTitle: rawComicTitle,
-                pagesCount: pages.length,
-                pages: pages
-              },
+          sessionStorage.setItem(cacheKey, JSON.stringify({
+            task: {
+              id: targetTaskId,
+              title: cleanTitle,
+              comicTitle: rawComicTitle,
+              chapterId: chId,
               pages: pages
-            }));
-          }
+            },
+            chapter: {
+              id: chId,
+              title: cleanTitle,
+              comicTitle: rawComicTitle,
+              pagesCount: pages.length,
+              pages: pages
+            },
+            pages: pages
+          }));
         } catch (e) {}
       }
 
       navigate(`/translator/translate-workspace/task/${targetTaskId}`);
     } catch (err) {
-      navigate(`/translator/translate-workspace/task/task-${proj.id}`);
+      toast.error('Unable to open workspace. Please try again.');
     }
   };
 

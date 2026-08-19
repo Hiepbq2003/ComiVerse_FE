@@ -818,6 +818,50 @@ html.light .profile-role-badge.project-leader {
   }
 }
 
+@media (max-width: 600px) {
+  .profile-cover-section {
+    min-height: 160px;
+    margin: 12px 12px 0;
+    border-radius: 8px;
+  }
+
+  .profile-cover-overlay {
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .profile-cover-heading,
+  .profile-cover-overlay h2 {
+    font-size: 23px;
+  }
+
+  .profile-grid-container {
+    gap: 16px;
+    margin: 16px auto 32px;
+    padding: 0 12px;
+  }
+
+  .profile-sidebar-card,
+  .profile-content-card {
+    padding: 18px;
+    border-radius: 8px;
+  }
+
+  .profile-sidebar-nav {
+    width: 100%;
+  }
+
+  .profile-sidebar-nav-btn {
+    min-height: 42px;
+  }
+
+  .profile-background-upload-btn,
+  .profile-save-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .profile-input-group {
   display: flex;
   flex-direction: column;

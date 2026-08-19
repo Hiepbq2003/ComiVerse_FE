@@ -293,9 +293,9 @@ function Explore() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '32px', marginTop: '10px' }}>
+          <div className="explore-layout" style={{ display: 'flex', gap: '32px', marginTop: '10px' }}>
             {/* ── LEFT SIDEBAR FILTERS ────────────────────── */}
-            <aside style={{ width: '220px', flexShrink: 0 }}>
+            <aside className="explore-filters" style={{ width: '220px', flexShrink: 0 }}>
 
               {/* Genres Dropdown Selector */}
               <div ref={genresDropdownRef} style={{ position: 'relative', marginBottom: '28px' }}>
@@ -746,7 +746,7 @@ function Explore() {
             </aside>
 
             {/* ── RIGHT MAIN AREA (GRID & TABS) ───────────── */}
-            <main style={{ flexGrow: 1 }}>
+            <main className="explore-results" style={{ flexGrow: 1 }}>
               {/* Header sort buttons row */}
               <div style={{ 
                 display: 'flex', 
