@@ -6,7 +6,6 @@ import { getMyReadingHistoryApi, deleteReadingHistoryComicApi } from '../../serv
 import { getMySavesApi, toggleSaveStatusApi } from '../../services/api/SaveApi'
 import { getMyLikesApi, toggleLikeStatusApi } from '../../services/api/LikeApi'
 import { getUserRatingsApi, deleteComicRatingApi } from '../../services/api/RatingApi'
-import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
 import { useAuth } from '../../context/AuthContext'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { toast } from 'react-toastify'
@@ -33,7 +32,6 @@ function Library() {
   const [likedList, setLikedList] = useState([])
   const [historyList, setHistoryList] = useState([])
   const [ratedList, setRatedList] = useState([])
-  const [groupsCount, setGroupsCount] = useState(0)
 
   // Unified Delete Confirmation Modal state
   const [deleteModal, setDeleteModal] = useState({
@@ -65,7 +63,7 @@ function Library() {
   const fetchLibraryData = async () => {
     try {
       setLoading(true)
-      const [historyData, savesData, likesData, ratingsData, projectTeamsData] = await Promise.all([
+      const [historyData, savesData, likesData, ratingsData] = await Promise.all([
         getMyReadingHistoryApi().catch(err => {
           console.error("Failed to fetch reading history:", err)
           return []
@@ -81,10 +79,6 @@ function Library() {
         getUserRatingsApi().catch(err => {
           console.error("Failed to fetch user ratings:", err)
           return []
-        }),
-        getAllProjectTeamsApi().catch(err => {
-          console.error("Failed to fetch project teams:", err)
-          return []
         })
       ])
 
@@ -92,11 +86,6 @@ function Library() {
       setSavedList(Array.isArray(savesData) ? savesData : [])
       setLikedList(Array.isArray(likesData) ? likesData : [])
       setRatedList(Array.isArray(ratingsData) ? ratingsData : (ratingsData?.data || []))
-
-      const teamsList = Array.isArray(projectTeamsData)
-        ? projectTeamsData
-        : (projectTeamsData?.data || [])
-      setGroupsCount(teamsList.length)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load library data.')
@@ -307,9 +296,7 @@ function Library() {
                 </div>
                 <div className="lib-banner-stat">
                   <span className="lib-banner-stat-label">Groups</span>
-                  <span className="lib-banner-stat-value">
-                    {groupsCount > 0 ? `${groupsCount} ${groupsCount === 1 ? 'group' : 'groups'}` : '0 groups'}
-                  </span>
+                  <span className="lib-banner-stat-value">Active Groups</span>
                 </div>
                 <button className="lib-banner-btn" onClick={() => navigate('/translator-register')}>
                   Learn More →
