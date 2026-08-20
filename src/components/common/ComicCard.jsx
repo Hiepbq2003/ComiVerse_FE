@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 
 function ComicCard({ comic }) {
   const navigate = useNavigate()
-  
+
   if (!comic) return null
 
   // Extract fields with fallbacks to handle different API schemas
@@ -15,11 +15,11 @@ function ComicCard({ comic }) {
     if (!str) return false
     return !str.includes('/') && !str.includes('.') && str.trim().length <= 4
   }
-  
+
   const rating = comic.rating !== undefined ? comic.rating : (comic.ratingAverage ?? '0.0')
   const views = comic.views || comic.viewCount || '0'
   const chapters = comic.chapters || comic.chaptersCount || comic.chapterCount || '0'
-  
+
   // Determine primary genre
   let genre = 'Fantasy'
   if (comic.genres && comic.genres.length > 0) {

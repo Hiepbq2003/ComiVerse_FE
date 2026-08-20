@@ -87,30 +87,43 @@ function ComicDetail() {
       try {
         setLoading(true)
 
+        // Step 1: Fetch comic detail by slug (or ID)
+        const comicRes = await getComicByIdApi(id, { signal })
+        const comicData = comicRes?.data || comicRes
+
+        if (!comicData || !comicData.id) {
+          throw new Error('Comic not found')
+        }
+
+        setComic(comicData)
+
+        // Clean SEO URL sync in browser address bar (if accessed via UUID)
+        if (comicData.slug && id !== comicData.slug) {
+          window.history.replaceState(null, '', `/comic/${comicData.slug}${location.search}`)
+        }
+
+        const realComicId = comicData.id
+
         // Check user login status at call time
         const auth = getAuth()
         const isLoggedIn = !!(auth && auth.user)
 
-        // Perform parallel async API calls to prevent sequential blocking
-        const [comicRes, chaptersRes, saveCheckRes, likeCheckRes, readHistoryRes, languagesRes] = await Promise.all([
-          getComicByIdApi(id, { signal }),
-          getChaptersByComicIdApi(id, { signal }),
-          isLoggedIn ? checkSaveStatusApi(id, { signal }) : Promise.resolve(null),
-          isLoggedIn ? checkLikeStatusApi(id, { signal }) : Promise.resolve(null),
-          isLoggedIn ? getReadChaptersByComicIdApi(id, { signal }) : Promise.resolve(null),
-          getComicTranslationLanguagesApi(id, { signal }).catch(() => ({ data: [] }))
+        // Step 2: Fetch all other resources using realComicId (UUID)
+        const [chaptersRes, saveCheckRes, likeCheckRes, readHistoryRes, languagesRes] = await Promise.all([
+          getChaptersByComicIdApi(realComicId, { signal }).catch(() => []),
+          isLoggedIn ? checkSaveStatusApi(realComicId, { signal }).catch(() => null) : Promise.resolve(null),
+          isLoggedIn ? checkLikeStatusApi(realComicId, { signal }).catch(() => null) : Promise.resolve(null),
+          isLoggedIn ? getReadChaptersByComicIdApi(realComicId, { signal }).catch(() => []) : Promise.resolve(null),
+          getComicTranslationLanguagesApi(realComicId, { signal }).catch(() => ({ data: [] }))
         ])
 
-        const comicData = comicRes?.data || comicRes
         const chaptersData = chaptersRes?.data || chaptersRes || []
         const languagesData = languagesRes?.data || languagesRes || []
 
-        // Save/Like check resolves to a boolean or object containing it
         const savedStatus = saveCheckRes?.data !== undefined ? saveCheckRes.data : !!saveCheckRes
         const likedStatus = likeCheckRes?.data !== undefined ? likeCheckRes.data : !!likeCheckRes
         const readHistoryData = readHistoryRes?.data || readHistoryRes || []
 
-        setComic(comicData)
         setChapters(chaptersData)
         setInLibrary(savedStatus)
         setIsLiked(likedStatus)
@@ -256,13 +269,16 @@ function ComicDetail() {
 
   const handleReadChapter1 = () => {
     const filteredChapters = chapters.filter(ch => chapterHasLanguage(ch, selectedLanguage))
-      
+
     if (filteredChapters && filteredChapters.length > 0) {
       // Find the first chapter (sorting by chapter number ascending)
       const sorted = [...filteredChapters].sort((a, b) => Number(a.chapterNumber) - Number(b.chapterNumber))
       const firstChap = sorted[0]
       const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(normalizeLanguageCode(selectedLanguage) || selectedLanguage)}` : ''
-      navigate(`/comic/${id}/chapter/${firstChap.id}${langQuery}`)
+      const comicSlugOrId = comic?.slug || id
+      const chapNum = firstChap.chapterNumber !== undefined && firstChap.chapterNumber !== null ? firstChap.chapterNumber : firstChap.id
+      const chapSlug = String(chapNum).startsWith('chapter-') ? chapNum : `chapter-${chapNum}`
+      navigate(`/comic/${comicSlugOrId}/chapter/${chapSlug}${langQuery}`)
     } else {
       toast.warning(selectedLanguage
         ? 'No translated chapters are available in this language yet.'
@@ -568,7 +584,10 @@ function ComicDetail() {
                               }
 
                               const langQuery = chapterLangQuery
-                              navigate(`/comic/${id}/chapter/${ch.id}${langQuery}`)
+                              const comicSlugOrId = comic?.slug || id
+                              const chapNum = ch.chapterNumber !== undefined && ch.chapterNumber !== null ? ch.chapterNumber : ch.id
+                              const chapSlug = String(chapNum).startsWith('chapter-') ? chapNum : `chapter-${chapNum}`
+                              navigate(`/comic/${comicSlugOrId}/chapter/${chapSlug}${langQuery}`)
                             }}
                           >
                             <div className="detail-chapter-name">

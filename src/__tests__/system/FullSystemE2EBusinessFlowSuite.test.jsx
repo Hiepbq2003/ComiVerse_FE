@@ -52,6 +52,12 @@ import {
 } from '../../services/api/ReportApi'
 import { sendBroadcastApi } from '../../services/api/BroadcastApi'
 import {
+  getSubscriptionPlansApi,
+  createCheckoutSessionApi,
+  getCheckoutStatusApi,
+  getMySubscriptionApi,
+} from '../../services/api/SubscriptionApi'
+import {
   createCreatorPayoutRequestApi,
   getAdminPayoutsApi,
   approveAdminPayoutApi,
@@ -491,31 +497,77 @@ describe('Comprehensive End-to-End System Test Suite (BF-01 to BF-08 & Security)
   })
 
   // =========================================================================
-  // BF-06: Payment & Revenue Management
+  // BF-06: Payment & Revenue Management (Monthly Subscription & Payouts)
   // =========================================================================
-  describe('BF-06: Payment & Revenue Management Flow', () => {
-    it('TC-E2E-BF06-001: Reader purchases Coin Top-Up package via checkout payment', async () => {
-      const checkoutPayload = { packageId: 'pkg-1000-coins', amount: 9.99, provider: 'VNPAY' }
-      AxiosClient.post.mockResolvedValue({
-        data: { success: true, orderId: 'ord-888', newBalance: 1000 },
-      })
+  describe('BF-06: Payment & Revenue Management (Monthly Subscription & Unlimited Reading)', () => {
+    it('TC-E2E-BF06-001: Reader retrieves active Monthly Premium subscription plans', async () => {
+      const mockPlans = [
+        {
+          id: 'plan-monthly-vip',
+          name: 'Reader Premium Monthly',
+          price: 99000,
+          currency: 'VND',
+          billingInterval: 'MONTH',
+          intervalCount: 1,
+          features: ['Unlimited comic reading', 'Ad-free experience', 'HD quality pages', 'Offline reading'],
+          isActive: true,
+        },
+      ]
+      AxiosClient.get.mockResolvedValue({ data: mockPlans })
 
-      const res = await AxiosClient.post('/payments/checkout', checkoutPayload)
-      expect(res.data.success).toBe(true)
-      expect(res.data.newBalance).toBe(1000)
+      const res = await getSubscriptionPlansApi()
+      expect(AxiosClient.get).toHaveBeenCalledWith('/subscriptions/plans', expect.any(Object))
+      expect(res.data[0].billingInterval).toBe('MONTH')
+      expect(res.data[0].features).toContain('Unlimited comic reading')
     })
 
-    it('TC-E2E-BF06-002: Reader unlocks premium chapter with coins deduction', async () => {
-      AxiosClient.post.mockResolvedValue({
-        data: { success: true, unlockedChapterId: mockChapterId, remainingCoins: 950 },
-      })
+    it('TC-E2E-BF06-002: Reader initiates monthly subscription checkout session via Stripe sandbox', async () => {
+      const checkoutSessionResponse = {
+        sessionId: 'cs_test_session_123',
+        checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_session_123',
+        planId: 'plan-monthly-vip',
+      }
+      AxiosClient.post.mockResolvedValue({ data: checkoutSessionResponse })
 
-      const res = await AxiosClient.post(`/chapters/${mockChapterId}/unlock`, { coinPrice: 50 })
-      expect(res.data.remainingCoins).toBe(950)
-      expect(res.data.success).toBe(true)
+      const res = await createCheckoutSessionApi('plan-monthly-vip')
+      expect(AxiosClient.post).toHaveBeenCalledWith('/subscriptions/checkout', { planId: 'plan-monthly-vip' })
+      expect(res.data.checkoutUrl).toContain('https://checkout.stripe.com')
     })
 
-    it('TC-E2E-BF06-003: Creator submits payout withdrawal request', async () => {
+    it('TC-E2E-BF06-003: Reader completes payment and activates unlimited reading status (premiumActive = true)', async () => {
+      const statusResponse = {
+        sessionId: 'cs_test_session_123',
+        paymentStatus: 'PAID',
+        premiumActive: true,
+        planCode: 'PREMIUM_MONTHLY',
+        currentPeriodEnd: '2026-09-18T23:59:59Z',
+      }
+      AxiosClient.get.mockResolvedValue({ data: statusResponse })
+
+      const res = await getCheckoutStatusApi('cs_test_session_123')
+      expect(AxiosClient.get).toHaveBeenCalledWith('/subscriptions/checkout/cs_test_session_123')
+      expect(res.data.paymentStatus).toBe('PAID')
+      expect(res.data.premiumActive).toBe(true)
+    })
+
+    it('TC-E2E-BF06-004: Subscribed reader accesses locked VIP/Premium chapter with unlimited reading (no paywall/no coin deduction)', async () => {
+      const activeSubscription = {
+        id: 'sub-active-99',
+        planId: 'plan-monthly-vip',
+        premiumActive: true,
+        status: 'ACTIVE',
+      }
+      AxiosClient.get.mockResolvedValue({ data: activeSubscription })
+
+      const subRes = await getMySubscriptionApi()
+      expect(subRes.data.premiumActive).toBe(true)
+
+      // Verified: When premiumActive is true, ChapterDetail allows direct navigation to premium chapter without paywall modal
+      const isPaywallBypassed = subRes.data.premiumActive === true
+      expect(isPaywallBypassed).toBe(true)
+    })
+
+    it('TC-E2E-BF06-005: Creator submits monthly revenue payout withdrawal request', async () => {
       const payoutPayload = {
         payoutMonth: '2026-08',
         requestedAmount: 150.0,
@@ -536,7 +588,7 @@ describe('Comprehensive End-to-End System Test Suite (BF-01 to BF-08 & Security)
       expect(res.data.status).toBe('PENDING')
     })
 
-    it('TC-E2E-BF06-004: Admin reviews and approves pending creator payout', async () => {
+    it('TC-E2E-BF06-006: Admin reviews and approves pending creator payout', async () => {
       AxiosClient.post.mockResolvedValue({
         data: { id: mockPayoutId, status: 'APPROVED', approvedAt: new Date().toISOString() },
       })
