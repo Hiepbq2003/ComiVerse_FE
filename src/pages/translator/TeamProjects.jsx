@@ -127,6 +127,40 @@ import RequestsTab from './RequestsTab'
 import TasksTab, { CreateTaskModal, EditTaskModal, parseTaskTitle, getTaskColumn } from './TasksTab'
 import SettingsTab, { normalizeProjectStatus } from './SettingsTab'
 
+function apiErrorMessage(err, fallback = 'Failed to save task changes. Please try again.') {
+  const data = err?.response?.data
+  const fieldErrors = data?.errors && typeof data.errors === 'object'
+    ? Object.values(data.errors).filter(Boolean).join('. ')
+    : ''
+  return fieldErrors || data?.message || err?.message || fallback
+}
+
+const MAX_ACTIVE_TASKS = 5
+
+function memberActiveTaskCount(member) {
+  return Number(member?.activeTaskCount ?? member?.activeTasksCount ?? 0)
+}
+
+function transferMemberActiveTaskCount(list, fromId, toId) {
+  if (!fromId && !toId) return list
+  if (fromId && toId && String(fromId) === String(toId)) return list
+  return (list || []).map((m) => {
+    const id = String(m.id || m.userId)
+    if (fromId && id === String(fromId)) {
+      return { ...m, activeTaskCount: Math.max(0, memberActiveTaskCount(m) - 1) }
+    }
+    if (toId && id === String(toId)) {
+      return { ...m, activeTaskCount: memberActiveTaskCount(m) + 1 }
+    }
+    return m
+  })
+}
+
+function findAssignMember(members, memberId) {
+  if (memberId == null) return null
+  return (members || []).find(m => String(m.id || m.userId) === String(memberId)) || null
+}
+
 function parseCompletedPageNumbers(value) {
   const result = new Set()
   String(value || '').split(',').map(part => part.trim()).filter(Boolean).forEach((part) => {
@@ -956,7 +990,7 @@ function WorkspaceDetailView({
         setWorkspaceTab={setWorkspaceTab}
         membersCount={members.length}
         isCurrentLeader={isCurrentLeader}
-        joinRequestsCount={joinRequests.length}
+        joinRequestsCount={joinRequests.filter(r => !r.status || r.status.toUpperCase() === 'PENDING').length}
         tasksCount={tasks.length}
       />
 
@@ -1344,7 +1378,7 @@ function TeamProjects() {
   const [openDropdownCol, setOpenDropdownCol] = useState(null)
   const [selectedTask, setSelectedTask] = useState(null)
   const [editTaskData, setEditTaskData] = useState({
-    title: '', status: 'backlog', priority: 'Medium', assigneeId: null, originalAssigneeId: null, dueDate: '', chapterRewardUsd: '', handoverCompletedPages: '', handoverFactor: '1.00', handoverReason: '', totalPages: 0
+    title: '', status: 'backlog', priority: 'Medium', assigneeId: null, originalAssigneeId: null, dueDate: '', chapterRewardUsd: '', handoverCompletedPages: '', handoverFactor: '1.00', totalPages: 0
   })
 
   const [members, setMembers] = useState([])
@@ -1687,7 +1721,10 @@ function TeamProjects() {
       setTasksLoading(false);
 
       const mappedRequests = (Array.isArray(reqList) ? reqList : [])
-        .filter(r => r && (!r.status || r.status.toUpperCase() === 'PENDING'))
+        .filter(r => {
+          const status = (r?.status || 'PENDING').toUpperCase()
+          return status === 'PENDING'
+        })
         .map(r => ({ ...r, roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles }));
       setJoinRequests(mappedRequests)
 
@@ -2282,7 +2319,7 @@ function TeamProjects() {
 
     try {
       await decideTeamRequestApi(reqId, 'rejected')
-      setJoinRequests(prev => prev.filter(req => req.id !== reqId))
+      setJoinRequests(prev => prev.filter(req => String(req.id) !== String(reqId)))
       toast.info(`Rejected request from ${reqName}.`)
     } catch (err) {
       console.error(err)
@@ -2358,6 +2395,11 @@ function TeamProjects() {
       toast.error('Please select a chapter.')
       return
     }
+    const assigneeMember = findAssignMember(teamMembersForAssign, data.assigneeId)
+    if (data.assigneeId && memberActiveTaskCount(assigneeMember) >= MAX_ACTIVE_TASKS) {
+      toast.error(`This translator already has ${MAX_ACTIVE_TASKS} incomplete tasks across all projects.`)
+      return
+    }
     
 
     const comicName = selectedDetails?.comicName || selectedDetails?.title || 'Unknown Comic'
@@ -2417,6 +2459,15 @@ function TeamProjects() {
     }
 
     toast.success('Task created successfully!')
+    if (data.assigneeId) {
+      const bump = (list) => list.map(m =>
+        String(m.id || m.userId) === String(data.assigneeId)
+          ? { ...m, activeTaskCount: memberActiveTaskCount(m) + 1 }
+          : m
+      )
+      setTeamMembersForAssign(prev => bump(prev))
+      setMembers(prev => bump(prev))
+    }
   }
 
   const handleMoveTask = async (id, newCol) => {
@@ -2452,7 +2503,6 @@ function TeamProjects() {
       chapterRewardUsd: task.chapterRewardUsd ?? '',
       handoverCompletedPages: '',
       handoverFactor: '1.00',
-      handoverReason: '',
       totalPages: Number(task.totalPages || 0),
       taskId: task.id || task._id || task.taskId || task.TaskID || 'KHONG-TIM-THAY-ID'
     })
@@ -2481,6 +2531,15 @@ function TeamProjects() {
 
     try {
       const assigneeChanged = String(editTaskData.originalAssigneeId || '') !== String(editTaskData.assigneeId || '')
+      if (assigneeChanged) {
+        const nextAssignee = findAssignMember(teamMembersForAssign, editTaskData.assigneeId)
+        const isOriginalAssignee = String(editTaskData.originalAssigneeId || '') === String(editTaskData.assigneeId || '')
+        if (!isOriginalAssignee && memberActiveTaskCount(nextAssignee) >= MAX_ACTIVE_TASKS) {
+          toast.error(`This translator already has ${MAX_ACTIVE_TASKS} incomplete tasks across all projects.`)
+          setTasks(previousTasks)
+          return
+        }
+      }
       await updateTeamTaskApi(targetId, {
         title: formattedTitle,
         assigneeId: assigneeChanged ? editTaskData.originalAssigneeId : editTaskData.assigneeId,
@@ -2488,21 +2547,23 @@ function TeamProjects() {
       })
 
       if (assigneeChanged) {
-        if (!String(editTaskData.handoverReason || '').trim()) {
-          throw new Error('A handover reason is required when changing the assignee.')
-        }
         await handoverTeamTaskApi(targetId, {
           newAssigneeId: editTaskData.assigneeId,
           completedPageNumbers: parseCompletedPageNumbers(editTaskData.handoverCompletedPages),
           responsibilityFactor: Number(editTaskData.handoverFactor || 1),
-          reason: String(editTaskData.handoverReason).trim()
+          reason: 'Reassigned'
         })
       }
     } catch (err) {
       console.error('Backend updateTeamTaskApi error, reverting edit:', err)
-      toast.error(err?.response?.data?.message || err?.message || 'Failed to save task changes. Please try again.')
+      toast.error(apiErrorMessage(err))
       setTasks(previousTasks)
       return
+    }
+
+    if (assigneeChanged) {
+      setTeamMembersForAssign(prev => transferMemberActiveTaskCount(prev, editTaskData.originalAssigneeId, editTaskData.assigneeId))
+      setMembers(prev => transferMemberActiveTaskCount(prev, editTaskData.originalAssigneeId, editTaskData.assigneeId))
     }
 
     toast.success('Task updated successfully!')

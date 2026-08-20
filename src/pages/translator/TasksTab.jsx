@@ -21,6 +21,33 @@ import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { resolveImageUrl } from '../../config/apiConfig';
 import "../../assets/style/moderator/comic-detail.css";
 
+const MAX_ACTIVE_TASKS = 5
+
+function assigneeTaskCount(member) {
+  return Number(member?.activeTaskCount ?? member?.activeTasksCount ?? 0)
+}
+
+function sameMemberId(a, b) {
+  return a != null && b != null && String(a) === String(b)
+}
+
+function displayedAssigneeTaskCount(member, selectedId, heldAssigneeId) {
+  const base = assigneeTaskCount(member)
+  const memberId = member?.id || member?.userId
+  if (memberId == null) return base
+  if (heldAssigneeId == null || sameMemberId(heldAssigneeId, selectedId)) return base
+  if (sameMemberId(memberId, heldAssigneeId)) return Math.max(0, base - 1)
+  if (sameMemberId(memberId, selectedId)) return base + 1
+  return base
+}
+
+function isAssigneeAtSystemTaskCap(member, selectedId, heldAssigneeId) {
+  if (!member) return false
+  const memberId = member.id || member.userId
+  if (memberId == null) return false
+  if (sameMemberId(selectedId, memberId) || sameMemberId(heldAssigneeId, memberId)) return false
+  return displayedAssigneeTaskCount(member, selectedId, heldAssigneeId) >= MAX_ACTIVE_TASKS
+}
 
 export function parseTaskTitle(title, fallbackComic) {
   const match = (title || '').match(/^\[(URGENT|HIGH|MEDIUM|LOW)\]\s*(?:\[([^\]]+)\])?\s*(.*)$/i)
@@ -1411,7 +1438,7 @@ function ChapterDropdownPicker({ options, selectedId, onChange, disabled, emptyL
   );
 }
 
-function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, readOnly = false, allowEmpty = false }) {
+function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, readOnly = false, allowEmpty = false, heldAssigneeId = null }) {
   // Allow all members, including leaders, to be selected as assignees
   const assignableCandidates = candidates || [];
 
@@ -1487,14 +1514,26 @@ function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, read
         const displayName = m.fullName || m.name || m.username || 'User';
         const initial = (m.avatar && m.avatar.length <= 3 ? m.avatar : displayName.charAt(0)).toUpperCase();
         const roleLabel = m.role || (m.isLeader ? 'Leader' : 'Member');
+        const taskCount = displayedAssigneeTaskCount(m, selectedId, heldAssigneeId);
+        const atCap = isAssigneeAtSystemTaskCap(m, selectedId, heldAssigneeId);
 
         return (
           <button
             key={memberId}
             type="button"
             className={`trans-assignee-chip${isSelected ? ' selected' : ''}`}
-            onClick={() => !readOnly && onSelect && onSelect(isSelected ? (allowEmpty ? null : memberId) : memberId)}
-            style={chipStyle(isSelected)}
+            onClick={() => {
+              if (readOnly) return
+              if (atCap) return
+              onSelect && onSelect(isSelected ? (allowEmpty ? null : memberId) : memberId)
+            }}
+            disabled={atCap}
+            title={atCap ? `Already has ${MAX_ACTIVE_TASKS} incomplete tasks across all projects` : undefined}
+            style={{
+              ...chipStyle(isSelected),
+              opacity: atCap ? 0.45 : 1,
+              cursor: readOnly ? 'default' : (atCap ? 'not-allowed' : 'pointer')
+            }}
           >
             <span
               style={{
@@ -1519,11 +1558,9 @@ function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, read
 
             <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: '1.2' }}>
               <span style={{ fontSize: '13px', fontWeight: 600 }}>{displayName}</span>
-              {roleLabel && (
-                <span style={{ fontSize: '10px', color: isSelected ? '#c084fc' : 'var(--trans-text-muted)', fontWeight: 500 }}>
-                  {roleLabel}
-                </span>
-              )}
+              <span style={{ fontSize: '10px', color: isSelected ? '#c084fc' : 'var(--trans-text-muted)', fontWeight: 500 }}>
+                {roleLabel}{atCap ? ` · ${taskCount}/${MAX_ACTIVE_TASKS} full` : ` · ${taskCount}/${MAX_ACTIVE_TASKS}`}
+              </span>
             </span>
 
             {isSelected && (
@@ -1799,7 +1836,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   const currentUserId = auth?.user?.id || auth?.user?.userId;
 
   const isAssigned = (() => {
-    const id = editTaskData.assigneeId;
+    const id = editTaskData.originalAssigneeId;
     if (!id) return false;
     if (currentUserId && String(id) === String(currentUserId)) return true;
     if (typeof id === 'string' && id.toLowerCase().trim() === currentUserName) return true;
@@ -1906,6 +1943,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                 <AssigneeChipPicker
                   candidates={teamMembersForAssign}
                   selectedId={editTaskData.assigneeId}
+                  heldAssigneeId={editTaskData.originalAssigneeId}
                   onSelect={selectAssignee}
                   error={showError('assigneeId')}
                 />
@@ -2013,9 +2051,9 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
             <button
               className="trans-btn primary"
               onClick={handleOpenWorkspaceClick}
-              title={isEditableByMember ? "Open translate workspace" : "View translate workspace in read-only mode"}
+              title={isAssigned ? "Open translate workspace" : "View translate workspace in read-only mode"}
             >
-              <StepForward />{isEditableByMember ? 'Open Workspace' : 'View Workspace (Read Only)'}
+              <StepForward />{isAssigned ? 'Open Workspace' : 'View Workspace (Read Only)'}
             </button>
           )}
 

@@ -44,9 +44,11 @@ function RequestsTab({ joinRequests = [], onApprove, onReject, onBan }) {
     }
   };
 
-  const pendingRequests = (Array.isArray(joinRequests) ? joinRequests : []).filter(
-    r => r && (!r.status || r.status.toUpperCase() === 'PENDING')
-  );
+  const pendingRequests = (Array.isArray(joinRequests) ? joinRequests : []).filter(r => {
+    if (!r) return false;
+    const status = (r.status || 'PENDING').toUpperCase();
+    return status === 'PENDING';
+  });
 
   return (
     <div className="join-requests-tab-container fade-in">
@@ -235,7 +237,11 @@ function RequestsTab({ joinRequests = [], onApprove, onReject, onBan }) {
 
               {/* Actions */}
               <div className="request-actions-row" style={{ display: 'flex', gap: '8px' }}>
-                <button className="trans-btn primary" onClick={() => onApprove(req.id, req.name, req)} style={{ padding: '8px 20px', fontWeight: '700' }}>
+                <button
+                  className="trans-btn primary"
+                  onClick={() => onApprove(req.id, req.name, req)}
+                  style={{ padding: '8px 20px', fontWeight: '700' }}
+                >
                   ✓ Approve
                 </button>
                 <button
