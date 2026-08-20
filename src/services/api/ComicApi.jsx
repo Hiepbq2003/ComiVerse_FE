@@ -28,17 +28,17 @@ export const getComicsPageApi = (page = 1, size = 10, search = '') => {
 };
 
 export const updateComicApi = async (id, data) => {
-    const cid = cleanComicId(id);
-    const formattedData = { ...data };
-    
-    if (data.publicationStatus || data.status) {
-      const statusValue = (data.publicationStatus || data.status).toUpperCase();
-      formattedData.status = statusValue;
-      formattedData.publicationStatus = statusValue;
-    }
-  
-    try {
-      const res = await AxiosClient.put(`/comics/${cid}`, formattedData);
+  const cid = cleanComicId(id);
+  const formattedData = { ...data };
+
+  if (data.publicationStatus || data.status) {
+    const statusValue = (data.publicationStatus || data.status).toUpperCase();
+    formattedData.status = statusValue;
+    formattedData.publicationStatus = statusValue;
+  }
+
+  try {
+    const res = await AxiosClient.put(`/comics/${cid}`, formattedData);
     return res;
   } catch (e) {
     console.error("PUT /comics/{id} failed with error:", e.response?.data || e);
@@ -62,6 +62,15 @@ export const getComicLeaderboardApi = (params, config = {}) => {
   return AxiosClient.get('/comics/leaderboard', { params, ...config });
 };
 
-export const getComicByIdApi = (id, config = {}) => {
-  return AxiosClient.get(`/comics/${cleanComicId(id)}`, config);
+export const getComicByIdApi = async (idOrSlug, config = {}) => {
+  const cleanId = cleanComicId(idOrSlug);
+  if (!cleanId) return null;
+
+  try {
+    // Primary API: GET /api/v2/comics/{slugOrId}
+    return await AxiosClient.get(`/v2/comics/${cleanId}`, config);
+  } catch (err) {
+    // Fallback API: GET /api/comics/{id}
+    return await AxiosClient.get(`/comics/${cleanId}`, config);
+  }
 };

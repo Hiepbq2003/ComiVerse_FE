@@ -76,7 +76,7 @@ function Ranking() {
   const activeComics = comics || []
   const featuredComic = activeComics[0]
   const rightListComics = activeComics.slice(1)
-  
+
   const totalPages = Math.ceil(rightListComics.length / ITEMS_PER_PAGE)
   const paginatedRightList = rightListComics.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
@@ -133,7 +133,7 @@ function Ranking() {
               <h2 className="section-title">Trending Now</h2>
               <span className="section-subtitle">Most read and active series on ComiVerse today</span>
             </div>
-            
+
             {/* Timeframe selector bar */}
             <div style={{
               display: 'flex',
