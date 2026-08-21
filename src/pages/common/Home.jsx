@@ -87,22 +87,22 @@ function Home() {
       if (savedLocal) {
         const parsed = JSON.parse(savedLocal);
         const merged = { ...comic, ...parsed };
-        
+
         // Don't let an older local timestamp overwrite a fresh one
         if (comic.lastChapterUpdatedAt && parsed.lastChapterUpdatedAt) {
           if (new Date(comic.lastChapterUpdatedAt) > new Date(parsed.lastChapterUpdatedAt)) {
             merged.lastChapterUpdatedAt = comic.lastChapterUpdatedAt;
           }
         }
-        
+
         // Don't let older local chapters override the freshly merged chapters
         if (comic.chaptersList && (!parsed.chaptersList || parsed.chaptersList.length < comic.chaptersList.length)) {
           merged.chaptersList = comic.chaptersList;
         }
-        
+
         return merged;
       }
-    } catch(e) {}
+    } catch (e) { }
     return comic;
   };
 
@@ -135,7 +135,7 @@ function Home() {
       }
 
       const res = await getComicRecommendationsApi(params, { signal })
-      
+
       let newList = []
       let newNextCursor = null
       let newNextReferenceId = null
@@ -255,7 +255,7 @@ function Home() {
             subs.forEach(sub => {
               const comicTitle = (sub.title || sub.comicTitle || sub.comicName).trim();
               const stableId = sub.comicId || (sub.id ? `comic-${sub.id}` : (sub.submissionId ? `comic-${sub.submissionId}` : `comic-${comicTitle.replace(/\s+/g, '-').toLowerCase()}`));
-              
+
               let chapsList = Array.isArray(sub.allChapters) ? sub.allChapters : (Array.isArray(sub.chapters) ? (typeof sub.chapters[0] === 'object' ? sub.chapters : []) : []);
               if (chapsList.length === 0 && (sub.chapterNumber || sub.number)) {
                 chapsList = [{
@@ -288,7 +288,7 @@ function Home() {
               }
             });
           }
-        } catch(e) {}
+        } catch (e) { }
 
         exploreList = exploreList.map(syncWithLocalOverride).filter(c => !c.archived);
         exploreList.sort((a, b) => new Date(b.lastChapterUpdatedAt || 0) - new Date(a.lastChapterUpdatedAt || 0));
@@ -306,12 +306,12 @@ function Home() {
           const resolved = await Promise.all(
             exploreList.map(async (comic) => {
               if (comic.chaptersList && comic.chaptersList.length > 0) {
-                 const chaps = comic.chaptersList.slice(-2).reverse().map(ch => ({
-                   id: ch.id || ch.chapterId,
-                   num: `Ch. ${ch.chapterNumber || ch.number || ''}`,
-                   time: formatTimeAgo(ch.createdAt || comic.lastChapterUpdatedAt)
-                 }));
-                 return { ...comic, chapters: chaps }
+                const chaps = comic.chaptersList.slice(-2).reverse().map(ch => ({
+                  id: ch.id || ch.chapterId,
+                  num: `Ch. ${ch.chapterNumber || ch.number || ''}`,
+                  time: formatTimeAgo(ch.createdAt || comic.lastChapterUpdatedAt)
+                }));
+                return { ...comic, chapters: chaps }
               }
 
               try {
@@ -576,8 +576,8 @@ function Home() {
           ) : (
             <div className="recommended-slider-container">
               {/* Back button */}
-              <button 
-                className="slider-nav-btn prev-btn" 
+              <button
+                className="slider-nav-btn prev-btn"
                 onClick={handlePrev}
                 disabled={currentIndex === 0}
                 aria-label="Previous recommendations"
@@ -589,7 +589,7 @@ function Home() {
 
               {/* Slider Viewport */}
               <div className="recommended-slider-viewport">
-                <div 
+                <div
                   className="recommended-slider-track"
                   style={{
                     transform: `translateX(calc(-${currentIndex} * ((100% - ${(visibleItems - 1) * 20}px) / ${visibleItems} + 20px)))`
@@ -604,8 +604,8 @@ function Home() {
               </div>
 
               {/* Next button */}
-              <button 
-                className="slider-nav-btn next-btn" 
+              <button
+                className="slider-nav-btn next-btn"
                 onClick={handleNext}
                 disabled={(currentIndex >= recommended.length - visibleItems && !hasMore) || (currentIndex >= recommended.length - visibleItems && loadingMore)}
                 aria-label="Next recommendations"

@@ -10,6 +10,11 @@ export function isDevToolsOpenSync() {
     return false
   }
 
+  // Skip pre-flight check if tab is currently hidden or not focused
+  if (document.hidden || !document.hasFocus()) {
+    return false
+  }
+
   // Method 1: Docked dimension threshold
   const threshold = 160
   const widthDiff = window.outerWidth - window.innerWidth
@@ -27,7 +32,7 @@ export function isDevToolsOpenSync() {
     // Ignore CSP errors
   }
   const duration = performance.now() - start
-  if (duration > 100) {
+  if (duration > 150) {
     return true
   }
 
@@ -236,20 +241,24 @@ function useReaderSecurity({ onDevToolsOpen, disableDetector = false, targetElem
       }
     }
 
-    const detect = () => {
-      if (isDevToolsTriggered) return
+    const handleVisibilityChange = () => {
+      // Reset frame timing when tab visibility changes to prevent false positives
+      lastFrameTime = performance.now()
+    }
 
-      // Method 1: Docked Window Size Threshold
+    const detect = () => {
+      if (isDevToolsTriggered || document.hidden) return
+
+      // Method 1: Docked Window Size Threshold (Only trigger if document has focus)
       const threshold = 160
       const widthDiff = window.outerWidth - window.innerWidth
       const heightDiff = window.outerHeight - window.innerHeight
-      if (widthDiff > threshold || heightDiff > threshold) {
+      if ((widthDiff > threshold || heightDiff > threshold) && document.hasFocus()) {
         triggerDetected()
         return
       }
 
       // Method 2: Debugger Timing (for undocked / standalone DevTools)
-      // Use dynamic constructor so Vite/esbuild minifier does not strip it during build
       const start = performance.now()
       try {
         const debugFn = (function () {}).constructor('debugger')
@@ -259,7 +268,7 @@ function useReaderSecurity({ onDevToolsOpen, disableDetector = false, targetElem
       }
       const end = performance.now()
 
-      if (end - start > 100) {
+      if (end - start > 150 && document.hasFocus()) {
         triggerDetected()
         return
       }
@@ -273,21 +282,27 @@ function useReaderSecurity({ onDevToolsOpen, disableDetector = false, targetElem
         },
         configurable: true
       })
-      // Trigger evaluation in console if active
       if (console && console.debug) {
         console.debug(element)
       }
     }
 
-    // Method 4: Continuous RequestAnimationFrame delta loop (catches undocked debugger pauses in real-time)
+    // Method 4: Continuous RequestAnimationFrame delta loop (catches undocked debugger pauses)
     const runFrameLoop = () => {
       if (isDevToolsTriggered) return
+
+      // Pause timing check if tab is hidden (prevent false positives when switching apps/tabs)
+      if (document.hidden) {
+        lastFrameTime = performance.now()
+        animationFrameId = requestAnimationFrame(runFrameLoop)
+        return
+      }
 
       const currentTime = performance.now()
       const delta = currentTime - lastFrameTime
 
-      // If execution was halted by debugger in DevTools for > 250ms between frames
-      if (delta > 250 && lastFrameTime > 0) {
+      // If execution was halted by debugger in DevTools for > 400ms between frames while active
+      if (delta > 400 && lastFrameTime > 0 && document.hasFocus()) {
         triggerDetected()
         return
       }
@@ -307,8 +322,9 @@ function useReaderSecurity({ onDevToolsOpen, disableDetector = false, targetElem
     // Run frame loop
     animationFrameId = requestAnimationFrame(runFrameLoop)
 
-    // Also run on window resize (e.g., when dock is toggled)
+    // Event listeners for window resize & visibility change
     window.addEventListener('resize', detect)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
       clearInterval(intervalId)
@@ -316,6 +332,7 @@ function useReaderSecurity({ onDevToolsOpen, disableDetector = false, targetElem
         cancelAnimationFrame(animationFrameId)
       }
       window.removeEventListener('resize', detect)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [disableDetector, targetElementId])
 }

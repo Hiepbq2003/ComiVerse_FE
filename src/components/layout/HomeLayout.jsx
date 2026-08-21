@@ -69,10 +69,10 @@ function HomeLayout({ children }) {
   const handleNotificationClick = async (notification) => {
     const text = `${notification.title || ''} ${notification.message || ''}`.toLowerCase();
     const isTeamNotif = text.includes('assigned as project leader') || text.includes('team join request');
-    
+
     const actionUrl = notification.actionUrl
     const hasNavigation = typeof actionUrl === 'string' && actionUrl.startsWith('/') && !actionUrl.startsWith('//')
-    
+
     try {
       await handleMarkAsRead(notification.id, notification.isRead)
     } finally {
@@ -81,7 +81,7 @@ function HomeLayout({ children }) {
         navigate(actionUrl)
       } else if (isTeamNotif) {
         setShowNotificationDropdown(false)
-        
+
         let teamName = null;
         const messageRaw = notification.message || '';
         if (text.includes('assigned as project leader')) {
@@ -241,7 +241,7 @@ function HomeLayout({ children }) {
         lastScrollY.current = currentScrollY
         return
       }
-      
+
       if (currentScrollY > lastScrollY.current && currentScrollY > 80) {
         setIsHeaderVisible(false)
       } else {
