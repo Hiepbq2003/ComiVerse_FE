@@ -776,7 +776,7 @@ function ChapterDetail() {
         }}>
           <CommentSection
             targetType="chapter"
-            targetId={chapterId}
+            targetId={currentChapter?.id || chapterId}
             user={user}
             targetCommentIdFromUrl={targetCommentIdFromUrl}
           />

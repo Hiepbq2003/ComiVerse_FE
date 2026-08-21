@@ -616,7 +616,7 @@ function ComicDetail() {
               {activeTab === 'comments' && (
                 <CommentSection
                   targetType="comic"
-                  targetId={id}
+                  targetId={comic?.id || id}
                   user={user}
                   targetCommentIdFromUrl={targetCommentIdFromUrl}
                 />
