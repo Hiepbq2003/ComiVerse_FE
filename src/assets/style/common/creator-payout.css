@@ -193,7 +193,7 @@
   .creator-status-chart { justify-content: flex-start; }
 }
 
-/* USD/EUR/CNY payout compatibility */
+/* Creator payout layout */
 .creator-payout-country select {
   width: 100%;
   box-sizing: border-box;

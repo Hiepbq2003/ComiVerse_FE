@@ -20,6 +20,13 @@ const formatDate = (value) => {
     : parsed.toLocaleString('en-US')
 }
 
+const formatUnits = (value) => (
+  (Number(value) || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+  })
+)
+
 const formatMonthLabel = (monthStr) => {
   if (!monthStr) return ''
   const [year, month] = monthStr.split('-').map(Number)
@@ -86,14 +93,10 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
 
   const role = (overview?.role || '').toUpperCase()
   const isTranslator = role === 'TRANSLATOR'
-  const currency = overview?.payoutCurrency
-    || overview?.account?.currency
-    || 'USD'
-  const unitsPerUsd = Number(overview?.payoutUnitsPerUsd) || 1
-
+  const currency = 'USD'
   const convertUsd = useCallback((value) => (
-    (Number(value) || 0) * unitsPerUsd
-  ), [unitsPerUsd])
+    Number(value) || 0
+  ), [])
 
   const tasks = Array.isArray(overview?.translatorTasks)
     ? overview.translatorTasks
@@ -134,10 +137,10 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
       const rows = comics.map(comic => [
         comic.comicTitle,
         Number(comic.monthlyViews || 0),
-        Number(comic.viewUnits || 0),
+        formatUnits(comic.viewUnits),
         formatMoney(convertUsd(comic.viewRevenueUsd), currency),
         Number(comic.monthlyFollows || 0),
-        Number(comic.followUnits || 0),
+        formatUnits(comic.followUnits),
         formatMoney(convertUsd(comic.followRevenueUsd), currency),
         formatMoney(convertUsd(comic.totalRevenueUsd), currency)
       ])
@@ -225,7 +228,7 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
         </div>
         <div className="creator-payout-card">
           <span>{isTranslator ? 'Credited pages' : 'Reward units'}</span>
-          <strong>{Number(overview?.calculationUnitCount) || 0}</strong>
+          <strong>{formatUnits(overview?.calculationUnitCount)}</strong>
           <small>{overview?.calculationUnitLabel || 'units'}</small>
         </div>
         {isTranslator ? (
@@ -252,7 +255,7 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
               )}
             </strong>
             <small>
-              Every {Number(overview?.authorViewsPerUnit || 0).toLocaleString('en-US')} views / comic
+              Rate basis: {Number(overview?.authorViewsPerUnit || 0).toLocaleString('en-US')} views / comic; partial units paid
             </small>
           </div>
         )}
@@ -274,7 +277,7 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
               )}
             </strong>
             <small>
-              Every {Number(overview?.authorFollowsPerUnit || 0).toLocaleString('en-US')} follows / comic
+              Rate basis: {Number(overview?.authorFollowsPerUnit || 0).toLocaleString('en-US')} follows / comic; partial units paid
             </small>
           </div>
         )}
@@ -361,13 +364,7 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
               ? `Available balance: ${formatMoney(overview?.availableBalanceAmount, currency)}`
               : `Monthly cap: ${formatMoney(overview?.monthlyLimitAmount, currency)}`}
           </span>
-          <span>Accounting currency: USD</span>
-          <span>Display/transfer currency: {currency}</span>
-          <span>
-            Conversion rate: 1 USD = {unitsPerUsd.toLocaleString('en-US', {
-              maximumFractionDigits: 6,
-            })} {currency}
-          </span>
+          <span>Accounting & transfer currency: USD</span>
         </div>
       </div>
 
@@ -429,8 +426,7 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
         <div className="creator-payout-card creator-payout-history">
           <h3>Comic revenue breakdown</h3>
           <p>
-            View and follow reward units are rounded down and calculated
-            separately for every comic.
+            View and follow rewards are calculated proportionally for every comic. Partial units are paid instead of being rounded down.
           </p>
           <div className="creator-payout-table-wrap">
             <table className="creator-payout-table creator-payout-table--wide">
@@ -460,7 +456,7 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
                       {Number(comic.monthlyViews || 0).toLocaleString('en-US')}
                     </td>
                     <td>
-                      {Number(comic.viewUnits || 0).toLocaleString('en-US')}
+                      {formatUnits(comic.viewUnits)}
                     </td>
                     <td>
                       {formatMoney(
@@ -472,7 +468,7 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
                       {Number(comic.monthlyFollows || 0).toLocaleString('en-US')}
                     </td>
                     <td>
-                      {Number(comic.followUnits || 0).toLocaleString('en-US')}
+                      {formatUnits(comic.followUnits)}
                     </td>
                     <td>
                       {formatMoney(

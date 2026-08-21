@@ -19,13 +19,13 @@ const FREE_FEATURES = [
   { label: 'Unlimited chapters/day', enabled: false }
 ]
 
-function formatPrice(value, currency = 'VND') {
+function formatPrice(value, currency = 'USD') {
   const amount = Number(value || 0)
   try {
-    return new Intl.NumberFormat(currency === 'VND' ? 'vi-VN' : 'en-US', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency,
-      maximumFractionDigits: currency === 'VND' ? 0 : 2
+      maximumFractionDigits: 2
     }).format(amount)
   } catch {
     return `${amount.toLocaleString()} ${currency}`
@@ -220,7 +220,7 @@ function SubscriptionPlanModal({ open, onClose }) {
                   <span className="subscription-plan-icon"><Zap size={21} /></span>
                   <h3>Free</h3>
                 </div>
-                <div className="subscription-plan-price">0 VND</div>
+                <div className="subscription-plan-price">$0.00</div>
                 <p className="subscription-plan-period">forever</p>
                 <div className="subscription-plan-divider" />
                 <ul className="subscription-feature-list">
