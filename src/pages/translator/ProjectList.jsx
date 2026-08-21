@@ -1,15 +1,18 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Filter, BookOpen, Users, Calendar, User, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { Search, Filter, BookOpen, Users, Calendar, User, AlertCircle, ClipboardList } from 'lucide-react';
 import { toast } from 'react-toastify';
 import '../../assets/style/translator/project-list.css';
 import { getAllProjectTeamsApi, getMyProjectTeamsApi } from '../../services/api/ProjectTeamApi';
-import { createTeamRequestApi, getRequestsByNameApi, cancelTeamRequestApi, getMyApplicationStatusApi } from '../../services/api/TeamWorkspaceApi';
+import { createTeamRequestApi, cancelTeamRequestApi, getMyApplicationStatusApi } from '../../services/api/TeamWorkspaceApi';
 import { uploadFileApi } from '../../services/api/UploadApi';
 import { getMyTranslatorProfileApi } from '../../services/api/TranslatorApi';
 import { getAuth } from '../../utils/Auth';
+import { useNotification } from '../../context/NotificationContext';
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages';
 
 const MAX_ACTIVE_PROJECTS = 5;
+const MAX_ACTIVE_TASKS = 5;
 
 function ProjectList() {
   const [projects, setProjects] = useState([]);
@@ -41,93 +44,108 @@ function ProjectList() {
   const authUser = auth?.user;
   const userFullName = authUser?.fullName || authUser?.username || 'Translator';
   const isUserProjectLeader = (authUser?.role || '').toUpperCase() === 'PROJECT_LEADER' || (authUser?.role || '').toUpperCase().includes('LEADER');
+  const { notifications } = useNotification();
+  const location = useLocation();
 
-  const fetchProjectsAndRequests = async (silent = false) => {
+  const applyPendingFromStatus = useCallback((statusData) => {
+    const applications = Array.isArray(statusData?.applications) ? statusData.applications : [];
+    const pendingFromApplications = applications.filter(item => {
+      const status = String(item?.status || 'PENDING').trim().toUpperCase();
+      return status === 'PENDING';
+    });
+    const details = pendingFromApplications.length > 0 || applications.length > 0
+      ? pendingFromApplications
+      : (Array.isArray(statusData?.pendingDetails) ? statusData.pendingDetails : []);
+
+    const appIds = [];
+    const reqMap = {};
+
+    details.forEach(item => {
+      const status = String(item?.status || 'PENDING').trim().toUpperCase();
+      if (status !== 'PENDING') return;
+      const teamId = item?.projectTeamId != null ? String(item.projectTeamId) : '';
+      if (!teamId) return;
+      appIds.push(teamId);
+      if (item.requestId) reqMap[teamId] = item.requestId;
+    });
+
+    setAppliedIds(appIds);
+    setAppliedRequestMap(reqMap);
+    if (statusData) setAppStatus(statusData);
+  }, []);
+
+  const refreshApplicationStatus = useCallback(async () => {
     try {
-      if (!silent && projects.length === 0) setLoading(true);
-      const [projectsData, requestsData, statusData] = await Promise.all([
-        getAllProjectTeamsApi(),
-        getRequestsByNameApi(userFullName).catch(() => []),
-        getMyApplicationStatusApi().catch(() => null)
-      ]);
-      const projList = Array.isArray(projectsData) ? projectsData : [];
-      const requestsList = Array.isArray(requestsData) ? requestsData : [];
-
-      let appIds = [];
-      const reqMap = {};
-
-      if (statusData && Array.isArray(statusData.pendingDetails) && statusData.pendingDetails.length > 0) {
-        statusData.pendingDetails.forEach(item => {
-          if (item.projectTeamId) {
-            appIds.push(item.projectTeamId);
-            if (item.requestId) {
-              reqMap[item.projectTeamId] = item.requestId;
-            }
-          }
-        });
-      } else {
-        requestsList.forEach(req => {
-          const s = (req.status || '').toUpperCase();
-          if (s === 'PENDING') {
-            appIds.push(req.projectTeamId);
-            reqMap[req.projectTeamId] = req.id;
-          }
-        });
-      }
-
-      setProjects(projList);
-      setAppliedIds(appIds);
-      setAppliedRequestMap(reqMap);
-      if (statusData) setAppStatus(statusData);
-
-      try {
-        sessionStorage.setItem('comiverse_available_projects_cache', JSON.stringify({
-          projects: projList,
-          appliedIds: appIds
-        }));
-      } catch (e) {}
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+      const statusData = await getMyApplicationStatusApi();
+      if (statusData) applyPendingFromStatus(statusData);
+    } catch (e) {}
+  }, [applyPendingFromStatus]);
 
   useEffect(() => {
-    let hasCache = false;
-    try {
-      const cached = sessionStorage.getItem('comiverse_available_projects_cache');
-      if (cached) {
-        const { projects: cProjects, appliedIds: cApplied } = JSON.parse(cached);
-        if (Array.isArray(cProjects) && cProjects.length > 0) {
-          setProjects(cProjects);
-          if (Array.isArray(cApplied)) setAppliedIds(cApplied);
-          setLoading(false);
-          hasCache = true;
-        }
-      }
-    } catch (e) {}
+    let cancelled = false;
 
-    fetchProjectsAndRequests(hasCache);
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [projectsData, statusData, myProjects] = await Promise.all([
+          getAllProjectTeamsApi(),
+          getMyApplicationStatusApi().catch(() => null),
+          getMyProjectTeamsApi().catch(() => []),
+        ]);
+        if (cancelled) return;
+
+        const projList = Array.isArray(projectsData) ? projectsData : [];
+        const myTeams = Array.isArray(myProjects) ? myProjects : [];
+
+        setProjects(projList);
+        applyPendingFromStatus(statusData);
+        setMyProjectTeams(myTeams);
+        setActiveProjectsCount(
+          myTeams.filter(p => p.status && p.status.toUpperCase() !== 'COMPLETED').length
+        );
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
 
     getMyTranslatorProfileApi()
       .then(profile => {
-        if (profile) setTranslatorProfile(profile);
+        if (!cancelled && profile) setTranslatorProfile(profile);
       })
       .catch(() => {});
 
-    // Load số projects user đang tham gia / làm leader để kiểm tra giới hạn
-    getMyProjectTeamsApi()
-      .then(myProjects => {
-        const projList = Array.isArray(myProjects) ? myProjects : [];
-        setMyProjectTeams(projList);
-        const activeCount = projList.filter(
-          p => p.status && p.status.toUpperCase() !== 'COMPLETED'
-        ).length;
-        setActiveProjectsCount(activeCount);
-      })
-      .catch(() => {});
-  }, [userFullName]);
+    return () => {
+      cancelled = true;
+    };
+  }, [userFullName, applyPendingFromStatus, location.pathname, location.key]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        refreshApplicationStatus();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    const intervalId = window.setInterval(refreshApplicationStatus, 4000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+      window.clearInterval(intervalId);
+    };
+  }, [refreshApplicationStatus]);
+
+  useEffect(() => {
+    const latest = notifications?.[0];
+    if (!latest) return;
+    const text = `${latest.title || ''} ${latest.message || ''}`.toLowerCase();
+    if (!text.includes('team request') && !text.includes('application') && !text.includes('rejected')) return;
+    refreshApplicationStatus();
+  }, [notifications, refreshApplicationStatus]);
 
   // Optimized query filtering with useMemo
   const filteredProjects = useMemo(() => {
@@ -217,12 +235,25 @@ function ProjectList() {
     return filteredProjects.slice(startIdx, startIdx + ITEMS_PER_PAGE);
   }, [filteredProjects, currentPage]);
 
-  const atProjectLimit = activeProjectsCount >= MAX_ACTIVE_PROJECTS;
+  const pendingCount = Math.max(
+    appliedIds.length,
+    Number(appStatus?.pendingApplications || 0)
+  );
+  const joinedCount = Math.max(
+    activeProjectsCount,
+    Number(appStatus?.joinedTeams || 0)
+  );
+  const atProjectLimit = (joinedCount + pendingCount) >= MAX_ACTIVE_PROJECTS;
 
   const handleApplyClick = (project) => {
     // 0. Check if user is a Project Leader
     if (isUserProjectLeader) {
       toast.error('Project Leaders manage project teams and cannot apply to join translation teams.');
+      return;
+    }
+
+    if (atProjectLimit) {
+      toast.error('You have reached the maximum number of concurrent projects.');
       return;
     }
 
@@ -240,10 +271,6 @@ function ProjectList() {
       return;
     }
 
-    if (atProjectLimit) {
-      toast.warn(`Bạn đang tham gia ${activeProjectsCount} dự án cùng lúc (tối đa ${MAX_ACTIVE_PROJECTS}). Hãy hoàn thành hoặc rời khỏi một dự án trước.`);
-      return;
-    }
     setSelectedProject(project);
 
     // Auto-populate message from bio or default professional intro
@@ -283,12 +310,6 @@ function ProjectList() {
     if (!selectedProject) return;
     if (uploading) return;
 
-    // Client-side slot check
-    if (appStatus && appStatus.availableSlots <= 0) {
-      toast.error(`You have reached the maximum of ${appStatus.maxSlots} active teams/applications.`);
-      return;
-    }
-
     try {
       setUploading(true);
       const initials = userFullName
@@ -325,16 +346,16 @@ function ProjectList() {
       });
 
       toast.success(`Application sent successfully for "${selectedProject.comicName || selectedProject.title}"!`);
-      setAppliedIds((prev) => [...prev, selectedProject.id]);
+      const teamId = String(selectedProject.id);
+      setAppliedIds((prev) => prev.includes(teamId) ? prev : [...prev, teamId]);
       if (result?.id) {
-        setAppliedRequestMap(prev => ({ ...prev, [selectedProject.id]: result.id }));
+        setAppliedRequestMap(prev => ({ ...prev, [teamId]: result.id }));
       }
       setShowJoinModal(false);
       setSelectedProject(null);
       setCvFile(null);
 
-      // Refresh application status
-      getMyApplicationStatusApi().then(s => { if (s) setAppStatus(s) }).catch(() => {});
+      getMyApplicationStatusApi().then(s => { if (s) applyPendingFromStatus(s); }).catch(() => {});
     } catch (err) {
       console.error(err);
       const errMsg = err.response?.data?.message || 'Failed to send application.';
@@ -345,7 +366,7 @@ function ProjectList() {
   };
 
   const handleCancelApplication = async (projectId) => {
-    const requestId = appliedRequestMap[projectId];
+    const requestId = appliedRequestMap[String(projectId)];
     if (!requestId) {
       toast.error('Could not find your pending application to cancel.');
       return;
@@ -354,14 +375,15 @@ function ProjectList() {
       setCancelling(projectId);
       await cancelTeamRequestApi(requestId);
       toast.success('Application cancelled. You are on a 12-hour cooldown.');
-      setAppliedIds(prev => prev.filter(id => id !== projectId));
+      const teamId = String(projectId);
+      setAppliedIds(prev => prev.filter(id => String(id) !== teamId));
       setAppliedRequestMap(prev => {
         const copy = { ...prev };
+        delete copy[teamId];
         delete copy[projectId];
         return copy;
       });
-      // Refresh application status
-      getMyApplicationStatusApi().then(s => { if (s) setAppStatus(s) }).catch(() => {});
+      getMyApplicationStatusApi().then(s => { if (s) applyPendingFromStatus(s); }).catch(() => {});
     } catch (err) {
       const errMsg = err.response?.data?.message || 'Failed to cancel application.';
       toast.error(errMsg);
@@ -369,6 +391,10 @@ function ProjectList() {
       setCancelling(null);
     }
   };
+
+  if (isUserProjectLeader) {
+    return <Navigate to="/translator/project-teams" replace />;
+  }
 
   if (loading) {
     return (
@@ -413,41 +439,117 @@ function ProjectList() {
         </p>
       </div>
 
-      {/* Slot Counter & Cooldown Banner (Only for Translators, hidden for Project Leaders) */}
+      {/* Capacity: projects joined + tasks assigned */}
       {!isUserProjectLeader && appStatus ? (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '16px',
-          marginBottom: '16px',
-          padding: '14px 20px',
-          borderRadius: '12px',
-          background: appStatus.availableSlots <= 0
-            ? 'rgba(239, 68, 68, 0.08)'
-            : appStatus.availableSlots <= 2
-              ? 'rgba(245, 158, 11, 0.08)'
-              : 'rgba(16, 185, 129, 0.06)',
-          border: `1px solid ${appStatus.availableSlots <= 0 ? 'rgba(239, 68, 68, 0.2)' : appStatus.availableSlots <= 2 ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.15)'}`,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '20px' }}>{appStatus.availableSlots <= 0 ? '🚫' : appStatus.availableSlots <= 2 ? '⚠️' : '✅'}</span>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--trans-text-primary)' }}>
-                Application Slots: <span style={{ color: appStatus.availableSlots <= 0 ? '#ef4444' : appStatus.availableSlots <= 2 ? '#f59e0b' : '#10b981' }}>{appStatus.availableSlots}</span> / {appStatus.maxSlots} available
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--trans-text-secondary)', marginTop: '2px' }}>
-                {appStatus.joinedTeams} team{appStatus.joinedTeams !== 1 ? 's' : ''} joined · {appStatus.pendingApplications} pending application{appStatus.pendingApplications !== 1 ? 's' : ''}
-              </div>
-            </div>
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: '12px',
+            marginBottom: appStatus.cooldownUntil && appStatus.cooldownUntil !== '' && new Date(appStatus.cooldownUntil) > new Date() ? '12px' : 0
+          }}>
+            {(() => {
+              const joined = Number(appStatus.joinedTeams || 0);
+              const pending = Number(appStatus.pendingApplications || 0);
+              const maxProjects = MAX_ACTIVE_PROJECTS;
+              const usedProjects = joined + pending;
+              const tasks = Number(appStatus.activeTasks ?? 0);
+              const maxTasks = MAX_ACTIVE_TASKS;
+              const projectAtLimit = usedProjects >= maxProjects;
+              const projectNearLimit = !projectAtLimit && usedProjects >= maxProjects - 2;
+              const taskAtLimit = tasks >= maxTasks;
+              const taskNearLimit = !taskAtLimit && tasks >= maxTasks - 2;
+
+              const tone = (atLimit, nearLimit) => ({
+                background: atLimit
+                  ? 'rgba(239, 68, 68, 0.08)'
+                  : nearLimit
+                    ? 'rgba(245, 158, 11, 0.08)'
+                    : 'rgba(16, 185, 129, 0.06)',
+                border: `1px solid ${atLimit ? 'rgba(239, 68, 68, 0.22)' : nearLimit ? 'rgba(245, 158, 11, 0.22)' : 'rgba(16, 185, 129, 0.18)'}`,
+                value: atLimit ? '#ef4444' : nearLimit ? '#f59e0b' : '#10b981',
+                iconBg: atLimit ? 'rgba(239, 68, 68, 0.15)' : nearLimit ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)'
+              });
+
+              const projectTone = tone(projectAtLimit, projectNearLimit);
+              const taskTone = tone(taskAtLimit, taskNearLimit);
+
+              return (
+                <>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    padding: '16px 18px',
+                    borderRadius: '14px',
+                    background: projectTone.background,
+                    border: projectTone.border
+                  }}>
+                    <div style={{
+                      width: 44, height: 44, borderRadius: '12px', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: projectTone.iconBg, color: projectTone.value
+                    }}>
+                      <Users size={22} />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--trans-text-muted)', marginBottom: '4px' }}>
+                        Concurrent projects
+                      </div>
+                      <div style={{ fontSize: '22px', fontWeight: 800, lineHeight: 1.1, color: 'var(--trans-text-primary)' }}>
+                        <span style={{ color: projectTone.value }}>{usedProjects}</span>
+                        <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--trans-text-secondary)' }}> / {maxProjects}</span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--trans-text-secondary)', marginTop: '4px' }}>
+                        {projectAtLimit
+                          ? 'Maximum concurrent projects reached'
+                          : `${joined} approved · ${pending} pending · ${Math.max(0, maxProjects - usedProjects)} slot${maxProjects - usedProjects !== 1 ? 's' : ''} left`}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    padding: '16px 18px',
+                    borderRadius: '14px',
+                    background: taskTone.background,
+                    border: taskTone.border
+                  }}>
+                    <div style={{
+                      width: 44, height: 44, borderRadius: '12px', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: taskTone.iconBg, color: taskTone.value
+                    }}>
+                      <ClipboardList size={22} />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--trans-text-muted)', marginBottom: '4px' }}>
+                        Tasks assigned
+                      </div>
+                      <div style={{ fontSize: '22px', fontWeight: 800, lineHeight: 1.1, color: 'var(--trans-text-primary)' }}>
+                        <span style={{ color: taskTone.value }}>{tasks}</span>
+                        <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--trans-text-secondary)' }}> / {maxTasks}</span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--trans-text-secondary)', marginTop: '4px' }}>
+                        {taskAtLimit
+                          ? 'At the incomplete-task limit. Finish a task before taking more work.'
+                          : `${tasks} assigned · ${Math.max(0, maxTasks - tasks)} slot${maxTasks - tasks !== 1 ? 's' : ''} left`}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
           {appStatus.cooldownUntil && appStatus.cooldownUntil !== '' && new Date(appStatus.cooldownUntil) > new Date() && (
             <div style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              padding: '6px 14px',
-              borderRadius: '8px',
+              padding: '8px 14px',
+              borderRadius: '10px',
               background: 'rgba(239, 68, 68, 0.1)',
               border: '1px solid rgba(239, 68, 68, 0.2)',
               fontSize: '12px',
@@ -472,10 +574,10 @@ function ProjectList() {
           <AlertCircle size={20} style={{ color: '#eab308', flexShrink: 0 }} />
           <div>
             <p style={{ margin: 0, fontWeight: '700', fontSize: '14px', color: '#fde047' }}>
-              Bạn đang xử lý tối đa {MAX_ACTIVE_PROJECTS} công việc cùng lúc
+              You have reached the maximum of {MAX_ACTIVE_PROJECTS} concurrent projects
             </p>
             <p style={{ margin: '3px 0 0 0', fontSize: '12.5px', color: '#ca8a04' }}>
-              Hoàn thành các công việc hiện tại (dịch/nộp bài) để tiếp tục đăng ký dự án mới.
+              Cancel a pending application or wait until a project is completed before applying to another team.
             </p>
           </div>
         </div>
@@ -551,21 +653,12 @@ function ProjectList() {
       {/* Grid Projects */}
       <div className="available-projects-grid">
         {paginatedProjects.map((project) => {
-          const alreadyApplied = appliedIds.includes(project.id);
+          const alreadyApplied = appliedIds.includes(String(project.id));
 
           const totalMembers = Number(project.membersCount) || 1;
           const recruitedTranslators = Math.max(0, totalMembers - 1); // Exclude the leader
           const limit = Number(project.maxMembers) || 5;
           const spotsLeft = Math.max(0, limit - recruitedTranslators);
-
-          const isDisabled = alreadyApplied || spotsLeft === 0 || atProjectLimit;
-          const btnLabel = alreadyApplied
-            ? 'Applied ✓'
-            : spotsLeft === 0
-            ? 'Team Full'
-            : atProjectLimit
-            ? '⛔ Project Limit Reached'
-            : 'Apply to Join';
 
           return (
             <div key={project.id} className="available-project-card">
@@ -694,19 +787,35 @@ function ProjectList() {
                     );
                   }
 
+                  const onCooldown = Boolean(appStatus && appStatus.cooldownUntil && new Date(appStatus.cooldownUntil) > new Date());
+                  const applyDisabled = spotsLeft === 0 || onCooldown || atProjectLimit;
+
                   return (
                     <button
                       className="available-project-apply-btn"
-                      disabled={spotsLeft === 0 || atProjectLimit || (appStatus && appStatus.availableSlots <= 0) || (appStatus && appStatus.cooldownUntil && new Date(appStatus.cooldownUntil) > new Date())}
+                      disabled={applyDisabled}
                       onClick={() => handleApplyClick(project)}
-                      style={{ flex: 1 }}
+                      style={{
+                        flex: 1,
+                        ...(atProjectLimit && spotsLeft > 0 && !onCooldown ? {
+                          background: 'rgba(239, 68, 68, 0.12)',
+                          border: '1px solid rgba(239, 68, 68, 0.28)',
+                          color: '#fca5a5',
+                          cursor: 'not-allowed',
+                          opacity: 0.9,
+                          fontWeight: 700,
+                          fontSize: '13px',
+                          lineHeight: 1.25
+                        } : {})
+                      }}
+                      title={atProjectLimit ? 'You have reached the maximum number of concurrent projects.' : undefined}
                     >
-                      {spotsLeft === 0 
-                        ? 'Team Full' 
-                        : (appStatus && appStatus.availableSlots <= 0) || atProjectLimit
-                        ? 'Max Teams Reached' 
-                        : (appStatus && appStatus.cooldownUntil && new Date(appStatus.cooldownUntil) > new Date()) 
-                        ? '⏳ On Cooldown' 
+                      {spotsLeft === 0
+                        ? 'Team Full'
+                        : onCooldown
+                        ? '⏳ On Cooldown'
+                        : atProjectLimit
+                        ? 'Maximum concurrent projects reached'
                         : 'Apply to Join'}
                     </button>
                   );

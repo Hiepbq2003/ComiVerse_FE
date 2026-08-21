@@ -2,12 +2,19 @@
 // Tab 5: Group Settings
 // =============================================================================
 
+export function normalizeProjectStatus(status) {
+  const value = String(status || '').toLowerCase().trim();
+  if (value === 'completed' || value === 'complete' || value === 'done') return 'completed';
+  return 'ongoing';
+}
+
 function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorkspaceSettings }) {
   const recruitedLimit = Number(selectedDetails.maxMembers) || 5;
   const totalCapacity = recruitedLimit + 1; // 1 Leader + N Members
   const currentMembersCount = members.length || selectedDetails.membersCount || 1;
   const spotsAvailable = Math.max(0, totalCapacity - currentMembersCount);
   const isOpen = selectedDetails.isRecruiting && spotsAvailable > 0;
+  const projectStatus = normalizeProjectStatus(selectedDetails.status);
 
   return (
     <div className="group-settings-tab-container fade-in">
@@ -41,9 +48,22 @@ function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorks
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <div className="settings-tab-card" style={{ maxWidth: '100%' }}>
-          <h3 className="settings-section-title">Recruitment & Capacity</h3>
+          <h3 className="settings-section-title">Project Settings</h3>
 
           <div className="trans-form-group">
+            <label className="trans-form-label">Project Status</label>
+            <select
+              className="trans-form-input"
+              value={projectStatus}
+              onChange={(e) => setSelectedDetails({ ...selectedDetails, status: e.target.value })}
+              onWheel={(e) => e.target.blur()}
+            >
+              <option value="ongoing">Ongoing</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+
+          <div className="trans-form-group" style={{ marginTop: '16px' }}>
             <label className="trans-form-label">Recruitment Status</label>
             <select
               className="trans-form-input"
@@ -118,7 +138,7 @@ function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorks
           </div>
 
           <button className="trans-btn primary" style={{ marginTop: '16px', width: '100%' }} onClick={onSaveWorkspaceSettings}>
-            Save Recruitment Settings
+            Save Project Settings
           </button>
         </div>
 

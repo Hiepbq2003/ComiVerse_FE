@@ -3270,14 +3270,9 @@ export default function TranslateWorkspace() {
            isSameTranslatorUser(chapterData?.taskAssigneeId, currentUserId, userFullName, teamMembers);
   }, [chapterData?.taskAssigneeId, currentUserId, userFullName, teamMembers]);
 
-  const isProjectLeader = useMemo(() => {
-    const me = (teamMembers || []).find((m) => String(m.id) === String(currentUserId));
-    return me?.role === "Group Leader";
-  }, [teamMembers, currentUserId]);
-
-  // Nobody is allowed to edit until we've actually loaded the task and know
-  // who's assigned — default is read-only, not editable.
-  const canEdit = status === "ready" && (isProjectLeader || isAssignedToTask);
+  // Only the current assignee can edit translation. Project Leader can still
+  // manage the task (assign/review) but must not keep editing after handing it over.
+  const canEdit = status === "ready" && isAssignedToTask;
 
 
   const {

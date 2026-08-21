@@ -43,7 +43,9 @@ function parseTranslationBubblesByPage(pagesBubblesJson) {
 }
 
 function ChapterDetail() {
-  const { comicId, chapterId } = useParams()
+  const routeParams = useParams()
+  const comicId = routeParams.comicId || routeParams.comicSlug || routeParams.id
+  const chapterId = routeParams.chapterId || routeParams.chapterNumber
   const navigate = useNavigate()
   const location = useLocation()
   const searchParams = new URLSearchParams(location.search)
@@ -152,38 +154,65 @@ function ChapterDetail() {
       try {
         setLoading(true)
 
-        if (!chapterId || !isValidUuid(chapterId)) {
-          throw new Error('Using local preview data for a demo route')
+        const comicIdOrSlug = comicId
+        const chapIdOrNum = chapterId
+
+        if (!chapIdOrNum && !comicIdOrSlug) {
+          throw new Error('Chapter or Comic parameter missing')
         }
-
-        // Fetch current chapter detail, comic detail, all chapters of the
-        // comic, and available translations, in parallel
-        const [chapterRes, chaptersListRes, comicRes, translationsRes] = await Promise.all([
-          getChapterDetailApi(chapterId),
-          getChaptersByComicIdApi(comicId),
-          getComicByIdApi(comicId),
-          getChapterTranslationsApi(chapterId).catch(() => ({ data: [] }))
-        ])
-
-        const chapterData = chapterRes?.data || chapterRes
-        const translationsData = translationsRes?.data || translationsRes || []
-
-        if (!chapterData) {
-          throw new Error('Chapter details not found')
-        }
-
-        const effectiveComicId = (comicId && isValidUuid(comicId)) ? comicId : chapterData.comicId
 
         let listData = []
         let comicData = null
+        let chapterData = null
+        let translationsData = []
+        let targetChapterId = null
 
-        if (effectiveComicId && isValidUuid(effectiveComicId)) {
-          const [chaptersListRes, comicRes] = await Promise.all([
-            getChaptersByComicIdApi(effectiveComicId),
-            getComicByIdApi(effectiveComicId)
-          ])
+        // 1. Fetch comic detail by slug (or ID) first to resolve real comic.id (UUID)
+        if (comicIdOrSlug) {
+          const comicRes = await getComicByIdApi(comicIdOrSlug).catch(() => null)
+          comicData = comicRes?.data || comicRes || null
+        }
+
+        const realComicId = comicData?.id || (isValidUuid(comicIdOrSlug) ? comicIdOrSlug : null)
+
+        // 2. Fetch chapters list using realComicId (UUID)
+        if (realComicId) {
+          const chaptersListRes = await getChaptersByComicIdApi(realComicId).catch(() => null)
           listData = chaptersListRes?.data || chaptersListRes || []
-          comicData = comicRes?.data || comicRes
+        }
+
+        // 2. Resolve chapter ID (whether chapIdOrNum is UUID, "chapter-2", or "2")
+        if (chapIdOrNum && isValidUuid(chapIdOrNum)) {
+          targetChapterId = chapIdOrNum
+        } else if (chapIdOrNum && listData.length > 0) {
+          const cleanNum = String(chapIdOrNum).replace(/^chapter-?/i, '').trim()
+          const found = listData.find(ch => 
+            String(ch.chapterNumber) === cleanNum || 
+            String(ch.chapterNumber) === String(chapIdOrNum) ||
+            String(ch.id) === String(chapIdOrNum)
+          )
+          if (found) {
+            targetChapterId = found.id
+          }
+        }
+
+        const effectiveChapId = targetChapterId || chapIdOrNum
+
+        if (effectiveChapId) {
+          const [chapterRes, translationsRes] = await Promise.all([
+            getChapterDetailApi(effectiveChapId).catch(() => null),
+            getChapterTranslationsApi(effectiveChapId).catch(() => ({ data: [] }))
+          ])
+          chapterData = chapterRes?.data || chapterRes || null
+          translationsData = translationsRes?.data || translationsRes || []
+        }
+
+        if (!chapterData && targetChapterId) {
+          chapterData = listData.find(ch => String(ch.id) === String(targetChapterId)) || null
+        }
+
+        if (!chapterData) {
+          throw new Error('Chapter details not found')
         }
 
         setCurrentChapter(chapterData)
@@ -191,6 +220,21 @@ function ChapterDetail() {
         setComic(comicData)
         setTranslations(Array.isArray(translationsData) ? translationsData : [])
         setIsMockData(false)
+
+        // Clean SEO URL sync in browser address bar
+        const displaySlug = comicData?.slug || comicIdOrSlug
+        const displayChapNum = chapterData?.chapterNumber !== undefined && chapterData?.chapterNumber !== null
+          ? chapterData.chapterNumber
+          : (targetChapterId || chapIdOrNum)
+        const chapSlug = String(displayChapNum).startsWith('chapter-') ? displayChapNum : `chapter-${displayChapNum}`
+        const searchStr = location.search || ''
+
+        if (displaySlug && chapSlug) {
+          const desiredPath = `/comic/${displaySlug}/chapter/${chapSlug}${searchStr}`
+          if (window.location.pathname + window.location.search !== desiredPath) {
+            window.history.replaceState(null, '', desiredPath)
+          }
+        }
       } catch (err) {
         console.error('API failed for chapter detail:', err.message)
         setIsMockData(false)
@@ -203,7 +247,7 @@ function ChapterDetail() {
       }
     }
 
-    if (chapterId) {
+    if (chapterId || comicId) {
       fetchChapterAndComicInfo()
     }
   }, [comicId, chapterId])
@@ -215,15 +259,20 @@ function ChapterDetail() {
 
   // Find index of current chapter
   const currentChapterIndex = sortedChapters.findIndex(
-    ch => String(ch.id) === String(chapterId)
+    ch => String(ch.id) === String(currentChapter?.id) || String(ch.chapterNumber) === String(currentChapter?.chapterNumber)
   )
 
   const hasPrevChapter = currentChapterIndex > 0
-  const hasNextChapter = currentChapterIndex < sortedChapters.length - 1
+  const hasNextChapter = currentChapterIndex >= 0 && currentChapterIndex < sortedChapters.length - 1
 
-  const buildChapterUrl = (targetChapterId) => {
+  const buildChapterUrl = (targetChapter) => {
     const langQuery = selectedLanguage ? `?lang=${encodeURIComponent(selectedLanguage)}` : ''
-    return `/comic/${comicId}/chapter/${targetChapterId}${langQuery}`
+    const currentComicSlug = comic?.slug || comicId
+    const targetChapNum = (typeof targetChapter === 'object' && targetChapter !== null)
+      ? (targetChapter.chapterNumber ?? targetChapter.id)
+      : targetChapter
+    const chapSlug = String(targetChapNum).startsWith('chapter-') ? targetChapNum : `chapter-${targetChapNum}`
+    return `/comic/${currentComicSlug}/chapter/${chapSlug}${langQuery}`
   }
 
   const rawUserRole = typeof user?.role === 'string'
@@ -255,7 +304,7 @@ function ChapterDetail() {
       }
     }
 
-    navigate(buildChapterUrl(chapter.id))
+    navigate(buildChapterUrl(chapter))
   }
 
   const handleGoToPrevChapter = () => {
@@ -359,8 +408,8 @@ function ChapterDetail() {
   // Do not trust a possibly stale local premium flag when rendering the lock state.
   const isPremiumLocked = Boolean(
     currentChapter.isPremium
-      && pages.length === 0
-      && !hasInternalChapterAccess
+    && pages.length === 0
+    && !hasInternalChapterAccess
   )
 
   const translationLanguage = (t) => t?.languageCode || t?.language_code || ''
@@ -615,8 +664,8 @@ function ChapterDetail() {
           ) : readerLayout === 'single' ? (
             <div className="premium-single-page-wrapper">
               {/* Left Navigation Zone */}
-              <div 
-                className="premium-page-nav-zone left" 
+              <div
+                className="premium-page-nav-zone left"
                 onClick={() => {
                   if (pageIndex > 0) {
                     setPageIndex(p => Math.max(0, p - 1))
@@ -642,8 +691,8 @@ function ChapterDetail() {
               />
 
               {/* Right Navigation Zone */}
-              <div 
-                className="premium-page-nav-zone right" 
+              <div
+                className="premium-page-nav-zone right"
                 onClick={() => {
                   if (pageIndex < pages.length - 1) {
                     setPageIndex(p => Math.min(pages.length - 1, p + 1))
