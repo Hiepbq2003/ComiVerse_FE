@@ -190,7 +190,7 @@ function ComicDetail() {
     saveTimeoutRef.current = setTimeout(async () => {
       try {
         if (next !== serverSavedRef.current) {
-          await toggleSaveStatusApi(id)
+          await toggleSaveStatusApi(comic?.id || id)
           serverSavedRef.current = next
         }
       } catch (err) {
@@ -239,7 +239,7 @@ function ComicDetail() {
     likeTimeoutRef.current = setTimeout(async () => {
       try {
         if (next !== serverLikedRef.current) {
-          await toggleLikeStatusApi(id)
+          await toggleLikeStatusApi(comic?.id || id)
           serverLikedRef.current = next
         }
       } catch (err) {
@@ -469,7 +469,7 @@ function ComicDetail() {
             {/* Interactive Star Rating */}
             <div className="hero-rating-box">
               <StarRating
-                comicId={id}
+                comicId={comic?.id || id}
                 user={user}
                 initialRatingAverage={comic.ratingAverage}
                 initialRatingCount={comic.ratingCount}
@@ -666,7 +666,7 @@ function ComicDetail() {
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}
         targetType="COMIC"
-        targetId={id}
+        targetId={comic?.id || id}
         targetTitle={comic?.title || 'Comic Series'}
       />
     </HomeLayout>
