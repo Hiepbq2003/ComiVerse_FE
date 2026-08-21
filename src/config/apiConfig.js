@@ -4,6 +4,7 @@
 
 // Primary API Base URL (e.g. "https://sep490g37sum26java-production-0ff1.up.railway.app/api" or "/api")
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://sep490g37sum26java-production-0ff1.up.railway.app/api';
+// export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api';
 
 // Compute backend server origin host (e.g. "http://localhost:8081")
 export const getBackendHost = () => {
