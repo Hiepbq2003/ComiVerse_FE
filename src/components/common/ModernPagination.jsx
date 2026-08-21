@@ -153,19 +153,28 @@ export const ModernPagination = ({
           </button>
 
           {(() => {
-            const totalRendered = maxClickablePage || 1;
+            let totalRendered = maxClickablePage || 1;
+            
+            // Force at least 3 numbers to show if there's more data
+            if (totalRendered < 3 && hasMore) {
+              totalRendered = 3;
+            }
             
             // If total rendered is small, just show all
             if (totalRendered <= 5) {
-              return Array.from({ length: totalRendered }, (_, i) => i + 1).map(p => (
-                <div 
-                  key={p} 
-                  className={`pag-item ${currentPage === p ? 'active' : ''}`}
-                  onClick={() => onPageChange(p)}
-                >
-                  {p}
-                </div>
-              ));
+              return Array.from({ length: totalRendered }, (_, i) => i + 1).map(p => {
+                const isDisabled = p > maxClickablePage;
+                return (
+                  <div 
+                    key={p} 
+                    className={`pag-item ${currentPage === p ? 'active' : ''} ${isDisabled ? 'disabled' : ''}`}
+                    onClick={() => !isDisabled && onPageChange(p)}
+                    style={isDisabled ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+                  >
+                    {p}
+                  </div>
+                );
+              });
             }
             
             // If large, show 1 ... window ... totalRendered
@@ -184,11 +193,13 @@ export const ModernPagination = ({
             }
             
             for (let p = windowStart; p <= windowEnd; p++) {
+              const isDisabled = p > maxClickablePage;
               elements.push(
                 <div 
                   key={p} 
-                  className={`pag-item ${currentPage === p ? 'active' : ''}`}
-                  onClick={() => onPageChange(p)}
+                  className={`pag-item ${currentPage === p ? 'active' : ''} ${isDisabled ? 'disabled' : ''}`}
+                  onClick={() => !isDisabled && onPageChange(p)}
+                  style={isDisabled ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
                 >
                   {p}
                 </div>
@@ -200,11 +211,13 @@ export const ModernPagination = ({
             }
             
             // Last page
+            const isLastDisabled = totalRendered > maxClickablePage;
             elements.push(
               <div 
                 key={totalRendered} 
-                className={`pag-item ${currentPage === totalRendered ? 'active' : ''}`}
-                onClick={() => onPageChange(totalRendered)}
+                className={`pag-item ${currentPage === totalRendered ? 'active' : ''} ${isLastDisabled ? 'disabled' : ''}`}
+                onClick={() => !isLastDisabled && onPageChange(totalRendered)}
+                style={isLastDisabled ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
               >
                 {totalRendered}
               </div>
