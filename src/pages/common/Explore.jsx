@@ -801,9 +801,10 @@ function Explore() {
                     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '40px', paddingBottom: '20px' }}>
                       <ModernPagination 
                         currentPage={currentPage}
-                        totalPages={currentPage + (hasMore ? 1 : 0)}
+                        maxClickablePage={pageCursorsRef.current.length}
+                        hasMore={hasMore}
                         onPageChange={(page) => setCurrentPage(page)}
-                        variant="pills"
+                        variant="cursor"
                       />
                     </div>
                   )}
