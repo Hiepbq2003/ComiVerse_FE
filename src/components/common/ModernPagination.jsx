@@ -163,13 +163,11 @@ export const ModernPagination = ({
             // If total rendered is small, just show all
             if (totalRendered <= 5) {
               return Array.from({ length: totalRendered }, (_, i) => i + 1).map(p => {
-                const isDisabled = p > maxClickablePage;
                 return (
                   <div 
                     key={p} 
-                    className={`pag-item ${currentPage === p ? 'active' : ''} ${isDisabled ? 'disabled' : ''}`}
-                    onClick={() => !isDisabled && onPageChange(p)}
-                    style={isDisabled ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+                    className={`pag-item ${currentPage === p ? 'active' : ''}`}
+                    onClick={() => onPageChange(p)}
                   >
                     {p}
                   </div>
@@ -193,13 +191,11 @@ export const ModernPagination = ({
             }
             
             for (let p = windowStart; p <= windowEnd; p++) {
-              const isDisabled = p > maxClickablePage;
               elements.push(
                 <div 
                   key={p} 
-                  className={`pag-item ${currentPage === p ? 'active' : ''} ${isDisabled ? 'disabled' : ''}`}
-                  onClick={() => !isDisabled && onPageChange(p)}
-                  style={isDisabled ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+                  className={`pag-item ${currentPage === p ? 'active' : ''}`}
+                  onClick={() => onPageChange(p)}
                 >
                   {p}
                 </div>
@@ -211,13 +207,11 @@ export const ModernPagination = ({
             }
             
             // Last page
-            const isLastDisabled = totalRendered > maxClickablePage;
             elements.push(
               <div 
                 key={totalRendered} 
-                className={`pag-item ${currentPage === totalRendered ? 'active' : ''} ${isLastDisabled ? 'disabled' : ''}`}
-                onClick={() => !isLastDisabled && onPageChange(totalRendered)}
-                style={isLastDisabled ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+                className={`pag-item ${currentPage === totalRendered ? 'active' : ''}`}
+                onClick={() => onPageChange(totalRendered)}
               >
                 {totalRendered}
               </div>

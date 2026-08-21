@@ -164,10 +164,59 @@ function Explore() {
       const statusParam = selectedStatus !== 'All' ? selectedStatus.toUpperCase() : undefined
       const sortByParam = sortBy !== 'Default' ? sortBy : undefined
 
+      let currentCursorObj = cursorObj || { cursor: null, referenceId: null }
+      
+      // Fast-forward fetch if jumping to a page without a cursor
+      if (page > pageCursorsRef.current.length) {
+        let tempCursor = pageCursorsRef.current[pageCursorsRef.current.length - 1]?.cursor
+        let tempRef = pageCursorsRef.current[pageCursorsRef.current.length - 1]?.referenceId
+        
+        for (let i = pageCursorsRef.current.length; i < page; i++) {
+          const tempParams = {
+            size: ITEMS_PER_PAGE,
+            cursor: tempCursor || undefined,
+            referenceId: tempRef || undefined,
+            genres: genreIds.length > 0 ? genreIds.join(',') : undefined,
+            publicationStatus: statusParam,
+            sortBy: sortByParam
+          }
+          
+          const tempResponse = await getExploreComicsApi(tempParams, { signal: controller.signal })
+          
+          let nc = null
+          let nr = null
+          let hm = false
+          
+          if (tempResponse) {
+            if (tempResponse.data && !Array.isArray(tempResponse.data)) {
+              nc = tempResponse.data.nextCursor || tempResponse.nextCursor
+              nr = tempResponse.data.nextReferenceId || tempResponse.nextReferenceId
+              hm = tempResponse.data.hasMore !== undefined ? tempResponse.data.hasMore : (tempResponse.hasMore || false)
+            } else if (tempResponse.success && tempResponse.data) {
+              nc = tempResponse.data.nextCursor
+              nr = tempResponse.data.nextReferenceId
+              hm = tempResponse.data.hasMore || false
+            } else {
+              nc = tempResponse.nextCursor
+              nr = tempResponse.nextReferenceId
+              hm = tempResponse.hasMore || false
+            }
+          }
+          
+          pageCursorsRef.current[i] = { cursor: nc, referenceId: nr }
+          tempCursor = nc
+          tempRef = nr
+          
+          if (!hm) break // Stop if we reach the end early
+        }
+        
+        currentCursorObj = pageCursorsRef.current[page - 1] || { cursor: tempCursor, referenceId: tempRef }
+      }
+
       const params = {
         size: ITEMS_PER_PAGE,
-        cursor: cursorObj?.cursor || undefined,
-        referenceId: cursorObj?.referenceId || undefined,
+        cursor: currentCursorObj?.cursor || undefined,
+        referenceId: currentCursorObj?.referenceId || undefined,
         genres: genreIds.length > 0 ? genreIds.join(',') : undefined,
         publicationStatus: statusParam,
         sortBy: sortByParam
