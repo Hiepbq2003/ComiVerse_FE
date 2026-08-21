@@ -5,8 +5,9 @@ import HomeLayout from '../../components/layout/HomeLayout'
 import { getExploreComicsApi } from '../../services/api/ComicApi'
 import { getAllGenresApi } from '../../services/api/GenreApi'
 import ComicCard from '../../components/common/ComicCard'
-import { toast } from 'react-toastify'
+import { ModernPagination } from '../../components/common/ModernPagination'
 import { mapToComicDTO } from '../../utils/comicModels'
+import { toast } from 'react-toastify'
 
 
 function Explore() {
@@ -797,44 +798,13 @@ function Explore() {
 
                   {/* Pagination Controls */}
                   {(currentPage > 1 || hasMore) && (
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '32px' }}>
-                      <button
-                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                        disabled={currentPage === 1 || loading}
-                        style={{
-                          background: currentPage === 1 ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
-                          border: '1px solid rgba(255,255,255,0.06)',
-                          color: currentPage === 1 ? '#64748b' : 'white',
-                          borderRadius: '6px',
-                          padding: '8px 16px',
-                          fontSize: '13px',
-                          cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                          fontWeight: '600',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        Previous
-                      </button>
-                      <span style={{ fontSize: '13px', color: '#cbd5e1' }}>
-                        Page <strong>{currentPage}</strong>
-                      </span>
-                      <button
-                        onClick={() => setCurrentPage(prev => prev + 1)}
-                        disabled={!hasMore || loading}
-                        style={{
-                          background: !hasMore ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
-                          border: '1px solid rgba(255,255,255,0.06)',
-                          color: !hasMore ? '#64748b' : 'white',
-                          borderRadius: '6px',
-                          padding: '8px 16px',
-                          fontSize: '13px',
-                          cursor: !hasMore ? 'not-allowed' : 'pointer',
-                          fontWeight: '600',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        Next
-                      </button>
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '40px', paddingBottom: '20px' }}>
+                      <ModernPagination 
+                        currentPage={currentPage}
+                        totalPages={currentPage + (hasMore ? 1 : 0)}
+                        onPageChange={(page) => setCurrentPage(page)}
+                        variant="pills"
+                      />
                     </div>
                   )}
                 </>
