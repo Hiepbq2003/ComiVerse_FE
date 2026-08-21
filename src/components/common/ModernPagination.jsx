@@ -152,39 +152,80 @@ export const ModernPagination = ({
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
 
-          <div className={`pag-item ${currentPage === 1 ? 'active' : ''}`} onClick={() => onPageChange(1)}>1</div>
-          
-          {currentPage > 3 && <span className="pag__ellipsis">...</span>}
-          
-          {[...Array(5)].map((_, i) => {
-            const p = currentPage > 3 ? currentPage - 1 + i : 2 + i;
-            if (p <= 1) return null;
+          {(() => {
+            const maxRendered = hasMore ? maxClickablePage + 1 : maxClickablePage;
             
-            // If hasMore is false, we don't show any pages beyond maxClickablePage
-            if (!hasMore && p > maxClickablePage) return null;
+            // If total rendered is small, just show all
+            if (maxRendered <= 5) {
+              return Array.from({ length: maxRendered }, (_, i) => i + 1).map(p => {
+                const isDisabled = p > maxClickablePage;
+                return (
+                  <div 
+                    key={p} 
+                    className={`pag-item ${currentPage === p ? 'active' : ''} ${isDisabled ? 'disabled' : ''}`}
+                    onClick={() => !isDisabled && onPageChange(p)}
+                    style={isDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                  >
+                    {p}
+                  </div>
+                );
+              });
+            }
             
-            if (p > maxClickablePage + 2) return null; // Only show a few disabled future pages
+            // If large, show 1 ... window ... maxRendered
+            const windowStart = Math.max(2, currentPage - 1);
+            const windowEnd = Math.min(maxRendered - 1, currentPage + 1);
             
-            const isDisabled = p > maxClickablePage;
-            return (
+            const elements = [];
+            
+            // Page 1
+            elements.push(
+              <div key={1} className={`pag-item ${currentPage === 1 ? 'active' : ''}`} onClick={() => onPageChange(1)}>1</div>
+            );
+            
+            if (windowStart > 2) {
+              elements.push(<span key="ell-1" className="pag__ellipsis">...</span>);
+            }
+            
+            for (let p = windowStart; p <= windowEnd; p++) {
+              const isDisabled = p > maxClickablePage;
+              elements.push(
+                <div 
+                  key={p} 
+                  className={`pag-item ${currentPage === p ? 'active' : ''} ${isDisabled ? 'disabled' : ''}`}
+                  onClick={() => !isDisabled && onPageChange(p)}
+                  style={isDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                >
+                  {p}
+                </div>
+              );
+            }
+            
+            if (windowEnd < maxRendered - 1) {
+              elements.push(<span key="ell-2" className="pag__ellipsis">...</span>);
+            }
+            
+            // Last page (maxRendered)
+            const isLastDisabled = maxRendered > maxClickablePage;
+            elements.push(
               <div 
-                key={p} 
-                className={`pag-item ${currentPage === p ? 'active' : ''} ${isDisabled ? 'disabled' : ''}`}
-                onClick={() => !isDisabled && onPageChange(p)}
-                style={isDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                key={maxRendered} 
+                className={`pag-item ${currentPage === maxRendered ? 'active' : ''} ${isLastDisabled ? 'disabled' : ''}`}
+                onClick={() => !isLastDisabled && onPageChange(maxRendered)}
+                style={isLastDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
               >
-                {p}
+                {maxRendered}
               </div>
             );
-          })}
-          
-          {hasMore && <span className="pag__ellipsis">...</span>}
+            
+            return elements;
+          })()}
 
           <button 
             type="button" 
             className="pag-nav-btn" 
             onClick={() => onPageChange(currentPage + 1)} 
-            disabled={currentPage >= maxClickablePage}
+            disabled={currentPage >= maxClickablePage && !hasMore}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
           </button>
