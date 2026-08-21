@@ -41,7 +41,7 @@ const statistics = {
     to: '2026-08-03',
     previousFrom: '2026-06-05',
     previousTo: '2026-07-04',
-    currency: 'VND',
+    currency: 'USD',
     zoneId: 'Asia/Ho_Chi_Minh'
   },
   summary: {
@@ -52,23 +52,23 @@ const statistics = {
     failedPayments: 3,
     expiredPayments: 2,
     refundedPayments: 1,
-    grossRevenue: 1500000,
-    averageOrderValue: 125000,
+    grossRevenue: 37.92,
+    averageOrderValue: 3.16,
     successRate: 72.5,
     activeSubscriptions: 18,
     revenueChangePercent: 15.5,
     paidPaymentsChangePercent: 9.1
   },
   dailySeries: [
-    { date: '2026-08-02', revenue: 500000, paidPayments: 4, failedPayments: 1, expiredPayments: 0 },
-    { date: '2026-08-03', revenue: 1000000, paidPayments: 8, failedPayments: 2, expiredPayments: 2 }
+    { date: '2026-08-02', revenue: 12.64, paidPayments: 4, failedPayments: 1, expiredPayments: 0 },
+    { date: '2026-08-03', revenue: 25.28, paidPayments: 8, failedPayments: 2, expiredPayments: 2 }
   ],
   statusBreakdown: [
-    { status: 'PAID', count: 12, attemptedAmount: 1500000, percentage: 60 },
-    { status: 'PENDING', count: 2, attemptedAmount: 158000, percentage: 10 },
-    { status: 'FAILED', count: 3, attemptedAmount: 237000, percentage: 15 },
-    { status: 'EXPIRED', count: 2, attemptedAmount: 158000, percentage: 10 },
-    { status: 'REFUNDED', count: 1, attemptedAmount: 79000, percentage: 5 }
+    { status: 'PAID', count: 12, attemptedAmount: 37.92, percentage: 60 },
+    { status: 'PENDING', count: 2, attemptedAmount: 6.32, percentage: 10 },
+    { status: 'FAILED', count: 3, attemptedAmount: 9.48, percentage: 15 },
+    { status: 'EXPIRED', count: 2, attemptedAmount: 6.32, percentage: 10 },
+    { status: 'REFUNDED', count: 1, attemptedAmount: 3.16, percentage: 5 }
   ],
   planBreakdown: [
     {
@@ -76,11 +76,11 @@ const statistics = {
       planCode: 'MONTHLY',
       planName: 'Premium Monthly',
       paidPayments: 12,
-      revenue: 1500000,
+      revenue: 37.92,
       revenueSharePercent: 100
     }
   ],
-  availableCurrencies: ['VND'],
+  availableCurrencies: ['USD'],
   generatedAt: '2026-08-03T12:00:00Z'
 }
 
@@ -92,8 +92,8 @@ const logs = {
       userEmail: 'reader@example.com',
       planCode: 'MONTHLY',
       planName: 'Premium Monthly',
-      amount: 79000,
-      currency: 'VND',
+      amount: 3.16,
+      currency: 'USD',
       status: 'PAID'
     }
   ]

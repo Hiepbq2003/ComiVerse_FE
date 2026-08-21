@@ -165,24 +165,13 @@ function AuthorDashboard() {
   const recentActivities = Array.isArray(dashboard?.recentActivities) ? dashboard.recentActivities : []
 
   const statCards = useMemo(() => {
-    // If backend returns 0 for revenue but we have views, calculate a mock revenue for demonstration
-    const calculateRevenue = (revenue, views) => revenue > 0 ? revenue : (views * 0.05);
-    
-    const totalEarn = summary.totalEarn || calculateRevenue(summary.estimatedRevenue || 0, summary.totalViews || 0);
-    const earnToday = summary.earnToday || (totalEarn * 0.02);
-    const earnWeek = summary.earnWeek || (totalEarn * 0.15);
-    const earnMonth = summary.earnMonth || (totalEarn * 0.45);
-    const earnYear = summary.earnYear || (totalEarn * 0.95);
+    const revenueEstimate = numberValue(summary.estimatedRevenue)
 
     return [
       { label: 'Total Comics', value: formatFullNumber(summary.totalComics), change: `${formatFullNumber(summary.publishedComics)} published · ${formatFullNumber(summary.draftComics)} other`, trend: 'neutral', icon: 'book', color: 'purple' },
       { label: 'Total Chapters', value: formatFullNumber(summary.totalChapters), change: 'All active author chapters', trend: 'neutral', icon: 'chapters', color: 'blue' },
       { label: 'Total Views', value: formatCompactNumber(summary.totalViews), change: `${formatCompactNumber(summary.totalLikes)} likes`, trend: 'up', icon: 'views', color: 'green' },
-      { label: 'Total Earn', value: formatMoney(totalEarn), change: 'All time earnings', trend: 'neutral', icon: 'revenue', color: 'orange' },
-      { label: 'Earn Today', value: formatMoney(earnToday), change: 'Today\'s revenue', trend: 'up', icon: 'revenue', color: 'orange' },
-      { label: 'Earn This Week', value: formatMoney(earnWeek), change: 'This week\'s revenue', trend: 'up', icon: 'revenue', color: 'orange' },
-      { label: 'Earn This Month', value: formatMoney(earnMonth), change: 'This month\'s revenue', trend: 'up', icon: 'revenue', color: 'orange' },
-      { label: 'Earn This Year', value: formatMoney(earnYear), change: 'This year\'s revenue', trend: 'up', icon: 'revenue', color: 'orange' },
+      { label: 'Revenue Estimate', value: formatMoney(revenueEstimate), change: 'Payout page is the source of truth', trend: 'neutral', icon: 'revenue', color: 'orange' },
       { label: 'Followers', value: formatCompactNumber(summary.totalFollowers), change: 'Readers who saved your comics', trend: 'up', icon: 'users', color: 'pink' },
       { label: 'Avg. Rating', value: formatRating(summary.averageRating), change: `${formatFullNumber(summary.totalRatings)} ratings`, trend: 'neutral', icon: 'star', color: 'cyan' },
       { label: 'Pending Reviews', value: formatFullNumber(summary.pendingReviews), change: 'Comic and chapter review queue', trend: 'warning', icon: 'review', color: 'red' },
@@ -197,11 +186,7 @@ function AuthorDashboard() {
     const views = monthlyMetrics.map((item) => numberValue(item.views))
     const followers = monthlyMetrics.map((item) => numberValue(item.followers))
 
-    const revenue = monthlyMetrics.map((item, idx) => {
-      const rev = numberValue(item.estimatedRevenue)
-      const v = views[idx] // use the globally backfilled views
-      return rev > 0 ? rev : (v * 0.05)
-    })
+    const revenue = monthlyMetrics.map((item) => numberValue(item.estimatedRevenue))
     
     const maxView = Math.max(1, ...views)
     const maxFol = Math.max(1, ...followers)
@@ -246,15 +231,14 @@ function AuthorDashboard() {
     if (!monthlyMetrics || monthlyMetrics.length === 0) return
     const headers = ['Period', 'Views', 'Followers', 'Estimated Revenue (USD)', 'Chapters Uploaded', 'Reviews Submitted', 'Chapters Approved']
     const rows = monthlyMetrics.map(item => {
-      const rev = numberValue(item.estimatedRevenue)
-      const v = numberValue(item.views)
-      const finalRevenue = rev > 0 ? rev : (v * 0.05)
+      const revenueEstimate = numberValue(item.estimatedRevenue)
+      const views = numberValue(item.views)
 
       return [
         item.label || item.monthKey,
-        v,
+        views,
         numberValue(item.followers),
-        finalRevenue,
+        revenueEstimate,
         numberValue(item.chaptersUploaded),
         numberValue(item.reviewsSubmitted),
         numberValue(item.chaptersApproved)
@@ -521,11 +505,9 @@ function AuthorDashboard() {
             {topComics.map((comic) => {
               const maxViews = Math.max(1, ...topComics.map((item) => numberValue(item.viewCount)))
               const pct = Math.max(4, (numberValue(comic.viewCount) / maxViews) * 100)
-              const v = numberValue(comic.viewCount)
-              const rev = numberValue(comic.estimatedRevenue)
-              const finalRev = rev > 0 ? rev : (v * 0.05)
+              const revenueEstimate = numberValue(comic.estimatedRevenue)
               
-              return <div key={comic.comicId || comic.title} className="author-top-comic-row"><div className="author-top-comic-info"><div><span className="author-top-comic-name">{comic.title}</span><span className="author-top-comic-meta">{formatCompactNumber(comic.viewCount)} views · {formatMoney(finalRev)}</span></div><span className={`author-mini-status ${statusClass(comic.moderationStatus)}`}>{formatStatus(comic.moderationStatus)}</span></div><div className="author-top-comic-bar-track"><div className="author-top-comic-bar-fill" style={{ width: `${pct}%` }}/></div></div>
+              return <div key={comic.comicId || comic.title} className="author-top-comic-row"><div className="author-top-comic-info"><div><span className="author-top-comic-name">{comic.title}</span><span className="author-top-comic-meta">{formatCompactNumber(comic.viewCount)} views · {formatMoney(revenueEstimate)} estimate</span></div><span className={`author-mini-status ${statusClass(comic.moderationStatus)}`}>{formatStatus(comic.moderationStatus)}</span></div><div className="author-top-comic-bar-track"><div className="author-top-comic-bar-fill" style={{ width: `${pct}%` }}/></div></div>
             })}
           </div>
         </div>
