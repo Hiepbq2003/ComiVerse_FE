@@ -12,6 +12,10 @@ export const getChapterDetailApi = (chapterId) => {
   return AxiosClient.get(`/chapters/detail/${chapterId}`);
 };
 
+export const getProtectedChapterPagesApi = (chapterId, config = {}) => {
+  return AxiosClient.get(`/chapters/${chapterId}/pages`, config);
+};
+
 export const deleteChapterApi = (chapterId) => {
   return AxiosClient.delete(`/chapters/${chapterId}`);
 };

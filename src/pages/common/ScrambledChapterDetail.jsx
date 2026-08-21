@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
 import HomeLayout from '../../components/layout/HomeLayout';
 import ScrambledComicPageCanvas from '../../components/common/ScrambledComicPageCanvas';
 import useReaderSecurity, { isDevToolsOpenSync } from '../../hooks/useReaderSecurity';
 import { getAuth } from '../../utils/Auth';
+import { getProtectedChapterPagesApi } from '../../services/api/ChapterApi';
 import { toast } from 'react-toastify';
 import { Flag, ArrowLeft, ChevronLeft, ChevronRight, Layers, Lock, ShieldAlert } from 'lucide-react';
 import '../../assets/style/reader/chapter-detail.css';
@@ -52,7 +52,7 @@ function ScrambledChapterDetail() {
     }
   }, []);
 
-  // Fetch API pages
+  // Fetch API pages using base URL Axios client and endpoint /chapters/{chapterId}/pages
   useEffect(() => {
     const fetchProtectedPages = async () => {
       if (isDevToolsOpenSync()) {
@@ -66,19 +66,16 @@ function ScrambledChapterDetail() {
 
       try {
         const auth = getAuth();
-        const tokenToUse = auth?.token || DEFAULT_BEARER_TOKEN;
+        const config = {};
+        if (!auth?.token && DEFAULT_BEARER_TOKEN) {
+          config.headers = {
+            Authorization: `Bearer ${DEFAULT_BEARER_TOKEN}`
+          };
+        }
 
-        // Backend endpoint specified by user request
-        const apiUrl = `http://localhost:8081/api/chapters/api/v1/chapters/${chapterId}/pages`;
+        // Endpoint: /chapters/{chapterId}/pages via AxiosClient (follows API_BASE_URL)
+        let data = await getProtectedChapterPagesApi(chapterId, config);
 
-        const response = await axios.get(apiUrl, {
-          headers: {
-            'accept': '*/*',
-            'Authorization': `Bearer ${tokenToUse}`
-          }
-        });
-
-        let data = response.data;
         // Unwrap nested API response structure if present
         if (data && data.data !== undefined) {
           data = data.data;
