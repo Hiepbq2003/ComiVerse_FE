@@ -63,7 +63,7 @@ function formatMoney(value, currency = 'USD') {
   }
 }
 
-function formatCompactMoney(value, currency = 'USD') {
+function formatCompactMoney(value) {
   const amount = Number(value || 0)
   try {
     return new Intl.NumberFormat('en-US', {
@@ -151,7 +151,7 @@ function RevenueChart({ series, currency }) {
             <g key={ratio}>
               <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} className="payment-chart-grid" />
               <text x={padding.left - 12} y={y + 4} textAnchor="end" className="payment-chart-axis-label">
-                {formatCompactMoney(maximum * ratio, currency)}
+                {formatCompactMoney(maximum * ratio)}
               </text>
             </g>
           )

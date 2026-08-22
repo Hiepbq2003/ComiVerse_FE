@@ -60,6 +60,8 @@ html.light {
 .admin-layout {
   display: flex;
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
   background: var(--admin-bg);
   font-family: var(--admin-font);
   color: var(--admin-text-primary);
@@ -1248,6 +1250,91 @@ html.light .btn-action-sm--reset:hover {
   margin-bottom: 28px;
 }
 
+.stats-dashboard-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.stats-dashboard-loading-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.stats-dashboard-loading-block,
+.stats-dashboard-loading-panel {
+  min-height: 112px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-md);
+  background: linear-gradient(90deg, var(--admin-card-bg) 25%, var(--admin-bg-secondary) 50%, var(--admin-card-bg) 75%);
+  background-size: 200% 100%;
+  animation: admin-statistics-shimmer 1.4s ease-in-out infinite;
+}
+
+.stats-dashboard-loading-panel {
+  min-height: 280px;
+}
+
+.stats-dashboard-error {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid rgba(239, 68, 68, 0.32);
+  border-radius: var(--admin-radius-md);
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--admin-text-primary);
+}
+
+.stats-dashboard-error > svg {
+  width: 30px;
+  flex: 0 0 30px;
+  color: var(--admin-red);
+}
+
+.stats-dashboard-error h2,
+.stats-dashboard-error p {
+  margin: 0;
+}
+
+.stats-dashboard-error p {
+  margin-top: 4px;
+  color: var(--admin-text-secondary);
+}
+
+.stats-dashboard-error .admin-btn {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+@keyframes admin-statistics-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@media (max-width: 1100px) {
+  .stats-dashboard-loading-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .stats-dashboard-loading-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-dashboard-error {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .stats-dashboard-error .admin-btn {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
 .stats-cards-grid--4 {
   grid-template-columns: repeat(4, 1fr);
 }
@@ -1849,6 +1936,107 @@ html.light .btn-action-sm--reset:hover {
 .admin-topbar-user-info svg {
   color: var(--admin-purple);
   flex-shrink: 0;
+}
+
+.admin-topbar-avatar {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 26px;
+  overflow: hidden;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  border-radius: 50%;
+  background: rgba(168, 85, 247, 0.12);
+  color: var(--admin-purple);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.admin-topbar-avatar img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.account-protected-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: 6px;
+  color: var(--admin-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-logout-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(4, 3, 12, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.admin-logout-dialog {
+  position: relative;
+  width: min(420px, 100%);
+  padding: 28px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-lg);
+  background: var(--admin-card-bg);
+  box-shadow: var(--admin-shadow-lg);
+}
+
+.admin-logout-dialog h2,
+.admin-logout-dialog p {
+  margin: 0;
+}
+
+.admin-logout-dialog h2 {
+  color: var(--admin-text-primary);
+  font-size: 22px;
+}
+
+.admin-logout-dialog p {
+  margin-top: 10px;
+  color: var(--admin-text-secondary);
+  line-height: 1.55;
+}
+
+.admin-logout-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--admin-text-secondary);
+  cursor: pointer;
+}
+
+.admin-logout-close:hover {
+  background: var(--admin-bg-secondary);
+  color: var(--admin-text-primary);
+}
+
+.admin-logout-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
 }
 
 /* ═══════════════════════════════════════════════════

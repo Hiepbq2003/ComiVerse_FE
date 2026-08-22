@@ -1,73 +1,88 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import React from 'react';
-import { MemoryRouter } from 'react-router-dom';
-import PayoutManagement from '../../../../pages/admin/PayoutManagement';
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import PayoutManagement from '../../../../pages/admin/PayoutManagement'
+import * as PayoutApi from '../../../../services/api/PayoutApi'
 
-// Mock Context Providers
-vi.mock('../../../../context/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 'admin-1', role: 'ADMIN', fullName: 'Super Admin' } }),
-  AuthProvider: ({ children }) => <>{children}</>,
-}));
+vi.mock('../../../../services/api/PayoutApi', () => ({
+  getAdminPayoutsApi: vi.fn(),
+  approveAdminPayoutApi: vi.fn(),
+  rejectAdminPayoutApi: vi.fn(),
+  payAdminPayoutApi: vi.fn(),
+}))
 
-vi.mock('../../../../context/NotificationContext', () => ({
-  useNotification: () => ({ unreadCount: 0, setUnreadCount: vi.fn(), fetchNotifications: vi.fn(), notifications: [] })
-}));
+vi.mock('../../../../components/layout/AdminLayout', () => ({
+  default: ({ children }) => <div>{children}</div>,
+}))
 
-vi.mock('../../../../context/ThemeContext', () => ({
-  useTheme: () => ({ theme: 'dark', toggleTheme: vi.fn() }),
-}));
+vi.mock('react-toastify', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}))
 
-describe('Admin Payout Management Tests', () => {
+const pendingPayout = {
+  id: 'payout-1',
+  userName: 'Author X',
+  userEmail: 'author@example.com',
+  role: 'AUTHOR',
+  payoutMonth: '2026-08',
+  amount: 25,
+  amountUsd: 25,
+  grossAmountUsd: 30,
+  monthlyLimitUsd: 480,
+  currency: 'USD',
+  status: 'PENDING',
+  requestedAt: '2026-08-20T10:00:00Z',
+}
+
+const responseFor = (status) => ({
+  items: status === 'PENDING' ? [pendingPayout] : [],
+  counts: { PENDING: 1, APPROVED: 0, PROCESSING: 0, PAID: 0, REJECTED: 0, FAILED: 0 },
+  totals: { PENDING: 25 },
+  totalsCurrency: 'USD',
+  totalElements: status === 'PENDING' ? 1 : 0,
+  totalPages: 1,
+  size: 20,
+})
+
+const renderPage = () => render(
+  <MemoryRouter>
+    <PayoutManagement />
+  </MemoryRouter>,
+)
+
+describe('Admin Payout Management', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-  });
+    vi.clearAllMocks()
+    PayoutApi.getAdminPayoutsApi.mockImplementation(({ status }) => Promise.resolve(responseFor(status)))
+  })
 
-  const renderComponent = () => {
-    return render(
-      <MemoryRouter>
-        <PayoutManagement />
-      </MemoryRouter>
-    );
-  };
+  it('loads API-shaped payout data and summary values', async () => {
+    renderPage()
 
-  it('Should render the initial payout list and summary stats', () => {
-    renderComponent();
+    expect(await screen.findByText('Author X')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pending (1)' })).toBeInTheDocument()
+    expect(PayoutApi.getAdminPayoutsApi).toHaveBeenCalledWith({ status: 'PENDING', page: 0, size: 20 })
+  })
 
-    // Verify summary cards
-    expect(screen.getByText('Pending')).toBeInTheDocument();
-    expect(screen.getByText('Processing')).toBeInTheDocument();
-    
-    // Verify some mock items exist
-    expect(screen.getByText('Author X')).toBeInTheDocument();
-    expect(screen.getByText('PhoenixWriter')).toBeInTheDocument();
-  });
+  it('requests the selected server-side status filter', async () => {
+    renderPage()
+    await screen.findByText('Author X')
 
-  it('Should filter payouts when clicking filter tabs', () => {
-    renderComponent();
+    fireEvent.click(screen.getByRole('button', { name: 'Approved (0)' }))
 
-    // Click "Completed"
-    const completedTab = screen.getByRole('button', { name: /^Completed$/i });
-    fireEvent.click(completedTab);
+    await waitFor(() => expect(PayoutApi.getAdminPayoutsApi).toHaveBeenLastCalledWith({ status: 'APPROVED', page: 0, size: 20 }))
+    expect(await screen.findByText('No payout requests match this filter.')).toBeInTheDocument()
+  })
 
-    // After filtering by Completed, "NoviceWriter" should be visible, but "PhoenixWriter" (Processing) shouldn't
-    expect(screen.getByText('NoviceWriter')).toBeInTheDocument();
-    expect(screen.queryByText('PhoenixWriter')).not.toBeInTheDocument();
-  });
+  it('approves a pending payout and refreshes the list', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue('Verified')
+    PayoutApi.approveAdminPayoutApi.mockResolvedValueOnce({})
+    renderPage()
+    await screen.findByText('Author X')
 
-  it('Should open and close action modal when clicking action button', () => {
-    renderComponent();
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
 
-    const actionBtns = screen.getAllByRole('button', { name: /Action/i });
-    expect(actionBtns.length).toBeGreaterThan(0);
-    
-    // Open action modal for first item
-    fireEvent.click(actionBtns[0]);
-    expect(screen.getByText(/Process Payout/i)).toBeInTheDocument();
-    
-    // Close modal
-    const closeBtn = screen.getByRole('button', { name: /Close/i });
-    fireEvent.click(closeBtn);
-    expect(screen.queryByText(/Process Payout/i)).not.toBeInTheDocument();
-  });
-});
+    await waitFor(() => expect(PayoutApi.approveAdminPayoutApi).toHaveBeenCalledWith('payout-1', 'Verified'))
+    await waitFor(() => expect(PayoutApi.getAdminPayoutsApi).toHaveBeenCalledTimes(2))
+  })
+})

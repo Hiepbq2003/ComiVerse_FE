@@ -1,14 +1,10 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'react-toastify'
 import AdminLayout from '../../components/layout/AdminLayout'
 import { getAllAccountsApi, registerStaffApi, banUserApi, unbanUserApi, resetUserPasswordApi, updateUserApi, approveAuthorLicenseApi, rejectAuthorLicenseApi, reopenAuthorLicenseApi } from '../../services/api/AccountApi'
 import ModernButton from '../../components/common/ModernButton'
 import AnimatedButton from '../../components/common/AnimatedButton'
-import { SkeletonLoader } from '../../components/common/SkeletonLoader'
-import { AIPopover } from '../../components/common/AIPopover'
-import { ModernPagination } from '../../components/common/ModernPagination'
 import { exportToCsv } from '../../utils/exportToCsv'
-import { useTheme } from '../../context/ThemeContext'
 import '../../assets/style/common/ai-popover.css'
 import '../../assets/style/common/modern-pagination.css'
 import '../../assets/style/common/skeleton-loader.css'
@@ -58,7 +54,6 @@ const getDisplayLanguages = (acc) => {
 }
 
 function AccountManagement() {
-  const { theme } = useTheme()
   // Data states
   const [accounts, setAccounts] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -154,7 +149,7 @@ function AccountManagement() {
           role: normalizedRole,
           status: acc.status || (acc.banned ? 'Banned' : 'Active'),
           createdDate: cDate ? formatDate(cDate) : '-',
-          lastActive: lActive ? formatDate(lActive) : 'Today',
+          lastActive: lActive ? formatDate(lActive) : '-',
           assignedLanguages: Array.isArray(acc.assignedLanguages) && acc.assignedLanguages.length > 0 
             ? acc.assignedLanguages 
             : (normalizedRole.toLowerCase().includes('moderator') ? getDisplayLanguages(acc) : []),
@@ -468,6 +463,10 @@ function AccountManagement() {
 
   // ── BAN / UNBAN ───────────────────────────────────
   const openConfirm = (type, account) => {
+    if (['ban', 'unban'].includes(type) && normalizeRoleValue(account?.role) === 'ADMIN') {
+      showAlert('warning', 'Admin accounts are protected from ban actions.')
+      return
+    }
     setConfirmAction({ type, account })
     setShowConfirmModal(true)
   }
@@ -494,7 +493,7 @@ function AccountManagement() {
       } else if (type === 'reset-pw') {
         await resetUserPasswordApi(account.id)
         setShowEditModal(false)
-        showAlert('success', `Password for "${account.fullName}" has been reset to 123456.`)
+        showAlert('success', `Password for "${account.fullName}" has been reset to abcd1234.`)
       }
     } catch (err) {
       const errorMsg = err.response?.data?.message || `Failed to ${type} user. Please try again.`
@@ -623,8 +622,8 @@ function AccountManagement() {
                 </td>
               </tr>
             ) : (
-              accounts.map((account) => (
-                <tr key={account.id}>
+              accounts.map((account, index) => (
+                <tr key={account.id || account.email || account.username || `account-${index}`}>
                   <td className="cell-user-id">{account.userId}</td>
                   <td className="cell-name">{account.fullName}</td>
                   <td className="cell-email">{account.email}</td>
@@ -692,7 +691,9 @@ function AccountManagement() {
                             </button>
                           )}
 
-                          {(account.status || '').toLowerCase() === 'banned' ? (
+                          {normalizeRoleValue(account.role) === 'ADMIN' ? (
+                            <span className="account-protected-label" title="Admin accounts cannot be banned">Protected</span>
+                          ) : (account.status || '').toLowerCase() === 'banned' ? (
                             <button
                               type="button"
                               className="btn-action-sm btn-action-sm--unban"
@@ -769,7 +770,7 @@ function AccountManagement() {
           AUTHOR LICENSE REVIEW MODAL
           ═══════════════════════════════════════════════ */}
       {licenseReviewAccount && (
-        <div className="admin-modal-overlay" onClick={closeLicenseReview}>
+        <div className="admin-modal-overlay" onClick={(event) => event.stopPropagation()}>
           <div className="admin-modal admin-license-review-modal" onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-header">
               <div>
@@ -1259,7 +1260,7 @@ function AccountManagement() {
                   {confirmAction.type === 'unban' &&
                     `"${confirmAction.account.fullName}" will regain access to the platform.`}
                   {confirmAction.type === 'reset-pw' &&
-                    `The password for "${confirmAction.account.fullName}" will be reset to the default: 123456.`}
+                    `The password for "${confirmAction.account.fullName}" will be reset to the default: abcd1234.`}
                 </p>
               </div>
 
