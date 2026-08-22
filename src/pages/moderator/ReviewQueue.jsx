@@ -927,8 +927,11 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           } else if (sortFilter === 'author_desc') {
             return (b.submittedBy || '').localeCompare(a.submittedBy || '');
           }
-          const timeA = new Date(a.timestamp || 0).getTime() || 0;
-          const timeB = new Date(b.timestamp || 0).getTime() || 0;
+          const getSortTime = (item) => {
+            return new Date(item.updatedAt || item.approvedAt || item.timestamp || 0).getTime() || 0;
+          };
+          const timeA = getSortTime(a);
+          const timeB = getSortTime(b);
           return sortFilter === 'date_asc' ? timeA - timeB : timeB - timeA;
         });
     }
@@ -961,8 +964,14 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         } else if (sortFilter === 'author_desc') {
           return (b.submittedBy || '').localeCompare(a.submittedBy || '');
         }
-        const timeA = new Date(a.timestamp || a.submittedAt || a.createdAt || 0).getTime() || 0;
-        const timeB = new Date(b.timestamp || b.submittedAt || b.createdAt || 0).getTime() || 0;
+        const getSortTime = (item) => {
+          if (activeTab === 'pending') {
+            return new Date(item.timestamp || item.submittedAt || item.createdAt || 0).getTime() || 0;
+          }
+          return new Date(item.updatedAt || item.approvedAt || item.timestamp || item.submittedAt || item.createdAt || 0).getTime() || 0;
+        };
+        const timeA = getSortTime(a);
+        const timeB = getSortTime(b);
         return sortFilter === 'date_asc' ? timeA - timeB : timeB - timeA;
       });
   }, [submissions, comics, activeTab, searchQuery, sortFilter]);
