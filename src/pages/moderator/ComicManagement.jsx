@@ -190,6 +190,7 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
     deadline: '',
     notes: ''
   })
+  const [isSubmittingTrans, setIsSubmittingTrans] = useState(false)
 
   // Direct Assignment modal states
   const [showDirectAssignModal, setShowDirectAssignModal] = useState(false)
@@ -198,6 +199,7 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
     targetLang: '',
     deadline: ''
   })
+  const [isSubmittingAssign, setIsSubmittingAssign] = useState(false)
   const [selectedTeamId, setSelectedTeamId] = useState('')
 
   // Chapter Management modal states
@@ -262,7 +264,9 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
       toast.warn('Please select at least one target language.')
       return
     }
+    if (isSubmittingTrans) return;
     try {
+      setIsSubmittingTrans(true);
       await createTranslationRequestApi({
         comicId: transReqComic.id,
         targetLanguages: transReqForm.targetLanguages,
@@ -278,6 +282,8 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
     } catch (err) {
       console.error(err)
       toast.error('Failed to submit translation request.')
+    } finally {
+      setIsSubmittingTrans(false);
     }
   }
 
@@ -316,7 +322,9 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
     const selectedTeamObj = projectTeams.find(t => t.id === selectedTeamId)
     if (!selectedTeamObj) return
 
+    if (isSubmittingAssign) return;
     try {
+      setIsSubmittingAssign(true);
       await updateProjectTeamApi(selectedTeamId, {
         ...selectedTeamObj,
         comicName: directAssignComic.title,
@@ -337,6 +345,8 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
     } catch (err) {
       console.error(err)
       toast.error('Failed to assign project team.')
+    } finally {
+      setIsSubmittingAssign(false);
     }
   }
 
@@ -1031,13 +1041,14 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
               <ModernButton 
                 variant={5} 
                 label="Cancel" 
+                disabled={isSubmittingTrans}
                 onClick={() => setShowTransReqModal(false)} 
               />
               <ModernButton 
                 variant={2} 
-                label={`Submit Request (${transReqForm.targetLanguages.length} language${transReqForm.targetLanguages.length !== 1 ? 's' : ''})`} 
+                label={isSubmittingTrans ? 'Submitting...' : `Submit Request (${transReqForm.targetLanguages.length} language${transReqForm.targetLanguages.length !== 1 ? 's' : ''})`} 
                 onClick={handleSubmitTranslationRequest}
-                disabled={transReqForm.targetLanguages.length === 0}
+                disabled={isSubmittingTrans || transReqForm.targetLanguages.length === 0}
               />
             </div>
           </div>
@@ -1134,13 +1145,14 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
               <ModernButton 
                 variant={5} 
                 label="Cancel" 
+                disabled={isSubmittingAssign}
                 onClick={() => setShowDirectAssignModal(false)} 
               />
               <ModernButton 
                 variant={2} 
-                label="Confirm Assignment" 
+                label={isSubmittingAssign ? 'Assigning...' : 'Assign Team'} 
                 onClick={handleSubmitDirectAssignment}
-                disabled={!directAssignForm.targetLang || !selectedTeamId}
+                disabled={isSubmittingAssign || !selectedTeamId || !directAssignForm.targetLang}
               />
             </div>
           </div>

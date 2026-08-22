@@ -146,6 +146,8 @@ function ModeratorDashboard() {
   })
   const [isSubmittingTeam, setIsSubmittingTeam] = useState(false)
   const isSubmittingTeamRef = useRef(false)
+  const [isSubmittingAction, setIsSubmittingAction] = useState(false)
+  const isSubmittingActionRef = useRef(false)
 
   useEffect(() => {
     fetchAllData()
@@ -926,6 +928,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
   // API Call Integration Handlers
   const handleApprove = async (id, subItem) => {
+    if (isSubmittingActionRef.current) return;
+    isSubmittingActionRef.current = true;
+    setIsSubmittingAction(true);
     try {
       let cleanId = String(id || '').replace(/^(comic|group|chap)-/, '');
       if (subItem && subItem.submissionId) {
@@ -996,13 +1001,20 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       if (appSub) {
         publishComicToManagement(appSub);
       }
+      if (fetchAllData) fetchAllData()
     } catch (err) {
       console.error(err)
       toast.error('Failed to approve submission.')
+    } finally {
+      isSubmittingActionRef.current = false;
+      setIsSubmittingAction(false);
     }
   }
 
   const handleApproveAndCreateProject = async (item) => {
+    if (isSubmittingActionRef.current) return;
+    isSubmittingActionRef.current = true;
+    setIsSubmittingAction(true);
     try {
       let realDbId = null;
       let submissionApproveSucceeded = false;
@@ -1057,10 +1069,16 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     } catch (err) {
       console.error(err)
       toast.error('Failed to approve submission.')
+    } finally {
+      isSubmittingActionRef.current = false;
+      setIsSubmittingAction(false);
     }
   }
 
   const handleConfirmReject = async (id, reason, subItem = null) => {
+    if (isSubmittingActionRef.current) return;
+    isSubmittingActionRef.current = true;
+    setIsSubmittingAction(true);
     try {
       let cleanId = String(id || '').replace(/^(comic|group|chap)-/, '');
       if (subItem && subItem.submissionId) {
@@ -1117,9 +1135,13 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
         return next;
       });
+      if (fetchAllData) fetchAllData()
     } catch (err) {
       console.error(err)
       toast.error('Failed to reject submission.')
+    } finally {
+      isSubmittingActionRef.current = false;
+      setIsSubmittingAction(false);
     }
   }
 
@@ -1151,6 +1173,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
   };
 
   const handleChapterApprove = async (submissionId, chapterObj) => {
+    if (isSubmittingActionRef.current) return;
+    isSubmittingActionRef.current = true;
+    setIsSubmittingAction(true);
     const chapTitle = chapterObj?.title || `Chapter ${chapterObj?.number || chapterObj?.chapterNumber || ''}`.trim() || 'Chapter';
 
     // Find the real submission record that owns this chapter
@@ -1293,11 +1318,17 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     } catch (err) {
       console.error(err);
       toast.error('Failed to approve chapter.');
+    } finally {
+      isSubmittingActionRef.current = false;
+      setIsSubmittingAction(false);
     }
   };
 
 
   const handleChapterReject = async (submissionId, chapterObj, reason, overallReason = null, skipSubmissionReject = false) => {
+    if (isSubmittingActionRef.current) return;
+    isSubmittingActionRef.current = true;
+    setIsSubmittingAction(true);
     let cleanId = String(submissionId || chapterObj?.submissionId || chapterObj?.comicId || '').replace(/^(comic|group|chap)-/, '');
     if (cleanId.includes('mock')) {
       const realSub = submissions.find(s => s.chapterId && String(s.chapterId) === String(chapterObj?.id));
@@ -2608,6 +2639,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               handleChapterApprove={handleChapterApprove}
               handleChapterReject={handleChapterReject}
               fetchAllData={fetchAllData}
+              isSubmittingAction={isSubmittingAction}
             />
           )}
 
