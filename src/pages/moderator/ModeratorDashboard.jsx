@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import '../../assets/style/moderator/dashboard.css'
 import ModeratorLayout from '../../components/layout/ModeratorLayout'
