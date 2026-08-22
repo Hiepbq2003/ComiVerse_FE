@@ -253,15 +253,7 @@ function StatisticsDashboard() {
                   statsData.genresList.map((g, idx) => (
                     <span
                       key={g.id || idx}
-                      style={{
-                        background: 'rgba(168, 85, 247, 0.12)',
-                        border: '1px solid rgba(168, 85, 247, 0.3)',
-                        color: '#c084fc',
-                        padding: '8px 16px',
-                        borderRadius: '20px',
-                        fontSize: '13px',
-                        fontWeight: '500'
-                      }}
+                      className="stats-genre-pill"
                     >
                       {g.genreName || g.name}
                     </span>
