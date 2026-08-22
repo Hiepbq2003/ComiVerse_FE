@@ -345,7 +345,7 @@ const loadPlans = useCallback(async () => {
       )}
 
       {formOpen && (
-        <div className="subscription-admin-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setFormOpen(false) }}>
+        <div className="subscription-admin-modal-overlay" onMouseDown={(event) => event.stopPropagation()}>
           <form className="subscription-admin-modal" onSubmit={handleSavePlan}>
             <div className="subscription-admin-modal-header">
               <div>

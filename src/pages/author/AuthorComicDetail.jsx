@@ -503,6 +503,22 @@ function EditComicModal({ comic, onClose, onSaved }) {
       return
     }
 
+    if (!form.summary.trim()) {
+      setError('Description is required.')
+      return
+    }
+
+    if (!form.cover.trim()) {
+      setError('Cover Image URL is required.')
+      return
+    }
+
+    const genreList = form.genres.split(',').map((genre) => genre.trim()).filter(Boolean);
+    if (genreList.length === 0) {
+      setError('Please select at least one genre.')
+      return
+    }
+
     setSaving(true)
     setError('')
 
@@ -560,12 +576,12 @@ function EditComicModal({ comic, onClose, onSaved }) {
           </label>
 
           <label className="author-form-label">
-            Minimum Age
+            Minimum Age *
             <input className="author-input" type="number" min="0" max="21" value={form.minimumAge} onChange={(event) => updateField('minimumAge', event.target.value)} />
           </label>
 
           <label className="author-form-label">
-            Publication Status
+            Publication Status *
             <select className="author-input" value={form.publicationStatus} onChange={(event) => updateField('publicationStatus', event.target.value)}>
               <option value="ONGOING">Ongoing</option>
               <option value="COMPLETED">Completed</option>
@@ -576,7 +592,7 @@ function EditComicModal({ comic, onClose, onSaved }) {
         </div>
 
         <div className="author-form-label">
-          Cover Image URL
+          Cover Image URL *
           <div style={{ display: 'flex', gap: '8px' }}>
             <input className="author-input" style={{ flex: 1 }} value={form.cover} onChange={(event) => updateField('cover', event.target.value)} />
             <label className="author-primary-btn" style={{ cursor: 'pointer', whiteSpace: 'nowrap', opacity: uploadingCover ? 0.7 : 1 }}>
@@ -587,7 +603,7 @@ function EditComicModal({ comic, onClose, onSaved }) {
         </div>
 
         <div className="author-form-label">
-          Genres (Comma separated)
+          Genres (Comma separated) *
           <input 
             className="author-input" 
             value={Array.isArray(form.genres) ? form.genres.map(g => typeof g === 'object' ? (g.name || g.title) : g).join(', ') : (form.genres || '')}
@@ -640,7 +656,7 @@ function EditComicModal({ comic, onClose, onSaved }) {
         </div>
 
         <label className="author-form-label">
-          Description
+          Description *
           <textarea className="author-input" rows="4" value={form.summary} onChange={(event) => updateField('summary', event.target.value)} />
         </label>
 

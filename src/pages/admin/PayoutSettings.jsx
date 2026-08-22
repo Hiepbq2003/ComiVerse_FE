@@ -123,7 +123,7 @@ function PayoutSettings() {
         <section className="admin-payout-settings">
           <div className="admin-payout-settings-head">
             <div><h2>Revenue & withdrawal rules</h2><p>Revenue formulas and limits are stored in USD.</p></div>
-            <button className="btn-table-action payout-mark-paid" onClick={saveSettings} disabled={saving || loading}>{saving ? 'Saving...' : 'Save settings'}</button>
+            <button className="payout-liquid-btn" onClick={saveSettings} disabled={saving || loading}>{saving ? 'Saving...' : 'Save settings'}</button>
           </div>
           <div className="admin-payout-settings-grid">
             {SETTING_FIELDS.map((field) => (

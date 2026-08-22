@@ -63,7 +63,7 @@ function formatMoney(value, currency = 'USD') {
   }
 }
 
-function formatCompactMoney(value, currency = 'USD') {
+function formatCompactMoney(value) {
   const amount = Number(value || 0)
   try {
     return new Intl.NumberFormat('en-US', {
@@ -112,6 +112,8 @@ function deltaMeta(value, noun) {
 }
 
 function RevenueChart({ series, currency }) {
+  const [hoverData, setHoverData] = useState(null)
+
   const width = 920
   const height = 300
   const padding = { left: 74, right: 22, top: 24, bottom: 48 }
@@ -149,7 +151,7 @@ function RevenueChart({ series, currency }) {
             <g key={ratio}>
               <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} className="payment-chart-grid" />
               <text x={padding.left - 12} y={y + 4} textAnchor="end" className="payment-chart-axis-label">
-                {formatCompactMoney(maximum * ratio, currency)}
+                {formatCompactMoney(maximum * ratio)}
               </text>
             </g>
           )
@@ -158,10 +160,35 @@ function RevenueChart({ series, currency }) {
         {areaPath && <path d={areaPath} fill="url(#paymentRevenueGradient)" />}
         {linePath && <path d={linePath} className="payment-chart-line" />}
 
-        {coordinates.length <= 90 && coordinates.map((point) => (
-          <circle key={point.date} cx={point.x} cy={point.y} r="3.5" className="payment-chart-point">
-            <title>{formatShortDate(point.date)}: {formatMoney(point.revenue, currency)} · {point.paidPayments || 0} paid</title>
-          </circle>
+        {/* Interactive Hover Bands */}
+        {coordinates.map((point, index) => {
+          const bandW = chartWidth / denominator
+          return (
+            <rect
+              key={`hover-${point.date}`}
+              x={point.x - bandW / 2}
+              y={padding.top}
+              width={bandW}
+              height={chartHeight}
+              fill={hoverData?.index === index ? "rgba(168, 85, 247, 0.05)" : "transparent"}
+              onMouseEnter={() => setHoverData({ index, ...point })}
+              onMouseLeave={() => setHoverData(null)}
+              style={{ cursor: 'crosshair', transition: 'fill 0.2s' }}
+            />
+          )
+        })}
+
+        {coordinates.length <= 90 && coordinates.map((point, index) => (
+          <circle 
+            key={point.date} 
+            cx={point.x} 
+            cy={point.y} 
+            r={hoverData?.index === index ? "6" : "4"} 
+            fill={hoverData?.index === index ? "#c084fc" : "#fff"}
+            stroke="#a855f7"
+            strokeWidth="2.5"
+            style={{ pointerEvents: 'none', transition: 'all 0.2s' }}
+          />
         ))}
 
         {coordinates.map((point, index) => {
@@ -174,12 +201,45 @@ function RevenueChart({ series, currency }) {
           )
         })}
       </svg>
+      
+      {hoverData && (() => {
+        const px = (hoverData.x / width) * 100
+        const py = (hoverData.y / height) * 100
+        let alignClass = ''
+        if (px > 80) alignClass += ' align-right'
+        else if (px < 20) alignClass += ' align-left'
+        
+        if (py < 30) alignClass += ' align-bottom'
+        
+        return (
+          <div 
+            className={`payment-chart-tooltip${alignClass}`} 
+            style={{ 
+              left: `${px}%`, 
+              top: `${py}%`,
+              pointerEvents: 'none',
+              zIndex: 999 
+            }}
+          >
+            <div className="payment-chart-tooltip-header">{formatShortDate(hoverData.date)}</div>
+            <div className="payment-chart-tooltip-row">
+              <span className="payment-chart-tooltip-label">Revenue</span>
+              <span className="payment-chart-tooltip-value">{formatMoney(hoverData.revenue, currency)}</span>
+            </div>
+            <div className="payment-chart-tooltip-row">
+              <span className="payment-chart-tooltip-label">Transactions</span>
+              <span className="payment-chart-tooltip-value">{hoverData.paidPayments || 0} paid</span>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
 
 function RevenueManagement() {
   const [days, setDays] = useState(30)
+  const [currency, setCurrency] = useState('USD')
   const [statistics, setStatistics] = useState(null)
   const [recentPayments, setRecentPayments] = useState([])
   const [loading, setLoading] = useState(true)
@@ -189,7 +249,7 @@ function RevenueManagement() {
     setLoading(true)
     setError('')
 
-    const params = { days, zoneId: 'Asia/Ho_Chi_Minh', currency: 'USD' }
+    const params = { days, zoneId: 'Asia/Ho_Chi_Minh', currency }
 
     const [statisticsResult, logsResult] = await Promise.allSettled([
       getAdminPaymentStatisticsApi(params),
@@ -210,14 +270,14 @@ function RevenueManagement() {
         : []
     )
     setLoading(false)
-  }, [days])
+  }, [days, currency])
 
   useEffect(() => {
     loadStatistics()
   }, [loadStatistics])
 
   const summary = statistics?.summary || EMPTY_SUMMARY
-  const selectedCurrency = 'USD'
+  const selectedCurrency = currency
   const dailySeries = Array.isArray(statistics?.dailySeries) ? statistics.dailySeries : []
   const statusBreakdown = Array.isArray(statistics?.statusBreakdown) ? statistics.statusBreakdown : []
   const planBreakdown = Array.isArray(statistics?.planBreakdown) ? statistics.planBreakdown : []
@@ -301,8 +361,13 @@ function RevenueManagement() {
             </label>
             <label className="payment-filter-control">
               <span>Currency</span>
-              <select value="USD" disabled aria-label="Currency">
+              <select value={currency} onChange={(e) => setCurrency(e.target.value)} disabled={loading} aria-label="Currency">
                 <option value="USD">USD</option>
+                {(statistics?.availableCurrencies || [])
+                  .filter(c => c !== 'USD')
+                  .map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
               </select>
             </label>
             <button type="button" className="admin-btn payment-action-btn" onClick={loadStatistics} disabled={loading}>
@@ -467,9 +532,31 @@ function RevenueManagement() {
                       <tr><td colSpan="5" className="payment-table-empty">No payment records yet.</td></tr>
                     ) : recentPayments.map((payment) => (
                       <tr key={payment.id}>
-                        <td>{formatDate(payment.createdAt)}</td>
-                        <td><strong>{payment.userEmail || 'Unknown reader'}</strong></td>
-                        <td><span className="payment-plan-code">{payment.planCode}</span> {payment.planName}</td>
+                        <td>
+                          <div className="payment-cell-created">
+                            <span className="payment-date">{formatDate(payment.createdAt).split(',')[0]}</span>
+                            <span className="payment-time">{formatDate(payment.createdAt).split(',')[1] || ''}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="payment-cell-reader">
+                            <div className="payment-reader-avatar">
+                              {(payment.userEmail || 'U')[0].toUpperCase()}
+                            </div>
+                            <div className="payment-reader-info">
+                              <span className="payment-reader-email">{payment.userEmail || 'Unknown reader'}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="payment-cell-plan">
+                            <span className="payment-plan-icon"><CreditCard size={14} /></span>
+                            <div className="payment-plan-details">
+                              <span className="payment-plan-name">{payment.planName}</span>
+                              <span className="payment-plan-code">{payment.planCode}</span>
+                            </div>
+                          </div>
+                        </td>
                         <td className="payment-table-amount">{formatMoney(payment.amount, payment.currency)}</td>
                         <td><span className={`payment-status-badge ${String(payment.status || '').toLowerCase()}`}>{payment.status}</span></td>
                       </tr>

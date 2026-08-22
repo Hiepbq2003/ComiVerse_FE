@@ -5,6 +5,11 @@ export const sendBroadcastApi = (data) => {
   return AxiosClient.post('/admin/broadcasts', data);
 };
 
+// Resolve and count the selected audience before the admin confirms delivery
+export const previewBroadcastAudienceApi = (data) => {
+  return AxiosClient.post('/admin/broadcasts/preview', data);
+};
+
 // Get broadcast history (admin only)
 export const getBroadcastHistoryApi = () => {
   return AxiosClient.get('/admin/broadcasts');

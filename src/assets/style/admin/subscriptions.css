@@ -69,20 +69,35 @@
 
 .subscription-plan-code {
   display: inline-flex;
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: 6px;
-  background: rgba(168, 85, 247, 0.12);
-  color: #c084fc;
-  font-size: 10px;
+  background: rgba(168, 85, 247, 0.15);
+  color: #d8b4fe;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
 }
 
+html.light .subscription-plan-code {
+  background: rgba(147, 51, 234, 0.12);
+  color: #7e22ce;
+}
+
 .subscription-admin-price {
   margin-top: 22px;
-  color: #c084fc;
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 900;
+  background: linear-gradient(135deg, #c084fc, #ec4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+html.light .subscription-admin-price {
+  background: linear-gradient(135deg, #7e22ce, #db2777);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .subscription-admin-interval {
@@ -93,21 +108,31 @@
 
 .subscription-admin-badge {
   display: inline-flex;
-  padding: 5px 10px;
+  padding: 5px 12px;
   border-radius: 999px;
-  background: rgba(16, 185, 129, 0.12);
-  color: #6ee7b7;
-  font-size: 11px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  font-size: 12px;
   font-weight: 800;
+}
+
+html.light .subscription-admin-badge {
+  background: rgba(5, 150, 105, 0.12);
+  color: #047857;
 }
 
 .subscription-admin-plan ul {
   min-height: 100px;
-  margin: 18px 0;
-  padding-left: 19px;
+  margin: 20px 0;
+  padding-left: 20px;
   color: var(--admin-text-secondary);
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
   line-height: 1.8;
+}
+
+html.light .subscription-admin-plan ul {
+  color: #475569;
 }
 
 .subscription-admin-plan-actions {
@@ -121,14 +146,33 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 38px;
+  min-height: 40px;
   border: 1px solid var(--admin-border);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.025);
-  color: var(--admin-text-secondary);
-  font-size: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--admin-text-primary);
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+  transition: all 0.2s;
+}
+
+html.light .subscription-admin-plan-actions button {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+
+.subscription-admin-plan-actions button:hover {
+  background: rgba(168, 85, 247, 0.15);
+  color: #d8b4fe;
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+html.light .subscription-admin-plan-actions button:hover {
+  background: rgba(147, 51, 234, 0.1);
+  color: #7e22ce;
+  border-color: rgba(147, 51, 234, 0.3);
 }
 
 .subscription-admin-empty,

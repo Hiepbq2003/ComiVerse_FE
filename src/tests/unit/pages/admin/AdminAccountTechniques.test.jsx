@@ -1,8 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import React from 'react';
-import { MemoryRouter } from 'react-router-dom';
-import AccountManagement from '../../../../pages/admin/AccountManagement';
 import * as AuthUtils from '../../../../utils/Auth';
 
 vi.mock('../../../../utils/Auth', () => ({
@@ -13,14 +9,6 @@ vi.mock('../../../../services/api/AccountApi', () => ({
   getAllAccountsApi: vi.fn(),
   updateAccountStatusApi: vi.fn(),
 }));
-
-const renderAccountManagement = () => {
-  return render(
-    <MemoryRouter>
-      <AccountManagement />
-    </MemoryRouter>
-  );
-};
 
 describe('AdminAccountManagement - Software Testing Techniques', () => {
   beforeEach(() => {

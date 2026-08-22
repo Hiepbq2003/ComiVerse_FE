@@ -42,10 +42,32 @@ function ProjectTeams({
 }) {
   const { theme } = useTheme()
   const [currentPage, setCurrentPage] = useState(1)
+  const [teamSearchTitle, setTeamSearchTitle] = useState('')
+  const [teamSearchLeader, setTeamSearchLeader] = useState('')
+  const [teamSearchStatus, setTeamSearchStatus] = useState('ALL')
+
+  const filteredProjectTeams = useMemo(() => {
+    return (projectTeams || []).filter(team => {
+      if (teamSearchTitle) {
+        const tTitle = (team.title || team.comicName || '').toLowerCase()
+        if (!tTitle.includes(teamSearchTitle.toLowerCase().trim())) return false
+      }
+      if (teamSearchLeader) {
+        const tLeader = (team.leaderName || '').toLowerCase()
+        if (!tLeader.includes(teamSearchLeader.toLowerCase().trim())) return false
+      }
+      if (teamSearchStatus !== 'ALL') {
+        const tStatus = (team.status || 'ACTIVE').toUpperCase()
+        if (tStatus !== teamSearchStatus) return false
+      }
+      return true
+    })
+  }, [projectTeams, teamSearchTitle, teamSearchLeader, teamSearchStatus])
+
   const ITEMS_PER_PAGE = 6
-  const totalPages = Math.ceil(projectTeams.length / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(filteredProjectTeams.length / ITEMS_PER_PAGE)
   const activePage = Math.min(currentPage, Math.max(1, totalPages))
-  const paginatedTeams = projectTeams.slice(
+  const paginatedTeams = filteredProjectTeams.slice(
     (activePage - 1) * ITEMS_PER_PAGE,
     activePage * ITEMS_PER_PAGE
   )
@@ -525,6 +547,35 @@ function ProjectTeams({
         </div>
       </div>
 
+      <div className="mod-filter-bar" style={{ marginTop: '24px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <input 
+          type="text" 
+          className="mod-input" 
+          placeholder="Search by comic / team name..." 
+          value={teamSearchTitle} 
+          onChange={e => setTeamSearchTitle(e.target.value)} 
+          style={{ flex: '1 1 250px' }}
+        />
+        <input 
+          type="text" 
+          className="mod-input" 
+          placeholder="Search by project leader..." 
+          value={teamSearchLeader} 
+          onChange={e => setTeamSearchLeader(e.target.value)} 
+          style={{ flex: '1 1 200px' }}
+        />
+        <select 
+          className="mod-input" 
+          value={teamSearchStatus} 
+          onChange={e => setTeamSearchStatus(e.target.value)}
+          style={{ width: '150px' }}
+        >
+          <option value="ALL">All Status</option>
+          <option value="ACTIVE">Active</option>
+          <option value="PAUSED">Paused</option>
+        </select>
+      </div>
+
       {loading ? (
         <div className="project-team-cards-grid" style={{ marginTop: '24px' }}>
           {[1, 2, 3].map(i => (
@@ -536,11 +587,11 @@ function ProjectTeams({
             </div>
           ))}
         </div>
-      ) : projectTeams.length === 0 ? (
+      ) : filteredProjectTeams.length === 0 ? (
         <div className="project-team-cards-list" style={{ marginTop: '24px' }}>
           <div className="moderator-empty-state">
-            <h3>No translation project teams</h3>
-            <p>Click "Create Project Team" on the top right to start a new project team.</p>
+            <h3>No project teams found</h3>
+            <p>Try adjusting your search or filters, or create a new team.</p>
           </div>
         </div>
       ) : (
@@ -621,12 +672,12 @@ function ProjectTeams({
           </div>
 
           {totalPages > 1 && (
-            <div className="project-teams-pagination-wrap" style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'center' }}>
               <ModernPagination 
-                currentPage={activePage}
+                currentPage={currentPage}
                 totalPages={totalPages}
-                onPageChange={(page) => setCurrentPage(page)}
-                variant="pills"
+                onPageChange={setCurrentPage}
+                variant="minimal"
               />
             </div>
           )}

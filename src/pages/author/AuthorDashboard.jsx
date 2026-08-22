@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Download } from 'lucide-react'
 import '../../assets/style/author/dashboard.css'
 import { getAuthorDashboardMetricsApi } from '../../services/api/AuthorComicApi'
+import { getCreatorPayoutOverviewApi } from '../../services/api/PayoutApi'
 import { exportToCsv } from '../../utils/exportToCsv'
 
 const EMPTY_SUMMARY = {
@@ -18,6 +19,7 @@ const EMPTY_SUMMARY = {
   pendingReviews: 0,
   approvedRate: 0,
   estimatedRevenue: 0,
+  totalPaid: 0,
 }
 
 const numberValue = (value) => {
@@ -40,6 +42,17 @@ const formatMoney = (value) => `$${new Intl.NumberFormat('en-US', {
 const formatPercent = (value) => `${numberValue(value).toFixed(1).replace('.0', '')}%`
 
 const formatRating = (value) => numberValue(value).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
+
+const currentPayoutMonthKey = () => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(new Date())
+  const year = parts.find((part) => part.type === 'year')?.value
+  const month = parts.find((part) => part.type === 'month')?.value
+  return year && month ? `${year}-${month}` : new Date().toISOString().slice(0, 7)
+}
 
 const formatStatus = (status) => {
   const value = (status || 'DRAFT').toString().toUpperCase()
@@ -114,6 +127,8 @@ function StatIcon({ type }) {
 function AuthorDashboard() {
   const navigate = useNavigate()
   const [dashboard, setDashboard] = useState(null)
+  const [currentMonthEarning, setCurrentMonthEarning] = useState(null)
+  const [currentMonthEarningError, setCurrentMonthEarningError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [chartPeriod, setChartPeriod] = useState('WEEK') // WEEK, MONTH, YEAR
@@ -136,6 +151,28 @@ function AuthorDashboard() {
   useEffect(() => {
     loadDashboard()
   }, [loadDashboard])
+
+  useEffect(() => {
+    let active = true
+
+    const loadCurrentMonthEarning = async () => {
+      try {
+        const overview = await getCreatorPayoutOverviewApi(currentPayoutMonthKey())
+        if (!active) return
+        setCurrentMonthEarning(numberValue(overview?.monthlyGrossAmountUsd))
+        setCurrentMonthEarningError(false)
+      } catch {
+        if (!active) return
+        setCurrentMonthEarning(null)
+        setCurrentMonthEarningError(true)
+      }
+    }
+
+    loadCurrentMonthEarning()
+    return () => {
+      active = false
+    }
+  }, [])
 
   const summary = dashboard?.summary || EMPTY_SUMMARY
   const monthlyMetrics = useMemo(() => {
@@ -166,17 +203,26 @@ function AuthorDashboard() {
 
   const statCards = useMemo(() => {
     const revenueEstimate = numberValue(summary.estimatedRevenue)
+    const currentYearKey = new Date().getFullYear().toString()
+    const earnThisMonth = currentMonthEarning
+
+    const earnThisYear = monthlyMetrics
+      .filter((metric) => metric.monthKey?.startsWith(currentYearKey))
+      .reduce((sum, metric) => sum + numberValue(metric.estimatedRevenue), 0)
 
     return [
       { label: 'Total Comics', value: formatFullNumber(summary.totalComics), change: `${formatFullNumber(summary.publishedComics)} published · ${formatFullNumber(summary.draftComics)} other`, trend: 'neutral', icon: 'book', color: 'purple' },
       { label: 'Total Chapters', value: formatFullNumber(summary.totalChapters), change: 'All active author chapters', trend: 'neutral', icon: 'chapters', color: 'blue' },
       { label: 'Total Views', value: formatCompactNumber(summary.totalViews), change: `${formatCompactNumber(summary.totalLikes)} likes`, trend: 'up', icon: 'views', color: 'green' },
-      { label: 'Revenue Estimate', value: formatMoney(revenueEstimate), change: 'Payout page is the source of truth', trend: 'neutral', icon: 'revenue', color: 'orange' },
+      { label: 'All-time Earn', value: formatMoney(revenueEstimate), change: 'Payout page is the source of truth', trend: 'neutral', icon: 'revenue', color: 'orange' },
+      { label: 'Earn this Month', value: earnThisMonth == null ? '—' : formatMoney(earnThisMonth), change: currentMonthEarningError ? 'Current-month payout data unavailable' : (earnThisMonth == null ? 'Loading current-month payout revenue' : 'Current-month payout revenue'), trend: currentMonthEarningError || earnThisMonth == null ? 'neutral' : 'up', icon: 'revenue', color: 'green' },
+      { label: 'Earn this Year', value: formatMoney(earnThisYear), change: 'Estimated for current year', trend: 'up', icon: 'revenue', color: 'blue' },
+      { label: 'Total Paid', value: formatMoney(summary.totalPaid), change: 'Amount successfully withdrawn', trend: 'neutral', icon: 'check', color: 'purple' },
       { label: 'Followers', value: formatCompactNumber(summary.totalFollowers), change: 'Readers who saved your comics', trend: 'up', icon: 'users', color: 'pink' },
       { label: 'Avg. Rating', value: formatRating(summary.averageRating), change: `${formatFullNumber(summary.totalRatings)} ratings`, trend: 'neutral', icon: 'star', color: 'cyan' },
       { label: 'Pending Reviews', value: formatFullNumber(summary.pendingReviews), change: 'Comic and chapter review queue', trend: 'warning', icon: 'review', color: 'red' },
     ]
-  }, [summary])
+  }, [summary, monthlyMetrics, currentMonthEarning, currentMonthEarningError])
 
   const lineChart = useMemo(() => {
     const chartW = 800

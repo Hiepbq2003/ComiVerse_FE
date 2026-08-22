@@ -15,6 +15,12 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
   const { user, isLoggedIn, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const adminName = user?.fullName || user?.username || 'Admin'
+  const adminInitials = adminName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || 'A'
 
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification()
 
@@ -244,11 +250,10 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
 
             {/* Admin Info */}
             <Link to="/profile" className="admin-topbar-user-info" title="My Profile">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-              {adminName}
+              <span className="admin-topbar-avatar" aria-hidden="true">
+                {user?.avatarUrl ? <img src={user.avatarUrl} alt="" /> : adminInitials}
+              </span>
+              <span className="admin-topbar-user-name">{adminName}</span>
             </Link>
 
             <div className="topbar-divider" />
@@ -270,6 +275,7 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
           {children}
         </div>
       </main>
+
     </div>
   )
 }

@@ -462,7 +462,7 @@ function ProjectsListView({
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                   <span className={`status-badge ${normalizeProjectStatus(proj.status)}`}>
-                    {normalizeProjectStatus(proj.status) === 'completed' ? 'Completed' : 'Ongoing'}
+                    {normalizeProjectStatus(proj.status) === 'completed' ? 'Completed' : normalizeProjectStatus(proj.status) === 'paused' ? 'Paused' : 'Ongoing'}
                   </span>
                   {isLeaderMatch(proj.leaderName) ? (
                     <span className="status-badge leader">⭐ Led by Me</span>
