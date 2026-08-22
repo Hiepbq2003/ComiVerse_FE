@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { Search, Filter, BookOpen, Users, Calendar, User, AlertCircle, ClipboardList } from 'lucide-react';
+import { Search, Filter, BookOpen, Users, Calendar, User, AlertCircle, ClipboardList, Hourglass } from 'lucide-react';
 import { toast } from 'react-toastify';
 import '../../assets/style/translator/project-list.css';
 import { getAllProjectTeamsApi, getMyProjectTeamsApi } from '../../services/api/ProjectTeamApi';
@@ -13,6 +13,145 @@ import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages';
 
 const MAX_ACTIVE_PROJECTS = 5;
 const MAX_ACTIVE_TASKS = 5;
+
+function isCooldownActive(until, now = Date.now()) {
+  return Boolean(until) && new Date(until).getTime() > now;
+}
+
+function cooldownLabel(type) {
+  const t = String(type || '').toUpperCase();
+  if (t === 'CANCEL') return 'Cancel';
+  if (t === 'REJECT') return 'Rejected';
+  if (t === 'LEAVE') return 'Leave';
+  return type || 'Cooldown';
+}
+
+function formatCooldownRemaining(until, now = Date.now()) {
+  const ms = new Date(until).getTime() - now;
+  if (!Number.isFinite(ms) || ms <= 0) return 'Expired';
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  if (hours > 0) return `${hours}h ${pad(minutes)}m ${pad(seconds)}s`;
+  if (minutes > 0) return `${minutes}m ${pad(seconds)}s`;
+  return `${seconds}s`;
+}
+
+function normalizeId(value) {
+  if (value == null) return '';
+  if (typeof value === 'object') {
+    return String(value.id || value.uuid || value.projectTeamId || '').toLowerCase().replace(/-/g, '');
+  }
+  return String(value).toLowerCase().replace(/-/g, '');
+}
+
+function sameId(a, b) {
+  const left = normalizeId(a);
+  const right = normalizeId(b);
+  return Boolean(left) && left === right;
+}
+
+function normalizeForSearch(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\s\u00a0\u3000]+/g, ' ')
+    .trim();
+}
+
+function textMatchesSearch(haystack, needle) {
+  const n = normalizeForSearch(needle);
+  if (!n) return true;
+  const h = normalizeForSearch(haystack);
+  if (h.includes(n)) return true;
+  const compactH = h.replace(/\s+/g, '');
+  const compactN = n.replace(/\s+/g, '');
+  return Boolean(compactN) && compactH.includes(compactN);
+}
+
+function unwrapStatus(payload) {
+  if (!payload || typeof payload !== 'object') return {};
+  if (Array.isArray(payload.cooldowns) || Array.isArray(payload.applications)) return payload;
+  if (payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)) {
+    return payload.data;
+  }
+  return payload;
+}
+
+function hoursForCooldownType(type) {
+  const t = String(type || '').toUpperCase();
+  if (t === 'CANCEL') return 12;
+  return 24;
+}
+
+function deriveCooldownsFromApplications(applications, now = Date.now()) {
+  const result = [];
+  for (const app of applications || []) {
+    const status = String(app?.status || '').trim().toUpperCase();
+    const teamId = app?.projectTeamId;
+    if (!teamId) continue;
+
+    let type = app?.cooldownType || null;
+    let until = app?.cooldownUntil || null;
+    if (!until) {
+      if (status === 'CANCELLED' || status === 'CANCELED') {
+        type = 'CANCEL';
+        if (app?.cancelledAt) {
+          until = new Date(new Date(app.cancelledAt).getTime() + hoursForCooldownType(type) * 3600 * 1000).toISOString();
+        }
+      } else if (status === 'REJECTED') {
+        type = 'REJECT';
+        if (app?.decidedAt) {
+          until = new Date(new Date(app.decidedAt).getTime() + hoursForCooldownType(type) * 3600 * 1000).toISOString();
+        }
+      }
+    }
+    if (!isCooldownActive(until, now)) continue;
+    result.push({
+      projectTeamId: String(teamId),
+      cooldownType: type || 'CANCEL',
+      cooldownUntil: until,
+      global: false,
+    });
+  }
+  return result;
+}
+
+function mergeProjectCooldowns(...lists) {
+  const map = new Map();
+  for (const list of lists) {
+    for (const cd of list || []) {
+      if (!cd?.projectTeamId || !isCooldownActive(cd.cooldownUntil)) continue;
+      const key = normalizeId(cd.projectTeamId);
+      if (!key) continue;
+      const prev = map.get(key);
+      if (!prev || new Date(cd.cooldownUntil) > new Date(prev.cooldownUntil)) {
+        map.set(key, {
+          ...cd,
+          projectTeamId: String(cd.projectTeamId),
+          global: false,
+        });
+      }
+    }
+  }
+  return [...map.values()];
+}
+
+function cooldownForProject(appStatus, projectId, now = Date.now()) {
+  if (projectId == null) return null;
+  const status = unwrapStatus(appStatus);
+  const stored = mergeProjectCooldowns(
+    status?.cooldowns,
+    deriveCooldownsFromApplications(status?.applications, now)
+  );
+  return stored.find((cd) => {
+    if (!cd?.projectTeamId) return false;
+    if (!isCooldownActive(cd?.cooldownUntil, now)) return false;
+    return sameId(cd.projectTeamId, projectId);
+  }) || null;
+}
 
 function ProjectList() {
   const [projects, setProjects] = useState([]);
@@ -33,11 +172,13 @@ function ProjectList() {
   const [uploading, setUploading] = useState(false);
   const [cancelling, setCancelling] = useState(null); // teamId being cancelled
   const fileInputRef = useRef(null);
+  const optimisticCooldownsRef = useRef([]);
   const [activeProjectsCount, setActiveProjectsCount] = useState(0);
   const [myProjectTeams, setMyProjectTeams] = useState([]);
 
   // Application status (slot counter + cooldown)
   const [appStatus, setAppStatus] = useState(null);
+  const [nowMs, setNowMs] = useState(Date.now());
 
   // Load auth details
   const auth = getAuth();
@@ -48,30 +189,38 @@ function ProjectList() {
   const location = useLocation();
 
   const applyPendingFromStatus = useCallback((statusData) => {
-    const applications = Array.isArray(statusData?.applications) ? statusData.applications : [];
+    const status = unwrapStatus(statusData);
+    const applications = Array.isArray(status?.applications) ? status.applications : [];
     const pendingFromApplications = applications.filter(item => {
-      const status = String(item?.status || 'PENDING').trim().toUpperCase();
-      return status === 'PENDING';
+      const itemStatus = String(item?.status || 'PENDING').trim().toUpperCase();
+      return itemStatus === 'PENDING';
     });
     const details = pendingFromApplications.length > 0 || applications.length > 0
       ? pendingFromApplications
-      : (Array.isArray(statusData?.pendingDetails) ? statusData.pendingDetails : []);
+      : (Array.isArray(status?.pendingDetails) ? status.pendingDetails : []);
 
     const appIds = [];
     const reqMap = {};
 
     details.forEach(item => {
-      const status = String(item?.status || 'PENDING').trim().toUpperCase();
-      if (status !== 'PENDING') return;
+      const itemStatus = String(item?.status || 'PENDING').trim().toUpperCase();
+      if (itemStatus !== 'PENDING') return;
       const teamId = item?.projectTeamId != null ? String(item.projectTeamId) : '';
       if (!teamId) return;
       appIds.push(teamId);
       if (item.requestId) reqMap[teamId] = item.requestId;
     });
 
+    const mergedCooldowns = mergeProjectCooldowns(
+      status?.cooldowns,
+      deriveCooldownsFromApplications(applications),
+      optimisticCooldownsRef.current
+    );
+    optimisticCooldownsRef.current = mergedCooldowns;
+
     setAppliedIds(appIds);
     setAppliedRequestMap(reqMap);
-    if (statusData) setAppStatus(statusData);
+    if (statusData) setAppStatus({ ...status, cooldowns: mergedCooldowns });
   }, []);
 
   const refreshApplicationStatus = useCallback(async () => {
@@ -122,6 +271,11 @@ function ProjectList() {
       cancelled = true;
     };
   }, [userFullName, applyPendingFromStatus, location.pathname, location.key]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     const onVisible = () => {
@@ -183,11 +337,9 @@ function ProjectList() {
 
       // 4. Search Filter
       if (searchTerm.trim()) {
-        const term = searchTerm.toLowerCase().trim();
-        const matchComic = (p.comicName || '').toLowerCase().includes(term);
-        const matchTeam = (p.title || '').toLowerCase().includes(term);
-        const matchLeader = (p.leaderName || '').toLowerCase().includes(term);
-        if (!matchComic && !matchTeam && !matchLeader) return false;
+        const matched = [p.comicName, p.title, p.leaderName]
+          .some((field) => textMatchesSearch(field, searchTerm));
+        if (!matched) return false;
       }
 
       // 5. Exclude projects led by current user (Project Leaders manage their team, they do not apply to it)
@@ -254,6 +406,12 @@ function ProjectList() {
 
     if (atProjectLimit) {
       toast.error('You have reached the maximum number of concurrent projects.');
+      return;
+    }
+
+    const projectCooldown = cooldownForProject(appStatus, project?.id, nowMs);
+    if (projectCooldown) {
+      toast.error(`You cannot re-apply to this project until ${new Date(projectCooldown.cooldownUntil).toLocaleString()}. Other projects are still available.`);
       return;
     }
 
@@ -373,14 +531,31 @@ function ProjectList() {
     }
     try {
       setCancelling(projectId);
-      await cancelTeamRequestApi(requestId);
-      toast.success('Application cancelled. You are on a 12-hour cooldown.');
-      const teamId = String(projectId);
-      setAppliedIds(prev => prev.filter(id => String(id) !== teamId));
+      const result = await cancelTeamRequestApi(requestId);
+      toast.success('Application cancelled. You can re-apply to this project after 12 hours. Other projects are unaffected.');
+      const teamId = String(result?.projectTeamId || projectId);
+      const localCooldown = {
+        projectTeamId: teamId,
+        cooldownType: result?.cooldownType || 'CANCEL',
+        cooldownUntil: result?.cooldownUntil || new Date(Date.now() + 12 * 3600 * 1000).toISOString(),
+        global: false,
+      };
+      optimisticCooldownsRef.current = mergeProjectCooldowns(
+        optimisticCooldownsRef.current,
+        [localCooldown]
+      );
+      setAppStatus(prev => {
+        const status = unwrapStatus(prev);
+        return {
+          ...status,
+          cooldowns: mergeProjectCooldowns(status?.cooldowns, [localCooldown], optimisticCooldownsRef.current),
+        };
+      });
+      setAppliedIds(prev => prev.filter(id => String(id) !== String(projectId) && String(id) !== teamId));
       setAppliedRequestMap(prev => {
         const copy = { ...prev };
         delete copy[teamId];
-        delete copy[projectId];
+        delete copy[String(projectId)];
         return copy;
       });
       getMyApplicationStatusApi().then(s => { if (s) applyPendingFromStatus(s); }).catch(() => {});
@@ -446,7 +621,7 @@ function ProjectList() {
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
             gap: '12px',
-            marginBottom: appStatus.cooldownUntil && appStatus.cooldownUntil !== '' && new Date(appStatus.cooldownUntil) > new Date() ? '12px' : 0
+            marginBottom: 0
           }}>
             {(() => {
               const joined = Number(appStatus.joinedTeams || 0);
@@ -543,22 +718,6 @@ function ProjectList() {
               );
             })()}
           </div>
-          {appStatus.cooldownUntil && appStatus.cooldownUntil !== '' && new Date(appStatus.cooldownUntil) > new Date() && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 14px',
-              borderRadius: '10px',
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
-              fontSize: '12px',
-              fontWeight: '600',
-              color: '#ef4444'
-            }}>
-              ⏳ Cooldown ({appStatus.cooldownType === 'CANCEL' ? 'Cancel' : appStatus.cooldownType === 'LEAVE' ? 'Leave' : appStatus.cooldownType}): expires {new Date(appStatus.cooldownUntil).toLocaleString()}
-            </div>
-          )}
         </div>
       ) : (!isUserProjectLeader && atProjectLimit) && (
         <div style={{
@@ -659,6 +818,8 @@ function ProjectList() {
           const recruitedTranslators = Math.max(0, totalMembers - 1); // Exclude the leader
           const limit = Number(project.maxMembers) || 5;
           const spotsLeft = Math.max(0, limit - recruitedTranslators);
+          const projectCooldown = cooldownForProject(appStatus, project.id, nowMs);
+          const onCooldown = Boolean(projectCooldown);
 
           return (
             <div key={project.id} className="available-project-card">
@@ -702,6 +863,14 @@ function ProjectList() {
                       {project.priority === 'Urgent' ? '🔥 URGENTLY Recruiting' : project.priority || 'Medium'}
                     </strong>
                   </li>
+                  {onCooldown && (
+                    <li className="project-details-item">
+                      <Hourglass size={15} />
+                      Cooldown: <strong style={{ color: '#f59e0b' }}>
+                        {formatCooldownRemaining(projectCooldown.cooldownUntil, nowMs)}
+                      </strong>
+                    </li>
+                  )}
                 </ul>
               </div>
 
@@ -787,7 +956,6 @@ function ProjectList() {
                     );
                   }
 
-                  const onCooldown = Boolean(appStatus && appStatus.cooldownUntil && new Date(appStatus.cooldownUntil) > new Date());
                   const applyDisabled = spotsLeft === 0 || onCooldown || atProjectLimit;
 
                   return (
@@ -797,7 +965,19 @@ function ProjectList() {
                       onClick={() => handleApplyClick(project)}
                       style={{
                         flex: 1,
-                        ...(atProjectLimit && spotsLeft > 0 && !onCooldown ? {
+                        ...(onCooldown ? {
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          background: 'rgba(245, 158, 11, 0.12)',
+                          border: '1px solid rgba(245, 158, 11, 0.32)',
+                          color: '#fbbf24',
+                          cursor: 'not-allowed',
+                          opacity: 0.95,
+                          fontWeight: 700,
+                          fontSize: '13px'
+                        } : atProjectLimit && spotsLeft > 0 ? {
                           background: 'rgba(239, 68, 68, 0.12)',
                           border: '1px solid rgba(239, 68, 68, 0.28)',
                           color: '#fca5a5',
@@ -808,12 +988,16 @@ function ProjectList() {
                           lineHeight: 1.25
                         } : {})
                       }}
-                      title={atProjectLimit ? 'You have reached the maximum number of concurrent projects.' : undefined}
+                      title={onCooldown
+                        ? `This project is on ${cooldownLabel(projectCooldown.cooldownType).toLowerCase()} cooldown. Remaining ${formatCooldownRemaining(projectCooldown.cooldownUntil, nowMs)}.`
+                        : atProjectLimit
+                        ? 'You have reached the maximum number of concurrent projects.'
+                        : undefined}
                     >
                       {spotsLeft === 0
                         ? 'Team Full'
                         : onCooldown
-                        ? '⏳ On Cooldown'
+                        ? <><Hourglass size={15} /> On Cooling down</>
                         : atProjectLimit
                         ? 'Maximum concurrent projects reached'
                         : 'Apply to Join'}

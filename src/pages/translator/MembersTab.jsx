@@ -5,7 +5,7 @@ import { getAuth } from '../../utils/Auth'
 import { toast } from 'react-toastify'
 import ModernPagination from '../../components/common/ModernPagination'
 
-async function downloadMemberCv(e, member) {
+async function viewMemberCv(e, member) {
   e.preventDefault()
   const cvUrl = member?.cvUrl
   if (!cvUrl) return
@@ -13,18 +13,12 @@ async function downloadMemberCv(e, member) {
     const res = await fetch(cvUrl)
     if (!res.ok) throw new Error('Network error')
     const blob = await res.blob()
-    const pdfBlob = new Blob([blob], { type: 'application/pdf' })
+    const pdfBlob = blob.type.includes('pdf') ? blob : new Blob([blob], { type: 'application/pdf' })
     const blobUrl = window.URL.createObjectURL(pdfBlob)
-    const link = document.createElement('a')
-    link.href = blobUrl
-    link.download = `CV_${String(member.name || 'Member').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(blobUrl)
+    window.open(blobUrl, '_blank', 'noopener,noreferrer')
   } catch (err) {
-    console.warn('CORS or fetch failed, falling back to new tab:', err)
-    window.open(cvUrl, '_blank')
+    console.warn('CORS or fetch failed, opening CV online:', err)
+    window.open(cvUrl, '_blank', 'noopener,noreferrer')
   }
 }
 
@@ -78,12 +72,12 @@ function MemberProfileModal({ member, onClose }) {
             {member.cvUrl ? (
               <a
                 href={member.cvUrl}
-                onClick={(e) => downloadMemberCv(e, member)}
+                onClick={(e) => viewMemberCv(e, member)}
                 target="_blank"
                 rel="noreferrer"
                 style={{ color: '#c084fc', fontSize: '13.5px', fontWeight: '600', textDecoration: 'none', cursor: 'pointer', overflowWrap: 'anywhere', textAlign: 'right' }}
               >
-                📄 View / Download CV
+                📄 View CV
               </a>
             ) : (
               <span style={{ color: '#94a3b8', fontSize: '13.5px', fontWeight: '500' }}>Not attached</span>

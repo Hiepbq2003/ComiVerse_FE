@@ -983,13 +983,19 @@
 .tw-x-resize-handle--sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
 
 /* ---- SourceImageCrop ---- */
+.tw-x-crop-scroll {
+  overflow: auto;
+  max-width: 100%;
+}
+
 .tw-x-crop-preview {
-  width: 260px;
-  height: var(--preview-height, 100px);
+  width: var(--preview-width, auto);
+  height: var(--preview-height, auto);
   overflow: hidden;
   position: relative;
   background: #000;
   cursor: default;
+  flex-shrink: 0;
 }
 .tw-x-crop-preview.is-rect { border-radius: 6px; }
 .tw-x-crop-preview.is-picking { cursor: crosshair; }

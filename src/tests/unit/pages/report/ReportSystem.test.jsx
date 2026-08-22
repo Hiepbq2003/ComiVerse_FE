@@ -151,6 +151,8 @@ describe('Report System - Comprehensive Test Suite with Reader Reporting', () =>
       expect(screen.getByText('Martial Peak - Chapter 124')).toBeInTheDocument();
       expect(screen.getByText('John Reader')).toBeInTheDocument();
       expect(screen.getAllByText('PENDING').length).toBeGreaterThan(0);
+      expect(screen.getByText('Done (DONE)')).toBeInTheDocument();
+      expect(screen.queryByText('In Progress (IN_PROGRESS)')).not.toBeInTheDocument();
     });
 
     it('filters reports when searching by text query', async () => {
@@ -167,11 +169,38 @@ describe('Report System - Comprehensive Test Suite with Reader Reporting', () =>
       const searchInput = screen.getByPlaceholderText(/Search by comic title/i);
       fireEvent.change(searchInput, { target: { value: 'Martial Peak' } });
 
-      await waitFor(() => {
-        expect(ReportApi.getAdminReportsApi).toHaveBeenCalledWith(
-          expect.objectContaining({ search: 'Martial Peak' })
-        );
+      expect(screen.getByText('Martial Peak - Chapter 124')).toBeInTheDocument();
+      expect(screen.queryByText('The Great Demon King - Chapter 52')).not.toBeInTheDocument();
+    });
+
+    it('keeps dashboard totals when switching to an empty Pending tab', async () => {
+      ReportApi.getAdminReportsApi.mockResolvedValue({
+        reports: [
+          { ...mockReports[0], status: 'ACCEPTED' },
+          { ...mockReports[0], id: 'rep-102', status: 'DONE', target_title: 'Charlotte - Chapter 1' },
+          { ...mockReports[0], id: 'rep-104', status: 'REJECTED', target_title: 'Charlotte - Chapter 2' }
+        ],
+        total: 3,
+        page: 1,
+        limit: 100
       });
+
+      render(
+        <MemoryRouter>
+          <LeaderReports />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Done (DONE)')).toBeInTheDocument();
+      });
+
+      expect(screen.getByText('All Reports').closest('button')).toHaveTextContent('3');
+      fireEvent.click(screen.getByText('Pending (PENDING)'));
+
+      expect(screen.getByText('All Reports').closest('button')).toHaveTextContent('3');
+      expect(screen.getByText('Pending (PENDING)').closest('button')).toHaveTextContent('0');
+      expect(screen.getByText('No matching reports found')).toBeInTheDocument();
     });
 
     it('opens Translation Split-Screen Review modal when clicking "Review Translation"', async () => {

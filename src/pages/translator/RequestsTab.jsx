@@ -1,46 +1,53 @@
 // =============================================================================
 // Tab 3: Join Requests
 // =============================================================================
+import { useEffect, useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 
 const MAX_ACTIVE_PROJECTS = 5;
 const MAX_ACTIVE_TASKS = 5;
 
+function toOnlineCvUrl(url) {
+  if (!url) return '';
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes('cloudinary.com') && parsed.pathname.includes('/upload/')) {
+      parsed.pathname = parsed.pathname.replace('/upload/', '/upload/fl_attachment:false/');
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 function RequestsTab({ joinRequests = [], onApprove, onReject, onBan }) {
   const { theme } = useTheme();
   const isLight = theme === 'light';
+  const [cvViewer, setCvViewer] = useState(null);
 
-  const handleDownloadCv = async (e, url, rawName) => {
+  useEffect(() => () => {
+    if (cvViewer?.revoke) window.URL.revokeObjectURL(cvViewer.src);
+  }, [cvViewer]);
+
+  const closeCvViewer = () => {
+    if (cvViewer?.revoke) window.URL.revokeObjectURL(cvViewer.src);
+    setCvViewer(null);
+  };
+
+  const handleViewCv = async (e, url, name) => {
     e.preventDefault();
     if (!url) return;
 
-    let fileName = rawName || 'Applicant_CV_Resume.pdf';
-    if (!fileName.toLowerCase().endsWith('.pdf')) {
-      fileName += '.pdf';
-    }
-
     try {
       const res = await fetch(url);
+      if (!res.ok) throw new Error('Unable to load CV');
       const blob = await res.blob();
-      const pdfBlob = new Blob([blob], { type: 'application/pdf' });
-      
+      const pdfBlob = blob.type.includes('pdf') ? blob : new Blob([blob], { type: 'application/pdf' });
       const blobUrl = window.URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
+      setCvViewer({ src: blobUrl, name, revoke: true });
     } catch (err) {
-      console.warn('[RequestsTab] Direct Blob download fallback:', err);
-      const link = document.createElement('a');
-      link.href = url;
-      link.target = '_blank';
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      console.warn('[RequestsTab] Opening CV online without blob preview:', err);
+      setCvViewer({ src: toOnlineCvUrl(url), name, revoke: false });
     }
   };
 
@@ -200,7 +207,7 @@ function RequestsTab({ joinRequests = [], onApprove, onReject, onBan }) {
 
                   <a
                     href={cvLink}
-                    onClick={(e) => handleDownloadCv(e, cvLink, cvName)}
+                    onClick={(e) => handleViewCv(e, cvLink, cvName)}
                     className="trans-btn icon-btn"
                     style={{
                       display: 'inline-flex',
@@ -221,11 +228,10 @@ function RequestsTab({ joinRequests = [], onApprove, onReject, onBan }) {
                     onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                      <polyline points="7 10 12 15 17 10"/>
-                      <line x1="12" y1="15" x2="12" y2="3"/>
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/>
+                      <circle cx="12" cy="12" r="3"/>
                     </svg>
-                    View / Download CV
+                    View CV
                   </a>
                 </div>
               ) : (
@@ -272,6 +278,76 @@ function RequestsTab({ joinRequests = [], onApprove, onReject, onBan }) {
             </div>
           );
         })
+      )}
+
+      {cvViewer && (
+        <div
+          className="trans-modal-overlay fade-in"
+          onClick={closeCvViewer}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.72)',
+            padding: '24px'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(960px, 96vw)',
+              height: 'min(88vh, 920px)',
+              background: isLight ? '#ffffff' : '#111827',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.45)'
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              padding: '14px 18px',
+              borderBottom: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.08)'
+            }}>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: isLight ? '#0f172a' : '#f8fafc' }}>
+                  {cvViewer.name || 'Applicant CV'}
+                </div>
+                <div style={{ fontSize: '12px', color: isLight ? '#64748b' : '#94a3b8', marginTop: '2px' }}>
+                  Online preview — PDF is not downloaded
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeCvViewer}
+                style={{
+                  background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.08)',
+                  border: 'none',
+                  color: isLight ? '#0f172a' : '#fff',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  fontSize: '18px'
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <iframe
+              title="Applicant CV preview"
+              src={cvViewer.src}
+              style={{ flex: 1, width: '100%', border: 0, background: '#525659' }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

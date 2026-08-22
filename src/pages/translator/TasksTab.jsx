@@ -41,8 +41,16 @@ function displayedAssigneeTaskCount(member, selectedId, heldAssigneeId) {
   return base
 }
 
+function isTranslatorWorkloadLimited(member) {
+  const teamRole = String(member?.role || '').toLowerCase()
+  const accountRole = String(member?.accountRole || '').toUpperCase()
+  if (teamRole === 'group leader' || teamRole === 'leader') return false
+  if (accountRole === 'PROJECT_LEADER' || accountRole.includes('LEADER')) return false
+  return true
+}
+
 function isAssigneeAtSystemTaskCap(member, selectedId, heldAssigneeId) {
-  if (!member) return false
+  if (!member || !isTranslatorWorkloadLimited(member)) return false
   const memberId = member.id || member.userId
   if (memberId == null) return false
   if (sameMemberId(selectedId, memberId) || sameMemberId(heldAssigneeId, memberId)) return false
@@ -147,6 +155,13 @@ export function isUserAssignedToTask(t, teamMembers = [], authUser) {
 export function isSupersededTask(task) {
   const status = String(task?.status || task?.column || '').toLowerCase().replace(/[-\s]/g, '_');
   return status === 'superseded';
+}
+
+function isGroupLeaderAssignee(member) {
+  if (!member) return false;
+  if (member.isLeader === true) return true;
+  const role = String(member.role || '').toLowerCase().replace(/[_\s-]+/g, ' ').trim();
+  return role === 'group leader' || role === 'project leader' || role === 'leader';
 }
 
 export function filterUnassignedChapters(chapterOptions, tasks) {
@@ -1515,6 +1530,7 @@ function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, read
         const initial = (m.avatar && m.avatar.length <= 3 ? m.avatar : displayName.charAt(0)).toUpperCase();
         const roleLabel = m.role || (m.isLeader ? 'Leader' : 'Member');
         const taskCount = displayedAssigneeTaskCount(m, selectedId, heldAssigneeId);
+        const workloadLimited = isTranslatorWorkloadLimited(m);
         const atCap = isAssigneeAtSystemTaskCap(m, selectedId, heldAssigneeId);
 
         return (
@@ -1559,7 +1575,9 @@ function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, read
             <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: '1.2' }}>
               <span style={{ fontSize: '13px', fontWeight: 600 }}>{displayName}</span>
               <span style={{ fontSize: '10px', color: isSelected ? '#c084fc' : 'var(--trans-text-muted)', fontWeight: 500 }}>
-                {roleLabel}{atCap ? ` · ${taskCount}/${MAX_ACTIVE_TASKS} full` : ` · ${taskCount}/${MAX_ACTIVE_TASKS}`}
+                {roleLabel}{workloadLimited
+                  ? (atCap ? ` · ${taskCount}/${MAX_ACTIVE_TASKS} full` : ` · ${taskCount}/${MAX_ACTIVE_TASKS}`)
+                  : ` · ${taskCount} assigned`}
               </span>
             </span>
 
@@ -1830,6 +1848,7 @@ export function CreateTaskModal({
 
 export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAssign, isProjectLeader, onCancel, onSave, onContinue, onReview }) {
   const [submitted, setSubmitted] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const auth = getAuth();
   const currentUserName = (auth?.user?.fullName || auth?.user?.username || '').toLowerCase().trim();
@@ -1864,43 +1883,65 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   const isUnderReview = editTaskData.status === 'under_review'
   const canReview = isProjectLeader && isUnderReview
   const isInProgress = editTaskData.status === 'in_progress'
+  const isTaskUnderReview = isUnderReview
+  const isTaskCompleted = editTaskData.status === 'completed'
+  const originalStatus = getNormalizedStatusKey(editTaskData.originalStatus || editTaskData.status)
+  const isOriginallyUnderReview = originalStatus === 'under_review'
+  const isOriginallyCompleted = originalStatus === 'completed'
+  const lockTaskEdits = saving || isOriginallyUnderReview
+  const assigneeCandidates = (() => {
+    const members = teamMembersForAssign || []
+    if (!isOriginallyUnderReview) return members
+    const leaders = members.filter(isGroupLeaderAssignee)
+    if (leaders.length > 0) return leaders
+    return members.filter((m) => String(m.id || m.userId) === String(editTaskData.assigneeId))
+  })()
+  const canEdit = isProjectLeader || (isEditableByMember && !isOriginallyUnderReview && !isOriginallyCompleted)
 
   const selectAssignee = (memberId) => {
-    if (!isProjectLeader) return;
+    if (!isProjectLeader || lockTaskEdits) return;
     setEditTaskData({ ...editTaskData, assigneeId: memberId })
   }
 
-  const handleSaveClick = () => {
-    if (!isProjectLeader) return;
+  const handleSaveClick = async () => {
+    if (!isProjectLeader || lockTaskEdits) return;
     setSubmitted(true)
     if (Object.values(errors).some(Boolean)) return
-    if (onSave) onSave()
+    setSaving(true)
+    try {
+      if (onSave) await onSave()
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleOpenWorkspaceClick = () => {
+    if (saving) return
     if (onContinue) onContinue()
   }
 
-  const handleReviewClick = () => {
-    if (!canReview) return
+  const handleReviewClick = async () => {
+    if (!canReview || saving) return
     setSubmitted(true)
     if (Object.values(errors).some(Boolean)) return
-    if (onSave) onSave()
-    onReview()
+    setSaving(true)
+    try {
+      if (onSave) await onSave()
+      onReview()
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const isTaskUnderReview = editTaskData.status === 'under_review'
-  const isTaskCompleted = editTaskData.status === 'completed'
-  const canEdit = isProjectLeader || (isEditableByMember && !isTaskUnderReview && !isTaskCompleted)
   return (
     <div className="trans-modal-overlay">
       <div className="trans-modal-card">
         <div className="trans-modal-header">
-          <h3>{isProjectLeader ? 'Edit Task Details' : (isEditableByMember ? 'Task Information' : 'Task Information (Read Only)')}</h3>
-          <button className="trans-modal-close-btn" onClick={onCancel}>×</button>
+          <h3>{isProjectLeader && !isOriginallyUnderReview ? 'Edit Task Details' : (isEditableByMember ? 'Task Information' : 'Task Information (Read Only)')}</h3>
+          <button className="trans-modal-close-btn" onClick={onCancel} disabled={saving}>×</button>
         </div>
 
-        <div className="trans-modal-body">
+        <div className="trans-modal-body" style={saving ? { opacity: 0.7, pointerEvents: 'none' } : undefined}>
           {isProjectLeader ? (
             /* ── FULL EDITING FORM FOR GROUP LEADER ───────────── */
             <>
@@ -1917,6 +1958,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                   className="trans-form-input"
                   style={errorBorder('title')}
                   value={editTaskData.title}
+                  disabled={lockTaskEdits}
                   onChange={(e) => setEditTaskData({ ...editTaskData, title: e.target.value })}
                 />
                 {showError('title') && (
@@ -1925,10 +1967,31 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
               </div>
 
               <div className="trans-form-group">
+                <label className="trans-form-label">Status</label>
+                <select
+                  className="trans-form-input"
+                  value={getNormalizedStatusKey(editTaskData.status)}
+                  disabled={lockTaskEdits || isOriginallyCompleted}
+                  onChange={(e) => setEditTaskData({ ...editTaskData, status: e.target.value })}
+                >
+                  {getAllowedStatusOptions(editTaskData.originalStatus || editTaskData.status).map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.value === 'in_progress' ? '🟠 In Progress'
+                        : opt.value === 'under_review' ? '🟣 Under Review'
+                        : opt.value === 'completed' ? '🟢 Completed'
+                        : opt.value === 'paused' ? '⏸️ Paused'
+                        : '⚪ Backlog'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="trans-form-group">
                 <label className="trans-form-label">Priority</label>
                 <select
                   className="trans-form-input"
                   value={editTaskData.priority}
+                  disabled={lockTaskEdits}
                   onChange={(e) => setEditTaskData({ ...editTaskData, priority: e.target.value })}
                 >
                   <option value="Urgent">🚨 Urgent</option>
@@ -1941,10 +2004,11 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
               <div className="trans-form-group">
                 <label className="trans-form-label">Assignee *</label>
                 <AssigneeChipPicker
-                  candidates={teamMembersForAssign}
+                  candidates={assigneeCandidates}
                   selectedId={editTaskData.assigneeId}
                   heldAssigneeId={editTaskData.originalAssigneeId}
                   onSelect={selectAssignee}
+                  readOnly={lockTaskEdits}
                   error={showError('assigneeId')}
                 />
                 {showError('assigneeId') && (
@@ -1959,6 +2023,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                   onChange={(val) => setEditTaskData({ ...editTaskData, dueDate: val })}
                   placeholder="Select due date"
                   style={errorBorder('dueDate')}
+                  disabled={lockTaskEdits}
                 />
                 {showError('dueDate') && (
                   <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Due date is required</p>
@@ -2005,7 +2070,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
               <div className="trans-form-group">
                 <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assigned Member</label>
                 <AssigneeChipPicker
-                  candidates={teamMembersForAssign}
+                  candidates={assigneeCandidates}
                   selectedId={editTaskData.assigneeId}
                   readOnly={true}
                   emptyLabel="No assigned member."
@@ -2029,38 +2094,45 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
         </div>
 
         <div className="trans-modal-footer">
-          <button className="trans-btn secondary" onClick={onCancel}>
+          <button className="trans-btn secondary" onClick={onCancel} disabled={saving}>
             {isProjectLeader ? 'Cancel' : 'Close'}
           </button>
 
-          {/* Review: chỉ hiển thị khi task đang under review / completed, và chỉ cho Project Leader */}
-          {(isTaskUnderReview || isTaskCompleted) && isProjectLeader && (
+          {/* Review: only for tasks that started as under review / completed */}
+          {(isOriginallyUnderReview || isOriginallyCompleted) && isProjectLeader && (
             <button
               className="trans-btn secondary"
               onClick={handleReviewClick}
-              disabled={!isUnderReview}
-              title={isUnderReview ? 'Review this submission' : 'Only available once the task is Under Review'}
-              style={!isUnderReview ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+              disabled={saving || !isOriginallyUnderReview}
+              title={isOriginallyUnderReview ? 'Review this submission' : 'Only available once the task is Under Review'}
+              style={(saving || !isOriginallyUnderReview) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
             >
               <GitCompare />Review
             </button>
           )}
 
-          {/* Open Workspace: chỉ hiển thị khi KHÔNG phải trạng thái review/completed */}
-          {!(isTaskUnderReview || isTaskCompleted) && !isUnderReview && (
+          {/* Open Workspace: hidden for review/completed source status */}
+          {!(isOriginallyUnderReview || isOriginallyCompleted) && (
             <button
               className="trans-btn primary"
               onClick={handleOpenWorkspaceClick}
+              disabled={saving}
               title={isAssigned ? "Open translate workspace" : "View translate workspace in read-only mode"}
+              style={saving ? { opacity: 0.65, cursor: 'not-allowed', transform: 'none' } : undefined}
             >
               <StepForward />{isAssigned ? 'Open Workspace' : 'View Workspace (Read Only)'}
             </button>
           )}
 
-          {/* Save: chỉ hiển thị khi KHÔNG phải trạng thái review/completed, và chỉ cho Project Leader */}
-          {!(isTaskUnderReview || isTaskCompleted) && isProjectLeader && (
-            <button className="trans-btn primary" onClick={handleSaveClick}>
-              <Check size={16} />Save
+          {/* Save: leader can persist status/details except on already-completed tasks */}
+          {!isOriginallyCompleted && !isOriginallyUnderReview && isProjectLeader && (
+            <button
+              className="trans-btn primary"
+              onClick={handleSaveClick}
+              disabled={saving}
+              style={saving ? { opacity: 0.65, cursor: 'not-allowed', transform: 'none' } : undefined}
+            >
+              <Check size={16} />{saving ? 'Saving...' : 'Save'}
             </button>
           )}
         </div>

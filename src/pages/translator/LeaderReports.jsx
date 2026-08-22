@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Layers,
   Search,
@@ -6,7 +6,7 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  AlertTriangle,
+  CheckCheck,
   ExternalLink,
   ChevronLeft,
   ChevronRight,
@@ -36,11 +36,10 @@ export default function LeaderReports() {
     }
   }, [roleUpper, navigate]);
 
-  const [reports, setReports] = useState([]);
+  const [allReports, setAllReports] = useState([]);
 
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [totalCount, setTotalCount] = useState(0);
 
   // Filter states
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -65,7 +64,7 @@ export default function LeaderReports() {
   useEffect(() => {
     const fetchCats = async () => {
       try {
-        const data = await getActiveReportCategoriesApi();
+        const data = await getActiveReportCategoriesApi('CHAPTER_TRANSLATIONS', 'PROJECT_LEADER');
         setCategories(data || []);
       } catch (err) {
         console.error(err);
@@ -74,31 +73,37 @@ export default function LeaderReports() {
     fetchCats();
   }, []);
 
-  // Fetch reports based on active filters
+  // Load the full leader report set once (and when non-status filters change).
+  // Status tabs / search filter this list on the client so stats stay accurate.
   const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getAdminReportsApi({
+      const pageSize = 100;
+      const baseParams = {
         assigned_role: 'PROJECT_LEADER',
-        status: statusFilter,
+        status: 'ALL',
         target_type: targetTypeFilter,
         category_id: categoryFilter,
         start_date: startDate,
         end_date: endDate,
-        search: searchQuery,
-        page,
-        limit
-      });
-
-      setReports(res?.reports || []);
-      setTotalCount(res?.total || 0);
+        limit: pageSize
+      };
+      const first = await getAdminReportsApi({ ...baseParams, page: 1 });
+      const list = [...(first?.reports || [])];
+      const total = Number(first?.total || list.length);
+      const totalPages = Math.max(1, Number(first?.totalPages || Math.ceil(total / pageSize) || 1));
+      for (let nextPage = 2; nextPage <= totalPages && list.length < total; nextPage += 1) {
+        const more = await getAdminReportsApi({ ...baseParams, page: nextPage });
+        list.push(...(more?.reports || []));
+      }
+      setAllReports(list);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load leader reports.');
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, targetTypeFilter, categoryFilter, startDate, endDate, searchQuery, page]);
+  }, [targetTypeFilter, categoryFilter, startDate, endDate]);
 
   useEffect(() => {
     if (roleUpper === 'TRANSLATOR') return;
@@ -139,10 +144,40 @@ export default function LeaderReports() {
     }
   };
 
-  const pendingCount = reports.filter(r => r.status === 'PENDING').length;
-  const progressCount = reports.filter(r => r.status === 'IN_PROGRESS').length;
-  const acceptedCount = reports.filter(r => r.status === 'ACCEPTED').length;
-  const rejectedCount = reports.filter(r => r.status === 'REJECTED').length;
+  const pendingCount = allReports.filter(r => r.status === 'PENDING').length;
+  const doneCount = allReports.filter(r => r.status === 'DONE').length;
+  const acceptedCount = allReports.filter(r => r.status === 'ACCEPTED').length;
+  const rejectedCount = allReports.filter(r => r.status === 'REJECTED').length;
+  const totalCount = allReports.length;
+
+  const filteredReports = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return allReports.filter(report => {
+      if (statusFilter !== 'ALL' && report.status !== statusFilter) return false;
+      if (!query) return true;
+      const haystack = [
+        report.id,
+        report.reporter_name,
+        report.reporterName,
+        report.reporter_email,
+        report.reporterEmail,
+        report.target_title,
+        report.targetTitle,
+        report.description_text,
+        report.descriptionText,
+        report.category_name,
+        report.categoryName
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [allReports, statusFilter, searchQuery]);
+
+  const pagedReports = useMemo(() => {
+    const start = (Math.max(1, page) - 1) * limit;
+    return filteredReports.slice(start, start + limit);
+  }, [filteredReports, page]);
+
+  const filteredTotal = filteredReports.length;
 
   const handleCreateReportTask = (report, resolutionNote) => {
     const targetChapterId = report?.chapter_id || report?.chapterId || null;
@@ -162,7 +197,7 @@ export default function LeaderReports() {
 
   // Export Reports list to Excel CSV
   const handleExportReports = () => {
-    if (!reports || reports.length === 0) {
+    if (!filteredReports || filteredReports.length === 0) {
       toast.warn('No report records available to export.');
       return;
     }
@@ -181,7 +216,7 @@ export default function LeaderReports() {
       'Created Date'
     ];
 
-    const rows = reports.map(r => [
+    const rows = filteredReports.map(r => [
       r.id || '',
       r.reporter_name || r.reporter?.fullName || r.reporter?.username || 'Anonymous',
       r.target_title || r.comic_title || 'Untitled Target',
@@ -218,7 +253,7 @@ export default function LeaderReports() {
           <button
             className="rep-btn rep-btn-primary"
             onClick={handleExportReports}
-            disabled={loading || reports.length === 0}
+            disabled={loading || allReports.length === 0}
             title="Export reports list to Excel CSV"
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
@@ -249,13 +284,13 @@ export default function LeaderReports() {
           </div>
         </div>
 
-        <div className="rep-stat-card" onClick={() => setStatusFilter('IN_PROGRESS')} style={{ cursor: 'pointer' }}>
-          <div className="rep-stat-icon progress">
-            <AlertTriangle size={22} />
+        <div className="rep-stat-card" onClick={() => setStatusFilter('DONE')} style={{ cursor: 'pointer' }}>
+          <div className="rep-stat-icon done">
+            <CheckCheck size={22} />
           </div>
           <div className="rep-stat-info">
-            <div className="rep-stat-value">{progressCount}</div>
-            <div className="rep-stat-label">In Progress</div>
+            <div className="rep-stat-value">{doneCount}</div>
+            <div className="rep-stat-label">Done</div>
           </div>
         </div>
 
@@ -287,7 +322,7 @@ export default function LeaderReports() {
           {[
             { key: 'ALL', label: 'All Reports', count: totalCount },
             { key: 'PENDING', label: 'Pending (PENDING)', count: pendingCount },
-            { key: 'IN_PROGRESS', label: 'In Progress (IN_PROGRESS)', count: progressCount },
+            { key: 'DONE', label: 'Done (DONE)', count: doneCount },
             { key: 'ACCEPTED', label: 'Approved (ACCEPTED)', count: acceptedCount },
             { key: 'REJECTED', label: 'Rejected (REJECTED)', count: rejectedCount }
           ].map(tab => (
@@ -399,7 +434,7 @@ export default function LeaderReports() {
                     <div style={{ color: 'var(--rep-text-muted)' }}>Loading reports...</div>
                   </td>
                 </tr>
-              ) : reports.length === 0 ? (
+              ) : pagedReports.length === 0 ? (
                 <tr>
                   <td colSpan={7}>
                     <div className="rep-empty-state">
@@ -410,7 +445,7 @@ export default function LeaderReports() {
                   </td>
                 </tr>
               ) : (
-                reports.map(report => (
+                pagedReports.map(report => (
                   <tr key={report.id}>
                     {/* Report ID */}
                     <td style={{ fontFamily: 'var(--rep-mono)', fontWeight: '700', fontSize: '13px' }}>
@@ -481,7 +516,7 @@ export default function LeaderReports() {
                     <td>
                       <span className={`rep-badge ${(report.status || 'pending').toLowerCase()}`}>
                         {report.status === 'PENDING' && <Clock size={12} />}
-                        {report.status === 'IN_PROGRESS' && <AlertTriangle size={12} />}
+                        {report.status === 'DONE' && <CheckCheck size={12} />}
                         {report.status === 'ACCEPTED' && <CheckCircle2 size={12} />}
                         {report.status === 'REJECTED' && <XCircle size={12} />}
                         {report.status}
@@ -524,7 +559,7 @@ export default function LeaderReports() {
         </div>
 
         {/* Pagination Footer */}
-        {totalCount > limit && (
+        {filteredTotal > limit && (
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -533,7 +568,7 @@ export default function LeaderReports() {
             borderTop: '1px solid var(--rep-border)'
           }}>
             <span style={{ fontSize: '13px', color: 'var(--rep-text-secondary)' }}>
-              Showing {reports.length} of {totalCount} reports
+              Showing {pagedReports.length} of {filteredTotal} reports
             </span>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
@@ -545,7 +580,7 @@ export default function LeaderReports() {
               </button>
               <button
                 className="rep-btn rep-btn-ghost"
-                disabled={page * limit >= totalCount}
+                disabled={page * limit >= filteredTotal}
                 onClick={() => setPage(p => p + 1)}
               >
                 Next <ChevronRight size={16} />

@@ -14,7 +14,6 @@ import {
   CheckCircle2,
   XCircle,
   MessageSquare,
-  HelpCircle,
   Send,
   X,
   Trash2,
@@ -257,13 +256,8 @@ function CommentThread({ comment, onResolve, onDelete, onUpdate, currentUserId, 
               onClick={() => onResolve(comment.id)}
               className={comment.resolved ? "rvw-resolved-tag rvw-resolved-tag--clickable" : "rvw-resolve-btn"}
               title={comment.resolved ? "Click to mark as unresolved" : "Mark as resolved"}
-              style={
-                comment.resolved
-                  ? { border: "none", background: "transparent", font: "inherit", cursor: "pointer", padding: 0 }
-                  : undefined
-              }
             >
-              <CheckCircle2 size={comment.resolved ? 12 : 13} /> {comment.resolved ? "Resolved" : "Resolve"}
+              <CheckCircle2 size={13} /> {comment.resolved ? "Resolved" : "Resolve"}
             </button>
           )}
 
@@ -688,14 +682,6 @@ function CommentsSidebar({
         )}
       </div>
     </aside>
-  );
-}
-
-function HelpButton({ style }) {
-  return (
-    <div className="rvw-help-btn" style={style}>
-      <HelpCircle size={16} />
-    </div>
   );
 }
 
@@ -1275,8 +1261,6 @@ export default function ReviewWorkspace() {
         onPostGeneralComment={handlePostGeneralComment}
         alreadyHasGeneralComment={alreadyHasGeneralComment}
       />
-
-      <HelpButton />
     </div>
   );
 }

@@ -1663,7 +1663,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       description: `Official translation team for ${createTeamForm.comicName}.`,
       assignedToMe: true,
       maxMembers: 5,
-      isRecruiting: true,
+      isRecruiting: false,
       notes: `Official translation team for ${createTeamForm.comicName}.`
     }
 

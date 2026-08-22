@@ -144,7 +144,7 @@ describe('Translator team member presence & contributions', () => {
     expect(mapped.cvUrl).toBe('https://cdn.example.com/vit-cv.pdf')
   })
 
-  it('shows a CV download link in the member profile modal', async () => {
+  it('shows a CV view link in the member profile modal', async () => {
     getTeamMembersApi.mockResolvedValue([
       { id: 'user-1', name: 'Online User', role: 'Group Leader', online: true },
       { id: 'user-2', name: 'Vit Reader', role: 'Member', online: false, cvUrl: 'https://cdn.example.com/vit-cv.pdf' },
@@ -160,6 +160,6 @@ describe('Translator team member presence & contributions', () => {
     )
 
     fireEvent.click(await screen.findByText('Vit Reader'))
-    expect(await screen.findByRole('link', { name: /view \/ download cv/i })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: /view cv/i })).toBeInTheDocument()
   })
 })
