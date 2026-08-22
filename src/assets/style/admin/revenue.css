@@ -540,9 +540,90 @@
   background: rgba(168, 85, 247, 0.035);
 }
 
-.payment-recent-table td strong {
+/* Premium Table Cell UI */
+.payment-cell-created {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.payment-date {
   color: var(--admin-text-primary);
-  font-weight: 650;
+  font-weight: 600;
+}
+
+.payment-time {
+  color: var(--admin-text-muted);
+  font-size: 10px;
+}
+
+.payment-cell-reader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.payment-reader-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(236, 72, 153, 0.15));
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  color: #d8b4fe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.payment-reader-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.payment-reader-email {
+  color: var(--admin-text-primary);
+  font-weight: 600;
+}
+
+.payment-cell-plan {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.payment-plan-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--admin-text-secondary);
+}
+
+.payment-plan-details {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.payment-plan-name {
+  color: var(--admin-text-primary);
+  font-weight: 500;
+}
+
+html.light .payment-reader-avatar {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(236, 72, 153, 0.1));
+  border-color: rgba(168, 85, 247, 0.2);
+  color: #7e22ce;
+}
+
+html.light .payment-plan-icon {
+  background: #f1f5f9;
+  color: #64748b;
 }
 
 .payment-table-amount {

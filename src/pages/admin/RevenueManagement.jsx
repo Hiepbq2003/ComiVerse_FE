@@ -532,9 +532,31 @@ function RevenueManagement() {
                       <tr><td colSpan="5" className="payment-table-empty">No payment records yet.</td></tr>
                     ) : recentPayments.map((payment) => (
                       <tr key={payment.id}>
-                        <td>{formatDate(payment.createdAt)}</td>
-                        <td><strong>{payment.userEmail || 'Unknown reader'}</strong></td>
-                        <td><span className="payment-plan-code">{payment.planCode}</span> {payment.planName}</td>
+                        <td>
+                          <div className="payment-cell-created">
+                            <span className="payment-date">{formatDate(payment.createdAt).split(',')[0]}</span>
+                            <span className="payment-time">{formatDate(payment.createdAt).split(',')[1] || ''}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="payment-cell-reader">
+                            <div className="payment-reader-avatar">
+                              {(payment.userEmail || 'U')[0].toUpperCase()}
+                            </div>
+                            <div className="payment-reader-info">
+                              <span className="payment-reader-email">{payment.userEmail || 'Unknown reader'}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="payment-cell-plan">
+                            <span className="payment-plan-icon"><CreditCard size={14} /></span>
+                            <div className="payment-plan-details">
+                              <span className="payment-plan-name">{payment.planName}</span>
+                              <span className="payment-plan-code">{payment.planCode}</span>
+                            </div>
+                          </div>
+                        </td>
                         <td className="payment-table-amount">{formatMoney(payment.amount, payment.currency)}</td>
                         <td><span className={`payment-status-badge ${String(payment.status || '').toLowerCase()}`}>{payment.status}</span></td>
                       </tr>
