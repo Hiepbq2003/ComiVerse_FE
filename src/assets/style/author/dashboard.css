@@ -284,7 +284,7 @@ html.light .author-primary-btn:hover {
 
 .author-analytics-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 16px;
   margin-bottom: 28px;
 }
