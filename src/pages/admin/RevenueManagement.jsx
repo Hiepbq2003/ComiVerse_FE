@@ -112,6 +112,8 @@ function deltaMeta(value, noun) {
 }
 
 function RevenueChart({ series, currency }) {
+  const [hoverData, setHoverData] = useState(null)
+
   const width = 920
   const height = 300
   const padding = { left: 74, right: 22, top: 24, bottom: 48 }
@@ -158,10 +160,35 @@ function RevenueChart({ series, currency }) {
         {areaPath && <path d={areaPath} fill="url(#paymentRevenueGradient)" />}
         {linePath && <path d={linePath} className="payment-chart-line" />}
 
-        {coordinates.length <= 90 && coordinates.map((point) => (
-          <circle key={point.date} cx={point.x} cy={point.y} r="3.5" className="payment-chart-point">
-            <title>{formatShortDate(point.date)}: {formatMoney(point.revenue, currency)} · {point.paidPayments || 0} paid</title>
-          </circle>
+        {/* Interactive Hover Bands */}
+        {coordinates.map((point, index) => {
+          const bandW = chartWidth / denominator
+          return (
+            <rect
+              key={`hover-${point.date}`}
+              x={point.x - bandW / 2}
+              y={padding.top}
+              width={bandW}
+              height={chartHeight}
+              fill={hoverData?.index === index ? "rgba(168, 85, 247, 0.05)" : "transparent"}
+              onMouseEnter={() => setHoverData({ index, ...point })}
+              onMouseLeave={() => setHoverData(null)}
+              style={{ cursor: 'crosshair', transition: 'fill 0.2s' }}
+            />
+          )
+        })}
+
+        {coordinates.length <= 90 && coordinates.map((point, index) => (
+          <circle 
+            key={point.date} 
+            cx={point.x} 
+            cy={point.y} 
+            r={hoverData?.index === index ? "6" : "4"} 
+            fill={hoverData?.index === index ? "#c084fc" : "#fff"}
+            stroke="#a855f7"
+            strokeWidth="2.5"
+            style={{ pointerEvents: 'none', transition: 'all 0.2s' }}
+          />
         ))}
 
         {coordinates.map((point, index) => {
@@ -174,6 +201,27 @@ function RevenueChart({ series, currency }) {
           )
         })}
       </svg>
+      
+      {hoverData && (() => {
+        const px = (hoverData.x / width) * 100
+        let alignClass = ''
+        if (px > 80) alignClass = ' align-right'
+        if (px < 20) alignClass = ' align-left'
+        
+        return (
+          <div className={`payment-chart-tooltip${alignClass}`} style={{ left: `${px}%`, top: '40%' }}>
+            <div className="payment-chart-tooltip-header">{formatShortDate(hoverData.date)}</div>
+            <div className="payment-chart-tooltip-row">
+              <span className="payment-chart-tooltip-label">Revenue</span>
+              <span className="payment-chart-tooltip-value">{formatMoney(hoverData.revenue, currency)}</span>
+            </div>
+            <div className="payment-chart-tooltip-row">
+              <span className="payment-chart-tooltip-label">Transactions</span>
+              <span className="payment-chart-tooltip-value">{hoverData.paidPayments || 0} paid</span>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
