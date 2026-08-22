@@ -144,6 +144,8 @@ function ModeratorDashboard() {
     cover: '',
     comicId: ''
   })
+  const [isSubmittingTeam, setIsSubmittingTeam] = useState(false)
+  const isSubmittingTeamRef = useRef(false)
 
   useEffect(() => {
     fetchAllData()
@@ -1597,6 +1599,8 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
   }
 
   const handleCreateProjectTeam = async () => {
+    if (isSubmittingTeamRef.current) return;
+
     const exists = projectTeams.some(
       t => t.comicName && (createTeamForm.comicName || '') && t.comicName.toLowerCase() === (createTeamForm.comicName || '').toLowerCase() &&
            t.targetLang && (createTeamForm.targetLang || '') && t.targetLang.toLowerCase() === (createTeamForm.targetLang || '').toLowerCase()
@@ -1605,6 +1609,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       toast.error(`A translation team for "${createTeamForm.comicName}" in "${createTeamForm.targetLang}" already exists!`)
       return
     }
+
+    isSubmittingTeamRef.current = true;
+    setIsSubmittingTeam(true);
 
     const leaderName = createTeamForm.leaderName.trim() || 'Translator Leader'
     const leaderInitials = leaderName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -1702,6 +1709,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       console.error(err)
       toast.error(err.response?.status === 409 ? `Conflict: A translation team for "${createTeamForm.comicName}" in "${createTeamForm.targetLang}" was just created by another moderator.` : 'Failed to create translation project team.')
       fetchComicsAndTeams() // Re-fetch on conflict
+    } finally {
+      isSubmittingTeamRef.current = false;
+      setIsSubmittingTeam(false);
     }
   }
 
@@ -2647,6 +2657,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               createTeamForm={createTeamForm}
               setCreateTeamForm={setCreateTeamForm}
               handleCreateProjectTeam={handleCreateProjectTeam}
+              isSubmittingTeam={isSubmittingTeam}
             />
           )}
 

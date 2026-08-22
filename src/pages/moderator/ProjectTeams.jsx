@@ -37,7 +37,8 @@ function ProjectTeams({
   setCreateTeamStep,
   createTeamForm,
   setCreateTeamForm,
-  handleCreateProjectTeam
+  handleCreateProjectTeam,
+  isSubmittingTeam = false
 }) {
   const { theme } = useTheme()
   const [currentPage, setCurrentPage] = useState(1)
@@ -962,12 +963,13 @@ function ProjectTeams({
                     }
                   }}
                   disabled={(() => {
+                    if (isSubmittingTeam) return true;
                     const isDisabled = createTeamStep === 1 && (!createTeamForm.comicName || !createTeamForm.title.trim() || availableTargetLanguages.length === 0);
                     if (isDisabled) console.log("DISABLED REASON:", { step: createTeamStep, comic: createTeamForm.comicName, title: createTeamForm.title, langLen: availableTargetLanguages.length });
                     return isDisabled;
                   })()}
                 >
-                  {createTeamStep === 1 ? 'Next →' : 'Create Team'}
+                  {isSubmittingTeam ? 'Creating...' : (createTeamStep === 1 ? 'Next →' : 'Create Team')}
                 </button>
               </div>
             </div>
