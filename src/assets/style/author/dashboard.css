@@ -1,10 +1,8 @@
 /* Page Content Container */
 .author-page-content {
   flex: 1;
-  padding: 32px;
-  max-width: 1200px;
+  padding: 32px 40px;
   width: 100%;
-  margin: 0 auto;
   box-sizing: border-box;
 }
 
