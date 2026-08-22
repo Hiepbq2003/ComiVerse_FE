@@ -5,6 +5,7 @@
 export function normalizeProjectStatus(status) {
   const value = String(status || '').toLowerCase().trim();
   if (value === 'completed' || value === 'complete' || value === 'done') return 'completed';
+  if (value === 'paused') return 'paused';
   return 'ongoing';
 }
 
