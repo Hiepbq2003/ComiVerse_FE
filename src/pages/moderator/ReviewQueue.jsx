@@ -916,23 +916,6 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         .filter(item => {
           if (!query) return true;
           return ((item.title || '').toLowerCase().includes(query) || (item.submittedBy || '').toLowerCase().includes(query));
-        })
-        .sort((a, b) => {
-          if (sortFilter === 'title_asc') {
-            return (a.title || '').localeCompare(b.title || '');
-          } else if (sortFilter === 'title_desc') {
-            return (b.title || '').localeCompare(a.title || '');
-          } else if (sortFilter === 'author_asc') {
-            return (a.submittedBy || '').localeCompare(b.submittedBy || '');
-          } else if (sortFilter === 'author_desc') {
-            return (b.submittedBy || '').localeCompare(a.submittedBy || '');
-          }
-          const getSortTime = (item) => {
-            return new Date(item.updatedAt || item.approvedAt || item.timestamp || 0).getTime() || 0;
-          };
-          const timeA = getSortTime(a);
-          const timeB = getSortTime(b);
-          return sortFilter === 'date_asc' ? timeA - timeB : timeB - timeA;
         });
     }
 
@@ -953,28 +936,8 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           item.submittedByEmail?.toLowerCase().includes(query) ||
           item.chapter?.toLowerCase().includes(query)
         );
-      })
-      .sort((a, b) => {
-        if (sortFilter === 'title_asc') {
-          return (a.title || '').localeCompare(b.title || '');
-        } else if (sortFilter === 'title_desc') {
-          return (b.title || '').localeCompare(a.title || '');
-        } else if (sortFilter === 'author_asc') {
-          return (a.submittedBy || '').localeCompare(b.submittedBy || '');
-        } else if (sortFilter === 'author_desc') {
-          return (b.submittedBy || '').localeCompare(a.submittedBy || '');
-        }
-        const getSortTime = (item) => {
-          if (activeTab === 'pending') {
-            return new Date(item.timestamp || item.submittedAt || item.createdAt || 0).getTime() || 0;
-          }
-          return new Date(item.updatedAt || item.approvedAt || item.timestamp || item.submittedAt || item.createdAt || 0).getTime() || 0;
-        };
-        const timeA = getSortTime(a);
-        const timeB = getSortTime(b);
-        return sortFilter === 'date_asc' ? timeA - timeB : timeB - timeA;
       });
-  }, [submissions, comics, activeTab, searchQuery, sortFilter]);
+  }, [submissions, comics, activeTab, searchQuery]);
 
   // 3. Smart Comic Grouping: Consolidate multiple chapter submissions of the same comic into 1 card
   const groupedItems = useMemo(() => {
@@ -995,11 +958,19 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         const group = groupsMap.get(key);
         group.subItems.push(item);
 
-        // Use newest timestamp for display
-        const itemTime = new Date(item.timestamp || item.submittedAt || item.createdAt || 0).getTime() || 0;
-        const groupTime = new Date(group.timestamp || group.submittedAt || group.createdAt || 0).getTime() || 0;
+        const getSortTime = (it) => {
+          if (activeTab === 'pending') {
+            return new Date(it.timestamp || it.submittedAt || it.createdAt || 0).getTime() || 0;
+          }
+          return new Date(it.updatedAt || it.approvedAt || it.timestamp || it.submittedAt || it.createdAt || 0).getTime() || 0;
+        };
+        const itemTime = getSortTime(item);
+        const groupTime = getSortTime(group);
+
         if (itemTime > groupTime) {
           group.timestamp = item.timestamp || item.submittedAt || item.createdAt;
+          group.updatedAt = item.updatedAt;
+          group.approvedAt = item.approvedAt;
         }
       }
     });
@@ -1073,8 +1044,29 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       const hasRealChapter = (group.subItems || []).some(isRealChapterSubmission);
       return hasRealChapter;
     });
-    return result;
-  }, [filteredItems]);
+    return result.sort((a, b) => {
+      if (sortFilter === 'title_asc') {
+        return (a.title || '').localeCompare(b.title || '');
+      } else if (sortFilter === 'title_desc') {
+        return (b.title || '').localeCompare(a.title || '');
+      } else if (sortFilter === 'author_asc') {
+        return (a.submittedBy || '').localeCompare(b.submittedBy || '');
+      } else if (sortFilter === 'author_desc') {
+        return (b.submittedBy || '').localeCompare(a.submittedBy || '');
+      }
+      
+      const getSortTime = (item) => {
+        if (activeTab === 'pending') {
+          return new Date(item.timestamp || item.submittedAt || item.createdAt || 0).getTime() || 0;
+        }
+        return new Date(item.updatedAt || item.approvedAt || item.timestamp || item.submittedAt || item.createdAt || 0).getTime() || 0;
+      };
+      
+      const timeA = getSortTime(a);
+      const timeB = getSortTime(b);
+      return sortFilter === 'date_asc' ? timeA - timeB : timeB - timeA;
+    });
+  }, [filteredItems, activeTab, sortFilter]);
 
   const totalPages = Math.ceil(groupedItems.length / ITEMS_PER_PAGE)
   const paginatedItems = useMemo(() => {
