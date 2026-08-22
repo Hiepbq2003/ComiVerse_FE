@@ -600,80 +600,83 @@ html.light {
   margin-bottom: 24px;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .profile-role-badge.reader {
-  background: rgba(59, 130, 246, 0.25);
-  color: #93c5fd;
-  border: 1px solid rgba(59, 130, 246, 0.6);
+  background: rgba(59, 130, 246, 0.75);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .profile-role-badge.translator {
-  background: rgba(16, 185, 129, 0.25);
-  color: #6ee7b7;
-  border: 1px solid rgba(16, 185, 129, 0.6);
+  background: rgba(16, 185, 129, 0.75);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .profile-role-badge.author {
-  background: rgba(168, 85, 247, 0.25);
-  color: #d8b4fe;
-  border: 1px solid rgba(168, 85, 247, 0.6);
+  background: rgba(168, 85, 247, 0.75);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .profile-role-badge.moderator {
-  background: rgba(249, 115, 22, 0.25);
-  color: #fdba74;
-  border: 1px solid rgba(249, 115, 22, 0.6);
+  background: rgba(249, 115, 22, 0.75);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .profile-role-badge.admin {
-  background: rgba(239, 68, 68, 0.25);
-  color: #fca5a5;
-  border: 1px solid rgba(239, 68, 68, 0.6);
+  background: rgba(239, 68, 68, 0.75);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .profile-role-badge.project-leader {
-  background: rgba(6, 182, 212, 0.25);
-  color: #67e8f9;
-  border: 1px solid rgba(6, 182, 212, 0.6);
+  background: rgba(6, 182, 212, 0.75);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 /* Light mode overrides for role badges for better contrast */
 html.light .profile-role-badge.reader {
-  background: rgba(59, 130, 246, 0.15);
-  color: #1d4ed8;
-  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(37, 99, 235, 0.85);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 html.light .profile-role-badge.translator {
-  background: rgba(16, 185, 129, 0.15);
-  color: #047857;
-  border-color: rgba(16, 185, 129, 0.5);
+  background: rgba(5, 150, 105, 0.85);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 html.light .profile-role-badge.author {
-  background: rgba(168, 85, 247, 0.15);
-  color: #7e22ce;
-  border-color: rgba(168, 85, 247, 0.5);
+  background: rgba(147, 51, 234, 0.85);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 html.light .profile-role-badge.moderator {
-  background: rgba(249, 115, 22, 0.15);
-  color: #c2410c;
-  border-color: rgba(249, 115, 22, 0.5);
+  background: rgba(234, 88, 12, 0.85);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 html.light .profile-role-badge.admin {
-  background: rgba(239, 68, 68, 0.15);
-  color: #b91c1c;
-  border-color: rgba(239, 68, 68, 0.5);
+  background: rgba(220, 38, 38, 0.85);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 html.light .profile-role-badge.project-leader {
-  background: rgba(6, 182, 212, 0.15);
-  color: #0369a1;
-  border-color: rgba(6, 182, 212, 0.5);
+  background: rgba(8, 145, 178, 0.85);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 .profile-sidebar-nav {

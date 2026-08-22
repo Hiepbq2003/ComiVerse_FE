@@ -166,18 +166,30 @@ function AuthorDashboard() {
 
   const statCards = useMemo(() => {
     const revenueEstimate = numberValue(summary.estimatedRevenue)
+    const currentMonthKey = new Date().toISOString().slice(0, 7)
+    const currentYearKey = new Date().getFullYear().toString()
+
+    const earnThisMonth = monthlyMetrics
+      .filter(m => m.monthKey === currentMonthKey)
+      .reduce((sum, m) => sum + numberValue(m.estimatedRevenue), 0)
+
+    const earnThisYear = monthlyMetrics
+      .filter(m => m.monthKey?.startsWith(currentYearKey))
+      .reduce((sum, m) => sum + numberValue(m.estimatedRevenue), 0)
 
     return [
       { label: 'Total Comics', value: formatFullNumber(summary.totalComics), change: `${formatFullNumber(summary.publishedComics)} published · ${formatFullNumber(summary.draftComics)} other`, trend: 'neutral', icon: 'book', color: 'purple' },
       { label: 'Total Chapters', value: formatFullNumber(summary.totalChapters), change: 'All active author chapters', trend: 'neutral', icon: 'chapters', color: 'blue' },
       { label: 'Total Views', value: formatCompactNumber(summary.totalViews), change: `${formatCompactNumber(summary.totalLikes)} likes`, trend: 'up', icon: 'views', color: 'green' },
-      { label: 'Revenue Estimate', value: formatMoney(revenueEstimate), change: 'Payout page is the source of truth', trend: 'neutral', icon: 'revenue', color: 'orange' },
-      { label: 'Total Paid', value: formatMoney(numberValue(summary.totalPaid)), change: 'Amount successfully withdrawn', trend: 'neutral', icon: 'check', color: 'green' },
+      { label: 'All-time Earn', value: formatMoney(revenueEstimate), change: 'Payout page is the source of truth', trend: 'neutral', icon: 'revenue', color: 'orange' },
+      { label: 'Earn this Month', value: formatMoney(earnThisMonth), change: 'Estimated for current month', trend: 'up', icon: 'revenue', color: 'green' },
+      { label: 'Earn this Year', value: formatMoney(earnThisYear), change: 'Estimated for current year', trend: 'up', icon: 'revenue', color: 'blue' },
+      { label: 'Total Paid', value: formatMoney(numberValue(summary.totalPaid)), change: 'Amount successfully withdrawn', trend: 'neutral', icon: 'check', color: 'purple' },
       { label: 'Followers', value: formatCompactNumber(summary.totalFollowers), change: 'Readers who saved your comics', trend: 'up', icon: 'users', color: 'pink' },
       { label: 'Avg. Rating', value: formatRating(summary.averageRating), change: `${formatFullNumber(summary.totalRatings)} ratings`, trend: 'neutral', icon: 'star', color: 'cyan' },
       { label: 'Pending Reviews', value: formatFullNumber(summary.pendingReviews), change: 'Comic and chapter review queue', trend: 'warning', icon: 'review', color: 'red' },
     ]
-  }, [summary])
+  }, [summary, monthlyMetrics])
 
   const lineChart = useMemo(() => {
     const chartW = 800
