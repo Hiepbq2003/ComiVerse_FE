@@ -157,6 +157,13 @@ export function isSupersededTask(task) {
   return status === 'superseded';
 }
 
+function isGroupLeaderAssignee(member) {
+  if (!member) return false;
+  if (member.isLeader === true) return true;
+  const role = String(member.role || '').toLowerCase().replace(/[_\s-]+/g, ' ').trim();
+  return role === 'group leader' || role === 'project leader' || role === 'leader';
+}
+
 export function filterUnassignedChapters(chapterOptions, tasks) {
   const activeTasks = (tasks || []).filter(t => t && !isSupersededTask(t));
 
@@ -1876,14 +1883,28 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   const isUnderReview = editTaskData.status === 'under_review'
   const canReview = isProjectLeader && isUnderReview
   const isInProgress = editTaskData.status === 'in_progress'
+  const isTaskUnderReview = isUnderReview
+  const isTaskCompleted = editTaskData.status === 'completed'
+  const originalStatus = getNormalizedStatusKey(editTaskData.originalStatus || editTaskData.status)
+  const isOriginallyUnderReview = originalStatus === 'under_review'
+  const isOriginallyCompleted = originalStatus === 'completed'
+  const lockTaskEdits = saving || isOriginallyUnderReview
+  const assigneeCandidates = (() => {
+    const members = teamMembersForAssign || []
+    if (!isOriginallyUnderReview) return members
+    const leaders = members.filter(isGroupLeaderAssignee)
+    if (leaders.length > 0) return leaders
+    return members.filter((m) => String(m.id || m.userId) === String(editTaskData.assigneeId))
+  })()
+  const canEdit = isProjectLeader || (isEditableByMember && !isOriginallyUnderReview && !isOriginallyCompleted)
 
   const selectAssignee = (memberId) => {
-    if (!isProjectLeader || saving) return;
+    if (!isProjectLeader || lockTaskEdits) return;
     setEditTaskData({ ...editTaskData, assigneeId: memberId })
   }
 
   const handleSaveClick = async () => {
-    if (!isProjectLeader || saving) return;
+    if (!isProjectLeader || lockTaskEdits) return;
     setSubmitted(true)
     if (Object.values(errors).some(Boolean)) return
     setSaving(true)
@@ -1912,17 +1933,11 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
     }
   }
 
-  const isTaskUnderReview = editTaskData.status === 'under_review'
-  const isTaskCompleted = editTaskData.status === 'completed'
-  const originalStatus = getNormalizedStatusKey(editTaskData.originalStatus || editTaskData.status)
-  const isOriginallyUnderReview = originalStatus === 'under_review'
-  const isOriginallyCompleted = originalStatus === 'completed'
-  const canEdit = isProjectLeader || (isEditableByMember && !isOriginallyUnderReview && !isOriginallyCompleted)
   return (
     <div className="trans-modal-overlay">
       <div className="trans-modal-card">
         <div className="trans-modal-header">
-          <h3>{isProjectLeader ? 'Edit Task Details' : (isEditableByMember ? 'Task Information' : 'Task Information (Read Only)')}</h3>
+          <h3>{isProjectLeader && !isOriginallyUnderReview ? 'Edit Task Details' : (isEditableByMember ? 'Task Information' : 'Task Information (Read Only)')}</h3>
           <button className="trans-modal-close-btn" onClick={onCancel} disabled={saving}>×</button>
         </div>
 
@@ -1943,7 +1958,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                   className="trans-form-input"
                   style={errorBorder('title')}
                   value={editTaskData.title}
-                  disabled={saving}
+                  disabled={lockTaskEdits}
                   onChange={(e) => setEditTaskData({ ...editTaskData, title: e.target.value })}
                 />
                 {showError('title') && (
@@ -1956,7 +1971,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                 <select
                   className="trans-form-input"
                   value={getNormalizedStatusKey(editTaskData.status)}
-                  disabled={saving || isOriginallyCompleted}
+                  disabled={lockTaskEdits || isOriginallyCompleted}
                   onChange={(e) => setEditTaskData({ ...editTaskData, status: e.target.value })}
                 >
                   {getAllowedStatusOptions(editTaskData.originalStatus || editTaskData.status).map((opt) => (
@@ -1976,7 +1991,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                 <select
                   className="trans-form-input"
                   value={editTaskData.priority}
-                  disabled={saving}
+                  disabled={lockTaskEdits}
                   onChange={(e) => setEditTaskData({ ...editTaskData, priority: e.target.value })}
                 >
                   <option value="Urgent">🚨 Urgent</option>
@@ -1989,11 +2004,11 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
               <div className="trans-form-group">
                 <label className="trans-form-label">Assignee *</label>
                 <AssigneeChipPicker
-                  candidates={teamMembersForAssign}
+                  candidates={assigneeCandidates}
                   selectedId={editTaskData.assigneeId}
                   heldAssigneeId={editTaskData.originalAssigneeId}
                   onSelect={selectAssignee}
-                  readOnly={saving}
+                  readOnly={lockTaskEdits}
                   error={showError('assigneeId')}
                 />
                 {showError('assigneeId') && (
@@ -2008,7 +2023,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                   onChange={(val) => setEditTaskData({ ...editTaskData, dueDate: val })}
                   placeholder="Select due date"
                   style={errorBorder('dueDate')}
-                  disabled={saving}
+                  disabled={lockTaskEdits}
                 />
                 {showError('dueDate') && (
                   <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Due date is required</p>
@@ -2055,7 +2070,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
               <div className="trans-form-group">
                 <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assigned Member</label>
                 <AssigneeChipPicker
-                  candidates={teamMembersForAssign}
+                  candidates={assigneeCandidates}
                   selectedId={editTaskData.assigneeId}
                   readOnly={true}
                   emptyLabel="No assigned member."
@@ -2110,7 +2125,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
           )}
 
           {/* Save: leader can persist status/details except on already-completed tasks */}
-          {!isOriginallyCompleted && isProjectLeader && (
+          {!isOriginallyCompleted && !isOriginallyUnderReview && isProjectLeader && (
             <button
               className="trans-btn primary"
               onClick={handleSaveClick}

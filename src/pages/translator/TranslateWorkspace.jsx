@@ -163,7 +163,7 @@ function ChapterList({ chapters, openChapterId, onToggleChapter, chapterPagesLoa
         const isOpen = ch.chapterId === openChapterId;
         const isLoadingPages = isOpen && !isCurrent && chapterPagesLoading === ch.taskId;
         return (
-          <div key={ch.chapterId}>
+          <div key={ch.chapterId || ch.taskId}>
             <button
               onClick={() => onToggleChapter(ch)}
               className={`tw-chapter-row ${isCurrent ? "is-current" : ""}`}
@@ -850,12 +850,10 @@ function PageImage({
 }
 
 function SourceImageCrop({ imageSrc, canvasRef, selection, imageNaturalSize, isPickingColor, onPickColorInCrop, zoomScale }) {
-  const PREVIEW_WIDTH = 260;
-
   if (!selection || !canvasRef.current || !imageSrc || !imageNaturalSize) return null;
 
   const box = getBoundingBox(selection);
-  if (!box || box.width === 0) return null;
+  if (!box || box.width === 0 || box.height === 0) return null;
 
   const rawContainer = canvasRef.current.getBoundingClientRect();
   if (rawContainer.width === 0 || rawContainer.height === 0) return null;
@@ -871,20 +869,24 @@ function SourceImageCrop({ imageSrc, canvasRef, selection, imageNaturalSize, isP
     imageNaturalSize.width,
     imageNaturalSize.height
   );
+  if (displayedWidth === 0 || displayedHeight === 0) return null;
 
   const boxXInImage = box.x - offsetX;
   const boxYInImage = box.y - offsetY;
 
-  const scale = PREVIEW_WIDTH / box.width;
-  const previewHeight = Math.min(box.height * scale, 320);
+  const scaleX = imageNaturalSize.width / displayedWidth;
+  const scaleY = imageNaturalSize.height / displayedHeight;
+  const scale = scaleX;
+  const previewWidth = box.width * scaleX;
+  const previewHeight = box.height * scaleY;
   let clipPath;
   if (selection.shape === "ellipse") {
     clipPath = "ellipse(50% 50% at 50% 50%)";
   } else if (selection.shape === "polygon" && selection.points?.length) {
     const pointsStr = selection.points
       .map((p) => {
-        const px = (p.x - offsetX - boxXInImage) * scale;
-        const py = (p.y - offsetY - boxYInImage) * scale;
+        const px = (p.x - offsetX - boxXInImage) * scaleX;
+        const py = (p.y - offsetY - boxYInImage) * scaleY;
         return `${px}px ${py}px`;
       })
       .join(", ");
@@ -894,30 +896,35 @@ function SourceImageCrop({ imageSrc, canvasRef, selection, imageNaturalSize, isP
   }
 
   return (
-    <div
-      onClick={(e) => {
-        if (!isPickingColor) return;
-        const rect = e.currentTarget.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const clickY = e.clientY - rect.top;
-        onPickColorInCrop?.(clickX, clickY, box, scale, boxXInImage, boxYInImage, displayedWidth, displayedHeight);
-      }}
-      className={`tw-x-crop-preview ${selection.shape === "rect" ? "is-rect" : ""} ${isPickingColor ? "is-picking" : ""}`}
-      style={{ "--preview-height": `${previewHeight}px` }}
-    >
-      <div className="tw-x-crop-clip" style={{ "--clip-path": clipPath }}>
-        <img
-          src={imageSrc}
-          alt="Selected source area"
-          draggable={false}
-          className="tw-x-crop-image"
-          style={{
-            "--img-left": `${-boxXInImage * scale}px`,
-            "--img-top": `${-boxYInImage * scale}px`,
-            "--img-w": `${displayedWidth * scale}px`,
-            "--img-h": `${displayedHeight * scale}px`,
-          }}
-        />
+    <div className="tw-x-crop-scroll">
+      <div
+        onClick={(e) => {
+          if (!isPickingColor) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const clickY = e.clientY - rect.top;
+          onPickColorInCrop?.(clickX, clickY, box, scale, boxXInImage, boxYInImage, displayedWidth, displayedHeight);
+        }}
+        className={`tw-x-crop-preview ${selection.shape === "rect" ? "is-rect" : ""} ${isPickingColor ? "is-picking" : ""}`}
+        style={{
+          "--preview-width": `${previewWidth}px`,
+          "--preview-height": `${previewHeight}px`,
+        }}
+      >
+        <div className="tw-x-crop-clip" style={{ "--clip-path": clipPath }}>
+          <img
+            src={imageSrc}
+            alt="Selected source area"
+            draggable={false}
+            className="tw-x-crop-image"
+            style={{
+              "--img-left": `${-boxXInImage * scaleX}px`,
+              "--img-top": `${-boxYInImage * scaleY}px`,
+              "--img-w": `${imageNaturalSize.width}px`,
+              "--img-h": `${imageNaturalSize.height}px`,
+            }}
+          />
+        </div>
       </div>
     </div>
   );
@@ -2188,6 +2195,16 @@ function isSameUser(assigneeId, userId) {
 function isBacklogTaskStatus(status) {
   const normalized = String(status || "").toLowerCase().replace(/[-\s]/g, "_");
   return !normalized || normalized === "backlog" || normalized === "todo";
+}
+
+function isSupersededTaskStatus(status) {
+  return String(status || "").toLowerCase().replace(/[-\s]/g, "_") === "superseded";
+}
+
+function chapterSidebarKey(entry) {
+  if (entry?.chapterId) return `id:${entry.chapterId}`;
+  if (entry?.chapterNumber != null && entry.chapterNumber !== "") return `num:${entry.chapterNumber}`;
+  return `task:${entry?.taskId || entry?.id || entry?.title || ""}`;
 }
 
 function isSameTranslatorUser(translatorId, userId, userName, teamMembers = []) {
@@ -3724,6 +3741,7 @@ export default function TranslateWorkspace() {
 
     const siblingEntries = (siblingTasks || [])
       .filter((t) => String(t.id) !== String(taskId))
+      .filter((t) => !isSupersededTaskStatus(t.status))
       .map((t) => {
         const cachedPages = chapterPagesCache[t.id];
         return {
@@ -3760,7 +3778,15 @@ export default function TranslateWorkspace() {
       const match = String(entry.title || "").match(/(\d+)/);
       return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
     };
-    return [currentEntry, ...siblingEntries].sort((a, b) => {
+    const seenChapters = new Set([chapterSidebarKey(currentEntry)]);
+    const uniqueSiblings = siblingEntries.filter((entry) => {
+      const key = chapterSidebarKey(entry);
+      if (seenChapters.has(key)) return false;
+      seenChapters.add(key);
+      return true;
+    });
+
+    return [currentEntry, ...uniqueSiblings].sort((a, b) => {
       const diff = orderKey(a) - orderKey(b);
       if (diff !== 0) return diff;
       return String(a.title).localeCompare(String(b.title));
