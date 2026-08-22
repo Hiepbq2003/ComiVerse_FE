@@ -151,6 +151,14 @@ function CreateComicModal({ onClose, onCreated }) {
       setError('Comic language is required.')
       return
     }
+    if (!form.summary.trim()) {
+      setError('Description is required.')
+      return
+    }
+    if (!form.genres || form.genres.length === 0) {
+      setError('Please select at least one genre.')
+      return
+    }
     if (!form.coverFile && !form.cover.trim()) {
       setError('Please upload a cover image or provide a cover image URL.')
       return
@@ -230,10 +238,10 @@ function CreateComicModal({ onClose, onCreated }) {
                 {COMIC_LANGUAGE_OPTIONS.map((language) => <option key={language} value={language}>{language}</option>)}
               </select>
             </label>
-            <label className="author-form-label">Minimum Age
+            <label className="author-form-label">Minimum Age *
               <input className="author-input" type="number" min="0" max="21" value={form.minimumAge} onChange={(event) => setForm({ ...form, minimumAge: event.target.value })} />
             </label>
-            <label className="author-form-label">Publication Status
+            <label className="author-form-label">Publication Status *
               <select className="author-input" value={form.publicationStatus} onChange={(event) => setForm({ ...form, publicationStatus: event.target.value })}>
                 <option value="ONGOING">Ongoing</option>
                 <option value="COMPLETED">Completed</option>
@@ -243,11 +251,11 @@ function CreateComicModal({ onClose, onCreated }) {
             </label>
           </div>
 
-          <label className="author-form-label">Description
+          <label className="author-form-label">Description *
             <textarea className="author-input" rows="4" value={form.summary} onChange={(event) => setForm({ ...form, summary: event.target.value })} />
           </label>
 
-          <div className="author-form-label">Genres
+          <div className="author-form-label">Genres *
             <div className="author-genre-pills selectable">
               {GENRE_OPTIONS.map((genre) => (
                 <button key={genre} type="button" className={`author-genre-pill ${form.genres.includes(genre) ? 'selected' : ''}`} onClick={() => toggleGenre(genre)}>
