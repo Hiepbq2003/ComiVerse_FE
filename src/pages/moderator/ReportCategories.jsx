@@ -111,7 +111,7 @@ export default function ReportCategories({ roleScope = 'ALL' }) {
   });
 
   return (
-    <div className="fade-in">
+    <div className="fade-in" style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'hidden' }}>
       {/* ── HEADER ── */}
       <div className="moderator-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
