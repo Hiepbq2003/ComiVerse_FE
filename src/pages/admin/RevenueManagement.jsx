@@ -206,8 +206,10 @@ function RevenueChart({ series, currency }) {
         const px = (hoverData.x / width) * 100
         const py = (hoverData.y / height) * 100
         let alignClass = ''
-        if (px > 80) alignClass = ' align-right'
-        if (px < 20) alignClass = ' align-left'
+        if (px > 80) alignClass += ' align-right'
+        else if (px < 20) alignClass += ' align-left'
+        
+        if (py < 30) alignClass += ' align-bottom'
         
         return (
           <div 
