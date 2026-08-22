@@ -4,9 +4,14 @@ import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import AuthorDashboard from '../../../../pages/author/AuthorDashboard';
 import * as AuthorComicApi from '../../../../services/api/AuthorComicApi';
+import * as PayoutApi from '../../../../services/api/PayoutApi';
 
 vi.mock('../../../../services/api/AuthorComicApi', () => ({
   getAuthorDashboardMetricsApi: vi.fn(),
+}));
+
+vi.mock('../../../../services/api/PayoutApi', () => ({
+  getCreatorPayoutOverviewApi: vi.fn(),
 }));
 
 // Mock Context Providers
@@ -26,6 +31,7 @@ vi.mock('../../../../context/ThemeContext', () => ({
 describe('Author Dashboard (Overview) Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    PayoutApi.getCreatorPayoutOverviewApi.mockResolvedValue({ monthlyGrossAmountUsd: 0 });
   });
 
   const renderDashboard = () => {
@@ -66,6 +72,21 @@ describe('Author Dashboard (Overview) Tests', () => {
     // The data should eventually render
     expect(await screen.findByText('5')).toBeInTheDocument(); // total comics
     expect(await screen.findByText(/10.5K/i)).toBeInTheDocument(); // total views
+  });
+
+  it('Should use current-month payout revenue for Earn this Month', async () => {
+    AuthorComicApi.getAuthorDashboardMetricsApi.mockResolvedValueOnce({
+      summary: { totalComics: 1, estimatedRevenue: 145, totalPaid: 70 },
+      monthlyMetrics: [],
+      topComics: [],
+      recentActivities: [],
+    });
+    PayoutApi.getCreatorPayoutOverviewApi.mockResolvedValueOnce({ monthlyGrossAmountUsd: 75 });
+
+    renderDashboard();
+
+    expect(await screen.findByText('$75.00')).toBeInTheDocument();
+    expect(PayoutApi.getCreatorPayoutOverviewApi).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}$/));
   });
 
   it('Should handle API failure gracefully with empty values', async () => {
