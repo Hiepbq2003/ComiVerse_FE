@@ -1417,7 +1417,7 @@ function ChapterDropdownPicker({ options, selectedId, onChange, disabled, emptyL
       {isOpen && !disabled && (
         <div style={{ 
           position: 'absolute', top: '100%', left: 0, right: 0, 
-          background: 'var(--trans-card-bg)', border: '1px solid var(--trans-border)', 
+          background: 'var(--trans-topbar-bg)', border: '1px solid var(--trans-border)', 
           borderRadius: '8px', marginTop: '6px', zIndex: 100, 
           maxHeight: '280px', overflowY: 'auto', boxShadow: '0 6px 24px rgba(0,0,0,0.6)'
         }}>
