@@ -130,7 +130,9 @@
 /* Search Bar */
 .home-search-wrapper {
   position: relative;
-  width: 300px;
+  width: 380px;
+  max-width: 40vw;
+  transition: width 0.3s ease;
 }
 
 .home-search-input {

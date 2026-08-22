@@ -16,7 +16,7 @@ const EMPTY_FORM = {
   name: '',
   description: '',
   price: '',
-  currency: 'VND',
+  currency: 'USD',
   billingInterval: 'MONTH',
   intervalCount: 1,
   active: true,
@@ -26,13 +26,13 @@ const EMPTY_FORM = {
   sortOrder: 0
 }
 
-function formatMoney(value, currency = 'VND') {
+function formatMoney(value, currency = 'USD') {
   const amount = Number(value || 0)
   try {
-    return new Intl.NumberFormat(currency === 'VND' ? 'vi-VN' : 'en-US', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency,
-      maximumFractionDigits: currency === 'VND' ? 0 : 2
+      maximumFractionDigits: 2
     }).format(amount)
   } catch {
     return `${amount.toLocaleString()} ${currency}`
@@ -147,7 +147,7 @@ const loadPlans = useCallback(async () => {
       name: plan.name || '',
       description: plan.description || '',
       price: plan.price ?? '',
-      currency: plan.currency || 'VND',
+      currency: 'USD',
       billingInterval: plan.billingInterval || 'MONTH',
       intervalCount: plan.intervalCount || 1,
       active: plan.active !== false,
@@ -167,7 +167,7 @@ const loadPlans = useCallback(async () => {
       name: form.name.trim(),
       description: form.description.trim(),
       price: Number(form.price),
-      currency: form.currency.trim().toUpperCase(),
+      currency: 'USD',
       billingInterval: form.billingInterval,
       intervalCount: Number(form.intervalCount),
       active: Boolean(form.active),
@@ -280,7 +280,7 @@ const loadPlans = useCallback(async () => {
         <section className="subscription-admin-section">
           <div className="subscription-log-summary">
             <div><span>Records</span><strong>{pagination.totalElements.toLocaleString()}</strong></div>
-            <div><span>Paid on this page</span><strong>{formatMoney(paidRevenue, logs[0]?.currency || 'VND')}</strong></div>
+            <div><span>Paid on this page</span><strong>{formatMoney(paidRevenue, 'USD')}</strong></div>
             <div><span>Provider</span><strong>Stripe Sandbox</strong></div>
           </div>
 
@@ -359,7 +359,7 @@ const loadPlans = useCallback(async () => {
               <label>Plan code<input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} maxLength={50} required /></label>
               <label>Plan name<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={120} required /></label>
               <label>Price<input type="number" min="0.01" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} required /></label>
-              <label>Currency<input value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} maxLength={3} required /></label>
+              <label>Currency<input value="USD" disabled readOnly /></label>
               <label>Billing interval<select value={form.billingInterval} onChange={(e) => setForm({ ...form, billingInterval: e.target.value })}><option value="MONTH">Month</option><option value="YEAR">Year</option></select></label>
               <label>Interval count<input type="number" min="1" max="12" value={form.intervalCount} onChange={(e) => setForm({ ...form, intervalCount: e.target.value })} /></label>
               <label>Badge<input value={form.badge} onChange={(e) => setForm({ ...form, badge: e.target.value })} maxLength={80} placeholder="Most Popular" /></label>

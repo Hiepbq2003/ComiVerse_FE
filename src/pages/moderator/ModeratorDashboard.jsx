@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import '../../assets/style/moderator/dashboard.css'
 import ModeratorLayout from '../../components/layout/ModeratorLayout'
@@ -144,6 +144,10 @@ function ModeratorDashboard() {
     cover: '',
     comicId: ''
   })
+  const [isSubmittingTeam, setIsSubmittingTeam] = useState(false)
+  const isSubmittingTeamRef = useRef(false)
+  const [isSubmittingAction, setIsSubmittingAction] = useState(false)
+  const isSubmittingActionRef = useRef(false)
 
   useEffect(() => {
     fetchAllData()
@@ -924,6 +928,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
   // API Call Integration Handlers
   const handleApprove = async (id, subItem) => {
+    if (isSubmittingActionRef.current) return;
+    isSubmittingActionRef.current = true;
+    setIsSubmittingAction(true);
     try {
       let cleanId = String(id || '').replace(/^(comic|group|chap)-/, '');
       if (subItem && subItem.submissionId) {
@@ -994,13 +1001,20 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       if (appSub) {
         publishComicToManagement(appSub);
       }
+      if (fetchAllData) fetchAllData()
     } catch (err) {
       console.error(err)
       toast.error('Failed to approve submission.')
+    } finally {
+      isSubmittingActionRef.current = false;
+      setIsSubmittingAction(false);
     }
   }
 
   const handleApproveAndCreateProject = async (item) => {
+    if (isSubmittingActionRef.current) return;
+    isSubmittingActionRef.current = true;
+    setIsSubmittingAction(true);
     try {
       let realDbId = null;
       let submissionApproveSucceeded = false;
@@ -1055,10 +1069,16 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     } catch (err) {
       console.error(err)
       toast.error('Failed to approve submission.')
+    } finally {
+      isSubmittingActionRef.current = false;
+      setIsSubmittingAction(false);
     }
   }
 
   const handleConfirmReject = async (id, reason, subItem = null) => {
+    if (isSubmittingActionRef.current) return;
+    isSubmittingActionRef.current = true;
+    setIsSubmittingAction(true);
     try {
       let cleanId = String(id || '').replace(/^(comic|group|chap)-/, '');
       if (subItem && subItem.submissionId) {
@@ -1115,9 +1135,13 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
         return next;
       });
+      if (fetchAllData) fetchAllData()
     } catch (err) {
       console.error(err)
       toast.error('Failed to reject submission.')
+    } finally {
+      isSubmittingActionRef.current = false;
+      setIsSubmittingAction(false);
     }
   }
 
@@ -1149,6 +1173,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
   };
 
   const handleChapterApprove = async (submissionId, chapterObj) => {
+    if (isSubmittingActionRef.current) return;
+    isSubmittingActionRef.current = true;
+    setIsSubmittingAction(true);
     const chapTitle = chapterObj?.title || `Chapter ${chapterObj?.number || chapterObj?.chapterNumber || ''}`.trim() || 'Chapter';
 
     // Find the real submission record that owns this chapter
@@ -1291,11 +1318,17 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     } catch (err) {
       console.error(err);
       toast.error('Failed to approve chapter.');
+    } finally {
+      isSubmittingActionRef.current = false;
+      setIsSubmittingAction(false);
     }
   };
 
 
   const handleChapterReject = async (submissionId, chapterObj, reason, overallReason = null, skipSubmissionReject = false) => {
+    if (isSubmittingActionRef.current) return;
+    isSubmittingActionRef.current = true;
+    setIsSubmittingAction(true);
     let cleanId = String(submissionId || chapterObj?.submissionId || chapterObj?.comicId || '').replace(/^(comic|group|chap)-/, '');
     if (cleanId.includes('mock')) {
       const realSub = submissions.find(s => s.chapterId && String(s.chapterId) === String(chapterObj?.id));
@@ -1597,6 +1630,8 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
   }
 
   const handleCreateProjectTeam = async () => {
+    if (isSubmittingTeamRef.current) return;
+
     const exists = projectTeams.some(
       t => t.comicName && (createTeamForm.comicName || '') && t.comicName.toLowerCase() === (createTeamForm.comicName || '').toLowerCase() &&
            t.targetLang && (createTeamForm.targetLang || '') && t.targetLang.toLowerCase() === (createTeamForm.targetLang || '').toLowerCase()
@@ -1605,6 +1640,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       toast.error(`A translation team for "${createTeamForm.comicName}" in "${createTeamForm.targetLang}" already exists!`)
       return
     }
+
+    isSubmittingTeamRef.current = true;
+    setIsSubmittingTeam(true);
 
     const leaderName = createTeamForm.leaderName.trim() || 'Translator Leader'
     const leaderInitials = leaderName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -1702,6 +1740,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       console.error(err)
       toast.error(err.response?.status === 409 ? `Conflict: A translation team for "${createTeamForm.comicName}" in "${createTeamForm.targetLang}" was just created by another moderator.` : 'Failed to create translation project team.')
       fetchComicsAndTeams() // Re-fetch on conflict
+    } finally {
+      isSubmittingTeamRef.current = false;
+      setIsSubmittingTeam(false);
     }
   }
 
@@ -2598,6 +2639,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               handleChapterApprove={handleChapterApprove}
               handleChapterReject={handleChapterReject}
               fetchAllData={fetchAllData}
+              isSubmittingAction={isSubmittingAction}
             />
           )}
 
@@ -2647,6 +2689,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               createTeamForm={createTeamForm}
               setCreateTeamForm={setCreateTeamForm}
               handleCreateProjectTeam={handleCreateProjectTeam}
+              isSubmittingTeam={isSubmittingTeam}
             />
           )}
 

@@ -346,7 +346,6 @@ function HomeLayout({ children }) {
                       />
                       <div className="search-dropdown-item-info">
                         <span className="search-dropdown-item-title">{comic.title}</span>
-                        <span className="search-dropdown-item-author">{comic.author || 'Unknown'}</span>
                       </div>
                     </Link>
                   ))}

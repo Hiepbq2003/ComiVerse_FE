@@ -25,6 +25,7 @@ const Library = lazy(() => import('./pages/common/Library'))
 const Forum = lazy(() => import('./pages/common/Forum'))
 const ComicDetail = lazy(() => import('./pages/common/ComicDetail'))
 const ChapterDetail = lazy(() => import('./pages/common/ChapterDetail'))
+const ScrambledChapterDetail = lazy(() => import('./pages/common/ScrambledChapterDetail'))
 const SearchResults = lazy(() => import('./pages/common/SearchResults'))
 const Profile = lazy(() => import('./pages/common/Profile'))
 const Policy = lazy(() => import('./pages/common/Policy'))
@@ -123,6 +124,9 @@ function App() {
                   <Route path="/comics/:id" element={<ComicDetail />} />
                   <Route path="/comic/:comicId/chapter/:chapterId" element={<ChapterDetail />} />
                   <Route path="/chapters/:chapterId" element={<ChapterDetail />} />
+                  <Route path="/scrambled-chapter" element={<ScrambledChapterDetail />} />
+                  <Route path="/scrambled-chapter/:chapterId" element={<ScrambledChapterDetail />} />
+                  <Route path="/protected-chapter/:chapterId" element={<ScrambledChapterDetail />} />
                   <Route path="/search" element={<SearchResults />} />
                   <Route path="/policy" element={<Policy />} />
                   <Route path="/about" element={<About />} />

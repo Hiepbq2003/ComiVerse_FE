@@ -6,7 +6,9 @@ export const ModernPagination = ({
   currentPage = 1,
   totalPages = 5,
   onPageChange = () => {},
-  variant = 'classic'
+  variant = 'classic',
+  maxClickablePage = null,
+  hasMore = false
 }) => {
   const { theme } = useTheme();
 
@@ -79,32 +81,51 @@ export const ModernPagination = ({
 
           {/* Simple smart pagination wrapper for pills to display ellipsis if page count is large */}
           {totalPages <= 6 ? (
-            pages.map((p) => (
-              <div 
-                key={p} 
-                className={`pag-item ${currentPage === p ? 'active' : ''}`}
-                onClick={() => onPageChange(p)}
-              >
-                {p}
-              </div>
-            ))
+            pages.map((p) => {
+              const isDisabled = maxClickablePage !== null && p > maxClickablePage;
+              return (
+                <div 
+                  key={p} 
+                  className={`pag-item ${currentPage === p ? 'active' : ''} ${isDisabled ? 'disabled' : ''}`}
+                  onClick={() => !isDisabled && onPageChange(p)}
+                  style={isDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                >
+                  {p}
+                </div>
+              );
+            })
           ) : (
             <>
               <div className={`pag-item ${currentPage === 1 ? 'active' : ''}`} onClick={() => onPageChange(1)}>1</div>
               {currentPage > 3 && <span className="pag__ellipsis">...</span>}
               
-              {pages.filter(p => p > 1 && p < totalPages && Math.abs(p - currentPage) <= 1).map(p => (
-                <div 
-                  key={p} 
-                  className={`pag-item ${currentPage === p ? 'active' : ''}`}
-                  onClick={() => onPageChange(p)}
-                >
-                  {p}
-                </div>
-              ))}
+              {pages.filter(p => p > 1 && p < totalPages && Math.abs(p - currentPage) <= 1).map(p => {
+                const isDisabled = maxClickablePage !== null && p > maxClickablePage;
+                return (
+                  <div 
+                    key={p} 
+                    className={`pag-item ${currentPage === p ? 'active' : ''} ${isDisabled ? 'disabled' : ''}`}
+                    onClick={() => !isDisabled && onPageChange(p)}
+                    style={isDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                  >
+                    {p}
+                  </div>
+                );
+              })}
               
               {currentPage < totalPages - 2 && <span className="pag__ellipsis">...</span>}
-              <div className={`pag-item ${currentPage === totalPages ? 'active' : ''}`} onClick={() => onPageChange(totalPages)}>{totalPages}</div>
+              {(() => {
+                const isDisabled = maxClickablePage !== null && totalPages > maxClickablePage;
+                return (
+                  <div 
+                    className={`pag-item ${currentPage === totalPages ? 'active' : ''} ${isDisabled ? 'disabled' : ''}`} 
+                    onClick={() => !isDisabled && onPageChange(totalPages)}
+                    style={isDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                  >
+                    {totalPages}
+                  </div>
+                );
+              })()}
             </>
           )}
 
@@ -119,7 +140,98 @@ export const ModernPagination = ({
         </nav>
       )}
 
-      {/* 3. Dots Pagination */}
+      {/* 3. Cursor Pagination (for Explore API) */}
+      {variant === 'cursor' && (
+        <nav className="pag--pills" aria-label="Cursor pagination">
+          <button 
+            type="button" 
+            className="pag-nav-btn" 
+            onClick={handlePrev} 
+            disabled={currentPage === 1}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+
+          {(() => {
+            let totalRendered = maxClickablePage || 1;
+            
+            // Force at least 3 numbers to show if there's more data
+            if (totalRendered < 3 && hasMore) {
+              totalRendered = 3;
+            }
+            
+            // If total rendered is small, just show all
+            if (totalRendered <= 5) {
+              return Array.from({ length: totalRendered }, (_, i) => i + 1).map(p => {
+                return (
+                  <div 
+                    key={p} 
+                    className={`pag-item ${currentPage === p ? 'active' : ''}`}
+                    onClick={() => onPageChange(p)}
+                  >
+                    {p}
+                  </div>
+                );
+              });
+            }
+            
+            // If large, show 1 ... window ... totalRendered
+            const windowStart = Math.max(2, currentPage - 1);
+            const windowEnd = Math.min(totalRendered - 1, currentPage + 1);
+            
+            const elements = [];
+            
+            // Page 1
+            elements.push(
+              <div key={1} className={`pag-item ${currentPage === 1 ? 'active' : ''}`} onClick={() => onPageChange(1)}>1</div>
+            );
+            
+            if (windowStart > 2) {
+              elements.push(<span key="ell-1" className="pag__ellipsis">...</span>);
+            }
+            
+            for (let p = windowStart; p <= windowEnd; p++) {
+              elements.push(
+                <div 
+                  key={p} 
+                  className={`pag-item ${currentPage === p ? 'active' : ''}`}
+                  onClick={() => onPageChange(p)}
+                >
+                  {p}
+                </div>
+              );
+            }
+            
+            if (windowEnd < totalRendered - 1) {
+              elements.push(<span key="ell-2" className="pag__ellipsis">...</span>);
+            }
+            
+            // Last page
+            elements.push(
+              <div 
+                key={totalRendered} 
+                className={`pag-item ${currentPage === totalRendered ? 'active' : ''}`}
+                onClick={() => onPageChange(totalRendered)}
+              >
+                {totalRendered}
+              </div>
+            );
+            
+            return elements;
+          })()}
+
+          <button 
+            type="button" 
+            className="pag-nav-btn" 
+            onClick={() => onPageChange(currentPage + 1)} 
+            disabled={currentPage >= maxClickablePage && !hasMore}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </nav>
+      )}
+
+      {/* 4. Dots Pagination */}
       {variant === 'dots' && (
         <nav className="pag--dots" aria-label="Dots pagination">
           <button 

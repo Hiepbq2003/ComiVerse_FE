@@ -776,7 +776,7 @@ function ChapterDetail() {
         }}>
           <CommentSection
             targetType="chapter"
-            targetId={chapterId}
+            targetId={currentChapter?.id || chapterId}
             user={user}
             targetCommentIdFromUrl={targetCommentIdFromUrl}
           />
@@ -792,7 +792,7 @@ function ChapterDetail() {
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}
         targetType={activeTranslationId ? 'CHAPTER_TRANSLATIONS' : 'CHAPTER'}
-        targetId={activeTranslationId || chapterId}
+        targetId={activeTranslationId || currentChapter?.id || chapterId}
         languageCode={activeTranslationId ? (selectedLanguage || translationLanguage(activeTranslation)) : ''}
         targetTitle={`${comic?.title || 'Comic'} - ${currentChapter?.title || `Chapter ${currentChapter?.chapterNumber || ''}`}${activeTranslationId ? ` (${(selectedLanguage || translationLanguage(activeTranslation)).toUpperCase()} Translation)` : ''}`}
         chapterNumber={currentChapter?.chapterNumber}

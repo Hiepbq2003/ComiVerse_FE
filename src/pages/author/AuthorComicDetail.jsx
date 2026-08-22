@@ -1240,7 +1240,7 @@ function AuthorComicDetail() {
                 <strong>{summary.views}</strong>
               </div>
               <div className="author-detail-stat-card">
-                <span>Revenue</span>
+                <span>Revenue Estimate</span>
                 <strong>{summary.revenue}</strong>
               </div>
               <div className="author-detail-stat-card">

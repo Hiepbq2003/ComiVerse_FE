@@ -37,7 +37,8 @@ function ProjectTeams({
   setCreateTeamStep,
   createTeamForm,
   setCreateTeamForm,
-  handleCreateProjectTeam
+  handleCreateProjectTeam,
+  isSubmittingTeam = false
 }) {
   const { theme } = useTheme()
   const [currentPage, setCurrentPage] = useState(1)
@@ -734,9 +735,9 @@ function ProjectTeams({
                       </div>
 
                       {isComicDropdownOpen && (
-                        <div className="custom-dropdown-menu" style={{ 
+                        <div className="custom-dropdown-menu mod-comic-select-menu" style={{ 
                           position: 'absolute', top: '100%', left: 0, right: 0, 
-                          background: 'var(--mod-card-bg)', border: '1px solid var(--mod-border)', 
+                          border: '1px solid var(--mod-border)', 
                           borderRadius: '8px', marginTop: '6px', maxHeight: '280px', overflowY: 'auto', zIndex: 50,
                           boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
                         }}>
@@ -962,12 +963,13 @@ function ProjectTeams({
                     }
                   }}
                   disabled={(() => {
+                    if (isSubmittingTeam) return true;
                     const isDisabled = createTeamStep === 1 && (!createTeamForm.comicName || !createTeamForm.title.trim() || availableTargetLanguages.length === 0);
                     if (isDisabled) console.log("DISABLED REASON:", { step: createTeamStep, comic: createTeamForm.comicName, title: createTeamForm.title, langLen: availableTargetLanguages.length });
                     return isDisabled;
                   })()}
                 >
-                  {createTeamStep === 1 ? 'Next →' : 'Create Team'}
+                  {isSubmittingTeam ? 'Creating...' : (createTeamStep === 1 ? 'Next →' : 'Create Team')}
                 </button>
               </div>
             </div>

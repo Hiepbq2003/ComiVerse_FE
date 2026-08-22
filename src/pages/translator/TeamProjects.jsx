@@ -1158,6 +1158,7 @@ function TeamProjects() {
   const currentUsername = (auth?.user?.username || '').toLowerCase().trim()
   const currentUserId = auth?.user?.id || auth?.user?.userId
   const user = auth?.user || {}
+  const userFullName = auth?.user?.fullName || auth?.user?.username || 'Translator'
 
   const [allMatchedTeams, setAllMatchedTeams] = useState([])
 
@@ -1495,9 +1496,10 @@ function TeamProjects() {
       ? new Date(project.createdAt).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
       : '01/15/2024';
 
+    const uName = getAuth()?.user?.fullName || getAuth()?.user?.username || 'Translator';
     const initialLeader = {
       id: `leader-${project.id}`,
-      name: project.leaderName || userFullName,
+      name: project.leaderName || uName,
       role: 'Group Leader',
       status: 'Offline',
       online: false,
@@ -2022,10 +2024,11 @@ function TeamProjects() {
         finalImageUrl = attachedImage
       }
 
+      const uName = getAuth()?.user?.fullName || getAuth()?.user?.username || 'Translator';
       const created = await createTeamAnnouncementApi(selectedDetails.id, {
-        author: userFullName,
-        role: (selectedDetails.leaderName || '').toLowerCase().trim() === userFullName.toLowerCase().trim() ? 'Group Leader' : 'Member',
-        avatar: userFullName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2),
+        author: uName,
+        role: (selectedDetails.leaderName || '').toLowerCase().trim() === uName.toLowerCase().trim() ? 'Group Leader' : 'Member',
+        avatar: uName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2),
         time: nowIso,
         createdAt: nowIso,
         content: textToPost.trim(),
@@ -2070,10 +2073,11 @@ function TeamProjects() {
   const handleAddComment = async (postId, commentText, replyTarget = null) => {
     if (!commentText || !commentText.trim()) return
     const nowIso = new Date().toISOString()
+    const uName = getAuth()?.user?.fullName || getAuth()?.user?.username || 'Translator';
     const newComment = {
       id: `cmt-${Date.now()}`,
-      author: userFullName,
-      avatar: userFullName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2),
+      author: uName,
+      avatar: uName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2),
       createdAt: nowIso,
       timestamp: Date.now(),
       text: commentText.trim(),
