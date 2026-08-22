@@ -701,6 +701,42 @@ html.light .payment-period-banner {
   background: rgba(124, 58, 237, 0.045);
 }
 
+/* Light mode overrides for Recent Payment Activity Table & Badges */
+html.light .payment-table-amount {
+  color: #059669 !important;
+}
+
+html.light .payment-status-badge.paid {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+html.light .payment-status-badge.pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+}
+
+html.light .payment-status-badge.failed,
+html.light .payment-status-badge.expired {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+
+html.light .payment-status-badge.refunded {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+html.light .payment-recent-table tbody tr:hover {
+  background: rgba(168, 85, 247, 0.04);
+}
+
+html.light .payment-plan-code {
+  color: #7e22ce;
+  background: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.25);
+}
+
 @media (max-width: 1280px) {
   .payment-statistics-header {
     align-items: flex-start;
