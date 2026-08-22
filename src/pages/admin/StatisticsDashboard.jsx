@@ -1,12 +1,29 @@
 import { useState, useEffect, useCallback } from 'react'
 import AdminLayout from '../../components/layout/AdminLayout'
-import { getAllAccountsApi } from '../../services/api/AccountApi'
-import { getAllComicsApi } from '../../services/api/ComicApi'
-import { getAllGenresApi } from '../../services/api/GenreApi'
-import { getAllSubmissionsApi } from '../../services/api/SubmissionApi'
-import { SkeletonLoader } from '../../components/common/SkeletonLoader'
+import { getAdminStatisticsApi } from '../../services/api/AdminStatisticsApi'
 import { AnimatedButton } from '../../components/common/AnimatedButton'
 import { exportToCsv } from '../../utils/exportToCsv'
+
+const EMPTY_ROLE_COUNTS = {
+  READER: 0,
+  AUTHOR: 0,
+  TRANSLATOR: 0,
+  PROJECT_LEADER: 0,
+  MODERATOR: 0,
+  ADMIN: 0
+}
+
+const EMPTY_STATS = {
+  totalUsers: 0,
+  activeUsers: 0,
+  bannedUsers: 0,
+  totalComics: 0,
+  totalGenres: 0,
+  pendingSubmissions: 0,
+  roleCounts: EMPTY_ROLE_COUNTS,
+  genresList: [],
+  generatedAt: null
+}
 
 function StatIcon({ type }) {
   const props = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }
@@ -25,91 +42,29 @@ function StatIcon({ type }) {
 
 function StatisticsDashboard() {
   const [loading, setLoading] = useState(true)
-  const [statsData, setStatsData] = useState({
-    totalUsers: 0,
-    activeUsers: 0,
-    bannedUsers: 0,
-    totalComics: 0,
-    totalGenres: 0,
-    pendingSubmissions: 0,
-    roleCounts: {
-      READER: 0,
-      AUTHOR: 0,
-      TRANSLATOR: 0,
-      MODERATOR: 0,
-      ADMIN: 0
-    },
-    genresList: []
-  })
+  const [loadError, setLoadError] = useState('')
+  const [statsData, setStatsData] = useState(EMPTY_STATS)
 
   const fetchStatistics = useCallback(async () => {
     setLoading(true)
+    setLoadError('')
     try {
-      const results = await Promise.allSettled([
-        getAllAccountsApi({ page: 1, size: 100 }),
-        getAllComicsApi(),
-        getAllGenresApi(),
-        getAllSubmissionsApi()
-      ])
-
-      const accountsRes = results[0].status === 'fulfilled' ? results[0].value : null
-      const comicsRes = results[1].status === 'fulfilled' ? results[1].value : null
-      const genresRes = results[2].status === 'fulfilled' ? results[2].value : null
-      const submissionsRes = results[3].status === 'fulfilled' ? results[3].value : null
-
-      // Accounts processing
-      const accountsList = Array.isArray(accountsRes)
-        ? accountsRes
-        : (Array.isArray(accountsRes?.data) ? accountsRes.data : [])
-      const totalUsers = accountsRes?.metadata?.totalElements || accountsList.length
-
-      let activeCount = 0
-      let bannedCount = 0
-      const rolesMap = { READER: 0, AUTHOR: 0, TRANSLATOR: 0, MODERATOR: 0, ADMIN: 0 }
-
-      accountsList.forEach((acc) => {
-        const status = (acc.status || (acc.banned ? 'INACTIVE' : 'ACTIVE')).toString().toUpperCase()
-        if (status === 'ACTIVE') activeCount++
-        else bannedCount++
-
-        const roleRaw = (acc.role?.roleName || acc.role || acc.roleName || 'READER').toString().toUpperCase().replace(/[\s-]+/g, '_')
-        if (rolesMap[roleRaw] !== undefined) {
-          rolesMap[roleRaw]++
-        } else {
-          rolesMap.READER++
-        }
-      })
-
-      // Comics processing
-      const comicsList = Array.isArray(comicsRes)
-        ? comicsRes
-        : (Array.isArray(comicsRes?.data) ? comicsRes.data : [])
-      const totalComics = comicsRes?.metadata?.totalElements || comicsList.length
-
-      // Genres processing
-      const genresList = Array.isArray(genresRes)
-        ? genresRes
-        : (Array.isArray(genresRes?.data) ? genresRes.data : [])
-      const totalGenres = genresList.length
-
-      // Submissions processing
-      const submissionsList = Array.isArray(submissionsRes)
-        ? submissionsRes
-        : (Array.isArray(submissionsRes?.data) ? submissionsRes.data : [])
-      const pendingSubmissions = submissionsList.filter(s => (s.status || '').toLowerCase() === 'pending').length
+      const result = await getAdminStatisticsApi()
 
       setStatsData({
-        totalUsers,
-        activeUsers: activeCount,
-        bannedUsers: bannedCount,
-        totalComics,
-        totalGenres,
-        pendingSubmissions,
-        roleCounts: rolesMap,
-        genresList: genresList.slice(0, 8)
+        totalUsers: Number(result?.totalUsers) || 0,
+        activeUsers: Number(result?.activeUsers) || 0,
+        bannedUsers: Number(result?.bannedUsers) || 0,
+        totalComics: Number(result?.totalPublishedComics) || 0,
+        totalGenres: Number(result?.totalGenres) || 0,
+        pendingSubmissions: Number(result?.pendingSubmissions) || 0,
+        roleCounts: { ...EMPTY_ROLE_COUNTS, ...(result?.roleCounts || {}) },
+        genresList: Array.isArray(result?.genres) ? result.genres : [],
+        generatedAt: result?.generatedAt || null
       })
     } catch (err) {
       console.error('Failed to load system statistics from API:', err)
+      setLoadError(err?.response?.data?.message || err?.message || 'System statistics are unavailable.')
     } finally {
       setLoading(false)
     }
@@ -144,6 +99,7 @@ function StatisticsDashboard() {
       ['Reader Accounts', statsData.roleCounts.READER, 'Role: READER'],
       ['Translator Accounts', statsData.roleCounts.TRANSLATOR, 'Role: TRANSLATOR'],
       ['Author Accounts', statsData.roleCounts.AUTHOR, 'Role: AUTHOR'],
+      ['Project Leader Accounts', statsData.roleCounts.PROJECT_LEADER, 'Role: PROJECT_LEADER'],
       ['Moderator Accounts', statsData.roleCounts.MODERATOR, 'Role: MODERATOR'],
       ['Admin Accounts', statsData.roleCounts.ADMIN, 'Role: ADMIN']
     ]
@@ -155,7 +111,7 @@ function StatisticsDashboard() {
       <div className="admin-page-header">
         <div className="admin-page-header-info">
           <h1>Statistics Dashboard</h1>
-          <p>Real-time system overview & database metrics</p>
+          <p>Current platform overview from verified database aggregates</p>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <AnimatedButton
@@ -177,10 +133,21 @@ function StatisticsDashboard() {
       </div>
 
       {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <SkeletonLoader count={4} height="100px" />
-          <SkeletonLoader count={2} height="240px" />
+        <div className="stats-dashboard-loading" data-testid="statistics-skeleton" aria-label="Loading system statistics">
+          <div className="stats-dashboard-loading-grid">
+            {Array.from({ length: 8 }, (_, index) => <div key={index} className="stats-dashboard-loading-block" />)}
+          </div>
+          <div className="stats-dashboard-loading-panel" />
         </div>
+      ) : loadError ? (
+        <section className="stats-dashboard-error" role="alert">
+          <StatIcon type="report" />
+          <div>
+            <h2>System statistics are unavailable</h2>
+            <p>{loadError}</p>
+          </div>
+          <button type="button" className="admin-btn admin-btn--primary" onClick={fetchStatistics}>Try again</button>
+        </section>
       ) : (
         <>
           {/* ── Stat Cards Grid ─────────────────────── */}
@@ -214,6 +181,7 @@ function StatisticsDashboard() {
                 { name: 'Readers', count: statsData.roleCounts.READER, color: '#a855f7' },
                 { name: 'Translators', count: statsData.roleCounts.TRANSLATOR, color: '#3b82f6' },
                 { name: 'Authors', count: statsData.roleCounts.AUTHOR, color: '#ec4899' },
+                { name: 'Project Leaders', count: statsData.roleCounts.PROJECT_LEADER, color: '#14b8a6' },
                 { name: 'Moderators', count: statsData.roleCounts.MODERATOR, color: '#f97316' },
                 { name: 'Admins', count: statsData.roleCounts.ADMIN, color: '#10b981' }
               ].map((r) => {
@@ -283,6 +251,12 @@ function StatisticsDashboard() {
                   <span>RBAC Guard:</span>
                   <span style={{ color: 'var(--admin-green)', fontWeight: '600' }}>✓ Admin Level</span>
                 </div>
+                {statsData.generatedAt && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '13px', color: 'var(--admin-text-secondary)' }}>
+                    <span>Last refreshed:</span>
+                    <span>{new Date(statsData.generatedAt).toLocaleString('en-US')}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

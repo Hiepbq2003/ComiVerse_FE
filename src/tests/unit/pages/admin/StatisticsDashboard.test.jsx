@@ -1,135 +1,105 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import React from 'react';
-import { MemoryRouter } from 'react-router-dom';
-import StatisticsDashboard from '../../../../pages/admin/StatisticsDashboard';
-import * as AccountApi from '../../../../services/api/AccountApi';
-import * as ComicApi from '../../../../services/api/ComicApi';
-import * as GenreApi from '../../../../services/api/GenreApi';
-import * as SubmissionApi from '../../../../services/api/SubmissionApi';
-import * as ExportUtils from '../../../../utils/exportToCsv';
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import StatisticsDashboard from '../../../../pages/admin/StatisticsDashboard'
+import * as StatisticsApi from '../../../../services/api/AdminStatisticsApi'
+import * as ExportUtils from '../../../../utils/exportToCsv'
 
-vi.mock('../../../../services/api/AccountApi', () => ({
-  getAllAccountsApi: vi.fn(),
-}));
-
-vi.mock('../../../../services/api/ComicApi', () => ({
-  getAllComicsApi: vi.fn(),
-}));
-
-vi.mock('../../../../services/api/GenreApi', () => ({
-  getAllGenresApi: vi.fn(),
-}));
-
-vi.mock('../../../../services/api/SubmissionApi', () => ({
-  getAllSubmissionsApi: vi.fn(),
-}));
+vi.mock('../../../../services/api/AdminStatisticsApi', () => ({
+  getAdminStatisticsApi: vi.fn(),
+}))
 
 vi.mock('../../../../utils/exportToCsv', () => ({
   exportToCsv: vi.fn(),
-}));
+}))
 
-// Mock AuthContext and NotificationContext for AdminLayout
-vi.mock('../../../../context/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 'admin-1', role: 'ADMIN', fullName: 'Super Admin' } }),
-  AuthProvider: ({ children }) => <>{children}</>,
-}));
-
-vi.mock('../../../../context/NotificationContext', () => ({
-  useNotification: () => ({ unreadCount: 0, setUnreadCount: vi.fn(), fetchNotifications: vi.fn(), notifications: [] })
-}));
+vi.mock('../../../../components/layout/AdminLayout', () => ({
+  default: ({ children }) => <div>{children}</div>,
+}))
 
 vi.mock('../../../../context/ThemeContext', () => ({
   useTheme: () => ({ theme: 'dark', toggleTheme: vi.fn() }),
-}));
+}))
 
-describe('Admin Statistics Dashboard Tests', () => {
+const statistics = {
+  totalUsers: 130,
+  activeUsers: 120,
+  bannedUsers: 4,
+  totalPublishedComics: 42,
+  totalGenres: 12,
+  pendingSubmissions: 7,
+  roleCounts: {
+    READER: 100,
+    AUTHOR: 8,
+    TRANSLATOR: 7,
+    PROJECT_LEADER: 3,
+    MODERATOR: 4,
+    ADMIN: 2,
+  },
+  genres: [{ id: 'genre-1', name: 'Action', slug: 'action' }],
+  generatedAt: '2026-08-23T00:00:00Z',
+}
+
+const renderDashboard = () => render(
+  <MemoryRouter>
+    <StatisticsDashboard />
+  </MemoryRouter>,
+)
+
+describe('Admin Statistics Dashboard', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-  });
+    vi.clearAllMocks()
+  })
 
-  const renderDashboard = () => {
-    return render(
-      <MemoryRouter>
-        <StatisticsDashboard />
-      </MemoryRouter>
-    );
-  };
+  it('renders a stable loading state while the aggregate request is pending', () => {
+    StatisticsApi.getAdminStatisticsApi.mockImplementation(() => new Promise(() => {}))
 
-  it('Should render skeleton loaders initially while fetching data', () => {
-    // Return unresolved promises to freeze the loading state
-    AccountApi.getAllAccountsApi.mockImplementation(() => new Promise(() => {}));
-    ComicApi.getAllComicsApi.mockImplementation(() => new Promise(() => {}));
-    GenreApi.getAllGenresApi.mockImplementation(() => new Promise(() => {}));
-    SubmissionApi.getAllSubmissionsApi.mockImplementation(() => new Promise(() => {}));
+    const { container } = renderDashboard()
 
-    const { container } = renderDashboard();
-    
-    // Check if skeleton loaders are present
-    expect(container.querySelectorAll('.skeleton-shimmer').length).toBeGreaterThan(0);
-  });
+    expect(screen.getByTestId('statistics-skeleton')).toBeInTheDocument()
+    expect(container.querySelectorAll('.stats-dashboard-loading-block')).toHaveLength(8)
+  })
 
-  it('Should successfully load and display dashboard statistics (Happy Path)', async () => {
-    AccountApi.getAllAccountsApi.mockResolvedValueOnce({
-      data: {
-        data: [
-          { id: 1, role: 'USER' },
-          { id: 2, role: 'AUTHOR' },
-          { id: 3, role: 'ADMIN' }
-        ]
-      }
-    });
+  it('renders exact database totals and keeps Project Leaders separate', async () => {
+    StatisticsApi.getAdminStatisticsApi.mockResolvedValueOnce(statistics)
 
-    ComicApi.getAllComicsApi.mockResolvedValueOnce({
-      data: {
-        data: [
-          { id: 101, title: 'Comic 1', views: 500, rating: 4.5 },
-          { id: 102, title: 'Comic 2', views: 1500, rating: 4.0 }
-        ]
-      }
-    });
+    renderDashboard()
 
-    GenreApi.getAllGenresApi.mockResolvedValueOnce({
-      data: [
-        { id: 1, name: 'Action' },
-        { id: 2, name: 'Romance' }
-      ]
-    });
+    expect(await screen.findByText('130')).toBeInTheDocument()
+    expect(screen.getByText('Project Leaders')).toBeInTheDocument()
+    expect(screen.getByText('3 accounts (2.4%)')).toBeInTheDocument()
+    expect(screen.getByText('Action')).toBeInTheDocument()
+    expect(screen.getByText('✓ Connected')).toBeInTheDocument()
+  })
 
-    SubmissionApi.getAllSubmissionsApi.mockResolvedValueOnce({
-      data: {
-        data: [
-          { id: 201, status: 'PENDING' },
-          { id: 202, status: 'APPROVED' }
-        ]
-      }
-    });
+  it('shows a retryable error instead of false green health statuses', async () => {
+    StatisticsApi.getAdminStatisticsApi
+      .mockRejectedValueOnce(new Error('Backend unavailable'))
+      .mockResolvedValueOnce(statistics)
 
-    renderDashboard();
+    renderDashboard()
 
-    // The data should eventually render
-    await waitFor(() => {
-      // Look for metrics based on mocked data. For example, 3 total users.
-      // We expect the dashboard to aggregate counts.
-      expect(screen.getByText('3')).toBeInTheDocument(); // 3 Total Users
-    });
-  });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Backend unavailable')
+    expect(screen.queryByText('✓ Connected')).not.toBeInTheDocument()
 
-  it('Should handle CSV export click', async () => {
-    AccountApi.getAllAccountsApi.mockResolvedValueOnce({ data: { data: [] } });
-    ComicApi.getAllComicsApi.mockResolvedValueOnce({ data: { data: [] } });
-    GenreApi.getAllGenresApi.mockResolvedValueOnce({ data: [] });
-    SubmissionApi.getAllSubmissionsApi.mockResolvedValueOnce({ data: { data: [] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
 
-    renderDashboard();
+    await waitFor(() => expect(screen.getByText('130')).toBeInTheDocument())
+    expect(StatisticsApi.getAdminStatisticsApi).toHaveBeenCalledTimes(2)
+  })
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('skeleton-loader')).not.toBeInTheDocument();
-    });
+  it('exports the aggregate statistics', async () => {
+    StatisticsApi.getAdminStatisticsApi.mockResolvedValueOnce(statistics)
+    renderDashboard()
 
-    const exportBtn = screen.getByRole('button', { name: /Export/i });
-    fireEvent.click(exportBtn);
+    await screen.findByText('130')
+    fireEvent.click(screen.getByRole('button', { name: /Export Report/i }))
 
-    expect(ExportUtils.exportToCsv).toHaveBeenCalled();
-  });
-});
+    expect(ExportUtils.exportToCsv).toHaveBeenCalledOnce()
+    expect(ExportUtils.exportToCsv.mock.calls[0][2]).toContainEqual([
+      'Project Leader Accounts',
+      3,
+      'Role: PROJECT_LEADER',
+    ])
+  })
+})

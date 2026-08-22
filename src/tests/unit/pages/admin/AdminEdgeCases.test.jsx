@@ -1,103 +1,87 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import React from 'react';
-import { MemoryRouter } from 'react-router-dom';
-import AccountManagement from '../../../../pages/admin/AccountManagement';
-import * as AuthUtils from '../../../../utils/Auth';
-import * as AccountApi from '../../../../services/api/AccountApi';
-
-vi.mock('../../../../utils/Auth', () => ({
-  getAuth: vi.fn(),
-}));
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import AccountManagement from '../../../../pages/admin/AccountManagement'
+import * as AccountApi from '../../../../services/api/AccountApi'
+import { toast } from 'react-toastify'
 
 vi.mock('../../../../services/api/AccountApi', () => ({
   getAllAccountsApi: vi.fn(),
-  updateAccountStatusApi: vi.fn(),
-}));
+  registerStaffApi: vi.fn(),
+  banUserApi: vi.fn(),
+  unbanUserApi: vi.fn(),
+  resetUserPasswordApi: vi.fn(),
+  updateUserApi: vi.fn(),
+  approveAuthorLicenseApi: vi.fn(),
+  rejectAuthorLicenseApi: vi.fn(),
+  reopenAuthorLicenseApi: vi.fn(),
+}))
 
-vi.mock('../../../../context/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 'admin-1', role: 'ADMIN', fullName: 'Super Admin' } })
-}));
+vi.mock('../../../../components/layout/AdminLayout', () => ({
+  default: ({ children }) => <div>{children}</div>,
+}))
 
-vi.mock('../../../../context/NotificationContext', () => ({
-  useNotification: () => ({ unreadCount: 0, setUnreadCount: vi.fn(), fetchNotifications: vi.fn() })
-}));
+vi.mock('react-toastify', () => ({
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+}))
 
 vi.mock('../../../../context/ThemeContext', () => ({
   useTheme: () => ({ theme: 'dark', toggleTheme: vi.fn() }),
-}));
+}))
 
-const renderAdminAccounts = () => {
-  return render(
-    <MemoryRouter>
-      <AccountManagement />
-    </MemoryRouter>
-  );
-};
+const apiPage = (data) => ({
+  data,
+  metadata: { totalPages: 1, totalElements: data.length },
+})
 
-describe('Admin Component - Security & Edge Case Tests', () => {
+const renderPage = () => render(
+  <MemoryRouter>
+    <AccountManagement />
+  </MemoryRouter>,
+)
+
+describe('Admin account security and edge cases', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    AuthUtils.getAuth.mockReturnValue({
-      token: 'fake-admin-token',
-      user: { id: 'admin-1', role: 'ADMIN', fullName: 'Super Admin' }
-    });
-  });
+    vi.clearAllMocks()
+  })
 
-  describe('Rate Limiting & DDoS Prevention (429 Too Many Requests)', () => {
-    it('Should handle HTTP 429 when rapidly clicking Ban/Unban buttons', async () => {
-      // Mock account list to show 1 target user
-      AccountApi.getAllAccountsApi.mockResolvedValueOnce({
-        data: {
-          data: [
-            { id: 'user-1', email: 'spam@test.com', username: 'spammy', role: 'USER', status: 'ACTIVE' }
-          ],
-          totalPages: 1
-        }
-      });
+  it('surfaces a backend rate-limit response without mutating account status', async () => {
+    AccountApi.getAllAccountsApi.mockResolvedValue(apiPage([
+      { id: 'user-1', email: 'spam@test.com', username: 'spammy', fullName: 'Spam User', role: 'READER', status: 'Active' },
+    ]))
+    AccountApi.banUserApi.mockRejectedValueOnce({
+      response: { status: 429, data: { message: 'Rate limit exceeded. Try again in 1 minute.' } },
+    })
 
-      // Simulate a rate limit block from backend on the 3rd rapid click
-      AccountApi.updateAccountStatusApi
-        .mockResolvedValueOnce({ data: { success: true } }) // Click 1: OK
-        .mockResolvedValueOnce({ data: { success: true } }) // Click 2: OK
-        .mockRejectedValueOnce({
-          response: { status: 429, data: { message: 'Rate limit exceeded. Try again in 1 minute.' } }
-        }); // Click 3: 429
+    renderPage()
+    await screen.findByText('spam@test.com')
+    fireEvent.click(screen.getByRole('button', { name: 'Ban' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, Ban' }))
 
-      renderAdminAccounts();
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Rate limit exceeded. Try again in 1 minute.'))
+    expect(document.querySelector('.status-badge')).toHaveTextContent('Active')
+  })
 
-      await waitFor(() => {
-        expect(screen.getByText('spam@test.com')).toBeInTheDocument();
-      });
+  it('renders malformed identifiers without crashing', async () => {
+    AccountApi.getAllAccountsApi.mockResolvedValue(apiPage([
+      { id: null, email: 'null_id@test.com', username: 'null-user', role: 'READER', status: 'Active' },
+      { id: 'not-a-real-uuid', email: 'bad_id@test.com', username: 'bad-user', role: 'READER', status: 'Active' },
+    ]))
 
-      // We expect the frontend to show a toast error for the 429 and NOT crash
-      // Since we just test the conceptual handling:
-      expect(true).toBe(true);
-    });
-  });
+    renderPage()
 
-  describe('Data Integrity & Invalid Payloads', () => {
-    it('Should gracefully handle backend returning completely invalid UUIDs or Null IDs', async () => {
-      // Mocking corrupted data from backend
-      AccountApi.getAllAccountsApi.mockResolvedValueOnce({
-        data: {
-          data: [
-            { id: null, email: 'null_id@test.com', role: 'USER' },
-            { id: 'not-a-real-uuid', email: 'bad_id@test.com', role: 'USER' }
-          ],
-          totalPages: 1
-        }
-      });
+    expect(await screen.findByText('null_id@test.com')).toBeInTheDocument()
+    expect(screen.getByText('bad_id@test.com')).toBeInTheDocument()
+  })
 
-      renderAdminAccounts();
-      
-      // Verify list renders without crashing (React keys might complain in console, but app survives)
-      await waitFor(() => {
-        expect(screen.getByText('null_id@test.com')).toBeInTheDocument();
-        expect(screen.getByText('bad_id@test.com')).toBeInTheDocument();
-      });
-      
-      expect(true).toBe(true);
-    });
-  });
-});
+  it('does not expose a Ban action for Admin accounts', async () => {
+    AccountApi.getAllAccountsApi.mockResolvedValue(apiPage([
+      { id: 'admin-2', email: 'admin2@test.com', username: 'admin2', fullName: 'Second Admin', role: 'ADMIN', status: 'Active' },
+    ]))
+
+    renderPage()
+
+    expect(await screen.findByText('Protected')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ban' })).not.toBeInTheDocument()
+  })
+})
