@@ -6,6 +6,7 @@ import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { AIPopover } from '../common/AIPopover'
 import LogoIcon from '../common/LogoIcon'
+import ConfirmModal from '../common/ConfirmModal'
 import '../../assets/style/admin/admin.css'
 
 function AdminLayout({ children, activeNav = 'account-management' }) {
@@ -278,21 +279,15 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
         </div>
       </main>
 
-      {showLogoutConfirm && (
-        <div className="admin-logout-overlay" role="dialog" aria-modal="true" aria-labelledby="admin-logout-title" onClick={(event) => event.stopPropagation()}>
-          <div className="admin-logout-dialog">
-            <button type="button" className="admin-logout-close" onClick={() => setShowLogoutConfirm(false)} aria-label="Close sign out confirmation">
-              <X size={18} />
-            </button>
-            <h2 id="admin-logout-title">Sign out?</h2>
-            <p>Your Admin session will be closed and you will return to the homepage.</p>
-            <div className="admin-logout-actions">
-              <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setShowLogoutConfirm(false)}>Cancel</button>
-              <button type="button" className="admin-btn admin-btn--danger" onClick={handleLogout}>Sign Out</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmModal
+        isOpen={showLogoutConfirm}
+        title="Sign out?"
+        message="Your Admin session will be closed and you will return to the homepage."
+        confirmText="Sign Out"
+        type="danger"
+        onConfirm={handleLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </div>
   )
 }
