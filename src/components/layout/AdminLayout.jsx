@@ -6,13 +6,11 @@ import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
 import { AIPopover } from '../common/AIPopover'
 import LogoIcon from '../common/LogoIcon'
-import ConfirmModal from '../common/ConfirmModal'
 import '../../assets/style/admin/admin.css'
 
 function AdminLayout({ children, activeNav = 'account-management' }) {
   const navigate = useNavigate()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   const { user, isLoggedIn, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
@@ -75,7 +73,6 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
 
   const handleLogout = () => {
     logout()
-    setShowLogoutConfirm(false)
     navigate('/', { replace: true })
   }
 
@@ -262,7 +259,7 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
             <div className="topbar-divider" />
 
             {/* Logout */}
-            <button className="admin-topbar-btn logout" onClick={() => setShowLogoutConfirm(true)}>
+            <button className="admin-topbar-btn logout" onClick={handleLogout}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                 <polyline points="16 17 21 12 16 7" />
@@ -279,15 +276,6 @@ function AdminLayout({ children, activeNav = 'account-management' }) {
         </div>
       </main>
 
-      <ConfirmModal
-        isOpen={showLogoutConfirm}
-        title="Sign out?"
-        message="Your Admin session will be closed and you will return to the homepage."
-        confirmText="Sign Out"
-        type="danger"
-        onConfirm={handleLogout}
-        onCancel={() => setShowLogoutConfirm(false)}
-      />
     </div>
   )
 }
