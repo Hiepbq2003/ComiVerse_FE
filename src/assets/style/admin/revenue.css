@@ -801,3 +801,65 @@ html.light .payment-period-banner {
     flex-direction: column;
   }
 }
+
+/* --- Interactive Chart Tooltip --- */
+.payment-chart-tooltip {
+  position: absolute;
+  background-color: #0f0a1a;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 8px;
+  padding: 12px;
+  pointer-events: none;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: #f8fafc;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  min-width: 150px;
+  transform: translate(-50%, -100%);
+  margin-top: -10px;
+  backdrop-filter: blur(12px);
+}
+
+.payment-chart-tooltip.align-right {
+  transform: translate(-90%, -100%);
+}
+
+.payment-chart-tooltip.align-left {
+  transform: translate(-10%, -100%);
+}
+
+.payment-chart-tooltip-header {
+  font-weight: 600;
+  color: #c084fc;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 14px;
+}
+
+.payment-chart-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  gap: 12px;
+}
+
+.payment-chart-tooltip-row:last-child {
+  margin-bottom: 0;
+}
+
+.payment-chart-tooltip-label {
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.payment-chart-tooltip-value {
+  font-weight: 600;
+}
+
+.payment-revenue-chart {
+  position: relative;
+}
