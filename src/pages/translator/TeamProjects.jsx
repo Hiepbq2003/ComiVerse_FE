@@ -11,6 +11,25 @@ import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
 import { getAuth } from '../../utils/Auth'
 import { exportToCsv } from '../../utils/exportToCsv'
 import { uploadImageApi } from '../../services/api/UploadApi'
+
+function normalizeForSearch(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\s\u00a0\u3000]+/g, ' ')
+    .trim()
+}
+
+function textMatchesSearch(haystack, needle) {
+  const n = normalizeForSearch(needle)
+  if (!n) return true
+  const h = normalizeForSearch(haystack)
+  if (h.includes(n)) return true
+  const compactH = h.replace(/\s+/g, '')
+  const compactN = n.replace(/\s+/g, '')
+  return Boolean(compactN) && compactH.includes(compactN)
+}
+
 const getProjectCover = (proj, dbComics = [], dbSubs = []) => {
   if (!proj) return '';
   const rawCover = proj.cover || proj.coverImage || proj.coverImageUrl || proj.coverUrl || proj.imageUrl || '';
@@ -124,7 +143,7 @@ import { toast } from 'react-toastify'
 import HomeTab from './HomeTab'
 import MembersTab from './MembersTab'
 import RequestsTab from './RequestsTab'
-import TasksTab, { CreateTaskModal, EditTaskModal, parseTaskTitle, getTaskColumn } from './TasksTab'
+import TasksTab, { CreateTaskModal, EditTaskModal, parseTaskTitle, getTaskColumn, getNormalizedStatusKey } from './TasksTab'
 import SettingsTab, { normalizeProjectStatus } from './SettingsTab'
 
 function apiErrorMessage(err, fallback = 'Failed to save task changes. Please try again.') {
@@ -139,6 +158,14 @@ const MAX_ACTIVE_TASKS = 5
 
 function memberActiveTaskCount(member) {
   return Number(member?.activeTaskCount ?? member?.activeTasksCount ?? 0)
+}
+
+function isTranslatorWorkloadLimited(member) {
+  const teamRole = String(member?.role || '').toLowerCase()
+  const accountRole = String(member?.accountRole || '').toUpperCase()
+  if (teamRole === 'group leader' || teamRole === 'leader') return false
+  if (accountRole === 'PROJECT_LEADER' || accountRole.includes('LEADER')) return false
+  return true
 }
 
 function transferMemberActiveTaskCount(list, fromId, toId) {
@@ -1177,16 +1204,14 @@ function TeamProjects() {
 
   // Instant In-Memory Multi-Field Filtering
   const filteredProjects = useMemo(() => {
-    const cleanSearch = (searchTerm || '').toLowerCase().trim()
+    const cleanSearch = normalizeForSearch(searchTerm)
 
     return allMatchedTeams.filter(p => {
-      // 1. Search Query
+      // 1. Search Query — NFKC so "1 F" matches fullwidth titles like "１Ｆの騎士"
       if (cleanSearch) {
-        const titleMatch = (p.title || '').toLowerCase().includes(cleanSearch)
-        const teamMatch = (p.team || '').toLowerCase().includes(cleanSearch)
-        const leaderMatch = (p.leaderName || '').toLowerCase().includes(cleanSearch)
-        const comicNameMatch = (p.comicName || '').toLowerCase().includes(cleanSearch)
-        if (!titleMatch && !teamMatch && !leaderMatch && !comicNameMatch) return false
+        const matched = [p.title, p.team, p.leaderName, p.comicName]
+          .some((field) => textMatchesSearch(field, cleanSearch))
+        if (!matched) return false
       }
 
       // 2. Source Language Filter
@@ -2320,7 +2345,7 @@ function TeamProjects() {
     try {
       await decideTeamRequestApi(reqId, 'rejected')
       setJoinRequests(prev => prev.filter(req => String(req.id) !== String(reqId)))
-      toast.info(`Rejected request from ${reqName}.`)
+      toast.info(`Rejected request from ${reqName}. They can re-apply to this project after 24 hours.`)
     } catch (err) {
       console.error(err)
       toast.error(err.response?.data?.message || 'Failed to reject request.')
@@ -2396,7 +2421,7 @@ function TeamProjects() {
       return
     }
     const assigneeMember = findAssignMember(teamMembersForAssign, data.assigneeId)
-    if (data.assigneeId && memberActiveTaskCount(assigneeMember) >= MAX_ACTIVE_TASKS) {
+    if (data.assigneeId && isTranslatorWorkloadLimited(assigneeMember) && memberActiveTaskCount(assigneeMember) >= MAX_ACTIVE_TASKS) {
       toast.error(`This translator already has ${MAX_ACTIVE_TASKS} incomplete tasks across all projects.`)
       return
     }
@@ -2496,6 +2521,7 @@ function TeamProjects() {
       title: cleanTitle,
       comic: comicProject || '',
       status: getTaskColumn(task),
+      originalStatus: getTaskColumn(task),
       priority: priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase(),
       assigneeId: task.assigneeId || null,
       originalAssigneeId: task.assigneeId || null,
@@ -2517,12 +2543,15 @@ function TeamProjects() {
     const comicFallback = selectedDetails?.comicName || selectedDetails?.title || 'Unknown Comic'
     const formattedTitle = `[${(editTaskData.priority || 'MEDIUM').toUpperCase()}] [${editTaskData.comic || comicFallback}] ${editTaskData.title.trim()}`
 
+    const nextStatus = getNormalizedStatusKey(editTaskData.status)
     const targetId = selectedTask.id || selectedTask._id || selectedTask.taskId
+    const assigneeChanged = String(editTaskData.originalAssigneeId || '') !== String(editTaskData.assigneeId || '')
     const updatedTaskObj = {
       ...selectedTask,
       title: formattedTitle,
       assigneeId: editTaskData.assigneeId,
-      dueDate: editTaskData.dueDate
+      dueDate: editTaskData.dueDate,
+      status: nextStatus
     }
 
     const previousTasks = tasks
@@ -2530,11 +2559,10 @@ function TeamProjects() {
     setTasks(updatedTasks)
 
     try {
-      const assigneeChanged = String(editTaskData.originalAssigneeId || '') !== String(editTaskData.assigneeId || '')
       if (assigneeChanged) {
         const nextAssignee = findAssignMember(teamMembersForAssign, editTaskData.assigneeId)
         const isOriginalAssignee = String(editTaskData.originalAssigneeId || '') === String(editTaskData.assigneeId || '')
-        if (!isOriginalAssignee && memberActiveTaskCount(nextAssignee) >= MAX_ACTIVE_TASKS) {
+        if (!isOriginalAssignee && isTranslatorWorkloadLimited(nextAssignee) && memberActiveTaskCount(nextAssignee) >= MAX_ACTIVE_TASKS) {
           toast.error(`This translator already has ${MAX_ACTIVE_TASKS} incomplete tasks across all projects.`)
           setTasks(previousTasks)
           return
@@ -2543,7 +2571,8 @@ function TeamProjects() {
       await updateTeamTaskApi(targetId, {
         title: formattedTitle,
         assigneeId: assigneeChanged ? editTaskData.originalAssigneeId : editTaskData.assigneeId,
-        dueDate: editTaskData.dueDate
+        dueDate: editTaskData.dueDate,
+        status: nextStatus
       })
 
       if (assigneeChanged) {
@@ -2586,10 +2615,7 @@ function TeamProjects() {
     return ln === username || ln === fullName
   }
 
-  const teamProjectsList = projects.filter(proj =>
-    (proj.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (proj.comicName || '').toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const teamProjectsList = projects
 
   if (loadingProjects && projects.length === 0) {
     return (
