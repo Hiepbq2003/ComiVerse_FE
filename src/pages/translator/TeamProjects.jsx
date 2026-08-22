@@ -2570,19 +2570,11 @@ function TeamProjects() {
       }
       await updateTeamTaskApi(targetId, {
         title: formattedTitle,
-        assigneeId: assigneeChanged ? editTaskData.originalAssigneeId : editTaskData.assigneeId,
+        assigneeId: editTaskData.assigneeId,
         dueDate: editTaskData.dueDate,
-        status: nextStatus
+        status: nextStatus,
+        reason: assigneeChanged ? 'Reassigned' : undefined
       })
-
-      if (assigneeChanged) {
-        await handoverTeamTaskApi(targetId, {
-          newAssigneeId: editTaskData.assigneeId,
-          completedPageNumbers: parseCompletedPageNumbers(editTaskData.handoverCompletedPages),
-          responsibilityFactor: Number(editTaskData.handoverFactor || 1),
-          reason: 'Reassigned'
-        })
-      }
     } catch (err) {
       console.error('Backend updateTeamTaskApi error, reverting edit:', err)
       toast.error(apiErrorMessage(err))

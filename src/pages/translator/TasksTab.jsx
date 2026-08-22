@@ -1841,6 +1841,7 @@ export function CreateTaskModal({
 
 export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAssign, isProjectLeader, onCancel, onSave, onContinue, onReview }) {
   const [submitted, setSubmitted] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const auth = getAuth();
   const currentUserName = (auth?.user?.fullName || auth?.user?.username || '').toLowerCase().trim();
@@ -1877,27 +1878,38 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   const isInProgress = editTaskData.status === 'in_progress'
 
   const selectAssignee = (memberId) => {
-    if (!isProjectLeader) return;
+    if (!isProjectLeader || saving) return;
     setEditTaskData({ ...editTaskData, assigneeId: memberId })
   }
 
-  const handleSaveClick = () => {
-    if (!isProjectLeader) return;
+  const handleSaveClick = async () => {
+    if (!isProjectLeader || saving) return;
     setSubmitted(true)
     if (Object.values(errors).some(Boolean)) return
-    if (onSave) onSave()
+    setSaving(true)
+    try {
+      if (onSave) await onSave()
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleOpenWorkspaceClick = () => {
+    if (saving) return
     if (onContinue) onContinue()
   }
 
-  const handleReviewClick = () => {
-    if (!canReview) return
+  const handleReviewClick = async () => {
+    if (!canReview || saving) return
     setSubmitted(true)
     if (Object.values(errors).some(Boolean)) return
-    if (onSave) onSave()
-    onReview()
+    setSaving(true)
+    try {
+      if (onSave) await onSave()
+      onReview()
+    } finally {
+      setSaving(false)
+    }
   }
 
   const isTaskUnderReview = editTaskData.status === 'under_review'
@@ -1911,10 +1923,10 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
       <div className="trans-modal-card">
         <div className="trans-modal-header">
           <h3>{isProjectLeader ? 'Edit Task Details' : (isEditableByMember ? 'Task Information' : 'Task Information (Read Only)')}</h3>
-          <button className="trans-modal-close-btn" onClick={onCancel}>×</button>
+          <button className="trans-modal-close-btn" onClick={onCancel} disabled={saving}>×</button>
         </div>
 
-        <div className="trans-modal-body">
+        <div className="trans-modal-body" style={saving ? { opacity: 0.7, pointerEvents: 'none' } : undefined}>
           {isProjectLeader ? (
             /* ── FULL EDITING FORM FOR GROUP LEADER ───────────── */
             <>
@@ -1931,6 +1943,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                   className="trans-form-input"
                   style={errorBorder('title')}
                   value={editTaskData.title}
+                  disabled={saving}
                   onChange={(e) => setEditTaskData({ ...editTaskData, title: e.target.value })}
                 />
                 {showError('title') && (
@@ -1943,7 +1956,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                 <select
                   className="trans-form-input"
                   value={getNormalizedStatusKey(editTaskData.status)}
-                  disabled={isOriginallyCompleted}
+                  disabled={saving || isOriginallyCompleted}
                   onChange={(e) => setEditTaskData({ ...editTaskData, status: e.target.value })}
                 >
                   {getAllowedStatusOptions(editTaskData.originalStatus || editTaskData.status).map((opt) => (
@@ -1963,6 +1976,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                 <select
                   className="trans-form-input"
                   value={editTaskData.priority}
+                  disabled={saving}
                   onChange={(e) => setEditTaskData({ ...editTaskData, priority: e.target.value })}
                 >
                   <option value="Urgent">🚨 Urgent</option>
@@ -1979,6 +1993,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                   selectedId={editTaskData.assigneeId}
                   heldAssigneeId={editTaskData.originalAssigneeId}
                   onSelect={selectAssignee}
+                  readOnly={saving}
                   error={showError('assigneeId')}
                 />
                 {showError('assigneeId') && (
@@ -1993,6 +2008,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                   onChange={(val) => setEditTaskData({ ...editTaskData, dueDate: val })}
                   placeholder="Select due date"
                   style={errorBorder('dueDate')}
+                  disabled={saving}
                 />
                 {showError('dueDate') && (
                   <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Due date is required</p>
@@ -2063,7 +2079,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
         </div>
 
         <div className="trans-modal-footer">
-          <button className="trans-btn secondary" onClick={onCancel}>
+          <button className="trans-btn secondary" onClick={onCancel} disabled={saving}>
             {isProjectLeader ? 'Cancel' : 'Close'}
           </button>
 
@@ -2072,9 +2088,9 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
             <button
               className="trans-btn secondary"
               onClick={handleReviewClick}
-              disabled={!isOriginallyUnderReview}
+              disabled={saving || !isOriginallyUnderReview}
               title={isOriginallyUnderReview ? 'Review this submission' : 'Only available once the task is Under Review'}
-              style={!isOriginallyUnderReview ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+              style={(saving || !isOriginallyUnderReview) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
             >
               <GitCompare />Review
             </button>
@@ -2085,7 +2101,9 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
             <button
               className="trans-btn primary"
               onClick={handleOpenWorkspaceClick}
+              disabled={saving}
               title={isAssigned ? "Open translate workspace" : "View translate workspace in read-only mode"}
+              style={saving ? { opacity: 0.65, cursor: 'not-allowed', transform: 'none' } : undefined}
             >
               <StepForward />{isAssigned ? 'Open Workspace' : 'View Workspace (Read Only)'}
             </button>
@@ -2093,8 +2111,13 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
 
           {/* Save: leader can persist status/details except on already-completed tasks */}
           {!isOriginallyCompleted && isProjectLeader && (
-            <button className="trans-btn primary" onClick={handleSaveClick}>
-              <Check size={16} />Save
+            <button
+              className="trans-btn primary"
+              onClick={handleSaveClick}
+              disabled={saving}
+              style={saving ? { opacity: 0.65, cursor: 'not-allowed', transform: 'none' } : undefined}
+            >
+              <Check size={16} />{saving ? 'Saving...' : 'Save'}
             </button>
           )}
         </div>
