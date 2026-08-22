@@ -655,8 +655,8 @@ function PriorityPicker({ value, onChange }) {
             style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
               padding: '10px 4px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-              border: `1.5px solid ${isActive ? p.color : 'rgba(255,255,255,0.1)'}`,
-              background: isActive ? `${p.color}22` : 'rgba(255,255,255,0.03)',
+              border: `1.5px solid ${isActive ? p.color : 'var(--trans-border)'}`,
+              background: isActive ? `${p.color}22` : 'var(--trans-card-bg)',
               color: isActive ? p.color : 'var(--trans-text-secondary)',
               transition: 'all 0.15s'
             }}
@@ -1417,7 +1417,7 @@ function ChapterDropdownPicker({ options, selectedId, onChange, disabled, emptyL
       {isOpen && !disabled && (
         <div style={{ 
           position: 'absolute', top: '100%', left: 0, right: 0, 
-          background: '#1e1b2e', border: '1px solid rgba(168, 85, 247, 0.35)', 
+          background: 'var(--trans-card-bg)', border: '1px solid var(--trans-border)', 
           borderRadius: '8px', marginTop: '6px', zIndex: 100, 
           maxHeight: '280px', overflowY: 'auto', boxShadow: '0 6px 24px rgba(0,0,0,0.6)'
         }}>
@@ -1427,12 +1427,12 @@ function ChapterDropdownPicker({ options, selectedId, onChange, disabled, emptyL
               onClick={() => { onChange(ch.id); setIsOpen(false); }}
               style={{ 
                 padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '12px',
-                cursor: 'pointer', borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                cursor: 'pointer', borderBottom: '1px solid var(--trans-border)',
                 background: String(selectedId) === String(ch.id) ? 'rgba(168, 85, 247, 0.15)' : 'transparent',
                 transition: 'background 0.15s ease'
               }}
               onMouseEnter={(e) => {
-                if (String(selectedId) !== String(ch.id)) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                if (String(selectedId) !== String(ch.id)) e.currentTarget.style.background = 'rgba(168, 85, 247, 0.08)';
               }}
               onMouseLeave={(e) => {
                 if (String(selectedId) !== String(ch.id)) e.currentTarget.style.background = 'transparent';
@@ -1440,7 +1440,7 @@ function ChapterDropdownPicker({ options, selectedId, onChange, disabled, emptyL
             >
                <img src={getCover(ch)} alt="cover" onError={handleImageError} style={{ width: '32px', height: '48px', objectFit: 'cover', borderRadius: '4px' }} />
                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                 <span style={{ fontSize: '14px', color: '#fff', fontWeight: String(selectedId) === String(ch.id) ? '600' : '400' }}>
+                 <span style={{ fontSize: '14px', color: 'var(--trans-text-primary)', fontWeight: String(selectedId) === String(ch.id) ? '600' : '400' }}>
                    {ch.title}{ch.revision ? ' — Revision' : ''}
                  </span>
                  {ch.pagesCount > 0 && <span style={{ fontSize: '12px', color: 'var(--trans-text-muted)' }}>{ch.pagesCount} pages</span>}
@@ -1468,11 +1468,11 @@ function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, read
     cursor: readOnly ? 'default' : 'pointer',
     border: isSelected
       ? '1.5px solid #a855f7'
-      : '1px solid rgba(255, 255, 255, 0.12)',
+      : '1px solid var(--trans-border)',
     background: isSelected
       ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.22) 0%, rgba(236, 72, 153, 0.18) 100%)'
-      : 'rgba(255, 255, 255, 0.05)',
-    color: isSelected ? '#e9d5ff' : 'var(--trans-text-secondary)',
+      : 'var(--trans-card-bg)',
+    color: isSelected ? 'var(--trans-purple)' : 'var(--trans-text-secondary)',
     boxShadow: isSelected
       ? '0 4px 14px rgba(168, 85, 247, 0.25), inset 0 1px 0 rgba(255,255,255,0.15)'
       : '0 2px 4px rgba(0,0,0,0.05)',
@@ -1500,7 +1500,7 @@ function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, read
               borderRadius: '50%',
               background: selectedId == null
                 ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)'
-                : 'rgba(255,255,255,0.15)',
+                : '#94a3b8',
               color: '#ffffff',
               display: 'inline-flex',
               alignItems: 'center',
@@ -1558,7 +1558,7 @@ function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, read
                 borderRadius: '50%',
                 background: isSelected
                   ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)'
-                  : (m.color || 'rgba(255,255,255,0.15)'),
+                  : (m.color || '#94a3b8'),
                 color: '#ffffff',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1802,9 +1802,9 @@ export function CreateTaskModal({
                     fontSize: '11px',
                     padding: '5px 12px',
                     borderRadius: '6px',
-                    background: isActive ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)' : 'rgba(255,255,255,0.06)',
-                    color: '#fff',
-                    border: isActive ? 'none' : '1px solid rgba(255,255,255,0.12)',
+                    background: isActive ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)' : 'var(--trans-card-bg)',
+                    color: isActive ? '#fff' : 'var(--trans-text-primary)',
+                    border: isActive ? 'none' : '1px solid var(--trans-border)',
                     fontWeight: isActive ? '700' : '500',
                     transition: 'all 0.2s ease',
                     cursor: 'pointer'
