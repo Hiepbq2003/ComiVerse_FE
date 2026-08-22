@@ -885,10 +885,11 @@ html.light .rep-role-badge.project_leader {
 
 .rep-table {
   width: 100%;
-  min-width: 820px;
+  min-width: 900px;
   border-collapse: collapse;
   text-align: left;
   font-size: 13.5px;
+  table-layout: fixed;
 }
 
 .rep-table th {

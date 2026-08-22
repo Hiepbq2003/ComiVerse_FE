@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { getTeamMembersApi } from '../../services/api/TeamWorkspaceApi'
 import { getAuth } from '../../utils/Auth'
@@ -84,20 +84,6 @@ function MemberProfileModal({ member, onClose }) {
             )}
           </div>
           
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>Contributions</span>
-            <span style={{ color: '#f8fafc', fontSize: '13.5px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '16px' }}>🏆</span> {member.contributions}
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>Revoked</span>
-            <span style={{ color: '#ef4444', fontSize: '13.5px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '16px' }}>❌</span> {member.revoked}
-            </span>
-          </div>
-
           {member.specializations && member.specializations.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
               <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>Specializations</span>
@@ -173,8 +159,6 @@ export function mapTeamMember(m, leaderName) {
     online,
     lastSeenAt: m?.lastSeenAt || null,
     joinDate: formattedJoinDate,
-    contributions: m?.contributions || 0,
-    revoked: m?.revoked || 0,
     avatar: m?.avatar || String(name).split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2),
     specializations: m?.specializations || [],
     experienceYears: m?.experienceYears || 0,
@@ -221,15 +205,6 @@ export function getTaskPageCount(t) {
   return 24
 }
 
-// A task counts as "published" once its translation work is fully done —
-// i.e. status reached "completed" in the kanban pipeline (backlog -> in_progress
-// -> under_review -> completed). Contribution is calculated based on the total number of
-// completed/published pages for each member.
-function isPublishedTaskStatus(status) {
-  const s = String(status || '').toLowerCase().trim()
-  return s === 'completed' || s === 'done' || s === 'published'
-}
-
 function MembersTab({
   teamId,
   leaderName,
@@ -237,7 +212,6 @@ function MembersTab({
   memberSearch = '',
   setMemberSearch,
   members: parentMembers = [],
-  tasks = [],
   onMembersLoaded,
   onLeaveTeam,
   onRemoveMember,
@@ -255,7 +229,6 @@ function MembersTab({
 
   // Filters & Sorting state
   const [joinDateSort, setJoinDateSort] = useState('newest')
-  const [contribFilter, setContribFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 10
 
@@ -276,7 +249,7 @@ function MembersTab({
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [memberSearch, joinDateSort, contribFilter])
+  }, [memberSearch, joinDateSort])
 
   // Sync parent members state (e.g. when approving new applicants)
   useEffect(() => {
@@ -326,8 +299,6 @@ function MembersTab({
           status: 'Offline',
           online: false,
           joinDate: '01/15/2024',
-          contributions: 0,
-          revoked: 0,
           avatar: leaderInitials
         };
 
@@ -407,117 +378,14 @@ function MembersTab({
     return () => window.removeEventListener('scroll', handleClose, true)
   }, [activeDropdownMemberId])
 
-  // Count completed ("published") translated pages per member.
-  // Supports granular per-page translator tracking (page.translatedBy / page.translatorId / task.pageContributions),
-  // so if Member A translated pages 1..5 before quitting/reassignment, those 5 pages stay credited to Member A,
-  // while Member B gets credited for pages translated by Member B.
-  const { contributionCounts, revokedCounts } = useMemo(() => {
-    const contributions = new Map()
-    const revoked = new Map()
-
-    ;(tasks || []).forEach(t => {
-      if (!t) return
-
-      const isTaskApproved = String(t.status).toLowerCase() === 'completed' || String(t.status).toLowerCase() === 'published' || isPublishedTaskStatus(t.status)
-      const isTaskRevoked = String(t.status).toLowerCase() === 'revoked'
-      let recordedPagesForTask = false
-
-      // 1. Check if task has explicit pageContributions map
-      if (t.pageContributions && typeof t.pageContributions === 'object') {
-        Object.entries(t.pageContributions).forEach(([userId, pageCount]) => {
-          if (userId && typeof pageCount === 'number' && pageCount > 0) {
-            recordedPagesForTask = true
-            const key = String(userId)
-            if (isTaskRevoked) {
-              revoked.set(key, (revoked.get(key) || 0) + pageCount)
-            } else {
-              contributions.set(key, (contributions.get(key) || 0) + pageCount)
-            }
-          }
-        })
-      }
-
-      // 2. Check if task has pages with individual translatedBy/translatorId info
-      if (!recordedPagesForTask && Array.isArray(t.pages) && t.pages.length > 0) {
-        const pagesWithTranslator = t.pages.filter(p => p && (p.translatedBy || p.translatorId || p.completedBy))
-        if (pagesWithTranslator.length > 0) {
-          recordedPagesForTask = true
-          t.pages.forEach(p => {
-            if (!p) return
-            const pStatus = String(p.status || '').toUpperCase()
-            const isDone = pStatus === 'DONE' || isTaskApproved || isTaskRevoked
-            if (isDone) {
-              const translatedById = String(p.translatedBy || p.translatorId || p.completedBy || '')
-              const assigneeId = String(t.assigneeId || '')
-              
-              const contributors = new Set()
-              if (translatedById) contributors.add(translatedById)
-              if (assigneeId) contributors.add(assigneeId)
-              
-              contributors.forEach(uid => {
-                if (isTaskRevoked) {
-                  revoked.set(uid, (revoked.get(uid) || 0) + 1)
-                } else {
-                  contributions.set(uid, (contributions.get(uid) || 0) + 1)
-                }
-              })
-            }
-          })
-        }
-      }
-
-      // 3. Fallback
-      if (!recordedPagesForTask && t.assigneeId && (isTaskApproved || isTaskRevoked)) {
-        const key = String(t.assigneeId)
-        const pageCount = getTaskPageCount(t)
-        if (isTaskRevoked) {
-          revoked.set(key, (revoked.get(key) || 0) + pageCount)
-        } else {
-          contributions.set(key, (contributions.get(key) || 0) + pageCount)
-        }
-      }
-    })
-
-    return { contributionCounts: contributions, revokedCounts: revoked }
-  }, [tasks])
-
-  const membersWithContributions = useMemo(() => {
-    return members.map(m => {
-      const contrib = contributionCounts.get(String(m.id)) || 0
-      const rev = revokedCounts.get(String(m.id)) || 0
-      return { 
-        ...m, 
-        contributions: contrib,
-        revoked: rev
-      }
-    })
-  }, [members, contributionCounts, revokedCounts])
-
-  const teamLeader = membersWithContributions.find(m => m.role === 'Group Leader') || null
+  const teamLeader = members.find(m => m.role === 'Group Leader') || null
 
   // Filter & Sort logic — leader is shown separately above, so the table itself
   // only ever contains regular members now (no more pinning-to-top needed).
-  const processedMembers = membersWithContributions
+  const processedMembers = members
     .filter(m => m.role !== 'Group Leader')
-    .filter(m => {
-      const matchesSearch = m.name.toLowerCase().includes((memberSearch || '').toLowerCase())
-      const count = parseInt(String(m.contributions || '0')) || 0
-      const matchesContrib = contribFilter !== 'active' || count > 0
-      return matchesSearch && matchesContrib
-    })
+    .filter(m => m.name.toLowerCase().includes((memberSearch || '').toLowerCase()))
     .sort((a, b) => {
-      // 1. Sub-sorting by contributions if selected
-      if (contribFilter === 'desc') {
-        const countA = parseInt(String(a.contributions || '0')) || 0
-        const countB = parseInt(String(b.contributions || '0')) || 0
-        if (countB !== countA) return countB - countA
-      } else if (contribFilter === 'asc') {
-        const countA = parseInt(String(a.contributions || '0')) || 0
-        const countB = parseInt(String(b.contributions || '0')) || 0
-        if (countB !== countA) return countA - countB
-      }
-
-      // 2. Sub-sorting by Join Date
       if (joinDateSort === 'oldest') {
         const dateA = new Date(a.joinDate).getTime() || 0
         const dateB = new Date(b.joinDate).getTime() || 0
@@ -647,17 +515,6 @@ function MembersTab({
             <option value="newest">📅 Join Date: Newest First</option>
             <option value="oldest">📅 Join Date: Oldest First</option>
           </select>
-
-          <select
-            className="trans-form-input members-sort-select"
-            value={contribFilter}
-            onChange={(e) => setContribFilter(e.target.value)}
-          >
-            <option value="all">🏆 Contribution: All</option>
-            <option value="desc">🏆 Contribution: High to Low</option>
-            <option value="asc">🏆 Contribution: Low to High</option>
-            <option value="active">🏆 Contribution: Active (&gt; 0 contributions)</option>
-          </select>
         </div>
 
         <span className="members-count-indicator">
@@ -680,8 +537,6 @@ function MembersTab({
                   <th>Member</th>
                   <th>Role</th>
                   <th>Join Date</th>
-                  <th style={{ textAlign: 'center' }}>Contributions</th>
-                  <th style={{ textAlign: 'center' }}>Revoked</th>
                   <th></th>
                 </tr>
               </thead>
@@ -726,8 +581,6 @@ function MembersTab({
                         </span>
                       </td>
                       <td className="member-join-date">{member.joinDate}</td>
-                      <td className="member-contributions" style={{ textAlign: 'center' }}>{member.contributions}</td>
-                      <td className="member-revoked" style={{ color: '#ef4444', textAlign: 'center' }}>{member.revoked}</td>
                       <td className="member-actions-cell">
                         {(canLeave || canRemove) && (
                           <button
