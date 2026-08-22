@@ -189,7 +189,7 @@ function RevenueManagement() {
     setLoading(true)
     setError('')
 
-    const params = { days, zoneId: 'Asia/Ho_Chi_Minh', currency: 'USD' }
+    const params = { days, zoneId: 'Asia/Ho_Chi_Minh' }
 
     const [statisticsResult, logsResult] = await Promise.allSettled([
       getAdminPaymentStatisticsApi(params),
@@ -217,7 +217,7 @@ function RevenueManagement() {
   }, [loadStatistics])
 
   const summary = statistics?.summary || EMPTY_SUMMARY
-  const selectedCurrency = 'USD'
+  const selectedCurrency = statistics?.period?.currency || 'USD'
   const dailySeries = Array.isArray(statistics?.dailySeries) ? statistics.dailySeries : []
   const statusBreakdown = Array.isArray(statistics?.statusBreakdown) ? statistics.statusBreakdown : []
   const planBreakdown = Array.isArray(statistics?.planBreakdown) ? statistics.planBreakdown : []
@@ -301,8 +301,10 @@ function RevenueManagement() {
             </label>
             <label className="payment-filter-control">
               <span>Currency</span>
-              <select value="USD" disabled aria-label="Currency">
-                <option value="USD">USD</option>
+              <select value={selectedCurrency} disabled aria-label="Currency">
+                {(statistics?.availableCurrencies || [selectedCurrency]).map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
               </select>
             </label>
             <button type="button" className="admin-btn payment-action-btn" onClick={loadStatistics} disabled={loading}>
