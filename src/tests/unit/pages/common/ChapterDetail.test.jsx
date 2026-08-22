@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ChapterDetail from '../../../../pages/common/ChapterDetail';
@@ -21,7 +21,8 @@ vi.mock('../../../../utils/Auth', () => ({
   getAuth: vi.fn()
 }));
 vi.mock('../../../../hooks/useReaderSecurity', () => ({
-  default: vi.fn()
+  default: vi.fn(),
+  isDevToolsOpenSync: vi.fn(() => false)
 }));
 vi.mock('../../../../components/common/ComicPageCanvas', () => ({
   default: ({ src }) => <div data-testid="mock-canvas">{src}</div>

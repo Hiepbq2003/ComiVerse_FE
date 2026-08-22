@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import ModeratorLayout from '../../components/layout/ModeratorLayout'
 import { getComicByIdApi, getAllComicsApi, updateComicApi, getComicsPageApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi, getChapterDetailApi, getTasksByChapterIdApi, getChapterTranslationsApi } from '../../services/api/ChapterApi'
+import AxiosClient from '../../services/api/AxiosClient'
 import { getPendingAppealByTargetApi } from '../../services/api/AppealApi'
 import ModeratorTakedownModal from '../../components/moderator/ModeratorTakedownModal'
 import ResolveAppealModal from '../../components/common/ResolveAppealModal'
@@ -16,6 +17,7 @@ import ModernButton from '../../components/common/ModernButton'
 import { toast } from 'react-toastify'
 import { useTheme } from '../../context/ThemeContext'
 import '../../assets/style/moderator/comic-detail.css'
+import '../../assets/style/translator/review-workspace.css'
 import { getAuth } from '../../utils/Auth'
 import { isLanguageInModeratorScope, getModeratorScope } from '../../utils/moderatorScope'
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
@@ -62,11 +64,49 @@ const getChapterDisplayTitle = (chap, idx = 0) => {
   return `Chapter ${num}`;
 };
 
+// Helper: Calculate standard bounding box for speech bubble selections
+const getBubbleBoundingBox = (selection) => {
+  if (!selection) return { x: 0, y: 0, width: 0, height: 0 };
+  if (selection.shape === 'polygon' && selection.points?.length) {
+    const xs = selection.points.map((p) => p.x);
+    const ys = selection.points.map((p) => p.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    return { x: minX, y: minY, width: Math.max(...xs) - minX, height: Math.max(...ys) - minY };
+  }
+  return {
+    x: selection.x ?? 0,
+    y: selection.y ?? 0,
+    width: selection.width ?? 0,
+    height: selection.height ?? 0
+  };
+};
+
+// Helper: Parse speech bubbles payload JSON safely
+const parseBubblesPayload = (raw) => {
+  if (!raw) return [];
+  try {
+    let parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (typeof parsed === 'string') {
+      try {
+        parsed = JSON.parse(parsed);
+      } catch {}
+    }
+    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed?.selections)) return parsed.selections;
+    if (Array.isArray(parsed?.bubbles)) return parsed.bubbles;
+    return [];
+  } catch {
+    return [];
+  }
+};
+
 function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = [], projectTeams = [], initialTargetLang, onClose }) {
   const { theme } = useTheme()
   const [loading, setLoading] = useState(true)
   const [pages, setPages] = useState([])
   const [currentPageIndex, setCurrentPageIndex] = useState(0)
+  const [showTextOverlay, setShowTextOverlay] = useState(true)
 
   // Local state to hold chosen parallel checking language
   const [selectedLang, setSelectedLang] = useState(initialTargetLang || 'raw')
@@ -119,48 +159,116 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
         let pageList = Array.isArray(rawPages)
           ? rawPages.map((item, idx) => {
               if (typeof item === 'string') {
-                return { pageNumber: idx + 1, imageUrl: item, url: item, translatedImageUrl: null }
+                return { pageNumber: idx + 1, imageUrl: item, url: item, translatedImageUrl: null, bubbles: [] }
               }
               return {
                 ...item,
                 pageNumber: item?.pageNumber || idx + 1,
                 imageUrl: item?.imageUrl || item?.url || item?.pageUrl || item,
-                translatedImageUrl: item?.translatedImageUrl || item?.translatedUrl || item?.translatedPageUrl || null
+                translatedImageUrl: item?.translatedImageUrl || item?.translatedUrl || item?.translatedPageUrl || null,
+                bubbles: parseBubblesPayload(item?.bubbles || item?.speechBubbles || item?.selections)
               }
             })
           : []
 
         // Fetch translations if we are inspecting a translated language
         if (displayTargetLang) {
+          const targetLangClean = displayTargetLang.toLowerCase().trim()
+          const translatedPagesMap = {} // pageNumber -> { bubbles: [], translatedImageUrl: '' }
+
+          // 1. Try fetching from Published Chapter Translations: GET /chapters/{chapterId}/translations
           try {
             const transResponse = await getChapterTranslationsApi(chapter.id);
             const transData = transResponse?.data?.data || transResponse?.data || transResponse || [];
             if (Array.isArray(transData)) {
-              const matchedTranslation = transData.find(t => t.languageCode?.toLowerCase() === displayTargetLang.toLowerCase());
-              if (matchedTranslation && matchedTranslation.pagesBubbles) {
-                let parsedBubbles = [];
-                try {
-                  parsedBubbles = typeof matchedTranslation.pagesBubbles === 'string' 
-                    ? JSON.parse(matchedTranslation.pagesBubbles) 
-                    : matchedTranslation.pagesBubbles;
-                } catch (e) {
-                  console.error('Failed to parse pagesBubbles:', e);
+              const matchedTranslation = transData.find(t => {
+                const lCode = (t.languageCode || t.targetLanguage || t.targetLang || t.language || '').toLowerCase().trim();
+                return lCode === targetLangClean || lCode.includes(targetLangClean) || targetLangClean.includes(lCode);
+              });
+
+              if (matchedTranslation) {
+                let parsed = [];
+                if (matchedTranslation.pagesBubbles) {
+                  try {
+                    parsed = typeof matchedTranslation.pagesBubbles === 'string'
+                      ? JSON.parse(matchedTranslation.pagesBubbles)
+                      : matchedTranslation.pagesBubbles;
+                  } catch (e) {
+                    console.error('Failed to parse pagesBubbles:', e);
+                  }
+                } else if (Array.isArray(matchedTranslation.pages)) {
+                  parsed = matchedTranslation.pages;
                 }
-                
-                // Merge translated images into pageList
-                if (Array.isArray(parsedBubbles) && parsedBubbles.length > 0) {
-                  pageList = pageList.map(p => {
-                    const transPage = parsedBubbles.find(tp => Number(tp.pageNumber) === Number(p.pageNumber));
-                    if (transPage && transPage.imageUrl) {
-                      return { ...p, translatedImageUrl: transPage.imageUrl };
-                    }
-                    return p;
+
+                if (Array.isArray(parsed)) {
+                  parsed.forEach((tp, pIdx) => {
+                    const pNum = Number(tp.pageNumber || tp.page_number || tp.number || (pIdx + 1));
+                    const b = parseBubblesPayload(tp.bubbles || tp.selections || tp.speechBubbles || tp.pagesBubbles);
+                    translatedPagesMap[pNum] = {
+                      translatedImageUrl: tp.imageUrl || tp.translatedImageUrl || tp.url || null,
+                      bubbles: b
+                    };
                   });
                 }
               }
             }
           } catch (transErr) {
-            console.error('Failed to load chapter translations:', transErr);
+            console.warn('Failed to load published chapter translations:', transErr);
+          }
+
+          // 2. If empty or in progress, fallback to Workspace Team Tasks: GET /team-workspace/tasks/by-chapter/{chapterId}
+          if (Object.keys(translatedPagesMap).length === 0) {
+            try {
+              const tasksRes = await getTasksByChapterIdApi(chapter.id);
+              const tasks = tasksRes?.data?.data || tasksRes?.data || tasksRes || [];
+              if (Array.isArray(tasks) && tasks.length > 0) {
+                // Find matching task for this team
+                const matchedTask = tasks.find(t => assignedTeam && t.projectTeamId === assignedTeam.id) 
+                                 || tasks.find(t => t.status !== 'REVOKED') 
+                                 || tasks[0];
+
+                if (matchedTask?.id) {
+                  try {
+                    const rvwPages = await AxiosClient.get(`/review-workspace/${matchedTask.id}`);
+                    const pagesList = rvwPages?.data?.data || rvwPages?.data || rvwPages || [];
+                    if (Array.isArray(pagesList)) {
+                      pagesList.forEach((rp, idx) => {
+                        const pNum = Number(rp.pageNumber || rp.page_number || rp.number || (idx + 1));
+                        const b = parseBubblesPayload(rp.bubblesPayload || rp.bubbles || rp.selections || rp.speechBubbles);
+                        translatedPagesMap[pNum] = {
+                          // Map rp.imageUrl because team workspace stores the working page image in imageUrl
+                          translatedImageUrl: rp.imageUrl || rp.translatedImageUrl || rp.canvasImageUrl || rp.renderedImageUrl || null,
+                          bubbles: b
+                        };
+                      });
+                    }
+                  } catch (e) {
+                    console.warn('Failed to load review workspace pages:', e);
+                  }
+                }
+              }
+            } catch (tasksErr) {
+              console.warn('Failed to load chapter team workspace tasks:', tasksErr);
+            }
+          }
+
+          // Merge translated data into pageList
+          if (Object.keys(translatedPagesMap).length > 0) {
+            pageList = pageList.map((p, idx) => {
+              const pNum = Number(p.pageNumber || (idx + 1));
+              const transInfo = translatedPagesMap[pNum];
+              if (transInfo) {
+                const bubbles = transInfo.bubbles && transInfo.bubbles.length > 0 ? transInfo.bubbles : p.bubbles;
+                const transImg = transInfo.translatedImageUrl || p.translatedImageUrl || (bubbles.length > 0 ? (p.imageUrl || p.url) : null);
+                return {
+                  ...p,
+                  translatedImageUrl: transImg,
+                  bubbles: bubbles,
+                  hasTranslation: true // flag to force render
+                };
+              }
+              return p;
+            });
           }
         }
 
@@ -175,7 +283,8 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
             ? fallbackPages.map((item, idx) => ({
                 pageNumber: idx + 1,
                 imageUrl: typeof item === 'string' ? item : (item?.imageUrl || item?.url || item),
-                translatedImageUrl: typeof item === 'object' ? (item?.translatedImageUrl || item?.translatedUrl) : null
+                translatedImageUrl: typeof item === 'object' ? (item?.translatedImageUrl || item?.translatedUrl) : null,
+                bubbles: []
               }))
             : []
           setPages(pageList)
@@ -238,6 +347,17 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
               ))}
             </select>
           </div>
+
+          {/* Toggle Text Overlay Mode */}
+          {displayTargetLang && (
+            <button
+              className={`mod-mode-tab ${showTextOverlay ? 'active' : ''}`}
+              onClick={() => setShowTextOverlay(!showTextOverlay)}
+              title="Toggle translated dialogue text overlay"
+            >
+              💬 {showTextOverlay ? 'Text Overlay (ON)' : 'Text Overlay (OFF)'}
+            </button>
+          )}
 
           {/* Language / View Mode Switcher */}
           <div className="mod-inspector-mode-tabs">
@@ -316,12 +436,58 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
                     </span>
                   </div>
                   <div className="mod-pane-content" style={{ position: 'relative' }}>
-                    {currentPage?.translatedImageUrl ? (
-                      <img
-                        src={currentPage.translatedImageUrl}
-                        alt={`Translated Page ${currentPageIndex + 1}`}
-                        className="mod-page-image"
-                      />
+                    {(currentPage?.translatedImageUrl || currentPage?.hasTranslation || (Array.isArray(currentPage?.bubbles) && currentPage.bubbles.length > 0)) ? (
+                      <div style={{ position: 'relative', display: 'inline-block', width: '100%', maxWidth: '640px' }}>
+                        <img
+                          src={currentPage.translatedImageUrl || currentPage.imageUrl || currentPage.url || ''}
+                          alt={`Translated Page ${currentPageIndex + 1}`}
+                          className="mod-page-image"
+                          style={{ width: '100%', height: 'auto', display: 'block' }}
+                        />
+                        {showTextOverlay && Array.isArray(currentPage?.bubbles) && currentPage.bubbles.length > 0 && (
+                          <div
+                            className="rvw-bubble-overlay"
+                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+                          >
+                            {currentPage.bubbles.map((sel, bIdx) => {
+                              const box = getBubbleBoundingBox(sel.selection || sel);
+                              const shapeClass = sel.shape === 'ellipse' ? 'rvw-bubble--ellipse' : sel.shape === 'polygon' ? 'rvw-bubble--polygon' : '';
+                              return (
+                                <div
+                                  key={sel.id || bIdx}
+                                  className={`rvw-bubble ${shapeClass} rvw-bubble--text-only`}
+                                  style={{
+                                    '--x': `${box.x}%`,
+                                    '--y': `${box.y}%`,
+                                    '--w': `${box.width}%`,
+                                    '--h': `${box.height}%`,
+                                    backgroundColor: sel.textBgColor || 'rgba(255,255,255,0.95)',
+                                    color: sel.textColor || '#000000',
+                                    fontFamily: sel.fontFamily || 'sans-serif',
+                                    fontWeight: sel.isBold ? 700 : 400,
+                                    fontStyle: sel.isItalic ? 'italic' : 'normal',
+                                    textAlign: sel.textAlign || 'center',
+                                    fontSize: sel.fontSize ? (sel.fontSize > 8 ? `${sel.fontSize}px` : `${Math.max(sel.fontSize * 5, 11)}px`) : '12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    padding: '2px',
+                                    whiteSpace: 'pre-wrap',
+                                    overflowWrap: 'anywhere',
+                                    lineHeight: 1.2,
+                                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                                    border: '1px solid rgba(0,0,0,0.1)',
+                                    borderRadius: sel.shape === 'ellipse' ? '50%' : '6px'
+                                  }}
+                                  title={`Bubble ${bIdx + 1}: ${sel.translation || sel.text || ''}`}
+                                >
+                                  {sel.translation || sel.text || ''}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <div className="mod-no-translation-notice">
                         <div className="mod-no-trans-icon">🌐</div>
@@ -362,12 +528,58 @@ function ChapterReaderInspectorModal({ chapter, comic, availableTargetLangs = []
                       <div className="mod-page-label">
                         {getLanguageFlag(displayTargetLang || 'Target')} Translated Page {idx + 1} ({displayTargetLang || 'Target'})
                       </div>
-                      {page.translatedImageUrl ? (
-                        <img
-                          src={page.translatedImageUrl}
-                          alt={`Translated Page ${idx + 1}`}
-                          className="mod-webtoon-image"
-                        />
+                      {(page.translatedImageUrl || (Array.isArray(page.bubbles) && page.bubbles.length > 0)) ? (
+                        <div style={{ position: 'relative', display: 'inline-block', width: '100%', maxWidth: '640px' }}>
+                          <img
+                            src={page.translatedImageUrl || page.imageUrl || page.url || ''}
+                            alt={`Translated Page ${idx + 1}`}
+                            className="mod-webtoon-image"
+                            style={{ width: '100%', height: 'auto', display: 'block' }}
+                          />
+                          {showTextOverlay && Array.isArray(page.bubbles) && page.bubbles.length > 0 && (
+                            <div
+                              className="rvw-bubble-overlay"
+                              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+                            >
+                              {page.bubbles.map((sel, bIdx) => {
+                                const box = getBubbleBoundingBox(sel.selection || sel);
+                                const shapeClass = sel.shape === 'ellipse' ? 'rvw-bubble--ellipse' : sel.shape === 'polygon' ? 'rvw-bubble--polygon' : '';
+                                return (
+                                  <div
+                                    key={sel.id || bIdx}
+                                    className={`rvw-bubble ${shapeClass} rvw-bubble--text-only`}
+                                    style={{
+                                      '--x': `${box.x}%`,
+                                      '--y': `${box.y}%`,
+                                      '--w': `${box.width}%`,
+                                      '--h': `${box.height}%`,
+                                      backgroundColor: sel.textBgColor || 'rgba(255,255,255,0.95)',
+                                      color: sel.textColor || '#000000',
+                                      fontFamily: sel.fontFamily || 'sans-serif',
+                                      fontWeight: sel.isBold ? 700 : 400,
+                                      fontStyle: sel.isItalic ? 'italic' : 'normal',
+                                      textAlign: sel.textAlign || 'center',
+                                      fontSize: sel.fontSize ? (sel.fontSize > 8 ? `${sel.fontSize}px` : `${Math.max(sel.fontSize * 5, 11)}px`) : '12px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      padding: '2px',
+                                      whiteSpace: 'pre-wrap',
+                                      overflowWrap: 'anywhere',
+                                      lineHeight: 1.2,
+                                      boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                                      border: '1px solid rgba(0,0,0,0.1)',
+                                      borderRadius: sel.shape === 'ellipse' ? '50%' : '6px'
+                                    }}
+                                    title={`Bubble ${bIdx + 1}: ${sel.translation || sel.text || ''}`}
+                                  >
+                                    {sel.translation || sel.text || ''}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <div className="mod-webtoon-no-trans">
                           ⚠️ Page {idx + 1} Not Translated {displayTargetLang ? `(${displayTargetLang})` : ''}

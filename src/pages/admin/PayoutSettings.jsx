@@ -6,7 +6,6 @@ import '../../assets/style/admin/payout.css'
 import {
   getAdminPayoutSettingsApi,
   updateAdminPayoutSettingsApi,
-  upsertAdminPayoutCurrencyApi,
 } from '../../services/api/PayoutApi'
 
 const MONEY_MAX = 1_000_000
@@ -45,16 +44,10 @@ const toSettingsForm = (source = {}) => ({
   supportedCurrencies: Array.isArray(source.supportedCurrencies) ? source.supportedCurrencies : [],
 })
 
-const countFractionDigits = (value) => {
-  const normalized = String(value)
-  const dot = normalized.indexOf('.')
-  return dot < 0 ? 0 : normalized.length - dot - 1
-}
 
 function PayoutSettings() {
   const navigate = useNavigate()
   const [settings, setSettings] = useState(() => toSettingsForm(defaultSettings))
-  const [currencyDraft, setCurrencyDraft] = useState({ currencyCode: 'USD', unitsPerUsd: '1.000000', active: true })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -110,35 +103,6 @@ function PayoutSettings() {
     }
   }
 
-  const saveCurrency = async () => {
-    const currencyCode = currencyDraft.currencyCode.trim().toUpperCase()
-    const unitsPerUsd = Number(currencyDraft.unitsPerUsd)
-    if (!Number.isFinite(unitsPerUsd) || unitsPerUsd <= 0 || unitsPerUsd > 1_000_000 || countFractionDigits(currencyDraft.unitsPerUsd) > 6) {
-      const message = 'Units per USD must be positive and have at most 6 decimal places.'
-      setError(message)
-      toast.warning(message)
-      return
-    }
-    try {
-      setSaving(true)
-      setError('')
-      await upsertAdminPayoutCurrencyApi({ currencyCode, unitsPerUsd, active: currencyCode === 'USD' || Boolean(currencyDraft.active) })
-      toast.success('Payout currency conversion saved.')
-      await loadSettings()
-    } catch (err) {
-      const message = err?.response?.data?.message || err?.message || 'Could not save currency conversion.'
-      setError(message)
-      toast.error(message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const editCurrency = (rate) => setCurrencyDraft({
-    currencyCode: rate.currencyCode || 'USD',
-    unitsPerUsd: String(rate.unitsPerUsd ?? 1),
-    active: rate.active !== false,
-  })
 
   return (
     <AdminLayout activeNav="payout">
@@ -146,7 +110,7 @@ function PayoutSettings() {
         <div className="admin-page-header">
           <div className="admin-page-header-info">
             <h1>Payment Settings</h1>
-            <p>Configure payout formulas, withdrawal limits, and settlement currencies.</p>
+            <p>Configure USD payout formulas and withdrawal limits.</p>
           </div>
           <div className="admin-payout-header-actions">
             <button className="admin-payout-view-tab" onClick={() => navigate('/admin/payout/history')}>Payment history</button>
@@ -171,18 +135,8 @@ function PayoutSettings() {
           </div>
 
           <div className="admin-payout-currency-editor">
-            <div><h3>Supported payout currencies</h3><p>Set how many currency units equal 1 USD.</p></div>
-            <select value={currencyDraft.currencyCode} onChange={(event) => setCurrencyDraft((current) => ({ ...current, currencyCode: event.target.value, unitsPerUsd: event.target.value === 'USD' ? '1.000000' : current.unitsPerUsd, active: event.target.value === 'USD' ? true : current.active }))}>
-              <option value="USD">USD</option><option value="EUR">EUR</option><option value="CNY">CNY</option>
-            </select>
-            <input type="number" min="0.000001" max="1000000" step="0.000001" value={currencyDraft.unitsPerUsd} disabled={currencyDraft.currencyCode === 'USD'} onChange={(event) => setCurrencyDraft((current) => ({ ...current, unitsPerUsd: event.target.value }))} aria-label="Units per USD" />
-            <label className="admin-payout-checkbox"><input type="checkbox" checked={currencyDraft.active} disabled={currencyDraft.currencyCode === 'USD'} onChange={(event) => setCurrencyDraft((current) => ({ ...current, active: event.target.checked }))} />Active</label>
-            <button className="btn-table-action" onClick={saveCurrency} disabled={saving}>Save currency</button>
-          </div>
-          <div className="admin-payout-rate-list">
-            {(settings.supportedCurrencies || []).map((rate) => (
-              <button type="button" key={rate.currencyCode} onClick={() => editCurrency(rate)}><strong>{rate.currencyCode}</strong><span>{rate.symbol} {rate.displayName}</span><span>1 USD = {Number(rate.unitsPerUsd).toLocaleString('vi-VN', { maximumFractionDigits: 6 })} {rate.currencyCode}</span><em>{rate.active ? 'Active' : 'Disabled'}</em></button>
-            ))}
+            <div><h3>Settlement currency</h3><p>All creator earnings, limits, requests, and Stripe transfers use USD.</p></div>
+            <strong>USD — US Dollar ($)</strong>
           </div>
         </section>
       </div>

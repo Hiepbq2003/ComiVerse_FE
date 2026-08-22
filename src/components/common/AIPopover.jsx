@@ -404,7 +404,8 @@ export const AIPopover = ({
                   const notifText = `${n.title || ''} ${n.message || n.msg || ''} ${n.type || ''}`.toLowerCase();
                   const isApproved = /approved|accepted|published successfully/i.test(notifText);
                   const isModeratorEdit = /updated by moderator|comic metadata updated|moderator edited/i.test(notifText);
-                  const isRejected = /rejected|changes requested|revision requested|disapproved/i.test(notifText);
+                  // Do not allow appeal for report rejections, license rejections, or team requests
+                  const isRejected = /rejected|changes requested|revision requested|disapproved/i.test(notifText) && !/report|license|team|join/i.test(notifText);
                   const isAppealQuery = Boolean(n.actionUrl && (n.actionUrl.includes('appeal=true') || n.actionUrl.includes('appealComicId=')));
                   const isAppealable = (isAppealQuery || isModeratorEdit || isRejected) && !isApproved;
 

@@ -17,7 +17,16 @@ const loadLocalKeywords = () => {
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        const seen = new Set();
+        const unique = [];
+        for (const item of parsed) {
+          const w = (item?.word || '').trim().toLowerCase();
+          if (w && !seen.has(w)) {
+            seen.add(w);
+            unique.push(item);
+          }
+        }
+        return unique;
       }
     }
   } catch (e) {
@@ -190,12 +199,22 @@ export const getBannedKeywordsApi = async () => {
     }
   }
 
-  if (backendData) {
-    localKeywords = backendData;
+  if (backendData && Array.isArray(backendData)) {
+    const seen = new Set();
+    const unique = [];
+    backendData.forEach(k => {
+      const w = (k?.word || '').trim().toLowerCase();
+      if (w && !seen.has(w)) {
+        seen.add(w);
+        unique.push(k);
+      }
+    });
+    localKeywords = unique;
     saveLocalKeywords(localKeywords);
-    return backendData;
+    return unique;
   }
   
+  localKeywords = loadLocalKeywords();
   return [...localKeywords];
 };
 
@@ -203,10 +222,16 @@ export const getBannedKeywordsApi = async () => {
  * Add a new banned keyword to the dictionary.
  */
 export const addBannedKeywordApi = async (data) => {
+  const cleanWord = (data?.word || '').trim().toLowerCase();
+  if (!cleanWord) return null;
+
   let savedData = null;
   if (HAS_BACKEND_ENDPOINT) {
     try {
-      const res = await AxiosClient.post('/chat/banned-keywords', data);
+      const res = await AxiosClient.post('/chat/banned-keywords', {
+        ...data,
+        word: cleanWord
+      });
       if (res?.data) {
         savedData = res.data;
       } else if (res) {
@@ -219,12 +244,13 @@ export const addBannedKeywordApi = async (data) => {
 
   const newKw = savedData || {
     id: `kw-${Date.now()}`,
-    word: data.word.trim().toLowerCase(),
+    word: cleanWord,
     category: data.category || 'General',
     severity: data.severity || 'HIGH',
     addedAt: new Date().toISOString().split('T')[0]
   };
   
+  localKeywords = loadLocalKeywords().filter(k => (k?.word || '').trim().toLowerCase() !== cleanWord && k.id !== newKw.id);
   localKeywords.unshift(newKw);
   saveLocalKeywords(localKeywords);
   return newKw;
@@ -233,7 +259,7 @@ export const addBannedKeywordApi = async (data) => {
 /**
  * Remove a banned keyword by ID.
  */
-export const deleteBannedKeywordApi = async (id) => {
+export const deleteBannedKeywordApi = async (id, word) => {
   if (HAS_BACKEND_ENDPOINT) {
     try {
       await AxiosClient.delete(`/chat/banned-keywords/${id}`);
@@ -242,7 +268,8 @@ export const deleteBannedKeywordApi = async (id) => {
     }
   }
 
-  localKeywords = localKeywords.filter(k => k.id !== id);
+  const cleanWord = (word || '').trim().toLowerCase();
+  localKeywords = loadLocalKeywords().filter(k => k.id !== id && (!cleanWord || (k?.word || '').trim().toLowerCase() !== cleanWord));
   saveLocalKeywords(localKeywords);
   return { success: true, id };
 };

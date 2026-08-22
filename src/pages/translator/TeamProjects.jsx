@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom';
 import '../../assets/style/translator/team-projects.css'
 import ModernButton from '../../components/common/ModernButton'
-import { getMyProjectTeamsApi, getAllProjectTeamsApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
+import ModernPagination from '../../components/common/ModernPagination'
+import { getMyProjectTeamsApi, getMyProjectTeamsPageApi, updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getAllSubmissionsApi } from '../../services/api/SubmissionApi'
 import { getAllComicsApi, getComicsPageApi } from '../../services/api/ComicApi'
 import { getChaptersByComicIdApi } from '../../services/api/ChapterApi'
@@ -10,6 +11,25 @@ import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
 import { getAuth } from '../../utils/Auth'
 import { exportToCsv } from '../../utils/exportToCsv'
 import { uploadImageApi } from '../../services/api/UploadApi'
+
+function normalizeForSearch(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\s\u00a0\u3000]+/g, ' ')
+    .trim()
+}
+
+function textMatchesSearch(haystack, needle) {
+  const n = normalizeForSearch(needle)
+  if (!n) return true
+  const h = normalizeForSearch(haystack)
+  if (h.includes(n)) return true
+  const compactH = h.replace(/\s+/g, '')
+  const compactN = n.replace(/\s+/g, '')
+  return Boolean(compactN) && compactH.includes(compactN)
+}
+
 const getProjectCover = (proj, dbComics = [], dbSubs = []) => {
   if (!proj) return '';
   const rawCover = proj.cover || proj.coverImage || proj.coverImageUrl || proj.coverUrl || proj.imageUrl || '';
@@ -124,7 +144,49 @@ import HomeTab from './HomeTab'
 import MembersTab from './MembersTab'
 import RequestsTab from './RequestsTab'
 import TasksTab, { CreateTaskModal, EditTaskModal, parseTaskTitle, getTaskColumn, getNormalizedStatusKey } from './TasksTab'
-import SettingsTab from './SettingsTab'
+import SettingsTab, { normalizeProjectStatus } from './SettingsTab'
+
+function apiErrorMessage(err, fallback = 'Failed to save task changes. Please try again.') {
+  const data = err?.response?.data
+  const fieldErrors = data?.errors && typeof data.errors === 'object'
+    ? Object.values(data.errors).filter(Boolean).join('. ')
+    : ''
+  return fieldErrors || data?.message || err?.message || fallback
+}
+
+const MAX_ACTIVE_TASKS = 5
+
+function memberActiveTaskCount(member) {
+  return Number(member?.activeTaskCount ?? member?.activeTasksCount ?? 0)
+}
+
+function isTranslatorWorkloadLimited(member) {
+  const teamRole = String(member?.role || '').toLowerCase()
+  const accountRole = String(member?.accountRole || '').toUpperCase()
+  if (teamRole === 'group leader' || teamRole === 'leader') return false
+  if (accountRole === 'PROJECT_LEADER' || accountRole.includes('LEADER')) return false
+  return true
+}
+
+function transferMemberActiveTaskCount(list, fromId, toId) {
+  if (!fromId && !toId) return list
+  if (fromId && toId && String(fromId) === String(toId)) return list
+  return (list || []).map((m) => {
+    const id = String(m.id || m.userId)
+    if (fromId && id === String(fromId)) {
+      return { ...m, activeTaskCount: Math.max(0, memberActiveTaskCount(m) - 1) }
+    }
+    if (toId && id === String(toId)) {
+      return { ...m, activeTaskCount: memberActiveTaskCount(m) + 1 }
+    }
+    return m
+  })
+}
+
+function findAssignMember(members, memberId) {
+  if (memberId == null) return null
+  return (members || []).find(m => String(m.id || m.userId) === String(memberId)) || null
+}
 
 function parseCompletedPageNumbers(value) {
   const result = new Set()
@@ -154,7 +216,30 @@ function getTimeAgo(date) {
   return date.toLocaleDateString()
 }
 
-function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpenDetails, onQuickTranslate, onOpenEdit, isLeaderMatch }) {
+function ProjectsListView({
+  teamProjectsList,
+  searchTerm,
+  onSearchChange,
+  sourceLang,
+  onSourceLangChange,
+  targetLang,
+  onTargetLangChange,
+  statusFilter,
+  onStatusFilterChange,
+  roleFilter,
+  onRoleFilterChange,
+  availableSourceLangs,
+  availableTargetLangs,
+  onResetFilters,
+  totalResults,
+  onOpenDetails,
+  onQuickTranslate,
+  onOpenEdit,
+  isLeaderMatch,
+  currentPage,
+  totalPages,
+  onPageChange
+}) {
   const handleExportProjects = () => {
     if (!teamProjectsList || teamProjectsList.length === 0) {
       return
@@ -193,6 +278,8 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
     exportToCsv('ComiVerse_Translation_Projects_Export', headers, rows)
   }
 
+  const hasActiveFilters = Boolean(searchTerm || sourceLang || targetLang || statusFilter || roleFilter)
+
   return (
     <div className="fade-in">
       <div className="translator-page-header">
@@ -204,8 +291,8 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
           <input
             type="text"
             className="trans-form-input"
-            placeholder="Search translation projects..."
-            style={{ width: '250px' }}
+            placeholder="Search comics, teams, leaders..."
+            style={{ width: '280px' }}
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
           />
@@ -238,11 +325,103 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
         </div>
       </div>
 
+      {/* Advanced Filter Toolbar */}
+      <div className="trans-filter-bar">
+        {/* Source Language Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span className="trans-filter-label">Origin:</span>
+          <select
+            className={`trans-form-select ${sourceLang ? 'active' : ''}`}
+            value={sourceLang}
+            onChange={(e) => onSourceLangChange(e.target.value)}
+          >
+            <option value="">🌐 All Source Languages</option>
+            {availableSourceLangs.map(l => (
+              <option key={l} value={l}>{l}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Target Language Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span className="trans-filter-label">Target:</span>
+          <select
+            className={`trans-form-select ${targetLang ? 'active' : ''}`}
+            value={targetLang}
+            onChange={(e) => onTargetLangChange(e.target.value)}
+          >
+            <option value="">🎯 All Target Languages</option>
+            {availableTargetLangs.map(l => (
+              <option key={l} value={l}>{l}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Status / Recruiting Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span className="trans-filter-label">Status:</span>
+          <select
+            className={`trans-form-select ${statusFilter ? 'active' : ''}`}
+            value={statusFilter}
+            onChange={(e) => onStatusFilterChange(e.target.value)}
+          >
+            <option value="">⚡ All Statuses</option>
+            <option value="RECRUITING">🟢 Open for Recruiting</option>
+            <option value="CLOSED">🔒 Full / Closed</option>
+            <option value="ACTIVE">✅ Active Status</option>
+            <option value="PAUSED">⏸️ Paused</option>
+          </select>
+        </div>
+
+        {/* Role Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span className="trans-filter-label">Role:</span>
+          <select
+            className={`trans-form-select ${roleFilter ? 'active' : ''}`}
+            value={roleFilter}
+            onChange={(e) => onRoleFilterChange(e.target.value)}
+          >
+            <option value="">👑 All Roles</option>
+            <option value="LEADER">⭐ Led by Me</option>
+            <option value="MEMBER">👥 Member Only</option>
+          </select>
+        </div>
+
+        {/* Reset Filter button */}
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={onResetFilters}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '10px',
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              color: '#fca5a5',
+              fontSize: '12px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            ✕ Reset Filters
+          </button>
+        )}
+
+        {/* Total Results Counter */}
+        <div className="trans-filter-results">
+          Found: <span style={{ color: '#c084fc', fontWeight: '700' }}>{totalResults}</span> teams
+        </div>
+      </div>
+
       <div className="trans-projects-list">
         {teamProjectsList.length === 0 ? (
           <div className="translator-empty-state">
             <h3>No translation projects found</h3>
-            <p>Change your search filters and try again.</p>
+            <p>Change your search or language filters and try again.</p>
           </div>
         ) : (
           teamProjectsList.map(proj => (
@@ -282,7 +461,9 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
                   </span>
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                  <span className={`status-badge ${proj.status.toLowerCase()}`}>{proj.status}</span>
+                  <span className={`status-badge ${normalizeProjectStatus(proj.status)}`}>
+                    {normalizeProjectStatus(proj.status) === 'completed' ? 'Completed' : 'Ongoing'}
+                  </span>
                   {isLeaderMatch(proj.leaderName) ? (
                     <span className="status-badge leader">⭐ Led by Me</span>
                   ) : (
@@ -292,27 +473,39 @@ function ProjectsListView({ teamProjectsList, searchTerm, onSearchChange, onOpen
               </div>
               <div className="trans-project-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <ModernButton variant={2} label="Workspace" onClick={() => onOpenDetails(proj)} />
-                <button
-                  className="dash-quick-action-btn"
-                  style={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
-                    padding: '8px 14px',
-                    fontSize: '12.5px'
-                  }}
-                  title="Open Translation Editor Directly"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (onQuickTranslate) onQuickTranslate(proj)
-                  }}
-                >
-                  Translate
-                </button>
+                {proj.status?.toLowerCase() !== 'paused' && (
+                  <button
+                    className="dash-quick-action-btn"
+                    style={{
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                      padding: '8px 14px',
+                      fontSize: '12.5px'
+                    }}
+                    title="Open Translation Editor Directly"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (onQuickTranslate) onQuickTranslate(proj)
+                    }}
+                  >
+                    Translate
+                  </button>
+                )}
               </div>
             </div>
           ))
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
+          <ModernPagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={onPageChange}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -341,11 +534,11 @@ function EditProjectModal({ editForm, setEditForm, onCancel, onSave }) {
             <label className="trans-form-label">Project Status</label>
             <select
               className="trans-form-input"
-              value={editForm.status}
+              value={normalizeProjectStatus(editForm.status)}
               onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
             >
-              <option value="Active">Active</option>
-              <option value="Paused">Paused</option>
+              <option value="ongoing">Ongoing</option>
+              <option value="completed">Completed</option>
             </select>
           </div>
 
@@ -824,7 +1017,7 @@ function WorkspaceDetailView({
         setWorkspaceTab={setWorkspaceTab}
         membersCount={members.length}
         isCurrentLeader={isCurrentLeader}
-        joinRequestsCount={joinRequests.length}
+        joinRequestsCount={joinRequests.filter(r => !r.status || r.status.toUpperCase() === 'PENDING').length}
         tasksCount={tasks.length}
       />
 
@@ -877,6 +1070,7 @@ function WorkspaceDetailView({
             </div>
           ) : (
             <TasksTab
+              isTeamPaused={String(selectedDetails?.status).toLowerCase() === 'paused'}
               comicName={comicName}
               comicId={selectedDetails?.comicId}
               tasks={tasks}
@@ -906,6 +1100,7 @@ function WorkspaceDetailView({
           {showCreateTask && (
             <CreateTaskModal
               comicName={comicName}
+              comicCover={selectedDetails?.cover || selectedDetails?.coverImage || selectedDetails?.coverUrl}
               newTaskData={newTaskData}
               setNewTaskData={setNewTaskData}
               chapterOptions={chapterOptions}
@@ -949,63 +1144,210 @@ function TeamProjects() {
 
   const [projects, setProjects] = useState([])
   const [loadingProjects, setLoadingProjects] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [sourceLang, setSourceLang] = useState('')
+  const [targetLang, setTargetLang] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [roleFilter, setRoleFilter] = useState('')
+  const ITEMS_PER_PAGE = 4
+
   const auth = getAuth()
-  const authUser = auth?.user
-  const userFullName = authUser?.fullName || authUser?.username || 'Translator'
-  const user = authUser || {}
+  const currentUserName = (auth?.user?.fullName || '').toLowerCase().trim()
+  const currentUsername = (auth?.user?.username || '').toLowerCase().trim()
+  const currentUserId = auth?.user?.id || auth?.user?.userId
+  const user = auth?.user || {}
+  const userFullName = auth?.user?.fullName || auth?.user?.username || 'Translator'
+
+  const [allMatchedTeams, setAllMatchedTeams] = useState([])
+
+  // Instant 0ms Load on Mount from Session Cache
+  useEffect(() => {
+    let hasCache = false
+    try {
+      const cached = sessionStorage.getItem('comiverse_projects_cache') || sessionStorage.getItem('comiverse_dash_cache')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        const list = Array.isArray(parsed) ? parsed : (parsed.projects || [])
+        if (Array.isArray(list) && list.length > 0) {
+          setAllMatchedTeams(list)
+          setLoadingProjects(false)
+          hasCache = true
+        }
+      }
+    } catch (e) {}
+
+    fetchProjects(hasCache)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Dynamic Available Language Options
+  const availableSourceLangs = useMemo(() => {
+    const langs = new Set(['Korean', 'Japanese', 'Chinese', 'English', 'Vietnamese'])
+    allMatchedTeams.forEach(t => {
+      if (t.sourceLang && t.sourceLang !== '-' && t.sourceLang !== 'Any') {
+        langs.add(t.sourceLang.trim())
+      }
+    })
+    return Array.from(langs).sort()
+  }, [allMatchedTeams])
+
+  const availableTargetLangs = useMemo(() => {
+    const langs = new Set(['Vietnamese', 'English', 'Japanese', 'Chinese', 'Korean'])
+    allMatchedTeams.forEach(t => {
+      if (t.targetLang && t.targetLang !== '-' && t.targetLang !== 'Any') {
+        langs.add(t.targetLang.trim())
+      }
+    })
+    return Array.from(langs).sort()
+  }, [allMatchedTeams])
+
+  // Instant In-Memory Multi-Field Filtering
+  const filteredProjects = useMemo(() => {
+    const cleanSearch = normalizeForSearch(searchTerm)
+
+    return allMatchedTeams.filter(p => {
+      // 1. Search Query — NFKC so "1 F" matches fullwidth titles like "１Ｆの騎士"
+      if (cleanSearch) {
+        const matched = [p.title, p.team, p.leaderName, p.comicName]
+          .some((field) => textMatchesSearch(field, cleanSearch))
+        if (!matched) return false
+      }
+
+      // 2. Source Language Filter
+      if (sourceLang) {
+        const sLang = (p.sourceLang || '').toLowerCase().trim()
+        if (sLang !== sourceLang.toLowerCase().trim()) return false
+      }
+
+      // 3. Target Language Filter
+      if (targetLang) {
+        const tLang = (p.targetLang || '').toLowerCase().trim()
+        if (tLang !== targetLang.toLowerCase().trim()) return false
+      }
+
+      // 4. Status Filter
+      if (statusFilter) {
+        if (statusFilter === 'RECRUITING' && !p.isRecruiting) return false
+        if (statusFilter === 'CLOSED' && p.isRecruiting) return false
+        if (statusFilter === 'ACTIVE' && (p.status || 'ACTIVE').toUpperCase() !== 'ACTIVE') return false
+        if (statusFilter === 'PAUSED' && (p.status || '').toUpperCase() !== 'PAUSED') return false
+      }
+
+      // 5. Role Filter
+      if (roleFilter) {
+        const leaderName = (p.leaderName || '').toLowerCase().trim()
+        const leaderId = p.leaderId || p.createdById
+        const isLeader = (currentUserName && leaderName === currentUserName) ||
+                         (currentUsername && leaderName === currentUsername) ||
+                         (currentUserId && leaderId === currentUserId)
+
+        if (roleFilter === 'LEADER' && !isLeader) return false
+        if (roleFilter === 'MEMBER' && isLeader) return false
+      }
+
+      return true
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allMatchedTeams, searchTerm, sourceLang, targetLang, statusFilter, roleFilter, currentUserName, currentUsername, currentUserId])
+
+  // Sync Paging State instantly
+  useEffect(() => {
+    const totalPagesCalc = Math.max(1, Math.ceil(filteredProjects.length / ITEMS_PER_PAGE))
+    setTotalPages(totalPagesCalc)
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+    setProjects(filteredProjects.slice(startIndex, startIndex + ITEMS_PER_PAGE))
+  }, [filteredProjects, currentPage])
+
+  const handleResetFilters = () => {
+    setSearchTerm('')
+    setSourceLang('')
+    setTargetLang('')
+    setStatusFilter('')
+    setRoleFilter('')
+    setCurrentPage(1)
+  }
+
+  const handleSearchChange = (val) => {
+    setSearchTerm(val)
+    setCurrentPage(1)
+  }
+
+  const handleSourceLangChange = (val) => {
+    setSourceLang(val)
+    setCurrentPage(1)
+  }
+
+  const handleTargetLangChange = (val) => {
+    setTargetLang(val)
+    setCurrentPage(1)
+  }
+
+  const handleStatusFilterChange = (val) => {
+    setStatusFilter(val)
+    setCurrentPage(1)
+  }
+
+  const handleRoleFilterChange = (val) => {
+    setRoleFilter(val)
+    setCurrentPage(1)
+  }
 
   const fetchProjects = async (silent = false) => {
     try {
       if (!silent && projects.length === 0) setLoadingProjects(true)
-      const [myTeams, allTeams, allComicsRes, submissionsRes] = await Promise.all([
+
+      // Check session cache for instant load
+      let cachedComics = []
+      let cachedSubs = []
+      try {
+        const c1 = sessionStorage.getItem('comiverse_comics_cache')
+        if (c1) cachedComics = JSON.parse(c1)
+        const c2 = sessionStorage.getItem('comiverse_subs_cache')
+        if (c2) cachedSubs = JSON.parse(c2)
+      } catch (e) {}
+
+      const fetchComicsPromise = cachedComics.length > 0 ? Promise.resolve(cachedComics) : getAllComicsApi().catch(() => [])
+      const fetchSubsPromise = cachedSubs.length > 0 ? Promise.resolve(cachedSubs) : getAllSubmissionsApi().catch(() => [])
+
+      const [myTeamsRes, allComicsRes, submissionsRes] = await Promise.all([
         getMyProjectTeamsApi().catch(() => []),
-        getAllProjectTeamsApi().catch(() => []),
-        getAllComicsApi().catch(() => []),
-        getAllSubmissionsApi().catch(() => [])
+        fetchComicsPromise,
+        fetchSubsPromise
       ])
 
-      const dbComics = allComicsRes?.data?.data || allComicsRes?.data || (Array.isArray(allComicsRes) ? allComicsRes : []);
-      const dbSubs = submissionsRes?.data?.data || submissionsRes?.data || (Array.isArray(submissionsRes) ? submissionsRes : []);
+      const dbComics = Array.isArray(allComicsRes) ? allComicsRes : (allComicsRes?.data?.data || allComicsRes?.data || cachedComics);
+      const dbSubs = Array.isArray(submissionsRes) ? submissionsRes : (submissionsRes?.data?.data || submissionsRes?.data || cachedSubs);
 
-      const currentUserName = (userFullName || '').toLowerCase().trim();
-      const currentUsername = (authUser?.username || '').toLowerCase().trim();
-      
-      const combinedProjectsMap = new Map();
+      try {
+        if (Array.isArray(dbComics) && dbComics.length > 0) sessionStorage.setItem('comiverse_comics_cache', JSON.stringify(dbComics))
+        if (Array.isArray(dbSubs) && dbSubs.length > 0) sessionStorage.setItem('comiverse_subs_cache', JSON.stringify(dbSubs))
+      } catch (e) {}
 
-      // 1. Add projects returned by backend getMyProjectTeamsApi
-      (myTeams || []).forEach(p => {
-        if (p && p.id) combinedProjectsMap.set(p.id, p);
-      });
+      let allTeams = [];
+      if (Array.isArray(myTeamsRes)) {
+        allTeams = myTeamsRes;
+      } else if (myTeamsRes?.data?.data || myTeamsRes?.data || myTeamsRes?.content) {
+        allTeams = myTeamsRes.data?.data || myTeamsRes.data || myTeamsRes.content || [];
+      } else if (Array.isArray(myTeamsRes.data)) {
+        allTeams = myTeamsRes.data;
+      }
 
-      // 2. Add projects from allTeams if current user is the leader
-      (allTeams || []).forEach(p => {
-        if (!p || !p.id) return;
+      const currentUserName = (user.fullName || '').toLowerCase().trim();
+      const currentUsername = (user.username || '').toLowerCase().trim();
+      const currentUserId = user.id || user.userId;
 
-        const isLeader = (p.leaderName || '').toLowerCase().trim() === currentUserName || (p.leaderName || '').toLowerCase().trim() === currentUsername;
-        
-        // Restore local storage check so members who were approved locally can still see the project during testing
-        const localApprovedKey = `comiverse_approved_members_${p.id}`;
-        let savedMems = [];
-        try {
-          savedMems = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
-        } catch (e) {}
+      const allMapped = allTeams.map(p => {
+        const leaderName = (p.leaderName || '').toLowerCase().trim();
+        const leaderId = p.leaderId || p.createdById;
+        const isLeaderMatch = (currentUserName && leaderName === currentUserName) ||
+                         (currentUsername && leaderName === currentUsername) ||
+                         (currentUserId && leaderId === currentUserId);
 
-        const isApprovedMember = savedMems.some(m => {
-          const mn = (m.name || '').toLowerCase().trim();
-          return mn === currentUserName || mn === currentUsername;
-        });
-
-        if (isLeader || isApprovedMember) {
-          combinedProjectsMap.set(p.id, p);
-        }
-      });
-
-      const finalProjectsList = Array.from(combinedProjectsMap.values()).map(p => {
-        // Real members count: backend usually counts the leader in members. If it's 0, assume at least 1 (the leader)
         const realCount = Math.max(1, p.membersCount || 0);
         const maxCap = (Number(p.maxMembers) || 5) + 1;
 
-        // Recruitment status: Default to OPEN unless full or manually closed by leader
         const localStatusKey = `comiverse_is_recruiting_${p.id}`;
         const manualStatus = localStorage.getItem(localStatusKey);
 
@@ -1016,23 +1358,27 @@ function TeamProjects() {
           isRecruiting = p.isRecruiting;
         }
 
-        // Automatically close ONLY if team capacity is FULL
         if (realCount >= maxCap) {
           isRecruiting = false;
         }
 
         return {
           ...p,
-          team: p.title,
-          title: p.comicName,
+          team: p.title || p.name || 'Unnamed Team',
+          title: p.comicName || p.title || 'Untitled Comic',
           cover: getProjectCover(p, dbComics, dbSubs),
           membersCount: realCount,
-          isRecruiting: isRecruiting
+          isRecruiting: isRecruiting,
+          isLeaderMatch
         };
       });
 
-      setProjects(finalProjectsList)
-      setProjects(finalProjectsList)
+      setAllMatchedTeams(allMapped);
+
+      // Cache to sessionStorage for instantaneous future tab switches
+      try {
+        sessionStorage.setItem('comiverse_projects_cache', JSON.stringify(allMapped))
+      } catch (e) {}
     } catch (err) {
       console.error(err)
     } finally {
@@ -1040,14 +1386,9 @@ function TeamProjects() {
     }
   }
 
-  useEffect(() => {
-    fetchProjects();
-  }, [])
-
-  const [searchTerm, setSearchTerm] = useState('')
   const [selectedDetails, setSelectedDetails] = useState(null)
   const [selectedEdit, setSelectedEdit] = useState(null)
-  const [editForm, setEditForm] = useState({ description: '', status: 'Active', team: '' })
+  const [editForm, setEditForm] = useState({ description: '', status: 'ongoing', team: '' })
 
   const [workspaceTab, setWorkspaceTab] = useState('home')
   const [loadingWorkspace, setLoadingWorkspace] = useState(false)
@@ -1063,7 +1404,7 @@ function TeamProjects() {
   const [openDropdownCol, setOpenDropdownCol] = useState(null)
   const [selectedTask, setSelectedTask] = useState(null)
   const [editTaskData, setEditTaskData] = useState({
-    title: '', status: 'backlog', priority: 'Medium', assigneeId: null, originalAssigneeId: null, dueDate: '', chapterRewardUsd: '', handoverCompletedPages: '', handoverFactor: '1.00', handoverReason: '', totalPages: 0
+    title: '', status: 'backlog', priority: 'Medium', assigneeId: null, originalAssigneeId: null, dueDate: '', chapterRewardUsd: '', handoverCompletedPages: '', handoverFactor: '1.00', totalPages: 0
   })
 
   const [members, setMembers] = useState([])
@@ -1107,12 +1448,27 @@ function TeamProjects() {
       if (updated) setSelectedDetails(updated)
     } else if (projects && projects.length > 0) {
       const stateTeamId = location.state?.teamId
-      const targetId = stateTeamId || localStorage.getItem('comiverse_active_project_id')
-      if (targetId) {
-        const matching = projects.find(p => String(p.id) === String(targetId))
-        if (matching) {
-          handleOpenDetails(matching, location.state?.tab || 'home')
+      const stateTeamName = location.state?.teamName
+      let matching = null;
+      if (stateTeamId) {
+        matching = projects.find(p => String(p.id) === String(stateTeamId))
+      } else if (stateTeamName) {
+        const matchName = stateTeamName.toLowerCase().trim();
+        matching = projects.find(p => {
+          const pTitle = p.title ? p.title.toLowerCase().trim() : '';
+          const pComicName = p.comicName ? p.comicName.toLowerCase().trim() : '';
+          return pTitle === matchName || pComicName === matchName;
+        })
+      }
+      if (!matching) {
+        const targetId = localStorage.getItem('comiverse_active_project_id')
+        if (targetId) {
+          matching = projects.find(p => String(p.id) === String(targetId))
         }
+      }
+      
+      if (matching) {
+        handleOpenDetails(matching, location.state?.tab || 'home')
       }
     }
   }, [projects, location.state])
@@ -1140,9 +1496,10 @@ function TeamProjects() {
       ? new Date(project.createdAt).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
       : '01/15/2024';
 
+    const uName = getAuth()?.user?.fullName || getAuth()?.user?.username || 'Translator';
     const initialLeader = {
       id: `leader-${project.id}`,
-      name: project.leaderName || userFullName,
+      name: project.leaderName || uName,
       role: 'Group Leader',
       status: 'Offline',
       online: false,
@@ -1391,7 +1748,10 @@ function TeamProjects() {
       setTasksLoading(false);
 
       const mappedRequests = (Array.isArray(reqList) ? reqList : [])
-        .filter(r => r && (!r.status || r.status.toUpperCase() === 'PENDING'))
+        .filter(r => {
+          const status = (r?.status || 'PENDING').toUpperCase()
+          return status === 'PENDING'
+        })
         .map(r => ({ ...r, roles: typeof r.roles === 'string' ? r.roles.split(',') : r.roles }));
       setJoinRequests(mappedRequests)
 
@@ -1462,9 +1822,19 @@ function TeamProjects() {
   useEffect(() => {
     if (loadingProjects) return
     const targetTeamId = location.state?.teamId
-    if (!targetTeamId) return
+    const targetTeamName = location.state?.teamName
+    const hasRoutingState = targetTeamId || targetTeamName || location.state?.openCreateTask || location.state?.tab
 
-    const targetProject = projects.find(p => p.id === targetTeamId)
+    if (!hasRoutingState) return
+
+    const targetProject = projects.find(p => {
+      if (p.id === targetTeamId) return true;
+      if (!targetTeamName) return false;
+      const matchName = targetTeamName.toLowerCase().trim();
+      const pTitle = p.title ? p.title.toLowerCase().trim() : '';
+      const pComicName = p.comicName ? p.comicName.toLowerCase().trim() : '';
+      return pTitle === matchName || pComicName === matchName;
+    });
     if (targetProject) {
       handleOpenDetails(targetProject).then(() => {
         const targetTab = location.state?.tab || 'home';
@@ -1495,7 +1865,7 @@ function TeamProjects() {
     setSelectedEdit(project)
     setEditForm({
       description: project.description || '',
-      status: project.status || 'Active',
+      status: normalizeProjectStatus(project.status),
       team: project.title || ''
     })
   }
@@ -1507,7 +1877,7 @@ function TeamProjects() {
         id: selectedEdit.id,
         title: editForm.team,
         comicName: selectedEdit.title,
-        status: editForm.status,
+        status: normalizeProjectStatus(editForm.status),
         description: editForm.description,
         deadline: selectedEdit.deadline,
         sourceLang: selectedEdit.sourceLang,
@@ -1555,7 +1925,7 @@ function TeamProjects() {
         id: selectedDetails.id,
         title: selectedDetails.team,
         comicName: selectedDetails.title,
-        status: selectedDetails.status,
+        status: normalizeProjectStatus(selectedDetails.status),
         description: selectedDetails.description,
         deadline: selectedDetails.deadline,
         sourceLang: selectedDetails.sourceLang,
@@ -1572,7 +1942,7 @@ function TeamProjects() {
         assignedToMe: selectedDetails.assignedToMe,
         notes: selectedDetails.description || selectedDetails.notes || ''
       })
-      const mappedUpdated = { ...selectedDetails, ...updated, team: updated.title || selectedDetails.team, title: updated.comicName || selectedDetails.title, isRecruiting: finalIsRecruiting }
+      const mappedUpdated = { ...selectedDetails, ...updated, team: updated.title || selectedDetails.team, title: updated.comicName || selectedDetails.title, isRecruiting: finalIsRecruiting, status: updated.status || normalizeProjectStatus(selectedDetails.status) }
       setProjects(prev => {
         const newList = prev.map(proj => (proj.id === selectedDetails.id ? mappedUpdated : proj));
         return newList;
@@ -1654,10 +2024,11 @@ function TeamProjects() {
         finalImageUrl = attachedImage
       }
 
+      const uName = getAuth()?.user?.fullName || getAuth()?.user?.username || 'Translator';
       const created = await createTeamAnnouncementApi(selectedDetails.id, {
-        author: userFullName,
-        role: (selectedDetails.leaderName || '').toLowerCase().trim() === userFullName.toLowerCase().trim() ? 'Group Leader' : 'Member',
-        avatar: userFullName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2),
+        author: uName,
+        role: (selectedDetails.leaderName || '').toLowerCase().trim() === uName.toLowerCase().trim() ? 'Group Leader' : 'Member',
+        avatar: uName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2),
         time: nowIso,
         createdAt: nowIso,
         content: textToPost.trim(),
@@ -1702,10 +2073,11 @@ function TeamProjects() {
   const handleAddComment = async (postId, commentText, replyTarget = null) => {
     if (!commentText || !commentText.trim()) return
     const nowIso = new Date().toISOString()
+    const uName = getAuth()?.user?.fullName || getAuth()?.user?.username || 'Translator';
     const newComment = {
       id: `cmt-${Date.now()}`,
-      author: userFullName,
-      avatar: userFullName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2),
+      author: uName,
+      avatar: uName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2),
       createdAt: nowIso,
       timestamp: Date.now(),
       text: commentText.trim(),
@@ -1974,14 +2346,13 @@ function TeamProjects() {
       return
     }
 
-    // Optimistically remove from UI instantly
-    setJoinRequests(prev => prev.filter(req => req.id !== reqId))
-    toast.info(`Rejected request from ${reqName}.`)
-
     try {
       await decideTeamRequestApi(reqId, 'rejected')
+      setJoinRequests(prev => prev.filter(req => String(req.id) !== String(reqId)))
+      toast.info(`Rejected request from ${reqName}. They can re-apply to this project after 24 hours.`)
     } catch (err) {
       console.error(err)
+      toast.error(err.response?.data?.message || 'Failed to reject request.')
     }
   }
 
@@ -2053,6 +2424,11 @@ function TeamProjects() {
       toast.error('Please select a chapter.')
       return
     }
+    const assigneeMember = findAssignMember(teamMembersForAssign, data.assigneeId)
+    if (data.assigneeId && isTranslatorWorkloadLimited(assigneeMember) && memberActiveTaskCount(assigneeMember) >= MAX_ACTIVE_TASKS) {
+      toast.error(`This translator already has ${MAX_ACTIVE_TASKS} incomplete tasks across all projects.`)
+      return
+    }
     
 
     const comicName = selectedDetails?.comicName || selectedDetails?.title || 'Unknown Comic'
@@ -2071,7 +2447,6 @@ function TeamProjects() {
       chapterId: data.chapterId,
       taskType: taskTypeVal,
       dueDate: dueDateVal,
-      chapterRewardUsd: Number(data.chapterRewardUsd) > 0 ? Number(data.chapterRewardUsd) : undefined,
       createdAt: new Date().toISOString()
     }
 
@@ -2084,8 +2459,7 @@ function TeamProjects() {
         assigneeId: data.assigneeId,
         chapterId: data.chapterId,
         taskType: taskTypeVal,
-        dueDate: dueDateVal,
-        chapterRewardUsd: Number(data.chapterRewardUsd) > 0 ? Number(data.chapterRewardUsd) : undefined
+        dueDate: dueDateVal
       })
       taskToSave = (created && (created.id || created.title)) ? { ...newTaskObj, ...created } : newTaskObj
     } catch (err) {
@@ -2097,21 +2471,37 @@ function TeamProjects() {
     const updatedTasks = [...tasks, taskToSave]
     setTasks(updatedTasks)
 
+    const createdChapterId = String(
+      taskToSave.chapterId || taskToSave.chapter_id || taskToSave.chapter?.id || data.chapterId || ''
+    )
+    if (createdChapterId) {
+      setChapterOptions(prev => prev.map(ch =>
+        String(ch.id || ch.chapterId) === createdChapterId
+          ? { ...ch, canCreateTask: false, revision: false }
+          : ch
+      ))
+    }
+
     if (!customData) {
       setNewTaskData({ title: '', column: 'backlog', assigneeId: null, dueDate: '', priority: 'Medium', chapterId: null, chapterRewardUsd: '', taskType: 'REGULAR' })
       setShowCreateTask(false)
     }
 
     toast.success('Task created successfully!')
+    if (data.assigneeId) {
+      const bump = (list) => list.map(m =>
+        String(m.id || m.userId) === String(data.assigneeId)
+          ? { ...m, activeTaskCount: memberActiveTaskCount(m) + 1 }
+          : m
+      )
+      setTeamMembersForAssign(prev => bump(prev))
+      setMembers(prev => bump(prev))
+    }
   }
 
   const handleMoveTask = async (id, newCol) => {
     if (!isLeaderMatch(selectedDetails?.leaderName)) {
       toast.error('Only the Project Leader can change task status.')
-      return
-    }
-    if (getNormalizedStatusKey(newCol) === 'completed') {
-      toast.info('A task becomes Completed only after every page is DONE and the chapter is approved in Review.')
       return
     }
     const previousTasks = tasks
@@ -2135,6 +2525,7 @@ function TeamProjects() {
       title: cleanTitle,
       comic: comicProject || '',
       status: getTaskColumn(task),
+      originalStatus: getTaskColumn(task),
       priority: priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase(),
       assigneeId: task.assigneeId || null,
       originalAssigneeId: task.assigneeId || null,
@@ -2142,7 +2533,6 @@ function TeamProjects() {
       chapterRewardUsd: task.chapterRewardUsd ?? '',
       handoverCompletedPages: '',
       handoverFactor: '1.00',
-      handoverReason: '',
       totalPages: Number(task.totalPages || 0),
       taskId: task.id || task._id || task.taskId || task.TaskID || 'KHONG-TIM-THAY-ID'
     })
@@ -2157,14 +2547,15 @@ function TeamProjects() {
     const comicFallback = selectedDetails?.comicName || selectedDetails?.title || 'Unknown Comic'
     const formattedTitle = `[${(editTaskData.priority || 'MEDIUM').toUpperCase()}] [${editTaskData.comic || comicFallback}] ${editTaskData.title.trim()}`
 
+    const nextStatus = getNormalizedStatusKey(editTaskData.status)
     const targetId = selectedTask.id || selectedTask._id || selectedTask.taskId
-    const nextStatus = (getNormalizedStatusKey(editTaskData.status) === 'backlog') ? 'in_progress' : editTaskData.status
+    const assigneeChanged = String(editTaskData.originalAssigneeId || '') !== String(editTaskData.assigneeId || '')
     const updatedTaskObj = {
       ...selectedTask,
       title: formattedTitle,
-      status: nextStatus,
       assigneeId: editTaskData.assigneeId,
-      dueDate: editTaskData.dueDate
+      dueDate: editTaskData.dueDate,
+      status: nextStatus
     }
 
     const previousTasks = tasks
@@ -2172,33 +2563,32 @@ function TeamProjects() {
     setTasks(updatedTasks)
 
     try {
-      const assigneeChanged = String(editTaskData.originalAssigneeId || '') !== String(editTaskData.assigneeId || '')
+      if (assigneeChanged) {
+        const nextAssignee = findAssignMember(teamMembersForAssign, editTaskData.assigneeId)
+        const isOriginalAssignee = String(editTaskData.originalAssigneeId || '') === String(editTaskData.assigneeId || '')
+        if (!isOriginalAssignee && isTranslatorWorkloadLimited(nextAssignee) && memberActiveTaskCount(nextAssignee) >= MAX_ACTIVE_TASKS) {
+          toast.error(`This translator already has ${MAX_ACTIVE_TASKS} incomplete tasks across all projects.`)
+          setTasks(previousTasks)
+          return
+        }
+      }
       await updateTeamTaskApi(targetId, {
         title: formattedTitle,
-        status: nextStatus,
-        assigneeId: assigneeChanged ? editTaskData.originalAssigneeId : editTaskData.assigneeId,
+        assigneeId: editTaskData.assigneeId,
         dueDate: editTaskData.dueDate,
-        ...(Number(editTaskData.chapterRewardUsd) > 0
-          ? { chapterRewardUsd: Number(editTaskData.chapterRewardUsd) }
-          : {})
+        status: nextStatus,
+        reason: assigneeChanged ? 'Reassigned' : undefined
       })
-
-      if (assigneeChanged) {
-        if (!String(editTaskData.handoverReason || '').trim()) {
-          throw new Error('A handover reason is required when changing the assignee.')
-        }
-        await handoverTeamTaskApi(targetId, {
-          newAssigneeId: editTaskData.assigneeId,
-          completedPageNumbers: parseCompletedPageNumbers(editTaskData.handoverCompletedPages),
-          responsibilityFactor: Number(editTaskData.handoverFactor || 1),
-          reason: String(editTaskData.handoverReason).trim()
-        })
-      }
     } catch (err) {
       console.error('Backend updateTeamTaskApi error, reverting edit:', err)
-      toast.error(err?.response?.data?.message || err?.message || 'Failed to save task changes. Please try again.')
+      toast.error(apiErrorMessage(err))
       setTasks(previousTasks)
       return
+    }
+
+    if (assigneeChanged) {
+      setTeamMembersForAssign(prev => transferMemberActiveTaskCount(prev, editTaskData.originalAssigneeId, editTaskData.assigneeId))
+      setMembers(prev => transferMemberActiveTaskCount(prev, editTaskData.originalAssigneeId, editTaskData.assigneeId))
     }
 
     toast.success('Task updated successfully!')
@@ -2216,15 +2606,12 @@ function TeamProjects() {
   const isLeaderMatch = (leaderName) => {
     if (!leaderName) return false
     const ln = leaderName.toLowerCase().trim()
-    const username = (authUser?.username || '').toLowerCase().trim()
-    const fullName = (authUser?.fullName || '').toLowerCase().trim()
+    const username = (user?.username || '').toLowerCase().trim()
+    const fullName = (user?.fullName || '').toLowerCase().trim()
     return ln === username || ln === fullName
   }
 
-  const teamProjectsList = projects.filter(proj =>
-    (proj.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (proj.comicName || '').toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const teamProjectsList = projects
 
   if (loadingProjects && projects.length === 0) {
     return (
@@ -2270,98 +2657,95 @@ function TeamProjects() {
     return (
       <>
         <WorkspaceDetailView
-        selectedDetails={selectedDetails}
-        setSelectedDetails={setSelectedDetails}
-        tasksLoading={tasksLoading}
-        onBackToProjects={() => {
-          localStorage.removeItem('comiverse_active_project_id');
-          setSelectedDetails(null);
-        }}
-        workspaceTab={workspaceTab}
-        setWorkspaceTab={setWorkspaceTab}
-        isCurrentLeader={isCurrentLeader}
-        members={members}
-        memberSearch={memberSearch}
-        setMemberSearch={setMemberSearch}
-        onMembersLoaded={setMembers}
-        onLeaveTeam={handleLeaveTeam}
-        onRemoveMember={handleRemoveMember}
-        bannedUsers={bannedUsers}
-        onUnbanUser={handleUnbanUser}
-        joinRequests={joinRequests}
-        onApproveRequest={handleApproveRequest}
-        onRejectRequest={handleRejectRequest}
-        onBanUser={handleBanUser}
-        newPostText={newPostText}
-        setNewPostText={setNewPostText}
-        onPostAnnouncement={handlePostAnnouncement}
-        announcements={announcements}
-        onLikePost={handleLikePost}
-        onTogglePinPost={handleTogglePinPost}
-        onDeletePost={handleDeletePost}
-        onEditPost={handleEditPost}
-        onAddComment={handleAddComment}
-        onLikeComment={handleLikeComment}
-        onEditComment={handleEditComment}
-        onDeleteComment={handleDeleteComment}
-        comicName={comicName}
-        tasks={boardTasks}
-        activeTasks={activeTasks}
-        pausedTasks={pausedTasks}
-        lockedColumns={lockedColumns}
-        setLockedColumns={setLockedColumns}
-        highlightedColumns={highlightedColumns}
-        setHighlightedColumns={setHighlightedColumns}
-        sortedColumns={sortedColumns}
-        setSortedColumns={setSortedColumns}
-        openDropdownCol={openDropdownCol}
-        setOpenDropdownCol={setOpenDropdownCol}
-        onCreateTaskClick={openCreateTaskModal}
-        onMoveAllToDone={handleMoveAllToDone}
-        onMoveTask={handleMoveTask}
-        onOpenTaskDetails={handleOpenTaskDetails}
-        getAssigneeInitials={getAssigneeInitials}
-        showCreateTask={showCreateTask}
-        newTaskData={newTaskData}
-        setNewTaskData={setNewTaskData}
-        chapterOptions={chapterOptions}
-        teamMembersForAssign={teamMembersForAssign}
-        onCancelCreateTask={() => setShowCreateTask(false)}
-        onCreateTask={handleCreateTask}
-        selectedTask={selectedTask}
-        editTaskData={editTaskData}
-        setEditTaskData={setEditTaskData}
-        onCancelEditTask={() => setSelectedTask(null)}
-        onSaveEditTask={handleSaveEditTask}
-        onContinueToWorkspace={() => navigate(`/translator/translate-workspace/task/${selectedTask.id}`)}
-        onContinueToReviewWorkspace={() => navigate(`/translator/review-workspace/task/${selectedTask.id}`)}
-        onSaveWorkspaceSettings={handleSaveWorkspaceSettings}
-      />
-      {banModalData && (
-        <BanUserModal
-          modalData={banModalData}
-          teamName={selectedDetails?.teamName || selectedDetails?.title || 'this team'}
-          onClose={() => setBanModalData(null)}
-          onConfirm={handleConfirmBanUser}
+          selectedDetails={selectedDetails}
+          setSelectedDetails={setSelectedDetails}
+          tasksLoading={tasksLoading}
+          onBackToProjects={() => {
+            localStorage.removeItem('comiverse_active_project_id');
+            setSelectedDetails(null);
+          }}
+          workspaceTab={workspaceTab}
+          setWorkspaceTab={setWorkspaceTab}
+          isCurrentLeader={isCurrentLeader}
+          members={members}
+          memberSearch={memberSearch}
+          setMemberSearch={setMemberSearch}
+          onMembersLoaded={setMembers}
+          onLeaveTeam={handleLeaveTeam}
+          onRemoveMember={handleRemoveMember}
+          bannedUsers={bannedUsers}
+          onUnbanUser={handleUnbanUser}
+          joinRequests={joinRequests}
+          onApproveRequest={handleApproveRequest}
+          onRejectRequest={handleRejectRequest}
+          onBanUser={handleBanUser}
+          newPostText={newPostText}
+          setNewPostText={setNewPostText}
+          onPostAnnouncement={handlePostAnnouncement}
+          announcements={announcements}
+          onLikePost={handleLikePost}
+          onTogglePinPost={handleTogglePinPost}
+          onDeletePost={handleDeletePost}
+          onEditPost={handleEditPost}
+          onAddComment={handleAddComment}
+          onLikeComment={handleLikeComment}
+          onEditComment={handleEditComment}
+          onDeleteComment={handleDeleteComment}
+          comicName={comicName}
+          tasks={boardTasks}
+          activeTasks={activeTasks}
+          pausedTasks={pausedTasks}
+          lockedColumns={lockedColumns}
+          setLockedColumns={setLockedColumns}
+          highlightedColumns={highlightedColumns}
+          setHighlightedColumns={setHighlightedColumns}
+          sortedColumns={sortedColumns}
+          setSortedColumns={setSortedColumns}
+          openDropdownCol={openDropdownCol}
+          setOpenDropdownCol={setOpenDropdownCol}
+          onCreateTaskClick={openCreateTaskModal}
+          onMoveAllToDone={handleMoveAllToDone}
+          onMoveTask={handleMoveTask}
+          onOpenTaskDetails={handleOpenTaskDetails}
+          getAssigneeInitials={getAssigneeInitials}
+          showCreateTask={showCreateTask}
+          newTaskData={newTaskData}
+          setNewTaskData={setNewTaskData}
+          chapterOptions={chapterOptions}
+          teamMembersForAssign={teamMembersForAssign}
+          onCancelCreateTask={() => setShowCreateTask(false)}
+          onCreateTask={handleCreateTask}
+          selectedTask={selectedTask}
+          editTaskData={editTaskData}
+          setEditTaskData={setEditTaskData}
+          onCancelEditTask={() => setSelectedTask(null)}
+          onSaveEditTask={handleSaveEditTask}
+          onContinueToWorkspace={() => navigate(`/translator/translate-workspace/task/${selectedTask.id}`)}
+          onContinueToReviewWorkspace={() => navigate(`/translator/review-workspace/task/${selectedTask.id}`)}
+          onSaveWorkspaceSettings={handleSaveWorkspaceSettings}
         />
-      )}
-      {unbanModalData && (
-        <UnbanUserModal
-          modalData={unbanModalData}
-          teamName={selectedDetails?.teamName || selectedDetails?.title || 'this team'}
-          onClose={() => setUnbanModalData(null)}
-          onConfirm={handleConfirmUnbanUser}
-        />
-      )}
-    </>
-  )
-}
+        {banModalData && (
+          <BanUserModal
+            modalData={banModalData}
+            teamName={selectedDetails?.teamName || selectedDetails?.title || 'this team'}
+            onClose={() => setBanModalData(null)}
+            onConfirm={handleConfirmBanUser}
+          />
+        )}
+        {unbanModalData && (
+          <UnbanUserModal
+            modalData={unbanModalData}
+            teamName={selectedDetails?.teamName || selectedDetails?.title || 'this team'}
+            onClose={() => setUnbanModalData(null)}
+            onConfirm={handleConfirmUnbanUser}
+          />
+        )}
+      </>
+    )
+  }
 
   const handleQuickTranslate = async (proj) => {
     try {
-      // Always fetch the live task list from the API — tasks are no longer
-      // cached in localStorage/sessionStorage, so this always reflects the
-      // current database state.
       let taskList = [];
       try {
         const tRes = await getTeamTasksApi(proj.id);
@@ -2373,12 +2757,16 @@ function TeamProjects() {
         return col.includes('progress') || col.includes('doing');
       }) || taskList[0];
 
-      const targetTaskId = targetTask?.id || `task-${proj.id}`;
+      if (!targetTask) {
+        toast.info('This team has no active tasks yet. Please create a task first.');
+        return;
+      }
 
-      // Pre-warm workspace cache to avoid 0-page flickering
+      const targetTaskId = targetTask.id;
+
       const rawComicTitle = proj.comicName || proj.title || 'Comic';
-      const cleanTitle = targetTask?.title || `${rawComicTitle} - Chapter 1 - Translation`;
-      const chId = targetTask?.chapterId || `ch-${proj.id}-1`;
+      const cleanTitle = targetTask.title || `${rawComicTitle} - Chapter 1 - Translation`;
+      const chId = targetTask.chapterId || `ch-${proj.id}-1`;
 
       const cacheKey = `comiverse_ws_cache_${targetTaskId}`;
       if (!sessionStorage.getItem(cacheKey)) {
@@ -2387,28 +2775,33 @@ function TeamProjects() {
           let pages = [];
           if (cachedPages) {
             pages = JSON.parse(cachedPages);
-          } else if (Array.isArray(targetTask?.pages) && targetTask.pages.length > 0) {
+          } else if (Array.isArray(targetTask.pages) && targetTask.pages.length > 0) {
             pages = targetTask.pages;
           }
 
-          if (pages.length > 0) {
-            sessionStorage.setItem(cacheKey, JSON.stringify({
-              chapter: {
-                id: chId,
-                title: cleanTitle,
-                comicTitle: rawComicTitle,
-                pagesCount: pages.length,
-                pages: pages
-              },
+          sessionStorage.setItem(cacheKey, JSON.stringify({
+            task: {
+              id: targetTaskId,
+              title: cleanTitle,
+              comicTitle: rawComicTitle,
+              chapterId: chId,
               pages: pages
-            }));
-          }
+            },
+            chapter: {
+              id: chId,
+              title: cleanTitle,
+              comicTitle: rawComicTitle,
+              pagesCount: pages.length,
+              pages: pages
+            },
+            pages: pages
+          }));
         } catch (e) {}
       }
 
       navigate(`/translator/translate-workspace/task/${targetTaskId}`);
     } catch (err) {
-      navigate(`/translator/translate-workspace/task/task-${proj.id}`);
+      toast.error('Unable to open workspace. Please try again.');
     }
   };
 
@@ -2417,11 +2810,26 @@ function TeamProjects() {
       <ProjectsListView
         teamProjectsList={teamProjectsList}
         searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
+        onSearchChange={handleSearchChange}
+        sourceLang={sourceLang}
+        onSourceLangChange={handleSourceLangChange}
+        targetLang={targetLang}
+        onTargetLangChange={handleTargetLangChange}
+        statusFilter={statusFilter}
+        onStatusFilterChange={handleStatusFilterChange}
+        roleFilter={roleFilter}
+        onRoleFilterChange={handleRoleFilterChange}
+        availableSourceLangs={availableSourceLangs}
+        availableTargetLangs={availableTargetLangs}
+        onResetFilters={handleResetFilters}
+        totalResults={filteredProjects.length}
         onOpenDetails={handleOpenDetails}
         onQuickTranslate={handleQuickTranslate}
         onOpenEdit={handleOpenEdit}
         isLeaderMatch={isLeaderMatch}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
       />
       {selectedEdit && (
         <EditProjectModal

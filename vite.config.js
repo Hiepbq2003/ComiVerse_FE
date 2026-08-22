@@ -11,12 +11,12 @@ export default defineConfig({
     proxy: {
       '/api': {
         // target: 'http://localhost:8082',
-        target: 'https://sep490g37sum26java-production.up.railway.app',
+        target: 'https://sep490g37sum26java-production-0ff1.up.railway.app',
         changeOrigin: true,
       },
       '/ws': {
         // target: 'http://localhost:8081/api',
-        target: 'https://sep490g37sum26java-production.up.railway.app/api',
+        target: 'https://sep490g37sum26java-production-0ff1.up.railway.app/api',
         ws: true,
         changeOrigin: true,
       }

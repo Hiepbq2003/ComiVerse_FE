@@ -1,4 +1,6 @@
-/* Reading Language Selector CSS */
+/* ═══════════════════════════════════════════════════
+   READING LANGUAGE SELECTOR CSS — DUAL MODE
+   ═══════════════════════════════════════════════════ */
 
 .reading-lang-container {
   display: flex;
@@ -18,12 +20,17 @@
 .reading-lang-label {
   font-size: 12px;
   font-weight: 700;
-  color: #e2e8f0;
+  color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: 0.8px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+html.light .reading-lang-label {
+  color: #334155 !important;
+  font-weight: 800;
 }
 
 /* Custom Glass Dropdown */
@@ -36,13 +43,13 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 14px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   color: #f1f5f9;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   backdrop-filter: blur(8px);
   transition: all 0.2s ease;
@@ -50,14 +57,29 @@
 
 .reading-lang-trigger-btn:hover,
 .reading-lang-trigger-btn.open {
-  background: rgba(168, 85, 247, 0.15);
-  border-color: rgba(168, 85, 247, 0.45);
+  background: rgba(168, 85, 247, 0.18);
+  border-color: rgba(168, 85, 247, 0.5);
   box-shadow: 0 0 14px rgba(168, 85, 247, 0.25);
   color: #ffffff;
 }
 
+html.light .reading-lang-trigger-btn {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+  color: #0f172a !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+html.light .reading-lang-trigger-btn:hover,
+html.light .reading-lang-trigger-btn.open {
+  background: rgba(147, 51, 234, 0.08) !important;
+  border-color: #9333ea !important;
+  color: #9333ea !important;
+  box-shadow: 0 0 14px rgba(147, 51, 234, 0.18);
+}
+
 .reading-lang-flag {
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1;
   display: inline-flex;
   align-items: center;
@@ -66,6 +88,10 @@
 .reading-lang-chevron {
   transition: transform 0.25s ease;
   color: #c084fc;
+}
+
+html.light .reading-lang-chevron {
+  color: #9333ea;
 }
 
 .reading-lang-chevron.open {
@@ -77,14 +103,20 @@
   top: calc(100% + 6px);
   right: 0;
   z-index: 100;
-  min-width: 170px;
+  min-width: 180px;
   padding: 6px;
-  background: rgba(19, 13, 31, 0.95);
+  background: rgba(19, 13, 31, 0.96);
   border: 1px solid rgba(168, 85, 247, 0.35);
-  border-radius: 12px;
+  border-radius: 14px;
   backdrop-filter: blur(16px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(168, 85, 247, 0.2);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.6), 0 0 20px rgba(168, 85, 247, 0.2);
   animation: reading-lang-menu-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html.light .reading-lang-menu {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15) !important;
 }
 
 .reading-lang-container.compact .reading-lang-menu {
@@ -108,8 +140,8 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 8px 12px;
-  border-radius: 8px;
+  padding: 9px 12px;
+  border-radius: 9px;
   background: transparent;
   border: none;
   color: #cbd5e1;
@@ -118,6 +150,10 @@
   cursor: pointer;
   transition: all 0.15s ease;
   text-align: left;
+}
+
+html.light .reading-lang-menu-item {
+  color: #334155 !important;
 }
 
 .reading-lang-menu-item-left {
@@ -131,8 +167,19 @@
   color: #ffffff;
 }
 
+html.light .reading-lang-menu-item:hover {
+  background: rgba(147, 51, 234, 0.08) !important;
+  color: #9333ea !important;
+}
+
 .reading-lang-menu-item.selected {
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(99, 102, 241, 0.3) 100%);
   color: #ffffff;
   font-weight: 600;
+}
+
+html.light .reading-lang-menu-item.selected {
+  background: rgba(147, 51, 234, 0.12) !important;
+  color: #7e22ce !important;
+  font-weight: 700;
 }

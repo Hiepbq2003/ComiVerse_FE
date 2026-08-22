@@ -15,8 +15,6 @@ const payoutOverviewRequests = new Map()
 
 const FALLBACK_CURRENCIES = [
   { currencyCode: 'USD', displayName: 'US Dollar', symbol: '$', active: true },
-  { currencyCode: 'EUR', displayName: 'Euro', symbol: '€', active: true },
-  { currencyCode: 'CNY', displayName: 'Chinese Yuan', symbol: '¥', active: true },
 ]
 
 const getPayoutOverviewDeduped = (month) => {
@@ -142,14 +140,7 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
         || data?.accountCountry
         || 'VN',
       )
-      setSelectedPayoutCurrency(
-        normalizeCurrency(
-          data?.account?.currency
-          || data?.payoutCurrency
-          || data?.existingRequest?.currency
-          || 'USD',
-        ),
-      )
+      setSelectedPayoutCurrency('USD')
     } catch (err) {
       setError(
         err?.response?.data?.message
@@ -279,15 +270,15 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
       return
     }
 
-    if (!['USD', 'EUR', 'CNY'].includes(selectedPayoutCurrency)) {
-      setError('Select USD, EUR, or CNY as the payout currency.')
+    if (selectedPayoutCurrency !== 'USD') {
+      setError('ComiVerse payouts are settled only in USD.')
       return
     }
 
     try {
       setAccountWorking(true)
       setError('')
-      await startOnboarding(countryCode, selectedPayoutCurrency)
+      await startOnboarding(countryCode, 'USD')
     } catch (err) {
       const message = err?.response?.data?.message
         || err?.message
@@ -321,12 +312,7 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
   }
 
   const role = (overview?.role || '').toUpperCase()
-  const currency = normalizeCurrency(
-    overview?.payoutCurrency
-    || overview?.account?.currency
-    || overview?.existingRequest?.currency
-    || 'USD',
-  )
+  const currency = 'USD'
   const account = overview?.account
 
   const supportedCurrencies = useMemo(() => {
@@ -334,12 +320,9 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
       ? overview.supportedCurrencies
       : FALLBACK_CURRENCIES
 
-    return source.filter((item) => item?.active !== false)
+    return source.filter((item) => item?.active !== false && item?.currencyCode === 'USD')
   }, [overview?.supportedCurrencies])
 
-  const currencySelectionLocked = Boolean(
-    account?.detailsSubmitted || account?.readyForPayout,
-  )
 
   const maximumRequestAmount = Number(
     role === 'TRANSLATOR'
@@ -468,7 +451,7 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
           >
             {generateMonthOptions(
               month,
-              overview?.latestRequestableMonth || overview?.lastClosedMonth
+              `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
             ).map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
@@ -597,7 +580,7 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
               onChange={(event) => setSelectedPayoutCurrency(
                 normalizeCurrency(event.target.value),
               )}
-              disabled={accountWorking || currencySelectionLocked}
+              disabled
             >
               {supportedCurrencies.map((item) => (
                 <option
@@ -609,9 +592,7 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
               ))}
             </select>
             <small>
-              USD is the accounting base. Stripe receives the selected
-              settlement currency. The currency is locked after onboarding
-              details are submitted.
+              ComiVerse uses USD for accounting and Stripe settlement. Currency conversion is disabled.
             </small>
           </label>
 
@@ -720,7 +701,7 @@ function CreatorPayoutPanel({ heading = 'Monthly Payout' }) {
             title={
               !overview?.requestable
                 ? overview?.notRequestableReason
-                  || 'Payout request is not available yet'
+                || 'Payout request is not available yet'
                 : undefined
             }
           >

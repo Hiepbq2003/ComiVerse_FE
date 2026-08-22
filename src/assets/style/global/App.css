@@ -1831,6 +1831,23 @@ body {
   line-height: 1.6;
   color: #cbd5e1;
   text-align: left;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(192, 132, 252, 0.55) transparent;
+}
+
+.policy-modal-body::-webkit-scrollbar {
+  width: 7px;
+}
+
+.policy-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.policy-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(192, 132, 252, 0.55);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background-clip: padding-box;
 }
 
 .policy-modal-body h4 {
@@ -1877,6 +1894,47 @@ body {
 .policy-modal-ok-btn:hover {
   opacity: 0.9;
   transform: translateY(-1px);
+}
+
+html.light .policy-modal-overlay {
+  background-color: rgba(36, 24, 45, 0.32);
+}
+
+html.light .policy-modal-container {
+  background-color: #ffffff;
+  border-color: rgba(124, 58, 237, 0.2);
+  box-shadow: 0 18px 50px rgba(61, 42, 70, 0.2), 0 0 20px rgba(124, 58, 237, 0.08);
+}
+
+html.light .policy-modal-header,
+html.light .policy-modal-footer {
+  border-color: rgba(76, 57, 87, 0.12);
+}
+
+html.light .policy-modal-close-btn {
+  color: #655a70;
+}
+
+html.light .policy-modal-body {
+  color: #655a70;
+  scrollbar-color: rgba(124, 58, 237, 0.38) #f8f5fa;
+}
+
+html.light .policy-modal-body::-webkit-scrollbar-track {
+  background: #f8f5fa;
+}
+
+html.light .policy-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(124, 58, 237, 0.38);
+  border-color: #f8f5fa;
+}
+
+html.light .policy-modal-body h4 {
+  color: #24182d;
+}
+
+html.light .policy-modal-footer {
+  background-color: #f8f5fa;
 }
 
 /* Animations */

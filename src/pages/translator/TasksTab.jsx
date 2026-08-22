@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   StepForward,
@@ -21,6 +21,41 @@ import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { resolveImageUrl } from '../../config/apiConfig';
 import "../../assets/style/moderator/comic-detail.css";
 
+const MAX_ACTIVE_TASKS = 5
+
+function assigneeTaskCount(member) {
+  return Number(member?.activeTaskCount ?? member?.activeTasksCount ?? 0)
+}
+
+function sameMemberId(a, b) {
+  return a != null && b != null && String(a) === String(b)
+}
+
+function displayedAssigneeTaskCount(member, selectedId, heldAssigneeId) {
+  const base = assigneeTaskCount(member)
+  const memberId = member?.id || member?.userId
+  if (memberId == null) return base
+  if (heldAssigneeId == null || sameMemberId(heldAssigneeId, selectedId)) return base
+  if (sameMemberId(memberId, heldAssigneeId)) return Math.max(0, base - 1)
+  if (sameMemberId(memberId, selectedId)) return base + 1
+  return base
+}
+
+function isTranslatorWorkloadLimited(member) {
+  const teamRole = String(member?.role || '').toLowerCase()
+  const accountRole = String(member?.accountRole || '').toUpperCase()
+  if (teamRole === 'group leader' || teamRole === 'leader') return false
+  if (accountRole === 'PROJECT_LEADER' || accountRole.includes('LEADER')) return false
+  return true
+}
+
+function isAssigneeAtSystemTaskCap(member, selectedId, heldAssigneeId) {
+  if (!member || !isTranslatorWorkloadLimited(member)) return false
+  const memberId = member.id || member.userId
+  if (memberId == null) return false
+  if (sameMemberId(selectedId, memberId) || sameMemberId(heldAssigneeId, memberId)) return false
+  return displayedAssigneeTaskCount(member, selectedId, heldAssigneeId) >= MAX_ACTIVE_TASKS
+}
 
 export function parseTaskTitle(title, fallbackComic) {
   const match = (title || '').match(/^\[(URGENT|HIGH|MEDIUM|LOW)\]\s*(?:\[([^\]]+)\])?\s*(.*)$/i)
@@ -51,7 +86,7 @@ export function getNormalizedStatusKey(statusStr) {
 
 export function getAllowedStatusOptions(currentStatusStr) {
   const currentKey = getNormalizedStatusKey(currentStatusStr)
-  
+
   const allOptions = [
     { value: 'backlog', label: 'Backlog' },
     { value: 'in_progress', label: 'In Progress' },
@@ -120,6 +155,13 @@ export function isUserAssignedToTask(t, teamMembers = [], authUser) {
 export function isSupersededTask(task) {
   const status = String(task?.status || task?.column || '').toLowerCase().replace(/[-\s]/g, '_');
   return status === 'superseded';
+}
+
+function isGroupLeaderAssignee(member) {
+  if (!member) return false;
+  if (member.isLeader === true) return true;
+  const role = String(member.role || '').toLowerCase().replace(/[_\s-]+/g, ' ').trim();
+  return role === 'group leader' || role === 'project leader' || role === 'leader';
 }
 
 export function filterUnassignedChapters(chapterOptions, tasks) {
@@ -366,7 +408,8 @@ function TasksTab({
   isCurrentLeader,
   chapterOptions = [],
   onOpenCreateTaskWithChapter,
-  onCreateTask
+  onCreateTask,
+  isTeamPaused
 }) {
   const [inspectingChapter, setInspectingChapter] = useState(null);
   const [isBacklogCollapsed, setIsBacklogCollapsed] = useState(false);
@@ -383,7 +426,7 @@ function TasksTab({
 
   return (
     <div className="board tasks-board-tab-container fade-in" style={{ padding: 0, background: 'transparent' }}>
-      
+
       {/* ── KANBAN BOARD CARD ────────────────────────────── */}
       <div className="board__card">
         <div className="board__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--trans-border)' }}>
@@ -455,7 +498,7 @@ function TasksTab({
             </div>
           </div>
 
-          {isCurrentLeader && (
+          {isCurrentLeader && !isTeamPaused && (
             <button
               type="button"
               className="trans-btn primary"
@@ -677,7 +720,7 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
             // Continue fetching in background to revalidate
           }
         }
-      } catch (e) {}
+      } catch (e) { }
 
       setLoading(prev => prev);
 
@@ -844,7 +887,7 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
           setPages(mapped);
           setLoading(false);
           // Cache to sessionStorage for instant future opens
-          try { sessionStorage.setItem(cacheKey, JSON.stringify(mapped)); } catch (e) {}
+          try { sessionStorage.setItem(cacheKey, JSON.stringify(mapped)); } catch (e) { }
           return;
         }
       }
@@ -921,7 +964,7 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, flexWrap: 'wrap' }}>
-          {onCreateTask && isCurrentLeader && (
+          {onCreateTask && isCurrentLeader && !isTeamPaused && (
             <button
               type="button"
               className="mod-mode-tab active"
@@ -1317,7 +1360,100 @@ function ChapterInspectModal({ chapter, onClose, comicName, comicId, chapterOpti
   );
 }
 
-function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, readOnly = false, allowEmpty = false }) {
+function ChapterDropdownPicker({ options, selectedId, onChange, disabled, emptyLabel, comicCover }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => String(o.id) === String(selectedId));
+  const defaultCover = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='48' viewBox='0 0 32 48'%3E%3Crect width='32' height='48' fill='%232d2844'/%3E%3Ctext x='16' y='26' font-family='sans-serif' font-size='10' fill='%236b6375' text-anchor='middle'%3ENo%3C/text%3E%3Ctext x='16' y='38' font-family='sans-serif' font-size='10' fill='%236b6375' text-anchor='middle'%3ECover%3C/text%3E%3C/svg%3E";
+  const getCover = (ch) => ch?.cover || ch?.coverUrl || ch?.thumbnail || ch?.coverImage || comicCover || defaultCover;
+
+  const handleImageError = (e) => {
+    e.currentTarget.onerror = null;
+    e.currentTarget.src = defaultCover;
+  };
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', width: '100%', outline: 'none' }}>
+      <div 
+        className={`trans-form-input ${disabled ? 'disabled' : ''}`}
+        style={{ 
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
+          cursor: disabled ? 'not-allowed' : 'pointer', userSelect: 'none',
+          padding: '8px 12px', minHeight: '44px',
+          ...(isOpen && !disabled ? { borderColor: '#a855f7', boxShadow: '0 0 0 1px rgba(168, 85, 247, 0.4)' } : {})
+        }}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        tabIndex={disabled ? -1 : 0}
+        onKeyDown={(e) => {
+          if (disabled) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsOpen(!isOpen);
+          }
+        }}
+      >
+        {selectedOption ? (
+           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+             <img src={getCover(selectedOption)} alt="cover" onError={handleImageError} style={{ width: '24px', height: '36px', objectFit: 'cover', borderRadius: '4px' }} />
+             <span>{selectedOption.title}{selectedOption.pagesCount > 0 ? ` (${selectedOption.pagesCount} pages)` : ''}{selectedOption.revision ? ' — Revision' : ''}</span>
+           </div>
+        ) : (
+           <span style={{ color: 'var(--trans-text-muted)' }}>{options.length === 0 ? (emptyLabel || 'No available chapters') : 'Select a chapter...'}</span>
+        )}
+        <span style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s', fontSize: '12px' }}>▼</span>
+      </div>
+      
+      {isOpen && !disabled && (
+        <div style={{ 
+          position: 'absolute', top: '100%', left: 0, right: 0, 
+          background: '#1e1b2e', border: '1px solid rgba(168, 85, 247, 0.35)', 
+          borderRadius: '8px', marginTop: '6px', zIndex: 100, 
+          maxHeight: '280px', overflowY: 'auto', boxShadow: '0 6px 24px rgba(0,0,0,0.6)'
+        }}>
+          {options.map(ch => (
+            <div 
+              key={ch.id}
+              onClick={() => { onChange(ch.id); setIsOpen(false); }}
+              style={{ 
+                padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '12px',
+                cursor: 'pointer', borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                background: String(selectedId) === String(ch.id) ? 'rgba(168, 85, 247, 0.15)' : 'transparent',
+                transition: 'background 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                if (String(selectedId) !== String(ch.id)) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+              }}
+              onMouseLeave={(e) => {
+                if (String(selectedId) !== String(ch.id)) e.currentTarget.style.background = 'transparent';
+              }}
+            >
+               <img src={getCover(ch)} alt="cover" onError={handleImageError} style={{ width: '32px', height: '48px', objectFit: 'cover', borderRadius: '4px' }} />
+               <div style={{ display: 'flex', flexDirection: 'column' }}>
+                 <span style={{ fontSize: '14px', color: '#fff', fontWeight: String(selectedId) === String(ch.id) ? '600' : '400' }}>
+                   {ch.title}{ch.revision ? ' — Revision' : ''}
+                 </span>
+                 {ch.pagesCount > 0 && <span style={{ fontSize: '12px', color: 'var(--trans-text-muted)' }}>{ch.pagesCount} pages</span>}
+               </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, readOnly = false, allowEmpty = false, heldAssigneeId = null }) {
   // Allow all members, including leaders, to be selected as assignees
   const assignableCandidates = candidates || [];
 
@@ -1393,14 +1529,27 @@ function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, read
         const displayName = m.fullName || m.name || m.username || 'User';
         const initial = (m.avatar && m.avatar.length <= 3 ? m.avatar : displayName.charAt(0)).toUpperCase();
         const roleLabel = m.role || (m.isLeader ? 'Leader' : 'Member');
+        const taskCount = displayedAssigneeTaskCount(m, selectedId, heldAssigneeId);
+        const workloadLimited = isTranslatorWorkloadLimited(m);
+        const atCap = isAssigneeAtSystemTaskCap(m, selectedId, heldAssigneeId);
 
         return (
           <button
             key={memberId}
             type="button"
             className={`trans-assignee-chip${isSelected ? ' selected' : ''}`}
-            onClick={() => !readOnly && onSelect && onSelect(isSelected ? (allowEmpty ? null : memberId) : memberId)}
-            style={chipStyle(isSelected)}
+            onClick={() => {
+              if (readOnly) return
+              if (atCap) return
+              onSelect && onSelect(isSelected ? (allowEmpty ? null : memberId) : memberId)
+            }}
+            disabled={atCap}
+            title={atCap ? `Already has ${MAX_ACTIVE_TASKS} incomplete tasks across all projects` : undefined}
+            style={{
+              ...chipStyle(isSelected),
+              opacity: atCap ? 0.45 : 1,
+              cursor: readOnly ? 'default' : (atCap ? 'not-allowed' : 'pointer')
+            }}
           >
             <span
               style={{
@@ -1425,11 +1574,11 @@ function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, read
 
             <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: '1.2' }}>
               <span style={{ fontSize: '13px', fontWeight: 600 }}>{displayName}</span>
-              {roleLabel && (
-                <span style={{ fontSize: '10px', color: isSelected ? '#c084fc' : 'var(--trans-text-muted)', fontWeight: 500 }}>
-                  {roleLabel}
-                </span>
-              )}
+              <span style={{ fontSize: '10px', color: isSelected ? '#c084fc' : 'var(--trans-text-muted)', fontWeight: 500 }}>
+                {roleLabel}{workloadLimited
+                  ? (atCap ? ` · ${taskCount}/${MAX_ACTIVE_TASKS} full` : ` · ${taskCount}/${MAX_ACTIVE_TASKS}`)
+                  : ` · ${taskCount} assigned`}
+              </span>
             </span>
 
             {isSelected && (
@@ -1444,6 +1593,7 @@ function AssigneeChipPicker({ candidates, selectedId, onSelect, emptyLabel, read
 
 export function CreateTaskModal({
   comicName,
+  comicCover,
   newTaskData,
   setNewTaskData,
   chapterOptions,
@@ -1518,34 +1668,27 @@ export function CreateTaskModal({
           <div className="trans-form-group" style={{ marginTop: '14px' }}>
             <label className="trans-form-label">Chapter *</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <select required
-                className="trans-form-input"
-                style={{ flex: 1, ...errorBorder('chapterId') }}
-                value={newTaskData.chapterId || ''}
-                onChange={(e) => {
-                  const chId = e.target.value || null;
-                  const foundCh = availableChapterOptions.find(c => String(c.id) === String(chId));
-                  const isRevision = !!foundCh?.revision;
-                  setNewTaskData(prev => ({
-                    ...prev,
-                    chapterId: chId,
-                    taskType: isRevision ? 'REVISION' : (prev.taskType === 'REVISION' ? 'REGULAR' : (prev.taskType || 'REGULAR')),
-                    title: (!prev.title.trim() && foundCh)
-                      ? `${foundCh.title} - ${isRevision ? 'Revision' : 'Translation & Proofreading'}`
-                      : prev.title
-                  }));
-                }}
-                disabled={availableChapterOptions.length === 0}
-              >
-                <option value="">
-                  {availableChapterOptions.length === 0 ? 'No available chapters (all already have a task)' : 'Select a chapter…'}
-                </option>
-                {availableChapterOptions.map((ch) => (
-                  <option key={ch.id} value={ch.id}>
-                    📖 {ch.title}{ch.pagesCount > 0 ? ` (${ch.pagesCount} pages)` : ''}{ch.revision ? ' — Revision' : ''}
-                  </option>
-                ))}
-              </select>
+              <div style={{ flex: 1, ...errorBorder('chapterId') }}>
+                <ChapterDropdownPicker
+                  options={availableChapterOptions}
+                  selectedId={newTaskData.chapterId || ''}
+                  disabled={availableChapterOptions.length === 0}
+                  emptyLabel="No available chapters (all already have a task)"
+                  comicCover={comicCover}
+                  onChange={(chId) => {
+                    const foundCh = availableChapterOptions.find(c => String(c.id) === String(chId));
+                    const isRevision = !!foundCh?.revision;
+                    setNewTaskData(prev => ({
+                      ...prev,
+                      chapterId: chId,
+                      taskType: isRevision ? 'REVISION' : (prev.taskType === 'REVISION' ? 'REGULAR' : (prev.taskType || 'REGULAR')),
+                      title: (!prev.title.trim() && foundCh)
+                        ? `${foundCh.title} - ${isRevision ? 'Revision' : 'Translation & Proofreading'}`
+                        : prev.title
+                    }));
+                  }}
+                />
+              </div>
 
               {/* 👁️ Nút xem chapter trước khi tạo task */}
               {newTaskData.chapterId && (() => {
@@ -1611,22 +1754,6 @@ export function CreateTaskModal({
             {showError('assigneeId') && (
               <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Assignee is required</p>
             )}
-          </div>
-
-          <div className="trans-form-group" style={{ marginTop: '14px' }}>
-            <label className="trans-form-label">Total chapter reward (USD)</label>
-            <input
-              type="number"
-              min="0.01"
-              step="0.01"
-              className="trans-form-input"
-              placeholder="Leave empty to use page count × Admin page rate"
-              value={newTaskData.chapterRewardUsd ?? ''}
-              onChange={(e) => setNewTaskData({ ...newTaskData, chapterRewardUsd: e.target.value })}
-            />
-            <p style={{ color: 'var(--trans-text-muted)', fontSize: '11px', margin: '5px 0 0', lineHeight: 1.45 }}>
-              The system divides this fixed chapter reward by the total number of pages. Earnings are locked until the whole chapter is approved.
-            </p>
           </div>
 
           <div className="trans-form-group" style={{ marginTop: '14px' }}>
@@ -1721,13 +1848,14 @@ export function CreateTaskModal({
 
 export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAssign, isProjectLeader, onCancel, onSave, onContinue, onReview }) {
   const [submitted, setSubmitted] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const auth = getAuth();
   const currentUserName = (auth?.user?.fullName || auth?.user?.username || '').toLowerCase().trim();
   const currentUserId = auth?.user?.id || auth?.user?.userId;
 
   const isAssigned = (() => {
-    const id = editTaskData.assigneeId;
+    const id = editTaskData.originalAssigneeId;
     if (!id) return false;
     if (currentUserId && String(id) === String(currentUserId)) return true;
     if (typeof id === 'string' && id.toLowerCase().trim() === currentUserName) return true;
@@ -1743,16 +1871,11 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   const canAccessWorkspace = true;
 
   const assigneeChanged = String(editTaskData.originalAssigneeId || '') !== String(editTaskData.assigneeId || '')
-  const parsedFactor = Number(editTaskData.handoverFactor)
 
   const errors = {
     title: !editTaskData.title.trim(),
     assigneeId: !editTaskData.assigneeId,
-    dueDate: !editTaskData.dueDate,
-    chapterRewardUsd: editTaskData.chapterRewardUsd !== '' && editTaskData.chapterRewardUsd != null
-      && (!Number.isFinite(Number(editTaskData.chapterRewardUsd)) || Number(editTaskData.chapterRewardUsd) <= 0),
-    handoverReason: assigneeChanged && !String(editTaskData.handoverReason || '').trim(),
-    handoverFactor: assigneeChanged && (!Number.isFinite(parsedFactor) || parsedFactor < 0 || parsedFactor > 1)
+    dueDate: !editTaskData.dueDate
   }
   const showError = (field) => submitted && errors[field]
   const errorBorder = (field) => showError(field) ? { borderColor: '#ef4444' } : undefined
@@ -1760,39 +1883,65 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
   const isUnderReview = editTaskData.status === 'under_review'
   const canReview = isProjectLeader && isUnderReview
   const isInProgress = editTaskData.status === 'in_progress'
+  const isTaskUnderReview = isUnderReview
+  const isTaskCompleted = editTaskData.status === 'completed'
+  const originalStatus = getNormalizedStatusKey(editTaskData.originalStatus || editTaskData.status)
+  const isOriginallyUnderReview = originalStatus === 'under_review'
+  const isOriginallyCompleted = originalStatus === 'completed'
+  const lockTaskEdits = saving || isOriginallyUnderReview
+  const assigneeCandidates = (() => {
+    const members = teamMembersForAssign || []
+    if (!isOriginallyUnderReview) return members
+    const leaders = members.filter(isGroupLeaderAssignee)
+    if (leaders.length > 0) return leaders
+    return members.filter((m) => String(m.id || m.userId) === String(editTaskData.assigneeId))
+  })()
+  const canEdit = isProjectLeader || (isEditableByMember && !isOriginallyUnderReview && !isOriginallyCompleted)
 
   const selectAssignee = (memberId) => {
-    if (!isProjectLeader) return;
+    if (!isProjectLeader || lockTaskEdits) return;
     setEditTaskData({ ...editTaskData, assigneeId: memberId })
   }
 
-  const handleSaveClick = () => {
-    if (!isProjectLeader) return;
+  const handleSaveClick = async () => {
+    if (!isProjectLeader || lockTaskEdits) return;
     setSubmitted(true)
     if (Object.values(errors).some(Boolean)) return
-    if (onSave) onSave()
+    setSaving(true)
+    try {
+      if (onSave) await onSave()
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleOpenWorkspaceClick = () => {
+    if (saving) return
     if (onContinue) onContinue()
   }
 
-  const handleReviewClick = () => {
-    if (!canReview) return
+  const handleReviewClick = async () => {
+    if (!canReview || saving) return
     setSubmitted(true)
     if (Object.values(errors).some(Boolean)) return
-    if (onSave) onSave()
-    onReview()
+    setSaving(true)
+    try {
+      if (onSave) await onSave()
+      onReview()
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <div className="trans-modal-overlay">
       <div className="trans-modal-card">
         <div className="trans-modal-header">
-          <h3>{isProjectLeader ? 'Edit Task Details' : (isEditableByMember ? 'Task Information' : 'Task Information (Read Only)')}</h3>
-          <button className="trans-modal-close-btn" onClick={onCancel}>×</button>
+          <h3>{isProjectLeader && !isOriginallyUnderReview ? 'Edit Task Details' : (isEditableByMember ? 'Task Information' : 'Task Information (Read Only)')}</h3>
+          <button className="trans-modal-close-btn" onClick={onCancel} disabled={saving}>×</button>
         </div>
-        <div className="trans-modal-body">
+
+        <div className="trans-modal-body" style={saving ? { opacity: 0.7, pointerEvents: 'none' } : undefined}>
           {isProjectLeader ? (
             /* ── FULL EDITING FORM FOR GROUP LEADER ───────────── */
             <>
@@ -1803,11 +1952,13 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
 
               <div className="trans-form-group">
                 <label className="trans-form-label">Task Name *</label>
-                <input required
+                <input
+                  required
                   type="text"
                   className="trans-form-input"
                   style={errorBorder('title')}
                   value={editTaskData.title}
+                  disabled={lockTaskEdits}
                   onChange={(e) => setEditTaskData({ ...editTaskData, title: e.target.value })}
                 />
                 {showError('title') && (
@@ -1816,16 +1967,22 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
               </div>
 
               <div className="trans-form-group">
-                <label className="trans-form-label">Status (Sprint Column)</label>
+                <label className="trans-form-label">Status</label>
                 <select
                   className="trans-form-input"
                   value={getNormalizedStatusKey(editTaskData.status)}
+                  disabled={lockTaskEdits || isOriginallyCompleted}
                   onChange={(e) => setEditTaskData({ ...editTaskData, status: e.target.value })}
                 >
-                  <option value="backlog">⚪ Backlog</option>
-                  <option value="in_progress">🟠 In Progress</option>
-                  <option value="under_review">🟣 Under Review</option>
-                  <option value="completed">🟢 Completed</option>
+                  {getAllowedStatusOptions(editTaskData.originalStatus || editTaskData.status).map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.value === 'in_progress' ? '🟠 In Progress'
+                        : opt.value === 'under_review' ? '🟣 Under Review'
+                        : opt.value === 'completed' ? '🟢 Completed'
+                        : opt.value === 'paused' ? '⏸️ Paused'
+                        : '⚪ Backlog'}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1834,6 +1991,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
                 <select
                   className="trans-form-input"
                   value={editTaskData.priority}
+                  disabled={lockTaskEdits}
                   onChange={(e) => setEditTaskData({ ...editTaskData, priority: e.target.value })}
                 >
                   <option value="Urgent">🚨 Urgent</option>
@@ -1846,9 +2004,11 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
               <div className="trans-form-group">
                 <label className="trans-form-label">Assignee *</label>
                 <AssigneeChipPicker
-                  candidates={teamMembersForAssign}
+                  candidates={assigneeCandidates}
                   selectedId={editTaskData.assigneeId}
+                  heldAssigneeId={editTaskData.originalAssigneeId}
                   onSelect={selectAssignee}
+                  readOnly={lockTaskEdits}
                   error={showError('assigneeId')}
                 />
                 {showError('assigneeId') && (
@@ -1857,82 +2017,13 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
               </div>
 
               <div className="trans-form-group">
-                <label className="trans-form-label">Total chapter reward (USD)</label>
-                <input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  className="trans-form-input"
-                  style={errorBorder('chapterRewardUsd')}
-                  value={editTaskData.chapterRewardUsd ?? ''}
-                  onChange={(e) => setEditTaskData({ ...editTaskData, chapterRewardUsd: e.target.value })}
-                  disabled={Boolean(editTaskData.settledAt)}
-                />
-                {showError('chapterRewardUsd') && (
-                  <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Chapter reward must be greater than zero</p>
-                )}
-                <p style={{ color: 'var(--trans-text-muted)', fontSize: '11px', margin: '5px 0 0', lineHeight: 1.45 }}>
-                  Page rate = chapter reward ÷ total pages. This snapshot is locked after chapter approval.
-                </p>
-              </div>
-
-              {assigneeChanged && (
-                <div style={{ margin: '2px 0 14px', padding: '14px', borderRadius: '12px', border: '1px solid rgba(245, 158, 11, 0.35)', background: 'rgba(245, 158, 11, 0.08)' }}>
-                  <h4 style={{ margin: '0 0 6px', color: '#fbbf24', fontSize: '13px' }}>Task handover</h4>
-                  <p style={{ margin: '0 0 12px', color: 'var(--trans-text-muted)', fontSize: '11.5px', lineHeight: 1.5 }}>
-                    Enter the pages accepted for the previous translator. Those pages keep their ownership and coefficient K; all remaining pages move to the new translator.
-                    {Number(editTaskData.totalPages) > 0 ? ` This task has ${editTaskData.totalPages} pages.` : ''}
-                  </p>
-                  <div className="trans-form-group">
-                    <label className="trans-form-label">Accepted pages of previous translator</label>
-                    <input
-                      type="text"
-                      className="trans-form-input"
-                      placeholder="Example: 1-6, 8"
-                      value={editTaskData.handoverCompletedPages || ''}
-                      onChange={(e) => setEditTaskData({ ...editTaskData, handoverCompletedPages: e.target.value })}
-                    />
-                  </div>
-                  <div className="trans-form-group" style={{ marginTop: '12px' }}>
-                    <label className="trans-form-label">Responsibility coefficient K *</label>
-                    <select
-                      className="trans-form-input"
-                      style={errorBorder('handoverFactor')}
-                      value={editTaskData.handoverFactor ?? '1.0'}
-                      onChange={(e) => setEditTaskData({ ...editTaskData, handoverFactor: e.target.value })}
-                    >
-                      <option value="1.0">1.0 — Proper handover</option>
-                      <option value="0.9">0.9 — Incomplete handover</option>
-                      <option value="0.8">0.8 — Abandoned task</option>
-                    </select>
-                    {showError('handoverFactor') && (
-                      <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>K must be from 0 to 1</p>
-                    )}
-                  </div>
-                  <div className="trans-form-group" style={{ marginTop: '12px' }}>
-                    <label className="trans-form-label">Handover reason *</label>
-                    <textarea
-                      className="trans-form-input"
-                      rows={3}
-                      style={errorBorder('handoverReason')}
-                      placeholder="Explain why this task is reassigned"
-                      value={editTaskData.handoverReason || ''}
-                      onChange={(e) => setEditTaskData({ ...editTaskData, handoverReason: e.target.value })}
-                    />
-                    {showError('handoverReason') && (
-                      <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>A reason is required when changing assignee</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="trans-form-group">
                 <label className="trans-form-label">Due Date *</label>
                 <CustomDatePicker
                   value={editTaskData.dueDate}
                   onChange={(val) => setEditTaskData({ ...editTaskData, dueDate: val })}
                   placeholder="Select due date"
                   style={errorBorder('dueDate')}
+                  disabled={lockTaskEdits}
                 />
                 {showError('dueDate') && (
                   <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0' }}>Due date is required</p>
@@ -1979,7 +2070,7 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
               <div className="trans-form-group">
                 <label className="trans-form-label" style={{ color: 'var(--trans-text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assigned Member</label>
                 <AssigneeChipPicker
-                  candidates={teamMembersForAssign}
+                  candidates={assigneeCandidates}
                   selectedId={editTaskData.assigneeId}
                   readOnly={true}
                   emptyLabel="No assigned member."
@@ -2003,34 +2094,45 @@ export function EditTaskModal({ editTaskData, setEditTaskData, teamMembersForAss
         </div>
 
         <div className="trans-modal-footer">
-          <button className="trans-btn secondary" onClick={onCancel}>
+          <button className="trans-btn secondary" onClick={onCancel} disabled={saving}>
             {isProjectLeader ? 'Cancel' : 'Close'}
           </button>
 
-          {/* Review: Project-Leader-only */}
-          {isProjectLeader && (
+          {/* Review: only for tasks that started as under review / completed */}
+          {(isOriginallyUnderReview || isOriginallyCompleted) && isProjectLeader && (
             <button
               className="trans-btn secondary"
               onClick={handleReviewClick}
-              disabled={!isUnderReview}
-              title={isUnderReview ? 'Review this submission' : 'Only available once the task is Under Review'}
-              style={!isUnderReview ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+              disabled={saving || !isOriginallyUnderReview}
+              title={isOriginallyUnderReview ? 'Review this submission' : 'Only available once the task is Under Review'}
+              style={(saving || !isOriginallyUnderReview) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
             >
               <GitCompare />Review
             </button>
           )}
 
-          {/* Open Workspace — ALLOW FOR ALL MEMBERS */}
-          {!isUnderReview && (
-            <button className="trans-btn primary" onClick={handleOpenWorkspaceClick} title={isEditableByMember ? "Open translate workspace" : "View translate workspace in read-only mode"}>
-              <StepForward />{isEditableByMember ? 'Open Workspace' : 'View Workspace (Read Only)'}
+          {/* Open Workspace: hidden for review/completed source status */}
+          {!(isOriginallyUnderReview || isOriginallyCompleted) && (
+            <button
+              className="trans-btn primary"
+              onClick={handleOpenWorkspaceClick}
+              disabled={saving}
+              title={isAssigned ? "Open translate workspace" : "View translate workspace in read-only mode"}
+              style={saving ? { opacity: 0.65, cursor: 'not-allowed', transform: 'none' } : undefined}
+            >
+              <StepForward />{isAssigned ? 'Open Workspace' : 'View Workspace (Read Only)'}
             </button>
           )}
 
-          {/* Save — ONLY FOR PROJECT LEADER */}
-          {isProjectLeader && (
-            <button className="trans-btn primary" onClick={handleSaveClick}>
-              <Check size={16} />Save
+          {/* Save: leader can persist status/details except on already-completed tasks */}
+          {!isOriginallyCompleted && !isOriginallyUnderReview && isProjectLeader && (
+            <button
+              className="trans-btn primary"
+              onClick={handleSaveClick}
+              disabled={saving}
+              style={saving ? { opacity: 0.65, cursor: 'not-allowed', transform: 'none' } : undefined}
+            >
+              <Check size={16} />{saving ? 'Saving...' : 'Save'}
             </button>
           )}
         </div>

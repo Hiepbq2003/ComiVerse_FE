@@ -249,5 +249,51 @@ describe('Role-Based Access Control (RBAC) Security Tests', () => {
 
       expect(screen.getByText('Translator Projects Management')).toBeInTheDocument();
     });
+
+    it('hides Translation Reports from regular translators', () => {
+      vi.spyOn(AuthModule, 'getAuth').mockReturnValue({
+        token: 'translator-token-888',
+        user: { id: 'trans-uuid-888', username: 'translator_pro', role: 'TRANSLATOR', fullName: 'Pro Translator' }
+      });
+
+      renderWithProviders(
+        <Routes>
+          <Route
+            path="/translator/projects"
+            element={
+              <TranslatorLayout>
+                <div>Translator Projects Management</div>
+              </TranslatorLayout>
+            }
+          />
+        </Routes>,
+        { initialEntries: ['/translator/projects'] }
+      );
+
+      expect(screen.queryByText('Translation Reports')).not.toBeInTheDocument();
+    });
+
+    it('shows Translation Reports for project leaders', () => {
+      vi.spyOn(AuthModule, 'getAuth').mockReturnValue({
+        token: 'leader-token',
+        user: { id: 'leader-uuid', username: 'project_leader', role: 'PROJECT_LEADER', fullName: 'Project Leader' }
+      });
+
+      renderWithProviders(
+        <Routes>
+          <Route
+            path="/translator/projects"
+            element={
+              <TranslatorLayout>
+                <div>Translator Projects Management</div>
+              </TranslatorLayout>
+            }
+          />
+        </Routes>,
+        { initialEntries: ['/translator/projects'] }
+      );
+
+      expect(screen.getByText('Translation Reports')).toBeInTheDocument();
+    });
   });
 });

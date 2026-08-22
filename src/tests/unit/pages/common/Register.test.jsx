@@ -63,6 +63,7 @@ describe('User Registration Component Unit & Security Tests (Register.jsx)', () 
     fireEvent.click(termsCheckbox);
 
     fireEvent.change(screen.getByPlaceholderText(/choose a username/i), { target: { value: 'john_doe' } });
+    fireEvent.change(screen.getByPlaceholderText(/enter email address/i), { target: { value: 'john@example.com' } });
     fireEvent.change(screen.getByPlaceholderText(/create password/i), { target: { value: 'Password123!' } });
     fireEvent.change(screen.getByPlaceholderText(/confirm password/i), { target: { value: 'DifferentPassword123!' } });
 
@@ -81,6 +82,7 @@ describe('User Registration Component Unit & Security Tests (Register.jsx)', () 
 
     // Invalid username with uppercase and spaces
     fireEvent.change(screen.getByPlaceholderText(/choose a username/i), { target: { value: 'INVALID USERNAME' } });
+    fireEvent.change(screen.getByPlaceholderText(/enter email address/i), { target: { value: 'john@example.com' } });
 
     fireEvent.change(screen.getByPlaceholderText(/create password/i), { target: { value: 'ValidPass123!' } });
     fireEvent.change(screen.getByPlaceholderText(/confirm password/i), { target: { value: 'ValidPass123!' } });
@@ -186,6 +188,7 @@ describe('User Registration Component Unit & Security Tests (Register.jsx)', () 
 
     // Boundary Value Analysis: max length is 20, we input 21 characters
     fireEvent.change(screen.getByPlaceholderText(/choose a username/i), { target: { value: 'thisusernameisexactly' } }); // 21 chars
+    fireEvent.change(screen.getByPlaceholderText(/enter email address/i), { target: { value: 'john@example.com' } });
 
     fireEvent.change(screen.getByPlaceholderText(/create password/i), { target: { value: 'ValidPass123!' } });
     fireEvent.change(screen.getByPlaceholderText(/confirm password/i), { target: { value: 'ValidPass123!' } });

@@ -1,8 +1,12 @@
-function LogoIcon({ size = 32, className = '', color = 'currentColor' }) {
+function LogoIcon({ size = 32, width = null, height = null, className = '', color = null }) {
+  const svgHeight = height || size;
+  const svgWidth = width || (size ? Math.round(size * 6) : 240);
+
   return (
     <svg 
       viewBox="0 0 240 40" 
-      height={size} 
+      height={svgHeight} 
+      width={svgWidth}
       className={`comiverse-full-logo ${className}`} 
       xmlns="http://www.w3.org/2000/svg"
     >
@@ -31,13 +35,39 @@ function LogoIcon({ size = 32, className = '', color = 'currentColor' }) {
             font-size: 28px; 
             font-weight: 900; 
             font-style: italic;
-            fill: var(--text-h, ${color});
+            fill: var(--logo-comi-color, #ffffff);
             letter-spacing: -0.5px;
+          }
+          html.light .logo-comi,
+          .light .logo-comi,
+          [data-theme="light"] .logo-comi {
+            fill: #0f172a !important;
+          }
+          html.dark .logo-comi,
+          .dark .logo-comi,
+          [data-theme="dark"] .logo-comi {
+            fill: #ffffff !important;
+          }
+          .logo-slash-secondary {
+            fill: var(--logo-slash-color, #ffffff);
+            opacity: 0.9;
+          }
+          html.light .logo-slash-secondary,
+          .light .logo-slash-secondary,
+          [data-theme="light"] .logo-slash-secondary {
+            fill: #0f172a !important;
+            opacity: 0.85;
+          }
+          html.dark .logo-slash-secondary,
+          .dark .logo-slash-secondary,
+          [data-theme="dark"] .logo-slash-secondary {
+            fill: #ffffff !important;
+            opacity: 0.9;
           }
           .logo-verse { 
             font-family: 'Outfit', system-ui, sans-serif; 
             font-size: 28px; 
-            font-weight: 500; 
+            font-weight: 600; 
             fill: url(#premiumGrad);
             letter-spacing: 1.5px;
           }
@@ -46,7 +76,7 @@ function LogoIcon({ size = 32, className = '', color = 'currentColor' }) {
             animation: slash-pulse 3s ease-in-out infinite alternate;
           }
           @keyframes slash-pulse {
-            0% { opacity: 0.8; filter: drop-shadow(0 0 4px rgba(236,72,153,0.5)); }
+            0% { opacity: 0.85; filter: drop-shadow(0 0 4px rgba(236,72,153,0.5)); }
             100% { opacity: 1; filter: drop-shadow(0 0 10px rgba(236,72,153,0.9)); }
           }
         `}
@@ -55,7 +85,7 @@ function LogoIcon({ size = 32, className = '', color = 'currentColor' }) {
       {/* Speed Slashes */}
       <g transform="translate(0, 0)">
         <path d="M 18 4 L 4 34 L 15 34 L 29 4 Z" className="slash-primary" filter="url(#premiumGlow)" />
-        <path d="M 32 14 L 23 34 L 29 34 L 38 14 Z" fill={color} opacity="0.9" />
+        <path d="M 32 14 L 23 34 L 29 34 L 38 14 Z" className="logo-slash-secondary" />
       </g>
       
       {/* Text Logo */}

@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, NavLink, Outlet, Link } from 'react-router-dom'
+import { Menu, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNotification } from '../../context/NotificationContext'
@@ -9,12 +10,12 @@ import '../../assets/style/translator/translator.css'
 
 function TranslatorLayout({ children }) {
   const navigate = useNavigate()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const { isLoggedIn, user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const userName = user?.fullName || user?.username || 'Translator'
   const roleUpper = (user?.role || '').toUpperCase().replace(/[\s-]+/g, '_')
-  const workspaceLabel = roleUpper === 'PROJECT_LEADER' ? 'Project Leader' : 'Translator'
 
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification()
 
@@ -41,14 +42,26 @@ function TranslatorLayout({ children }) {
     } else {
       if (action.unread) await markAsRead(action.id)
 
-      const text = `${action.title || ''} ${action.message || ''}`.toLowerCase();
-      if (text.includes('assigned as project leader') || text.includes('team join request')) {
-        navigate('/translator/project-teams');
+      if (action.actionUrl?.startsWith('/') && !action.actionUrl.startsWith('//')) {
+        navigate(action.actionUrl);
         return;
       }
 
-      if (action.actionUrl?.startsWith('/') && !action.actionUrl.startsWith('//')) {
-        navigate(action.actionUrl)
+      const text = `${action.title || ''} ${action.message || ''}`.toLowerCase();
+      const messageRaw = action.message || '';
+      
+      if (text.includes('assigned as project leader')) {
+        const match = messageRaw.match(/responsible for (.*?)(?: \([^)]+\))?\.$/i);
+        const teamName = match ? match[1].trim() : null;
+        navigate('/translator/project-teams', { state: { teamName } });
+        return;
+      }
+      
+      if (text.includes('team join request')) {
+        const match = messageRaw.match(/requested to join (.*?)\.$/i);
+        const teamName = match ? match[1].trim() : null;
+        navigate('/translator/project-teams', { state: { teamName } });
+        return;
       }
     }
   }
@@ -76,9 +89,13 @@ function TranslatorLayout({ children }) {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', path: '/translator/dashboard' },
-    { id: 'project-list', label: 'Project List', icon: 'list', path: '/translator/project-list' },
+    ...(roleUpper === 'TRANSLATOR'
+      ? [{ id: 'project-list', label: 'Project List', icon: 'list', path: '/translator/project-list' }]
+      : []),
     { id: 'project-teams', label: 'Project Teams', icon: 'comics', path: '/translator/project-teams' },
-    { id: 'reports', label: 'Translation Reports', icon: 'reports', path: '/leader/reports' },
+    ...(roleUpper === 'PROJECT_LEADER'
+      ? [{ id: 'reports', label: 'Translation Reports', icon: 'reports', path: '/leader/reports' }]
+      : []),
     ...(roleUpper === 'TRANSLATOR'
       ? [
           { id: 'revenue', label: 'Revenue', icon: 'revenue', path: '/translator/revenue' },
@@ -139,9 +156,15 @@ function TranslatorLayout({ children }) {
   }
 
   return (
-    <div className="translator-layout">
+    <div className={`translator-layout ${isMobileMenuOpen ? 'mobile-menu-open' : ''}`}>
+      <button
+        type="button"
+        className={`translator-mobile-overlay ${isMobileMenuOpen ? 'show' : ''}`}
+        onClick={() => setIsMobileMenuOpen(false)}
+        aria-label="Close translator navigation"
+      />
       {/* Sidebar */}
-      <aside className="translator-sidebar">
+      <aside className={`translator-sidebar ${isMobileMenuOpen ? 'open' : ''}`}>
         <div className="translator-sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px' }}>
           <Link to="/" style={{ display: 'block', textDecoration: 'none', marginLeft: '38px' }}>
             <LogoIcon size={26} />
@@ -154,6 +177,7 @@ function TranslatorLayout({ children }) {
               key={item.id}
               to={item.path}
               className={({ isActive }) => `translator-nav-item ${isActive ? 'active' : ''}`}
+              onClick={() => setIsMobileMenuOpen(false)}
             >
               <span className="translator-nav-label-group">
                 <span className="translator-nav-icon">
@@ -184,9 +208,18 @@ function TranslatorLayout({ children }) {
         {/* Topbar */}
         <header className="translator-topbar">
           <div className="translator-topbar-left">
-            <span className="workspace-prefix">Workspace</span>
+            <button
+              type="button"
+              className="translator-mobile-toggle"
+              onClick={() => setIsMobileMenuOpen((current) => !current)}
+              aria-label={isMobileMenuOpen ? 'Close translator navigation' : 'Open translator navigation'}
+              aria-expanded={isMobileMenuOpen}
+            >
+              {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+            <span className="workspace-prefix">WORKSPACE</span>
             <div className="workspace-tag" style={{ marginTop: 0, fontSize: '12px', padding: '6px 12px' }}>
-              {workspaceLabel}
+              {roleUpper === 'PROJECT_LEADER' ? 'Project Leader' : 'Translator'}
             </div>
           </div>
 

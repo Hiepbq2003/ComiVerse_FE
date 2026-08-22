@@ -50,23 +50,23 @@ const EMPTY_SUMMARY = {
   paidPaymentsChangePercent: null
 }
 
-function formatMoney(value, currency = 'VND') {
+function formatMoney(value, currency = 'USD') {
   const amount = Number(value || 0)
   try {
-    return new Intl.NumberFormat(currency === 'VND' ? 'vi-VN' : 'en-US', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency,
-      maximumFractionDigits: currency === 'VND' ? 0 : 2
+      maximumFractionDigits: 2
     }).format(amount)
   } catch {
     return `${amount.toLocaleString()} ${currency}`
   }
 }
 
-function formatCompactMoney(value, currency = 'VND') {
+function formatCompactMoney(value, currency = 'USD') {
   const amount = Number(value || 0)
   try {
-    return new Intl.NumberFormat(currency === 'VND' ? 'vi-VN' : 'en-US', {
+    return new Intl.NumberFormat('en-US', {
       notation: 'compact',
       maximumFractionDigits: 1
     }).format(amount)
@@ -180,7 +180,6 @@ function RevenueChart({ series, currency }) {
 
 function RevenueManagement() {
   const [days, setDays] = useState(30)
-  const [currency, setCurrency] = useState('')
   const [statistics, setStatistics] = useState(null)
   const [recentPayments, setRecentPayments] = useState([])
   const [loading, setLoading] = useState(true)
@@ -190,8 +189,7 @@ function RevenueManagement() {
     setLoading(true)
     setError('')
 
-    const params = { days, zoneId: 'Asia/Ho_Chi_Minh' }
-    if (currency) params.currency = currency
+    const params = { days, zoneId: 'Asia/Ho_Chi_Minh', currency: 'USD' }
 
     const [statisticsResult, logsResult] = await Promise.allSettled([
       getAdminPaymentStatisticsApi(params),
@@ -212,20 +210,17 @@ function RevenueManagement() {
         : []
     )
     setLoading(false)
-  }, [currency, days])
+  }, [days])
 
   useEffect(() => {
     loadStatistics()
   }, [loadStatistics])
 
   const summary = statistics?.summary || EMPTY_SUMMARY
-  const selectedCurrency = statistics?.period?.currency || currency || 'VND'
+  const selectedCurrency = 'USD'
   const dailySeries = Array.isArray(statistics?.dailySeries) ? statistics.dailySeries : []
   const statusBreakdown = Array.isArray(statistics?.statusBreakdown) ? statistics.statusBreakdown : []
   const planBreakdown = Array.isArray(statistics?.planBreakdown) ? statistics.planBreakdown : []
-  const currencies = Array.isArray(statistics?.availableCurrencies) && statistics.availableCurrencies.length
-    ? statistics.availableCurrencies
-    : [selectedCurrency]
 
   const revenueDelta = deltaMeta(summary.revenueChangePercent, 'revenue')
   const paymentsDelta = deltaMeta(summary.paidPaymentsChangePercent, 'paid payments')
@@ -306,12 +301,8 @@ function RevenueManagement() {
             </label>
             <label className="payment-filter-control">
               <span>Currency</span>
-              <select
-                value={selectedCurrency}
-                onChange={(event) => setCurrency(event.target.value)}
-                disabled={loading || currencies.length <= 1}
-              >
-                {currencies.map((item) => <option key={item} value={item}>{item}</option>)}
+              <select value="USD" disabled aria-label="Currency">
+                <option value="USD">USD</option>
               </select>
             </label>
             <button type="button" className="admin-btn payment-action-btn" onClick={loadStatistics} disabled={loading}>
@@ -490,7 +481,7 @@ function RevenueManagement() {
 
             <div className="payment-data-note">
               <RotateCcw size={15} />
-              <span>Revenue uses verified PAID time; status counts use transaction creation time. Currency totals are kept separate and never converted.</span>
+              <span>Revenue uses verified PAID time; status counts use transaction creation time. All monetary totals are stored and reported in USD.</span>
             </div>
           </>
         )}

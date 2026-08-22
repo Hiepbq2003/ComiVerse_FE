@@ -25,13 +25,52 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
+  --logo-comi-color: #0f172a;
+  --logo-slash-color: #0f172a;
+
   @media (max-width: 1024px) {
     font-size: 16px;
   }
 }
 
+html.dark,
+:root.dark,
+[data-theme="dark"] {
+  --text: #9ca3af;
+  --text-h: #f3f4f6;
+  --bg: #16171d;
+  --border: #2e303a;
+  --code-bg: #1f2028;
+  --accent: #c084fc;
+  --accent-bg: rgba(192, 132, 252, 0.15);
+  --accent-border: rgba(192, 132, 252, 0.5);
+  --social-bg: rgba(47, 48, 58, 0.5);
+  --logo-comi-color: #ffffff;
+  --logo-slash-color: #ffffff;
+  --shadow:
+    rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+}
+
+html.light,
+:root.light,
+[data-theme="light"] {
+  --text: #6b6375;
+  --text-h: #08060d;
+  --bg: #fff;
+  --border: #e5e4e7;
+  --code-bg: #f4f3ec;
+  --accent: #aa3bff;
+  --accent-bg: rgba(170, 59, 255, 0.1);
+  --accent-border: rgba(170, 59, 255, 0.5);
+  --social-bg: rgba(244, 243, 236, 0.5);
+  --logo-comi-color: #0f172a;
+  --logo-slash-color: #0f172a;
+  --shadow:
+    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --text: #9ca3af;
     --text-h: #f3f4f6;
     --bg: #16171d;
@@ -41,6 +80,8 @@
     --accent-bg: rgba(192, 132, 252, 0.15);
     --accent-border: rgba(192, 132, 252, 0.5);
     --social-bg: rgba(47, 48, 58, 0.5);
+    --logo-comi-color: #ffffff;
+    --logo-slash-color: #ffffff;
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
   }
@@ -306,8 +347,8 @@ html.light .home-user-menu-divider {
 
 /* Footer overrides */
 html.light .home-footer {
-  background-color: #f1f5f9 !important;
-  border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
+  background-color: #ffffff !important;
+  border-top: 1.5px solid #e8e0d5 !important;
   color: #475569 !important;
 }
 
@@ -1057,6 +1098,40 @@ html.light .detail-info-value {
 .moderator-sidebar-brand .comiverse-full-logo,
 .translator-sidebar-brand .comiverse-full-logo {
   transform: translateX(-20px);
+}
+
+/* Global Logo Text Theme Overrides */
+.comiverse-full-logo .logo-comi {
+  fill: var(--logo-comi-color, #ffffff);
+}
+.comiverse-full-logo .logo-slash-secondary {
+  fill: var(--logo-slash-color, #ffffff);
+}
+
+html.light .comiverse-full-logo .logo-comi,
+.light .comiverse-full-logo .logo-comi,
+[data-theme="light"] .comiverse-full-logo .logo-comi {
+  fill: #0f172a !important;
+}
+
+html.light .comiverse-full-logo .logo-slash-secondary,
+.light .comiverse-full-logo .logo-slash-secondary,
+[data-theme="light"] .comiverse-full-logo .logo-slash-secondary {
+  fill: #0f172a !important;
+  opacity: 0.85 !important;
+}
+
+html.dark .comiverse-full-logo .logo-comi,
+.dark .comiverse-full-logo .logo-comi,
+[data-theme="dark"] .comiverse-full-logo .logo-comi {
+  fill: #ffffff !important;
+}
+
+html.dark .comiverse-full-logo .logo-slash-secondary,
+.dark .comiverse-full-logo .logo-slash-secondary,
+[data-theme="dark"] .comiverse-full-logo .logo-slash-secondary {
+  fill: #ffffff !important;
+  opacity: 0.9 !important;
 }
 
 /* =========================================================================

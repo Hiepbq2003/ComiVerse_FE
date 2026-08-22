@@ -5,6 +5,23 @@ import { getAuth } from '../../utils/Auth'
 import { toast } from 'react-toastify'
 import ModernPagination from '../../components/common/ModernPagination'
 
+async function viewMemberCv(e, member) {
+  e.preventDefault()
+  const cvUrl = member?.cvUrl
+  if (!cvUrl) return
+  try {
+    const res = await fetch(cvUrl)
+    if (!res.ok) throw new Error('Network error')
+    const blob = await res.blob()
+    const pdfBlob = blob.type.includes('pdf') ? blob : new Blob([blob], { type: 'application/pdf' })
+    const blobUrl = window.URL.createObjectURL(pdfBlob)
+    window.open(blobUrl, '_blank', 'noopener,noreferrer')
+  } catch (err) {
+    console.warn('CORS or fetch failed, opening CV online:', err)
+    window.open(cvUrl, '_blank', 'noopener,noreferrer')
+  }
+}
+
 function MemberProfileModal({ member, onClose }) {
   if (!member) return null;
   return (
@@ -48,6 +65,23 @@ function MemberProfileModal({ member, onClose }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>Experience</span>
             <span style={{ color: '#f8fafc', fontSize: '13.5px', fontWeight: '500' }}>{member.experienceYears || 0} years</span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', paddingBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>CV / Resume</span>
+            {member.cvUrl ? (
+              <a
+                href={member.cvUrl}
+                onClick={(e) => viewMemberCv(e, member)}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: '#c084fc', fontSize: '13.5px', fontWeight: '600', textDecoration: 'none', cursor: 'pointer', overflowWrap: 'anywhere', textAlign: 'right' }}
+              >
+                📄 View CV
+              </a>
+            ) : (
+              <span style={{ color: '#94a3b8', fontSize: '13.5px', fontWeight: '500' }}>Not attached</span>
+            )}
           </div>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -101,7 +135,7 @@ function MemberProfileModal({ member, onClose }) {
             </div>
           )}
 
-          {(member.phoneNumber || member.facebookUrl || member.cvUrl) && (
+          {(member.phoneNumber || member.facebookUrl) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>Contact & Links</span>
               {member.phoneNumber && (
@@ -112,37 +146,6 @@ function MemberProfileModal({ member, onClose }) {
               {member.facebookUrl && (
                 <a href={member.facebookUrl} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#60a5fa', fontSize: '13.5px', textDecoration: 'none' }}>
                   🌐 Facebook Profile
-                </a>
-              )}
-              {member.cvUrl && (
-                <a 
-                  href={member.cvUrl}
-                  onClick={async (e) => {
-                    e.preventDefault();
-                    try {
-                      const res = await fetch(member.cvUrl);
-                      if (!res.ok) throw new Error('Network error');
-                      const blob = await res.blob();
-                      // Force PDF mime type just in case
-                      const pdfBlob = new Blob([blob], { type: 'application/pdf' });
-                      const blobUrl = window.URL.createObjectURL(pdfBlob);
-                      const link = document.createElement('a');
-                      link.href = blobUrl;
-                      link.download = `CV_${member.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                      window.URL.revokeObjectURL(blobUrl);
-                    } catch (err) {
-                      console.warn('CORS or fetch failed, falling back to new tab:', err);
-                      window.open(member.cvUrl, '_blank');
-                    }
-                  }}
-                  target="_blank" 
-                  rel="noreferrer" 
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#34d399', fontSize: '13.5px', textDecoration: 'none', cursor: 'pointer' }}
-                >
-                  📄 Download CV
                 </a>
               )}
             </div>
@@ -177,7 +180,7 @@ export function mapTeamMember(m, leaderName) {
     experienceYears: m?.experienceYears || 0,
     phoneNumber: m?.phoneNumber || '',
     facebookUrl: m?.facebookUrl || '',
-    cvUrl: m?.cvUrl || '',
+    cvUrl: m?.cvUrl || m?.cv_url || '',
     bio: m?.bio || '',
     joinedProjectCount: m?.joinedProjectCount || 0
   }

@@ -11,13 +11,11 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
-  Upload,
   Save,
   Send,
   MessageSquare,
   BookMarked,
   Square,
-  Pentagon,
   Minus,
   Plus,
   Pipette,
@@ -37,6 +35,7 @@ import useWorkspaceSecurity from "../../hooks/useWorkspaceSecurity";
 import { useChat } from "../../hooks/useChat";
 import "../../assets/style/translator/translate-workspace.css";
 import { API_BASE_URL as API_BASE, resolveImageUrl } from "../../config/apiConfig";
+import { updateTeamTaskApi } from "../../services/api/TeamWorkspaceApi";
 
 const TOKEN_KEY = "token";
 const IS_DEV = process.env.NODE_ENV === "development";
@@ -74,6 +73,30 @@ const COMIC_FONT_LIBRARY = [
   { name: "Architects Daughter", value: "'Architects Daughter', cursive", group: "Art & Handwriting" },
   { name: "Handlee", value: "'Handlee', cursive", group: "Art & Handwriting" },
 ];
+
+function isPageTranslated(page) {
+  if (!page) return false;
+  if (String(page.status || "").toUpperCase() === "DONE") return true;
+  return hasTranslationWork(page.bubbles);
+}
+
+function hasTranslationWork(bubbles) {
+  if (!bubbles) return false;
+  let raw = bubbles;
+  if (typeof raw !== "string") {
+    try {
+      raw = JSON.stringify(raw);
+    } catch {
+      return false;
+    }
+  }
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === "[]" || trimmed === "{}" || trimmed.toLowerCase() === "null") return false;
+  if (trimmed.includes('"selections"')) {
+    return /"selections"\s*:\s*\[\s*\{/.test(trimmed);
+  }
+  return trimmed.startsWith("[") && trimmed.includes("{");
+}
 
 function PageStatusDot({ status }) {
   if (status === "done") {
@@ -140,7 +163,7 @@ function ChapterList({ chapters, openChapterId, onToggleChapter, chapterPagesLoa
         const isOpen = ch.chapterId === openChapterId;
         const isLoadingPages = isOpen && !isCurrent && chapterPagesLoading === ch.taskId;
         return (
-          <div key={ch.chapterId}>
+          <div key={ch.chapterId || ch.taskId}>
             <button
               onClick={() => onToggleChapter(ch)}
               className={`tw-chapter-row ${isCurrent ? "is-current" : ""}`}
@@ -169,7 +192,10 @@ function ChapterList({ chapters, openChapterId, onToggleChapter, chapterPagesLoa
               (ch.pages || []).map((page) => {
                 const pageIndex = page.pageNumber - 1;
                 const isCurrentPage = isCurrent && pageIndex === currentPageIndex;
-                const status = isCurrentPage ? "current" : page.status === "DONE" ? "done" : "todo";
+                const isDone = isPageTranslated(page) || String(page.status).toUpperCase() === "DONE";
+                const status = isDone ? "done" : isCurrentPage ? "current" : "todo";
+                const avatarName = [page.translatorLabel, ...(page.contributorLabels || [])]
+                  .find((label) => label && label !== "Unassigned" && label !== "Unknown Member" && !String(label).startsWith("Assignee "));
                 return (
                   <button
                     key={page.pageId}
@@ -181,18 +207,8 @@ function ChapterList({ chapters, openChapterId, onToggleChapter, chapterPagesLoa
                       <PageStatusDot status={status} />
                       Page {page.pageNumber}
                     </span>
-                    {page.contributorLabels && page.contributorLabels.length > 0 ? (
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        {page.contributorLabels.map((label, i) => (
-                          label !== "Unassigned" && label !== "Unknown Member" && (
-                            <UserInitialsAvatar key={i} name={label} size={18} />
-                          )
-                        ))}
-                      </div>
-                    ) : (
-                      page.translatorLabel && page.translatorLabel !== "Unassigned" && page.translatorLabel !== "Unknown Member" && (
-                        <UserInitialsAvatar name={page.translatorLabel} size={18} />
-                      )
+                    {isDone && avatarName && (
+                      <UserInitialsAvatar name={avatarName} size={18} />
                     )}
                   </button>
                 );
@@ -204,21 +220,7 @@ function ChapterList({ chapters, openChapterId, onToggleChapter, chapterPagesLoa
   );
 }
 
-function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend, sending, saveStatus, canEdit = true, isPageTranslatedByOther = false, onUpload, isUploading = false }) {
-  const uploadInputRef = useRef(null);
-
-  const handleUploadClick = () => {
-    if (!canEdit || isUploading) return;
-    uploadInputRef.current?.click();
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    onUpload?.(file);
-    // Reset input so the same file can be picked again next time
-    e.target.value = "";
-  };
+function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend, sending, saveStatus, canEdit = true, isPageTranslatedByOther = false }) {
   const badgeConfig = {
     saving: { icon: <Loader2 size={11} strokeWidth={3} className="tw-spin" />, label: "SAVING" },
     saved: { icon: <Check size={11} strokeWidth={3} />, label: "SAVED" },
@@ -256,29 +258,6 @@ function TranslateHeaderBar({ comicTitle, chapterTitle, onBack, onSend, canSend,
         <span className={`tw-badge-saved tw-font-mono is-${statusKey}`}>
           {badgeConfig.icon} {badgeConfig.label}
         </span>
-        <input
-          ref={uploadInputRef}
-          type="file"
-          accept="image/*"
-          style={{ display: "none" }}
-          onChange={handleFileChange}
-        />
-        <button
-          className="tw-btn"
-          disabled={!canEdit || isUploading}
-          onClick={handleUploadClick}
-          title={
-            !canEdit
-              ? "You don't have permission to edit this task"
-              : isUploading
-              ? "Uploading…"
-              : "Replace the current page image"
-          }
-          style={(!canEdit || isUploading) ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
-        >
-          {isUploading ? <Loader2 size={14} className="tw-spin" /> : <Upload size={14} />}
-          {isUploading ? "Uploading…" : "Upload"}
-        </button>
         <button
           className="tw-btn-primary"
           onClick={onSend}
@@ -570,7 +549,6 @@ function ShapeToolbar({ activeTool, onSetTool, canEdit = true }) {
   const tools = [
     { id: "rect", label: "Rectangle", Icon: Square },
     { id: "ellipse", label: "Oval", Icon: Circle },
-    { id: "polygon", label: "Freeform", Icon: Pentagon },
   ];
   return (
     <div className="tw-toolbar-group">
@@ -631,7 +609,7 @@ function PageImage({
             Drawing freeform shape: {polygonDraft.length} points (minimum 3)
           </span>
           <button type="button" onClick={onFinishPolygon} className="tw-btn tw-x-mini-btn">
-            Xong
+            Done
           </button>
           <button type="button" onClick={onCancelPolygon} className="tw-btn tw-x-mini-btn">
             Cancel
@@ -872,12 +850,10 @@ function PageImage({
 }
 
 function SourceImageCrop({ imageSrc, canvasRef, selection, imageNaturalSize, isPickingColor, onPickColorInCrop, zoomScale }) {
-  const PREVIEW_WIDTH = 260;
-
   if (!selection || !canvasRef.current || !imageSrc || !imageNaturalSize) return null;
 
   const box = getBoundingBox(selection);
-  if (!box || box.width === 0) return null;
+  if (!box || box.width === 0 || box.height === 0) return null;
 
   const rawContainer = canvasRef.current.getBoundingClientRect();
   if (rawContainer.width === 0 || rawContainer.height === 0) return null;
@@ -893,20 +869,24 @@ function SourceImageCrop({ imageSrc, canvasRef, selection, imageNaturalSize, isP
     imageNaturalSize.width,
     imageNaturalSize.height
   );
+  if (displayedWidth === 0 || displayedHeight === 0) return null;
 
   const boxXInImage = box.x - offsetX;
   const boxYInImage = box.y - offsetY;
 
-  const scale = PREVIEW_WIDTH / box.width;
-  const previewHeight = Math.min(box.height * scale, 320);
+  const scaleX = imageNaturalSize.width / displayedWidth;
+  const scaleY = imageNaturalSize.height / displayedHeight;
+  const scale = scaleX;
+  const previewWidth = box.width * scaleX;
+  const previewHeight = box.height * scaleY;
   let clipPath;
   if (selection.shape === "ellipse") {
     clipPath = "ellipse(50% 50% at 50% 50%)";
   } else if (selection.shape === "polygon" && selection.points?.length) {
     const pointsStr = selection.points
       .map((p) => {
-        const px = (p.x - offsetX - boxXInImage) * scale;
-        const py = (p.y - offsetY - boxYInImage) * scale;
+        const px = (p.x - offsetX - boxXInImage) * scaleX;
+        const py = (p.y - offsetY - boxYInImage) * scaleY;
         return `${px}px ${py}px`;
       })
       .join(", ");
@@ -916,30 +896,35 @@ function SourceImageCrop({ imageSrc, canvasRef, selection, imageNaturalSize, isP
   }
 
   return (
-    <div
-      onClick={(e) => {
-        if (!isPickingColor) return;
-        const rect = e.currentTarget.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const clickY = e.clientY - rect.top;
-        onPickColorInCrop?.(clickX, clickY, box, scale, boxXInImage, boxYInImage, displayedWidth, displayedHeight);
-      }}
-      className={`tw-x-crop-preview ${selection.shape === "rect" ? "is-rect" : ""} ${isPickingColor ? "is-picking" : ""}`}
-      style={{ "--preview-height": `${previewHeight}px` }}
-    >
-      <div className="tw-x-crop-clip" style={{ "--clip-path": clipPath }}>
-        <img
-          src={imageSrc}
-          alt="Selected source area"
-          draggable={false}
-          className="tw-x-crop-image"
-          style={{
-            "--img-left": `${-boxXInImage * scale}px`,
-            "--img-top": `${-boxYInImage * scale}px`,
-            "--img-w": `${displayedWidth * scale}px`,
-            "--img-h": `${displayedHeight * scale}px`,
-          }}
-        />
+    <div className="tw-x-crop-scroll">
+      <div
+        onClick={(e) => {
+          if (!isPickingColor) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const clickY = e.clientY - rect.top;
+          onPickColorInCrop?.(clickX, clickY, box, scale, boxXInImage, boxYInImage, displayedWidth, displayedHeight);
+        }}
+        className={`tw-x-crop-preview ${selection.shape === "rect" ? "is-rect" : ""} ${isPickingColor ? "is-picking" : ""}`}
+        style={{
+          "--preview-width": `${previewWidth}px`,
+          "--preview-height": `${previewHeight}px`,
+        }}
+      >
+        <div className="tw-x-crop-clip" style={{ "--clip-path": clipPath }}>
+          <img
+            src={imageSrc}
+            alt="Selected source area"
+            draggable={false}
+            className="tw-x-crop-image"
+            style={{
+              "--img-left": `${-boxXInImage * scaleX}px`,
+              "--img-top": `${-boxYInImage * scaleY}px`,
+              "--img-w": `${imageNaturalSize.width}px`,
+              "--img-h": `${imageNaturalSize.height}px`,
+            }}
+          />
+        </div>
       </div>
     </div>
   );
@@ -966,7 +951,6 @@ function TranslateTabPanel({
   onSelectPrev,
   onSelectNext,
   onChangeTranslation,
-  textStyle,
   onSaveProgress,
   currentImage,
   canvasRef,
@@ -1039,11 +1023,6 @@ function TranslateTabPanel({
           value={translationValue}
           onChange={(e) => canEdit && onChangeTranslation(e.target.value)}
           className="tw-textarea tw-x-translation-textarea"
-          style={{
-            "--text-align": textStyle.textAlign,
-            "--font-weight": textStyle.fontWeight,
-            "--font-style": textStyle.fontStyle,
-          }}
           placeholder={
             !canEdit
               ? "View only — you're not assigned to this task"
@@ -1789,7 +1768,6 @@ function TranslationSidePanel({
   onSelectPrev,
   onSelectNext,
   onChangeTranslation,
-  textStyle,
   onSaveProgress,
   currentImage,
   canvasRef,
@@ -1828,7 +1806,6 @@ function TranslationSidePanel({
           onSelectPrev={onSelectPrev}
           onSelectNext={onSelectNext}
           onChangeTranslation={onChangeTranslation}
-          textStyle={textStyle}
           onSaveProgress={onSaveProgress}
           currentImage={currentImage}
           canvasRef={canvasRef}
@@ -1885,7 +1862,7 @@ function TeamMessagePopup({ groupId, onClose }) {
     isNearBottomRef,
     fetchOlderMessages,
     sendMessage,
-  } = useChat("GROUP", groupId);
+  } = useChat("TEAM", groupId);
 
   const handleScroll = () => {
     const container = scrollContainerRef.current;
@@ -2053,9 +2030,29 @@ function getTaskFallbackData(taskId) {
     }
   } catch (e) {}
 
+  if (!foundTask) {
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        const cachedSession = sessionStorage.getItem(`comiverse_ws_cache_${taskId}`);
+        if (cachedSession) {
+          const parsed = JSON.parse(cachedSession);
+          if (parsed?.task) foundTask = parsed.task;
+          else if (parsed?.chapter) {
+            foundTask = {
+              id: taskId,
+              title: parsed.chapter.title,
+              chapterId: parsed.chapter.id,
+              pages: parsed.pages || []
+            };
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
   const rawTitle = foundTask?.title || 'Chapter 1 - Translation';
   const cleanTitleMatch = rawTitle.match(/^\[(URGENT|HIGH|MEDIUM|LOW)\]\s*(?:\[([^\]]+)\])?\s*(.*)$/i);
-  const comicTitle = cleanTitleMatch?.[2] || 'Tạm biệt Long tóc đỏ';
+  const comicTitle = cleanTitleMatch?.[2] || foundTask?.comicTitle || '';
   const chapterName = cleanTitleMatch?.[3] || rawTitle;
 
   const chapterId = foundTask?.chapterId || `ch-${taskId}`;
@@ -2104,6 +2101,7 @@ async function fetchChapterForTask(taskId, signal) {
       (Array.isArray(task) ? task[0]?.chapterId : undefined);
 
     const taskAssigneeId = task?.assigneeId ?? null;
+    const taskStatus = task?.status ?? null;
 
     if (!chapterId || !UUID_RE.test(chapterId)) {
       throw new Error(`Task ${taskId} has no valid chapter linked (got chapterId: ${chapterId ?? "none"})`);
@@ -2114,6 +2112,7 @@ async function fetchChapterForTask(taskId, signal) {
       ...chapterResult,
       projectTeamId: task?.projectTeamId ?? null,
       taskAssigneeId,
+      taskStatus,
     };
   }
 
@@ -2128,10 +2127,11 @@ async function fetchChapterForTask(taskId, signal) {
       ...chapterResult,
       projectTeamId: null,
       taskAssigneeId: fallbackAssigneeId,
+      taskStatus: fallback.task?.status ?? null,
     };
   }
 
-  return { ...fallback.chapter, taskAssigneeId: fallbackAssigneeId };
+  return { ...fallback.chapter, taskAssigneeId: fallbackAssigneeId, taskStatus: fallback.task?.status ?? null };
 }
 
 // ChapterEntity has no `title` field — only `chapterNumber`. Every place that
@@ -2190,6 +2190,21 @@ async function fetchTeamMembers(projectTeamId, signal) {
 function isSameUser(assigneeId, userId) {
   if (assigneeId == null || userId == null) return false;
   return String(assigneeId) === String(userId);
+}
+
+function isBacklogTaskStatus(status) {
+  const normalized = String(status || "").toLowerCase().replace(/[-\s]/g, "_");
+  return !normalized || normalized === "backlog" || normalized === "todo";
+}
+
+function isSupersededTaskStatus(status) {
+  return String(status || "").toLowerCase().replace(/[-\s]/g, "_") === "superseded";
+}
+
+function chapterSidebarKey(entry) {
+  if (entry?.chapterId) return `id:${entry.chapterId}`;
+  if (entry?.chapterNumber != null && entry.chapterNumber !== "") return `num:${entry.chapterNumber}`;
+  return `task:${entry?.taskId || entry?.id || entry?.title || ""}`;
 }
 
 function isSameTranslatorUser(translatorId, userId, userName, teamMembers = []) {
@@ -2260,7 +2275,7 @@ async function fetchPagesForTask(taskId, signal) {
   const fallback = getTaskFallbackData(taskId);
   const foundTask = fallback.task;
   const chapterId = foundTask?.chapterId || fallback.chapter?.id;
-  const comicTitle = fallback.chapter?.comicTitle || foundTask?.title || '';
+  const comicTitle = fallback.chapter?.comicTitle || foundTask?.comicTitle || foundTask?.title || '';
 
   if (rawPages.length === 0 && foundTask) {
     if (Array.isArray(foundTask.pages) && foundTask.pages.length > 0) {
@@ -2289,9 +2304,9 @@ async function fetchPagesForTask(taskId, signal) {
       const list = Array.isArray(allComics) ? allComics : (allComics?.data || allComics?.content || []);
       const cleanQuery = (comicTitle || '').toLowerCase().trim();
 
-      const foundComic = list.find(c =>
-        c.title && (c.title.toLowerCase().includes(cleanQuery) || cleanQuery.includes(c.title.toLowerCase()))
-      ) || list.find(c => c.title && c.title.toLowerCase().includes('long tóc đỏ')) || list[0];
+      const foundComic = cleanQuery
+        ? list.find(c => c.title && (c.title.toLowerCase().includes(cleanQuery) || cleanQuery.includes(c.title.toLowerCase())))
+        : null;
 
       if (foundComic?.id) {
         let chapList = [];
@@ -2354,39 +2369,40 @@ async function fetchPagesForTask(taskId, signal) {
         const resolved = resolveImageUrl(rawUrl);
         if (!resolved) return null;
 
-        // BE (ChapterPageDTO) returns `pageId`, not `id` — always try pageId first
         const pageId = item?.pageId || item?.id || `p-${taskId}-${idx + 1}`;
         let bubblesData = item?.bubbles || [];
-        let localTranslatedBy = null;
+        let localTranslatedBy = item?.assignedTranslatorId || item?.translatedBy || null;
 
-        // ── 1. Try to recover translatedBy from the bubbles JSON string stored in BE
-        //    (for pages translated before the DB column was added, the attribution
-        //     lives only inside the `bubbles` string as { selections:[…], translatedBy:"…" })
         const rawBubbles = item?.bubbles;
-        if (rawBubbles && typeof rawBubbles === 'string' && !localTranslatedBy) {
+        if (rawBubbles && typeof rawBubbles === "string") {
           try {
             const parsedBubbles = JSON.parse(rawBubbles);
             if (parsedBubbles?.translatedBy) localTranslatedBy = parsedBubbles.translatedBy;
           } catch (e) {}
         }
 
-        // ── 2. Also check localStorage (covers current session edits not yet saved to BE)
         try {
           const localSaved = localStorage.getItem(`comiverse_bubbles_${pageId}`);
           if (localSaved) {
             const parsed = JSON.parse(localSaved);
             bubblesData = localSaved;
-            // localStorage wins over BE bubbles for translator attribution
             if (parsed?.translatedBy) localTranslatedBy = parsed.translatedBy;
           }
         } catch (e) {}
 
+        const status = String(item?.status || "").toUpperCase() === "DONE" || hasTranslationWork(bubblesData)
+          ? "DONE"
+          : (item?.status || "TODO");
+
         return {
-          id: item?.id || `p-${taskId}-${idx + 1}`,
-          pageId: item?.id || `p-${taskId}-${idx + 1}`,
+          id: pageId,
+          pageId,
           pageNumber: item?.pageNumber || idx + 1,
           imageUrl: resolved,
-          bubbles: bubblesData
+          bubbles: bubblesData,
+          status,
+          assignedTranslatorId: item?.assignedTranslatorId || null,
+          translatedBy: localTranslatedBy || item?.assignedTranslatorId || null,
         };
       })
       .filter(Boolean);
@@ -2410,7 +2426,10 @@ async function fetchPagesForTask(taskId, signal) {
               id: real.pageId,
               pageId: real.pageId,
               imageUrl: p.imageUrl || resolveImageUrl(real.imageUrl),
-              bubbles: p.bubbles ?? real.bubbles
+              bubbles: p.bubbles ?? real.bubbles,
+              status: p.status === "DONE" || String(real.status || "").toUpperCase() === "DONE" ? "DONE" : (real.status || p.status),
+              assignedTranslatorId: p.assignedTranslatorId || real.assignedTranslatorId || null,
+              translatedBy: p.translatedBy || real.assignedTranslatorId || real.translatedBy || null,
             };
           });
         }
@@ -2475,51 +2494,6 @@ async function saveBubblesForPage(pageId, payload, signal) {
     } catch (e) {}
     return false;
   }
-}
-
-async function uploadImageToCloudinary(file, signal) {
-  const token = localStorage.getItem(TOKEN_KEY);
-  const formData = new FormData();
-  formData.append("file", file);
-  const res = await fetch(`${API_BASE}/upload/image`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-    signal,
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok || !json?.success) throw new Error(json?.message || `Upload failed (${res.status})`);
-  return json.data; // Cloudinary URL string
-}
-
-async function replacePageImage(pageId, imageUrl, signal) {
-  const res = await fetch(`${API_BASE}/translate-workspace/pages/${pageId}/image`, {
-    method: "PUT",
-    headers: authHeaders(),
-    body: JSON.stringify({ imageUrl }),
-    signal,
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(json?.message || `Failed to update page image (${res.status})`);
-  return json?.data !== undefined ? json.data : json;
-}
-
-async function updateTranslationPageStatus(pageId, status, signal) {
-  const res = await fetch(`${API_BASE}/translate-workspace/pages/${pageId}/status`, {
-    method: "PUT",
-    headers: authHeaders(),
-    body: JSON.stringify({ status }),
-    signal,
-  });
-  if (!res.ok) {
-    let message = `Failed to update page status (${res.status})`;
-    try {
-      const payload = await res.json();
-      message = payload?.message || message;
-    } catch (e) {}
-    throw new Error(message);
-  }
-  return res.json();
 }
 
 async function submitTaskForReview(taskId, signal) {
@@ -3313,14 +3287,9 @@ export default function TranslateWorkspace() {
            isSameTranslatorUser(chapterData?.taskAssigneeId, currentUserId, userFullName, teamMembers);
   }, [chapterData?.taskAssigneeId, currentUserId, userFullName, teamMembers]);
 
-  const isProjectLeader = useMemo(() => {
-    const me = (teamMembers || []).find((m) => String(m.id) === String(currentUserId));
-    return me?.role === "Group Leader";
-  }, [teamMembers, currentUserId]);
-
-  // Nobody is allowed to edit until we've actually loaded the task and know
-  // who's assigned — default is read-only, not editable.
-  const canEdit = status === "ready" && (isProjectLeader || isAssignedToTask);
+  // Only the current assignee can edit translation. Project Leader can still
+  // manage the task (assign/review) but must not keep editing after handing it over.
+  const canEdit = status === "ready" && isAssignedToTask;
 
 
   const {
@@ -3512,7 +3481,6 @@ export default function TranslateWorkspace() {
   }, [saveStatus]);
 
   const [sending, setSending] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const isLoadingPageRef = useRef(false);
 
 
@@ -3533,15 +3501,6 @@ export default function TranslateWorkspace() {
 
 
   
-  const textStyle = useMemo(
-    () => ({
-      fontWeight: activeSelection?.isBold ? 700 : 400,
-      fontStyle: activeSelection?.isItalic ? "italic" : "normal",
-      textAlign: activeSelection?.textAlign ?? "left",
-    }),
-    [activeSelection]
-  );
-
   const pendingTargetPageRef = useRef(null);
   const consumePendingTargetIndex = (pages) => {
     const target = pendingTargetPageRef.current;
@@ -3755,7 +3714,7 @@ export default function TranslateWorkspace() {
     if (!chapterData && taskPages.length === 0) return [];
     const chapId = chapterData?.id || currentChapterId || 'ch-1';
     const chapTitle = deriveChapterTitle(chapterData) || 'Chapter';
-    const doneCount = taskPages.filter((p) => p.status === "DONE").length;
+    const doneCount = taskPages.filter((p) => isPageTranslated(p)).length;
 
     const currentEntry = {
       chapterId: chapId,
@@ -3764,21 +3723,25 @@ export default function TranslateWorkspace() {
       title: chapTitle,
       progress: `${doneCount > 0 ? doneCount : (taskPages.length > 0 ? currentPageIndex + 1 : 0)}/${taskPages.length}`,
       assigneeLabel: formatAssigneeLabel(chapterData?.taskAssigneeId, teamMembers),
-      pages: taskPages.map((p, idx) => ({
-        ...p,
-        pageId: p.pageId || p.id || `p-${idx + 1}`,
-        pageNumber: p.pageNumber || idx + 1,
-        status: p.status === "DONE" ? "DONE" : (idx === currentPageIndex ? "current" : "todo"),
-        translatorLabel: formatAssigneeLabel(p.translatedBy || p.translatorId || p.completedBy, teamMembers),
-        contributorLabels: Array.from(new Set([
-          p.translatedBy || p.translatorId || p.completedBy, 
-          p.status === "DONE" ? chapterData?.taskAssigneeId : null
-        ].filter(Boolean))).map(id => formatAssigneeLabel(id, teamMembers))
-      })),
+      pages: taskPages.map((p, idx) => {
+        const translated = isPageTranslated(p);
+        const translatorId = p.translatedBy || p.assignedTranslatorId || p.translatorId || p.completedBy
+          || (translated ? chapterData?.taskAssigneeId : null);
+        const translatorLabel = formatAssigneeLabel(translatorId, teamMembers);
+        return {
+          ...p,
+          pageId: p.pageId || p.id || `p-${idx + 1}`,
+          pageNumber: p.pageNumber || idx + 1,
+          status: translated ? "DONE" : "todo",
+          translatorLabel,
+          contributorLabels: translatorLabel && translatorLabel !== "Unassigned" ? [translatorLabel] : [],
+        };
+      }),
     };
 
     const siblingEntries = (siblingTasks || [])
       .filter((t) => String(t.id) !== String(taskId))
+      .filter((t) => !isSupersededTaskStatus(t.status))
       .map((t) => {
         const cachedPages = chapterPagesCache[t.id];
         return {
@@ -3788,17 +3751,20 @@ export default function TranslateWorkspace() {
           title: t.title,
           progress: t.status || '',
           assigneeLabel: formatAssigneeLabel(t.assigneeId, teamMembers),
-          pages: (cachedPages || []).map((p, idx) => ({
-            ...p,
-            pageId: p.pageId || p.id || `p-${idx + 1}`,
-            pageNumber: p.pageNumber || idx + 1,
-            status: p.status === "DONE" ? "DONE" : "todo",
-            translatorLabel: formatAssigneeLabel(p.translatedBy || p.translatorId || p.completedBy, teamMembers),
-            contributorLabels: Array.from(new Set([
-              p.translatedBy || p.translatorId || p.completedBy, 
-              p.status === "DONE" ? t.assigneeId : null
-            ].filter(Boolean))).map(id => formatAssigneeLabel(id, teamMembers))
-          })),
+          pages: (cachedPages || []).map((p, idx) => {
+            const translated = isPageTranslated(p);
+            const translatorId = p.translatedBy || p.assignedTranslatorId || p.translatorId || p.completedBy
+              || (translated ? t.assigneeId : null);
+            const translatorLabel = formatAssigneeLabel(translatorId, teamMembers);
+            return {
+              ...p,
+              pageId: p.pageId || p.id || `p-${idx + 1}`,
+              pageNumber: p.pageNumber || idx + 1,
+              status: translated ? "DONE" : "todo",
+              translatorLabel,
+              contributorLabels: translatorLabel && translatorLabel !== "Unassigned" ? [translatorLabel] : [],
+            };
+          }),
         };
       });
 
@@ -3812,7 +3778,15 @@ export default function TranslateWorkspace() {
       const match = String(entry.title || "").match(/(\d+)/);
       return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
     };
-    return [currentEntry, ...siblingEntries].sort((a, b) => {
+    const seenChapters = new Set([chapterSidebarKey(currentEntry)]);
+    const uniqueSiblings = siblingEntries.filter((entry) => {
+      const key = chapterSidebarKey(entry);
+      if (seenChapters.has(key)) return false;
+      seenChapters.add(key);
+      return true;
+    });
+
+    return [currentEntry, ...uniqueSiblings].sort((a, b) => {
       const diff = orderKey(a) - orderKey(b);
       if (diff !== 0) return diff;
       return String(a.title).localeCompare(String(b.title));
@@ -3900,14 +3874,43 @@ export default function TranslateWorkspace() {
             return false;
           }
           setTaskPages((prev) =>
-            prev.map((p) => (p.pageId === pageId || p.id === pageId ? { ...p, bubbles: bubblesJson, translatedBy: activeUserId || p.translatedBy, status: 'DONE' } : p))
+            prev.map((p) => (p.pageId === pageId || p.id === pageId
+              ? {
+                  ...p,
+                  bubbles: bubblesJson,
+                  translatedBy: activeUserId || p.translatedBy,
+                  assignedTranslatorId: activeUserId || p.assignedTranslatorId,
+                  status: hasTranslationWork(bubblesJson) ? "DONE" : "TODO",
+                }
+              : p))
           );
-          setSaveStatus("saved");
-          return true;
+
+          const markSaved = () => {
+            setSaveStatus("saved");
+            return true;
+          };
+          if (!isBacklogTaskStatus(chapterData?.taskStatus)) {
+            return markSaved();
+          }
+          return updateTeamTaskApi(taskId, { status: "in_progress" })
+            .then(() => {
+              setChapterData((prev) => (prev ? { ...prev, taskStatus: "in_progress" } : prev));
+              setSiblingTasks((prev) =>
+                (prev || []).map((t) =>
+                  String(t.id) === String(taskId) ? { ...t, status: "in_progress" } : t
+                )
+              );
+              return markSaved();
+            })
+            .catch((err) => {
+              console.error("[persistBubbles] Failed to move task to in_progress via PUT /tasks/{id}:", err);
+              toast.error(err?.response?.data?.message || "Could not move the task to In Progress");
+              return markSaved();
+            });
         });
       });
     },
-    [canvasRef, canEdit]
+    [canvasRef, canEdit, chapterData?.taskStatus, taskId]
   );
 
 
@@ -3985,18 +3988,8 @@ export default function TranslateWorkspace() {
       toast.error("Page could not be saved. It was not marked as completed.");
       return;
     }
-    try {
-      const updatedPage = await updateTranslationPageStatus(currentPageMeta.pageId, "DONE");
-      setTaskPages((prev) => prev.map((page) => (
-        String(page.pageId || page.id) === String(currentPageMeta.pageId)
-          ? { ...page, ...updatedPage, status: "DONE" }
-          : page
-      )));
-      if (currentPageIndex < images.length - 1) {
-        setCurrentPageIndex(currentPageIndex + 1);
-      }
-    } catch (err) {
-      toast.error(err?.message || "Failed to mark the page as completed.");
+    if (currentPageIndex < images.length - 1) {
+      setCurrentPageIndex(currentPageIndex + 1);
     }
   }, [canEdit, currentPageMeta, persistCurrentPage, currentPageIndex, images.length]);
 
@@ -4014,38 +4007,6 @@ export default function TranslateWorkspace() {
 
   const isLastPage = images.length > 0 && currentPageIndex === images.length - 1;
 
-  const handleUploadImage = useCallback(async (file) => {
-    const pageId = currentPageMeta?.pageId;
-    if (!pageId) {
-      toast.error("No page loaded — cannot upload image.");
-      return;
-    }
-    if (!canEdit) {
-      toast.warning("You don't have permission to edit this task.");
-      return;
-    }
-    setIsUploading(true);
-    try {
-      const cloudinaryUrl = await uploadImageToCloudinary(file);
-      await replacePageImage(pageId, cloudinaryUrl);
-      // Update local state so canvas shows new image immediately
-      setTaskPages((prev) =>
-        prev.map((p) =>
-          (p.pageId === pageId || p.id === pageId)
-            ? { ...p, imageUrl: cloudinaryUrl }
-            : p
-        )
-      );
-      // Also invalidate session cache so re-load reflects new image
-      try { sessionStorage.removeItem(`comiverse_ws_cache_${taskId}`); } catch (e) {}
-      toast.success("Page image replaced successfully!");
-    } catch (err) {
-      toast.error(err?.message || "Failed to upload image.");
-    } finally {
-      setIsUploading(false);
-    }
-  }, [currentPageMeta, canEdit, taskId]);
-
   const handleSend = useCallback(async () => {
     if (!isLastPage || sending || !canEdit) return;
 
@@ -4060,22 +4021,6 @@ export default function TranslateWorkspace() {
         return;
       }
 
-      const pageIds = [...new Set(
-        taskPages
-          .map((page) => page.pageId || page.id)
-          .filter(Boolean)
-          .map(String)
-      )];
-      const completedEntries = await Promise.all(pageIds.map(async (pageId) => {
-        const updatedPage = await updateTranslationPageStatus(pageId, "DONE");
-        return [pageId, updatedPage];
-      }));
-      const updatedById = Object.fromEntries(completedEntries);
-      setTaskPages((prev) => prev.map((page) => {
-        const updatedPage = updatedById[String(page.pageId || page.id)];
-        return updatedPage ? { ...page, ...updatedPage, status: "DONE" } : page;
-      }));
-
       await submitTaskForReview(taskId);
       navigate("/translator/project-teams", {
         state: { teamId: chapterData?.projectTeamId, tab: "tasks" },
@@ -4086,7 +4031,7 @@ export default function TranslateWorkspace() {
     } finally {
       setSending(false);
     }
-  }, [isLastPage, sending, canEdit, persistCurrentPage, taskPages, taskId, navigate, chapterData]);
+  }, [isLastPage, sending, canEdit, persistCurrentPage, taskId, navigate, chapterData]);
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -4191,8 +4136,6 @@ export default function TranslateWorkspace() {
         isPageTranslatedByOther={isPageTranslatedByOther}
         sending={sending}
         saveStatus={saveStatus}
-        onUpload={handleUploadImage}
-        isUploading={isUploading}
       />
 
       <div className="tw-body">
@@ -4319,7 +4262,6 @@ export default function TranslateWorkspace() {
           onSelectPrev={selectPrev}
           onSelectNext={selectNext}
           onChangeTranslation={(text) => activeId != null && updateTranslation(activeId, text)}
-          textStyle={textStyle}
           onSaveProgress={handleSaveProgress}
           currentImage={currentImage}
           canvasRef={canvasRef}

@@ -983,13 +983,19 @@
 .tw-x-resize-handle--sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
 
 /* ---- SourceImageCrop ---- */
+.tw-x-crop-scroll {
+  overflow: auto;
+  max-width: 100%;
+}
+
 .tw-x-crop-preview {
-  width: 260px;
-  height: var(--preview-height, 100px);
+  width: var(--preview-width, auto);
+  height: var(--preview-height, auto);
   overflow: hidden;
   position: relative;
   background: #000;
   cursor: default;
+  flex-shrink: 0;
 }
 .tw-x-crop-preview.is-rect { border-radius: 6px; }
 .tw-x-crop-preview.is-picking { cursor: crosshair; }
@@ -1029,9 +1035,9 @@
 
 .tw-x-translation-textarea {
   color: #ffffff;
-  text-align: var(--text-align, left);
-  font-weight: var(--font-weight, 400);
-  font-style: var(--font-style, normal);
+  text-align: left;
+  font-weight: 400;
+  font-style: normal;
 }
 
 /* ---- Root layout: collapsible left sidebar ---- */
@@ -1442,6 +1448,7 @@
 
 .tw-msg-row-inner {
   max-width: 78%;
+  min-width: 0;
 }
 
 .tw-msg-sender {
@@ -1458,6 +1465,9 @@
   line-height: 1.35;
   background: var(--ink-850);
   color: var(--ink-text);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .tw-msg-row.is-me .tw-msg-bubble {

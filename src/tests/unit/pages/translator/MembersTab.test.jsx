@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MembersTab, {
   formatMemberPresence,
@@ -133,5 +133,33 @@ describe('Translator team member presence & contributions', () => {
     expect(await screen.findByText('5 pages')).toBeInTheDocument()
     // User B should get credited for 10 pages translated after takeover
     expect(await screen.findByText('10 pages')).toBeInTheDocument()
+  })
+
+  it('maps translator CV url onto the member profile', () => {
+    const mapped = mapTeamMember({
+      id: 'user-2',
+      name: 'Vit Reader',
+      cvUrl: 'https://cdn.example.com/vit-cv.pdf',
+    }, '')
+    expect(mapped.cvUrl).toBe('https://cdn.example.com/vit-cv.pdf')
+  })
+
+  it('shows a CV view link in the member profile modal', async () => {
+    getTeamMembersApi.mockResolvedValue([
+      { id: 'user-1', name: 'Online User', role: 'Group Leader', online: true },
+      { id: 'user-2', name: 'Vit Reader', role: 'Member', online: false, cvUrl: 'https://cdn.example.com/vit-cv.pdf' },
+    ])
+
+    render(
+      <MembersTab
+        teamId="team-1"
+        leaderName="Online User"
+        isCurrentLeader={true}
+        setMemberSearch={() => {}}
+      />,
+    )
+
+    fireEvent.click(await screen.findByText('Vit Reader'))
+    expect(await screen.findByRole('link', { name: /view cv/i })).toBeInTheDocument()
   })
 })

@@ -12,6 +12,10 @@ export const getChapterDetailApi = (chapterId) => {
   return AxiosClient.get(`/chapters/detail/${chapterId}`);
 };
 
+export const getProtectedChapterPagesApi = (chapterId, config = {}) => {
+  return AxiosClient.get(`/chapters/${chapterId}/pages`, config);
+};
+
 export const deleteChapterApi = (chapterId) => {
   return AxiosClient.delete(`/chapters/${chapterId}`);
 };
@@ -35,7 +39,7 @@ export const getChapterTranslationsApi = (chapterId) => {
 export const getChapterTranslationByIdApi = (translationId) => {
   return AxiosClient.get(`/chapters/translations/${translationId}`);
 };
- 
+
 export const getComicTranslationLanguagesApi = (comicId) => {
   return AxiosClient.get(`/comics/${comicId}/translation-languages`);
 };

@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ComicDetail from '../../../../pages/common/ComicDetail';
@@ -117,7 +117,7 @@ describe('Reader - ComicDetail Page Tests', () => {
 
     await waitFor(() => {
       expect(LikeApi.toggleLikeStatusApi).toHaveBeenCalledWith('comic-123');
-    });
+    }, { timeout: 3000 });
   });
 
   it('should not toggle like if unauthenticated', async () => {

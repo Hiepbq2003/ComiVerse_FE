@@ -26,6 +26,11 @@ import { getMyProjectTeamsApi, getAllProjectTeamsApi } from '../../services/api/
 import { getModeratorScope, isScopeGlobal } from '../../utils/moderatorScope'
 import { getMyTranslatorProfileApi, updateMyTranslatorProfileApi } from '../../services/api/TranslatorApi'
 import { uploadFileApi } from '../../services/api/UploadApi'
+import {
+  getAuthorProfileApi,
+  saveAuthorProfileApi,
+  uploadAuthorLicenseApi,
+} from '../../services/api/AuthorProfileApi'
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 const COMMON_NOTIFICATION_OPTIONS = [
   {
@@ -39,177 +44,43 @@ const COMMON_NOTIFICATION_OPTIONS = [
 ]
 
 const ROLE_NOTIFICATION_OPTIONS = {
-  MODERATOR: [{ title: 'Moderator Workspace', options: [
-    { key: 'REVIEW_QUEUE', label: 'Review queue', description: 'New comic and chapter submissions waiting for moderation.' },
-  ] }],
+  MODERATOR: [{
+    title: 'Moderator Workspace', options: [
+      { key: 'REVIEW_QUEUE', label: 'Review queue', description: 'New comic and chapter submissions waiting for moderation.' },
+    ]
+  }],
 
-  AUTHOR: [{ title: 'Author Hub', options: [
-    { key: 'SUBMISSION_STATUS', label: 'Submission status', description: 'Approval, rejection, and change requests for your submitted work.' },
-  ] }],
-  TRANSLATOR: [{ title: 'Translator Hub', options: [
-    { key: 'PROJECT_OPPORTUNITIES', label: 'Project opportunities', description: 'New translation projects available in the project pool.' },
-    { key: 'TEAM_UPDATES', label: 'Team updates', description: 'Project claims, team decisions, and workflow updates affecting you.' },
-  ] }],
-  PROJECT_LEADER: [{ title: 'Project Leader Workspace', options: [
-    { key: 'PROJECT_OPPORTUNITIES', label: 'Project opportunities', description: 'New translation projects available in the project pool.' },
-    { key: 'TEAM_UPDATES', label: 'Team updates', description: 'Project claims, team decisions, and workflow updates affecting you.' },
-    { key: 'TEAM_JOIN_REQUESTS', label: 'Team join requests', description: 'Applications from translators who want to join your project team.' },
-  ] }],
+  AUTHOR: [{
+    title: 'Author Hub', options: [
+      { key: 'SUBMISSION_STATUS', label: 'Submission status', description: 'Approval, rejection, and change requests for your submitted work.' },
+      { key: 'AUTHOR_REVIEWS', label: 'Review Notifications', description: 'Get notified when a reader posts a review on your series.' },
+      { key: 'AUTHOR_CHAPTER_UPDATES', label: 'Chapter Updates', description: 'Receive updates about chapter approvals and translation status.' },
+      { key: 'AUTHOR_WEEKLY_DIGEST', label: 'Weekly digest report', description: 'Receive an email summary of page views and subscriber milestones.' },
+    ]
+  }],
+  TRANSLATOR: [{
+    title: 'Translator Hub', options: [
+      { key: 'PROJECT_OPPORTUNITIES', label: 'Project opportunities', description: 'New translation projects available in the project pool.' },
+      { key: 'TEAM_UPDATES', label: 'Team updates', description: 'Project claims, team decisions, and workflow updates affecting you.' },
+    ]
+  }],
+  PROJECT_LEADER: [{
+    title: 'Project Leader Workspace', options: [
+      { key: 'PROJECT_OPPORTUNITIES', label: 'Project opportunities', description: 'New translation projects available in the project pool.' },
+      { key: 'TEAM_UPDATES', label: 'Team updates', description: 'Project claims, team decisions, and workflow updates affecting you.' },
+      { key: 'TEAM_JOIN_REQUESTS', label: 'Team join requests', description: 'Applications from translators who want to join your project team.' },
+    ]
+  }],
 }
 
-// ── ROLE-SPECIFIC STATISTICS COMPONENTS ────────────────────────────
 
-function ReaderStats({ stats, loading }) {
-  if (loading) {
-    return (
-      <div className="profile-stats-list">
-        <div style={{ color: 'var(--profile-text-muted)', fontSize: '13px', textAlign: 'center', padding: '8px 0' }}>
-          Loading stats...
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="profile-stats-list">
-      <div className="profile-stats-row">
-        <span>Comics liked</span>
-        <span className="profile-stats-value">{(stats?.likedCount ?? 0).toLocaleString()}</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Comics saved</span>
-        <span className="profile-stats-value">{(stats?.savedCount ?? 0).toLocaleString()}</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Comics read</span>
-        <span className="profile-stats-value">{(stats?.readCount ?? 0).toLocaleString()}</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Comics rated</span>
-        <span className="profile-stats-value">{(stats?.ratingCount ?? 0).toLocaleString()}</span>
-      </div>
-    </div>
-  )
-}
-
-function TranslatorStats({ teams = [], loading = false }) {
-  if (loading) {
-    return (
-      <div className="profile-stats-list">
-        <div className="profile-stats-row"><span>Comics translated</span><span className="profile-stats-value">...</span></div>
-        <div className="profile-stats-row"><span>Chapters translated</span><span className="profile-stats-value">...</span></div>
-        <div className="profile-stats-row"><span>Group members</span><span className="profile-stats-value">...</span></div>
-      </div>
-    )
-  }
-
-  const uniqueComics = new Set(teams.map(t => (t.comicName || t.comic_name || t.title || '').toLowerCase().trim()).filter(Boolean)).size
-  const totalChapters = teams.reduce((acc, t) => acc + (Number(t.chaptersCount || t.chapters_count) || 0), 0)
-  const totalMembers = teams.reduce((acc, t) => acc + (Number(t.membersCount || t.members_count) || 1), 0)
-
-  return (
-    <div className="profile-stats-list">
-      <div className="profile-stats-row">
-        <span>Comics translated</span>
-        <span className="profile-stats-value">{uniqueComics}</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Chapters translated</span>
-        <span className="profile-stats-value">{totalChapters}</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Group members</span>
-        <span className="profile-stats-value">{totalMembers}</span>
-      </div>
-    </div>
-  )
-}
-
-function ProjectLeaderStats({ teams = [], loading = false }) {
-  if (loading) {
-    return (
-      <div className="profile-stats-list">
-        <div className="profile-stats-row"><span>Projects led</span><span className="profile-stats-value">...</span></div>
-        <div className="profile-stats-row"><span>Active teams</span><span className="profile-stats-value">...</span></div>
-        <div className="profile-stats-row"><span>Chapters delivered</span><span className="profile-stats-value">...</span></div>
-      </div>
-    )
-  }
-
-  const projectsLed = teams.length
-  const activeTeams = teams.filter(t => (t.status || 'Active').toLowerCase() === 'active').length
-  const totalChaptersDelivered = teams.reduce((acc, t) => acc + (Number(t.chaptersCount || t.chapters_count) || 0), 0)
-
-  return (
-    <div className="profile-stats-list">
-      <div className="profile-stats-row">
-        <span>Projects led</span>
-        <span className="profile-stats-value">{projectsLed}</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Active teams</span>
-        <span className="profile-stats-value">{activeTeams}</span>
-      </div>
-      <div className="profile-stats-row">
-        <span>Chapters delivered</span>
-        <span className="profile-stats-value">{totalChaptersDelivered}</span>
-      </div>
-    </div>
-  )
-}
-
-function AuthorStats() {
-  return (
-    <div className="profile-stats-list">
-      <div className="profile-stats-row">
-        <span className="profile-stats-value" style={{ fontSize: '14px', color: 'var(--text)' }}>No statistics available yet.</span>
-      </div>
-    </div>
-  )
-}
-
-function ModeratorStats({ assignedLanguages = [], user }) {
-  const langs = Array.isArray(assignedLanguages) ? assignedLanguages : [];
-
-  const isGlobal = isScopeGlobal(langs, user);
-
-  return (
-    <div className="profile-stats-list">
-      <div className="profile-stats-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '6px' }}>
-        <span>Assigned Scope</span>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-          {isGlobal ? (
-            <span className="profile-lang-chip">🌐 All Languages</span>
-          ) : langs.length > 0 ? (
-            langs.map(l => (
-              <span key={l} className="profile-lang-chip">🌐 {l}</span>
-            ))
-          ) : (
-            <span className="profile-lang-chip" style={{ opacity: 0.7 }}>Not Assigned</span>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function AdminStats() {
-  return (
-    <div className="profile-stats-list">
-      <div className="profile-stats-row">
-        <span>Assigned Scope</span>
-        <span className="profile-stats-value">Full System</span>
-      </div>
-    </div>
-  )
-}
 
 // Main profile page
 
 function Profile({ user: userProp }) {
   const navigate = useNavigate()
   const { user: authUser, updateUser } = useAuth()
-  
+
   // Safely resolve user from prop, auth context, or localStorage fallback
   const user = userProp || authUser || getAuth()?.user || null
 
@@ -355,6 +226,12 @@ function Profile({ user: userProp }) {
   const [transBio, setTransBio] = useState('')
   const [isTranslator, setIsTranslator] = useState(false)
   const [cvUploading, setCvUploading] = useState(false)
+  const [authorProfile, setAuthorProfile] = useState(null)
+  const [authorDisplayName, setAuthorDisplayName] = useState('')
+  const [authorType, setAuthorType] = useState('INDIVIDUAL')
+  const [authorCopyrightDoc, setAuthorCopyrightDoc] = useState('')
+  const [authorLicenseStatus, setAuthorLicenseStatus] = useState('')
+  const [authorCanUploadLicense, setAuthorCanUploadLicense] = useState(false)
 
   const [notifSettings, setNotifSettings] = useState({})
   const [availableNotifKeys, setAvailableNotifKeys] = useState([])
@@ -383,6 +260,33 @@ function Profile({ user: userProp }) {
       })
     return () => { cancelled = true }
   }, [user?.id, user?.userId])
+
+  // Load Author profile and license state for the shared Profile page.
+  // The AuthorEntity remains the single source of truth for displayName,
+  // authorType and copyright-license verification.
+  useEffect(() => {
+    if (!user || roleUpper !== 'AUTHOR') return
+    let cancelled = false
+
+    getAuthorProfileApi()
+      .then(profile => {
+        if (cancelled || !profile) return
+        setAuthorProfile(profile)
+        setAuthorDisplayName(profile.displayName || user.fullName || user.username || '')
+        setAuthorType(profile.authorType || 'INDIVIDUAL')
+        setAuthorCopyrightDoc(profile.licenseUrl || '')
+        setAuthorLicenseStatus(profile.licenseStatus || '')
+        setAuthorCanUploadLicense(Boolean(profile.canUploadLicense))
+      })
+      .catch(err => {
+        if (!cancelled) {
+          console.error('Failed to load author profile:', err)
+          toast.error(err.response?.data?.message || 'Failed to load author workspace profile.')
+        }
+      })
+
+    return () => { cancelled = true }
+  }, [user?.id, user?.userId, roleUpper])
 
   // Load Translator Profile
   useEffect(() => {
@@ -417,30 +321,62 @@ function Profile({ user: userProp }) {
   const handleCvUpload = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
+
     const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
     if (!isPdf) {
-      toast.warn('🚫 Invalid file format! Only PDF documents (.pdf) are accepted for CV uploads.')
+      toast.warn('🚫 Invalid file format! Only PDF documents (.pdf) are accepted.')
       e.target.value = ''
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.warn('File size must be under 5MB.')
+
+    // Author licenses use the dedicated AuthorLicenseService limit (10 MB).
+    // Translator CVs continue to use the existing generic upload limit (5 MB).
+    const maxSizeBytes = roleUpper === 'AUTHOR' ? 10 * 1024 * 1024 : 5 * 1024 * 1024
+    if (file.size > maxSizeBytes) {
+      toast.warn(roleUpper === 'AUTHOR' ? 'License PDF must be under 10MB.' : 'File size must be under 5MB.')
       e.target.value = ''
       return
     }
+
     try {
       setCvUploading(true)
-      const uploadResult = await uploadFileApi(file)
-      const uploadedUrl = typeof uploadResult === 'string' ? uploadResult : uploadResult?.url || uploadResult?.fileUrl || null
-      if (uploadedUrl) {
-        setTransCvUrl(uploadedUrl)
-        toast.success('CV / Resume document uploaded successfully!')
+
+      if (roleUpper === 'AUTHOR') {
+        // IMPORTANT: do not use /upload/file here. This endpoint persists the
+        // PDF URL and transitions AuthorEntity -> PENDING_VERIFICATION.
+        const result = await uploadAuthorLicenseApi(file)
+        setAuthorCopyrightDoc(result?.licenseUrl || '')
+        setAuthorLicenseStatus(result?.status || 'PENDING_VERIFICATION')
+        setAuthorCanUploadLicense(Boolean(result?.canUploadLicense))
+        setAuthorProfile(prev => prev ? {
+          ...prev,
+          licenseUrl: result?.licenseUrl || prev.licenseUrl,
+          licenseOriginalFilename: result?.licenseOriginalFilename || file.name,
+          licenseUploadedAt: result?.licenseUploadedAt || prev.licenseUploadedAt,
+          licenseStatus: result?.status || 'PENDING_VERIFICATION',
+          canUploadLicense: Boolean(result?.canUploadLicense),
+          canPublishComic: Boolean(result?.canPublishComic),
+          canRequestAuthorPayout: Boolean(result?.canRequestAuthorPayout),
+        } : prev)
+        toast.success('License uploaded. Waiting for administrator verification.')
+      } else {
+        const uploadResult = await uploadFileApi(file)
+        const uploadedUrl = typeof uploadResult === 'string'
+          ? uploadResult
+          : uploadResult?.url || uploadResult?.fileUrl || null
+        if (uploadedUrl) {
+          setTransCvUrl(uploadedUrl)
+          toast.success('CV / Resume document uploaded successfully!')
+        }
       }
     } catch (err) {
-      console.error('CV upload error:', err)
-      toast.error('Failed to upload CV document.')
+      console.error('Upload error:', err)
+      toast.error(err.response?.data?.message || (roleUpper === 'AUTHOR'
+        ? 'Failed to upload author license.'
+        : 'Failed to upload document.'))
     } finally {
       setCvUploading(false)
+      e.target.value = ''
     }
   }
 
@@ -476,8 +412,8 @@ function Profile({ user: userProp }) {
     try {
       const payload = availableNotifKeys && availableNotifKeys.length > 0
         ? Object.fromEntries(
-            Object.entries(notifSettings).filter(([k]) => availableNotifKeys.includes(k))
-          )
+          Object.entries(notifSettings).filter(([k]) => availableNotifKeys.includes(k))
+        )
         : notifSettings
       const response = await updateNotificationPreferencesApi(payload)
       setNotifSettings(response?.preferences || notifSettings)
@@ -526,8 +462,34 @@ function Profile({ user: userProp }) {
     e.preventDefault()
     setProfileSaving(true)
     try {
+      const authorDisplayNameToSave = roleUpper === 'AUTHOR' ? authorDisplayName.trim() : ''
+      if (roleUpper === 'AUTHOR' && !authorDisplayNameToSave) {
+        throw new Error('Author display name is required.')
+      }
+
       const savedProfile = await updateProfileApi(buildProfilePayload())
       applySavedProfile(savedProfile)
+
+      // Save the two Author-only workspace fields into AuthorEntity.
+      if (roleUpper === 'AUTHOR') {
+        const savedAuthor = await saveAuthorProfileApi({
+          authorType,
+          displayName: authorDisplayNameToSave,
+          // Preserve existing AuthorEntity fields that are not edited on this shared page.
+          legalName: authorProfile?.legalName || null,
+          bio: authorProfile?.bio || null,
+          avatarUrl: authorProfile?.avatarUrl || null,
+          contactEmail: authorProfile?.contactEmail || user?.email || null,
+          externalProfileRef: authorProfile?.externalProfileRef || null,
+          note: authorProfile?.note || null,
+        })
+        setAuthorProfile(savedAuthor)
+        setAuthorDisplayName(savedAuthor?.displayName || authorDisplayNameToSave)
+        setAuthorType(savedAuthor?.authorType || authorType)
+        setAuthorCopyrightDoc(savedAuthor?.licenseUrl || authorCopyrightDoc)
+        setAuthorLicenseStatus(savedAuthor?.licenseStatus || authorLicenseStatus)
+        setAuthorCanUploadLicense(Boolean(savedAuthor?.canUploadLicense))
+      }
 
       // Save Translator Profile if role is TRANSLATOR or has profile
       if (roleUpper === 'TRANSLATOR' || isTranslator) {
@@ -545,9 +507,9 @@ function Profile({ user: userProp }) {
         }
       }
 
-      toast.success('Basic Info and Translator profile updated successfully!')
+      toast.success('Profile updated successfully!')
     } catch (err) {
-      const errMsg = err.response?.data?.message || 'Failed to save changes.'
+      const errMsg = err.response?.data?.message || err.message || 'Failed to save changes.'
       toast.error(errMsg)
     } finally {
       setProfileSaving(false)
@@ -557,22 +519,22 @@ function Profile({ user: userProp }) {
   const handleAvatarChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     if (file.size > 2 * 1024 * 1024) {
       toast.error('File size exceeds 2MB limit!');
       return;
     }
-    
+
     try {
       const uploadToast = toast.info('Uploading avatar...', { autoClose: false });
       const uploadedUrl = await uploadAvatarApi(file);
       toast.dismiss(uploadToast);
-      
+
       setAvatarUrl(uploadedUrl);
-      
+
       const savedProfile = await updateProfileApi(buildProfilePayload({ avatarUrl: uploadedUrl }));
       applySavedProfile(savedProfile);
-      
+
       toast.success('Avatar uploaded successfully!');
     } catch (err) {
       const errMsg = err.response?.data?.message || 'Failed to upload image.';
@@ -628,25 +590,7 @@ function Profile({ user: userProp }) {
     }
   }
 
-  // Render stats dynamically based on role
-  const renderStats = () => {
-    switch (roleUpper) {
-      case 'ADMIN':
-        return <AdminStats />
-      case 'AUTHOR':
-        return <AuthorStats />
-      case 'MODERATOR':
-        return <ModeratorStats assignedLanguages={assignedLanguages} user={user} />
-      case 'TRANSLATOR':
-        return <TranslatorStats teams={projectTeams} loading={projectTeamsLoading} />
-      case 'PROJECT_LEADER':
-        return <ProjectLeaderStats teams={projectTeams} loading={projectTeamsLoading} />
-      case 'READER':
-      case 'USER':
-      default:
-        return <ReaderStats stats={interactionCounts} loading={statsLoading} />
-    }
-  }
+
 
   // Helper for role details
   const getRoleInfo = () => {
@@ -697,517 +641,659 @@ function Profile({ user: userProp }) {
   return (
     <LayoutComponent {...layoutProps}>
       <div className="profile-page-wrapper">
-      {/* ── TOP SITE HEADER ──────────────────────────────── */}
+        {/* ── TOP SITE HEADER ──────────────────────────────── */}
 
 
-      {/* ── SUB BACK-BAR ─────────────────────────────────── */}
-      <div className="profile-back-bar">
-        <button className="profile-back-btn" onClick={() => window.history.back()}>
-          &larr; Back
-        </button>
-        <span>/</span>
-        <span className="profile-page-title">My Profile</span>
-      </div>
-
-      <section
-        className={`profile-cover-section ${backgroundImageUrl ? 'has-custom-bg' : ''}`}
-        style={backgroundImageUrl ? { backgroundImage: `url(${backgroundImageUrl})` } : undefined}
-      >
-        {!backgroundImageUrl && <div className="profile-cover-ambient-mesh" />}
-        <div className="profile-cover-overlay">
-          <div className="profile-cover-badge-wrap">
-            <span className="profile-cover-kicker">✨ Profile Background</span>
-          </div>
-          <label className="profile-cover-upload-btn" htmlFor="profile-background-input">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-            <span>Upload background</span>
-          </label>
-          <input
-            id="profile-background-input"
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={handleBackgroundChange}
-          />
-        </div>
-      </section>
-
-      {/* ── GRID LAYOUT ──────────────────────────────────── */}
-      <div className="profile-grid-container">
-        {/* Left Column: Sidebar Cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div className="profile-sidebar-card">
-            <div className="profile-avatar-container">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="Avatar" className="profile-avatar-img" style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--profile-purple)' }} />
-              ) : (
-                <div className="profile-avatar-main">
-                  {userInitials}
-                </div>
-              )}
-              <label className="profile-avatar-upload-icon" title="Upload Photo" htmlFor="avatar-file-input">
-                📷
-              </label>
-              <input 
-                type="file" 
-                id="avatar-file-input" 
-                style={{ display: 'none' }} 
-                accept="image/*" 
-                onChange={handleAvatarChange} 
-              />
-            </div>
-
-            <h3 className="profile-sidebar-name">{displayUserName}</h3>
-            <span className="profile-sidebar-joined">Member since 2023</span>
-
-            <span className={`profile-role-badge ${roleInfo.className}`}>
-              {roleInfo.icon} {roleInfo.label}
-            </span>
-
-            <div className="profile-sidebar-nav">
-              <button 
-                className={`profile-sidebar-nav-btn ${activeTab === 'info' ? 'active' : ''}`}
-                onClick={() => setActiveTab('info')}
-              >
-                👤 Basic Info
-              </button>
-              <button 
-                className={`profile-sidebar-nav-btn ${activeTab === 'password' ? 'active' : ''}`}
-                onClick={() => setActiveTab('password')}
-              >
-                🔒 Change Password
-              </button>
-              <button 
-                className={`profile-sidebar-nav-btn ${activeTab === 'notifications' ? 'active' : ''}`}
-                onClick={() => setActiveTab('notifications')}
-              >
-                🔔 Notification Settings
-              </button>
-              <button 
-                className={`profile-sidebar-nav-btn ${activeTab === 'ratings' ? 'active' : ''}`}
-                onClick={() => setActiveTab('ratings')}
-              >
-                ⭐ My Ratings
-              </button>
-            </div>
-
-            {/* Stats Block */}
-            <div className="profile-stats-card">
-              <h4 className="profile-stats-title">Stats</h4>
-              {renderStats()}
-            </div>
-          </div>
+        {/* ── SUB BACK-BAR ─────────────────────────────────── */}
+        <div className="profile-back-bar">
+          <button className="profile-back-btn" onClick={() => window.history.back()}>
+            &larr; Back
+          </button>
+          <span>/</span>
+          <span className="profile-page-title">My Profile</span>
         </div>
 
-        {/* Right Column: Dynamic Form Panels */}
-        <div className="profile-content-card">
-          {activeTab === 'info' ? (
-            <div className="fade-in">
-              <h2 className="profile-content-title">Basic Info</h2>
-              
-              <form onSubmit={handleSaveInfo}>
-                {/* Profile Picture Upload row */}
-                <div className="profile-picture-edit-sec">
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt="Avatar" style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--profile-purple)' }} />
-                  ) : (
-                    <div className="profile-picture-edit-avatar">
-                      {userInitials}
-                    </div>
-                  )}
-                  <div>
-                    <label className="profile-picture-upload-btn" htmlFor="avatar-file-input" style={{ cursor: 'pointer', display: 'inline-block', padding: '8px 16px', background: 'var(--profile-purple)', borderRadius: '8px', color: 'white', fontWeight: '600' }}>
-                      Upload photo
-                    </label>
-                    <p className="profile-picture-upload-text">PNG, JPG up to 2MB</p>
+        <section
+          className={`profile-cover-section ${backgroundImageUrl ? 'has-custom-bg' : ''}`}
+          style={backgroundImageUrl ? { backgroundImage: `url(${backgroundImageUrl})` } : undefined}
+        >
+          {!backgroundImageUrl && <div className="profile-cover-ambient-mesh" />}
+          <div className="profile-cover-overlay">
+            <div className="profile-cover-badge-wrap">
+              <span className="profile-cover-kicker">✨ Profile Background</span>
+            </div>
+            <label className="profile-cover-upload-btn" htmlFor="profile-background-input">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+              <span>Upload background</span>
+            </label>
+            <input
+              id="profile-background-input"
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={handleBackgroundChange}
+            />
+          </div>
+        </section>
+
+        {/* ── GRID LAYOUT ──────────────────────────────────── */}
+        <div className="profile-grid-container">
+          {/* Left Column: Sidebar Cards */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div className="profile-sidebar-card">
+              <div className="profile-avatar-container">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Avatar" className="profile-avatar-img" style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--profile-purple)' }} />
+                ) : (
+                  <div className="profile-avatar-main">
+                    {userInitials}
                   </div>
-                </div>
+                )}
+                <label className="profile-avatar-upload-icon" title="Upload Photo" htmlFor="avatar-file-input">
+                  📷
+                </label>
+                <input
+                  type="file"
+                  id="avatar-file-input"
+                  style={{ display: 'none' }}
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                />
+              </div>
 
-                <div className="profile-input-group">
-                  <label>Profile Background</label>
-                  <div className="profile-background-upload-row">
+              <h3 className="profile-sidebar-name">{displayUserName}</h3>
+
+              <span className={`profile-role-badge ${roleInfo.className}`}>
+                {roleInfo.icon} {roleInfo.label}
+              </span>
+
+              <div className="profile-sidebar-nav">
+                <button
+                  className={`profile-sidebar-nav-btn ${activeTab === 'info' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('info')}
+                >
+                  👤 Basic Info
+                </button>
+                <button
+                  className={`profile-sidebar-nav-btn ${activeTab === 'password' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('password')}
+                >
+                  🔒 Change Password
+                </button>
+                <button
+                  className={`profile-sidebar-nav-btn ${activeTab === 'notifications' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('notifications')}
+                >
+                  🔔 Notification Settings
+                </button>
+                <button
+                  className={`profile-sidebar-nav-btn ${activeTab === 'ratings' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('ratings')}
+                >
+                  ⭐ My Ratings
+                </button>
+                {(roleUpper === 'AUTHOR' || roleUpper === 'TRANSLATOR' || isTranslator) && (
+                  <button
+                    className={`profile-sidebar-nav-btn ${activeTab === 'professional' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('professional')}
+                  >
+                    📄 Workspace Profile
+                  </button>
+                )}
+              </div>
+
+
+            </div>
+          </div>
+
+          {/* Right Column: Dynamic Form Panels */}
+          <div className="profile-content-card">
+            {activeTab === 'info' ? (
+              <div className="fade-in">
+                <h2 className="profile-content-title">Basic Info</h2>
+
+                <form onSubmit={handleSaveInfo}>
+                  {/* Profile Picture Upload row */}
+                  <div className="profile-picture-edit-sec">
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt="Avatar" style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--profile-purple)' }} />
+                    ) : (
+                      <div className="profile-picture-edit-avatar">
+                        {userInitials}
+                      </div>
+                    )}
+                    <div>
+                      <label className="profile-picture-upload-btn" htmlFor="avatar-file-input" style={{ cursor: 'pointer', display: 'inline-block', padding: '8px 16px', background: 'var(--profile-purple)', borderRadius: '8px', color: 'white', fontWeight: '600' }}>
+                        Upload photo
+                      </label>
+                      <p className="profile-picture-upload-text">PNG, JPG up to 2MB</p>
+                    </div>
+                  </div>
+
+                  <div className="profile-input-group">
+                    <label>Profile Background</label>
+                    <div className="profile-background-upload-row">
+                      <input
+                        type="text"
+                        value={backgroundImageUrl}
+                        onChange={(e) => setBackgroundImageUrl(e.target.value)}
+                        placeholder="https://.../background.jpg"
+                      />
+                      <label className="profile-background-upload-btn" htmlFor="profile-background-input">
+                        Upload image
+                      </label>
+                    </div>
+                    <p className="profile-input-desc">PNG, JPG up to 4MB. This background is shown on profiles for every role.</p>
+                  </div>
+
+                  {/* Names row */}
+                  <div className="profile-form-grid">
+                    <div className="profile-input-group">
+                      <label>First Name</label>
+                      <input
+                        type="text"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="profile-input-group">
+                      <label>Last Name</label>
+                      <input
+                        type="text"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Username (Immutable Handle) */}
+                  <div className="profile-input-group">
+                    <label>Username (Account Handle)</label>
                     <input
                       type="text"
-                      value={backgroundImageUrl}
-                      onChange={(e) => setBackgroundImageUrl(e.target.value)}
-                      placeholder="https://.../background.jpg"
-                    />
-                    <label className="profile-background-upload-btn" htmlFor="profile-background-input">
-                      Upload image
-                    </label>
-                  </div>
-                  <p className="profile-input-desc">PNG, JPG up to 4MB. This background is shown on profiles for every role.</p>
-                </div>
-
-                {/* Names row */}
-                <div className="profile-form-grid">
-                  <div className="profile-input-group">
-                    <label>First Name</label>
-                    <input 
-                      type="text" 
-                      value={firstName} 
-                      onChange={(e) => setFirstName(e.target.value)} 
-                      required 
-                    />
-                  </div>
-                  <div className="profile-input-group">
-                    <label>Last Name</label>
-                    <input 
-                      type="text" 
-                      value={lastName} 
-                      onChange={(e) => setLastName(e.target.value)} 
-                      required 
-                    />
-                  </div>
-                </div>
-
-                {/* Username (Immutable Handle) */}
-                <div className="profile-input-group">
-                  <label>Username (Account Handle)</label>
-                  <input 
-                    type="text" 
-                    value={username} 
-                    readOnly
-                    disabled
-                    className="profile-input-readonly"
-                  />
-                  <p className="profile-input-desc">🔒 Unique account handle. Username is immutable and cannot be changed.</p>
-                </div>
-
-                {/* Email (Verified, Immutable) */}
-                <div className="profile-input-group">
-                  <label>Email Address</label>
-                  <div className="profile-email-container">
-                    <input 
-                      type="email" 
-                      value={email} 
+                      value={username}
                       readOnly
                       disabled
                       className="profile-input-readonly"
                     />
-                    <span className="profile-email-badge">Verified</span>
+                    <p className="profile-input-desc">🔒 Unique account handle. Username is immutable and cannot be changed.</p>
                   </div>
-                  <p className="profile-input-desc">🔒 Account email address linked to your profile identity.</p>
-                </div>
 
-                {/* Date of Birth */}
-                <div className="profile-input-group">
-                  <label>Date of Birth</label>
-                  <CustomDatePicker 
-                    value={dateOfBirth} 
-                    onChange={(val) => setDateOfBirth(val)} 
-                  />
-                </div>
-
-                {/* Bio */}
-                <div className="profile-input-group">
-                  <label>Bio</label>
-                  <textarea 
-                    rows="4" 
-                    placeholder="Write a few lines about yourself..." 
-                    value={bio} 
-                    onChange={(e) => setBio(e.target.value)}
-                  />
-                </div>
-
-                {/* Moderator Specific: Assigned Scope (Read-Only, Assigned by Admin) */}
-                {roleUpper === 'MODERATOR' && (
+                  {/* Email (Verified, Immutable) */}
                   <div className="profile-input-group">
-                    <label>Assigned Moderation Languages (Scope)</label>
-                    <div className="profile-readonly-scope-container">
-                      {assignedLanguages.map((lang) => (
-                        <span key={lang} className="profile-readonly-scope-badge">
-                          🌐 {lang}
-                        </span>
-                      ))}
-                    </div>
-                    <p className="profile-input-desc">
-                      Moderation tasks, chat monitoring, and comic review queues will be filtered based on your assigned language scope.
-                    </p>
-                  </div>
-                )}
-
-                {/* Translator Specific: Professional Profile & CV (Auto-attached on Team Application) */}
-                {(roleUpper === 'TRANSLATOR' || isTranslator) && (
-                  <div className="profile-translator-section">
-                    <div className="profile-translator-header">
-                      <div className="profile-translator-icon-wrap">🌐</div>
-                      <div>
-                        <h4 className="profile-translator-title">
-                          Translator Professional Profile
-                        </h4>
-                        <p className="profile-translator-subtitle">
-                          This verified info is automatically attached when you apply to Comic Translation Teams.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Language Specializations */}
-                    <div className="profile-input-group" style={{ marginBottom: '18px' }}>
-                      <label>Language Specializations</label>
-                      <div className="profile-specialization-list">
-                        {COMIC_LANGUAGE_OPTIONS.map((lang) => {
-                          const selected = transSpecializations.includes(lang)
-                          return (
-                            <button
-                              key={lang}
-                              type="button"
-                              onClick={() => toggleSpecialization(lang)}
-                              className={`profile-spec-btn ${selected ? 'selected' : ''}`}
-                            >
-                              {selected ? '✓ ' : '+ '} {lang}
-                            </button>
-                          )
-                        })}
-                      </div>
-                      {transSpecializations.length === 0 && (
-                        <p style={{ color: '#f59e0b', fontSize: '12px', marginTop: '6px', fontWeight: '500' }}>Please select at least one language specialization.</p>
-                      )}
-                    </div>
-
-                    {/* Experience & Contact Grid */}
-                    <div className="profile-form-grid" style={{ marginBottom: '18px' }}>
-                      <div className="profile-input-group">
-                        <label>Years of Translation Experience</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="50"
-                          value={transExp}
-                          onChange={(e) => setTransExp(e.target.value)}
-                          placeholder="e.g. 2"
-                        />
-                      </div>
-
-                      <div className="profile-input-group">
-                        <label>Phone Number / Direct Contact</label>
-                        <input
-                          type="text"
-                          value={transPhone}
-                          onChange={(e) => setTransPhone(e.target.value)}
-                          placeholder="e.g. 0904034333"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="profile-input-group" style={{ marginBottom: '18px' }}>
-                      <label>Social / Portfolio URL (Facebook / Discord / LinkedIn)</label>
+                    <label>Email Address</label>
+                    <div className="profile-email-container">
                       <input
-                        type="url"
-                        value={transFacebook}
-                        onChange={(e) => setTransFacebook(e.target.value)}
-                        placeholder="https://facebook.com/... or discord handle"
+                        type="email"
+                        value={email}
+                        readOnly
+                        disabled
+                        className="profile-input-readonly"
                       />
+                      <span className="profile-email-badge">Verified</span>
                     </div>
-
-                    {/* CV / Resume Document */}
-                    <div className="profile-input-group" style={{ marginBottom: '8px' }}>
-                      <label>Attached CV / Portfolio Resume (PDF)</label>
-                      <div className="profile-cv-box">
-                        <div className="profile-cv-doc-info">
-                          <span className="profile-cv-icon">📄</span>
-                          <div>
-                            {transCvUrl ? (
-                              <>
-                                <a
-                                  href={transCvUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="profile-cv-link"
-                                >
-                                  View Uploaded CV Document (PDF) ↗
-                                </a>
-                                <p className="profile-cv-badge">✓ Active and ready to auto-attach for team applications</p>
-                              </>
-                            ) : (
-                              <span className="profile-cv-empty-text">No CV attached yet. Upload a PDF for 1-click team applications.</span>
-                            )}
-                          </div>
-                        </div>
-
-                        <label
-                          htmlFor="profile-cv-file-input"
-                          className="profile-cv-upload-btn"
-                        >
-                          {cvUploading ? 'Uploading...' : transCvUrl ? 'Replace CV File' : 'Upload CV (PDF)'}
-                        </label>
-                        <input
-                          id="profile-cv-file-input"
-                          type="file"
-                          accept="application/pdf,.pdf"
-                          style={{ display: 'none' }}
-                          onChange={handleCvUpload}
-                          disabled={cvUploading}
-                        />
-                      </div>
-                    </div>
+                    <p className="profile-input-desc">🔒 Account email address linked to your profile identity.</p>
                   </div>
-                )}
 
-                <button type="submit" className="profile-save-btn" disabled={profileSaving}>
-                  {profileSaving ? 'Saving...' : 'Save Changes'}
-                </button>
-              </form>
-            </div>
-          ) : activeTab === 'password' ? (
-            <div className="fade-in">
-              <h2 className="profile-content-title">Change Password</h2>
-              
-              <form onSubmit={handleSavePassword}>
-                <div className="profile-input-group">
-                  <label>Current Password</label>
-                  <input 
-                    type="password" 
-                    placeholder="Enter current password" 
-                    value={currentPassword} 
-                    onChange={(e) => setCurrentPassword(e.target.value)} 
-                    required 
-                  />
-                </div>
+                  {/* Date of Birth */}
+                  <div className="profile-input-group">
+                    <label>Date of Birth</label>
+                    <CustomDatePicker
+                      value={dateOfBirth}
+                      onChange={(val) => setDateOfBirth(val)}
+                    />
+                  </div>
 
-                <div className="profile-input-group">
-                  <label>New Password</label>
-                  <input 
-                    type="password" 
-                    placeholder="Enter new password (min. 8 chars)" 
-                    value={newPassword} 
-                    onChange={(e) => setNewPassword(e.target.value)} 
-                    required 
-                  />
-                </div>
+                  {/* Bio */}
+                  <div className="profile-input-group">
+                    <label>Bio</label>
+                    <textarea
+                      rows="4"
+                      placeholder="Write a few lines about yourself..."
+                      value={bio}
+                      onChange={(e) => setBio(e.target.value)}
+                    />
+                  </div>
 
-                <div className="profile-input-group">
-                  <label>Confirm New Password</label>
-                  <input 
-                    type="password" 
-                    placeholder="Confirm new password" 
-                    value={confirmPassword} 
-                    onChange={(e) => setConfirmPassword(e.target.value)} 
-                    required 
-                  />
-                </div>
 
-                <button type="submit" className="profile-save-btn">
-                  Change Password
-                </button>
-              </form>
-            </div>
-          ) : activeTab === 'notifications' ? (
-            <div className="fade-in">
-              <h2 className="profile-content-title">Notification Settings</h2>
-              <p className="profile-input-desc" style={{ marginBottom: '24px', fontSize: '13px' }}>
-                Choose which in-app workflow notifications you receive for your current role.
-              </p>
 
-              {notifLoading ? (
-                <p className="profile-input-desc">Loading notification preferences...</p>
-              ) : (
-                <form onSubmit={handleSaveNotifSettings}>
-                  {[...(ROLE_NOTIFICATION_OPTIONS[roleUpper] || []), ...COMMON_NOTIFICATION_OPTIONS].map(section => {
-                    const options = section.options.filter(option => availableNotifKeys.includes(option.key))
-                    if (options.length === 0) return null
-                    return (
-                      <div className="profile-notif-group" key={section.title}>
-                        <h3 className="profile-notif-group-title">{section.title}</h3>
-                        {options.map(option => (
-                          <div className="profile-notif-item" key={option.key}>
-                            <div>
-                              <strong>{option.label}</strong>
-                              <p>{option.description}</p>
-                            </div>
-                            <label className="profile-switch">
-                              <input
-                                type="checkbox"
-                                checked={notifSettings[option.key] !== false}
-                                onChange={() => setNotifSettings(prev => ({
-                                  ...prev,
-                                  [option.key]: !(prev[option.key] !== false)
-                                }))}
-                              />
-                              <span className="profile-slider" />
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    )
-                  })}
-
-                  <button type="submit" className="profile-save-btn" disabled={notifSaving}>
-                    {notifSaving ? 'Saving...' : 'Save Notification Preferences'}
+                  <button type="submit" className="profile-save-btn" disabled={profileSaving}>
+                    {profileSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </form>
-              )}
-            </div>
-          ) : activeTab === 'ratings' ? (
-            <div className="fade-in">
-              <h2 className="profile-content-title">My Rated Comics</h2>
-              <p className="profile-input-desc" style={{ marginBottom: '24px', fontSize: '13px' }}>
-                A complete history of all comics you have rated and reviewed.
-              </p>
+              </div>
+            ) : activeTab === 'password' ? (
+              <div className="fade-in">
+                <h2 className="profile-content-title">Change Password</h2>
 
-              {ratingsLoading ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
-                  Loading your rated comics...
-                </div>
-              ) : userRatings.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b', background: 'rgba(255,255,255,0.01)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)' }}>
-                  <span style={{ fontSize: '40px', display: 'block', marginBottom: '12px' }}>⭐</span>
-                  <h4 style={{ color: 'white', margin: '0 0 8px' }}>No Rated Comics Yet</h4>
-                  <p style={{ margin: 0, fontSize: '13px' }}>
-                    You haven't rated any comics yet. Explore titles and drop your star ratings!
-                  </p>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
-                  {userRatings.map((item) => {
-                    const comicObj = item.comic || item;
-                    const comicId = comicObj.id || item.comicId;
-                    const comicTitle = comicObj.title || 'Untitled Comic';
-                    const userScoreVal = item.score || item.userScore || 5;
+                <form onSubmit={handleSavePassword}>
+                  <div className="profile-input-group">
+                    <label>Current Password</label>
+                    <input
+                      type="password"
+                      placeholder="Enter current password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      required
+                    />
+                  </div>
 
-                    return (
-                      <div
-                        key={item.id || comicId}
-                        style={{
-                          background: 'rgba(255, 255, 255, 0.02)',
-                          border: '1px solid rgba(255, 255, 255, 0.06)',
-                          borderRadius: '12px',
-                          padding: '14px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '10px',
-                          cursor: 'pointer',
-                          transition: 'transform 0.2s, border-color 0.2s'
-                        }}
-                        onClick={() => navigate(`/comic/${comicId}`)}
-                      >
-                        {comicObj.cover && (
-                          <img
-                            src={comicObj.cover}
-                            alt={comicTitle}
-                            style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: '8px' }}
-                          />
-                        )}
-                        <div>
-                          <h4 style={{ margin: '0 0 4px', fontSize: '14px', color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {comicTitle}
-                          </h4>
-                          <span style={{ fontSize: '13px', color: '#fbbf24', fontWeight: 'bold' }}>
-                            ⭐ Rated: {userScoreVal} / 5
+                  <div className="profile-input-group">
+                    <label>New Password</label>
+                    <input
+                      type="password"
+                      placeholder="Enter new password (min. 8 chars)"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="profile-input-group">
+                    <label>Confirm New Password</label>
+                    <input
+                      type="password"
+                      placeholder="Confirm new password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <button type="submit" className="profile-save-btn">
+                    Change Password
+                  </button>
+                </form>
+              </div>
+            ) : activeTab === 'notifications' ? (
+              <div className="fade-in">
+                <h2 className="profile-content-title">Notification Settings</h2>
+                <p className="profile-input-desc" style={{ marginBottom: '24px', fontSize: '13px' }}>
+                  Choose which in-app workflow notifications you receive for your current role.
+                </p>
+
+                {notifLoading ? (
+                  <p className="profile-input-desc">Loading notification preferences...</p>
+                ) : (
+                  <form onSubmit={handleSaveNotifSettings}>
+                    {[...(ROLE_NOTIFICATION_OPTIONS[roleUpper] || []), ...COMMON_NOTIFICATION_OPTIONS].map(section => {
+                      const options = section.options
+                      if (options.length === 0) return null
+                      return (
+                        <div className="profile-notif-group" key={section.title}>
+                          <h3 className="profile-notif-group-title">{section.title}</h3>
+                          {options.map(option => (
+                            <div className="profile-notif-item" key={option.key}>
+                              <div>
+                                <strong>{option.label}</strong>
+                                <p>{option.description}</p>
+                              </div>
+                              <label className="profile-toggle">
+                                <input
+                                  type="checkbox"
+                                  checked={notifSettings[option.key] || false}
+                                  onChange={() => handleToggleNotifSetting(option.key)}
+                                />
+                                <span className="profile-toggle-slider" />
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })}
+
+                    <button type="submit" className="profile-save-btn" disabled={notifSaving}>
+                      {notifSaving ? 'Saving...' : 'Save Notification Preferences'}
+                    </button>
+                  </form>
+                )}
+              </div>
+            ) : activeTab === 'ratings' ? (
+              <div className="fade-in">
+                <h2 className="profile-content-title">My Rated Comics</h2>
+                <p className="profile-input-desc" style={{ marginBottom: '24px', fontSize: '13px' }}>
+                  A complete history of all comics you have rated and reviewed.
+                </p>
+
+                {ratingsLoading ? (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
+                    Loading your rated comics...
+                  </div>
+                ) : userRatings.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b', background: 'rgba(255,255,255,0.01)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                    <span style={{ fontSize: '40px', display: 'block', marginBottom: '12px' }}>⭐</span>
+                    <h4 style={{ color: 'white', margin: '0 0 8px' }}>No Rated Comics Yet</h4>
+                    <p style={{ margin: 0, fontSize: '13px' }}>
+                      You haven't rated any comics yet. Explore titles and drop your star ratings!
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
+                    {userRatings.map((item) => {
+                      const comicObj = item.comic || item;
+                      const comicId = comicObj.id || item.comicId;
+                      const comicTitle = comicObj.title || 'Untitled Comic';
+                      const userScoreVal = item.score || item.userScore || 5;
+
+                      return (
+                        <div
+                          key={item.id || comicId}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.02)',
+                            border: '1px solid rgba(255, 255, 255, 0.06)',
+                            borderRadius: '12px',
+                            padding: '14px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px',
+                            cursor: 'pointer',
+                            transition: 'transform 0.2s, border-color 0.2s'
+                          }}
+                          onClick={() => navigate(`/comic/${comicId}`)}
+                        >
+                          {comicObj.cover && (
+                            <img
+                              src={comicObj.cover}
+                              alt={comicTitle}
+                              style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: '8px' }}
+                            />
+                          )}
+                          <div>
+                            <h4 style={{ margin: '0 0 4px', fontSize: '14px', color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {comicTitle}
+                            </h4>
+                            <span style={{ fontSize: '13px', color: '#fbbf24', fontWeight: 'bold' }}>
+                              ⭐ Rated: {userScoreVal} / 5
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : activeTab === 'professional' ? (
+              <div className="fade-in">
+                <h2 className="profile-content-title">Workspace Profile</h2>
+                <p className="profile-input-desc" style={{ marginBottom: '24px', fontSize: '13px' }}>
+                  Manage your professional identity and credentials used in the Creator and Mod Workspaces.
+                </p>
+
+                <form onSubmit={handleSaveInfo}>
+                  {/* Moderator Specific: Assigned Scope (Read-Only, Assigned by Admin) */}
+                  {roleUpper === 'MODERATOR' && (
+                    <div className="profile-input-group" style={{ marginBottom: '24px' }}>
+                      <label>Assigned Moderation Languages (Scope)</label>
+                      <div className="profile-readonly-scope-container">
+                        {assignedLanguages.map((lang) => (
+                          <span key={lang} className="profile-readonly-scope-badge">
+                            🌐 {lang}
                           </span>
+                        ))}
+                      </div>
+                      <p className="profile-input-desc">
+                        Moderation tasks, chat monitoring, and comic review queues will be filtered based on your assigned language scope.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Author Specific: Copyright Identity */}
+                  {roleUpper === 'AUTHOR' && (
+                    <div className="profile-translator-section" style={{ marginBottom: '24px', borderColor: 'rgba(168, 85, 247, 0.3)' }}>
+                      <div className="profile-translator-header">
+                        <div className="profile-translator-icon-wrap" style={{ background: 'rgba(168, 85, 247, 0.1)', color: 'var(--mod-purple)' }}>✍️</div>
+                        <div>
+                          <h4 className="profile-translator-title" style={{ color: 'var(--mod-purple)' }}>
+                            Author Copyright Identity
+                          </h4>
+                          <p className="profile-translator-subtitle">
+                            This verified name is used as your public publisher identity and copyright holder name for all comics.
+                          </p>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ) : null}
+
+                      <div className="profile-form-grid">
+                        <div className="profile-input-group">
+                          <label htmlFor="author-display-name">Display Name / Pen Name</label>
+                          <input
+                            id="author-display-name"
+                            type="text"
+                            value={authorDisplayName}
+                            onChange={(e) => setAuthorDisplayName(e.target.value)}
+                            maxLength={150}
+                            placeholder="Public author name"
+                            required
+                          />
+                          <small style={{ color: 'var(--profile-text-muted)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                            Public author identity shown on comics and author-facing content.
+                          </small>
+                        </div>
+
+                        <div className="profile-input-group">
+                          <label htmlFor="author-type">Author Type</label>
+                          <select
+                            id="author-type"
+                            value={authorType}
+                            onChange={(e) => setAuthorType(e.target.value)}
+                          >
+                            <option value="INDIVIDUAL">Individual</option>
+                            <option value="STUDIO">Studio</option>
+                            <option value="PUBLISHER">Publisher</option>
+                            <option value="COMPANY">Company</option>
+                          </select>
+                          <small style={{ color: 'var(--profile-text-muted)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                            Describes the ownership type of this Author profile.
+                          </small>
+                        </div>
+                      </div>
+
+                      {/* Copyright Document Upload */}
+                      <div className="profile-input-group" style={{ marginTop: '16px' }}>
+                        <label>Copyright Registration Document (PDF)</label>
+                        <div className="profile-cv-box">
+                          <div className="profile-cv-doc-info">
+                            <span className="profile-cv-icon">📄</span>
+                            <div>
+                              {authorCopyrightDoc ? (
+                                <>
+                                  <a
+                                    href={authorCopyrightDoc}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="profile-cv-link"
+                                  >
+                                    View Uploaded Copyright Document ↗
+                                  </a>
+                                  <p className="profile-cv-badge">
+                                    {authorLicenseStatus === 'ACTIVE'
+                                      ? '✓ Verified — publishing enabled'
+                                      : authorLicenseStatus === 'PENDING_VERIFICATION'
+                                        ? '⏳ Waiting for administrator verification'
+                                        : authorLicenseStatus === 'REJECTED'
+                                          ? '✕ Rejected — upload a corrected PDF'
+                                          : `Status: ${authorLicenseStatus || 'PENDING_LICENSE'}`}
+                                  </p>
+                                  {authorLicenseStatus === 'REJECTED' && authorProfile?.licenseRejectionReason && (
+                                    <p className="profile-input-desc" style={{ marginTop: '4px' }}>
+                                      Reason: {authorProfile.licenseRejectionReason}
+                                    </p>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="profile-cv-empty-text">
+                                  {authorLicenseStatus === 'EXPIRED'
+                                    ? 'License upload deadline expired. Contact an administrator to reopen it.'
+                                    : 'No document attached. Upload a PDF for copyright verification.'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <label
+                            htmlFor="author-copyright-file-input"
+                            className="profile-cv-upload-btn"
+                            style={{
+                              background: 'var(--mod-purple)',
+                              borderColor: 'var(--mod-purple)',
+                              opacity: (!authorCanUploadLicense || cvUploading) ? 0.55 : 1,
+                              pointerEvents: (!authorCanUploadLicense || cvUploading) ? 'none' : 'auto',
+                            }}
+                          >
+                            {cvUploading
+                              ? 'Uploading...'
+                              : authorCanUploadLicense
+                                ? (authorCopyrightDoc ? 'Upload Corrected PDF' : 'Upload PDF')
+                                : authorLicenseStatus === 'PENDING_VERIFICATION'
+                                  ? 'Waiting for Review'
+                                  : authorLicenseStatus === 'ACTIVE'
+                                    ? 'Verified'
+                                    : 'Upload unavailable'}
+                          </label>
+                          <input
+                            id="author-copyright-file-input"
+                            type="file"
+                            accept="application/pdf,.pdf"
+                            style={{ display: 'none' }}
+                            onChange={handleCvUpload}
+                            disabled={cvUploading || !authorCanUploadLicense}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Translator Specific: Professional Profile & CV (Auto-attached on Team Application) */}
+                  {(roleUpper === 'TRANSLATOR' || isTranslator) && (
+                    <div className="profile-translator-section" style={{ marginBottom: '24px' }}>
+                      <div className="profile-translator-header">
+                        <div className="profile-translator-icon-wrap">🌐</div>
+                        <div>
+                          <h4 className="profile-translator-title">
+                            Translator Professional Profile
+                          </h4>
+                          <p className="profile-translator-subtitle">
+                            This verified info is automatically attached when you apply to Comic Translation Teams.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Language Specializations */}
+                      <div className="profile-input-group" style={{ marginBottom: '18px' }}>
+                        <label>Language Specializations</label>
+                        <div className="profile-specialization-list">
+                          {COMIC_LANGUAGE_OPTIONS.map((lang) => {
+                            const selected = transSpecializations.includes(lang)
+                            return (
+                              <button
+                                key={lang}
+                                type="button"
+                                onClick={() => toggleSpecialization(lang)}
+                                className={`profile-spec-btn ${selected ? 'selected' : ''}`}
+                              >
+                                {selected ? '✓ ' : '+ '} {lang}
+                              </button>
+                            )
+                          })}
+                        </div>
+                        {transSpecializations.length === 0 && (
+                          <p style={{ color: '#f59e0b', fontSize: '12px', marginTop: '6px', fontWeight: '500' }}>Please select at least one language specialization.</p>
+                        )}
+                      </div>
+
+                      {/* Experience & Contact Grid */}
+                      <div className="profile-form-grid" style={{ marginBottom: '18px' }}>
+                        <div className="profile-input-group">
+                          <label>Years of Translation Experience</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="50"
+                            value={transExp}
+                            onChange={(e) => setTransExp(e.target.value)}
+                            placeholder="e.g. 2"
+                          />
+                        </div>
+
+                        <div className="profile-input-group">
+                          <label>Phone Number / Direct Contact</label>
+                          <input
+                            type="text"
+                            value={transPhone}
+                            onChange={(e) => setTransPhone(e.target.value)}
+                            placeholder="e.g. 0904034333"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="profile-input-group" style={{ marginBottom: '18px' }}>
+                        <label>Social / Portfolio URL (Facebook / Discord / LinkedIn)</label>
+                        <input
+                          type="url"
+                          value={transFacebook}
+                          onChange={(e) => setTransFacebook(e.target.value)}
+                          placeholder="https://facebook.com/... or discord handle"
+                        />
+                      </div>
+
+                      {/* CV / Resume Document */}
+                      <div className="profile-input-group" style={{ marginBottom: '8px' }}>
+                        <label>Attached CV / Portfolio Resume (PDF)</label>
+                        <div className="profile-cv-box">
+                          <div className="profile-cv-doc-info">
+                            <span className="profile-cv-icon">📄</span>
+                            <div>
+                              {transCvUrl ? (
+                                <>
+                                  <a
+                                    href={transCvUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="profile-cv-link"
+                                  >
+                                    View Uploaded CV Document (PDF) ↗
+                                  </a>
+                                  <p className="profile-cv-badge">✓ Active and ready to auto-attach for team applications</p>
+                                </>
+                              ) : (
+                                <span className="profile-cv-empty-text">No CV attached yet. Upload a PDF for 1-click team applications.</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <label
+                            htmlFor="profile-cv-file-input"
+                            className="profile-cv-upload-btn"
+                          >
+                            {cvUploading ? 'Uploading...' : transCvUrl ? 'Replace CV File' : 'Upload CV (PDF)'}
+                          </label>
+                          <input
+                            id="profile-cv-file-input"
+                            type="file"
+                            accept="application/pdf,.pdf"
+                            style={{ display: 'none' }}
+                            onChange={handleCvUpload}
+                            disabled={cvUploading}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {(roleUpper === 'AUTHOR' || roleUpper === 'TRANSLATOR' || isTranslator) && (
+                    <button type="submit" className="profile-save-btn" disabled={profileSaving}>
+                      {profileSaving ? 'Saving...' : 'Save Workspace Profile'}
+                    </button>
+                  )}
+                </form>
+              </div>
+            ) : null}
+          </div>
         </div>
-      </div>
       </div>
     </LayoutComponent>
   )

@@ -7,7 +7,7 @@ function AuthorEarnings() {
     <>
       <div className="author-page-header">
         <h1>Earnings & Revenue</h1>
-        <p>Revenue is calculated per comic from monthly views and new follows. Request a closed-month payout through Stripe sandbox.</p>
+        <p>Revenue is calculated proportionally per comic from monthly views and new follows in USD. Partial reward units are paid, and prior requests for the same month are reserved to prevent duplicate payouts.</p>
       </div>
 
       <CreatorRevenuePanel heading="Author Monthly Revenue" />

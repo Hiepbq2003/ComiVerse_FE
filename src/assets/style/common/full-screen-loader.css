@@ -1,0 +1,108 @@
+.full-screen-loader-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #08060d;
+  z-index: 99999;
+  transition: background-color 0.25s ease;
+}
+
+html.light .full-screen-loader-overlay,
+.light .full-screen-loader-overlay,
+[data-theme="light"] .full-screen-loader-overlay {
+  background-color: #fdfbf7;
+}
+
+html.dark .full-screen-loader-overlay,
+.dark .full-screen-loader-overlay,
+[data-theme="dark"] .full-screen-loader-overlay {
+  background-color: #08060d;
+}
+
+.full-screen-loader-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.full-screen-loader-spinner {
+  width: 48px;
+  height: 48px;
+  animation: spinner-rotate 2s linear infinite;
+}
+
+.full-screen-loader-spinner svg {
+  width: 100%;
+  height: 100%;
+}
+
+.full-screen-loader-spinner circle {
+  stroke: var(--accent, #a855f7);
+  stroke-linecap: round;
+  animation: spinner-dash 1.5s ease-in-out infinite;
+}
+
+.full-screen-loader-logo {
+  opacity: 0.95;
+  animation: pulse-opacity 2s ease-in-out infinite;
+}
+
+/* Explicit theme overrides for logo inside full-screen-loader */
+html.light .full-screen-loader-overlay .logo-comi,
+.light .full-screen-loader-overlay .logo-comi,
+[data-theme="light"] .full-screen-loader-overlay .logo-comi {
+  fill: #0f172a !important;
+}
+
+html.light .full-screen-loader-overlay .logo-slash-secondary,
+.light .full-screen-loader-overlay .logo-slash-secondary,
+[data-theme="light"] .full-screen-loader-overlay .logo-slash-secondary {
+  fill: #0f172a !important;
+  opacity: 0.9 !important;
+}
+
+html.dark .full-screen-loader-overlay .logo-comi,
+.dark .full-screen-loader-overlay .logo-comi,
+[data-theme="dark"] .full-screen-loader-overlay .logo-comi {
+  fill: #ffffff !important;
+}
+
+html.dark .full-screen-loader-overlay .logo-slash-secondary,
+.dark .full-screen-loader-overlay .logo-slash-secondary,
+[data-theme="dark"] .full-screen-loader-overlay .logo-slash-secondary {
+  fill: #ffffff !important;
+  opacity: 0.9 !important;
+}
+
+@keyframes spinner-rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spinner-dash {
+  0% {
+    stroke-dasharray: 1, 150;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -35;
+  }
+  100% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -124;
+  }
+}
+
+@keyframes pulse-opacity {
+  0%, 100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+}

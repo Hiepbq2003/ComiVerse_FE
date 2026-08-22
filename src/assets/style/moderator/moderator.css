@@ -3025,3 +3025,10 @@ html.light .moderator-mobile-toggle {
   overflow-x: hidden;
   max-width: 100vw;
 }
+/* Fix Create Project Team Comic Dropdown Background */
+.mod-comic-select-menu {
+  background: #180e30 !important;
+}
+html.light .mod-comic-select-menu {
+  background: #ffffff !important;
+}

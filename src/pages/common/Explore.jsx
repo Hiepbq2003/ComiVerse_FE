@@ -5,8 +5,9 @@ import HomeLayout from '../../components/layout/HomeLayout'
 import { getExploreComicsApi } from '../../services/api/ComicApi'
 import { getAllGenresApi } from '../../services/api/GenreApi'
 import ComicCard from '../../components/common/ComicCard'
-import { toast } from 'react-toastify'
+import { ModernPagination } from '../../components/common/ModernPagination'
 import { mapToComicDTO } from '../../utils/comicModels'
+import { toast } from 'react-toastify'
 
 
 function Explore() {
@@ -163,10 +164,59 @@ function Explore() {
       const statusParam = selectedStatus !== 'All' ? selectedStatus.toUpperCase() : undefined
       const sortByParam = sortBy !== 'Default' ? sortBy : undefined
 
+      let currentCursorObj = cursorObj || { cursor: null, referenceId: null }
+      
+      // Fast-forward fetch if jumping to a page without a cursor
+      if (page > pageCursorsRef.current.length) {
+        let tempCursor = pageCursorsRef.current[pageCursorsRef.current.length - 1]?.cursor
+        let tempRef = pageCursorsRef.current[pageCursorsRef.current.length - 1]?.referenceId
+        
+        for (let i = pageCursorsRef.current.length; i < page; i++) {
+          const tempParams = {
+            size: ITEMS_PER_PAGE,
+            cursor: tempCursor || undefined,
+            referenceId: tempRef || undefined,
+            genres: genreIds.length > 0 ? genreIds.join(',') : undefined,
+            publicationStatus: statusParam,
+            sortBy: sortByParam
+          }
+          
+          const tempResponse = await getExploreComicsApi(tempParams, { signal: controller.signal })
+          
+          let nc = null
+          let nr = null
+          let hm = false
+          
+          if (tempResponse) {
+            if (tempResponse.data && !Array.isArray(tempResponse.data)) {
+              nc = tempResponse.data.nextCursor || tempResponse.nextCursor
+              nr = tempResponse.data.nextReferenceId || tempResponse.nextReferenceId
+              hm = tempResponse.data.hasMore !== undefined ? tempResponse.data.hasMore : (tempResponse.hasMore || false)
+            } else if (tempResponse.success && tempResponse.data) {
+              nc = tempResponse.data.nextCursor
+              nr = tempResponse.data.nextReferenceId
+              hm = tempResponse.data.hasMore || false
+            } else {
+              nc = tempResponse.nextCursor
+              nr = tempResponse.nextReferenceId
+              hm = tempResponse.hasMore || false
+            }
+          }
+          
+          pageCursorsRef.current[i] = { cursor: nc, referenceId: nr }
+          tempCursor = nc
+          tempRef = nr
+          
+          if (!hm) break // Stop if we reach the end early
+        }
+        
+        currentCursorObj = pageCursorsRef.current[page - 1] || { cursor: tempCursor, referenceId: tempRef }
+      }
+
       const params = {
         size: ITEMS_PER_PAGE,
-        cursor: cursorObj?.cursor || undefined,
-        referenceId: cursorObj?.referenceId || undefined,
+        cursor: currentCursorObj?.cursor || undefined,
+        referenceId: currentCursorObj?.referenceId || undefined,
         genres: genreIds.length > 0 ? genreIds.join(',') : undefined,
         publicationStatus: statusParam,
         sortBy: sortByParam
@@ -293,9 +343,9 @@ function Explore() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '32px', marginTop: '10px' }}>
+          <div className="explore-layout" style={{ display: 'flex', gap: '32px', marginTop: '10px' }}>
             {/* ── LEFT SIDEBAR FILTERS ────────────────────── */}
-            <aside style={{ width: '220px', flexShrink: 0 }}>
+            <aside className="explore-filters" style={{ width: '220px', flexShrink: 0 }}>
 
               {/* Genres Dropdown Selector */}
               <div ref={genresDropdownRef} style={{ position: 'relative', marginBottom: '28px' }}>
@@ -746,7 +796,7 @@ function Explore() {
             </aside>
 
             {/* ── RIGHT MAIN AREA (GRID & TABS) ───────────── */}
-            <main style={{ flexGrow: 1 }}>
+            <main className="explore-results" style={{ flexGrow: 1 }}>
               {/* Header sort buttons row */}
               <div style={{ 
                 display: 'flex', 
@@ -797,44 +847,14 @@ function Explore() {
 
                   {/* Pagination Controls */}
                   {(currentPage > 1 || hasMore) && (
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '32px' }}>
-                      <button
-                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                        disabled={currentPage === 1 || loading}
-                        style={{
-                          background: currentPage === 1 ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
-                          border: '1px solid rgba(255,255,255,0.06)',
-                          color: currentPage === 1 ? '#64748b' : 'white',
-                          borderRadius: '6px',
-                          padding: '8px 16px',
-                          fontSize: '13px',
-                          cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                          fontWeight: '600',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        Previous
-                      </button>
-                      <span style={{ fontSize: '13px', color: '#cbd5e1' }}>
-                        Page <strong>{currentPage}</strong>
-                      </span>
-                      <button
-                        onClick={() => setCurrentPage(prev => prev + 1)}
-                        disabled={!hasMore || loading}
-                        style={{
-                          background: !hasMore ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
-                          border: '1px solid rgba(255,255,255,0.06)',
-                          color: !hasMore ? '#64748b' : 'white',
-                          borderRadius: '6px',
-                          padding: '8px 16px',
-                          fontSize: '13px',
-                          cursor: !hasMore ? 'not-allowed' : 'pointer',
-                          fontWeight: '600',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        Next
-                      </button>
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '40px', paddingBottom: '20px' }}>
+                      <ModernPagination 
+                        currentPage={currentPage}
+                        maxClickablePage={pageCursorsRef.current.length}
+                        hasMore={hasMore}
+                        onPageChange={(page) => setCurrentPage(page)}
+                        variant="cursor"
+                      />
                     </div>
                   )}
                 </>

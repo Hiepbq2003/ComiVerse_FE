@@ -211,7 +211,9 @@ function TeamGroupChat({ groupId, teamName, onClose, style, isLeader }) {
                         const content = msg.content || msg.text || '';
                         const time = formatMsgTime(msg);
                         const key = msg.id || `group-msg-${idx}-${msg.createdAt}`;
-                        const isSystem = senderName === 'SYSTEM' || msg.sender === 'SYSTEM' || content.includes('[CẢNH BÁO') || content.includes('[WARNING]');
+                        const isSystem = senderName === 'SYSTEM' || msg.sender === 'SYSTEM'
+                          || content.includes('[CẢNH BÁO') || content.includes('[WARNING]')
+                          || content.includes('[TRANSLATION REPORT]');
 
                         if (isSystem) {
                             return (

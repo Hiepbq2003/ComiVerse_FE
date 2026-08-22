@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import '../../assets/style/moderator/dashboard.css'
 import ModeratorLayout from '../../components/layout/ModeratorLayout'
@@ -12,6 +12,7 @@ import ModeratorReports from './ModeratorReports'
 import ReportCategories from './ReportCategories'
 import { getAllComicsApi, updateComicApi, deleteComicApi, getComicLeaderboardApi } from '../../services/api/ComicApi'
 import { getAllProjectTeamsApi, createProjectTeamApi, deleteProjectTeamApi } from '../../services/api/ProjectTeamApi'
+import { getTeamTasksApi, getTeamMembersApi, getTeamChaptersApi } from '../../services/api/TeamWorkspaceApi'
 import { getAllSubmissionsApi, approveSubmissionApi, rejectSubmissionApi } from '../../services/api/SubmissionApi'
 import { getAllGenresApi } from '../../services/api/GenreApi'
 import { getAllForumThreadsApi } from '../../services/api/ForumThreadApi'
@@ -143,6 +144,10 @@ function ModeratorDashboard() {
     cover: '',
     comicId: ''
   })
+  const [isSubmittingTeam, setIsSubmittingTeam] = useState(false)
+  const isSubmittingTeamRef = useRef(false)
+  const [isSubmittingAction, setIsSubmittingAction] = useState(false)
+  const isSubmittingActionRef = useRef(false)
 
   useEffect(() => {
     fetchAllData()
@@ -179,23 +184,40 @@ function ModeratorDashboard() {
   };
 
   const syncApprovedComics = (initialComics, subsList) => {
-    const result = (initialComics || []).map(c => {
+    const result = [...(initialComics || [])];
+    
+    // Build index maps for fast lookups
+    const titleMap = new Map();
+    const idMap = new Map();
+    result.forEach((c, idx) => {
       const cCover = getComicCover(c);
-      return {
-        ...c,
-        cover: cCover,
-        coverImage: cCover,
-        coverImageUrl: cCover
-      };
+      c.cover = cCover;
+      c.coverImage = cCover;
+      c.coverImageUrl = cCover;
+      
+      const cleanTitle = c.title ? String(c.title).trim().toLowerCase().replace(/[^a-z0-9]/gi, '').replace(/s$/, '') : '';
+      if (cleanTitle) titleMap.set(cleanTitle, idx);
+      if (c.id) idMap.set(String(c.id), idx);
     });
+
+    const newComics = [];
+
     (subsList || []).forEach(sub => {
       if (sub.status === 'approved' && (sub.title || sub.comicName || sub.comicTitle)) {
         const comicTitle = (sub.title || sub.comicName || sub.comicTitle).trim();
-        const existingIdx = result.findIndex(c => isTitleMatch(c.title, comicTitle) || (sub.comicId && String(c.id) === String(sub.comicId)));
+        const cleanSubTitle = comicTitle.toLowerCase().replace(/[^a-z0-9]/gi, '').replace(/s$/, '');
+        
+        let existingIdx = -1;
+        if (sub.comicId && idMap.has(String(sub.comicId))) {
+          existingIdx = idMap.get(String(sub.comicId));
+        } else if (titleMap.has(cleanSubTitle)) {
+          existingIdx = titleMap.get(cleanSubTitle);
+        }
+
         const coverVal = getComicCover(sub);
         if (existingIdx !== -1) {
           const finalCover = getComicCover(result[existingIdx]) || coverVal;
-          const subChapsCount = Array.isArray(sub.allChapters) ? sub.allChapters.length : (Array.isArray(sub.chapters) ? sub.chapters.length : 0);
+          const subChapsCount = Array.isArray(sub.allChapters) ? sub.allChapters.length : (Array.isArray(sub.chapters) ? sub.chapters.length : (sub.chapterNumber || sub.number || 0));
           const currentChapsCount = result[existingIdx].chapterCount || result[existingIdx].chapters || 0;
           result[existingIdx] = {
             ...result[existingIdx],
@@ -207,6 +229,7 @@ function ModeratorDashboard() {
             chapterCount: Math.max(currentChapsCount, subChapsCount),
             chapters: Math.max(currentChapsCount, subChapsCount)
           };
+
         } else {
           const authorNameClean = formatSubmitterName(sub.submittedBy || sub.author || sub.submittedByEmail || sub.authorName || 'Unknown Author').replace(/^Author:\s*/i, '');
           const stableId = sub.comicId || (sub.id ? `comic-${sub.id}` : (sub.submissionId ? `comic-${sub.submissionId}` : `comic-${comicTitle.replace(/\s+/g, '-').toLowerCase()}`));
@@ -228,7 +251,7 @@ function ModeratorDashboard() {
             const subChapsCount = Array.isArray(sub.allChapters) ? sub.allChapters.length : (Array.isArray(sub.chapters) ? sub.chapters.length : 0);
             const initialChaps = subChapsCount > 0 ? subChapsCount : (sub.chapterCount || sub.chapters || sub.chapterNumber || sub.number || 0);
 
-            result.unshift({
+            newComics.push({
               id: stableId,
               title: comicTitle,
               authorName: authorNameClean,
@@ -346,6 +369,182 @@ function ModeratorDashboard() {
     return comic;
   };
 
+  const enrichProjectTeamsWithTasks = async (rawTeamsList, currentComics = []) => {
+    if (!Array.isArray(rawTeamsList) || rawTeamsList.length === 0) return rawTeamsList || [];
+    
+    // O(N) map building for O(1) lookups
+    const comicTitleMap = new Map();
+    const comicIdMap = new Map();
+    (currentComics || []).forEach(c => {
+      if (c.id) comicIdMap.set(String(c.id), c);
+      if (c.title) comicTitleMap.set(c.title.toLowerCase().trim(), c);
+    });
+
+    try {
+      const enriched = [];
+      const CHUNK_SIZE = 3;
+      
+      for (let i = 0; i < rawTeamsList.length; i += CHUNK_SIZE) {
+        const chunk = rawTeamsList.slice(i, i + CHUNK_SIZE);
+        const chunkResults = await Promise.all(
+          chunk.map(async (t) => {
+            if (!t) return t;
+            let tasks = [];
+          let members = [];
+          let chapters = [];
+
+          if (t.id) {
+            try {
+              const [tasksRes, membersRes, chaptersRes] = await Promise.allSettled([
+                getTeamTasksApi(t.id),
+                getTeamMembersApi(t.id),
+                getTeamChaptersApi(t.id)
+              ]);
+
+              if (tasksRes.status === 'fulfilled') {
+                const val = tasksRes.value;
+                tasks = Array.isArray(val) ? val : (val?.data || val?.content || []);
+              }
+              if (membersRes.status === 'fulfilled') {
+                const val = membersRes.value;
+                members = Array.isArray(val) ? val : (val?.data || val?.content || []);
+              }
+              if (chaptersRes.status === 'fulfilled') {
+                const val = chaptersRes.value;
+                chapters = Array.isArray(val) ? val : (val?.data || val?.content || []);
+              }
+            } catch (e) {}
+
+            // Merge local tasks if any
+            try {
+              const localKey = `comiverse_tasks_${t.id}`;
+              const localTasks = JSON.parse(localStorage.getItem(localKey) || '[]');
+              if (Array.isArray(localTasks) && localTasks.length > 0) {
+                const taskMap = new Map();
+                tasks.forEach(tsk => taskMap.set(String(tsk.id), tsk));
+                localTasks.forEach(tsk => taskMap.set(String(tsk.id), tsk));
+                tasks = Array.from(taskMap.values());
+              }
+            } catch (e) {}
+
+            // Merge local approved members if any
+            try {
+              const localApprovedKey = `comiverse_approved_members_${t.id}`;
+              const savedMems = JSON.parse(localStorage.getItem(localApprovedKey) || '[]');
+              if (Array.isArray(savedMems) && savedMems.length > 0) {
+                const memMap = new Map();
+                members.forEach(m => memMap.set(String(m.id || m.userId || m.username || m.name), m));
+                savedMems.forEach(m => memMap.set(String(m.id || m.userId || m.username || m.name), m));
+                members = Array.from(memMap.values());
+              }
+            } catch (e) {}
+
+            // Merge local chapters if any
+            try {
+              const localChapKey = `comiverse_chapters_${t.id}`;
+              const localChaps = JSON.parse(localStorage.getItem(localChapKey) || '[]');
+              if (Array.isArray(localChaps) && localChaps.length > 0) {
+                const chapMap = new Map();
+                chapters.forEach(c => chapMap.set(String(c.id), c));
+                localChaps.forEach(c => chapMap.set(String(c.id), c));
+                chapters = Array.from(chapMap.values());
+              }
+            } catch (e) {}
+          }
+
+          const isTaskCompleted = (tsk) => {
+            if (!tsk) return false;
+            if (tsk.isCompleted === true) return true;
+            const col = String(tsk.column || '').toLowerCase().trim();
+            const st = String(tsk.status || '').toLowerCase().trim();
+            const sg = String(tsk.stage || '').toLowerCase().trim();
+            return col === 'done' || col === 'completed' || col === 'published' || col === 'finish' || col === 'finished' ||
+                   st === 'done' || st === 'completed' || st === 'published' || st === 'finish' || st === 'finished' ||
+                   sg === 'done' || sg === 'completed' || sg === 'published' || sg === 'finish' || sg === 'finished';
+          };
+
+          const isTaskInProgress = (tsk) => {
+            if (!tsk || isTaskCompleted(tsk)) return false;
+            const col = String(tsk.column || '').toLowerCase().trim();
+            const st = String(tsk.status || '').toLowerCase().trim();
+            const sg = String(tsk.stage || '').toLowerCase().trim();
+            return col.includes('progress') || col.includes('doing') || col.includes('review') || col.includes('translate') || col.includes('edit') ||
+                   st.includes('progress') || st.includes('doing') || st.includes('review') || st.includes('translate') || st.includes('edit') ||
+                   sg.includes('progress') || sg.includes('doing') || sg.includes('review') || sg.includes('translate') || sg.includes('edit');
+          };
+
+          const completedTasks = tasks.filter(isTaskCompleted);
+          const inProgressTasks = tasks.filter(isTaskInProgress);
+
+          const now = Date.now();
+          const startOfToday = new Date().setHours(0, 0, 0, 0);
+          const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+          const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+
+          let tasksToday = 0;
+          let tasksWeek = 0;
+          let tasksMonth = 0;
+
+          completedTasks.forEach(tsk => {
+            const time = new Date(tsk.completedAt || tsk.updatedAt || tsk.createdAt || tsk.timestamp || now).getTime();
+            if (time >= startOfToday) tasksToday++;
+            if (time >= sevenDaysAgo) tasksWeek++;
+            if (time >= thirtyDaysAgo) tasksMonth++;
+          });
+
+          // Match linked comic for chapter counts & progress
+          const cNameLower = (t.comicName || '').toLowerCase().trim();
+          const cTitleLower = (t.comicTitle || '').toLowerCase().trim();
+          
+          let matchedComic = null;
+          if (t.comicId && comicIdMap.has(String(t.comicId))) {
+            matchedComic = comicIdMap.get(String(t.comicId));
+          } else if (cNameLower && comicTitleMap.has(cNameLower)) {
+            matchedComic = comicTitleMap.get(cNameLower);
+          } else if (cTitleLower && comicTitleMap.has(cTitleLower)) {
+            matchedComic = comicTitleMap.get(cTitleLower);
+          }
+
+          const totalDone = Math.max(completedTasks.length, t.completedTasksCount || 0, t.totalCompletedTasks || 0);
+
+          if (completedTasks.length === 0 && totalDone > 0) {
+            // Only fallback to backend stats if task array wasn't loaded
+            tasksToday = t.tasksToday || 0;
+            tasksWeek = t.tasksWeek || 0;
+            tasksMonth = t.tasksMonth || totalDone;
+          }
+
+          const totalChapters = chapters.length > 0 ? chapters.length : (matchedComic?.chapterCount || matchedComic?.chaptersCount || t.chaptersCount || t.chapterCount || 0);
+          const membersCount = members.length > 0 ? members.length : (t.membersCount || (Array.isArray(t.members) ? t.members.length : 1));
+
+          const leaderUser = members.find(m => String(m.role || '').toUpperCase().includes('LEADER') || m.isLeader);
+          const leaderName = t.leaderName || leaderUser?.name || leaderUser?.fullName || leaderUser?.username || 'Assigning...';
+          const leaderInitials = t.leaderInitials || (leaderName !== 'Assigning...' && leaderName ? leaderName[0].toUpperCase() : 'TL');
+
+          return {
+            ...t,
+            tasksToday,
+            tasksWeek,
+            tasksMonth,
+            totalCompletedTasks: totalDone,
+            completedTasksCount: totalDone,
+            inProgressTasksCount: inProgressTasks.length,
+            chaptersCount: totalChapters,
+            membersCount,
+            leaderName,
+            leaderInitials
+          };
+          })
+        );
+        enriched.push(...chunkResults);
+      }
+      return enriched;
+    } catch (err) {
+      console.warn('[ModeratorDashboard] enrichProjectTeamsWithTasks error:', err);
+      return rawTeamsList || [];
+    }
+  };
+
   const fetchComicsAndTeams = async () => {
     try {
       const [comicsData, teamsData, genresData] = await Promise.all([
@@ -364,12 +563,31 @@ function ModeratorDashboard() {
       ])
       const authUser = getAuth()?.user;
       const rawComics = comicsData || [];
+      const teamsList = teamsData || [];
+
+      // Build Map for fast comic title lookups
+      const comicTitleMap = new Map();
+      rawComics.forEach(c => {
+        if (c && c.title) {
+          const clean = String(c.title).trim().toLowerCase().replace(/[^a-z0-9]/gi, '').replace(/s$/, '');
+          comicTitleMap.set(clean, c);
+        }
+      });
+
+      // Build Map for fast team comicName lookups
+      const teamComicNameMap = new Map();
+      teamsList.forEach(t => {
+        if (t && t.comicName) {
+          teamComicNameMap.set(t.comicName.toLowerCase(), t);
+        }
+      });
       
       // Auto-link submissions to real DB IDs if titles match
       setSubmissions(prevSubs => (prevSubs || []).map(sub => {
         if (!sub) return sub;
         const subTitle = sub.title || sub.comicName || sub.comicTitle;
-        const dbMatch = rawComics.find(c => c && isTitleMatch(c.title, subTitle));
+        const cleanSubTitle = subTitle ? String(subTitle).trim().toLowerCase().replace(/[^a-z0-9]/gi, '').replace(/s$/, '') : '';
+        const dbMatch = comicTitleMap.get(cleanSubTitle);
         if (dbMatch) {
           return {
             ...sub,
@@ -380,9 +598,9 @@ function ModeratorDashboard() {
       }));
 
       const mappedComics = syncApprovedComics(
-        rawComics.map(c => {
+        rawComics.filter(c => c.moderationStatus === 'PUBLISHED' || c.moderationStatus === 'UNPUBLISHED').map(c => {
           const merged = syncComicWithLocalOverride(c);
-          const team = (teamsData || []).find(t => t.comicName && t.comicName.toLowerCase() === merged.title.toLowerCase())
+          const team = merged.title ? teamComicNameMap.get(merged.title.toLowerCase()) : undefined;
           const cCover = getComicCover(merged);
           return {
             ...merged,
@@ -413,8 +631,14 @@ function ModeratorDashboard() {
           mergedTeamsMap.set(key, t);
         }
       });
-      setProjectTeams(Array.from(mergedTeamsMap.values()));
+      
+      const allUniqueTeams = Array.from(mergedTeamsMap.values());
+      setProjectTeams(allUniqueTeams);
       setGenres(genresData?.data || genresData || [])
+
+      enrichProjectTeamsWithTasks(allUniqueTeams, mappedComics).then(enriched => {
+        setProjectTeams(enriched);
+      });
     } catch (err) {
       console.error('Failed to fetch comics/teams:', err)
     }
@@ -448,7 +672,24 @@ function ModeratorDashboard() {
   const fetchChatFlagsData = async () => {
     try {
       const data = await getAllChatFlagsApi()
-      setChatFlags(data || [])
+      const serverFlags = data || []
+      
+      let localFlags = []
+      try {
+        const raw = localStorage.getItem('comiverse_moderator_flags')
+        localFlags = raw ? JSON.parse(raw) : []
+      } catch (e) {}
+
+      const flagMap = new Map()
+      serverFlags.forEach(f => flagMap.set(f.id, f))
+      localFlags.forEach(f => {
+        if (flagMap.has(f.id) || (f.status && f.status !== 'pending') || f.isLocal) {
+          flagMap.set(f.id, { ...(flagMap.get(f.id) || {}), ...f })
+        }
+      })
+      const merged = Array.from(flagMap.values()).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+      
+      setChatFlags(merged)
     } catch (err) {
       console.error('Failed to fetch chat flags:', err)
     }
@@ -468,16 +709,32 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       setLoadingPhase2(true);
     }
     
-    // Phase 1: Core Dashboard Data (Comics, Teams, Submissions, Genres) with 2s max timeout
+    // Phase 1: Core Dashboard Data (Comics, Teams, Submissions, Chat Flags) with 2s max timeout
     Promise.all([
       withTimeout(getAllComicsApi(), []),
       withTimeout(getAllProjectTeamsApi(), []),
       withTimeout(getAllSubmissionsApi(), []),
-      withTimeout(getAllGenresApi(), []),
-      withTimeout(getComicLeaderboardApi({ timeframe: 'month' }), [])
-    ]).then(([comicsData, teamsData, submissionsData, genresData, leaderboardData]) => {
+      withTimeout(getAllChatFlagsApi(), [])
+    ]).then(([comicsData, teamsData, submissionsData, chatData]) => {
       const authUser = getAuth()?.user;
-      setTopComics(leaderboardData?.data || leaderboardData?.content || leaderboardData || []);
+      const serverFlags = chatData || []
+      
+      let localFlags = []
+      try {
+        const raw = localStorage.getItem('comiverse_moderator_flags')
+        localFlags = raw ? JSON.parse(raw) : []
+      } catch (e) {}
+
+      const flagMap = new Map()
+      serverFlags.forEach(f => flagMap.set(f.id, f))
+      localFlags.forEach(f => {
+        if (flagMap.has(f.id) || (f.status && f.status !== 'pending') || f.isLocal) {
+          flagMap.set(f.id, { ...(flagMap.get(f.id) || {}), ...f })
+        }
+      })
+      const mergedChatFlags = Array.from(flagMap.values()).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+      
+      setChatFlags(mergedChatFlags);
       
       const mergedSubmissionsData = [...(submissionsData || [])].filter(s => {
         // Determine if this submission is a chapter submission
@@ -521,13 +778,17 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
           normalizedStatus = 'rejected';
         }
 
+        const resolvedCover = getComicCover(baseObj) || getComicCover(s) || getComicCover(matchComic) || getComicCover(s.comic) || '';
+
         return {
           ...baseObj,
           id: s.id || `sub-${Date.now()}-${Math.random()}`,
           originalId: s.id,
           comicId: baseObj.comicId || baseObj.id,
           title: baseObj.title || baseObj.comicTitle || s.title || 'Untitled',
-          cover: baseObj.coverImageUrl || baseObj.cover || s.cover || '',
+          cover: resolvedCover,
+          coverImage: resolvedCover,
+          coverImageUrl: resolvedCover,
           type: (s.submissionType || s.type || 'NEW_COMIC').toUpperCase(),
           status: normalizedStatus,
           author: baseObj.authorName || baseObj.author || s.submittedBy || 'Unknown',
@@ -586,8 +847,13 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
           mergedTeamsMap.set(key, t);
         }
       });
-      setProjectTeams(Array.from(mergedTeamsMap.values()));
-      setGenres(genresData?.data || (Array.isArray(genresData) ? genresData : []));
+      const initialTeams = Array.from(mergedTeamsMap.values());
+      setProjectTeams(initialTeams);
+
+      // Asynchronously enrich teams with live tasks, members, and completed counts
+      enrichProjectTeamsWithTasks(initialTeams, mappedComics).then(enriched => {
+        setProjectTeams(enriched);
+      });
     }).catch(err => {
       console.error(err);
       toast.error('Failed to retrieve core data from server.');
@@ -595,19 +861,49 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       setLoadingPhase1(false);
     });
 
-    // Phase 2: Secondary Background Data (Forum threads & Chat flags) with timeout
+    // Phase 2: Secondary Background Data (Forum threads, Genres, Leaderboard) with timeout
     Promise.all([
       withTimeout(getAllForumThreadsApi(), []),
-      withTimeout(getAllChatFlagsApi(), [])
-    ]).then(([forumData, chatData]) => {
+      withTimeout(getAllGenresApi(), []),
+      withTimeout(getComicLeaderboardApi({ timeframe: 'month' }), [])
+    ]).then(([forumData, genresData, leaderboardData]) => {
       setForumThreads(forumData || []);
-      setChatFlags(chatData || []);
+      setGenres(genresData?.data || (Array.isArray(genresData) ? genresData : []));
+      setTopComics(leaderboardData?.data || leaderboardData?.content || leaderboardData || []);
     }).catch(err => {
       console.error(err);
     }).finally(() => {
       setLoadingPhase2(false);
     });
   }
+
+  const getPendingComicsCount = () => {
+    const authUser = getAuth()?.user;
+    const scopedSubmissions = (submissions || []).filter(item => {
+      const lang = item.language || item.rawLanguage || item.originalLanguage || item.lang || 'Original Raw';
+      return isLanguageInModeratorScope(lang, authUser);
+    });
+    const itemsInTab = scopedSubmissions.filter(item => {
+      if (item.status !== 'pending' && item.status) return false;
+      
+      // Filter out items with 0 pending chapters to match ReviewQueue logic
+      const chaps = item.allChapters || item.chaptersData || item.chapters || [];
+      const pendingChaps = (Array.isArray(chaps) ? chaps : []).filter(c => {
+        const s = (c.status || c.moderationStatus || '').toLowerCase();
+        return s.includes('pending') || s.includes('submitted') || s === 'new' || !s;
+      });
+      
+      return pendingChaps.length > 0;
+    });
+    const uniqueKeys = new Set();
+    itemsInTab.forEach(item => {
+      const titleClean = (item.title || item.comicTitle || item.comicName || '').toLowerCase().trim();
+      const submitterClean = (item.submittedBy || item.author || '').toLowerCase().trim();
+      const key = item.comicId ? `comic-${item.comicId}` : `group-${titleClean}_${submitterClean}`;
+      uniqueKeys.add(key);
+    });
+    return uniqueKeys.size;
+  };
 
   const getNavBadges = () => {
     let localFlags = []
@@ -624,22 +920,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     const pendingChatFlags = allFlags.filter(item => !item.status || item.status === 'pending').length
 
     return {
-      'review-queue': (() => {
-        const authUser = getAuth()?.user;
-        const scopedSubmissions = submissions.filter(item => {
-          const lang = item.language || item.rawLanguage || item.originalLanguage || item.lang || 'Original Raw';
-          return isLanguageInModeratorScope(lang, authUser);
-        });
-        const itemsInTab = scopedSubmissions.filter(item => item.status === 'pending' || !item.status);
-        const uniqueKeys = new Set();
-        itemsInTab.forEach(item => {
-          const titleClean = (item.title || '').toLowerCase().trim();
-          const submitterClean = (item.submittedBy || '').toLowerCase().trim();
-          const key = item.comicId ? `comic-${item.comicId}` : `group-${titleClean}_${submitterClean}`;
-          uniqueKeys.add(key);
-        });
-        return uniqueKeys.size;
-      })(),
+      'review-queue': getPendingComicsCount(),
       'chat-monitor': pendingChatFlags,
       'forum': forumThreads.filter(item => item.isReported).length,
     }
@@ -647,6 +928,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
   // API Call Integration Handlers
   const handleApprove = async (id, subItem) => {
+    if (isSubmittingActionRef.current) return;
+    isSubmittingActionRef.current = true;
+    setIsSubmittingAction(true);
     try {
       let cleanId = String(id || '').replace(/^(comic|group|chap)-/, '');
       if (subItem && subItem.submissionId) {
@@ -717,13 +1001,20 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       if (appSub) {
         publishComicToManagement(appSub);
       }
+      if (fetchAllData) fetchAllData()
     } catch (err) {
       console.error(err)
       toast.error('Failed to approve submission.')
+    } finally {
+      isSubmittingActionRef.current = false;
+      setIsSubmittingAction(false);
     }
   }
 
   const handleApproveAndCreateProject = async (item) => {
+    if (isSubmittingActionRef.current) return;
+    isSubmittingActionRef.current = true;
+    setIsSubmittingAction(true);
     try {
       let realDbId = null;
       let submissionApproveSucceeded = false;
@@ -778,10 +1069,16 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     } catch (err) {
       console.error(err)
       toast.error('Failed to approve submission.')
+    } finally {
+      isSubmittingActionRef.current = false;
+      setIsSubmittingAction(false);
     }
   }
 
   const handleConfirmReject = async (id, reason, subItem = null) => {
+    if (isSubmittingActionRef.current) return;
+    isSubmittingActionRef.current = true;
+    setIsSubmittingAction(true);
     try {
       let cleanId = String(id || '').replace(/^(comic|group|chap)-/, '');
       if (subItem && subItem.submissionId) {
@@ -838,9 +1135,13 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
         return next;
       });
+      if (fetchAllData) fetchAllData()
     } catch (err) {
       console.error(err)
       toast.error('Failed to reject submission.')
+    } finally {
+      isSubmittingActionRef.current = false;
+      setIsSubmittingAction(false);
     }
   }
 
@@ -872,6 +1173,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
   };
 
   const handleChapterApprove = async (submissionId, chapterObj) => {
+    if (isSubmittingActionRef.current) return;
+    isSubmittingActionRef.current = true;
+    setIsSubmittingAction(true);
     const chapTitle = chapterObj?.title || `Chapter ${chapterObj?.number || chapterObj?.chapterNumber || ''}`.trim() || 'Chapter';
 
     // Find the real submission record that owns this chapter
@@ -1014,11 +1318,17 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     } catch (err) {
       console.error(err);
       toast.error('Failed to approve chapter.');
+    } finally {
+      isSubmittingActionRef.current = false;
+      setIsSubmittingAction(false);
     }
   };
 
 
   const handleChapterReject = async (submissionId, chapterObj, reason, overallReason = null, skipSubmissionReject = false) => {
+    if (isSubmittingActionRef.current) return;
+    isSubmittingActionRef.current = true;
+    setIsSubmittingAction(true);
     let cleanId = String(submissionId || chapterObj?.submissionId || chapterObj?.comicId || '').replace(/^(comic|group|chap)-/, '');
     if (cleanId.includes('mock')) {
       const realSub = submissions.find(s => s.chapterId && String(s.chapterId) === String(chapterObj?.id));
@@ -1320,6 +1630,8 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
   }
 
   const handleCreateProjectTeam = async () => {
+    if (isSubmittingTeamRef.current) return;
+
     const exists = projectTeams.some(
       t => t.comicName && (createTeamForm.comicName || '') && t.comicName.toLowerCase() === (createTeamForm.comicName || '').toLowerCase() &&
            t.targetLang && (createTeamForm.targetLang || '') && t.targetLang.toLowerCase() === (createTeamForm.targetLang || '').toLowerCase()
@@ -1328,6 +1640,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       toast.error(`A translation team for "${createTeamForm.comicName}" in "${createTeamForm.targetLang}" already exists!`)
       return
     }
+
+    isSubmittingTeamRef.current = true;
+    setIsSubmittingTeam(true);
 
     const leaderName = createTeamForm.leaderName.trim() || 'Translator Leader'
     const leaderInitials = leaderName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -1386,7 +1701,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       description: `Official translation team for ${createTeamForm.comicName}.`,
       assignedToMe: true,
       maxMembers: 5,
-      isRecruiting: true,
+      isRecruiting: false,
       notes: `Official translation team for ${createTeamForm.comicName}.`
     }
 
@@ -1425,6 +1740,9 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       console.error(err)
       toast.error(err.response?.status === 409 ? `Conflict: A translation team for "${createTeamForm.comicName}" in "${createTeamForm.targetLang}" was just created by another moderator.` : 'Failed to create translation project team.')
       fetchComicsAndTeams() // Re-fetch on conflict
+    } finally {
+      isSubmittingTeamRef.current = false;
+      setIsSubmittingTeam(false);
     }
   }
 
@@ -1445,7 +1763,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
   const handleExportDashboardReport = () => {
     try {
-      const pendingReviewsCount = submissions.filter(s => s.status === 'pending').length;
+      const pendingReviewsCount = getPendingComicsCount();
       const approvedReviewsCount = submissions.filter(s => s.status === 'approved').length;
       const rejectedReviewsCount = submissions.filter(s => s.status === 'rejected').length;
       const totalChaptersCount = comics.reduce((acc, c) => acc + (c.chaptersCount || c.chapterCount || c.chapters?.length || 0), 0);
@@ -1486,12 +1804,21 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
         ]),
         ['', '', '', ''],
         ['CATALOG COMICS SNAPSHOT', 'Comic Title', 'Author Name', 'Status | Chapters | Views'],
-        ...comics.slice(0, 50).map(c => [
-          'COMIC TITLE',
-          c.title || 'Untitled',
-          c.authorName || c.author || 'N/A',
-          `Status: ${c.moderationStatus || 'PUBLISHED'} | Chapters: ${c.chaptersCount || c.chapterCount || c.chapters?.length || 0} | Views: ${c.views || 0}`
-        ])
+        ...comics.slice(0, 50).map(c => {
+          let v = c.viewCount || c.views || c.totalViews || 0;
+          if (typeof v === 'string') {
+            let num = parseFloat(v.replace(/[^0-9.]/g, '')) || 0;
+            if (v.toUpperCase().includes('M')) num *= 1000000;
+            if (v.toUpperCase().includes('K')) num *= 1000;
+            v = num;
+          }
+          return [
+            'COMIC TITLE',
+            c.title || 'Untitled',
+            c.authorName || c.author || 'N/A',
+            `Status: ${c.moderationStatus || 'PUBLISHED'} | Chapters: ${c.chaptersCount || c.chapterCount || c.chapters?.length || 0} | Views: ${v}`
+          ];
+        })
       ];
 
       exportToCsv('ComiVerse_Moderator_Dashboard_Report', headers, rows);
@@ -1524,7 +1851,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                     {loadingPhase1 ? (
                       <span className="skeleton-line skeleton-shimmer" style={{ width: '300px', display: 'inline-block', margin: 0 }}></span>
                     ) : (
-                      <>System is running smoothly. There are currently <strong>{submissions.filter(s => s.status === 'pending').length}</strong> reviews pending and <strong>{forumThreads.filter(t => t.isReported).length}</strong> open forum reports.</>
+                      <>System is running smoothly. There are currently <strong>{getPendingComicsCount()}</strong> reviews pending and <strong>{forumThreads.filter(t => t.isReported).length}</strong> open forum reports.</>
                     )}
                   </p>
                 </div>
@@ -1544,7 +1871,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               {/* Core Metrics Grid */}
               <div className="mod-core-metrics-grid">
                 {/* Pending Reviews */}
-                <div className="mod-core-card" style={{ borderLeft: '4px solid var(--mod-purple)' }}>
+                <div className="mod-core-card" style={{ borderLeft: '4px solid var(--mod-purple)' }} onClick={() => setActiveNav('review-queue')}>
                   <div className="mod-core-header">
                     <span className="mod-core-title">Pending Reviews</span>
                     <span className="mod-core-icon" style={{ background: 'rgba(168, 85, 247, 0.12)', color: 'var(--mod-purple)' }}>⏳</span>
@@ -1552,7 +1879,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                   <div className="mod-core-body">
                     <div className="mod-core-value-group">
                       <div className="mod-core-value">
-                        {loadingPhase1 ? <div className="skeleton-line skeleton-shimmer" style={{ width: '60px', height: '32px', margin: 0 }}></div> : submissions.filter(s => s.status === 'pending').length}
+                        {loadingPhase1 ? <div className="skeleton-line skeleton-shimmer" style={{ width: '60px', height: '32px', margin: 0 }}></div> : getPendingComicsCount()}
                       </div>
                       <span className="mod-core-trend">Awaiting review queue</span>
                     </div>
@@ -1564,7 +1891,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 </div>
 
                 {/* Total Comics */}
-                <div className="mod-core-card" style={{ borderLeft: '4px solid #3b82f6' }}>
+                <div className="mod-core-card" style={{ borderLeft: '4px solid #3b82f6' }} onClick={() => setActiveNav('comic-management')}>
                   <div className="mod-core-header">
                     <span className="mod-core-title">Total Comics</span>
                     <span className="mod-core-icon" style={{ background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6' }}>📚</span>
@@ -1584,7 +1911,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 </div>
 
                 {/* Active Teams */}
-                <div className="mod-core-card" style={{ borderLeft: '4px solid var(--mod-green)' }}>
+                <div className="mod-core-card" style={{ borderLeft: '4px solid var(--mod-green)' }} onClick={() => setActiveNav('project-teams')}>
                   <div className="mod-core-header">
                     <span className="mod-core-title">Active Teams</span>
                     <span className="mod-core-icon" style={{ background: 'rgba(16, 185, 129, 0.12)', color: 'var(--mod-green)' }}>⚡</span>
@@ -1604,7 +1931,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 </div>
 
                 {/* Flagged Messages */}
-                <div className="mod-core-card" style={{ borderLeft: '4px solid var(--mod-red)' }}>
+                <div className="mod-core-card" style={{ borderLeft: '4px solid var(--mod-red)' }} onClick={() => setActiveNav('chat-monitor')}>
                   <div className="mod-core-header">
                     <span className="mod-core-title">Flagged Chats</span>
                     <span className="mod-core-icon" style={{ background: 'rgba(239, 68, 68, 0.12)', color: 'var(--mod-red)' }}>💬</span>
@@ -1626,7 +1953,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
 
               {/* Secondary Metrics Row */}
               <div className="mod-sec-metrics-grid">
-                <div className="mod-sec-card">
+                <div className="mod-sec-card" style={{ cursor: 'pointer' }} onClick={() => setActiveNav('project-teams')}>
                   <span className="mod-sec-icon-circle">🏢</span>
                   <div className="mod-sec-details">
                     <span className="mod-sec-value">
@@ -1666,7 +1993,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                   </div>
                 </div>
 
-                <div className="mod-sec-card">
+                <div className="mod-sec-card" style={{ cursor: 'pointer' }} onClick={() => setActiveNav('reports')}>
                   <span className="mod-sec-icon-circle">🚩</span>
                   <div className="mod-sec-details">
                     <span className="mod-sec-value">
@@ -1697,7 +2024,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               {/* Data Visualization Section */}
               <div className="mod-charts-grid">
                 {/* Area Curve Line Chart (7 Day Submissions Trend) */}
-                <div className="mod-chart-card">
+                <div className="mod-chart-card" onClick={() => setActiveNav('review-queue')} style={{ cursor: 'pointer' }}>
                   <div className="mod-chart-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <h3 className="mod-chart-title">Submission Activity</h3>
@@ -1707,13 +2034,13 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                     </div>
                     <div className="timeframe-toggles">
                       <button 
-                        onClick={() => { setChartTimeframe('week'); setPinnedPoint(null); setHoveredPoint(null); }}
+                        onClick={(e) => { e.stopPropagation(); setChartTimeframe('week'); setPinnedPoint(null); setHoveredPoint(null); }}
                         className={`timeframe-btn ${chartTimeframe === 'week' ? 'active' : ''}`}
                       >
                         Week
                       </button>
                       <button 
-                        onClick={() => { setChartTimeframe('month'); setPinnedPoint(null); setHoveredPoint(null); }}
+                        onClick={(e) => { e.stopPropagation(); setChartTimeframe('month'); setPinnedPoint(null); setHoveredPoint(null); }}
                         className={`timeframe-btn ${chartTimeframe === 'month' ? 'active' : ''}`}
                       >
                         Month
@@ -1965,7 +2292,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 </div>
 
                 {/* Genre Breakdown Bar Chart */}
-                <div className="mod-chart-card">
+                <div className="mod-chart-card" onClick={() => setActiveNav('genre-management')} style={{ cursor: 'pointer' }}>
                   <div className="mod-chart-header">
                     <div>
                       <h3 className="mod-chart-title">Top Genres</h3>
@@ -2035,15 +2362,44 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                     <div className="mod-submission-list">
                       {submissions.filter(s => s.status === 'pending').slice(0, 4).map(s => {
                         const isAuthor = s.queueType === 'author';
+                        const coverSrc = getComicCover(s) || getComicCover(s.comic) || (comics.find(c => String(c.id) === String(s.comicId) || (s.title && c.title && c.title.toLowerCase().trim() === s.title.toLowerCase().trim())) && getComicCover(comics.find(c => String(c.id) === String(s.comicId) || (s.title && c.title && c.title.toLowerCase().trim() === s.title.toLowerCase().trim())))) || '';
+
                         return (
-                          <div key={s.id} className="mod-submission-item">
+                          <div 
+                            key={s.id} 
+                            className="mod-submission-item"
+                            onClick={() => setActiveNav('review-queue')}
+                            style={{ cursor: 'pointer' }}
+                            title="Click to review submission in Review Queue"
+                          >
                             <div className="mod-sub-thumb">
-                              {s.title.toLowerCase().includes('sword') ? '⚔️' : s.title.toLowerCase().includes('spirit') ? '🔮' : s.title.toLowerCase().includes('demon') ? '👑' : '📚'}
+                              {coverSrc ? (
+                                <img 
+                                  src={coverSrc} 
+                                  alt={s.title || 'Comic Cover'} 
+                                  className="mod-sub-thumb-img"
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    const fallback = e.target.nextElementSibling;
+                                    if (fallback) fallback.style.display = 'flex';
+                                  }}
+                                />
+                              ) : null}
+                              <div 
+                                className="mod-sub-thumb-fallback"
+                                style={{ display: coverSrc ? 'none' : 'flex' }}
+                              >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/>
+                                  <path d="M6 6h10"/>
+                                  <path d="M6 10h10"/>
+                                </svg>
+                              </div>
                             </div>
                             <div className="mod-sub-details">
                               <div className="mod-sub-title" title={s.title}>{s.title}</div>
                               <div className="mod-sub-meta">
-                                {isAuthor ? 'New Comic Upload' : `Chapter ${s.chapter}`} · {s.submittedBy || 'Author'}
+                                {s.chapter || s.chapterNumber ? `Chapter ${s.chapter || s.chapterNumber}` : 'New Comic Upload'} · {formatSubmitterName(s.submittedBy || s.author || 'Author')}
                               </div>
                             </div>
                             <span className={`priority-badge ${(s.priority || 'Medium').toLowerCase()}`}>
@@ -2062,23 +2418,74 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 <div className="mod-overview-col">
                   <div className="mod-overview-card">
                     <div className="mod-overview-card-header">
-                      <h3 className="mod-overview-card-title">Forum Reports</h3>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h3 className="mod-overview-card-title">Forum Activity & Reports</h3>
+                        {forumThreads.filter(t => t.isReported).length > 0 && (
+                          <span className="priority-badge high" style={{ fontSize: '10px', padding: '2px 7px' }}>
+                            {forumThreads.filter(t => t.isReported).length} Reported
+                          </span>
+                        )}
+                      </div>
                       <span className="mod-overview-link" onClick={() => setActiveNav('forum')}>View all</span>
                     </div>
                     <div className="mod-report-list">
-                      {forumThreads.filter(t => t.isReported).slice(0, 3).map(t => {
-                        const reason = t.reportReason || 'Violation of community guidelines';
-                        const level = reason.toLowerCase().includes('hate') || reason.toLowerCase().includes('harassment') ? 'high' : reason.toLowerCase().includes('spoiler') ? 'low' : 'medium';
+                      {[...forumThreads].sort((a, b) => {
+                        if (a.isReported && !b.isReported) return -1;
+                        if (!a.isReported && b.isReported) return 1;
+                        if (a.isPinned && !b.isPinned) return -1;
+                        if (!a.isPinned && b.isPinned) return 1;
+                        const timeA = new Date(a.createdAt || a.timestamp || 0).getTime();
+                        const timeB = new Date(b.createdAt || b.timestamp || 0).getTime();
+                        return timeB - timeA;
+                      }).slice(0, 4).map(t => {
+                        const reason = t.reportReason || (t.isReported ? 'Flagged for Moderator Review' : '');
+                        const level = t.isReported 
+                          ? (reason.toLowerCase().includes('hate') || reason.toLowerCase().includes('harassment') ? 'high' : reason.toLowerCase().includes('spoiler') ? 'low' : 'medium')
+                          : 'normal';
+                        const authorName = typeof t.author === 'object' ? (t.author?.username || t.author?.name || 'User') : (t.author || 'User');
+                        const repliesCount = t.replies ?? t.replyCount ?? 0;
+
                         return (
-                          <div key={t.id} className={`mod-report-item ${level}`}>
-                            <h4 className="mod-report-title">{t.title}</h4>
-                            <span className="mod-report-reason">{reason}</span>
-                            <span className="mod-report-time">{formatTimeAgo(t.createdAt || t.timestamp)}</span>
+                          <div 
+                            key={t.id} 
+                            className={`mod-report-item ${level}`}
+                            onClick={() => setActiveNav('forum')}
+                            style={{ cursor: 'pointer' }}
+                            title="Click to manage thread in Forum workspace"
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1 }}>
+                                {t.isPinned && <span title="Pinned thread" style={{ fontSize: '12px', flexShrink: 0 }}>📌</span>}
+                                {t.isLocked && <span title="Locked thread" style={{ fontSize: '12px', flexShrink: 0 }}>🔒</span>}
+                                <h4 className="mod-report-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.title}</h4>
+                              </div>
+                              {t.isReported ? (
+                                <span className={`priority-badge ${level}`} style={{ fontSize: '10px', padding: '2px 6px', flexShrink: 0 }}>REPORTED</span>
+                              ) : (
+                                <span className="mod-forum-cat-badge" style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '6px', background: 'rgba(168, 85, 247, 0.12)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.25)', flexShrink: 0 }}>
+                                  {t.category || 'General'}
+                                </span>
+                              )}
+                            </div>
+                            
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11.5px', color: 'var(--mod-text-secondary)', marginTop: '2px' }}>
+                              <span>By <strong style={{ color: 'var(--mod-text-primary)', fontWeight: 600 }}>{authorName}</strong></span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span>💬 {repliesCount} {repliesCount === 1 ? 'reply' : 'replies'}</span>
+                                <span className="mod-report-time">{formatTimeAgo(t.createdAt || t.timestamp)}</span>
+                              </div>
+                            </div>
+
+                            {t.isReported && reason && (
+                              <div style={{ fontSize: '11px', color: '#f87171', background: 'rgba(239, 68, 68, 0.1)', padding: '3px 8px', borderRadius: '4px', marginTop: '4px' }}>
+                                ⚠️ Reason: {reason}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
-                      {forumThreads.filter(t => t.isReported).length === 0 && (
-                        <p style={{ fontStyle: 'italic', fontSize: '13px', color: 'var(--mod-text-muted)', margin: 0 }}>No reported forum threads.</p>
+                      {forumThreads.length === 0 && (
+                        <p style={{ fontStyle: 'italic', fontSize: '13px', color: 'var(--mod-text-muted)', margin: 0 }}>No forum discussions found.</p>
                       )}
                     </div>
                   </div>
@@ -2090,16 +2497,25 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                 <div className="mod-overview-col">
                   <div className="mod-overview-card">
                     <div className="mod-overview-card-header">
-                      <h3 className="mod-overview-card-title">Project Teams</h3>
+                      <h3 className="mod-overview-card-title">Best Performing Teams</h3>
                       <span className="mod-overview-link" onClick={() => setActiveNav('project-teams')}>Manage teams</span>
                     </div>
                     <div className="mod-team-cards-row">
                       {projectTeams.slice().sort((a, b) => {
-                        const scoreA = (a.tasksToday || 0) * 100 + (a.tasksWeek || 0) * 10 + (a.tasksMonth || 0);
-                        const scoreB = (b.tasksToday || 0) * 100 + (b.tasksWeek || 0) * 10 + (b.tasksMonth || 0);
-                        return scoreB - scoreA;
-                      }).slice(0, 3).map(t => (
-                        <div key={t.id} className="mod-team-dashboard-card">
+                        const scoreA = (a.tasksToday || 0) * 100 + (a.tasksWeek || 0) * 10 + (a.tasksMonth || 0) + (a.totalCompletedTasks || 0);
+                        const scoreB = (b.tasksToday || 0) * 100 + (b.tasksWeek || 0) * 10 + (b.tasksMonth || 0) + (b.totalCompletedTasks || 0);
+                        if (scoreA !== scoreB) return scoreB - scoreA;
+                        const timeA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+                        const timeB = new Date(b.createdAt || b.updatedAt || 0).getTime();
+                        return timeB - timeA;
+                      }).slice(0, 4).map(t => (
+                        <div 
+                          key={t.id} 
+                          className="mod-team-dashboard-card"
+                          onClick={() => setActiveNav('project-teams')}
+                          style={{ cursor: 'pointer' }}
+                          title="Click to manage team in Project Teams workspace"
+                        >
                           <div className="mod-team-card-header">
                             <h4 className="mod-team-card-title" title={t.title}>{t.title}</h4>
                             <span className={`team-status-badge ${(t.status || 'Active').toLowerCase()}`}>{t.status || 'Active'}</span>
@@ -2160,7 +2576,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                           return v;
                         };
                         return getV(b) - getV(a);
-                      }).slice(0, 4).map((c, idx) => {
+                      }).slice(0, 5).map((c, idx) => {
                         const getV = x => {
                           let v = x.viewCount || x.views || x.totalViews || 0;
                           if (typeof v === 'string') {
@@ -2178,7 +2594,13 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                         const chaps = c.chapterCount || c.chapters || c.chaptersCount || 0;
 
                         return (
-                          <div key={c.id} className="mod-rank-item">
+                          <div 
+                            key={c.id} 
+                            className="mod-rank-item"
+                            onClick={() => setActiveNav('comic-management')}
+                            style={{ cursor: 'pointer' }}
+                            title="Click to view in Comic Management"
+                          >
                             <div className="mod-rank-left">
                               <span className="mod-rank-number">#{idx + 1}</span>
                               <div className="mod-rank-details">
@@ -2217,6 +2639,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               handleChapterApprove={handleChapterApprove}
               handleChapterReject={handleChapterReject}
               fetchAllData={fetchAllData}
+              isSubmittingAction={isSubmittingAction}
             />
           )}
 
@@ -2266,6 +2689,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               createTeamForm={createTeamForm}
               setCreateTeamForm={setCreateTeamForm}
               handleCreateProjectTeam={handleCreateProjectTeam}
+              isSubmittingTeam={isSubmittingTeam}
             />
           )}
 

@@ -6,7 +6,6 @@ import { getMyReadingHistoryApi, deleteReadingHistoryComicApi } from '../../serv
 import { getMySavesApi, toggleSaveStatusApi } from '../../services/api/SaveApi'
 import { getMyLikesApi, toggleLikeStatusApi } from '../../services/api/LikeApi'
 import { getUserRatingsApi, deleteComicRatingApi } from '../../services/api/RatingApi'
-import { getAllProjectTeamsApi } from '../../services/api/ProjectTeamApi'
 import { useAuth } from '../../context/AuthContext'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
 import { toast } from 'react-toastify'
@@ -20,20 +19,19 @@ function Library() {
   const { isLoggedIn, user } = useAuth()
   const [loading, setLoading] = useState(true)
 
-  const userRole = typeof user?.role === 'string' 
-    ? user.role 
+  const userRole = typeof user?.role === 'string'
+    ? user.role
     : (user?.role?.roleName || user?.roleName || 'READER');
   const isReader = !userRole || userRole.toUpperCase() === 'READER' || userRole.toUpperCase() === 'USER';
 
   // Sub-tabs state
   const [activeTab, setActiveTab] = useState('Saved')
-  
+
   // Library lists stored in state for interactivity
   const [savedList, setSavedList] = useState([])
   const [likedList, setLikedList] = useState([])
   const [historyList, setHistoryList] = useState([])
   const [ratedList, setRatedList] = useState([])
-  const [groupsCount, setGroupsCount] = useState(0)
 
   // Unified Delete Confirmation Modal state
   const [deleteModal, setDeleteModal] = useState({
@@ -65,7 +63,7 @@ function Library() {
   const fetchLibraryData = async () => {
     try {
       setLoading(true)
-      const [historyData, savesData, likesData, ratingsData, projectTeamsData] = await Promise.all([
+      const [historyData, savesData, likesData, ratingsData] = await Promise.all([
         getMyReadingHistoryApi().catch(err => {
           console.error("Failed to fetch reading history:", err)
           return []
@@ -81,22 +79,13 @@ function Library() {
         getUserRatingsApi().catch(err => {
           console.error("Failed to fetch user ratings:", err)
           return []
-        }),
-        getAllProjectTeamsApi().catch(err => {
-          console.error("Failed to fetch project teams:", err)
-          return []
         })
       ])
-      
+
       setHistoryList(Array.isArray(historyData) ? historyData : [])
       setSavedList(Array.isArray(savesData) ? savesData : [])
       setLikedList(Array.isArray(likesData) ? likesData : [])
       setRatedList(Array.isArray(ratingsData) ? ratingsData : (ratingsData?.data || []))
-
-      const teamsList = Array.isArray(projectTeamsData) 
-        ? projectTeamsData 
-        : (projectTeamsData?.data || [])
-      setGroupsCount(teamsList.length)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load library data.')
@@ -153,7 +142,7 @@ function Library() {
     const tab = deleteModal.targetTab || activeTab
 
     setDeleteModal(prev => ({ ...prev, isOpen: false }))
-    
+
     // Save previous state for rollback
     const previousSaved = [...savedList]
     const previousLiked = [...likedList]
@@ -307,9 +296,7 @@ function Library() {
                 </div>
                 <div className="lib-banner-stat">
                   <span className="lib-banner-stat-label">Groups</span>
-                  <span className="lib-banner-stat-value">
-                    {groupsCount > 0 ? `${groupsCount} ${groupsCount === 1 ? 'group' : 'groups'}` : '0 groups'}
-                  </span>
+                  <span className="lib-banner-stat-value">Active Groups</span>
                 </div>
                 <button className="lib-banner-btn" onClick={() => navigate('/translator-register')}>
                   Learn More →
@@ -321,25 +308,25 @@ function Library() {
           {/* ── SUB-TABS ROW ─────────────────── */}
           <div className="lib-tabs-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <div className="lib-tabs-group">
-              <div 
+              <div
                 className={`lib-tab-item ${activeTab === 'Saved' ? 'active' : ''}`}
                 onClick={() => handleTabClick('Saved')}
               >
                 Saved
               </div>
-              <div 
+              <div
                 className={`lib-tab-item ${activeTab === 'Liked' ? 'active' : ''}`}
                 onClick={() => handleTabClick('Liked')}
               >
                 Liked
               </div>
-              <div 
+              <div
                 className={`lib-tab-item ${activeTab === 'History' ? 'active' : ''}`}
                 onClick={() => handleTabClick('History')}
               >
                 Reading History
               </div>
-              <div 
+              <div
                 className={`lib-tab-item ${activeTab === 'Rated' ? 'active' : ''}`}
                 onClick={() => handleTabClick('Rated')}
               >
@@ -374,8 +361,8 @@ function Library() {
                   const comicStatus = actualComic.publicationStatus || 'ONGOING';
 
                   return (
-                    <div 
-                      key={item.id || comicId} 
+                    <div
+                      key={item.id || comicId}
                       className="lib-comic-card"
                       onClick={() => navigate(`/comic/${comicId}`)}
                       style={{ cursor: 'pointer' }}
@@ -383,16 +370,16 @@ function Library() {
                       {isEmoji(comicCover) ? (
                         <div className="lib-comic-cover-emoji-fallback">{comicCover}</div>
                       ) : (
-                        <img 
-                          src={comicCover} 
-                          alt={comicTitle} 
-                          className="lib-comic-cover" 
+                        <img
+                          src={comicCover}
+                          alt={comicTitle}
+                          className="lib-comic-cover"
                         />
                       )}
                       <div className="lib-comic-details">
                         <h4 className="lib-comic-title">{comicTitle}</h4>
                         <p className="lib-comic-author">{comicAuthor}</p>
-                        
+
                         <div className="lib-comic-genres">
                           {comicGenres.slice(0, 2).map((g, idx) => {
                             const genreName = typeof g === 'object' && g !== null ? g.name : g;
@@ -427,7 +414,7 @@ function Library() {
                       </div>
 
                       {/* Remove action button */}
-                      <button 
+                      <button
                         className="lib-comic-delete-btn"
                         onClick={(e) => requestRemoveItem(comicId, comicTitle, e)}
                         title="Remove from list"

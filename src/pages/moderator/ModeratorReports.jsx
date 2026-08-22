@@ -308,13 +308,13 @@ export default function ModeratorReports() {
           <table className="rep-table">
             <thead>
               <tr>
-                <th>Report ID</th>
-                <th>Reporter</th>
-                <th>Reported Target</th>
-                <th>Violation Category</th>
-                <th>Submitted At</th>
-                <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
+                <th style={{ width: '10%' }}>Report ID</th>
+                <th style={{ width: '15%' }}>Reporter</th>
+                <th style={{ width: '25%' }}>Reported Target</th>
+                <th style={{ width: '15%' }}>Violation Category</th>
+                <th style={{ width: '10%' }}>Submitted At</th>
+                <th style={{ width: '10%' }}>Status</th>
+                <th style={{ width: '15%', textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -340,7 +340,9 @@ export default function ModeratorReports() {
                   <tr key={report.id}>
                     {/* ID */}
                     <td style={{ fontFamily: 'var(--rep-mono)', fontWeight: '700', fontSize: '13px' }}>
-                      #{report.id}
+                      <span title={report.id}>
+                        #{report.id ? report.id.substring(0, 8) : 'N/A'}...
+                      </span>
                     </td>
 
                     {/* Reporter */}
@@ -354,8 +356,12 @@ export default function ModeratorReports() {
                           />
                         )}
                         <div>
-                          <div className="rep-reporter-name">{report.reporter_name || 'Reader'}</div>
-                          <div className="rep-reporter-email">{report.reporter_email || 'user@comiverse.vn'}</div>
+                          <div className="rep-reporter-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>
+                            {report.reporter_name || 'Reader'}
+                          </div>
+                          <div className="rep-reporter-email" style={{ wordBreak: 'break-all', maxWidth: '140px' }}>
+                            {report.reporter_email || 'user@comiverse.vn'}
+                          </div>
                         </div>
                       </div>
                     </td>
