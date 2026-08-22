@@ -172,6 +172,7 @@ function AuthorDashboard() {
       { label: 'Total Chapters', value: formatFullNumber(summary.totalChapters), change: 'All active author chapters', trend: 'neutral', icon: 'chapters', color: 'blue' },
       { label: 'Total Views', value: formatCompactNumber(summary.totalViews), change: `${formatCompactNumber(summary.totalLikes)} likes`, trend: 'up', icon: 'views', color: 'green' },
       { label: 'Revenue Estimate', value: formatMoney(revenueEstimate), change: 'Payout page is the source of truth', trend: 'neutral', icon: 'revenue', color: 'orange' },
+      { label: 'Total Paid', value: formatMoney(numberValue(summary.totalPaid)), change: 'Amount successfully withdrawn', trend: 'neutral', icon: 'check', color: 'green' },
       { label: 'Followers', value: formatCompactNumber(summary.totalFollowers), change: 'Readers who saved your comics', trend: 'up', icon: 'users', color: 'pink' },
       { label: 'Avg. Rating', value: formatRating(summary.averageRating), change: `${formatFullNumber(summary.totalRatings)} ratings`, trend: 'neutral', icon: 'star', color: 'cyan' },
       { label: 'Pending Reviews', value: formatFullNumber(summary.pendingReviews), change: 'Comic and chapter review queue', trend: 'warning', icon: 'review', color: 'red' },
@@ -187,15 +188,17 @@ function AuthorDashboard() {
     const followers = monthlyMetrics.map((item) => numberValue(item.followers))
 
     const revenue = monthlyMetrics.map((item) => numberValue(item.estimatedRevenue))
+    const paid = monthlyMetrics.map((item) => numberValue(item.totalPaid))
     
     const maxView = Math.max(1, ...views)
     const maxFol = Math.max(1, ...followers)
     const maxRev = Math.max(1, ...revenue)
+    const maxPaid = Math.max(1, ...paid)
 
-    const scaleMax = Math.ceil(Math.max(maxView, maxFol, maxRev) * 1.1)
+    const scaleMax = Math.ceil(Math.max(maxView, maxFol, maxRev, maxPaid) * 1.1)
     const scaleView = Math.ceil(maxView * 1.1)
     const scaleFol = Math.ceil(maxFol * 1.1)
-    const scaleRev = Math.ceil(maxRev * 1.1)
+    const scaleRev = Math.ceil(Math.max(maxRev, maxPaid) * 1.1)
 
     return {
       chartW,
@@ -208,9 +211,11 @@ function AuthorDashboard() {
       scaleRev,
       views,
       revenue,
+      paid,
       followers,
       viewPath: buildLinePath(views, scaleView, chartW, chartH, padX, padY),
       revenuePath: buildLinePath(revenue, scaleRev, chartW, chartH, padX, padY),
+      paidPath: buildLinePath(paid, scaleRev, chartW, chartH, padX, padY),
       followerPath: buildLinePath(followers, scaleFol, chartW, chartH, padX, padY),
     }
   }, [monthlyMetrics])
@@ -229,9 +234,10 @@ function AuthorDashboard() {
 
   const handleExport = () => {
     if (!monthlyMetrics || monthlyMetrics.length === 0) return
-    const headers = ['Period', 'Views', 'Followers', 'Estimated Revenue (USD)', 'Chapters Uploaded', 'Reviews Submitted', 'Chapters Approved']
+    const headers = ['Period', 'Views', 'Followers', 'Estimated Revenue (USD)', 'Total Paid (USD)', 'Chapters Uploaded', 'Reviews Submitted', 'Chapters Approved']
     const rows = monthlyMetrics.map(item => {
       const revenueEstimate = numberValue(item.estimatedRevenue)
+      const totalPaid = numberValue(item.totalPaid)
       const views = numberValue(item.views)
 
       return [
@@ -239,6 +245,7 @@ function AuthorDashboard() {
         views,
         numberValue(item.followers),
         revenueEstimate,
+        totalPaid,
         numberValue(item.chaptersUploaded),
         numberValue(item.reviewsSubmitted),
         numberValue(item.chaptersApproved)
@@ -370,12 +377,14 @@ function AuthorDashboard() {
             })}
             <path d={lineChart.viewPath} fill="none" stroke="#c084fc" strokeWidth="2.5" strokeLinejoin="round"/>
             <path d={lineChart.revenuePath} fill="none" stroke="#aa3bff" strokeWidth="2" strokeDasharray="6 3" strokeLinejoin="round"/>
+            <path d={lineChart.paidPath} fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinejoin="round"/>
             <path d={lineChart.followerPath} fill="none" stroke="#10b981" strokeWidth="2" strokeDasharray="4 4" strokeLinejoin="round"/>
             {lineChart.views.map((value, index) => {
               const denominator = Math.max(1, lineChart.views.length - 1)
               const x = lineChart.padX + (index / denominator) * (lineChart.chartW - lineChart.padX * 2)
               const vy = lineChart.padY + (1 - value / Math.max(1, lineChart.scaleView)) * (lineChart.chartH - lineChart.padY * 2)
               const ry = lineChart.padY + (1 - lineChart.revenue[index] / Math.max(1, lineChart.scaleRev)) * (lineChart.chartH - lineChart.padY * 2)
+              const py = lineChart.padY + (1 - lineChart.paid[index] / Math.max(1, lineChart.scaleRev)) * (lineChart.chartH - lineChart.padY * 2)
               const fy = lineChart.padY + (1 - lineChart.followers[index] / Math.max(1, lineChart.scaleFol)) * (lineChart.chartH - lineChart.padY * 2)
               
               const isHovered = lineHoverData?.index === index
@@ -385,6 +394,7 @@ function AuthorDashboard() {
                 <g key={index} style={{ pointerEvents: 'none' }}>
                   <circle cx={x} cy={vy} r={r} fill="#c084fc" style={{ transition: 'all 0.2s' }} />
                   <circle cx={x} cy={ry} r={r} fill="#aa3bff" style={{ transition: 'all 0.2s' }} />
+                  <circle cx={x} cy={py} r={r} fill="#3b82f6" style={{ transition: 'all 0.2s' }} />
                   <circle cx={x} cy={fy} r={r} fill="#10b981" style={{ transition: 'all 0.2s' }} />
                 </g>
               )
@@ -411,6 +421,10 @@ function AuthorDashboard() {
                   <span className="author-chart-tooltip-value">{formatMoney(lineChart.revenue[index])}</span>
                 </div>
                 <div className="author-chart-tooltip-row">
+                  <span className="author-chart-tooltip-label"><span className="author-legend-dot blue"/> Paid</span>
+                  <span className="author-chart-tooltip-value">{formatMoney(lineChart.paid[index])}</span>
+                </div>
+                <div className="author-chart-tooltip-row">
                   <span className="author-chart-tooltip-label"><span className="author-legend-dot green"/> Followers</span>
                   <span className="author-chart-tooltip-value">{formatFullNumber(lineChart.followers[index])}</span>
                 </div>
@@ -421,6 +435,7 @@ function AuthorDashboard() {
         <div className="author-analytics-legend">
           <span className="author-legend-item"><span className="author-legend-dot dark"/>Views</span>
           <span className="author-legend-item"><span className="author-legend-dot purple"/>Revenue</span>
+          <span className="author-legend-item"><span className="author-legend-dot blue"/>Paid</span>
           <span className="author-legend-item"><span className="author-legend-dot green"/>Followers</span>
         </div>
       </div>
