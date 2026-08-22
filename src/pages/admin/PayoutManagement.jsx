@@ -32,6 +32,8 @@ const FILTER_TABS = [
   { label: 'Pending', value: 'PENDING' },
   { label: 'Approved', value: 'APPROVED' },
   { label: 'Processing', value: 'PROCESSING' },
+  { label: 'Failed', value: 'FAILED' },
+  { label: 'Rejected', value: 'REJECTED' },
 ]
 
 const HISTORY_FILTER_TABS = [
@@ -125,17 +127,21 @@ function PayoutManagement({ historyMode = false }) {
         : []
   const items = allItems.filter((payout) => getPayoutStatus(payout) === activeStatus)
   const totalsCurrency = data?.totalsCurrency || 'USD'
-  const summaryCards = useMemo(() => {
-    const activeStatuses = ['PENDING', 'APPROVED', 'PROCESSING']
-    const historyStatuses = ['PAID', 'REJECTED', 'FAILED']
-    const displayStatuses = historyMode ? historyStatuses : activeStatuses
-    
-    return displayStatuses.map((status) => ({
+  const summaryCards = useMemo(
+    () => [
+      'PENDING',
+      'APPROVED',
+      'PROCESSING',
+      'PAID',
+      'REJECTED',
+      'FAILED',
+    ].map((status) => ({
       status,
       count: Number(data?.counts?.[status]) || 0,
       total: Number(data?.totals?.[status]) || 0,
-    }))
-  }, [data, historyMode])
+    })),
+    [data],
+  )
 
   const runAction = async (payout, action) => {
     try {

@@ -3,7 +3,7 @@
   isolation: isolate;
 }
 
-.payout-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 20px 0; }
+.payout-summary-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin: 20px 0; }
 .payout-summary-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; }
 .payout-summary-badge { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; background: #e5e7eb; }
 .payout-summary-badge--pending { background: #fef3c7; color: #92400e; }
@@ -55,7 +55,7 @@
 @media (max-width: 1200px) { .admin-payout-settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .admin-payout-currency-editor { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .admin-payout-settings-head { flex-direction: column; } .admin-payout-settings-grid, .admin-payout-currency-editor { grid-template-columns: 1fr; } }
 /* Creator payout layout */
-.payout-summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.payout-summary-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .admin-payout-currency-editor {
   grid-template-columns: minmax(280px, 1.8fr) 110px 180px 100px 140px;
 }
