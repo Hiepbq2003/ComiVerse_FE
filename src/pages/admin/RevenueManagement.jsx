@@ -239,6 +239,7 @@ function RevenueChart({ series, currency }) {
 
 function RevenueManagement() {
   const [days, setDays] = useState(30)
+  const [currency, setCurrency] = useState('USD')
   const [statistics, setStatistics] = useState(null)
   const [recentPayments, setRecentPayments] = useState([])
   const [loading, setLoading] = useState(true)
@@ -248,7 +249,7 @@ function RevenueManagement() {
     setLoading(true)
     setError('')
 
-    const params = { days, zoneId: 'Asia/Ho_Chi_Minh' }
+    const params = { days, zoneId: 'Asia/Ho_Chi_Minh', currency }
 
     const [statisticsResult, logsResult] = await Promise.allSettled([
       getAdminPaymentStatisticsApi(params),
@@ -269,14 +270,14 @@ function RevenueManagement() {
         : []
     )
     setLoading(false)
-  }, [days])
+  }, [days, currency])
 
   useEffect(() => {
     loadStatistics()
   }, [loadStatistics])
 
   const summary = statistics?.summary || EMPTY_SUMMARY
-  const selectedCurrency = statistics?.period?.currency || 'USD'
+  const selectedCurrency = currency
   const dailySeries = Array.isArray(statistics?.dailySeries) ? statistics.dailySeries : []
   const statusBreakdown = Array.isArray(statistics?.statusBreakdown) ? statistics.statusBreakdown : []
   const planBreakdown = Array.isArray(statistics?.planBreakdown) ? statistics.planBreakdown : []
@@ -360,10 +361,13 @@ function RevenueManagement() {
             </label>
             <label className="payment-filter-control">
               <span>Currency</span>
-              <select value={selectedCurrency} disabled aria-label="Currency">
-                {(statistics?.availableCurrencies || [selectedCurrency]).map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
+              <select value={currency} onChange={(e) => setCurrency(e.target.value)} disabled={loading} aria-label="Currency">
+                <option value="USD">USD</option>
+                {(statistics?.availableCurrencies || [])
+                  .filter(c => c !== 'USD')
+                  .map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
               </select>
             </label>
             <button type="button" className="admin-btn payment-action-btn" onClick={loadStatistics} disabled={loading}>
