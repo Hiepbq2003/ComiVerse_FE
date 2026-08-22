@@ -2061,7 +2061,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                   {getSubmissionMinAge(item) !== 'Not specified' && <span> · <strong>Age:</strong> {getSubmissionMinAge(item)}</span>}
                 </p>
                 <div className="submission-extra" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px', flexWrap: 'wrap' }}>
-                  <span className="submission-extra-item">⏱️ {formatTimeAgo(item.timestamp || item.submittedAt || item.createdAt)}</span>
+                  <span className="submission-extra-item">⏱️ {formatTimeAgo(activeTab === 'pending' ? (item.timestamp || item.submittedAt || item.createdAt) : (item.updatedAt || item.approvedAt || item.timestamp || item.submittedAt || item.createdAt))}</span>
                   <span className="submission-extra-item" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '2px 8px', borderRadius: '6px', fontWeight: '800', fontSize: '11.5px' }}>
                     📚 {item.isComicAppealItem ? (item.chapterCount || item.chapters || 0) : getSubmissionChapters(item).length} {item.isComicAppealItem ? ((item.chapterCount || item.chapters || 0) === 1 ? 'Chapter' : 'Chapters') : (getSubmissionChapters(item).length === 1 ? 'Chapter' : 'Chapters')}
                   </span>
@@ -2183,7 +2183,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                       📖 {selectedReview.title} {selectedChapter ? `— ${selectedChapter.title}` : ''}
                     </h3>
                     <div className="mod-inspector-subtitle">
-                      {getSubmissionAuthor(selectedReview)} · {formatTimeAgo(selectedReview.timestamp || selectedReview.submittedAt || selectedReview.createdAt)}
+                      {getSubmissionAuthor(selectedReview)} · {formatTimeAgo(activeTab === 'pending' ? (selectedReview.timestamp || selectedReview.submittedAt || selectedReview.createdAt) : (selectedReview.updatedAt || selectedReview.approvedAt || selectedReview.timestamp || selectedReview.submittedAt || selectedReview.createdAt))}
                     </div>
                   </div>
                 </div>
