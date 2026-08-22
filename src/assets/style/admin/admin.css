@@ -60,6 +60,8 @@ html.light {
 .admin-layout {
   display: flex;
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
   background: var(--admin-bg);
   font-family: var(--admin-font);
   color: var(--admin-text-primary);
