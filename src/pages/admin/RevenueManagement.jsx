@@ -204,12 +204,21 @@ function RevenueChart({ series, currency }) {
       
       {hoverData && (() => {
         const px = (hoverData.x / width) * 100
+        const py = (hoverData.y / height) * 100
         let alignClass = ''
         if (px > 80) alignClass = ' align-right'
         if (px < 20) alignClass = ' align-left'
         
         return (
-          <div className={`payment-chart-tooltip${alignClass}`} style={{ left: `${px}%`, top: '40%' }}>
+          <div 
+            className={`payment-chart-tooltip${alignClass}`} 
+            style={{ 
+              left: `${px}%`, 
+              top: `${py}%`,
+              pointerEvents: 'none',
+              zIndex: 999 
+            }}
+          >
             <div className="payment-chart-tooltip-header">{formatShortDate(hoverData.date)}</div>
             <div className="payment-chart-tooltip-row">
               <span className="payment-chart-tooltip-label">Revenue</span>
