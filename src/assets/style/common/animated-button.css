@@ -345,6 +345,26 @@
     bottom: calc(100% + 4px);
 }
 
+/* Tooltip on the bottom */
+.animated-btn-container .btn--icon-swap.tooltip-bottom::before {
+    bottom: auto;
+    top: calc(100% + 10px);
+}
+.animated-btn-container .btn--icon-swap.tooltip-bottom::after {
+    bottom: auto;
+    top: calc(100% + 2px);
+    border-top-color: transparent;
+    border-bottom-color: var(--surface);
+}
+.animated-btn-container .btn--icon-swap.tooltip-bottom:hover::before {
+    bottom: auto;
+    top: calc(100% + 14px);
+}
+.animated-btn-container .btn--icon-swap.tooltip-bottom:hover::after {
+    bottom: auto;
+    top: calc(100% + 4px);
+}
+
 .animated-btn-container .btn-is__inner {
     position: relative;
     display: flex;

@@ -479,7 +479,7 @@ function AccountManagement() {
             variant={3}
             label="📥 Export Accounts"
             tooltip="Export CSV"
-            className="btn-excel"
+            className="btn-excel tooltip-bottom"
             onClick={handleExportAccounts}
             disabled={isLoading || accounts.length === 0}
           />
