@@ -14,7 +14,6 @@ import {
   uploadAuthorChapterFolderApi,
 } from '../../services/api/AuthorComicApi'
 import { uploadImageApi } from '../../services/api/UploadApi'
-import { getAuthorProfileApi } from '../../services/api/AuthorProfileApi'
 import { buildChapterFolderFormData, validateChapterFolder } from '../../utils/chapterFolderUpload'
 
 const GENRE_OPTIONS = [
@@ -171,13 +170,8 @@ function CreateComicModal({ onClose, onCreated }) {
         return
       }
 
-      // Check license before uploading the cover so an inactive Author cannot
-      // create orphan Cloudinary assets from the Create Comic workflow.
-      const authorProfile = await getAuthorProfileApi()
-      const licenseStatus = (authorProfile?.licenseStatus || 'PENDING_LICENSE').toString().toUpperCase()
-      if (licenseStatus !== 'ACTIVE' || authorProfile?.canPublishComic === false) {
-        throw new Error(`Author license must be ACTIVE before creating comics. Current status: ${licenseStatus}`)
-      }
+      // License verification is intentionally not a prerequisite for creating
+      // a comic draft. Publication still goes through the normal moderation flow.
 
       let cover = form.cover.trim()
       if (form.coverFile) {
