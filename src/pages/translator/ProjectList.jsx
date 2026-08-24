@@ -8,6 +8,7 @@ import { createTeamRequestApi, cancelTeamRequestApi, getMyApplicationStatusApi }
 import { uploadFileApi } from '../../services/api/UploadApi';
 import { getMyTranslatorProfileApi } from '../../services/api/TranslatorApi';
 import { getAuth } from '../../utils/Auth';
+import { isParticipatingProjectStatus, reconcileProjectCompletion } from './SettingsTab';
 import { useNotification } from '../../context/NotificationContext';
 import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages';
 
@@ -236,21 +237,34 @@ function ProjectList() {
     const load = async () => {
       setLoading(true);
       try {
-        const [projectsData, statusData, myProjects] = await Promise.all([
+        const [projectsData, myProjects] = await Promise.all([
           getAllProjectTeamsApi(),
-          getMyApplicationStatusApi().catch(() => null),
           getMyProjectTeamsApi().catch(() => []),
         ]);
         if (cancelled) return;
 
         const projList = Array.isArray(projectsData) ? projectsData : [];
-        const myTeams = Array.isArray(myProjects) ? myProjects : [];
+        const myTeamsRaw = Array.isArray(myProjects) ? myProjects : [];
+        let cachedTeams = [];
+        try {
+          const cached = sessionStorage.getItem('comiverse_projects_cache');
+          const parsed = cached ? JSON.parse(cached) : [];
+          cachedTeams = Array.isArray(parsed) ? parsed : (parsed.projects || []);
+        } catch (e) {}
+        const cachedById = new Map(cachedTeams.filter(t => t?.id).map(t => [t.id, t]));
+        const currentUserId = getAuth()?.user?.id || getAuth()?.user?.userId;
+        const myTeams = await Promise.all(myTeamsRaw.map((p) => reconcileProjectCompletion(p, {
+          canPersist: Boolean(currentUserId && p.leaderId && String(p.leaderId) === String(currentUserId)),
+          cachedStatus: cachedById.get(p.id)?.status,
+        })));
+        const statusData = await getMyApplicationStatusApi().catch(() => null);
+        if (cancelled) return;
 
         setProjects(projList);
         applyPendingFromStatus(statusData);
         setMyProjectTeams(myTeams);
         setActiveProjectsCount(
-          myTeams.filter(p => p.status && p.status.toUpperCase() !== 'COMPLETED').length
+          myTeams.filter(p => isParticipatingProjectStatus(p.status)).length
         );
       } catch (err) {
         console.error(err);
@@ -391,10 +405,9 @@ function ProjectList() {
     appliedIds.length,
     Number(appStatus?.pendingApplications || 0)
   );
-  const joinedCount = Math.max(
-    activeProjectsCount,
-    Number(appStatus?.joinedTeams || 0)
-  );
+  const joinedCount = appStatus
+    ? Number(appStatus.joinedTeams || 0)
+    : activeProjectsCount;
   const atProjectLimit = (joinedCount + pendingCount) >= MAX_ACTIVE_PROJECTS;
 
   const handleApplyClick = (project) => {

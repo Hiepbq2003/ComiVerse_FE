@@ -144,7 +144,7 @@ import HomeTab from './HomeTab'
 import MembersTab from './MembersTab'
 import RequestsTab from './RequestsTab'
 import TasksTab, { CreateTaskModal, EditTaskModal, parseTaskTitle, getTaskColumn, getNormalizedStatusKey } from './TasksTab'
-import SettingsTab, { normalizeProjectStatus } from './SettingsTab'
+import SettingsTab, { normalizeProjectStatus, reconcileProjectCompletion, storeProjectStatus } from './SettingsTab'
 
 function apiErrorMessage(err, fallback = 'Failed to save task changes. Please try again.') {
   const data = err?.response?.data
@@ -1338,7 +1338,15 @@ function TeamProjects() {
       const currentUsername = (user.username || '').toLowerCase().trim();
       const currentUserId = user.id || user.userId;
 
-      const allMapped = allTeams.map(p => {
+      let cachedTeams = []
+      try {
+        const cached = sessionStorage.getItem('comiverse_projects_cache')
+        const parsed = cached ? JSON.parse(cached) : []
+        cachedTeams = Array.isArray(parsed) ? parsed : (parsed.projects || [])
+      } catch (e) {}
+      const cachedById = new Map(cachedTeams.filter(t => t?.id).map(t => [t.id, t]))
+
+      const allMapped = await Promise.all(allTeams.map(async (p) => {
         const leaderName = (p.leaderName || '').toLowerCase().trim();
         const leaderId = p.leaderId || p.createdById;
         const isLeaderMatch = (currentUserName && leaderName === currentUserName) ||
@@ -1362,7 +1370,7 @@ function TeamProjects() {
           isRecruiting = false;
         }
 
-        return {
+        const mapped = {
           ...p,
           team: p.title || p.name || 'Unnamed Team',
           title: p.comicName || p.title || 'Untitled Comic',
@@ -1371,7 +1379,11 @@ function TeamProjects() {
           isRecruiting: isRecruiting,
           isLeaderMatch
         };
-      });
+        return reconcileProjectCompletion(mapped, {
+          canPersist: isLeaderMatch,
+          cachedStatus: cachedById.get(p.id)?.status
+        });
+      }));
 
       setAllMatchedTeams(allMapped);
 
@@ -1884,7 +1896,7 @@ function TeamProjects() {
         targetLang: selectedEdit.targetLang,
         priority: selectedEdit.priority,
         cover: selectedEdit.cover,
-        isRecruiting: selectedEdit.isRecruiting,
+        isRecruiting: normalizeProjectStatus(editForm.status) === 'completed' ? false : selectedEdit.isRecruiting,
         maxMembers: selectedEdit.maxMembers,
         leaderName: selectedEdit.leaderName,
         leaderInitials: selectedEdit.leaderInitials,
@@ -1893,8 +1905,23 @@ function TeamProjects() {
         progress: selectedEdit.progress,
         assignedToMe: selectedEdit.assignedToMe
       })
-      const mappedUpdated = { ...updated, team: updated.title, title: updated.comicName }
-      setProjects(prev => prev.map(proj => (proj.id === selectedEdit.id ? mappedUpdated : proj)))
+      const nextStatus = normalizeProjectStatus(updated.status || editForm.status)
+      storeProjectStatus(selectedEdit.id, nextStatus)
+      const mappedUpdated = {
+        ...selectedEdit,
+        ...updated,
+        team: updated.title || editForm.team,
+        title: updated.comicName || selectedEdit.title,
+        status: nextStatus,
+        isRecruiting: nextStatus === 'completed' ? false : (updated.isRecruiting ?? selectedEdit.isRecruiting)
+      }
+      const applyUpdated = (prev) => prev.map(proj => (proj.id === selectedEdit.id ? mappedUpdated : proj))
+      setProjects(applyUpdated)
+      setAllMatchedTeams(prev => {
+        const next = applyUpdated(prev)
+        try { sessionStorage.setItem('comiverse_projects_cache', JSON.stringify(next)) } catch (e) {}
+        return next
+      })
       toast.success('Project details updated successfully!')
       setSelectedEdit(null)
       if (selectedDetails && selectedDetails.id === selectedEdit.id) {
@@ -1914,8 +1941,9 @@ function TeamProjects() {
     const totalCapacity = (Number(selectedDetails.maxMembers) || 5) + 1;
     const isFull = currentMembersCount >= totalCapacity;
     
-    // Force isRecruiting to false if team is at full capacity
-    const finalIsRecruiting = isFull ? false : selectedDetails.isRecruiting;
+    const projectStatus = normalizeProjectStatus(selectedDetails.status);
+    // Force isRecruiting to false if team is at full capacity or the project is completed
+    const finalIsRecruiting = isFull || projectStatus === 'completed' ? false : selectedDetails.isRecruiting;
 
     // Save manual recruitment status choice to LocalStorage
     localStorage.setItem(`comiverse_is_recruiting_${selectedDetails.id}`, String(finalIsRecruiting))
@@ -1925,7 +1953,7 @@ function TeamProjects() {
         id: selectedDetails.id,
         title: selectedDetails.team,
         comicName: selectedDetails.title,
-        status: normalizeProjectStatus(selectedDetails.status),
+        status: projectStatus,
         description: selectedDetails.description,
         deadline: selectedDetails.deadline,
         sourceLang: selectedDetails.sourceLang,
@@ -1942,17 +1970,20 @@ function TeamProjects() {
         assignedToMe: selectedDetails.assignedToMe,
         notes: selectedDetails.description || selectedDetails.notes || ''
       })
-      const mappedUpdated = { ...selectedDetails, ...updated, team: updated.title || selectedDetails.team, title: updated.comicName || selectedDetails.title, isRecruiting: finalIsRecruiting, status: updated.status || normalizeProjectStatus(selectedDetails.status) }
-      setProjects(prev => {
-        const newList = prev.map(proj => (proj.id === selectedDetails.id ? mappedUpdated : proj));
-        return newList;
+      const mappedUpdated = { ...selectedDetails, ...updated, team: updated.title || selectedDetails.team, title: updated.comicName || selectedDetails.title, isRecruiting: finalIsRecruiting, status: normalizeProjectStatus(updated.status || projectStatus) }
+      storeProjectStatus(selectedDetails.id, mappedUpdated.status)
+      const applyUpdated = (prev) => prev.map(proj => (proj.id === selectedDetails.id ? mappedUpdated : proj));
+      setProjects(applyUpdated)
+      setAllMatchedTeams(prev => {
+        const next = applyUpdated(prev)
+        try { sessionStorage.setItem('comiverse_projects_cache', JSON.stringify(next)) } catch (e) {}
+        return next
       })
       setSelectedDetails(mappedUpdated)
       toast.success('Workspace details saved successfully!')
     } catch (err) {
-      console.warn('Backend update workspace settings fallback:', err)
-      setProjects(prev => prev.map(proj => (proj.id === selectedDetails.id ? selectedDetails : proj)))
-      toast.success('Workspace details saved locally!')
+      console.error(err)
+      toast.error('Failed to save project settings. Concurrent project slots were not updated.')
     }
   }
 

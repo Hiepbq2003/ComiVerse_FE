@@ -6,6 +6,7 @@ import { getTranslatorDashboardApi, updateProjectTeamApi } from '../../services/
 import { getAuth } from '../../utils/Auth'
 import { exportToCsv } from '../../utils/exportToCsv'
 import { toast } from 'react-toastify'
+import { isParticipatingProjectStatus } from './SettingsTab'
 
 const PROJECTS_PER_PAGE = 4
 const TASKS_PER_PAGE = 5
@@ -158,7 +159,7 @@ function TranslatorDashboard() {
 
     return {
       totalProjects: filteredProjects.length,
-      activeProjects: filteredProjects.filter(p => p.status === 'ACTIVE' || !p.status).length,
+      activeProjects: filteredProjects.filter(p => isParticipatingProjectStatus(p.status)).length,
       pendingProjects: filteredProjects.filter(p => p.status === 'PENDING').length,
       totalTasksCount,
       activeTasksCount: backlogCount + inProgressCount + reviewCount,

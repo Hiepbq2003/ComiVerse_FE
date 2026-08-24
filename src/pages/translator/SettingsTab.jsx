@@ -1,3 +1,5 @@
+import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi';
+
 // =============================================================================
 // Tab 5: Group Settings
 // =============================================================================
@@ -9,13 +11,92 @@ export function normalizeProjectStatus(status) {
   return 'ongoing';
 }
 
+export function isParticipatingProjectStatus(status) {
+  const value = String(status || '').toLowerCase().trim();
+  return value === 'active' || value === 'ongoing';
+}
+
+function projectStatusStorageKey(id) {
+  return `comiverse_project_status_${id}`;
+}
+
+export function storeProjectStatus(id, status) {
+  if (!id) return;
+  try {
+    localStorage.setItem(projectStatusStorageKey(id), normalizeProjectStatus(status));
+  } catch (e) {}
+}
+
+export function readStoredProjectStatus(id) {
+  if (!id) return null;
+  try {
+    const raw = localStorage.getItem(projectStatusStorageKey(id));
+    return raw ? normalizeProjectStatus(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function reconcileProjectCompletion(project, { canPersist = false, cachedStatus, previousStatus } = {}) {
+  if (!project?.id) return project;
+
+  const serverStatus = normalizeProjectStatus(project.status);
+  const storedStatus = readStoredProjectStatus(project.id);
+  const localCompleted = [storedStatus, cachedStatus, previousStatus]
+    .map((value) => (value == null || value === '' ? '' : normalizeProjectStatus(value)))
+    .includes('completed');
+
+  if (serverStatus === 'completed') {
+    storeProjectStatus(project.id, 'completed');
+    return { ...project, status: 'completed' };
+  }
+
+  if (storedStatus && storedStatus !== 'completed') {
+    return { ...project, status: serverStatus };
+  }
+
+  if (!localCompleted) {
+    return { ...project, status: serverStatus };
+  }
+
+  const next = { ...project, status: 'completed', isRecruiting: false };
+  storeProjectStatus(project.id, 'completed');
+  if (canPersist && isParticipatingProjectStatus(project.status)) {
+    try {
+      await updateProjectTeamApi(project.id, {
+        id: project.id,
+        title: project.team || project.title,
+        comicName: project.comicName || project.title,
+        status: 'completed',
+        isRecruiting: false,
+        leaderName: project.leaderName,
+        leaderId: project.leaderId,
+        leaderInitials: project.leaderInitials,
+        membersCount: project.membersCount,
+        chaptersCount: project.chaptersCount,
+        progress: project.progress,
+        deadline: project.deadline,
+        sourceLang: project.sourceLang,
+        targetLang: project.targetLang,
+        priority: project.priority,
+        cover: project.cover,
+        description: project.description,
+        notes: project.notes,
+        maxMembers: project.maxMembers,
+      });
+    } catch (e) {}
+  }
+  return next;
+}
+
 function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorkspaceSettings }) {
   const recruitedLimit = Number(selectedDetails.maxMembers) || 5;
   const totalCapacity = recruitedLimit + 1; // 1 Leader + N Members
   const currentMembersCount = members.length || selectedDetails.membersCount || 1;
   const spotsAvailable = Math.max(0, totalCapacity - currentMembersCount);
-  const isOpen = selectedDetails.isRecruiting && spotsAvailable > 0;
   const projectStatus = normalizeProjectStatus(selectedDetails.status);
+  const isCompleted = projectStatus === 'completed';
+  const isOpen = !isCompleted && selectedDetails.isRecruiting && spotsAvailable > 0;
 
   return (
     <div className="group-settings-tab-container fade-in">
@@ -56,7 +137,11 @@ function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorks
             <select
               className="trans-form-input"
               value={projectStatus}
-              onChange={(e) => setSelectedDetails({ ...selectedDetails, status: e.target.value })}
+              onChange={(e) => setSelectedDetails({
+                ...selectedDetails,
+                status: e.target.value,
+                isRecruiting: e.target.value === 'completed' ? false : selectedDetails.isRecruiting
+              })}
               onWheel={(e) => e.target.blur()}
             >
               <option value="ongoing">Ongoing</option>
@@ -68,15 +153,20 @@ function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorks
             <label className="trans-form-label">Recruitment Status</label>
             <select
               className="trans-form-input"
-              value={(selectedDetails.isRecruiting && spotsAvailable > 0) ? "true" : "false"}
+              value={(!isCompleted && selectedDetails.isRecruiting && spotsAvailable > 0) ? "true" : "false"}
               onChange={(e) => setSelectedDetails({ ...selectedDetails, isRecruiting: e.target.value === "true" })}
-              disabled={spotsAvailable <= 0}
+              disabled={isCompleted || spotsAvailable <= 0}
               onWheel={(e) => e.target.blur()}
             >
               <option value="true">Open — recruiting new members</option>
               <option value="false">Closed — not accepting new members</option>
             </select>
-            {spotsAvailable <= 0 && (
+            {isCompleted && (
+              <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginTop: '6px' }}>
+                Completed projects are closed for recruitment and no longer count toward concurrent slots.
+              </span>
+            )}
+            {!isCompleted && spotsAvailable <= 0 && (
               <span style={{ fontSize: '12px', color: '#f87171', display: 'block', marginTop: '6px' }}>
                 Team is at full capacity. Recruitment is automatically closed.
               </span>
