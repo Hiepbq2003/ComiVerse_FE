@@ -38,9 +38,9 @@ function ConfirmModal({
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(5, 3, 10, 0.8)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
         zIndex: 99999,
         display: 'flex',
         alignItems: 'center',
@@ -63,14 +63,14 @@ function ConfirmModal({
       <div
         className="confirm-modal-box"
         style={{
-          background: 'linear-gradient(145deg, #1e152d 0%, #110c1c 100%)',
-          border: '1px solid rgba(168, 85, 247, 0.25)',
+          background: 'var(--bg)',
+          border: '1px solid var(--border)',
           borderRadius: '20px',
           width: '100%',
           maxWidth: '440px',
           padding: '28px 24px',
-          boxShadow: '0 25px 60px -10px rgba(0, 0, 0, 0.8), 0 0 35px rgba(168, 85, 247, 0.2)',
-          color: 'white',
+          boxShadow: 'var(--shadow)',
+          color: 'var(--text)',
           animation: 'scaleUpModal 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
           position: 'relative'
         }}
@@ -94,15 +94,15 @@ function ConfirmModal({
             {type === 'danger' ? <Trash2 size={24} color="#ef4444" /> : <AlertTriangle size={24} color="#f59e0b" />}
           </div>
           <div>
-            <h3 style={{ margin: 0, fontSize: '19px', fontWeight: '700', color: 'white', letterSpacing: '-0.2px' }}>
+            <h3 style={{ margin: 0, fontSize: '19px', fontWeight: '700', color: 'var(--text-h)', letterSpacing: '-0.2px' }}>
               {title}
             </h3>
-            <span style={{ fontSize: '12px', color: '#94a3b8' }}>Action Confirmation</span>
+            <span style={{ fontSize: '12px', color: 'var(--text)' }}>Action Confirmation</span>
           </div>
         </div>
 
         {/* Content Message */}
-        <p style={{ margin: '0 0 24px', fontSize: '14.5px', color: '#cbd5e1', lineHeight: '1.55' }}>
+        <p style={{ margin: '0 0 24px', fontSize: '14.5px', color: 'var(--text)', lineHeight: '1.55' }}>
           {message}
         </p>
 
@@ -114,16 +114,22 @@ function ConfirmModal({
             style={{
               padding: '10px 20px',
               borderRadius: '10px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              color: '#e2e8f0',
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              color: 'var(--text-h)',
               fontSize: '14px',
               fontWeight: '600',
               cursor: 'pointer',
               transition: 'all 0.18s ease'
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)')}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--border)';
+              e.currentTarget.style.opacity = '0.8';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.opacity = '1';
+            }}
           >
             {cancelText}
           </button>
