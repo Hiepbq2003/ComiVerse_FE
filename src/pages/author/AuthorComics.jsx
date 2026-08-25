@@ -5,6 +5,7 @@ import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 import '../../assets/style/author/comics.css'
 import '../../assets/style/author/upload-guide.css'
 import AuthorAppealModal from '../../components/author/AuthorAppealModal'
+import ModernPagination from '../../components/common/ModernPagination'
 import {
   checkAuthorComicTitleExistsApi,
   createAuthorComicApi,
@@ -48,6 +49,7 @@ const getViews = (comic) => comic?.viewCount ?? 0
 const getTaskId = (task) => task?.taskId || task?.id || task?.uploadTaskId
 const isFinalUploadStatus = (status) => ['COMPLETED', 'FAILED'].includes((status || '').toString().toUpperCase())
 const UPLOAD_POLL_INTERVAL_MS = 2500
+const COMICS_PER_PAGE = 6
 
 const formatPublicationStatus = (status) => {
   const value = (status || 'ONGOING').toString().toUpperCase()
@@ -391,6 +393,7 @@ function AuthorComics() {
   const [activeTab, setActiveTab] = useState('all') // 'all' | 'rejected' | 'pending' | 'approved' | 'draft'
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState('action_first') // 'action_first' | 'updated' | 'created' | 'title'
+  const [currentPage, setCurrentPage] = useState(1)
   const [reviewingId, setReviewingId] = useState(null)
   const comicsLoadedRef = useRef(false)
 
@@ -469,6 +472,25 @@ function AuthorComics() {
       return dateB - dateA
     })
   }, [comics, activeTab, searchQuery, sortBy])
+
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedComics.length / COMICS_PER_PAGE))
+  const paginatedComics = useMemo(() => {
+    const startIndex = (currentPage - 1) * COMICS_PER_PAGE
+    return filteredAndSortedComics.slice(startIndex, startIndex + COMICS_PER_PAGE)
+  }, [filteredAndSortedComics, currentPage])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [activeTab, searchQuery, sortBy])
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages))
+  }, [totalPages])
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   const loadComics = async () => {
     setLoading(true)
@@ -748,7 +770,7 @@ function AuthorComics() {
 
       {!loading && (
         <div className="author-comic-list">
-        {filteredAndSortedComics.map((comic) => {
+        {paginatedComics.map((comic) => {
           const comicId = getComicId(comic)
           const moderationStatus = comic.moderationStatus
           const publicationStatus = comic.publicationStatus
@@ -801,6 +823,20 @@ function AuthorComics() {
             </article>
           )
         })}
+        </div>
+      )}
+
+      {!loading && !error && filteredAndSortedComics.length > COMICS_PER_PAGE && (
+        <div className="author-comics-pagination">
+          <span>
+            Showing {(currentPage - 1) * COMICS_PER_PAGE + 1}–{Math.min(currentPage * COMICS_PER_PAGE, filteredAndSortedComics.length)} of {filteredAndSortedComics.length} comics
+          </span>
+          <ModernPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            variant="pills"
+          />
         </div>
       )}
 
