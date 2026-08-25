@@ -1359,6 +1359,11 @@ html.light .brand-footer-text p {
   box-shadow: 0 4px 12px rgba(168, 85, 247, 0.08) !important;
 }
 
+.auth-page-container .terms-checkbox-container:has(input[type="checkbox"]:checked) {
+  border-color: rgba(168, 85, 247, 0.42) !important;
+  background: rgba(168, 85, 247, 0.08) !important;
+}
+
 .auth-page-container .terms-checkbox-container input[type="checkbox"] {
   appearance: none !important;
   -webkit-appearance: none !important;
@@ -1940,6 +1945,17 @@ html.light .auth-page-container .terms-checkbox-container:hover {
 html.light .auth-page-container .terms-checkbox-container input[type="checkbox"] {
   background: #ffffff !important;
   border-color: rgba(76, 57, 87, 0.38) !important;
+}
+
+html.light .auth-page-container .terms-checkbox-container input[type="checkbox"]:checked {
+  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%) !important;
+  border-color: #7c3aed !important;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12), 0 0 10px rgba(124, 58, 237, 0.3) !important;
+}
+
+html.light .auth-page-container .terms-checkbox-container:has(input[type="checkbox"]:checked) {
+  background: rgba(124, 58, 237, 0.055) !important;
+  border-color: rgba(124, 58, 237, 0.38) !important;
 }
 
 html.light .login-security-notice.is-locked {

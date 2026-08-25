@@ -21,6 +21,11 @@ const ROLE_OPTIONS = [
   { value: 'TRANSLATOR', label: 'Translator' },
   { value: 'READER', label: 'Reader' },
 ]
+const STATUS_FILTER_VALUES = {
+  Active: 'ACTIVE',
+  Banned: 'INACTIVE',
+  'Pending Verification': 'PENDING_VERIFICATION',
+}
 
 const normalizeRoleValue = (role) => (role || 'READER').toString().trim().toUpperCase().replace(/[\s-]+/g, '_')
 const formatRoleLabel = (role) => {
@@ -34,6 +39,15 @@ const formatRoleLabel = (role) => {
     .join(' ')
 }
 const roleToClassName = (role) => normalizeRoleValue(role).toLowerCase().replace(/_/g, '-')
+const normalizeAccountStatus = (status) => {
+  const normalized = (status || '').toString().trim().toUpperCase().replace(/[\s-]+/g, '_')
+  if (normalized === 'ACTIVE') return 'Active'
+  if (normalized === 'INACTIVE' || normalized === 'BANNED') return 'Banned'
+  if (normalized === 'PENDING_VERIFICATION') return 'Pending Verification'
+  return status?.toString().trim() || 'Unknown'
+}
+const statusToClassName = (status) => normalizeAccountStatus(status).toLowerCase().replace(/[\s_]+/g, '-')
+const isPendingVerification = (status) => normalizeAccountStatus(status) === 'Pending Verification'
 
 const formatDate = (dateVal) => {
   if (!dateVal || dateVal === '-') return '-'
@@ -126,7 +140,7 @@ function AccountManagement() {
         params.role = roleFilter
       }
       if (statusFilter !== 'All Status') {
-        params.status = statusFilter === 'Active' ? 'ACTIVE' : 'INACTIVE'
+        params.status = STATUS_FILTER_VALUES[statusFilter]
       }
 
       const response = await getAllAccountsApi(params)
@@ -145,7 +159,7 @@ function AccountManagement() {
           username: acc.username,
           email: acc.email,
           role: normalizedRole,
-          status: acc.status || (acc.banned ? 'Banned' : 'Active'),
+          status: normalizeAccountStatus(acc.status || (acc.banned ? 'Banned' : 'Active')),
           createdDate: cDate ? formatDate(cDate) : '-',
           lastActive: lActive ? formatDate(lActive) : '-',
           assignedLanguages: Array.isArray(acc.assignedLanguages) && acc.assignedLanguages.length > 0 
@@ -390,6 +404,10 @@ function AccountManagement() {
       showAlert('warning', 'Admin accounts are protected from ban actions.')
       return
     }
+    if (['ban', 'unban'].includes(type) && isPendingVerification(account?.status)) {
+      showAlert('warning', 'This account must verify its email before ban status can be changed.')
+      return
+    }
     setConfirmAction({ type, account })
     setShowConfirmModal(true)
   }
@@ -512,6 +530,7 @@ function AccountManagement() {
         <select className="admin-filter-select" value={statusFilter} onChange={handleStatusChange}>
           <option>All Status</option>
           <option>Active</option>
+          <option>Pending Verification</option>
           <option>Banned</option>
         </select>
       </div>
@@ -565,7 +584,7 @@ function AccountManagement() {
                     )}
                   </td>
                   <td>
-                    <span className={`status-badge ${(account.status || '').toLowerCase()}`}>
+                    <span className={`status-badge ${statusToClassName(account.status)}`}>
                       {account.status}
                     </span>
                   </td>
@@ -591,6 +610,8 @@ function AccountManagement() {
 
                           {normalizeRoleValue(account.role) === 'ADMIN' ? (
                             <span className="account-protected-label" title="Admin accounts cannot be banned">Protected</span>
+                          ) : isPendingVerification(account.status) ? (
+                            <span className="account-protected-label account-pending-label" title="Waiting for email OTP verification">Awaiting OTP</span>
                           ) : (account.status || '').toLowerCase() === 'banned' ? (
                             <button
                               type="button"
