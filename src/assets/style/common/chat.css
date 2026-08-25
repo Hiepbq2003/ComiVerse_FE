@@ -775,3 +775,139 @@
   font-size: 12px;
 }
 
+/* ========================================================================== 
+   Light Theme
+   ========================================================================== */
+
+html.light .cv-chat-fab-badge,
+[data-theme="light"] .cv-chat-fab-badge {
+  border-color: #ffffff;
+}
+
+html.light .cv-chat-drawer,
+[data-theme="light"] .cv-chat-drawer {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18), 0 0 24px rgba(168, 85, 247, 0.1);
+}
+
+html.light .cv-chat-header,
+html.light .cv-chat-group-selector,
+[data-theme="light"] .cv-chat-header,
+[data-theme="light"] .cv-chat-group-selector {
+  background: rgba(248, 246, 250, 0.92);
+  border-color: rgba(15, 23, 42, 0.09);
+}
+
+html.light .cv-chat-header-title h3,
+[data-theme="light"] .cv-chat-header-title h3 {
+  color: #17111f;
+}
+
+html.light .cv-chat-icon-btn,
+html.light .cv-chat-tab-btn,
+html.light .cv-chat-action-btn,
+[data-theme="light"] .cv-chat-icon-btn,
+[data-theme="light"] .cv-chat-tab-btn,
+[data-theme="light"] .cv-chat-action-btn {
+  color: #6b6375;
+}
+
+html.light .cv-chat-icon-btn:hover,
+html.light .cv-chat-tab-btn:hover,
+[data-theme="light"] .cv-chat-icon-btn:hover,
+[data-theme="light"] .cv-chat-tab-btn:hover {
+  color: #17111f;
+  background: rgba(15, 23, 42, 0.06);
+}
+
+html.light .cv-chat-tab-bar,
+[data-theme="light"] .cv-chat-tab-bar {
+  background: #f8f6fa;
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+html.light .cv-chat-group-input,
+[data-theme="light"] .cv-chat-group-input {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.14);
+  color: #17111f;
+}
+
+html.light .cv-chat-message-list::-webkit-scrollbar-thumb,
+html.light .cv-emoji-grid::-webkit-scrollbar-thumb,
+[data-theme="light"] .cv-chat-message-list::-webkit-scrollbar-thumb,
+[data-theme="light"] .cv-emoji-grid::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.18);
+}
+
+html.light .cv-chat-empty-state,
+html.light .cv-chat-sender-name,
+html.light .cv-chat-time,
+[data-theme="light"] .cv-chat-empty-state,
+[data-theme="light"] .cv-chat-sender-name,
+[data-theme="light"] .cv-chat-time {
+  color: #6b6375;
+}
+
+html.light .cv-chat-msg-row.mine .cv-chat-time,
+[data-theme="light"] .cv-chat-msg-row.mine .cv-chat-time {
+  color: #6b6375;
+}
+
+html.light .cv-chat-msg-row.others .cv-chat-bubble,
+[data-theme="light"] .cv-chat-msg-row.others .cv-chat-bubble {
+  background: #f4f1f6;
+  border-color: rgba(15, 23, 42, 0.1);
+  color: #17111f;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+html.light .cv-chat-input-wrapper,
+html.light .cv-chat-input-bar,
+[data-theme="light"] .cv-chat-input-wrapper,
+[data-theme="light"] .cv-chat-input-bar {
+  background: #faf8fb;
+  border-color: rgba(15, 23, 42, 0.1);
+}
+
+html.light .cv-chat-input,
+[data-theme="light"] .cv-chat-input {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.14);
+  color: #17111f;
+}
+
+html.light .cv-chat-input:focus,
+[data-theme="light"] .cv-chat-input:focus {
+  background: #ffffff;
+}
+
+html.light .cv-emoji-picker,
+[data-theme="light"] .cv-emoji-picker {
+  background: rgba(255, 255, 255, 0.99);
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.18), 0 0 18px rgba(168, 85, 247, 0.08);
+}
+
+html.light .cv-emoji-picker-tabs,
+[data-theme="light"] .cv-emoji-picker-tabs {
+  background: #f8f6fa;
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+html.light .cv-emoji-tab:hover,
+[data-theme="light"] .cv-emoji-tab:hover {
+  background: rgba(15, 23, 42, 0.06);
+}
+
+html.light .cv-emoji-picker-label,
+[data-theme="light"] .cv-emoji-picker-label {
+  color: #6b6375;
+}
+
+html.light .cv-chat-image-bubble,
+[data-theme="light"] .cv-chat-image-bubble {
+  border-color: rgba(15, 23, 42, 0.12);
+}
+

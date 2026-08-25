@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import { getAuth, getUserChatRestriction } from '../../utils/Auth';
 
 const EMOJI_CATEGORIES = [
@@ -74,12 +75,18 @@ function ChatInputBar({ onSendMessage, isSending, disabled }) {
   const handleImageSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) return;
-    if (file.size > 5 * 1024 * 1024) return; // 5MB limit
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Chat images must be 5MB or smaller.');
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = () => {
-      setAttachedImage(reader.result);
+      setAttachedImage({ file, previewUrl: reader.result });
     };
     reader.readAsDataURL(file);
   };
@@ -119,7 +126,7 @@ function ChatInputBar({ onSendMessage, isSending, disabled }) {
       {attachedImage && (
         <div className="cv-chat-attachment-preview">
           <div className="cv-chat-attachment-thumb">
-            <img src={attachedImage} alt="Attachment" />
+            <img src={attachedImage.previewUrl} alt="Attachment" />
             <button
               type="button"
               className="cv-chat-attachment-remove"

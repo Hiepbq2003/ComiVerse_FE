@@ -94,4 +94,18 @@ describe('VerifyEmail Component', () => {
       expect(mockShowAlert).toHaveBeenCalledWith('success', expect.any(String));
     });
   });
+
+  it('Should ask for the account email when login used a username', async () => {
+    AuthApi.resendVerificationOtpApi.mockResolvedValueOnce({});
+    renderComponent({ email: '' });
+
+    const emailInput = screen.getByPlaceholderText('Enter your account email');
+    fireEvent.change(emailInput, { target: { value: ' Pending@Example.com ' } });
+    fireEvent.click(screen.getByText('Resend OTP Code'));
+
+    await waitFor(() => {
+      expect(AuthApi.resendVerificationOtpApi).toHaveBeenCalledWith('pending@example.com');
+      expect(mockShowAlert).toHaveBeenCalledWith('success', expect.any(String));
+    });
+  });
 });

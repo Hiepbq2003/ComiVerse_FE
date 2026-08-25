@@ -132,9 +132,11 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
       }
     } catch (err) {
       const errMessage = err.response?.data?.message || err.message || 'Invalid username or password.';
+      const errorCode = err.response?.data?.errors?.code || err.response?.data?.code;
       const isBanned = (err.response?.status === 403 || err.response?.status === 400) && /banned|inactive|disabled|blocked|lock/i.test(errMessage)
       const isInvalidCredentials = err.response?.status === 401 || /invalid username or password/i.test(errMessage)
-      const needsEmailVerification = err.response?.status === 403 && /verify your email/i.test(errMessage)
+      const needsEmailVerification = errorCode === 'EMAIL_VERIFICATION_REQUIRED'
+        || (err.response?.status === 403 && /verify your email/i.test(errMessage))
 
       if (isBanned) {
         clearAuth()
@@ -183,9 +185,10 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
 
       if (needsEmailVerification) {
         const loginIdentifier = form.username.trim()
-        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginIdentifier)) {
-          onVerificationRequired(loginIdentifier)
-        }
+        const verificationEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginIdentifier)
+          ? loginIdentifier
+          : ''
+        onVerificationRequired(verificationEmail)
         toast.error(errMessage)
         if (typeof showAlert === 'function') {
           showAlert('error', errMessage)

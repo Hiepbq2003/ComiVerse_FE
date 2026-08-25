@@ -26,13 +26,17 @@ export const getChatMessagesApi = ({ chatType, groupId, page = 1, limit = 20 }) 
  * @param {'GLOBAL' | 'GROUP'} payload.chatType
  * @param {string} [payload.groupId]
  * @param {string} payload.content
+ * @param {string} [payload.imageUrl]
  */
-export const sendChatMessageApi = ({ chatType, groupId, content }) => {
+export const sendChatMessageApi = ({ chatType, groupId, content, imageUrl }) => {
 
     const data = {
         chatType,
         content,
     };
+    if (imageUrl) {
+        data.imageUrl = imageUrl;
+    }
     if (chatType === 'GROUP' && groupId) {
         data.groupId = groupId;
     }

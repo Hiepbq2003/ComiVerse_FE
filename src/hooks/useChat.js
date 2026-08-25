@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import stompService from '../services/websocket/StompService';
 import { getChatMessagesApi, sendChatMessageApi, deleteChatMessageApi } from '../services/api/ChatApi';
+import { uploadImageApi } from '../services/api/UploadApi';
 import { getTeamMessagesApi, createTeamMessageApi, deleteTeamMessageApi } from '../services/api/TeamWorkspaceApi';
 import { getAuth, getUserChatRestriction } from '../utils/Auth';
 import { getBannedKeywordsApi, checkBannedContent } from '../services/api/BannedKeywordApi';
@@ -232,6 +233,7 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
         const senderName = newMsg.senderName || newMsg.sender || newMsg.username || newMsg.submittedBy || 'Member';
         const senderId = newMsg.senderId || newMsg.userId || null;
         const contentText = newMsg.content || newMsg.text || '';
+        const imageUrl = newMsg.imageUrl || newMsg.image || newMsg.attachedImage || null;
 
         const safeMsg = {
             id: newMsg.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
@@ -242,6 +244,7 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
             time: newMsg.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             text: contentText,
             content: contentText,
+            imageUrl,
             createdAt: newMsg.createdAt || newMsg.timestamp || new Date().toISOString(),
             ...newMsg
         };
@@ -250,7 +253,8 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
             // Search if a temporary optimistic message exists with matching content
             const tempIdx = prevMessages.findIndex(m =>
                 String(m.id).startsWith('temp-') &&
-                (m.content || m.text) === contentText
+                (m.content || m.text || '') === contentText &&
+                (m.imageUrl || null) === imageUrl
             );
 
             if (tempIdx !== -1) {
@@ -266,6 +270,7 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
             const isDup = prevMessages.some((m) =>
                 m.id === safeMsg.id ||
                 ((m.content || m.text) === contentText &&
+                    (m.imageUrl || null) === imageUrl &&
                     Math.abs(new Date(m.createdAt || 0) - new Date(safeMsg.createdAt || 0)) < 4000)
             );
             if (isDup) return prevMessages;
@@ -351,8 +356,8 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
     }, [chatType, groupId, removeMessage]);
 
     // 5. Send Message Handler
-    const sendMessage = useCallback(async (content, imageData = null) => {
-        if ((!content || !content.trim()) && !imageData) return;
+    const sendMessage = useCallback(async (content, imageAttachment = null) => {
+        if ((!content || !content.trim()) && !imageAttachment) return false;
 
         // Check if user has active moderation restriction (BAN or MUTE)
         const restriction = getUserChatRestriction(currentUser);
@@ -371,6 +376,11 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
         }
 
         const trimmedContent = (content || '').trim();
+        const imageFile = imageAttachment?.file || null;
+        if (imageAttachment && !imageFile) {
+            toast.error('The selected chat image could not be read. Please choose it again.');
+            return false;
+        }
 
         // 0ms Instant Client-Side Keyword Pre-filter (text only)
         if (trimmedContent) {
@@ -384,72 +394,65 @@ export function useChat(initialChatType = 'GLOBAL', initialGroupId = null) {
 
         setIsSending(true);
 
-        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const localOptimisticMsg = {
-            id: `temp-${Date.now()}`,
-            sender: currentUser?.fullName || currentUser?.username || 'Member',
-            senderName: currentUser?.fullName || currentUser?.username || 'Member',
-            senderId: currentUser?.id || currentUser?.userId || null,
-            sender_id: currentUser?.id || currentUser?.userId || null,
-            avatar: currentUser?.avatarUrl || null,
-            time: timeStr,
-            text: trimmedContent,
-            content: trimmedContent,
-            imageUrl: imageData || null,
-            createdAt: new Date().toISOString(),
-            chatType,
-            groupId: chatType === 'GROUP' ? groupId : undefined
-        };
-
-        // Instantly display message in local UI (Optimistic UI update)
-        handleIncomingMessage(localOptimisticMsg);
-
-        const payload = {
-            chatType,
-            groupId: chatType === 'GROUP' ? groupId : undefined,
-            content: trimmedContent,
-            imageUrl: imageData || undefined,
-        };
-
+        let temporaryMessageId = null;
         try {
-            // 1. Try sending via WebSocket STOMP (/app/chat/send)
-            // Note: For TEAM chat, we just use REST directly because TeamWorkspaceController doesn't have an @MessageMapping yet. 
-            // The REST call will broadcast it to /topic/team-workspace via SimpMessagingTemplate.
-            if (chatType !== 'TEAM' && stompService.isConnected()) {
-                const sentViaWs = stompService.publish('/app/chat/send', payload);
-                if (sentViaWs) {
-                    setIsSending(false);
-                    return;
+            let uploadedImageUrl = null;
+            if (imageFile) {
+                uploadedImageUrl = await uploadImageApi(imageFile);
+                if (typeof uploadedImageUrl !== 'string' || !/^https?:\/\//i.test(uploadedImageUrl)) {
+                    throw new Error('The image upload did not return a valid URL.');
                 }
             }
 
-            // 2. Fallback to REST API 
-            try {
-                let sentMsg = null;
-                if (chatType === 'TEAM' && groupId) {
-                    sentMsg = await createTeamMessageApi(groupId, {
-                        sender: currentUser?.fullName || currentUser?.username || 'Member',
-                        avatar: currentUser?.avatarUrl || null,
-                        time: timeStr,
-                        text: trimmedContent
-                    }).catch(() => null);
-                } else {
-                    sentMsg = await sendChatMessageApi(payload).catch(() => null);
-                }
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            temporaryMessageId = `temp-${Date.now()}`;
+            handleIncomingMessage({
+                id: temporaryMessageId,
+                sender: currentUser?.fullName || currentUser?.username || 'Member',
+                senderName: currentUser?.fullName || currentUser?.username || 'Member',
+                senderId: currentUser?.id || currentUser?.userId || null,
+                sender_id: currentUser?.id || currentUser?.userId || null,
+                avatar: currentUser?.avatarUrl || null,
+                time: timeStr,
+                text: trimmedContent,
+                content: trimmedContent,
+                imageUrl: uploadedImageUrl,
+                createdAt: new Date().toISOString(),
+                chatType,
+                groupId: chatType === 'GROUP' ? groupId : undefined
+            });
 
-                if (sentMsg) {
-                    // Normalize TeamMessageEntity schema to our generic chat format if needed
-                    handleIncomingMessage(sentMsg);
-                }
-            } catch (restErr) {
-                console.warn('[useChat] REST send fallback preserved message in local cache:', restErr);
+            let sentMsg;
+            if (chatType === 'TEAM' && groupId) {
+                sentMsg = await createTeamMessageApi(groupId, {
+                    sender: currentUser?.fullName || currentUser?.username || 'Member',
+                    avatar: currentUser?.avatarUrl || null,
+                    time: timeStr,
+                    text: trimmedContent,
+                    imageUrl: uploadedImageUrl || undefined,
+                });
+            } else {
+                sentMsg = await sendChatMessageApi({
+                    chatType,
+                    groupId: chatType === 'GROUP' ? groupId : undefined,
+                    content: trimmedContent,
+                    imageUrl: uploadedImageUrl || undefined,
+                });
             }
+
+            if (!sentMsg) throw new Error('The server did not confirm the message.');
+            handleIncomingMessage(sentMsg);
+            return true;
         } catch (err) {
             console.error('[useChat] Error sending message:', err);
+            if (temporaryMessageId) removeMessage(temporaryMessageId);
+            const message = err?.response?.data?.message || err?.message || 'Could not send the message.';
+            toast.error(message);
+            return false;
         } finally {
             setIsSending(false);
         }
-    }, [chatType, groupId, handleIncomingMessage, currentUser]);
+    }, [chatType, groupId, handleIncomingMessage, currentUser, removeMessage]);
 
     // 6. Switch Tab Handler
     const switchTab = useCallback((newType, newGroupId = null) => {

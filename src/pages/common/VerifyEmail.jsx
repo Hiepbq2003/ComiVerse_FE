@@ -1,16 +1,28 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { resendVerificationOtpApi, verifyEmailApi } from '../../services/api/AuthApi'
 
 function VerifyEmail({ email, onNavigate, showAlert, loading, setLoading }) {
   const [otp, setOtp] = useState('')
+  const [verificationEmail, setVerificationEmail] = useState(email || '')
+
+  useEffect(() => {
+    setVerificationEmail(email || '')
+  }, [email])
+
+  const normalizedEmail = verificationEmail.trim().toLowerCase()
+  const hasValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)
 
   const handleVerify = async (e) => {
     e.preventDefault()
     if (loading) return
+    if (!hasValidEmail) {
+      showAlert('error', 'Enter the email address used for this account.')
+      return
+    }
 
     setLoading(true)
     try {
-      await verifyEmailApi(email, otp)
+      await verifyEmailApi(normalizedEmail, otp)
       showAlert('success', 'Email verified successfully. You can now sign in.')
       onNavigate('signin')
     } catch (err) {
@@ -22,15 +34,15 @@ function VerifyEmail({ email, onNavigate, showAlert, loading, setLoading }) {
   }
 
   const handleResend = async () => {
-    if (!email) {
-      onNavigate('signup')
+    if (!hasValidEmail) {
+      showAlert('error', 'Enter the email address used for this account.')
       return
     }
     if (loading) return
 
     setLoading(true)
     try {
-      await resendVerificationOtpApi(email)
+      await resendVerificationOtpApi(normalizedEmail)
       showAlert('success', 'A new verification OTP has been sent to your email.')
     } catch (err) {
       const errMessage = err.response?.data?.message || 'Could not resend verification OTP.'
@@ -53,10 +65,30 @@ function VerifyEmail({ email, onNavigate, showAlert, loading, setLoading }) {
           </div>
         </div>
         <h2>Verify email</h2>
-        <p>We've sent a 6-digit OTP code to <strong>{email}</strong>.</p>
+        <p>
+          {hasValidEmail
+            ? <>We've sent a 6-digit OTP code to <strong>{normalizedEmail}</strong>.</>
+            : 'Enter your account email to receive a 6-digit OTP code.'}
+        </p>
       </div>
 
       <form onSubmit={handleVerify}>
+        {!email && (
+          <div className="glass-input-wrapper">
+            <span className="glass-input-label">ACCOUNT EMAIL</span>
+            <input
+              id="verify-account-email"
+              type="email"
+              placeholder="Enter your account email"
+              value={verificationEmail}
+              onChange={(event) => setVerificationEmail(event.target.value)}
+              className="glass-input-field"
+              autoComplete="email"
+              required
+            />
+          </div>
+        )}
+
         <div className="glass-input-wrapper">
           <span className="glass-input-label">EMAIL VERIFICATION CODE</span>
           <input
@@ -74,7 +106,7 @@ function VerifyEmail({ email, onNavigate, showAlert, loading, setLoading }) {
           />
         </div>
 
-        <button type="submit" className="btn-primary auth-margin-top-20" disabled={loading || otp.length !== 6}>
+        <button type="submit" className="btn-primary auth-margin-top-20" disabled={loading || !hasValidEmail || otp.length !== 6}>
           <span>{loading ? 'Verifying...' : 'Verify Email'}</span> <span className="btn-arrow-icon">&gt;</span>
         </button>
 

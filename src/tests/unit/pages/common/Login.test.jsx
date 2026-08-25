@@ -138,6 +138,33 @@ describe('Login Component Unit & Security Tests (Login.test.jsx)', () => {
     });
   });
 
+  it('should use the backend verification code and open OTP for username login', async () => {
+    AuthApi.loginApi.mockRejectedValueOnce({
+      response: {
+        status: 403,
+        data: {
+          message: 'Account action required.',
+          errors: { code: 'EMAIL_VERIFICATION_REQUIRED' }
+        }
+      }
+    });
+
+    renderLogin();
+
+    fireEvent.change(screen.getByPlaceholderText(/enter username or email/i), {
+      target: { value: 'pending_reader' }
+    });
+    fireEvent.change(screen.getByPlaceholderText(/enter password/i), {
+      target: { value: 'Password123!' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(mockOnVerificationRequired).toHaveBeenCalledWith('');
+      expect(mockShowAlert).toHaveBeenCalledWith('error', 'Account action required.');
+    });
+  });
+
   it('should enforce 5 failed login attempts limit and lock account for 10 minutes to prevent spam', async () => {
     AuthApi.loginApi.mockRejectedValue({
       response: { status: 401, data: { message: 'Invalid username or password.' } }

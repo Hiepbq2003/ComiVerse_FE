@@ -374,25 +374,17 @@ export function NotificationProvider({ children }) {
       return undefined
     }
 
-    const topicsToSubscribe = [
-      '/topic/notifications',
-      '/user/queue/notifications'
-    ]
-
-    // Keep backward compatibility while the backend may still publish to this destination.
-    if (currentUserId) {
-      topicsToSubscribe.push(`/topic/notifications/${currentUserId}`)
+    if (!currentUserId) {
+      return undefined
     }
 
+    const notificationTopic = `/topic/notifications/${currentUserId}`
+
     StompService.connect()
-    topicsToSubscribe.forEach((topic) => {
-      StompService.subscribe(topic, handleWsMessage)
-    })
+    StompService.subscribe(notificationTopic, handleWsMessage)
 
     return () => {
-      topicsToSubscribe.forEach((topic) => {
-        StompService.unsubscribe(topic)
-      })
+      StompService.unsubscribe(notificationTopic)
     }
   }, [isLoggedIn, currentUserId, handleWsMessage])
 
