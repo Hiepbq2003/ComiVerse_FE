@@ -16,6 +16,33 @@ export function isParticipatingProjectStatus(status) {
   return value === 'active' || value === 'ongoing';
 }
 
+function normalizeTaskStatus(status) {
+  return String(status || '').toLowerCase().trim().replace(/[-\s]/g, '_');
+}
+
+export function isTerminalTaskStatus(status) {
+  const value = normalizeTaskStatus(status);
+  return value === 'completed' || value === 'complete' || value === 'done' || value === 'published';
+}
+
+export function countIncompleteProjectTasks(tasks = []) {
+  return (Array.isArray(tasks) ? tasks : []).filter((task) => {
+    const status = task?.status || task?.column;
+    if (normalizeTaskStatus(status) === 'superseded') return false;
+    return !isTerminalTaskStatus(status);
+  }).length;
+}
+
+export function areAllProjectTasksCompleted(tasks = []) {
+  return countIncompleteProjectTasks(tasks) === 0;
+}
+
+export function incompleteProjectTasksMessage(incompleteCount) {
+  const count = Number(incompleteCount) || 0;
+  if (count <= 0) return '';
+  return `Cannot mark this project as completed. ${count} task${count === 1 ? ' is' : 's are'} still incomplete. Complete all tasks first.`;
+}
+
 function projectStatusStorageKey(id) {
   return `comiverse_project_status_${id}`;
 }
@@ -60,7 +87,6 @@ export async function reconcileProjectCompletion(project, { canPersist = false, 
   }
 
   const next = { ...project, status: 'completed', isRecruiting: false };
-  storeProjectStatus(project.id, 'completed');
   if (canPersist && isParticipatingProjectStatus(project.status)) {
     try {
       await updateProjectTeamApi(project.id, {
@@ -84,18 +110,25 @@ export async function reconcileProjectCompletion(project, { canPersist = false, 
         notes: project.notes,
         maxMembers: project.maxMembers,
       });
-    } catch (e) {}
+      storeProjectStatus(project.id, 'completed');
+      return next;
+    } catch (e) {
+      return { ...project, status: serverStatus };
+    }
   }
+  storeProjectStatus(project.id, 'completed');
   return next;
 }
 
-function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorkspaceSettings }) {
+function SettingsTab({ selectedDetails, setSelectedDetails, members, tasks = [], tasksLoading = false, onSaveWorkspaceSettings }) {
   const recruitedLimit = Number(selectedDetails.maxMembers) || 5;
   const totalCapacity = recruitedLimit + 1; // 1 Leader + N Members
   const currentMembersCount = members.length || selectedDetails.membersCount || 1;
   const spotsAvailable = Math.max(0, totalCapacity - currentMembersCount);
   const projectStatus = normalizeProjectStatus(selectedDetails.status);
   const isCompleted = projectStatus === 'completed';
+  const incompleteTaskCount = countIncompleteProjectTasks(tasks);
+  const canMarkCompleted = isCompleted || (!tasksLoading && incompleteTaskCount === 0);
   const isOpen = !isCompleted && selectedDetails.isRecruiting && spotsAvailable > 0;
 
   return (
@@ -137,16 +170,27 @@ function SettingsTab({ selectedDetails, setSelectedDetails, members, onSaveWorks
             <select
               className="trans-form-input"
               value={projectStatus}
-              onChange={(e) => setSelectedDetails({
-                ...selectedDetails,
-                status: e.target.value,
-                isRecruiting: e.target.value === 'completed' ? false : selectedDetails.isRecruiting
-              })}
+              onChange={(e) => {
+                const nextStatus = e.target.value;
+                if (nextStatus === 'completed' && !canMarkCompleted) return;
+                setSelectedDetails({
+                  ...selectedDetails,
+                  status: nextStatus,
+                  isRecruiting: nextStatus === 'completed' ? false : selectedDetails.isRecruiting
+                });
+              }}
               onWheel={(e) => e.target.blur()}
             >
               <option value="ongoing">Ongoing</option>
-              <option value="completed">Completed</option>
+              <option value="completed" disabled={!canMarkCompleted}>Completed</option>
             </select>
+            {!canMarkCompleted && (
+              <span style={{ fontSize: '12px', color: '#f87171', display: 'block', marginTop: '6px' }}>
+                {tasksLoading
+                  ? 'Checking tasks before Completed can be selected…'
+                  : `All tasks must be completed before this project can be marked Completed.${incompleteTaskCount > 0 ? ` ${incompleteTaskCount} remaining.` : ''}`}
+              </span>
+            )}
           </div>
 
           <div className="trans-form-group" style={{ marginTop: '16px' }}>

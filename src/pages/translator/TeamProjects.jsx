@@ -144,7 +144,13 @@ import HomeTab from './HomeTab'
 import MembersTab from './MembersTab'
 import RequestsTab from './RequestsTab'
 import TasksTab, { CreateTaskModal, EditTaskModal, parseTaskTitle, getTaskColumn, getNormalizedStatusKey } from './TasksTab'
-import SettingsTab, { normalizeProjectStatus, reconcileProjectCompletion, storeProjectStatus } from './SettingsTab'
+import SettingsTab, {
+  normalizeProjectStatus,
+  reconcileProjectCompletion,
+  storeProjectStatus,
+  countIncompleteProjectTasks,
+  incompleteProjectTasksMessage
+} from './SettingsTab'
 
 function apiErrorMessage(err, fallback = 'Failed to save task changes. Please try again.') {
   const data = err?.response?.data
@@ -510,7 +516,7 @@ function ProjectsListView({
   )
 }
 
-function EditProjectModal({ editForm, setEditForm, onCancel, onSave }) {
+function EditProjectModal({ editForm, setEditForm, canMarkCompleted = true, incompleteTaskCount = 0, onCancel, onSave }) {
   return (
     <div className="trans-modal-overlay">
       <div className="trans-modal-card">
@@ -535,11 +541,20 @@ function EditProjectModal({ editForm, setEditForm, onCancel, onSave }) {
             <select
               className="trans-form-input"
               value={normalizeProjectStatus(editForm.status)}
-              onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+              onChange={(e) => {
+                const nextStatus = e.target.value
+                if (nextStatus === 'completed' && !canMarkCompleted) return
+                setEditForm({ ...editForm, status: nextStatus })
+              }}
             >
               <option value="ongoing">Ongoing</option>
-              <option value="completed">Completed</option>
+              <option value="completed" disabled={!canMarkCompleted}>Completed</option>
             </select>
+            {!canMarkCompleted && (
+              <span style={{ fontSize: '12px', color: '#f87171', display: 'block', marginTop: '6px' }}>
+                All tasks must be completed before this project can be marked Completed.{incompleteTaskCount > 0 ? ` ${incompleteTaskCount} remaining.` : ''}
+              </span>
+            )}
           </div>
 
           <div className="trans-form-group">
@@ -1131,6 +1146,8 @@ function WorkspaceDetailView({
           selectedDetails={selectedDetails}
           setSelectedDetails={setSelectedDetails}
           members={members}
+          tasks={tasks}
+          tasksLoading={tasksLoading}
           onSaveWorkspaceSettings={onSaveWorkspaceSettings}
         />
       )}
@@ -1401,6 +1418,7 @@ function TeamProjects() {
   const [selectedDetails, setSelectedDetails] = useState(null)
   const [selectedEdit, setSelectedEdit] = useState(null)
   const [editForm, setEditForm] = useState({ description: '', status: 'ongoing', team: '' })
+  const [editIncompleteTaskCount, setEditIncompleteTaskCount] = useState(null)
 
   const [workspaceTab, setWorkspaceTab] = useState('home')
   const [loadingWorkspace, setLoadingWorkspace] = useState(false)
@@ -1872,18 +1890,42 @@ function TeamProjects() {
   }, [loadingProjects, projects, location.state])
 
 
-  const handleOpenEdit = (project, e) => {
+  const loadIncompleteTaskCount = async (projectId) => {
+    if (selectedDetails?.id === projectId) {
+      return countIncompleteProjectTasks(tasks)
+    }
+    try {
+      const tRes = await getTeamTasksApi(projectId)
+      const taskList = Array.isArray(tRes) ? tRes : (tRes?.data || tRes?.content || [])
+      return countIncompleteProjectTasks(taskList)
+    } catch {
+      return null
+    }
+  }
+
+  const handleOpenEdit = async (project, e) => {
     e.stopPropagation()
     setSelectedEdit(project)
+    setEditIncompleteTaskCount(null)
     setEditForm({
       description: project.description || '',
       status: normalizeProjectStatus(project.status),
       team: project.title || ''
     })
+    const count = await loadIncompleteTaskCount(project.id)
+    setEditIncompleteTaskCount(count)
   }
 
   const handleSaveEdit = async () => {
     if (!selectedEdit) return
+    const nextRequestedStatus = normalizeProjectStatus(editForm.status)
+    if (nextRequestedStatus === 'completed' && normalizeProjectStatus(selectedEdit.status) !== 'completed') {
+      const incompleteCount = editIncompleteTaskCount ?? await loadIncompleteTaskCount(selectedEdit.id)
+      if (incompleteCount > 0) {
+        toast.error(incompleteProjectTasksMessage(incompleteCount))
+        return
+      }
+    }
     try {
       const updated = await updateProjectTeamApi(selectedEdit.id, {
         id: selectedEdit.id,
@@ -1929,7 +1971,7 @@ function TeamProjects() {
       }
     } catch (err) {
       console.error(err)
-      toast.error('Failed to save project updates.')
+      toast.error(apiErrorMessage(err, 'Failed to save project updates.'))
     }
   }
 
@@ -1942,6 +1984,16 @@ function TeamProjects() {
     const isFull = currentMembersCount >= totalCapacity;
     
     const projectStatus = normalizeProjectStatus(selectedDetails.status);
+    const persistedProject = allMatchedTeams.find((p) => p.id === selectedDetails.id)
+      || projects.find((p) => p.id === selectedDetails.id)
+    const persistedStatus = normalizeProjectStatus(persistedProject?.status)
+    if (projectStatus === 'completed' && persistedStatus !== 'completed') {
+      const incompleteCount = countIncompleteProjectTasks(tasks)
+      if (incompleteCount > 0) {
+        toast.error(incompleteProjectTasksMessage(incompleteCount))
+        return
+      }
+    }
     // Force isRecruiting to false if team is at full capacity or the project is completed
     const finalIsRecruiting = isFull || projectStatus === 'completed' ? false : selectedDetails.isRecruiting;
 
@@ -1983,7 +2035,7 @@ function TeamProjects() {
       toast.success('Workspace details saved successfully!')
     } catch (err) {
       console.error(err)
-      toast.error('Failed to save project settings. Concurrent project slots were not updated.')
+      toast.error(apiErrorMessage(err, 'Failed to save project settings. Concurrent project slots were not updated.'))
     }
   }
 
@@ -2866,6 +2918,8 @@ function TeamProjects() {
         <EditProjectModal
           editForm={editForm}
           setEditForm={setEditForm}
+          canMarkCompleted={normalizeProjectStatus(selectedEdit.status) === 'completed' || editIncompleteTaskCount === 0}
+          incompleteTaskCount={editIncompleteTaskCount || 0}
           onCancel={() => setSelectedEdit(null)}
           onSave={handleSaveEdit}
         />

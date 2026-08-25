@@ -6,7 +6,7 @@ import { getTranslatorDashboardApi, updateProjectTeamApi } from '../../services/
 import { getAuth } from '../../utils/Auth'
 import { exportToCsv } from '../../utils/exportToCsv'
 import { toast } from 'react-toastify'
-import { isParticipatingProjectStatus } from './SettingsTab'
+import { isParticipatingProjectStatus, normalizeProjectStatus } from './SettingsTab'
 
 const PROJECTS_PER_PAGE = 4
 const TASKS_PER_PAGE = 5
@@ -457,18 +457,10 @@ function TranslatorDashboard() {
                 </p>
               ) : (
                 paginatedProjects.map(team => {
-                  const pStats = teamStats[team.id] || { totalTasks: 0, backlog: 0, inProgress: 0, review: 0, done: 0, totalChapters: 0 }
-
-                  let statusDisplay = (team.status || 'Active').toUpperCase()
-                  const hasInProgress = (pStats.inProgress || 0) > 0
-                  const hasReview = (pStats.review || 0) > 0
-
-                  if (hasInProgress) statusDisplay = 'IN PROGRESS'
-                  else if (hasReview) statusDisplay = 'UNDER REVIEW'
-
+                  const statusDisplay = normalizeProjectStatus(team.status).toUpperCase()
                   let statusColor = '#10b981'
-                  if (statusDisplay === 'IN PROGRESS') statusColor = '#3b82f6'
-                  else if (statusDisplay === 'UNDER REVIEW') statusColor = '#f59e0b'
+                  if (statusDisplay === 'COMPLETED') statusColor = '#64748b'
+                  else if (statusDisplay === 'PAUSED') statusColor = '#f59e0b'
 
                   return (
                     <div key={team.id} className="dash-project-card-theme">
