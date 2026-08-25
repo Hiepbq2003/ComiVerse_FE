@@ -807,11 +807,7 @@ function ModeratorComicDetail() {
       let chaptersData = chaptersRes ? (chaptersRes.data?.data || chaptersRes.data || chaptersRes || []) : [];
 
       if (Array.isArray(chaptersData) && chaptersData.length > 0) {
-        const approvedChaps = chaptersData.filter(c => {
-          const s = (c.status || c.moderationStatus || '').toUpperCase();
-          return s === 'PUBLISHED' || s === 'APPROVED' || !s;
-        });
-        setChapters(approvedChaps.map((c, idx) => {
+        setChapters(chaptersData.map((c, idx) => {
           let modStatus = c.moderationStatus;
           let approvedBy = c.approvedBy;
           
