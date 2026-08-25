@@ -84,4 +84,41 @@ describe('Admin account security and edge cases', () => {
     expect(await screen.findByText('Protected')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Ban' })).not.toBeInTheDocument()
   })
+
+  it('shows unverified accounts as pending and never exposes ban or unban actions', async () => {
+    AccountApi.getAllAccountsApi.mockResolvedValue(apiPage([
+      {
+        id: 'pending-1',
+        email: 'pending@test.com',
+        username: 'pending-reader',
+        fullName: 'Pending Reader',
+        role: 'READER',
+        status: 'PENDING_VERIFICATION',
+      },
+    ]))
+
+    renderPage()
+
+    expect(await screen.findByText('Pending Verification')).toBeInTheDocument()
+    expect(screen.getByText('Awaiting OTP')).toBeInTheDocument()
+    expect(document.querySelector('.status-badge')).toHaveClass('pending-verification')
+    expect(screen.queryByRole('button', { name: 'Ban' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Unban' })).not.toBeInTheDocument()
+  })
+
+  it('sends the pending-verification status value when filtering accounts', async () => {
+    AccountApi.getAllAccountsApi.mockResolvedValue(apiPage([]))
+
+    renderPage()
+    await waitFor(() => expect(AccountApi.getAllAccountsApi).toHaveBeenCalled())
+
+    const statusFilter = screen.getAllByRole('combobox')[1]
+    fireEvent.change(statusFilter, { target: { value: 'Pending Verification' } })
+
+    await waitFor(() => {
+      expect(AccountApi.getAllAccountsApi).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'PENDING_VERIFICATION' }),
+      )
+    })
+  })
 })
