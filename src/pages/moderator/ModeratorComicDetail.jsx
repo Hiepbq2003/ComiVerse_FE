@@ -1024,8 +1024,10 @@ function ModeratorComicDetail() {
   }
 
   const onTakedownSubmitted = (chapterId) => {
+    const auth = getAuth();
+    const currentUser = auth?.user?.fullName || auth?.user?.username || 'Moderator';
     // Optionally update chapter list to reflect REJECTED status
-    setChapters(prev => prev.map(c => c.id === chapterId ? { ...c, moderationStatus: 'REJECTED' } : c))
+    setChapters(prev => prev.map(c => c.id === chapterId ? { ...c, moderationStatus: 'REJECTED', rejectedBy: currentUser } : c))
   }
 
   // Filter project teams assigned to this comic
