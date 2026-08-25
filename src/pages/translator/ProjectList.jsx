@@ -159,6 +159,7 @@ function ProjectList() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTargetLang, setSelectedTargetLang] = useState('ALL');
+  const [selectedSourceLang, setSelectedSourceLang] = useState('ALL');
   const [selectedPriority, setSelectedPriority] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 6;
@@ -333,12 +334,24 @@ function ProjectList() {
       }
 
       if (!isRecruiting) return false;
-      if (p.status && p.status.toUpperCase() !== 'ACTIVE') return false;
+      if (p.status) {
+        const pStatus = p.status.toUpperCase();
+        if (pStatus === 'COMPLETED' || pStatus === 'PAUSED' || pStatus === 'CLOSED') {
+          return false;
+        }
+      }
 
       // 2. Target Language Filter
       if (selectedTargetLang !== 'ALL') {
-        const pLang = (p.targetLanguage || p.language || '').toLowerCase().trim();
+        const pLang = (p.targetLang || p.targetLanguage || p.language || '').toLowerCase().trim();
         const selLang = selectedTargetLang.toLowerCase().trim();
+        if (!pLang.includes(selLang)) return false;
+      }
+
+      // 2.5. Source Language Filter
+      if (selectedSourceLang !== 'ALL') {
+        const pLang = (p.sourceLang || p.sourceLanguage || '').toLowerCase().trim();
+        const selLang = selectedSourceLang.toLowerCase().trim();
         if (!pLang.includes(selLang)) return false;
       }
 
@@ -387,12 +400,12 @@ function ProjectList() {
 
       return !isAlreadyMember;
     });
-  }, [projects, selectedTargetLang, selectedPriority, searchTerm, userFullName, authUser, myProjectTeams]);
+  }, [projects, selectedTargetLang, selectedSourceLang, selectedPriority, searchTerm, userFullName, authUser, myProjectTeams]);
 
   // Reset to page 1 whenever filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedTargetLang, selectedPriority]);
+  }, [searchTerm, selectedTargetLang, selectedSourceLang, selectedPriority]);
 
   const totalPages = Math.ceil(filteredProjects.length / ITEMS_PER_PAGE) || 1;
 
@@ -758,7 +771,7 @@ function ProjectList() {
       {/* Toolbar & Filters (1 row) */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '1.5fr 1fr 1fr',
+        gridTemplateColumns: '1.5fr 1fr 1fr 1fr',
         gap: '12px',
         marginBottom: '24px',
         background: 'rgba(255, 255, 255, 0.03)',
@@ -788,16 +801,32 @@ function ProjectList() {
           />
         </div>
 
+        {/* Source Language Category Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--trans-text-secondary)', whiteSpace: 'nowrap' }}>🌐 Source:</span>
+          <select
+            className="trans-form-input"
+            style={{ height: '42px', fontSize: '13px', fontWeight: '600' }}
+            value={selectedSourceLang}
+            onChange={(e) => setSelectedSourceLang(e.target.value)}
+          >
+            <option value="ALL">All Sources</option>
+            {COMIC_LANGUAGE_OPTIONS.map(lang => (
+              <option key={lang} value={lang}>{lang}</option>
+            ))}
+          </select>
+        </div>
+
         {/* Target Language Category Filter */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--trans-text-secondary)', whiteSpace: 'nowrap' }}>🌐 Target:</span>
+          <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--trans-text-secondary)', whiteSpace: 'nowrap' }}>🎯 Target:</span>
           <select
             className="trans-form-input"
             style={{ height: '42px', fontSize: '13px', fontWeight: '600' }}
             value={selectedTargetLang}
             onChange={(e) => setSelectedTargetLang(e.target.value)}
           >
-            <option value="ALL">All Languages</option>
+            <option value="ALL">All Targets</option>
             {COMIC_LANGUAGE_OPTIONS.map(lang => (
               <option key={lang} value={lang}>{lang}</option>
             ))}

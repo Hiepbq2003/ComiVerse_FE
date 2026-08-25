@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'react-toastify'
 import AdminLayout from '../../components/layout/AdminLayout'
-import { getAllAccountsApi, registerStaffApi, banUserApi, unbanUserApi, resetUserPasswordApi, updateUserApi, approveAuthorLicenseApi, rejectAuthorLicenseApi, reopenAuthorLicenseApi } from '../../services/api/AccountApi'
+import { getAllAccountsApi, registerStaffApi, banUserApi, unbanUserApi, resetUserPasswordApi, updateUserApi } from '../../services/api/AccountApi'
 import ModernButton from '../../components/common/ModernButton'
 import AnimatedButton from '../../components/common/AnimatedButton'
 import { exportToCsv } from '../../utils/exportToCsv'
@@ -21,6 +21,11 @@ const ROLE_OPTIONS = [
   { value: 'TRANSLATOR', label: 'Translator' },
   { value: 'READER', label: 'Reader' },
 ]
+const STATUS_FILTER_VALUES = {
+  Active: 'ACTIVE',
+  Banned: 'INACTIVE',
+  'Pending Verification': 'PENDING_VERIFICATION',
+}
 
 const normalizeRoleValue = (role) => (role || 'READER').toString().trim().toUpperCase().replace(/[\s-]+/g, '_')
 const formatRoleLabel = (role) => {
@@ -34,6 +39,15 @@ const formatRoleLabel = (role) => {
     .join(' ')
 }
 const roleToClassName = (role) => normalizeRoleValue(role).toLowerCase().replace(/_/g, '-')
+const normalizeAccountStatus = (status) => {
+  const normalized = (status || '').toString().trim().toUpperCase().replace(/[\s-]+/g, '_')
+  if (normalized === 'ACTIVE') return 'Active'
+  if (normalized === 'INACTIVE' || normalized === 'BANNED') return 'Banned'
+  if (normalized === 'PENDING_VERIFICATION') return 'Pending Verification'
+  return status?.toString().trim() || 'Unknown'
+}
+const statusToClassName = (status) => normalizeAccountStatus(status).toLowerCase().replace(/[\s_]+/g, '-')
+const isPendingVerification = (status) => normalizeAccountStatus(status) === 'Pending Verification'
 
 const formatDate = (dateVal) => {
   if (!dateVal || dateVal === '-') return '-'
@@ -79,8 +93,6 @@ function AccountManagement() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [confirmAction, setConfirmAction] = useState(null) // { type: 'ban'|'unban'|'reset-pw', account }
-  const [licenseReviewAccount, setLicenseReviewAccount] = useState(null)
-  const [licenseRejectionReason, setLicenseRejectionReason] = useState('')
 
   // MODERATOR SPECIALIZATION LANGUAGES
   const MODERATOR_LANGUAGES = COMIC_LANGUAGE_OPTIONS
@@ -128,7 +140,7 @@ function AccountManagement() {
         params.role = roleFilter
       }
       if (statusFilter !== 'All Status') {
-        params.status = statusFilter === 'Active' ? 'ACTIVE' : 'INACTIVE'
+        params.status = STATUS_FILTER_VALUES[statusFilter]
       }
 
       const response = await getAllAccountsApi(params)
@@ -147,19 +159,12 @@ function AccountManagement() {
           username: acc.username,
           email: acc.email,
           role: normalizedRole,
-          status: acc.status || (acc.banned ? 'Banned' : 'Active'),
+          status: normalizeAccountStatus(acc.status || (acc.banned ? 'Banned' : 'Active')),
           createdDate: cDate ? formatDate(cDate) : '-',
           lastActive: lActive ? formatDate(lActive) : '-',
           assignedLanguages: Array.isArray(acc.assignedLanguages) && acc.assignedLanguages.length > 0 
             ? acc.assignedLanguages 
             : (normalizedRole.toLowerCase().includes('moderator') ? getDisplayLanguages(acc) : []),
-          authorId: acc.authorId || null,
-          authorLicenseStatus: acc.authorLicenseStatus || null,
-          licenseUrl: acc.licenseUrl || null,
-          licenseOriginalFilename: acc.licenseOriginalFilename || null,
-          licenseDeadlineAt: acc.licenseDeadlineAt || null,
-          licenseUploadedAt: acc.licenseUploadedAt || null,
-          licenseRejectionReason: acc.licenseRejectionReason || null,
         }
       })
       setAccounts(normalized)
@@ -279,7 +284,7 @@ function AccountManagement() {
       setStaffForm({ username: '', password: '', fullName: '', email: '', role: 'READER', assignedLanguages: ['Japanese', 'Korean'] })
       setStaffFormErrors({})
       setModalError(null)
-      showAlert('success', `Account "${staffForm.fullName}" created successfully!${normalizeRoleValue(staffForm.role) === 'AUTHOR' ? ' Author license status: PENDING LICENSE (7-day PDF upload deadline).' : ''}`)
+      showAlert('success', `Account "${staffForm.fullName}" created successfully!`)
       await fetchAccounts()
     } catch (err) {
       let errorMsg = 'Failed to create account. Please try again.'
@@ -393,78 +398,14 @@ function AccountManagement() {
     openConfirm('reset-pw', editingAccount)
   }
 
-  // ── AUTHOR LICENSE REVIEW ─────────────────────────
-  const openLicenseReview = (account) => {
-    if (!account?.authorId) {
-      showAlert('error', 'Missing AuthorEntity.id for this Author.')
-      return
-    }
-    setLicenseRejectionReason('')
-    setLicenseReviewAccount(account)
-  }
-
-  const closeLicenseReview = () => {
-    if (licenseReviewAccount && actionLoadingId === licenseReviewAccount.id) return
-    setLicenseReviewAccount(null)
-    setLicenseRejectionReason('')
-  }
-
-  const handleApproveAuthorLicense = async (account) => {
-    if (!account?.authorId) return
-    setActionLoadingId(account.id)
-    try {
-      await approveAuthorLicenseApi(account.authorId)
-      showAlert('success', `License verified. ${account.fullName} is now ACTIVE.`)
-      setLicenseReviewAccount(null)
-      setLicenseRejectionReason('')
-      await fetchAccounts()
-    } catch (err) {
-      showAlert('error', err.response?.data?.message || 'Failed to approve Author license.')
-    } finally {
-      setActionLoadingId(null)
-    }
-  }
-
-  const handleRejectAuthorLicense = async (account) => {
-    if (!account?.authorId) return
-    const rejectionReason = licenseRejectionReason.trim()
-    if (!rejectionReason) {
-      showAlert('error', 'Rejection reason is required.')
-      return
-    }
-    setActionLoadingId(account.id)
-    try {
-      await rejectAuthorLicenseApi(account.authorId, { reason: rejectionReason, deadlineDays: 7 })
-      showAlert('warning', `License rejected. ${account.fullName} can upload a replacement PDF within 7 days.`)
-      setLicenseReviewAccount(null)
-      setLicenseRejectionReason('')
-      await fetchAccounts()
-    } catch (err) {
-      showAlert('error', err.response?.data?.message || 'Failed to reject Author license.')
-    } finally {
-      setActionLoadingId(null)
-    }
-  }
-
-  const handleReopenAuthorLicense = async (account) => {
-    if (!account?.authorId) return
-    if (!window.confirm(`Give ${account.fullName} a new 7-day license upload deadline?`)) return
-    setActionLoadingId(account.id)
-    try {
-      await reopenAuthorLicenseApi(account.authorId, { deadlineDays: 7 })
-      showAlert('success', 'New 7-day PDF upload deadline assigned.')
-      await fetchAccounts()
-    } catch (err) {
-      showAlert('error', err.response?.data?.message || 'Failed to reopen Author license upload.')
-    } finally {
-      setActionLoadingId(null)
-    }
-  }
-
   // ── BAN / UNBAN ───────────────────────────────────
   const openConfirm = (type, account) => {
     if (['ban', 'unban'].includes(type) && normalizeRoleValue(account?.role) === 'ADMIN') {
       showAlert('warning', 'Admin accounts are protected from ban actions.')
+      return
+    }
+    if (['ban', 'unban'].includes(type) && isPendingVerification(account?.status)) {
+      showAlert('warning', 'This account must verify its email before ban status can be changed.')
       return
     }
     setConfirmAction({ type, account })
@@ -556,7 +497,7 @@ function AccountManagement() {
             variant={3}
             label="📥 Export Accounts"
             tooltip="Export CSV"
-            className="btn-excel"
+            className="btn-excel tooltip-bottom"
             onClick={handleExportAccounts}
             disabled={isLoading || accounts.length === 0}
           />
@@ -589,6 +530,7 @@ function AccountManagement() {
         <select className="admin-filter-select" value={statusFilter} onChange={handleStatusChange}>
           <option>All Status</option>
           <option>Active</option>
+          <option>Pending Verification</option>
           <option>Banned</option>
         </select>
       </div>
@@ -640,14 +582,9 @@ function AccountManagement() {
                         })()}
                       </div>
                     )}
-                    {normalizeRoleValue(account.role) === 'AUTHOR' && account.authorLicenseStatus && (
-                      <div style={{ marginTop: '5px', fontSize: '11px', fontWeight: '700', color: account.authorLicenseStatus === 'ACTIVE' ? '#22c55e' : '#f59e0b' }}>
-                        License: {account.authorLicenseStatus.replace(/_/g, ' ')}
-                      </div>
-                    )}
                   </td>
                   <td>
-                    <span className={`status-badge ${(account.status || '').toLowerCase()}`}>
+                    <span className={`status-badge ${statusToClassName(account.status)}`}>
                       {account.status}
                     </span>
                   </td>
@@ -671,28 +608,10 @@ function AccountManagement() {
                             <span>Edit</span>
                           </button>
 
-                          {normalizeRoleValue(account.role) === 'AUTHOR' && account.authorLicenseStatus === 'PENDING_VERIFICATION' && (
-                            <button
-                              type="button"
-                              className="btn-action-sm btn-action-sm--unban"
-                              onClick={() => openLicenseReview(account)}
-                            >
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
-                                <circle cx="12" cy="12" r="3" />
-                              </svg>
-                              <span>Review</span>
-                            </button>
-                          )}
-
-                          {normalizeRoleValue(account.role) === 'AUTHOR' && ['EXPIRED', 'AUTHOR_DISABLED'].includes(account.authorLicenseStatus) && (
-                            <button type="button" className="btn-action-sm btn-action-sm--unban" onClick={() => handleReopenAuthorLicense(account)}>
-                              <span>New Deadline</span>
-                            </button>
-                          )}
-
                           {normalizeRoleValue(account.role) === 'ADMIN' ? (
                             <span className="account-protected-label" title="Admin accounts cannot be banned">Protected</span>
+                          ) : isPendingVerification(account.status) ? (
+                            <span className="account-protected-label account-pending-label" title="Waiting for email OTP verification">Awaiting OTP</span>
                           ) : (account.status || '').toLowerCase() === 'banned' ? (
                             <button
                               type="button"
@@ -765,113 +684,6 @@ function AccountManagement() {
           </div>
         )}
       </div>
-
-      {/* ═══════════════════════════════════════════════
-          AUTHOR LICENSE REVIEW MODAL
-          ═══════════════════════════════════════════════ */}
-      {licenseReviewAccount && (
-        <div className="admin-modal-overlay" onClick={(event) => event.stopPropagation()}>
-          <div className="admin-modal admin-license-review-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="admin-modal-header">
-              <div>
-                <h2 className="admin-modal-title">Review Author License</h2>
-                <p className="admin-license-review-subtitle">
-                  Verify the submitted copyright document before activating Author permissions.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="admin-modal-close"
-                onClick={closeLicenseReview}
-                disabled={actionLoadingId === licenseReviewAccount.id}
-                aria-label="Close license review"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="admin-modal-body admin-license-review-body">
-              <div className="admin-license-review-meta">
-                <div className="admin-license-review-meta-item">
-                  <span>Author</span>
-                  <strong>{licenseReviewAccount.fullName || '-'}</strong>
-                </div>
-                <div className="admin-license-review-meta-item">
-                  <span>Email</span>
-                  <strong>{licenseReviewAccount.email || '-'}</strong>
-                </div>
-                <div className="admin-license-review-meta-item">
-                  <span>License status</span>
-                  <strong>{licenseReviewAccount.authorLicenseStatus || '-'}</strong>
-                </div>
-                <div className="admin-license-review-meta-item">
-                  <span>Uploaded</span>
-                  <strong>{formatDate(licenseReviewAccount.licenseUploadedAt)}</strong>
-                </div>
-                <div className="admin-license-review-meta-item admin-license-review-meta-item--wide">
-                  <span>Document</span>
-                  <strong>{licenseReviewAccount.licenseOriginalFilename || 'Author license PDF'}</strong>
-                </div>
-              </div>
-
-              <div className="admin-license-review-document">
-                {licenseReviewAccount.licenseUrl ? (
-                  <>
-                    <iframe
-                      title={`License document for ${licenseReviewAccount.fullName || 'Author'}`}
-                      src={licenseReviewAccount.licenseUrl}
-                      className="admin-license-review-frame"
-                    />
-                    <a
-                      href={licenseReviewAccount.licenseUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="admin-license-review-open-pdf"
-                    >
-                      Open PDF in new tab
-                    </a>
-                  </>
-                ) : (
-                  <div className="admin-license-review-missing">No license document URL was provided by the backend.</div>
-                )}
-              </div>
-
-              <div className="admin-form-group admin-license-review-reason">
-                <label className="admin-form-label" htmlFor="license-rejection-reason">
-                  Rejection reason <span className="admin-license-review-optional">(required only when rejecting)</span>
-                </label>
-                <textarea
-                  id="license-rejection-reason"
-                  className="admin-form-input admin-license-review-textarea"
-                  value={licenseRejectionReason}
-                  onChange={(e) => setLicenseRejectionReason(e.target.value)}
-                  placeholder="Explain what the Author needs to correct before uploading a replacement PDF..."
-                  disabled={actionLoadingId === licenseReviewAccount.id}
-                />
-              </div>
-            </div>
-
-            <div className="admin-modal-footer admin-license-review-footer">
-              <button
-                type="button"
-                className="admin-btn admin-btn--success"
-                onClick={() => handleApproveAuthorLicense(licenseReviewAccount)}
-                disabled={actionLoadingId === licenseReviewAccount.id || !licenseReviewAccount.licenseUrl}
-              >
-                {actionLoadingId === licenseReviewAccount.id ? 'Processing...' : 'Verify'}
-              </button>
-              <button
-                type="button"
-                className="admin-btn admin-btn--danger"
-                onClick={() => handleRejectAuthorLicense(licenseReviewAccount)}
-                disabled={actionLoadingId === licenseReviewAccount.id}
-              >
-                {actionLoadingId === licenseReviewAccount.id ? 'Processing...' : 'Reject'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ═══════════════════════════════════════════════
           CREATE STAFF MODAL

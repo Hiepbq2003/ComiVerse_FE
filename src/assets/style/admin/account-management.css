@@ -39,6 +39,23 @@
   justify-content: center;
 }
 
+.admin-account-management-screen .status-badge.pending-verification {
+  background: rgba(245, 158, 11, 0.12) !important;
+  color: #f59e0b !important;
+  border-color: rgba(245, 158, 11, 0.28) !important;
+}
+
+.admin-account-management-screen .account-pending-label {
+  border-color: rgba(245, 158, 11, 0.28);
+  background: rgba(245, 158, 11, 0.08);
+  color: #f59e0b;
+}
+
+html.light .admin-account-management-screen .status-badge.pending-verification,
+html.light .admin-account-management-screen .account-pending-label {
+  color: #b45309 !important;
+}
+
 @media (max-width: 900px) {
   .admin-account-management-actions {
     width: 100%;
