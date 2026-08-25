@@ -547,14 +547,13 @@ function ProjectTeams({
         </div>
       </div>
 
-      <div className="mod-filter-bar" style={{ marginTop: '24px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="mod-filter-bar" style={{ marginTop: '24px', display: 'grid', gridTemplateColumns: '1.5fr 1fr 150px', gap: '16px', alignItems: 'center' }}>
         <input 
           type="text" 
           className="mod-input" 
           placeholder="Search by comic / team name..." 
           value={teamSearchTitle} 
           onChange={e => setTeamSearchTitle(e.target.value)} 
-          style={{ flex: '1 1 250px' }}
         />
         <input 
           type="text" 
@@ -562,10 +561,10 @@ function ProjectTeams({
           placeholder="Search by project leader..." 
           value={teamSearchLeader} 
           onChange={e => setTeamSearchLeader(e.target.value)} 
-          style={{ flex: '1 1 200px' }}
         />
         <select 
           className="mod-input" 
+
           value={teamSearchStatus} 
           onChange={e => setTeamSearchStatus(e.target.value)}
           style={{ width: '150px' }}
@@ -671,7 +670,7 @@ function ProjectTeams({
             ))}
           </div>
 
-          {totalPages > 1 && (
+          {totalPages > 0 && (
             <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'center' }}>
               <ModernPagination 
                 currentPage={currentPage}
