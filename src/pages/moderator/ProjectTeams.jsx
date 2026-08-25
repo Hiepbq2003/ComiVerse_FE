@@ -676,7 +676,7 @@ function ProjectTeams({
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
-                variant="minimal"
+                variant="pills"
               />
             </div>
           )}

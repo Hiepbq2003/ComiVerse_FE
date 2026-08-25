@@ -45,7 +45,7 @@ function Library() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalElements, setTotalElements] = useState(0)
-  const ITEMS_PER_PAGE = 4
+  const ITEMS_PER_PAGE = 10
 
   const handleTabClick = (tabName) => {
     navigate(`/library?tab=${tabName}`, { replace: true })
@@ -392,7 +392,7 @@ function Library() {
                             <>
                               <span className="lib-comic-chapter">Ch.{comicChapter || 1}</span>
                               <span className="lib-comic-status-text">
-                                {lastReadTime ? `Read ${formatTimeAgo(lastReadTime)}` : 'Recently'}
+                                {lastReadTime ? `Updated ${formatTimeAgo(lastReadTime)}` : 'Recently'}
                               </span>
                             </>
                           ) : activeTab === 'Rated' ? (
