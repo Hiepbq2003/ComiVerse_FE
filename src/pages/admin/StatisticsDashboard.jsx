@@ -338,6 +338,10 @@ function StatisticsDashboard() {
         return c;
       });
 
+      uniqueLocalComics = uniqueLocalComics.filter(c => 
+        c.moderationStatus !== 'REJECTED' && c.moderationStatus !== 'SUBMITTED_FOR_REVIEW'
+      );
+
       const localOngoing = uniqueLocalComics.filter(c => (!c.publicationStatus || c.publicationStatus.toUpperCase() === 'ONGOING')).length;
       const localCompleted = uniqueLocalComics.filter(c => c.publicationStatus?.toUpperCase() === 'COMPLETED').length;
       const localHiatus = uniqueLocalComics.filter(c => c.publicationStatus?.toUpperCase() === 'HIATUS').length;
