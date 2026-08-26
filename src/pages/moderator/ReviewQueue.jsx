@@ -1886,6 +1886,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         <div>
           <h1>Raw Content Review Queue</h1>
           <p>Review and verify author submission inputs (Title, Language, Min Age, Description, Genres, Cover & Chapters), inspect raw chapter manuscripts, and approve catalog publication.</p>
+        </div>
       </div>
 
       {/* Dynamic Statistics Ribbon */}
