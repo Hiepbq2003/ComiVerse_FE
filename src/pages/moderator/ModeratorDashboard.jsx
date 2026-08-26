@@ -1999,7 +1999,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                     <span className="mod-sec-value">
                       {loadingPhase1 ? <div className="skeleton-line skeleton-shimmer" style={{ width: '40px', height: '24px', margin: 0 }}></div> : comics.filter(c => c.publicationStatus?.toUpperCase() === 'ONGOING').length}
                     </span>
-                    <span className="mod-sec-title">Ongoing</span>
+                    <span className="mod-sec-title">Ongoing Comics</span>
                   </div>
                 </div>
 
@@ -2009,7 +2009,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                     <span className="mod-sec-value">
                       {loadingPhase1 ? <div className="skeleton-line skeleton-shimmer" style={{ width: '40px', height: '24px', margin: 0 }}></div> : comics.filter(c => c.publicationStatus?.toUpperCase() === 'COMPLETED').length}
                     </span>
-                    <span className="mod-sec-title">Completed</span>
+                    <span className="mod-sec-title">Completed Comics</span>
                   </div>
                 </div>
 
