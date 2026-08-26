@@ -349,18 +349,18 @@ function Explore() {
 
               {/* Genres Dropdown Selector */}
               <div ref={genresDropdownRef} style={{ position: 'relative', marginBottom: '28px' }}>
-                <h4 style={{ color: 'white', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', paddingLeft: '8px' }}>
+                <h4 style={{ color: 'var(--text-h)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', paddingLeft: '8px' }}>
                   Genres
                 </h4>
                 <div
                   onClick={() => setIsGenresOpen(!isGenresOpen)}
                   style={{
                     width: '100%',
-                    background: isGenresOpen ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.04)',
-                    border: isGenresOpen ? '1px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.08)',
+                    background: isGenresOpen ? 'var(--accent-bg)' : 'var(--code-bg)',
+                    border: isGenresOpen ? '1px solid var(--accent)' : '1px solid var(--border)',
                     borderRadius: '8px',
                     padding: '10px 14px',
-                    color: '#cbd5e1',
+                    color: 'var(--text)',
                     fontSize: '13px',
                     fontWeight: '500',
                     outline: 'none',
@@ -373,19 +373,19 @@ function Explore() {
                   }}
                   onMouseEnter={(e) => {
                     if (!isGenresOpen) {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-                      e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.6)'
+                      e.currentTarget.style.background = 'var(--code-bg)'
+                      e.currentTarget.style.borderColor = 'var(--accent-border)'
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isGenresOpen) {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'
+                      e.currentTarget.style.background = 'var(--code-bg)'
+                      e.currentTarget.style.borderColor = 'var(--border)'
                     }
                   }}
                 >
                   <span style={{ 
-                    color: isGenresOpen ? 'white' : '#cbd5e1', 
+                    color: isGenresOpen ? 'var(--text-h)' : 'var(--text)', 
                     transition: 'color 0.2s',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
@@ -406,7 +406,7 @@ function Explore() {
                     style={{
                       transform: isGenresOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                       transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                      color: isGenresOpen ? '#c084fc' : '#94a3b8',
+                      color: isGenresOpen ? 'var(--accent)' : 'var(--text-muted)',
                       flexShrink: 0
                     }}
                   >
@@ -422,17 +422,15 @@ function Explore() {
                       left: '0',
                       right: '0',
                       marginTop: '6px',
-                      background: 'rgba(13, 9, 25, 0.95)',
-                      backdropFilter: 'blur(12px)',
-                      WebkitBackdropFilter: 'blur(12px)',
-                      border: '1px solid rgba(168, 85, 247, 0.2)',
+                      background: 'var(--bg)',
+                      border: '1px solid var(--border)',
                       borderRadius: '10px',
-                      boxShadow: '0 10px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(168, 85, 247, 0.1)',
+                      boxShadow: 'var(--shadow)',
                       zIndex: 100,
                       overflowY: 'auto',
                       maxHeight: '210px',
                       scrollbarWidth: 'thin',
-                      scrollbarColor: 'rgba(168, 85, 247, 0.4) transparent',
+                      scrollbarColor: 'var(--accent-border) transparent',
                       padding: '4px',
                       boxSizing: 'border-box'
                     }}
@@ -443,11 +441,11 @@ function Explore() {
                       style={{
                         padding: '10px 12px',
                         borderRadius: '6px',
-                        color: selectedGenres.includes('All') ? 'white' : '#cbd5e1',
-                        background: selectedGenres.includes('All') ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(236, 72, 153, 0.2) 100%)' : 'transparent',
-                        border: selectedGenres.includes('All') ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid transparent',
+                        color: selectedGenres.includes('All') ? '#ffffff' : 'var(--text)',
+                        background: selectedGenres.includes('All') ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)' : 'transparent',
+                        border: selectedGenres.includes('All') ? '1px solid transparent' : '1px solid transparent',
                         fontSize: '13px',
-                        fontWeight: selectedGenres.includes('All') ? '600' : '400',
+                        fontWeight: selectedGenres.includes('All') ? '600' : '500',
                         cursor: 'pointer',
                         transition: 'all 0.15s ease',
                         display: 'flex',
@@ -458,20 +456,20 @@ function Explore() {
                       }}
                       onMouseEnter={(e) => {
                         if (!selectedGenres.includes('All')) {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'
-                          e.currentTarget.style.color = 'white'
+                          e.currentTarget.style.background = 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)'
+                          e.currentTarget.style.color = '#ffffff'
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (!selectedGenres.includes('All')) {
                           e.currentTarget.style.background = 'transparent'
-                          e.currentTarget.style.color = '#cbd5e1'
+                          e.currentTarget.style.color = 'var(--text)'
                         }
                       }}
                     >
                       <span>All</span>
                       {selectedGenres.includes('All') && (
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#c084fc' }}>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--accent)' }}>
                           <polyline points="20 6 9 17 4 12"></polyline>
                         </svg>
                       )}
@@ -486,12 +484,11 @@ function Explore() {
                           onClick={() => handleToggleGenre(g.name)}
                           style={{
                             padding: '10px 12px',
-                            borderRadius: '6px',
-                            color: isSelected ? 'white' : '#cbd5e1',
-                            background: isSelected ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(236, 72, 153, 0.2) 100%)' : 'transparent',
-                            border: isSelected ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid transparent',
+                            color: isSelected ? '#ffffff' : 'var(--text)',
+                            background: isSelected ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)' : 'transparent',
+                            border: isSelected ? '1px solid transparent' : '1px solid transparent',
                             fontSize: '13px',
-                            fontWeight: isSelected ? '600' : '400',
+                            fontWeight: isSelected ? '600' : '500',
                             cursor: 'pointer',
                             transition: 'all 0.15s ease',
                             display: 'flex',
@@ -502,20 +499,20 @@ function Explore() {
                           }}
                           onMouseEnter={(e) => {
                             if (!isSelected) {
-                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'
-                              e.currentTarget.style.color = 'white'
+                              e.currentTarget.style.background = 'var(--accent-bg)'
+                              e.currentTarget.style.color = 'var(--accent)'
                             }
                           }}
                           onMouseLeave={(e) => {
                             if (!isSelected) {
                               e.currentTarget.style.background = 'transparent'
-                              e.currentTarget.style.color = '#cbd5e1'
+                              e.currentTarget.style.color = 'var(--text)'
                             }
                           }}
                         >
                           <span>{g.name}</span>
                           {isSelected && (
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#c084fc' }}>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--accent)' }}>
                               <polyline points="20 6 9 17 4 12"></polyline>
                             </svg>
                           )}
@@ -528,18 +525,18 @@ function Explore() {
 
               {/* Status Dropdown Selector */}
               <div ref={statusDropdownRef} style={{ position: 'relative', marginBottom: '28px' }}>
-                <h4 style={{ color: 'white', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', paddingLeft: '8px' }}>
+                <h4 style={{ color: 'var(--text-h)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', paddingLeft: '8px' }}>
                   Status
                 </h4>
                 <div
                   onClick={() => setIsStatusOpen(!isStatusOpen)}
                   style={{
                     width: '100%',
-                    background: isStatusOpen ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.04)',
-                    border: isStatusOpen ? '1px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.08)',
+                    background: isStatusOpen ? 'var(--accent-bg)' : 'var(--code-bg)',
+                    border: isStatusOpen ? '1px solid var(--accent)' : '1px solid var(--border)',
                     borderRadius: '8px',
                     padding: '10px 14px',
-                    color: '#cbd5e1',
+                    color: 'var(--text)',
                     fontSize: '13px',
                     fontWeight: '500',
                     outline: 'none',
@@ -552,18 +549,18 @@ function Explore() {
                   }}
                   onMouseEnter={(e) => {
                     if (!isStatusOpen) {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-                      e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.6)'
+                      e.currentTarget.style.background = 'var(--code-bg)'
+                      e.currentTarget.style.borderColor = 'var(--accent-border)'
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isStatusOpen) {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'
+                      e.currentTarget.style.background = 'var(--code-bg)'
+                      e.currentTarget.style.borderColor = 'var(--border)'
                     }
                   }}
                 >
-                  <span style={{ color: isStatusOpen ? 'white' : '#cbd5e1', transition: 'color 0.2s' }}>
+                  <span style={{ color: isStatusOpen ? 'var(--text-h)' : 'var(--text)', transition: 'color 0.2s' }}>
                     {selectedStatus === 'All' ? 'All Statuses' : selectedStatus}
                   </span>
                   <svg
@@ -578,7 +575,7 @@ function Explore() {
                     style={{
                       transform: isStatusOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                       transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                      color: isStatusOpen ? '#c084fc' : '#94a3b8'
+                      color: isStatusOpen ? 'var(--accent)' : 'var(--text-muted)'
                     }}
                   >
                     <polyline points="6 9 12 15 18 9"></polyline>
@@ -593,17 +590,15 @@ function Explore() {
                       left: '0',
                       right: '0',
                       marginTop: '6px',
-                      background: 'rgba(13, 9, 25, 0.95)',
-                      backdropFilter: 'blur(12px)',
-                      WebkitBackdropFilter: 'blur(12px)',
-                      border: '1px solid rgba(168, 85, 247, 0.2)',
+                      background: 'var(--bg)',
+                      border: '1px solid var(--border)',
                       borderRadius: '10px',
-                      boxShadow: '0 10px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(168, 85, 247, 0.1)',
+                      boxShadow: 'var(--shadow)',
                       zIndex: 100,
                       overflowY: 'auto',
                       maxHeight: '210px',
                       scrollbarWidth: 'thin',
-                      scrollbarColor: 'rgba(168, 85, 247, 0.4) transparent',
+                      scrollbarColor: 'var(--accent-border) transparent',
                       padding: '4px',
                       boxSizing: 'border-box'
                     }}
@@ -620,11 +615,11 @@ function Explore() {
                           style={{
                             padding: '10px 12px',
                             borderRadius: '6px',
-                            color: isSelected ? 'white' : '#cbd5e1',
-                            background: isSelected ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(236, 72, 153, 0.2) 100%)' : 'transparent',
-                            border: isSelected ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid transparent',
+                            color: isSelected ? '#ffffff' : 'var(--text)',
+                            background: isSelected ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)' : 'transparent',
+                            border: isSelected ? '1px solid transparent' : '1px solid transparent',
                             fontSize: '13px',
-                            fontWeight: isSelected ? '600' : '400',
+                            fontWeight: isSelected ? '600' : '500',
                             cursor: 'pointer',
                             transition: 'all 0.15s ease',
                             display: 'flex',
@@ -635,20 +630,20 @@ function Explore() {
                           }}
                           onMouseEnter={(e) => {
                             if (!isSelected) {
-                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'
-                              e.currentTarget.style.color = 'white'
+                              e.currentTarget.style.background = 'var(--accent-bg)'
+                              e.currentTarget.style.color = 'var(--accent)'
                             }
                           }}
                           onMouseLeave={(e) => {
                             if (!isSelected) {
                               e.currentTarget.style.background = 'transparent'
-                              e.currentTarget.style.color = '#cbd5e1'
+                              e.currentTarget.style.color = 'var(--text)'
                             }
                           }}
                         >
                           <span>{status}</span>
                           {isSelected && (
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#c084fc' }}>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--accent)' }}>
                               <polyline points="20 6 9 17 4 12"></polyline>
                             </svg>
                           )}
@@ -661,18 +656,18 @@ function Explore() {
 
               {/* Quick Sort Dropdown Selector */}
               <div ref={sortDropdownRef} style={{ position: 'relative' }}>
-                <h4 style={{ color: 'white', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', paddingLeft: '8px' }}>
+                <h4 style={{ color: 'var(--text-h)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', paddingLeft: '8px' }}>
                   Sort By
                 </h4>
                 <div
                   onClick={() => setIsSortOpen(!isSortOpen)}
                   style={{
                     width: '100%',
-                    background: isSortOpen ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.04)',
-                    border: isSortOpen ? '1px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.08)',
+                    background: isSortOpen ? 'var(--accent-bg)' : 'var(--code-bg)',
+                    border: isSortOpen ? '1px solid var(--accent)' : '1px solid var(--border)',
                     borderRadius: '8px',
                     padding: '10px 14px',
-                    color: '#cbd5e1',
+                    color: 'var(--text)',
                     fontSize: '13px',
                     fontWeight: '500',
                     outline: 'none',
@@ -685,18 +680,18 @@ function Explore() {
                   }}
                   onMouseEnter={(e) => {
                     if (!isSortOpen) {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-                      e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.6)'
+                      e.currentTarget.style.background = 'var(--code-bg)'
+                      e.currentTarget.style.borderColor = 'var(--accent-border)'
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isSortOpen) {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'
+                      e.currentTarget.style.background = 'var(--code-bg)'
+                      e.currentTarget.style.borderColor = 'var(--border)'
                     }
                   }}
                 >
-                  <span style={{ color: isSortOpen ? 'white' : '#cbd5e1', transition: 'color 0.2s' }}>
+                  <span style={{ color: isSortOpen ? 'var(--text-h)' : 'var(--text)', transition: 'color 0.2s' }}>
                     {sortOptions.find(opt => opt.value === sortBy)?.label || 'Default'}
                   </span>
                   <svg
@@ -711,7 +706,7 @@ function Explore() {
                     style={{
                       transform: isSortOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                       transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                      color: isSortOpen ? '#c084fc' : '#94a3b8'
+                      color: isSortOpen ? 'var(--accent)' : 'var(--text-muted)'
                     }}
                   >
                     <polyline points="6 9 12 15 18 9"></polyline>
@@ -726,17 +721,15 @@ function Explore() {
                       left: '0',
                       right: '0',
                       marginTop: '6px',
-                      background: 'rgba(13, 9, 25, 0.95)',
-                      backdropFilter: 'blur(12px)',
-                      WebkitBackdropFilter: 'blur(12px)',
-                      border: '1px solid rgba(168, 85, 247, 0.2)',
+                      background: 'var(--bg)',
+                      border: '1px solid var(--border)',
                       borderRadius: '10px',
-                      boxShadow: '0 10px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(168, 85, 247, 0.1)',
+                      boxShadow: 'var(--shadow)',
                       zIndex: 100,
                       overflowY: 'auto',
                       maxHeight: '210px',
                       scrollbarWidth: 'thin',
-                      scrollbarColor: 'rgba(168, 85, 247, 0.4) transparent',
+                      scrollbarColor: 'var(--accent-border) transparent',
                       padding: '4px',
                       boxSizing: 'border-box'
                     }}
@@ -753,9 +746,9 @@ function Explore() {
                           style={{
                             padding: '10px 12px',
                             borderRadius: '6px',
-                            color: isSelected ? 'white' : '#cbd5e1',
-                            background: isSelected ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(236, 72, 153, 0.2) 100%)' : 'transparent',
-                            border: isSelected ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid transparent',
+                            color: isSelected ? '#ffffff' : 'var(--text)',
+                            background: isSelected ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)' : 'transparent',
+                            border: isSelected ? '1px solid transparent' : '1px solid transparent',
                             fontSize: '13px',
                             fontWeight: isSelected ? '600' : '400',
                             cursor: 'pointer',
@@ -768,15 +761,15 @@ function Explore() {
                           }}
                           onMouseEnter={(e) => {
                             if (!isSelected) {
-                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'
-                              e.currentTarget.style.color = 'white'
+                              e.currentTarget.style.background = 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)'
+                              e.currentTarget.style.color = '#ffffff'
                               e.currentTarget.style.paddingLeft = '14px'
                             }
                           }}
                           onMouseLeave={(e) => {
                             if (!isSelected) {
                               e.currentTarget.style.background = 'transparent'
-                              e.currentTarget.style.color = '#cbd5e1'
+                              e.currentTarget.style.color = 'var(--text)'
                               e.currentTarget.style.paddingLeft = '12px'
                             }
                           }}

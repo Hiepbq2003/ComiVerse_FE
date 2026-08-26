@@ -32,25 +32,28 @@ import {
 import '../../assets/style/translator/review-workspace.css';
 import '../../assets/style/report/report-system.css';
 
-// Helper: Calculate standard bounding box for speech bubble selections
+function num(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function getBoundingBox(selection) {
   if (!selection) return { x: 0, y: 0, width: 0, height: 0 };
   if (selection.shape === 'polygon' && selection.points?.length) {
-    const xs = selection.points.map((p) => p.x);
-    const ys = selection.points.map((p) => p.y);
+    const xs = selection.points.map((p) => num(p.x));
+    const ys = selection.points.map((p) => num(p.y));
     const minX = Math.min(...xs);
     const minY = Math.min(...ys);
     return { x: minX, y: minY, width: Math.max(...xs) - minX, height: Math.max(...ys) - minY };
   }
   return {
-    x: selection.x ?? 0,
-    y: selection.y ?? 0,
-    width: selection.width ?? 0,
-    height: selection.height ?? 0
+    x: num(selection.x),
+    y: num(selection.y),
+    width: num(selection.width),
+    height: num(selection.height)
   };
 }
 
-// Helper: Parse speech bubbles payload JSON safely
 function parseBubblesPayload(raw) {
   if (!raw) return [];
   try {
@@ -66,6 +69,169 @@ function parseBubblesPayload(raw) {
   } catch {
     return [];
   }
+}
+
+// Stored coords are % of the image (same as Review). Convert to px on the
+// measured bitmap so height does not collapse when the overlay parent is height:auto.
+function bubbleRectPx(sel, imgW, imgH) {
+  const box = getBoundingBox(sel);
+  const maxVal = Math.max(Math.abs(box.x), Math.abs(box.y), Math.abs(box.width), Math.abs(box.height));
+  if (!(imgW > 0) || !(imgH > 0)) return { x: 0, y: 0, width: 0, height: 0 };
+  if (maxVal > 100) {
+    return { x: box.x, y: box.y, width: box.width, height: box.height };
+  }
+  return {
+    x: (box.x / 100) * imgW,
+    y: (box.y / 100) * imgH,
+    width: (box.width / 100) * imgW,
+    height: (box.height / 100) * imgH
+  };
+}
+
+function ReportPageFrame({
+  page,
+  idx,
+  variant,
+  zoomScale,
+  showTextOverlay,
+  selectedBubbleId,
+  onSelectBubble,
+  onLightbox
+}) {
+  const imgRef = useRef(null);
+  const [imgSize, setImgSize] = useState({ width: 0, height: 0 });
+  const isRaw = variant === 'raw';
+  const pageBubbles = Array.isArray(page.bubbles) ? page.bubbles : [];
+  const imgSrc = page.image_url || page.imageUrl || page.url || '';
+  const showText = !isRaw && showTextOverlay;
+  const hasSize = imgSize.width > 0 && imgSize.height > 0;
+
+  useEffect(() => {
+    const el = imgRef.current;
+    if (!el) return undefined;
+
+    const measure = () => {
+      setImgSize({ width: el.clientWidth, height: el.clientHeight });
+    };
+
+    if (el.complete) measure();
+    el.addEventListener('load', measure);
+    let observer;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(measure);
+      observer.observe(el);
+    }
+    return () => {
+      el.removeEventListener('load', measure);
+      observer?.disconnect();
+    };
+  }, [imgSrc, zoomScale]);
+
+  return (
+    <div
+      id={`${isRaw ? 'raw' : 'trans'}-page-${idx}`}
+      className="rep-page-frame"
+      style={{
+        width: `${zoomScale * 680}px`,
+        maxWidth: '95%',
+        position: 'relative',
+        minHeight: '260px',
+        background: '#161722'
+      }}
+    >
+      <span
+        className="rep-page-badge"
+        style={!isRaw ? { background: 'rgba(168, 85, 247, 0.85)' } : undefined}
+      >
+        {isRaw ? 'Raw' : 'Translated'} Page {page.page_number || idx + 1}
+      </span>
+      <button
+        className="rep-page-zoom-trigger"
+        onClick={() => imgSrc && onLightbox(imgSrc)}
+        title="Fullscreen Preview"
+      >
+        <Maximize2 size={16} />
+      </button>
+
+      {imgSrc ? (
+        <div style={{ position: 'relative' }}>
+          <img
+            ref={imgRef}
+            src={imgSrc}
+            alt={page.label || `${isRaw ? 'Raw' : 'Translated'} page ${idx + 1}`}
+            className="rep-page-img"
+            loading="eager"
+            decoding="async"
+            crossOrigin="anonymous"
+            referrerPolicy="no-referrer"
+            draggable={false}
+            style={{
+              width: '100%',
+              height: 'auto',
+              display: 'block',
+              minHeight: '200px',
+              objectFit: 'contain'
+            }}
+            onLoad={() => {
+              const el = imgRef.current;
+              if (el) setImgSize({ width: el.clientWidth, height: el.clientHeight });
+            }}
+          />
+          {hasSize && pageBubbles.length > 0 && (
+            <div
+              className="rvw-bubble-overlay"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                pointerEvents: 'none',
+                overflow: 'hidden'
+              }}
+            >
+              {pageBubbles.map((sel, bIdx) => {
+                const box = getBoundingBox(sel);
+                const isSelected = selectedBubbleId === sel.id;
+                const rect = bubbleRectPx(sel, imgSize.width, imgSize.height);
+                const fontSizePx =
+                  showText && typeof sel.fontSize === 'number' && imgSize.height > 0
+                    ? (sel.fontSize > 8 ? sel.fontSize : (sel.fontSize / 100) * imgSize.height)
+                    : undefined;
+                return (
+                  <div
+                    key={sel.id || bIdx}
+                    data-bubble-id={sel.id}
+                    onClick={() => onSelectBubble(isSelected ? null : sel.id)}
+                    className={`rvw-bubble ${sel.shape === 'ellipse' ? 'rvw-bubble--ellipse' : sel.shape === 'polygon' ? 'rvw-bubble--polygon' : ''} ${isSelected ? 'rvw-bubble--selected' : ''} ${showText ? 'rvw-bubble--text-only' : 'rvw-bubble--outline-only'}`}
+                    style={{
+                      position: 'absolute',
+                      left: `${box.x}%`,
+                      top: `${box.y}%`,
+                      width: `${box.width}%`,
+                      height: `${rect.height}px`,
+                      minHeight: `${rect.height}px`,
+                      boxSizing: 'border-box',
+                      pointerEvents: 'auto',
+                      cursor: 'pointer',
+                      ...(fontSizePx ? { fontSize: `${fontSizePx}px` } : {}),
+                      ...(showText && sel.textBgColor ? { '--bg-color': sel.textBgColor } : {}),
+                      ...(showText && sel.textColor ? { '--text-color': sel.textColor } : {})
+                    }}
+                    title={`Bubble ${bIdx + 1}: ${sel.translation || sel.original || 'Speech Bubble'}`}
+                  >
+                    {!showText && <span className="rvw-bubble-index">{bIdx + 1}</span>}
+                    {showText && (sel.translation || sel.original)}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{ height: '260px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '13px' }}>
+          {isRaw ? 'Raw Image Not Available' : 'Translated Image Not Available'}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function TranslationSplitScreenReview({
@@ -608,88 +774,19 @@ export default function TranslationSplitScreenReview({
                 onScroll={handleScroll('raw', transScrollRef)}
               >
                 {rawPages.length > 0 ? (
-                  rawPages.map((page, idx) => {
-                    const pageBubbles = page.bubbles || currentBubbles;
-                    const imgSrc = page.image_url || page.imageUrl || page.url || '';
-                    return (
-                      <div
-                        key={page.page_number || idx}
-                        id={`raw-page-${idx}`}
-                        className="rep-page-frame"
-                        style={{
-                          width: `${zoomScale * 680}px`,
-                          maxWidth: '95%',
-                          position: 'relative',
-                          minHeight: '260px',
-                          background: '#161722'
-                        }}
-                      >
-                        <span className="rep-page-badge">Raw Page {page.page_number || idx + 1}</span>
-                        <button
-                          className="rep-page-zoom-trigger"
-                          onClick={() => setLightboxImage(imgSrc)}
-                          title="Fullscreen Preview"
-                        >
-                          <Maximize2 size={16} />
-                        </button>
-                        
-                        {imgSrc ? (
-                          <img
-                            src={imgSrc}
-                            alt={page.label || `Raw page ${idx + 1}`}
-                            className="rep-page-img"
-                            loading="eager"
-                            decoding="async"
-                            crossOrigin="anonymous"
-                            referrerPolicy="no-referrer"
-                            style={{
-                              width: '100%',
-                              height: 'auto',
-                              display: 'block',
-                              minHeight: '200px',
-                              objectFit: 'contain'
-                            }}
-                          />
-                        ) : (
-                          <div style={{ height: '260px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '13px' }}>
-                            Raw Image Not Available
-                          </div>
-                        )}
-
-                        {/* Interactive Speech Bubble Overlays on Raw Artwork */}
-                        {Array.isArray(pageBubbles) && pageBubbles.length > 0 && (
-                          <div
-                            className="rvw-bubble-overlay"
-                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-                          >
-                            {pageBubbles.map((sel, bIdx) => {
-                              const box = getBoundingBox(sel);
-                              const isSelected = selectedBubbleId === sel.id;
-                              const shapeClass = sel.shape === 'ellipse' ? 'rvw-bubble--ellipse' : sel.shape === 'polygon' ? 'rvw-bubble--polygon' : '';
-                              return (
-                                <div
-                                  key={sel.id || bIdx}
-                                  data-bubble-id={sel.id}
-                                  onClick={() => setSelectedBubbleId(isSelected ? null : sel.id)}
-                                  className={`rvw-bubble ${shapeClass} ${isSelected ? 'rvw-bubble--selected' : ''} rvw-bubble--outline-only`}
-                                  style={{
-                                    '--x': `${box.x}%`,
-                                    '--y': `${box.y}%`,
-                                    '--w': `${box.width}%`,
-                                    '--h': `${box.height}%`,
-                                    cursor: 'pointer'
-                                  }}
-                                  title={`Bubble ${bIdx + 1}: ${sel.original || sel.translation || 'Speech Bubble'}`}
-                                >
-                                  <span className="rvw-bubble-index">{bIdx + 1}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
+                  rawPages.map((page, idx) => (
+                    <ReportPageFrame
+                      key={page.page_number || idx}
+                      page={page}
+                      idx={idx}
+                      variant="raw"
+                      zoomScale={zoomScale}
+                      showTextOverlay={false}
+                      selectedBubbleId={selectedBubbleId}
+                      onSelectBubble={setSelectedBubbleId}
+                      onLightbox={setLightboxImage}
+                    />
+                  ))
                 ) : (
                   <div className="rep-empty-state">
                     <HelpCircle size={40} className="rep-empty-icon" />
@@ -718,106 +815,19 @@ export default function TranslationSplitScreenReview({
                 onScroll={handleScroll('trans', rawScrollRef)}
               >
                 {transPages.length > 0 ? (
-                  transPages.map((page, idx) => {
-                    const pageBubbles = page.bubbles || currentBubbles;
-                    const imgSrc = page.image_url || page.imageUrl || page.url || '';
-                    return (
-                      <div
-                        key={page.page_number || idx}
-                        id={`trans-page-${idx}`}
-                        className="rep-page-frame"
-                        style={{
-                          width: `${zoomScale * 680}px`,
-                          maxWidth: '95%',
-                          position: 'relative',
-                          minHeight: '260px',
-                          background: '#161722'
-                        }}
-                      >
-                        <span className="rep-page-badge" style={{ background: 'rgba(168, 85, 247, 0.85)' }}>
-                          Translated Page {page.page_number || idx + 1}
-                        </span>
-                        <button
-                          className="rep-page-zoom-trigger"
-                          onClick={() => setLightboxImage(imgSrc)}
-                          title="Fullscreen Preview"
-                        >
-                          <Maximize2 size={16} />
-                        </button>
-                        
-                        {imgSrc ? (
-                          <img
-                            src={imgSrc}
-                            alt={page.label || `Translated page ${idx + 1}`}
-                            className="rep-page-img"
-                            loading="eager"
-                            decoding="async"
-                            crossOrigin="anonymous"
-                            referrerPolicy="no-referrer"
-                            style={{
-                              width: '100%',
-                              height: 'auto',
-                              display: 'block',
-                              minHeight: '200px',
-                              objectFit: 'contain'
-                            }}
-                          />
-                        ) : (
-                          <div style={{ height: '260px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '13px' }}>
-                            Translated Image Not Available
-                          </div>
-                        )}
-
-                        {/* Interactive Speech Bubble Overlays on Translated Image */}
-                        {Array.isArray(pageBubbles) && pageBubbles.length > 0 && (
-                          <div
-                            className="rvw-bubble-overlay"
-                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-                          >
-                            {pageBubbles.map((sel, bIdx) => {
-                              const box = getBoundingBox(sel);
-                              const isSelected = selectedBubbleId === sel.id;
-                              const shapeClass = sel.shape === 'ellipse' ? 'rvw-bubble--ellipse' : sel.shape === 'polygon' ? 'rvw-bubble--polygon' : '';
-                              return (
-                                <div
-                                  key={sel.id || bIdx}
-                                  data-bubble-id={sel.id}
-                                  onClick={() => setSelectedBubbleId(isSelected ? null : sel.id)}
-                                  className={`rvw-bubble ${shapeClass} ${isSelected ? 'rvw-bubble--selected' : ''} ${showTextOverlay ? 'rvw-bubble--text-only' : 'rvw-bubble--outline-only'}`}
-                                  style={{
-                                    '--x': `${box.x}%`,
-                                    '--y': `${box.y}%`,
-                                    '--w': `${box.width}%`,
-                                    '--h': `${box.height}%`,
-                                    ...(showTextOverlay && sel.textBgColor ? { '--bg-color': sel.textBgColor, backgroundColor: sel.textBgColor } : {}),
-                                    ...(showTextOverlay && sel.textColor ? { '--text-color': sel.textColor, color: sel.textColor } : {}),
-                                    fontFamily: sel.fontFamily || undefined,
-                                    fontWeight: sel.isBold ? 700 : 400,
-                                    fontStyle: sel.isItalic ? 'italic' : 'normal',
-                                    textAlign: sel.textAlign || 'center',
-                                    fontSize: sel.fontSize ? (sel.fontSize > 8 ? `${sel.fontSize}px` : `${Math.max(sel.fontSize * 5, 11)}px`) : '12px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'pointer',
-                                    padding: '2px',
-                                    whiteSpace: 'pre-wrap',
-                                    overflowWrap: 'anywhere',
-                                    lineHeight: 1.2
-                                  }}
-                                  title={`Bubble ${bIdx + 1}: ${sel.translation || sel.original || ''}`}
-                                >
-                                  {!showTextOverlay && <span className="rvw-bubble-index">{bIdx + 1}</span>}
-                                  {sel.changed && <span className="rvw-bubble-alert">!</span>}
-                                  {showTextOverlay && (sel.translation || sel.original)}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
+                  transPages.map((page, idx) => (
+                    <ReportPageFrame
+                      key={page.page_number || idx}
+                      page={page}
+                      idx={idx}
+                      variant="translated"
+                      zoomScale={zoomScale}
+                      showTextOverlay={showTextOverlay}
+                      selectedBubbleId={selectedBubbleId}
+                      onSelectBubble={setSelectedBubbleId}
+                      onLightbox={setLightboxImage}
+                    />
+                  ))
                 ) : (
                   <div className="rep-empty-state">
                     <AlertTriangle size={40} className="rep-empty-icon" />
