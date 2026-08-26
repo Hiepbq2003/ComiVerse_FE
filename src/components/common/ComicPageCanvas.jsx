@@ -325,7 +325,7 @@ function ComicPageCanvas({ src, pageIndex, isEncrypted = false, xorKey = 0x5A, f
           className="chapter-page-canvas no-select no-pointer no-drag"
           draggable="false"
           style={{
-            width: '100%',
+            maxWidth: '100%',
             height: 'auto',
             display: loading ? 'none' : 'block',
             // Layer 2 requirements:

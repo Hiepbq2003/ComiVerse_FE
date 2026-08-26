@@ -2259,6 +2259,36 @@ html.light .update-thumb-emoji-fallback {
   border: 1px solid rgba(0, 0, 0, 0.06) !important;
 }
 
+/* ── LIGHT MODE HOT SECTION OVERRIDES ── */
+html.light .hot-featured-info {
+  background: #ffffff !important;
+}
+html.light .hot-featured-title {
+  color: #0f172a !important;
+}
+html.light .hot-featured-tagline {
+  color: #475569 !important;
+}
+html.light .hot-featured-meta {
+  color: #64748b !important;
+  border-top-color: rgba(0, 0, 0, 0.08) !important;
+}
+html.light .ranking-item {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+html.light .ranking-item:hover {
+  background: rgba(139, 92, 246, 0.04) !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
+}
+html.light .rank-item-thumb {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  background: rgba(0, 0, 0, 0.02) !important;
+}
+html.light .rank-item-title {
+  color: #0f172a !important;
+}
+
 /* ── LIGHT MODE HERO SPOTLIGHT OVERRIDES ── */
 html.light .home-hero-section {
   background-color: #faf6f0 !important;
