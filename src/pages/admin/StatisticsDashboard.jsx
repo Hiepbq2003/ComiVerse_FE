@@ -352,7 +352,6 @@ function StatisticsDashboard() {
     { label: 'Translators', value: statsData.roleCounts.TRANSLATOR, change: 'Localization', trend: 'up', icon: 'roles', color: 'cyan' },
     { label: 'Project Leaders', value: statsData.roleCounts.PROJECT_LEADER, change: 'Team managers', trend: 'up', icon: 'roles', color: 'purple' },
     { label: 'Moderators', value: statsData.roleCounts.MODERATOR, change: 'Content reviewers', trend: 'up', icon: 'roles', color: 'blue' },
-    { label: 'Pending Review Submissions', value: statsData.pendingSubmissions, change: 'Awaiting moderation', trend: 'warning', icon: 'report', color: 'orange' },
     { label: 'Banned Accounts', value: statsData.bannedUsers, change: 'Restricted users', trend: 'neutral', icon: 'banned', color: 'red' },
     { label: 'New Bookmarks Today', value: statsData.newBookmarksToday, change: 'Library additions', trend: 'up', icon: 'star', color: 'green' },
     { label: 'New Likes Today', value: statsData.newLikesToday, change: 'Comic interactions', trend: 'up', icon: 'heart', color: 'pink' }
