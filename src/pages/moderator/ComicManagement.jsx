@@ -9,6 +9,7 @@ import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import { createTranslationRequestApi } from '../../services/api/TranslationPoolApi'
 import { toast } from 'react-toastify'
 import { exportToCsv } from '../../utils/exportToCsv'
+import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 import { updateProjectTeamApi } from '../../services/api/ProjectTeamApi'
 import { getChaptersByComicIdApi, deleteChapterApi } from '../../services/api/ChapterApi'
 import { getComicByIdApi } from '../../services/api/ComicApi'
@@ -573,10 +574,7 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
             onChange={setComicLanguageFilter} 
             options={[
               {value: 'All Languages', label: 'All Languages'}, 
-              {value: 'Japanese', label: 'Japanese'}, 
-              {value: 'Korean', label: 'Korean'}, 
-              {value: 'Chinese', label: 'Chinese'}, 
-              {value: 'English', label: 'English'}
+              ...COMIC_LANGUAGE_OPTIONS.map(lang => ({ value: lang, label: lang }))
             ]}
           />
           <CustomDropdown 

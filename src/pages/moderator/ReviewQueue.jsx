@@ -16,6 +16,7 @@ import {
 import { useTheme } from '../../context/ThemeContext'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import { exportToCsv } from '../../utils/exportToCsv'
+import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 import { toast } from 'react-toastify'
 import { getAuth } from '../../utils/Auth'
 import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
@@ -2000,10 +2001,9 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
             }}
           >
             <option value="ALL">All Languages</option>
-            <option value="Japanese">Japanese</option>
-            <option value="Korean">Korean</option>
-            <option value="Chinese">Chinese</option>
-            <option value="English">English</option>
+            {COMIC_LANGUAGE_OPTIONS.map(lang => (
+              <option key={lang} value={lang}>{lang}</option>
+            ))}
           </select>
 
           <CustomSortDropdown value={sortFilter} onChange={setSortFilter} />
