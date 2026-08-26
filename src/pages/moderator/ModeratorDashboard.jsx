@@ -2030,12 +2030,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                       {loadingPhase1 ? <div className="skeleton-line skeleton-shimmer" style={{ width: '40px', height: '24px', margin: 0 }}></div> : (() => {
                         try {
                           const todayStr = new Date().toDateString();
-                          return submissions.filter(s => {
-                            if (s.status !== 'approved') return false;
-                            const ts = s.approvedAt || s.submittedAt || s.createdAt;
-                            if (!ts) return false;
-                            return new Date(ts).toDateString() === todayStr;
-                          }).length;
+                          return submissions.filter(s => s.status === 'approved' && s.timestamp && new Date(s.timestamp).toDateString() === todayStr).length;
                         } catch (e) {
                           return 0;
                         }
@@ -2084,10 +2079,10 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                           d.setDate(d.getDate() - i);
                           const dateStr = d.toDateString();
                           
+                          // Get matching submissions
                           const items = submissions.filter(s => {
-                            const ts = s.submittedAt || s.createdAt || s.approvedAt;
-                            if (!ts) return false;
-                            return new Date(ts).toDateString() === dateStr;
+                            if (!s.timestamp) return false;
+                            return new Date(s.timestamp).toDateString() === dateStr;
                           });
                           
                           const label = chartTimeframe === 'week' 
