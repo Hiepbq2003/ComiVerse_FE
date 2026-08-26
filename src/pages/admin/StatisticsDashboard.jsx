@@ -379,6 +379,41 @@ function StatisticsDashboard() {
               </div>
             </div>
 
+            {/* Top Contributing Authors */}
+            <div className="stats-chart-card" style={{ margin: 0 }}>
+              <div className="stats-chart-header">
+                <div>
+                  <h2 className="stats-chart-title">Top Contributing Authors</h2>
+                  <p className="stats-chart-subtitle">Authors with the most published comics</p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
+                {statsData.topAuthors && statsData.topAuthors.length > 0 ? (
+                  statsData.topAuthors.map((author, index) => (
+                    <div key={author.authorId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: index < statsData.topAuthors.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(150,150,150,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 'bold', color: index < 3 ? 'var(--admin-primary)' : 'var(--admin-text-secondary)' }}>
+                          #{index + 1}
+                        </div>
+                        <img src={author.avatarUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(author.fullName) + '&background=random'} alt="avatar" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
+                        <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-h)' }}>{author.fullName}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--text-h)' }}>{author.publishedComicsCount}</span>
+                        <span style={{ fontSize: '12px', color: 'var(--admin-text-muted)' }}>comics</span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+                    No published authors found.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Comic Catalog Status */}
+            <div className="stats-chart-card" style={{ margin: 0 }}>
               <div className="stats-chart-header">
                 <div>
                   <h2 className="stats-chart-title">Comic Catalog Status</h2>
