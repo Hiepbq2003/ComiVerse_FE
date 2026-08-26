@@ -3344,3 +3344,86 @@ html.light .genre-pill-btn.selected:hover {
   background: #9d2ae8;
 }
 
+
+/* =========================================================
+   Dark mode - selectable genre chips
+   Keep unselected chips subtle and make the selected state
+   visually unmistakable without changing light mode.
+   ========================================================= */
+html.dark .author-genre-pills.selectable .author-genre-pill {
+  background: rgba(255, 255, 255, 0.035) !important;
+  color: #ddd6e8 !important;
+  border-color: rgba(192, 132, 252, 0.38) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+  opacity: 0.86;
+}
+
+html.dark .author-genre-pills.selectable .author-genre-pill:hover {
+  background: rgba(168, 85, 247, 0.14) !important;
+  color: #ffffff !important;
+  border-color: rgba(216, 180, 254, 0.72) !important;
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.16) !important;
+  opacity: 1;
+}
+
+html.dark .author-genre-pills.selectable .author-genre-pill.selected {
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%) !important;
+  color: #ffffff !important;
+  border-color: #e9d5ff !important;
+  box-shadow:
+    0 0 0 2px rgba(216, 180, 254, 0.24),
+    0 6px 18px rgba(126, 34, 206, 0.48) !important;
+  opacity: 1;
+  transform: translateY(-1px);
+  font-weight: 700;
+}
+
+html.dark .author-genre-pills.selectable .author-genre-pill.selected::before {
+  content: '✓';
+  margin-right: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+html.dark .author-genre-pills.selectable .author-genre-pill:focus-visible {
+  outline: 2px solid #d8b4fe;
+  outline-offset: 3px;
+}
+
+/* =========================================================
+   Dark mode - chapter folder format guide inside Add Chapter
+   Remove the light/white card appearance and keep the guide
+   readable against the dark author modal.
+   ========================================================= */
+html.dark .author-modal.author-chapter-modal .author-upload-guide-card.compact {
+  background: linear-gradient(135deg, rgba(35, 24, 58, 0.98) 0%, rgba(19, 13, 36, 0.98) 100%) !important;
+  border: 1px solid rgba(192, 132, 252, 0.34) !important;
+  color: #f8fafc !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 10px 24px rgba(0, 0, 0, 0.18) !important;
+}
+
+html.dark .author-modal.author-chapter-modal .author-upload-guide-card.compact strong {
+  color: #f8fafc !important;
+}
+
+html.dark .author-modal.author-chapter-modal .author-upload-guide-card.compact p,
+html.dark .author-modal.author-chapter-modal .author-upload-guide-card.compact li {
+  color: #aebbd0 !important;
+}
+
+html.dark .author-modal.author-chapter-modal .author-upload-guide-card.compact code {
+  background: rgba(168, 85, 247, 0.18) !important;
+  color: #e9d5ff !important;
+  border: 1px solid rgba(192, 132, 252, 0.34) !important;
+}
+
+html.dark .author-modal.author-chapter-modal .author-upload-guide-card.compact .author-guide-link {
+  color: #d8b4fe !important;
+}
+
+html.dark .author-modal.author-chapter-modal .author-upload-guide-card.compact .author-guide-link:hover {
+  color: #f3e8ff !important;
+}
