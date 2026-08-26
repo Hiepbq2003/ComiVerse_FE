@@ -345,9 +345,7 @@ function StatisticsDashboard() {
   }, [fetchStatistics])
 
   const statCards = [
-    { label: 'Total Registered Users', value: statsData.totalUsers, change: 'Active in system', trend: 'up', icon: 'users', color: 'purple' },
     { label: 'Active User Accounts', value: statsData.activeUsers, change: 'Verified status', trend: 'up', icon: 'activity', color: 'green' },
-    { label: 'Content Categories', value: statsData.totalGenres, change: 'Genre classifications', trend: 'up', icon: 'genres', color: 'cyan' },
     { label: 'Authors', value: statsData.roleCounts.AUTHOR, change: 'Original creators', trend: 'up', icon: 'roles', color: 'orange' },
     { label: 'Translators', value: statsData.roleCounts.TRANSLATOR, change: 'Localization', trend: 'up', icon: 'roles', color: 'cyan' },
     { label: 'Project Leaders', value: statsData.roleCounts.PROJECT_LEADER, change: 'Team managers', trend: 'up', icon: 'roles', color: 'purple' },
