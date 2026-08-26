@@ -193,7 +193,7 @@ function ChatInputBar({ onSendMessage, isSending, disabled }) {
           )}
         </div>
 
-        {/* Image Attach Button */}
+        {/* Image Attach Button - Temporarily hidden 
         <button
           type="button"
           className="cv-chat-action-btn"
@@ -215,6 +215,7 @@ function ChatInputBar({ onSendMessage, isSending, disabled }) {
           style={{ display: 'none' }}
           onChange={handleImageSelect}
         />
+        */}
 
         {/* Text Input */}
         <input
