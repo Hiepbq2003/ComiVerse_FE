@@ -4,7 +4,7 @@ import { getAdminStatisticsApi } from '../../services/api/AdminStatisticsApi'
 import { AnimatedButton } from '../../components/common/AnimatedButton'
 import { exportToCsv } from '../../utils/exportToCsv'
 import { RefreshCw, Download } from 'lucide-react'
-
+import { getAllComicsApi } from '../../services/api/ComicApi'
 const EMPTY_ROLE_COUNTS = {
   READER: 0,
   AUTHOR: 0,
@@ -311,13 +311,50 @@ function StatisticsDashboard() {
       const result = await getAdminStatisticsApi()
 
       const roles = { ...EMPTY_ROLE_COUNTS, ...(result?.roleCounts || {}) }
-      const comicStatuses = { ...EMPTY_COMIC_STATUS, ...(result?.comicStatusCounts || {}) }
+      let localComics = []
+      try {
+        const res = await getAllComicsApi()
+        localComics = Array.isArray(res) ? res : (res?.data || [])
+      } catch (e) {}
+
+      const seenIds = new Set();
+      const seenTitles = new Set();
+      let uniqueLocalComics = localComics.filter(item => {
+        if (!item) return false;
+        const idKey = item.id ? String(item.id).toLowerCase() : '';
+        const titleKey = item.title ? String(item.title).trim().toLowerCase().replace(/[^a-z0-9]/gi, '').replace(/s$/, '') : '';
+        if (idKey && seenIds.has(idKey)) return false;
+        if (titleKey && seenTitles.has(titleKey)) return false;
+        if (idKey) seenIds.add(idKey);
+        if (titleKey) seenTitles.add(titleKey);
+        return true;
+      });
+
+      uniqueLocalComics = uniqueLocalComics.map(c => {
+        try {
+          const savedLocal = localStorage.getItem('comiverse_local_comic_' + c.id);
+          if (savedLocal) return { ...c, ...JSON.parse(savedLocal) };
+        } catch(e) {}
+        return c;
+      });
+
+      const localOngoing = uniqueLocalComics.filter(c => (!c.publicationStatus || c.publicationStatus.toUpperCase() === 'ONGOING')).length;
+      const localCompleted = uniqueLocalComics.filter(c => c.publicationStatus?.toUpperCase() === 'COMPLETED').length;
+      const localHiatus = uniqueLocalComics.filter(c => c.publicationStatus?.toUpperCase() === 'HIATUS').length;
+      const localSuspended = uniqueLocalComics.filter(c => c.moderationStatus === 'UNPUBLISHED').length;
+
+      const comicStatuses = { 
+        ONGOING: localOngoing,
+        COMPLETED: localCompleted,
+        HIATUS: localHiatus,
+        SUSPENDED: localSuspended
+      }
 
       setStatsData({
         totalUsers: Number(result?.totalUsers) || 0,
         activeUsers: Number(result?.activeUsers) || 0,
         bannedUsers: Number(result?.bannedUsers) || 0,
-        totalComics: Number(result?.totalPublishedComics) || 0,
+        totalComics: uniqueLocalComics.length || Number(result?.totalPublishedComics) || 0,
         totalGenres: Number(result?.totalGenres) || 0,
         pendingSubmissions: Number(result?.pendingSubmissions) || 0,
         roleCounts: roles,
