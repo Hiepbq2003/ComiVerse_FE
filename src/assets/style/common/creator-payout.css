@@ -13,16 +13,28 @@
   border-radius: 16px; 
   padding: 24px; 
   color: var(--text-h); 
-  box-shadow: var(--shadow); 
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.05); 
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
 }
 
+html.light .creator-payout-card {
+  background: #ffffff;
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06), 0 1px 4px rgba(15, 23, 42, 0.03);
+  border: 1px solid rgba(15, 23, 42, 0.05);
+}
+
+html.dark .creator-payout-card {
+  background: var(--code-bg);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+}
+
 .creator-payout-summary .creator-payout-card:hover { 
   border-color: var(--accent-border); 
   transform: translateY(-4px); 
-  box-shadow: 0 12px 24px -8px rgba(168, 85, 247, 0.25);
+  box-shadow: 0 12px 30px -8px rgba(168, 85, 247, 0.3);
 }
 
 .creator-payout-card h2, .creator-payout-card h3 { 
@@ -97,14 +109,15 @@
 }
 
 .creator-payout-summary strong { 
-  font-size: 28px; 
-  font-weight: 800;
+  font-size: 32px; 
+  font-weight: 900;
   letter-spacing: -0.04em; 
   color: var(--text-h);
-  background: linear-gradient(135deg, var(--text-h) 0%, var(--accent) 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, #ec4899 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   display: inline-block;
+  line-height: 1.2;
 }
 
 .creator-payout-summary small { 
