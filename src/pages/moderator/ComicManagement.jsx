@@ -102,13 +102,12 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
            return false;
         }
 
-        let effectiveStatus = (c.publicationStatus || 'ONGOING').toUpperCase();
-        if (c.moderationStatus === 'UNPUBLISHED') {
-          effectiveStatus = 'SUSPENDED';
-        }
+        let isSuspended = c.moderationStatus === 'UNPUBLISHED';
+        let pubStatus = (c.publicationStatus || 'ONGOING').toUpperCase();
 
         const matchesStatus = comicStatusFilter === 'All Status' || 
-          effectiveStatus === comicStatusFilter.toUpperCase();
+          (comicStatusFilter.toUpperCase() === 'SUSPENDED' && isSuspended) ||
+          (pubStatus === comicStatusFilter.toUpperCase());
         const matchesGenre = comicGenreFilter === 'All Genres' || (c.genres || []).some(g => (typeof g === 'object' && g !== null ? g.name : g) === comicGenreFilter);
         const matchesAuthor = comicAuthorFilter === 'All Authors' || c.authorName === comicAuthorFilter || c.author === comicAuthorFilter;
         const matchesTeam = comicTeamFilter === 'All Project Teams' || c.projectTeam === comicTeamFilter;
@@ -486,7 +485,7 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
               <path d="M0 25 C 20 25, 40 5, 60 10 C 80 15, 90 2, 100 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value active-count">{comics.filter(c => c.moderationStatus !== 'UNPUBLISHED' && (!c.publicationStatus || c.publicationStatus.toUpperCase() === 'ONGOING')).length}</span>
+          <span className="stat-value active-count">{comics.filter(c => (!c.publicationStatus || c.publicationStatus.toUpperCase() === 'ONGOING')).length}</span>
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -495,7 +494,7 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
               <path d="M0 25 C 30 25, 50 20, 70 8 C 85 2, 95 10, 100 2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value" style={{ color: '#3b82f6' }}>{comics.filter(c => c.moderationStatus !== 'UNPUBLISHED' && c.publicationStatus?.toUpperCase() === 'COMPLETED').length}</span>
+          <span className="stat-value" style={{ color: '#3b82f6' }}>{comics.filter(c => c.publicationStatus?.toUpperCase() === 'COMPLETED').length}</span>
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -504,7 +503,7 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
               <path d="M0 10 C 20 10, 40 25, 60 20 C 80 15, 90 25, 100 25" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value paused-count">{comics.filter(c => c.moderationStatus !== 'UNPUBLISHED' && c.publicationStatus?.toUpperCase() === 'HIATUS').length}</span>
+          <span className="stat-value paused-count">{comics.filter(c => c.publicationStatus?.toUpperCase() === 'HIATUS').length}</span>
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -730,9 +729,14 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
                         PENDING REVIEW
                       </span>
                     ) : comic.moderationStatus === 'UNPUBLISHED' ? (
-                      <span className="comic-status-badge rejected">
-                        SUSPENDED
-                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span className="comic-status-badge rejected" style={{ width: 'fit-content' }}>
+                          SUSPENDED
+                        </span>
+                        <span className={`comic-status-badge ${(comic.publicationStatus || 'ONGOING').toLowerCase()}`} style={{ fontSize: '10px', padding: '2px 6px', width: 'fit-content' }}>
+                          {comic.publicationStatus || 'ONGOING'}
+                        </span>
+                      </div>
                     ) : (
                       <span className={`comic-status-badge ${(comic.publicationStatus || 'ONGOING').toLowerCase()}`}>
                         {comic.publicationStatus || 'ONGOING'}
