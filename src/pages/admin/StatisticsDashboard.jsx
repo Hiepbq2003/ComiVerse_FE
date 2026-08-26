@@ -354,30 +354,31 @@ function StatisticsDashboard() {
             ))}
           </div>
 
-          {/* ── Mid Row: Role Distribution & Top Authors ───────────── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginTop: '24px' }}>
-            {/* User Role Distribution */}
-            <div className="stats-chart-card" style={{ margin: 0 }}>
-              <div className="stats-chart-header">
-                <div>
-                  <h2 className="stats-chart-title">User Base & Role Distribution</h2>
-                  <p className="stats-chart-subtitle">Live proportion of platform user roles</p>
-                </div>
-              </div>
-              <div style={{ marginTop: '16px' }}>
-                <InteractiveDonutChart 
-                  total={totalRoleSum}
-                  data={[
-                    { name: 'Readers', count: statsData.roleCounts.READER, color: '#a855f7' },
-                    { name: 'Translators', count: statsData.roleCounts.TRANSLATOR, color: '#3b82f6' },
-                    { name: 'Authors', count: statsData.roleCounts.AUTHOR, color: '#ec4899' },
-                    { name: 'Project Leaders', count: statsData.roleCounts.PROJECT_LEADER, color: '#14b8a6' },
-                    { name: 'Moderators', count: statsData.roleCounts.MODERATOR, color: '#f97316' },
-                    { name: 'Admins', count: statsData.roleCounts.ADMIN, color: '#10b981' }
-                  ]} 
-                />
+          {/* ── User Role Distribution (Standalone Row) ───────────── */}
+          <div className="stats-chart-card" style={{ marginTop: '24px' }}>
+            <div className="stats-chart-header">
+              <div>
+                <h2 className="stats-chart-title">User Base & Role Distribution</h2>
+                <p className="stats-chart-subtitle">Live proportion of platform user roles</p>
               </div>
             </div>
+            <div style={{ marginTop: '16px' }}>
+              <InteractiveDonutChart 
+                total={totalRoleSum}
+                data={[
+                  { name: 'Readers', count: statsData.roleCounts.READER, color: '#a855f7' },
+                  { name: 'Translators', count: statsData.roleCounts.TRANSLATOR, color: '#3b82f6' },
+                  { name: 'Authors', count: statsData.roleCounts.AUTHOR, color: '#ec4899' },
+                  { name: 'Project Leaders', count: statsData.roleCounts.PROJECT_LEADER, color: '#14b8a6' },
+                  { name: 'Moderators', count: statsData.roleCounts.MODERATOR, color: '#f97316' },
+                  { name: 'Admins', count: statsData.roleCounts.ADMIN, color: '#10b981' }
+                ]} 
+              />
+            </div>
+          </div>
+
+          {/* ── Mid Row: Top Authors & Catalog Status ───────────── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginTop: '24px' }}>
 
             {/* Top Contributing Authors */}
             <div className="stats-chart-card" style={{ margin: 0 }}>
