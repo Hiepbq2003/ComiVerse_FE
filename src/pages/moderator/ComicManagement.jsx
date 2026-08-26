@@ -16,7 +16,6 @@ import { getComicByIdApi } from '../../services/api/ComicApi'
 import { getAuthorComicChaptersApi } from '../../services/api/AuthorComicApi'
 import { getAuth } from '../../utils/Auth'
 import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
-import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 import React from 'react'
 
 const CustomDropdown = ({ value, onChange, options, minWidth = '160px' }) => {
