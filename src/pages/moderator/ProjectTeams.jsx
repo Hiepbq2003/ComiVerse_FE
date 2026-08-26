@@ -562,14 +562,13 @@ function ProjectTeams({
         </div>
       </div>
 
-      <div className="mod-filter-bar" style={{ marginTop: '24px', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
+      <div className="mod-filter-bar" style={{ marginTop: '24px', display: 'grid', gridTemplateColumns: '1.5fr 1fr 150px 160px 130px', gap: '12px', alignItems: 'center' }}>
         <input 
           type="text" 
           className="mod-input" 
           placeholder="Search by comic / team name..." 
           value={teamSearchTitle} 
           onChange={e => setTeamSearchTitle(e.target.value)} 
-          style={{ flex: '1 1 250px' }}
         />
         <input 
           type="text" 
@@ -577,15 +576,13 @@ function ProjectTeams({
           placeholder="Search by project leader..." 
           value={teamSearchLeader} 
           onChange={e => setTeamSearchLeader(e.target.value)} 
-          style={{ flex: '1 1 200px' }}
         />
         <select 
           className="mod-input" 
           value={teamFilterDone} 
           onChange={e => setTeamFilterDone(e.target.value)}
-          style={{ width: '160px', flex: '0 0 auto' }}
         >
-          <option value="ALL">All Done Tasks</option>
+          <option value="ALL">Done Tasks</option>
           <option value="0">0 done</option>
           <option value=">0">&gt; 0 done</option>
           <option value=">=5">&ge; 5 done</option>
@@ -595,9 +592,8 @@ function ProjectTeams({
           className="mod-input" 
           value={teamFilterOngoing} 
           onChange={e => setTeamFilterOngoing(e.target.value)}
-          style={{ width: '170px', flex: '0 0 auto' }}
         >
-          <option value="ALL">All Ongoing Tasks</option>
+          <option value="ALL">Ongoing Tasks</option>
           <option value="0">0 ongoing</option>
           <option value=">0">&gt; 0 ongoing</option>
           <option value=">=5">&ge; 5 ongoing</option>
@@ -606,7 +602,6 @@ function ProjectTeams({
           className="mod-input" 
           value={teamSearchStatus} 
           onChange={e => setTeamSearchStatus(e.target.value)}
-          style={{ width: '130px', flex: '0 0 auto' }}
         >
           <option value="ALL">All Status</option>
           <option value="ACTIVE">Active</option>
