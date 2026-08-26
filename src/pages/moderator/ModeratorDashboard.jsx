@@ -2380,7 +2380,15 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                       <span className="mod-overview-link" onClick={() => setActiveNav('review-queue')}>View all</span>
                     </div>
                     <div className="mod-submission-list">
-                      {submissions.filter(s => s.status === 'pending').slice(0, 4).map(s => {
+                      {submissions
+                        .filter(s => s.status === 'pending')
+                        .sort((a, b) => {
+                          const timeA = new Date(a.timestamp || a.submittedAt || a.createdAt || 0).getTime();
+                          const timeB = new Date(b.timestamp || b.submittedAt || b.createdAt || 0).getTime();
+                          return timeB - timeA;
+                        })
+                        .slice(0, 4)
+                        .map(s => {
                         const isAuthor = s.queueType === 'author';
                         const coverSrc = getComicCover(s) || getComicCover(s.comic) || (comics.find(c => String(c.id) === String(s.comicId) || (s.title && c.title && c.title.toLowerCase().trim() === s.title.toLowerCase().trim())) && getComicCover(comics.find(c => String(c.id) === String(s.comicId) || (s.title && c.title && c.title.toLowerCase().trim() === s.title.toLowerCase().trim())))) || '';
 
