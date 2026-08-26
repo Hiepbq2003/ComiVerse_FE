@@ -217,7 +217,8 @@ function InteractiveHalfDonutChart({ data, total }) {
               />
             )
           })}
-          <circle cx="0" cy="0" r="0.65" fill="var(--bg)" style={{ pointerEvents: 'none' }} />
+          {/* Inner cutout (half circle so it doesn't overflow downwards) */}
+          <path d="M -0.65 0 A 0.65 0.65 0 0 1 0.65 0 Z" fill="var(--bg)" style={{ pointerEvents: 'none' }} />
         </svg>
         
         <div style={{ position: 'absolute', bottom: '0', left: '50%', transform: 'translate(-50%, 0)', textAlign: 'center', pointerEvents: 'none', width: '100%' }}>

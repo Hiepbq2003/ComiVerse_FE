@@ -614,7 +614,7 @@ function ModeratorDashboard() {
         }).filter(c => isLanguageInModeratorScope(c.language || c.rawLanguage || c.originalLanguage, authUser)),
         submissions
       ).map(c => syncComicWithLocalOverride(c));
-      setComics(deduplicateComics(mappedComics))
+      setComics(mappedComics)
       
       let localTeams = [];
       try {
@@ -831,7 +831,7 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
         filteredSubmissions
       ).map(c => syncComicWithLocalOverride(c));
 
-      setComics(deduplicateComics(mappedComics));
+      setComics(mappedComics);
       let localTeams = [];
       try {
         const localRaw = localStorage.getItem('comiverse_local_project_teams');
