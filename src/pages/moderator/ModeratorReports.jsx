@@ -28,6 +28,12 @@ export default function ModeratorReports() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+  const [globalStats, setGlobalStats] = useState({
+    PENDING: 0,
+    IN_PROGRESS: 0,
+    ACCEPTED: 0,
+    REJECTED: 0
+  });
 
   // Filters
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -85,21 +91,43 @@ export default function ModeratorReports() {
     fetchReports();
   }, [fetchReports]);
 
-  // Handle process report
+  const fetchGlobalStats = useCallback(async () => {
+    try {
+      const [pendingRes, progressRes, acceptedRes, rejectedRes] = await Promise.all([
+        getAdminReportsApi({ status: 'PENDING', limit: 1 }),
+        getAdminReportsApi({ status: 'IN_PROGRESS', limit: 1 }),
+        getAdminReportsApi({ status: 'ACCEPTED', limit: 1 }),
+        getAdminReportsApi({ status: 'REJECTED', limit: 1 })
+      ]);
+      setGlobalStats({
+        PENDING: pendingRes.total || 0,
+        IN_PROGRESS: progressRes.total || 0,
+        ACCEPTED: acceptedRes.total || 0,
+        REJECTED: rejectedRes.total || 0
+      });
+    } catch (err) {
+      console.error('Failed to fetch global report stats', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchGlobalStats();
+  }, [fetchGlobalStats]);
+
   const handleProcessReport = async (reportId, { action, resolution_note }) => {
     const result = await processReportApi(reportId, {
       action,
       resolution_note
     });
     await fetchReports();
+    await fetchGlobalStats();
     return result;
   };
 
-  const pendingCount = reports.filter(r => r.status === 'PENDING').length;
-  const progressCount = reports.filter(r => r.status === 'IN_PROGRESS').length;
-  const acceptedCount = reports.filter(r => r.status === 'ACCEPTED').length;
-  const rejectedCount = reports.filter(r => r.status === 'REJECTED').length;
-
+  const pendingCount = globalStats.PENDING;
+  const progressCount = globalStats.IN_PROGRESS;
+  const acceptedCount = globalStats.ACCEPTED;
+  const rejectedCount = globalStats.REJECTED;
   const handleExportReports = () => {
     try {
       const headers = [
