@@ -47,6 +47,7 @@ function ProjectTeams({
   const [teamSearchStatus, setTeamSearchStatus] = useState('ALL')
   const [teamFilterDone, setTeamFilterDone] = useState('ALL')
   const [teamFilterOngoing, setTeamFilterOngoing] = useState('ALL')
+  const [teamLanguageFilter, setTeamLanguageFilter] = useState('ALL')
 
   const filteredProjectTeams = useMemo(() => {
     return (projectTeams || []).filter(team => {
@@ -75,9 +76,13 @@ function ProjectTeams({
         if (teamFilterOngoing === '>0' && ongoingCount <= 0) return false;
         if (teamFilterOngoing === '>=5' && ongoingCount < 5) return false;
       }
+      if (teamLanguageFilter !== 'ALL') {
+        const lang = team.originalLanguage || team.comic?.originalLanguage || team.sourceLanguage || 'Japanese';
+        if (lang.toLowerCase() !== teamLanguageFilter.toLowerCase()) return false;
+      }
       return true
     })
-  }, [projectTeams, teamSearchTitle, teamSearchLeader, teamSearchStatus, teamFilterDone, teamFilterOngoing])
+  }, [projectTeams, teamSearchTitle, teamSearchLeader, teamSearchStatus, teamFilterDone, teamFilterOngoing, teamLanguageFilter])
 
   const ITEMS_PER_PAGE = 6
   const totalPages = Math.ceil(filteredProjectTeams.length / ITEMS_PER_PAGE)
@@ -562,7 +567,7 @@ function ProjectTeams({
         </div>
       </div>
 
-      <div className="mod-filter-bar" style={{ marginTop: '24px', display: 'grid', gridTemplateColumns: '1.5fr 1fr 150px 160px 130px', gap: '12px', alignItems: 'center' }}>
+      <div className="mod-filter-bar" style={{ marginTop: '24px', display: 'grid', gridTemplateColumns: '1.5fr 1fr 150px 160px 130px 130px', gap: '12px', alignItems: 'center' }}>
         <input 
           type="text" 
           className="mod-input" 
@@ -606,6 +611,17 @@ function ProjectTeams({
           <option value="ALL">All Status</option>
           <option value="ACTIVE">Active</option>
           <option value="PAUSED">Paused</option>
+        </select>
+        <select 
+          className="mod-input" 
+          value={teamLanguageFilter} 
+          onChange={e => setTeamLanguageFilter(e.target.value)}
+        >
+          <option value="ALL">All Langs</option>
+          <option value="Japanese">Japanese</option>
+          <option value="Korean">Korean</option>
+          <option value="Chinese">Chinese</option>
+          <option value="English">English</option>
         </select>
       </div>
 
