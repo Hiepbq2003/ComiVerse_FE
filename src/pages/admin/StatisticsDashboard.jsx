@@ -250,7 +250,8 @@ function StatisticsDashboard() {
         activeUsersToday: Number(result?.activeUsersToday) || 0,
         onlineUsersNow: Number(result?.onlineUsersNow) || 0,
         newLikesToday: Number(result?.newLikesToday) || 0,
-        newBookmarksToday: Number(result?.newBookmarksToday) || 0
+        newBookmarksToday: Number(result?.newBookmarksToday) || 0,
+        topAuthors: Array.isArray(result?.topAuthors) ? result.topAuthors : []
       })
     } catch (err) {
       console.error('Failed to load system statistics from API:', err)
@@ -353,9 +354,10 @@ function StatisticsDashboard() {
             ))}
           </div>
 
-          {/* ── Mid Row: Donut Chart & Candy Bar ───────────── */}
-          <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'stretch' }}>
-            <div className="stats-chart-card" style={{ flex: '1 1 400px', minWidth: '0' }}>
+          {/* ── Mid Row: Role Distribution & Top Authors ───────────── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginTop: '24px' }}>
+            {/* User Role Distribution */}
+            <div className="stats-chart-card" style={{ margin: 0 }}>
               <div className="stats-chart-header">
                 <div>
                   <h2 className="stats-chart-title">User Base & Role Distribution</h2>
@@ -370,13 +372,13 @@ function StatisticsDashboard() {
                     { name: 'Translators', count: statsData.roleCounts.TRANSLATOR, color: '#3b82f6' },
                     { name: 'Authors', count: statsData.roleCounts.AUTHOR, color: '#ec4899' },
                     { name: 'Project Leaders', count: statsData.roleCounts.PROJECT_LEADER, color: '#14b8a6' },
-                    { name: 'Moderators', count: statsData.roleCounts.MODERATOR, color: '#f97316' }
+                    { name: 'Moderators', count: statsData.roleCounts.MODERATOR, color: '#f97316' },
+                    { name: 'Admins', count: statsData.roleCounts.ADMIN, color: '#10b981' }
                   ]} 
                 />
               </div>
             </div>
 
-            <div className="stats-chart-card" style={{ flex: '1 1 400px', minWidth: '0' }}>
               <div className="stats-chart-header">
                 <div>
                   <h2 className="stats-chart-title">Comic Catalog Status</h2>
