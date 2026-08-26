@@ -45,6 +45,8 @@ function ProjectTeams({
   const [teamSearchTitle, setTeamSearchTitle] = useState('')
   const [teamSearchLeader, setTeamSearchLeader] = useState('')
   const [teamSearchStatus, setTeamSearchStatus] = useState('ALL')
+  const [teamFilterDone, setTeamFilterDone] = useState('ALL')
+  const [teamFilterOngoing, setTeamFilterOngoing] = useState('ALL')
 
   const filteredProjectTeams = useMemo(() => {
     return (projectTeams || []).filter(team => {
@@ -60,9 +62,22 @@ function ProjectTeams({
         const tStatus = (team.status || 'ACTIVE').toUpperCase()
         if (tStatus !== teamSearchStatus) return false
       }
+      if (teamFilterDone !== 'ALL') {
+        const doneCount = team.completedTasksCount ?? team.totalCompletedTasks ?? 0;
+        if (teamFilterDone === '0' && doneCount !== 0) return false;
+        if (teamFilterDone === '>0' && doneCount <= 0) return false;
+        if (teamFilterDone === '>=5' && doneCount < 5) return false;
+        if (teamFilterDone === '>=10' && doneCount < 10) return false;
+      }
+      if (teamFilterOngoing !== 'ALL') {
+        const ongoingCount = team.inProgressTasksCount || 0;
+        if (teamFilterOngoing === '0' && ongoingCount !== 0) return false;
+        if (teamFilterOngoing === '>0' && ongoingCount <= 0) return false;
+        if (teamFilterOngoing === '>=5' && ongoingCount < 5) return false;
+      }
       return true
     })
-  }, [projectTeams, teamSearchTitle, teamSearchLeader, teamSearchStatus])
+  }, [projectTeams, teamSearchTitle, teamSearchLeader, teamSearchStatus, teamFilterDone, teamFilterOngoing])
 
   const ITEMS_PER_PAGE = 6
   const totalPages = Math.ceil(filteredProjectTeams.length / ITEMS_PER_PAGE)
@@ -547,13 +562,14 @@ function ProjectTeams({
         </div>
       </div>
 
-      <div className="mod-filter-bar" style={{ marginTop: '24px', display: 'grid', gridTemplateColumns: '1.5fr 1fr 150px', gap: '16px', alignItems: 'center' }}>
+      <div className="mod-filter-bar" style={{ marginTop: '24px', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
         <input 
           type="text" 
           className="mod-input" 
           placeholder="Search by comic / team name..." 
           value={teamSearchTitle} 
           onChange={e => setTeamSearchTitle(e.target.value)} 
+          style={{ flex: '1 1 250px' }}
         />
         <input 
           type="text" 
@@ -561,13 +577,36 @@ function ProjectTeams({
           placeholder="Search by project leader..." 
           value={teamSearchLeader} 
           onChange={e => setTeamSearchLeader(e.target.value)} 
+          style={{ flex: '1 1 200px' }}
         />
         <select 
           className="mod-input" 
-
+          value={teamFilterDone} 
+          onChange={e => setTeamFilterDone(e.target.value)}
+          style={{ width: '160px', flex: '0 0 auto' }}
+        >
+          <option value="ALL">All Done Tasks</option>
+          <option value="0">0 done</option>
+          <option value=">0">&gt; 0 done</option>
+          <option value=">=5">&ge; 5 done</option>
+          <option value=">=10">&ge; 10 done</option>
+        </select>
+        <select 
+          className="mod-input" 
+          value={teamFilterOngoing} 
+          onChange={e => setTeamFilterOngoing(e.target.value)}
+          style={{ width: '170px', flex: '0 0 auto' }}
+        >
+          <option value="ALL">All Ongoing Tasks</option>
+          <option value="0">0 ongoing</option>
+          <option value=">0">&gt; 0 ongoing</option>
+          <option value=">=5">&ge; 5 ongoing</option>
+        </select>
+        <select 
+          className="mod-input" 
           value={teamSearchStatus} 
           onChange={e => setTeamSearchStatus(e.target.value)}
-          style={{ width: '150px' }}
+          style={{ width: '130px', flex: '0 0 auto' }}
         >
           <option value="ALL">All Status</option>
           <option value="ACTIVE">Active</option>
