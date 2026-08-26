@@ -659,7 +659,7 @@ html.light .forum-textarea-field::placeholder {
 .forum-search-field:focus {
   border-color: #a855f7 !important;
   box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.25) !important;
-  width: 260px !important; /* Expand slightly for active feel */
+  width: 100% !important; /* Take full width of wrapper */
 }
 
 /* ── 2. CREATIVE BUTTON UPGRADES (SHINE EFFECT) ── */
