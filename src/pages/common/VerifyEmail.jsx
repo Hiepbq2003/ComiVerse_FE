@@ -1,13 +1,27 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { resendVerificationOtpApi, verifyEmailApi } from '../../services/api/AuthApi'
 
 function VerifyEmail({ email, onNavigate, showAlert, loading, setLoading }) {
   const [otp, setOtp] = useState('')
   const [verificationEmail, setVerificationEmail] = useState(email || '')
+  const autoSentRef = useRef(false)
 
   useEffect(() => {
     setVerificationEmail(email || '')
   }, [email])
+
+  // Automatically send an OTP when the page opens with a known email
+  // (e.g. redirected here after trying to sign in with an unverified account).
+  // Guard with a ref so it only fires once even in StrictMode double-invocations.
+  useEffect(() => {
+    const normalized = (email || '').trim().toLowerCase()
+    const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)
+    if (!isValid || autoSentRef.current) return
+    autoSentRef.current = true
+    resendVerificationOtpApi(normalized)
+      .then(() => showAlert('success', 'A verification OTP has been sent to your email.'))
+      .catch(() => {/* throttle or already sent – silent, user can tap Resend */})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const normalizedEmail = verificationEmail.trim().toLowerCase()
   const hasValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)
