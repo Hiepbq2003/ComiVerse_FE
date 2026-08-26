@@ -22,7 +22,11 @@ const EMPTY_STATS = {
   pendingSubmissions: 0,
   roleCounts: EMPTY_ROLE_COUNTS,
   genresList: [],
-  generatedAt: null
+  generatedAt: null,
+  newUsersToday: 0,
+  newComicsToday: 0,
+  activeUsersToday: 0,
+  onlineUsersNow: 0
 }
 
 function StatIcon({ type }) {
@@ -60,7 +64,11 @@ function StatisticsDashboard() {
         pendingSubmissions: Number(result?.pendingSubmissions) || 0,
         roleCounts: { ...EMPTY_ROLE_COUNTS, ...(result?.roleCounts || {}) },
         genresList: Array.isArray(result?.genres) ? result.genres : [],
-        generatedAt: result?.generatedAt || null
+        generatedAt: result?.generatedAt || null,
+        newUsersToday: Number(result?.newUsersToday) || 0,
+        newComicsToday: Number(result?.newComicsToday) || 0,
+        activeUsersToday: Number(result?.activeUsersToday) || 0,
+        onlineUsersNow: Number(result?.onlineUsersNow) || 0
       })
     } catch (err) {
       console.error('Failed to load system statistics from API:', err)
@@ -79,9 +87,12 @@ function StatisticsDashboard() {
     { label: 'Active User Accounts', value: statsData.activeUsers, change: 'Verified status', trend: 'up', icon: 'activity', color: 'green' },
     { label: 'Total Published Comics', value: statsData.totalComics, change: 'Catalog listings', trend: 'up', icon: 'book', color: 'pink' },
     { label: 'Content Categories', value: statsData.totalGenres, change: 'Genre classifications', trend: 'up', icon: 'genres', color: 'cyan' },
-    { label: 'Authors & Translators', value: statsData.roleCounts.AUTHOR + statsData.roleCounts.TRANSLATOR, change: 'Content creators', trend: 'up', icon: 'roles', color: 'orange' },
-    { label: 'Pending Review Submissions', value: statsData.pendingSubmissions, change: 'Awaiting moderation', trend: 'warning', icon: 'report', color: 'red' },
-    { label: 'Moderator & Admin Staff', value: statsData.roleCounts.MODERATOR + statsData.roleCounts.ADMIN, change: 'System officers', trend: 'up', icon: 'revenue', color: 'blue' },
+    { label: 'Authors', value: statsData.roleCounts.AUTHOR, change: 'Original creators', trend: 'up', icon: 'roles', color: 'orange' },
+    { label: 'Translators', value: statsData.roleCounts.TRANSLATOR, change: 'Localization', trend: 'up', icon: 'roles', color: 'cyan' },
+    { label: 'Project Leaders', value: statsData.roleCounts.PROJECT_LEADER, change: 'Team managers', trend: 'up', icon: 'roles', color: 'purple' },
+    { label: 'Moderators', value: statsData.roleCounts.MODERATOR, change: 'Content reviewers', trend: 'up', icon: 'roles', color: 'blue' },
+    { label: 'System Admins', value: statsData.roleCounts.ADMIN, change: 'System officers', trend: 'up', icon: 'revenue', color: 'red' },
+    { label: 'Pending Review Submissions', value: statsData.pendingSubmissions, change: 'Awaiting moderation', trend: 'warning', icon: 'report', color: 'orange' },
     { label: 'Banned Accounts', value: statsData.bannedUsers, change: 'Restricted users', trend: 'neutral', icon: 'banned', color: 'red' }
   ]
 
@@ -204,55 +215,50 @@ function StatisticsDashboard() {
             </div>
           </div>
 
-          {/* ── Bottom Row: Genres & Platform Info ── */}
+          {/* ── Bottom Row: Daily & Live Activity ── */}
           <div className="stats-bottom-row">
-            {/* Real Active Genres Listing */}
+            {/* Today's Activity */}
             <div className="stats-chart-card stats-chart-card--wide">
               <div className="stats-chart-header">
                 <div>
-                  <h2 className="stats-chart-title">Active Comic Genres</h2>
-                  <p className="stats-chart-subtitle">Configured categories from database</p>
-                </div>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '16px' }}>
-                {statsData.genresList.length === 0 ? (
-                  <p style={{ color: 'var(--admin-text-muted)', fontSize: '14px' }}>No genres registered yet.</p>
-                ) : (
-                  statsData.genresList.map((g, idx) => (
-                    <span
-                      key={g.id || idx}
-                      className="stats-genre-pill"
-                    >
-                      {g.genreName || g.name}
-                    </span>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Platform Status */}
-            <div className="stats-chart-card stats-chart-card--narrow">
-              <div className="stats-chart-header">
-                <div>
-                  <h2 className="stats-chart-title">System Status</h2>
-                  <p className="stats-chart-subtitle">Security & Database Health</p>
+                  <h2 className="stats-chart-title">Today's Activity</h2>
+                  <p className="stats-chart-subtitle">Real-time engagement metrics for today</p>
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--admin-text-secondary)' }}>
-                  <span>API Connection:</span>
-                  <span style={{ color: 'var(--admin-green)', fontWeight: '600' }}>✓ Connected</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--admin-text-secondary)', paddingBottom: '10px', borderBottom: '1px solid var(--border)' }}>
+                  <span>New users registered today:</span>
+                  <span style={{ color: 'var(--text-h)', fontWeight: '600', fontSize: '15px' }}>{statsData.newUsersToday.toLocaleString('en-US')}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--admin-text-secondary)', paddingBottom: '10px', borderBottom: '1px solid var(--border)' }}>
+                  <span>New comics published today:</span>
+                  <span style={{ color: 'var(--text-h)', fontWeight: '600', fontSize: '15px' }}>{statsData.newComicsToday.toLocaleString('en-US')}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--admin-text-secondary)' }}>
-                  <span>Database Auth:</span>
-                  <span style={{ color: 'var(--admin-green)', fontWeight: '600' }}>✓ Synchronized</span>
+                  <span>Total users active today:</span>
+                  <span style={{ color: 'var(--text-h)', fontWeight: '600', fontSize: '15px' }}>{statsData.activeUsersToday.toLocaleString('en-US')}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--admin-text-secondary)' }}>
-                  <span>RBAC Guard:</span>
-                  <span style={{ color: 'var(--admin-green)', fontWeight: '600' }}>✓ Admin Level</span>
+              </div>
+            </div>
+
+            {/* Live Traffic Status */}
+            <div className="stats-chart-card stats-chart-card--narrow">
+              <div className="stats-chart-header">
+                <div>
+                  <h2 className="stats-chart-title">Live Traffic</h2>
+                  <p className="stats-chart-subtitle">Currently active sessions</p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '16px', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+                <div style={{ fontSize: '48px', fontWeight: 'bold', color: 'var(--admin-green)', lineHeight: 1 }}>
+                  {statsData.onlineUsersNow.toLocaleString('en-US')}
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--admin-text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--admin-green)', animation: 'pulse 2s infinite' }} />
+                  Users online now
                 </div>
                 {statsData.generatedAt && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '13px', color: 'var(--admin-text-secondary)' }}>
+                  <div style={{ marginTop: 'auto', paddingTop: '20px', width: '100%', display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '11px', color: 'var(--admin-text-muted)', borderTop: '1px solid var(--border)' }}>
                     <span>Last refreshed:</span>
                     <span>{new Date(statsData.generatedAt).toLocaleString('en-US')}</span>
                   </div>
