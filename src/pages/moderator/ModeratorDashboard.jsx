@@ -233,7 +233,50 @@ function ModeratorDashboard() {
           };
 
         } else {
-          // Intentionally do nothing to prevent fake comics injection.
+          const authorNameClean = formatSubmitterName(sub.submittedBy || sub.author || sub.submittedByEmail || sub.authorName || 'Unknown Author').replace(/^Author:\s*/i, '');
+          const stableId = sub.comicId || (sub.id ? `comic-${sub.id}` : (sub.submissionId ? `comic-${sub.submissionId}` : `comic-${comicTitle.replace(/\s+/g, '-').toLowerCase()}`));
+
+          // Check if local override marks this comic as archived
+          let isArchived = false;
+          try {
+            const l1 = JSON.parse(localStorage.getItem('comiverse_local_comic_' + stableId) || '{}');
+            const l2 = JSON.parse(localStorage.getItem('comiverse_local_comic_' + sub.comicId) || '{}');
+            if (l1.archived || l2.archived) isArchived = true;
+          } catch (e) {}
+
+          // Dynamically check if this submission holds a real comic UUID that no longer exists in backend DB
+          const isUUID = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str.trim());
+          const hasRealBackendComics = Array.isArray(initialComics) && initialComics.length > 0;
+          const isDeletedBackendComic = hasRealBackendComics && sub.comicId && sub.comicId !== sub.id && isUUID(sub.comicId);
+
+          if (!isArchived && !isDeletedBackendComic) {
+            const subChapsCount = Array.isArray(sub.allChapters) ? sub.allChapters.length : (Array.isArray(sub.chapters) ? sub.chapters.length : 0);
+            const initialChaps = subChapsCount > 0 ? subChapsCount : (sub.chapterCount || sub.chapters || sub.chapterNumber || sub.number || 0);
+
+            newComics.push({
+              id: stableId,
+              title: comicTitle,
+              authorName: authorNameClean,
+              author: sub.submittedBy || sub.author || sub.submittedByEmail || sub.authorName || 'Unknown Author',
+              genres: Array.isArray(sub.genres) ? sub.genres : (typeof sub.genres === 'string' ? sub.genres.split(',').map(g => g.trim()) : []),
+              cover: coverVal,
+              coverImage: coverVal,
+              coverImageUrl: coverVal,
+              publicationStatus: 'ONGOING',
+              status: 'Active',
+              language: sub.language || sub.rawLanguage || sub.originalLanguage || sub.targetLanguage || '',
+              description: sub.description || sub.summary || sub.synopsis || sub.comicDescription || sub.overview || '',
+              chapterCount: initialChaps,
+              chapters: initialChaps,
+              views: 0,
+              viewCount: 0,
+              rating: sub.rating || sub.ratingAverage || 0.0,
+              ratingAverage: sub.ratingAverage || sub.rating || 0.0,
+              ratingCount: sub.ratingCount || 0,
+              projectTeam: '-',
+              lastChapterUpdatedAt: sub.approvedAt || sub.timestamp || new Date().toISOString()
+            });
+          }
         }
       }
     });
