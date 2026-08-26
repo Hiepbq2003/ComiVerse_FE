@@ -3,6 +3,7 @@ import AdminLayout from '../../components/layout/AdminLayout'
 import { getAdminStatisticsApi } from '../../services/api/AdminStatisticsApi'
 import { AnimatedButton } from '../../components/common/AnimatedButton'
 import { exportToCsv } from '../../utils/exportToCsv'
+import { RefreshCw, Download } from 'lucide-react'
 
 const EMPTY_ROLE_COUNTS = {
   READER: 0,
@@ -124,22 +125,13 @@ function StatisticsDashboard() {
           <h1>Statistics Dashboard</h1>
           <p>Current platform overview from verified database aggregates</p>
         </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <AnimatedButton
-            variant={3}
-            label={loading ? 'Refreshing...' : '🔄 Refresh Data'}
-            tooltip="Reload API"
-            onClick={fetchStatistics}
-            disabled={loading}
-          />
-          <AnimatedButton
-            variant={3}
-            label="📥 Export Report"
-            tooltip="Export CSV"
-            className="btn-excel"
-            onClick={handleExport}
-            disabled={loading}
-          />
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button type="button" className="admin-btn" style={{ display: 'inline-flex', height: '40px', alignItems: 'center', justifyContent: 'center', gap: '7px', whiteSpace: 'nowrap' }} onClick={fetchStatistics} disabled={loading}>
+            <RefreshCw size={16} className={loading ? 'spin' : ''} /> Refresh
+          </button>
+          <button type="button" className="admin-btn admin-btn--primary" style={{ display: 'inline-flex', height: '40px', alignItems: 'center', justifyContent: 'center', gap: '7px', whiteSpace: 'nowrap' }} onClick={handleExport} disabled={loading || !statsData}>
+            <Download size={16} /> Export CSV
+          </button>
         </div>
       </div>
 
