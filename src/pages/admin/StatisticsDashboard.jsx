@@ -462,8 +462,8 @@ function StatisticsDashboard() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
                 {statsData.topAuthors && statsData.topAuthors.length > 0 ? (
-                  statsData.topAuthors.slice(0, 5).map((author, index) => (
-                    <div key={author.authorId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: index < Math.min(statsData.topAuthors.length, 5) - 1 ? '1px solid var(--border)' : 'none' }}>
+                  statsData.topAuthors.slice(0, 8).map((author, index) => (
+                    <div key={author.authorId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: index < Math.min(statsData.topAuthors.length, 8) - 1 ? '1px solid var(--border)' : 'none' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(150,150,150,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 'bold', color: index < 3 ? 'var(--admin-primary)' : 'var(--admin-text-secondary)' }}>
                           #{index + 1}
