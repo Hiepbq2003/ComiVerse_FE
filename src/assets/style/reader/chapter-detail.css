@@ -725,6 +725,28 @@ html.light .btn-reader-action:disabled {
   color: #94a3b8;
 }
 
+/* ── COMIC PAGE CANVAS & VERTICAL LIST ────────────────────── */
+.chapter-vertical-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.chapter-page-canvas {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: white; /* to ensure transparent PNGs don't look weird if they expect white bg */
+}
+
+html.dark .chapter-page-canvas,
+[data-theme="dark"] .chapter-page-canvas {
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
 /* ── PREMIUM SINGLE PAGE MODE ────────────────────── */
 
 .premium-single-page-wrapper {
