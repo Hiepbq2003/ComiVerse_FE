@@ -3,6 +3,13 @@ import { Circle } from 'lucide-react'
 import { registerApi } from '../../services/api/AuthApi'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { getGoogleAuthUrl } from '../../config/apiConfig'
+import {
+  AUTH_LIMITS,
+  isValidEmail,
+  isValidFullName,
+  isValidPassword,
+  isValidUsername,
+} from '../../utils/authValidation'
 
 function Register({ onNavigate, onVerificationRequired, showAlert, loading, setLoading, onOpenModal }) {
   const [form, setForm] = useState({
@@ -47,28 +54,26 @@ function Register({ onNavigate, onVerificationRequired, showAlert, loading, setL
     }
 
     // Validate Email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(form.email.trim())) {
-      showAlert('error', 'Please enter a valid email address.')
+    if (!isValidEmail(form.email)) {
+      showAlert('error', 'Enter a valid email address')
       return
     }
 
     // Validate Password
-    if (form.password.length < 8) {
-      showAlert('error', 'Password must be at least 8 characters long.')
+    if (!isValidPassword(form.password)) {
+      showAlert('error', 'Password must be between 8 and 128 characters.')
       return
     }
 
     // Validate Password Match
     if (form.password !== form.confirmPassword) {
-      showAlert('error', 'Passwords do not match!')
+      showAlert('error', 'Passwords do not match')
       return
     }
 
     // Validate Username regex
-    const usernameRegex = /^[a-z0-9_]{3,20}$/
-    if (!usernameRegex.test(form.username.trim())) {
-      showAlert('error', 'Username must be 3-20 characters, lowercase, numbers, and underscores only.')
+    if (!isValidUsername(form.username)) {
+      showAlert('error', 'Username must be 3-20 characters and contain only letters, numbers, dots, or underscores.')
       return
     }
 
@@ -99,6 +104,12 @@ function Register({ onNavigate, onVerificationRequired, showAlert, loading, setL
       }
     }
 
+    const fullName = `${fName} ${lName}`.trim().replace(/\s+/g, ' ')
+    if (!isValidFullName(fullName)) {
+      showAlert('error', 'Full name must be 2-50 letters and may include spaces, apostrophes, or hyphens.')
+      return
+    }
+
     // Validate Age (>= 13 years old)
     if (form.dateOfBirth) {
       const today = new Date()
@@ -116,7 +127,6 @@ function Register({ onNavigate, onVerificationRequired, showAlert, loading, setL
 
     setLoading(true)
     try {
-      const fullName = `${form.firstName.trim()} ${form.lastName.trim()}`.trim()
       const email = form.email.trim()
       await registerApi({
         username: form.username.trim(),
@@ -208,13 +218,14 @@ function Register({ onNavigate, onVerificationRequired, showAlert, loading, setL
                 type="text" 
                 placeholder="Choose a username" 
                 value={form.username}
-                onChange={(e) => setForm({ ...form, username: e.target.value.toLowerCase() })}
+                onChange={(e) => setForm({ ...form, username: e.target.value })}
                 className="glass-input-field"
+                maxLength={AUTH_LIMITS.usernameMax}
                 required
               />
             </div>
             <p className="input-description-label">
-              3-20 characters, lowercase, numbers and underscores only.
+              3-20 characters; letters, numbers, dots and underscores only.
             </p>
 
             {/* Email */}
@@ -289,6 +300,7 @@ function Register({ onNavigate, onVerificationRequired, showAlert, loading, setL
                     value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
                     className="glass-input-field"
+                    maxLength={AUTH_LIMITS.passwordMax}
                     onFocus={() => setIsPasswordFocused(true)}
                     onBlur={() => setIsPasswordFocused(false)}
                     required
@@ -384,6 +396,7 @@ function Register({ onNavigate, onVerificationRequired, showAlert, loading, setL
                     value={form.confirmPassword}
                     onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
                     className="glass-input-field"
+                    maxLength={AUTH_LIMITS.passwordMax}
                     required
                   />
                 </div>
