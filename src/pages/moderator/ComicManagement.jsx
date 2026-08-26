@@ -65,7 +65,7 @@ const CustomDropdown = ({ value, onChange, options, minWidth = '160px' }) => {
   );
 };
 
-function ComicManagement({ loading = false, comics, projectTeams, genres, statistics, handleSaveEditComic, handleSuspendComic, handleRestoreComic, handleTriggerAssignTeam, fetchAllData }) {
+function ComicManagement({ loading = false, comics, projectTeams, genres, handleSaveEditComic, handleSuspendComic, handleRestoreComic, handleTriggerAssignTeam, fetchAllData }) {
   const navigate = useNavigate()
 
   // Search & Filters local states
@@ -476,7 +476,7 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, statis
               <path d="M0 20 Q 25 5, 50 15 T 100 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value">{statistics ? statistics.totalPublishedComics : comics.filter(c => c.moderationStatus !== 'REJECTED' && c.moderationStatus !== 'SUBMITTED_FOR_REVIEW').length}</span>
+          <span className="stat-value">{comics.filter(c => c.moderationStatus !== 'REJECTED' && c.moderationStatus !== 'SUBMITTED_FOR_REVIEW').length}</span>
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -485,7 +485,7 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, statis
               <path d="M0 25 C 20 25, 40 5, 60 10 C 80 15, 90 2, 100 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value active-count">{statistics ? (statistics.comicStatusCounts?.ONGOING || 0) : comics.filter(c => (!c.publicationStatus || c.publicationStatus.toUpperCase() === 'ONGOING')).length}</span>
+          <span className="stat-value active-count">{comics.filter(c => (!c.publicationStatus || c.publicationStatus.toUpperCase() === 'ONGOING')).length}</span>
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -494,7 +494,7 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, statis
               <path d="M0 25 C 30 25, 50 20, 70 8 C 85 2, 95 10, 100 2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value" style={{ color: '#3b82f6' }}>{statistics ? (statistics.comicStatusCounts?.COMPLETED || 0) : comics.filter(c => c.publicationStatus?.toUpperCase() === 'COMPLETED').length}</span>
+          <span className="stat-value" style={{ color: '#3b82f6' }}>{comics.filter(c => c.publicationStatus?.toUpperCase() === 'COMPLETED').length}</span>
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -503,7 +503,7 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, statis
               <path d="M0 10 C 20 10, 40 25, 60 20 C 80 15, 90 25, 100 25" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value paused-count">{statistics ? (statistics.comicStatusCounts?.HIATUS || 0) : comics.filter(c => c.publicationStatus?.toUpperCase() === 'HIATUS').length}</span>
+          <span className="stat-value paused-count">{comics.filter(c => c.publicationStatus?.toUpperCase() === 'HIATUS').length}</span>
         </div>
         <div className="mod-stat-overview-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -512,7 +512,7 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, statis
               <path d="M0 15 C 20 25, 40 25, 60 15 C 80 5, 90 5, 100 15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <span className="stat-value" style={{ color: '#ef4444' }}>{statistics ? (statistics.comicStatusCounts?.SUSPENDED || 0) : comics.filter(c => c.moderationStatus === 'UNPUBLISHED').length}</span>
+          <span className="stat-value" style={{ color: '#ef4444' }}>{comics.filter(c => c.moderationStatus === 'UNPUBLISHED').length}</span>
         </div>
       </div>
 

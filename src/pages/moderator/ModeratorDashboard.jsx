@@ -17,7 +17,6 @@ import { getAllSubmissionsApi, approveSubmissionApi, rejectSubmissionApi } from 
 import { getAllGenresApi } from '../../services/api/GenreApi'
 import { getAllForumThreadsApi } from '../../services/api/ForumThreadApi'
 import { getAllChatFlagsApi } from '../../services/api/ChatFlagApi'
-import { getAdminStatisticsApi } from '../../services/api/AdminStatisticsApi'
 import { approveChapterDirectApi } from '../../services/api/ChapterApi'
 import { toast } from 'react-toastify'
 import { formatTimeAgo } from '../../utils/formatTimeAgo'
@@ -128,7 +127,6 @@ function ModeratorDashboard() {
   const [genres, setGenres] = useState([])
   const [forumThreads, setForumThreads] = useState([])
   const [chatFlags, setChatFlags] = useState([])
-  const [statistics, setStatistics] = useState(null)
   const [loadingPhase1, setLoadingPhase1] = useState(true)
   const [loadingPhase2, setLoadingPhase2] = useState(true)
 
@@ -549,7 +547,7 @@ function ModeratorDashboard() {
 
   const fetchComicsAndTeams = async () => {
     try {
-      const [comicsData, teamsData, genresData, statsData] = await Promise.all([
+      const [comicsData, teamsData, genresData] = await Promise.all([
         getAllComicsApi().catch(err => {
           console.warn('[ModeratorDashboard] getAllComicsApi fallback:', err?.message || err)
           return []
@@ -561,10 +559,6 @@ function ModeratorDashboard() {
         getAllGenresApi().catch(err => {
           console.warn('[ModeratorDashboard] getAllGenresApi fallback:', err?.message || err)
           return []
-        }),
-        getAdminStatisticsApi().catch(err => {
-          console.warn('[ModeratorDashboard] getAdminStatisticsApi fallback:', err?.message || err)
-          return null
         })
       ])
       const authUser = getAuth()?.user;
@@ -579,12 +573,6 @@ function ModeratorDashboard() {
           comicTitleMap.set(clean, c);
         }
       });
-      
-      if (statsData?.data) {
-        setStatistics(statsData.data);
-      } else if (statsData) {
-        setStatistics(statsData);
-      }
 
       // Build Map for fast team comicName lookups
       const teamComicNameMap = new Map();
@@ -726,17 +714,10 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
       withTimeout(getAllComicsApi(), []),
       withTimeout(getAllProjectTeamsApi(), []),
       withTimeout(getAllSubmissionsApi(), []),
-      withTimeout(getAllChatFlagsApi(), []),
-      withTimeout(getAdminStatisticsApi(), null)
-    ]).then(([comicsData, teamsData, submissionsData, chatData, statsData]) => {
+      withTimeout(getAllChatFlagsApi(), [])
+    ]).then(([comicsData, teamsData, submissionsData, chatData]) => {
       const authUser = getAuth()?.user;
       const serverFlags = chatData || []
-      
-      if (statsData?.data) {
-        setStatistics(statsData.data);
-      } else if (statsData) {
-        setStatistics(statsData);
-      }
       
       let localFlags = []
       try {
@@ -2694,7 +2675,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
               comics={comics} 
               projectTeams={projectTeams}
               genres={genres}
-              statistics={statistics}
               handleSaveEditComic={handleSaveEditComic} 
               handleSuspendComic={handleSuspendComic} 
               handleRestoreComic={handleRestoreComic}
