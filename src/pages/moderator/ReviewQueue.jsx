@@ -1967,8 +1967,8 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     </div>
 
       {/* Filter and Sort bar */}
-      <div className="moderator-filter-bar" style={{ display: 'flex', gap: '12px', alignItems: 'center', width: '100%', flexWrap: 'wrap', marginBottom: '20px' }}>
-        <div className="mod-search-wrapper">
+      <div className="moderator-filter-bar" style={{ display: 'flex', gap: '16px', alignItems: 'center', width: '100%', marginBottom: '24px' }}>
+        <div className="mod-search-wrapper" style={{ flex: 1 }}>
           <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -1979,23 +1979,35 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
             placeholder="Search comics by title, author name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ width: '100%' }}
           />
         </div>
 
-        <select 
-          className="mod-search-input" 
-          value={languageFilter} 
-          onChange={(e) => setLanguageFilter(e.target.value)}
-          style={{ minWidth: '150px', background: 'rgba(255, 255, 255, 0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 16px', borderRadius: '12px' }}
-        >
-          <option value="ALL">All Languages</option>
-          <option value="Japanese">Japanese</option>
-          <option value="Korean">Korean</option>
-          <option value="Chinese">Chinese</option>
-          <option value="English">English</option>
-        </select>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
+          <select 
+            className="mod-search-input" 
+            value={languageFilter} 
+            onChange={(e) => setLanguageFilter(e.target.value)}
+            style={{ 
+              minWidth: '160px', 
+              background: 'rgba(255, 255, 255, 0.03)', 
+              color: 'var(--text-h)', 
+              border: '1px solid var(--border)', 
+              padding: '10px 16px', 
+              borderRadius: '12px',
+              outline: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            <option value="ALL">All Languages</option>
+            <option value="Japanese">Japanese</option>
+            <option value="Korean">Korean</option>
+            <option value="Chinese">Chinese</option>
+            <option value="English">English</option>
+          </select>
 
-        <CustomSortDropdown value={sortFilter} onChange={setSortFilter} />
+          <CustomSortDropdown value={sortFilter} onChange={setSortFilter} />
+        </div>
       </div>
 
       {/* Submissions List Grid */}
