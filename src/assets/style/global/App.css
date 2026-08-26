@@ -2215,3 +2215,81 @@ html.light .custom-datepicker-icon,
   color: white;
   background: #a855f7;
 }
+
+/* Light theme for the portal-rendered calendar. The popover lives under
+   document.body, so auth-card selectors cannot theme it reliably. */
+html.light .custom-datepicker-popover {
+  background: #ffffff !important;
+  border-color: rgba(124, 58, 237, 0.24) !important;
+  box-shadow: 0 22px 48px -18px rgba(61, 42, 70, 0.28),
+    0 0 0 1px rgba(76, 57, 87, 0.04) !important;
+  color: #24182d;
+}
+
+html.light .custom-datepicker-popover.drop-up {
+  box-shadow: 0 -22px 48px -18px rgba(61, 42, 70, 0.28),
+    0 0 0 1px rgba(76, 57, 87, 0.04) !important;
+}
+
+html.light .custom-datepicker-select {
+  background: #f8f5fa;
+  border-color: rgba(76, 57, 87, 0.18);
+  color: #24182d;
+}
+
+html.light .custom-datepicker-select:hover,
+html.light .custom-datepicker-select:focus {
+  background: #ffffff;
+  border-color: #8b5cf6;
+}
+
+html.light .custom-datepicker-select option {
+  background: #ffffff;
+  color: #24182d;
+}
+
+html.light .custom-datepicker-nav-btn {
+  background: #f8f5fa;
+  border-color: rgba(76, 57, 87, 0.16);
+  color: #655a70;
+}
+
+html.light .custom-datepicker-nav-btn:hover {
+  background: #7c3aed;
+  border-color: #7c3aed;
+  color: #ffffff;
+}
+
+html.light .custom-datepicker-weekday {
+  color: #756a7e;
+}
+
+html.light .custom-datepicker-day {
+  color: #24182d;
+}
+
+html.light .custom-datepicker-day:hover:not(.outside):not(:disabled) {
+  background: rgba(124, 58, 237, 0.12);
+  color: #5b21b6;
+}
+
+html.light .custom-datepicker-day.outside {
+  color: rgba(76, 57, 87, 0.34);
+}
+
+html.light .custom-datepicker-day.today:not(.selected) {
+  border-color: #7c3aed;
+  color: #6d28d9;
+}
+
+html.light .custom-datepicker-footer {
+  border-top-color: rgba(76, 57, 87, 0.12);
+}
+
+html.light .custom-datepicker-footer-btn.clear {
+  color: #756a7e;
+}
+
+html.light .custom-datepicker-footer-btn.today {
+  color: #6d28d9;
+}
