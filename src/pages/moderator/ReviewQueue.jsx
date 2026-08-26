@@ -1886,15 +1886,6 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         <div>
           <h1>Raw Content Review Queue</h1>
           <p>Review and verify author submission inputs (Title, Language, Min Age, Description, Genres, Cover & Chapters), inspect raw chapter manuscripts, and approve catalog publication.</p>
-        </div>
-        <button
-          type="button"
-          className="mod-export-btn"
-          onClick={handleExportReviewQueue}
-          title="Export current review queue items as CSV"
-        >
-          <span>📥 Export Queue ({activeTab.toUpperCase()})</span>
-        </button>
       </div>
 
       {/* Dynamic Statistics Ribbon */}
@@ -1932,8 +1923,9 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       })()}
 
       {/* Main Status Tabs */}
-      <div className="moderator-tabs">
-        <button 
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid var(--mod-border)', marginBottom: '20px' }}>
+        <div className="moderator-tabs" style={{ borderBottom: 'none', marginBottom: 0 }}>
+          <button 
           className={`moderator-tab-btn ${activeTab === 'pending' ? 'active' : ''}`}
           onClick={() => setActiveTab('pending')}
         >
@@ -1962,6 +1954,16 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           <span className="moderator-tab-btn-badge appealed" style={{ background: '#f59e0b', color: '#fff' }}>{tabCounts.appealed}</span>
         </button>
       </div>
+      <button
+        type="button"
+        className="mod-export-btn"
+        onClick={handleExportReviewQueue}
+        title="Export current review queue items as CSV"
+        style={{ margin: 0 }}
+      >
+        <span>📥 Export Queue ({activeTab.toUpperCase()})</span>
+      </button>
+    </div>
 
       {/* Filter and Sort bar */}
       <div className="moderator-filter-bar" style={{ display: 'flex', gap: '12px', alignItems: 'center', width: '100%', flexWrap: 'wrap', marginBottom: '20px' }}>
