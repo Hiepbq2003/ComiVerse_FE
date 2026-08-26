@@ -37,7 +37,7 @@ export default function ModeratorReports() {
   const [endDate, setEndDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
-  const limit = 10;
+  const limit = 7; // Temporarily changed from 10 to 7 for testing
 
   // Content Inspection Modal
   const [inspectingReport, setInspectingReport] = useState(null);
