@@ -4,7 +4,7 @@ import { getAdminStatisticsApi } from '../../services/api/AdminStatisticsApi'
 import { AnimatedButton } from '../../components/common/AnimatedButton'
 import { exportToCsv } from '../../utils/exportToCsv'
 import { RefreshCw, Download } from 'lucide-react'
-import { getAllComicsApi } from '../../services/api/ComicApi'
+
 const EMPTY_ROLE_COUNTS = {
   READER: 0,
   AUTHOR: 0,
@@ -311,54 +311,13 @@ function StatisticsDashboard() {
       const result = await getAdminStatisticsApi()
 
       const roles = { ...EMPTY_ROLE_COUNTS, ...(result?.roleCounts || {}) }
-      let localComics = []
-      try {
-        const res = await getAllComicsApi()
-        localComics = Array.isArray(res) ? res : (res?.data || [])
-      } catch (e) {}
-
-      const seenIds = new Set();
-      const seenTitles = new Set();
-      let uniqueLocalComics = localComics.filter(item => {
-        if (!item) return false;
-        const idKey = item.id ? String(item.id).toLowerCase() : '';
-        const titleKey = item.title ? String(item.title).trim().toLowerCase().replace(/[^a-z0-9]/gi, '').replace(/s$/, '') : '';
-        if (idKey && seenIds.has(idKey)) return false;
-        if (titleKey && seenTitles.has(titleKey)) return false;
-        if (idKey) seenIds.add(idKey);
-        if (titleKey) seenTitles.add(titleKey);
-        return true;
-      });
-
-      uniqueLocalComics = uniqueLocalComics.map(c => {
-        try {
-          const savedLocal = localStorage.getItem('comiverse_local_comic_' + c.id);
-          if (savedLocal) return { ...c, ...JSON.parse(savedLocal) };
-        } catch(e) {}
-        return c;
-      });
-
-      uniqueLocalComics = uniqueLocalComics.filter(c => 
-        c.moderationStatus !== 'REJECTED' && c.moderationStatus !== 'SUBMITTED_FOR_REVIEW'
-      );
-
-      const localOngoing = uniqueLocalComics.filter(c => (!c.publicationStatus || c.publicationStatus.toUpperCase() === 'ONGOING')).length;
-      const localCompleted = uniqueLocalComics.filter(c => c.publicationStatus?.toUpperCase() === 'COMPLETED').length;
-      const localHiatus = uniqueLocalComics.filter(c => c.publicationStatus?.toUpperCase() === 'HIATUS').length;
-      const localSuspended = uniqueLocalComics.filter(c => c.moderationStatus === 'UNPUBLISHED').length;
-
-      const comicStatuses = { 
-        ONGOING: localOngoing,
-        COMPLETED: localCompleted,
-        HIATUS: localHiatus,
-        SUSPENDED: localSuspended
-      }
+      const comicStatuses = { ...EMPTY_COMIC_STATUS, ...(result?.comicStatusCounts || {}) }
 
       setStatsData({
         totalUsers: Number(result?.totalUsers) || 0,
         activeUsers: Number(result?.activeUsers) || 0,
         bannedUsers: Number(result?.bannedUsers) || 0,
-        totalComics: uniqueLocalComics.length || Number(result?.totalPublishedComics) || 0,
+        totalComics: Number(result?.totalPublishedComics) || 0,
         totalGenres: Number(result?.totalGenres) || 0,
         pendingSubmissions: Number(result?.pendingSubmissions) || 0,
         roleCounts: roles,
@@ -388,7 +347,6 @@ function StatisticsDashboard() {
   const statCards = [
     { label: 'Total Registered Users', value: statsData.totalUsers, change: 'Active in system', trend: 'up', icon: 'users', color: 'purple' },
     { label: 'Active User Accounts', value: statsData.activeUsers, change: 'Verified status', trend: 'up', icon: 'activity', color: 'green' },
-    { label: 'Total Published Comics', value: statsData.totalComics, change: 'Catalog listings', trend: 'up', icon: 'book', color: 'pink' },
     { label: 'Content Categories', value: statsData.totalGenres, change: 'Genre classifications', trend: 'up', icon: 'genres', color: 'cyan' },
     { label: 'Authors', value: statsData.roleCounts.AUTHOR, change: 'Original creators', trend: 'up', icon: 'roles', color: 'orange' },
     { label: 'Translators', value: statsData.roleCounts.TRANSLATOR, change: 'Localization', trend: 'up', icon: 'roles', color: 'cyan' },
@@ -474,31 +432,29 @@ function StatisticsDashboard() {
             ))}
           </div>
 
-          {/* ── User Role Distribution (Standalone Row) ───────────── */}
-          <div className="stats-chart-card" style={{ marginTop: '24px' }}>
-            <div className="stats-chart-header">
-              <div>
-                <h2 className="stats-chart-title">User Base & Role Distribution</h2>
-                <p className="stats-chart-subtitle">Live proportion of platform user roles</p>
+          {/* ── User Role Distribution & Top Authors ───────────── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginTop: '24px' }}>
+            <div className="stats-chart-card" style={{ margin: 0 }}>
+              <div className="stats-chart-header">
+                <div>
+                  <h2 className="stats-chart-title">User Base & Role Distribution</h2>
+                  <p className="stats-chart-subtitle">Live proportion of platform user roles</p>
+                </div>
+              </div>
+              <div style={{ marginTop: '16px' }}>
+                <InteractiveDonutChart 
+                  total={totalRoleSum}
+                  data={[
+                    { name: 'Readers', count: statsData.roleCounts.READER, color: '#a855f7' },
+                    { name: 'Translators', count: statsData.roleCounts.TRANSLATOR, color: '#3b82f6' },
+                    { name: 'Authors', count: statsData.roleCounts.AUTHOR, color: '#ec4899' },
+                    { name: 'Project Leaders', count: statsData.roleCounts.PROJECT_LEADER, color: '#14b8a6' },
+                    { name: 'Moderators', count: statsData.roleCounts.MODERATOR, color: '#f97316' },
+                    { name: 'Admins', count: statsData.roleCounts.ADMIN, color: '#10b981' }
+                  ]} 
+                />
               </div>
             </div>
-            <div style={{ marginTop: '16px' }}>
-              <InteractiveDonutChart 
-                total={totalRoleSum}
-                data={[
-                  { name: 'Readers', count: statsData.roleCounts.READER, color: '#a855f7' },
-                  { name: 'Translators', count: statsData.roleCounts.TRANSLATOR, color: '#3b82f6' },
-                  { name: 'Authors', count: statsData.roleCounts.AUTHOR, color: '#ec4899' },
-                  { name: 'Project Leaders', count: statsData.roleCounts.PROJECT_LEADER, color: '#14b8a6' },
-                  { name: 'Moderators', count: statsData.roleCounts.MODERATOR, color: '#f97316' },
-                  { name: 'Admins', count: statsData.roleCounts.ADMIN, color: '#10b981' }
-                ]} 
-              />
-            </div>
-          </div>
-
-          {/* ── Mid Row: Top Authors & Catalog Status ───────────── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginTop: '24px' }}>
 
             {/* Top Contributing Authors */}
             <div className="stats-chart-card" style={{ margin: 0 }}>
@@ -530,26 +486,6 @@ function StatisticsDashboard() {
                     No published authors found.
                   </div>
                 )}
-              </div>
-            </div>
-
-            {/* Comic Catalog Status */}
-            <div className="stats-chart-card" style={{ margin: 0 }}>
-              <div className="stats-chart-header">
-                <div>
-                  <h2 className="stats-chart-title">Comic Catalog Status</h2>
-                  <p className="stats-chart-subtitle">Distribution of series by publication state</p>
-                </div>
-              </div>
-              <div style={{ marginTop: '16px', height: 'calc(100% - 60px)' }}>
-                <InteractiveHalfDonutChart 
-                  total={(statsData.comicStatusCounts.ONGOING || 0) + (statsData.comicStatusCounts.COMPLETED || 0) + (statsData.comicStatusCounts.HIATUS || 0) + (statsData.comicStatusCounts.CANCEL || 0)}
-                  data={[
-                    { name: 'Ongoing', count: statsData.comicStatusCounts.ONGOING || 0, color: '#3b82f6' },
-                    { name: 'Completed', count: statsData.comicStatusCounts.COMPLETED || 0, color: '#10b981' },
-                    { name: 'Hiatus / Dropped', count: (statsData.comicStatusCounts.HIATUS || 0) + (statsData.comicStatusCounts.CANCEL || 0), color: '#f97316' }
-                  ]}
-                />
               </div>
             </div>
           </div>
