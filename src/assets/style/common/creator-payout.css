@@ -174,23 +174,28 @@ html.dark .creator-payout-card {
   cursor: not-allowed; 
 }
 
-.creator-payout-account-actions button.secondary,
+.creator-payout-inline-form button.secondary,
 .creator-payout-max-button,
 .author-secondary-btn { 
-  border: 1px solid var(--border); 
-  background: var(--bg); 
-  color: var(--text-h); 
-  border-radius: 10px;
-  padding: 10px 18px;
+  border: 1px solid var(--accent); 
+  background: transparent; 
+  color: var(--accent); 
+  border-radius: 12px;
+  padding: 8px 20px;
   font-weight: 600;
+  font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .author-secondary-btn:hover:not(:disabled) {
-  background: var(--code-bg);
-  border-color: var(--accent-border);
-  color: var(--accent);
+  background: var(--accent-bg);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.2);
 }
 
 .creator-payout-account-meta { 
