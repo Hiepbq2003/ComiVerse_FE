@@ -14,6 +14,13 @@ const EMPTY_ROLE_COUNTS = {
   ADMIN: 0
 }
 
+const EMPTY_COMIC_STATUS = {
+  ONGOING: 0,
+  COMPLETED: 0,
+  HIATUS: 0,
+  CANCEL: 0
+}
+
 const EMPTY_STATS = {
   totalUsers: 0,
   activeUsers: 0,
@@ -22,6 +29,7 @@ const EMPTY_STATS = {
   totalGenres: 0,
   pendingSubmissions: 0,
   roleCounts: EMPTY_ROLE_COUNTS,
+  comicStatusCounts: EMPTY_COMIC_STATUS,
   genresList: [],
   generatedAt: null,
   newComicsToday: 0,
@@ -157,6 +165,44 @@ function InteractiveDonutChart({ data, total }) {
   )
 }
 
+function StackedProgressBar({ data, total }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '10px 20px', height: '100%', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: '13px', color: 'var(--admin-text-secondary)', fontWeight: '500' }}>Total Catalog</div>
+          <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--text-h)', lineHeight: 1, marginTop: '4px' }}>{total}</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', height: '24px', borderRadius: '12px', overflow: 'hidden', width: '100%', filter: 'drop-shadow(0px 4px 8px rgba(0,0,0,0.15))' }}>
+        {data.map((item) => {
+          const w = total > 0 ? (item.count / total * 100) : 0
+          if (w === 0) return null
+          return (
+            <div key={item.name} style={{ width: `${w}%`, background: item.color, transition: 'width 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275)', height: '100%' }} title={`${item.name}: ${item.count}`} />
+          )
+        })}
+      </div>
+
+      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '8px' }}>
+        {data.map(item => {
+          const pct = total > 0 ? ((item.count / total) * 100).toFixed(1) : 0
+          return (
+            <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 auto', background: 'rgba(255,255,255,0.03)', padding: '10px 14px', borderRadius: '8px' }}>
+              <div style={{ width: '14px', height: '14px', borderRadius: '4px', background: item.color }} />
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-h)' }}>{item.name}</div>
+                <div style={{ fontSize: '13px', color: 'var(--admin-text-secondary)' }}>{item.count} <span style={{fontSize: '12px', opacity: 0.7}}>({pct}%)</span></div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function StatIcon({ type }) {
   const props = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }
   switch (type) {
@@ -186,6 +232,7 @@ function StatisticsDashboard() {
       const result = await getAdminStatisticsApi()
 
       const roles = { ...EMPTY_ROLE_COUNTS, ...(result?.roleCounts || {}) }
+      const comicStatuses = { ...EMPTY_COMIC_STATUS, ...(result?.comicStatusCounts || {}) }
 
       setStatsData({
         totalUsers: Number(result?.totalUsers) || 0,
@@ -195,6 +242,7 @@ function StatisticsDashboard() {
         totalGenres: Number(result?.totalGenres) || 0,
         pendingSubmissions: Number(result?.pendingSubmissions) || 0,
         roleCounts: roles,
+        comicStatusCounts: comicStatuses,
         genresList: Array.isArray(result?.genres) ? result.genres : [],
         generatedAt: result?.generatedAt || null,
         newUsersToday: Number(result?.newUsersToday) || 0,
@@ -305,25 +353,46 @@ function StatisticsDashboard() {
             ))}
           </div>
 
-          {/* ── User Role Distribution Breakdown ───────────── */}
-          <div className="stats-chart-card">
-            <div className="stats-chart-header">
-              <div>
-                <h2 className="stats-chart-title">User Base & Role Distribution</h2>
-                <p className="stats-chart-subtitle">Live proportion of platform user roles</p>
+          {/* ── Mid Row: Donut Chart & Candy Bar ───────────── */}
+          <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'stretch' }}>
+            <div className="stats-chart-card" style={{ flex: '1 1 400px', minWidth: '0' }}>
+              <div className="stats-chart-header">
+                <div>
+                  <h2 className="stats-chart-title">User Base & Role Distribution</h2>
+                  <p className="stats-chart-subtitle">Live proportion of platform user roles</p>
+                </div>
+              </div>
+              <div style={{ marginTop: '16px' }}>
+                <InteractiveDonutChart 
+                  total={totalRoleSum}
+                  data={[
+                    { name: 'Readers', count: statsData.roleCounts.READER, color: '#a855f7' },
+                    { name: 'Translators', count: statsData.roleCounts.TRANSLATOR, color: '#3b82f6' },
+                    { name: 'Authors', count: statsData.roleCounts.AUTHOR, color: '#ec4899' },
+                    { name: 'Project Leaders', count: statsData.roleCounts.PROJECT_LEADER, color: '#14b8a6' },
+                    { name: 'Moderators', count: statsData.roleCounts.MODERATOR, color: '#f97316' }
+                  ]} 
+                />
               </div>
             </div>
-            <div style={{ marginTop: '16px' }}>
-              <InteractiveDonutChart 
-                total={totalRoleSum}
-                data={[
-                  { name: 'Readers', count: statsData.roleCounts.READER, color: '#a855f7' },
-                  { name: 'Translators', count: statsData.roleCounts.TRANSLATOR, color: '#3b82f6' },
-                  { name: 'Authors', count: statsData.roleCounts.AUTHOR, color: '#ec4899' },
-                  { name: 'Project Leaders', count: statsData.roleCounts.PROJECT_LEADER, color: '#14b8a6' },
-                  { name: 'Moderators', count: statsData.roleCounts.MODERATOR, color: '#f97316' }
-                ]} 
-              />
+
+            <div className="stats-chart-card" style={{ flex: '1 1 400px', minWidth: '0' }}>
+              <div className="stats-chart-header">
+                <div>
+                  <h2 className="stats-chart-title">Comic Catalog Status</h2>
+                  <p className="stats-chart-subtitle">Distribution of series by publication state</p>
+                </div>
+              </div>
+              <div style={{ marginTop: '16px', height: 'calc(100% - 60px)' }}>
+                <StackedProgressBar 
+                  total={(statsData.comicStatusCounts.ONGOING || 0) + (statsData.comicStatusCounts.COMPLETED || 0) + (statsData.comicStatusCounts.HIATUS || 0) + (statsData.comicStatusCounts.CANCEL || 0)}
+                  data={[
+                    { name: 'Ongoing', count: statsData.comicStatusCounts.ONGOING || 0, color: '#3b82f6' },
+                    { name: 'Completed', count: statsData.comicStatusCounts.COMPLETED || 0, color: '#10b981' },
+                    { name: 'Hiatus / Dropped', count: (statsData.comicStatusCounts.HIATUS || 0) + (statsData.comicStatusCounts.CANCEL || 0), color: '#f97316' }
+                  ]}
+                />
+              </div>
             </div>
           </div>
 
