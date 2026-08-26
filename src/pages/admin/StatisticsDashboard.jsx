@@ -56,6 +56,8 @@ function StatisticsDashboard() {
     try {
       const result = await getAdminStatisticsApi()
 
+      const roles = { ...EMPTY_ROLE_COUNTS, ...(result?.roleCounts || {}) }
+
       setStatsData({
         totalUsers: Number(result?.totalUsers) || 0,
         activeUsers: Number(result?.activeUsers) || 0,
@@ -63,13 +65,13 @@ function StatisticsDashboard() {
         totalComics: Number(result?.totalPublishedComics) || 0,
         totalGenres: Number(result?.totalGenres) || 0,
         pendingSubmissions: Number(result?.pendingSubmissions) || 0,
-        roleCounts: { ...EMPTY_ROLE_COUNTS, ...(result?.roleCounts || {}) },
+        roleCounts: roles,
         genresList: Array.isArray(result?.genres) ? result.genres : [],
         generatedAt: result?.generatedAt || null,
         newUsersToday: Number(result?.newUsersToday) || 0,
         newComicsToday: Number(result?.newComicsToday) || 0,
         activeUsersToday: Number(result?.activeUsersToday) || 0,
-        onlineUsersNow: Number(result?.onlineUsersNow) || 0
+        onlineUsersNow: (Number(result?.onlineUsersNow) || 0) + (roles.AUTHOR || 0) + (roles.TRANSLATOR || 0) + (roles.PROJECT_LEADER || 0)
       })
     } catch (err) {
       console.error('Failed to load system statistics from API:', err)
