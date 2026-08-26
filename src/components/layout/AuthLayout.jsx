@@ -59,7 +59,7 @@ function AuthLayout({ children, alert, isWide }) {
 
           <div className="brand-footer-text">
             <h1>Every chapter is <br/><span className="text-highlight">a new world.</span></h1>
-            <p>Discover 1,000+ comics, manhwa & manga - updated daily, completely free.</p>
+            <p>Discover 1,000+ comics & manga - updated daily, completely free.</p>
           </div>
         </div>
       )}
