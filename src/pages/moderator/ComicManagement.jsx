@@ -97,8 +97,8 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, statis
           (c.author || '').toLowerCase().includes(searchLower) ||
           (c.projectTeam || '').toLowerCase().includes(searchLower);
         
-        // Exclude comics that are not yet published (i.e. still in Review Queue)
-        if (c.moderationStatus === 'REJECTED' || c.moderationStatus === 'SUBMITTED_FOR_REVIEW') {
+        // Strictly only show published and suspended (UNPUBLISHED) comics in the catalog
+        if (c.moderationStatus !== 'PUBLISHED' && c.moderationStatus !== 'UNPUBLISHED') {
            return false;
         }
 
