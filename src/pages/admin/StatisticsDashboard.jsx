@@ -24,10 +24,137 @@ const EMPTY_STATS = {
   roleCounts: EMPTY_ROLE_COUNTS,
   genresList: [],
   generatedAt: null,
-  newUsersToday: 0,
   newComicsToday: 0,
   activeUsersToday: 0,
-  onlineUsersNow: 0
+  onlineUsersNow: 0,
+  newLikesToday: 0,
+  newBookmarksToday: 0
+}
+
+function InteractiveDonutChart({ data, total }) {
+  const [hoverIndex, setHoverIndex] = useState(null)
+
+  const getCoordinatesForPercent = (percent) => {
+    const x = Math.cos(2 * Math.PI * percent - Math.PI / 2)
+    const y = Math.sin(2 * Math.PI * percent - Math.PI / 2)
+    return [x, y]
+  }
+
+  let cumulativePercent = 0
+  const slices = data.map((slice, index) => {
+    if (slice.count === 0) return { ...slice, pathData: '', index }
+    
+    const slicePercent = slice.count / Math.max(1, total)
+    const [startX, startY] = getCoordinatesForPercent(cumulativePercent)
+    cumulativePercent += slicePercent
+    
+    let pathData
+    if (slicePercent > 0.999) {
+      pathData = `M 0 -1 A 1 1 0 1 1 0 1 A 1 1 0 1 1 0 -1 Z`
+    } else {
+      const [endX, endY] = getCoordinatesForPercent(cumulativePercent)
+      const largeArcFlag = slicePercent > 0.5 ? 1 : 0
+      pathData = [
+        `M ${startX} ${startY}`,
+        `A 1 1 0 ${largeArcFlag} 1 ${endX} ${endY}`,
+        `L 0 0 Z`
+      ].join(' ')
+    }
+    
+    return { ...slice, pathData, index, slicePercent }
+  })
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '40px', flexWrap: 'wrap', padding: '10px 20px' }}>
+      {/* Chart */}
+      <div style={{ position: 'relative', width: '240px', height: '240px', flexShrink: 0, margin: '0 auto' }}>
+        <svg viewBox="-1.2 -1.2 2.4 2.4" style={{ width: '100%', height: '100%', filter: 'drop-shadow(0px 8px 16px rgba(0,0,0,0.2))' }}>
+          {slices.map((slice) => {
+            if (!slice.pathData) return null
+            const isHovered = hoverIndex === slice.index
+            return (
+              <path
+                key={slice.name}
+                d={slice.pathData}
+                fill={slice.color}
+                onMouseEnter={() => setHoverIndex(slice.index)}
+                onMouseLeave={() => setHoverIndex(null)}
+                style={{
+                  transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+                  transformOrigin: 'center',
+                  transition: 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                  cursor: 'pointer',
+                  filter: isHovered ? 'brightness(1.15)' : 'brightness(1)'
+                }}
+              />
+            )
+          })}
+          {/* Inner circle for Donut effect */}
+          <circle cx="0" cy="0" r="0.65" fill="var(--bg)" style={{ pointerEvents: 'none' }} />
+        </svg>
+        
+        {/* Center Label */}
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none', width: '100%' }}>
+          {hoverIndex !== null ? (
+            <div style={{ animation: 'fadeIn 0.2s ease-out' }}>
+              <div style={{ fontSize: '12px', color: 'var(--admin-text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {slices.find(s => s.index === hoverIndex)?.name}
+              </div>
+              <div style={{ fontSize: '28px', fontWeight: 'bold', color: slices.find(s => s.index === hoverIndex)?.color, marginTop: '2px' }}>
+                {slices.find(s => s.index === hoverIndex)?.count}
+              </div>
+            </div>
+          ) : (
+            <div style={{ animation: 'fadeIn 0.2s ease-out' }}>
+              <div style={{ fontSize: '13px', color: 'var(--admin-text-secondary)', fontWeight: '500' }}>Total</div>
+              <div style={{ fontSize: '30px', fontWeight: 'bold', color: 'var(--text-h)' }}>{total}</div>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Interactive Legend */}
+      <div style={{ flex: 1, minWidth: '250px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {data.map((r, index) => {
+          const pct = ((r.count / Math.max(1, total)) * 100).toFixed(1)
+          const isHovered = hoverIndex === index
+          return (
+            <div 
+              key={r.name} 
+              onMouseEnter={() => setHoverIndex(index)}
+              onMouseLeave={() => setHoverIndex(null)}
+              style={{ 
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
+                padding: '10px 14px', borderRadius: '8px',
+                background: isHovered ? 'rgba(150,150,150,0.1)' : 'transparent',
+                transition: 'all 0.2s ease',
+                cursor: 'pointer',
+                border: '1px solid transparent',
+                borderColor: isHovered ? 'var(--border)' : 'transparent',
+                transform: isHovered ? 'translateX(6px)' : 'translateX(0)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ 
+                  width: '14px', height: '14px', borderRadius: '50%', 
+                  background: r.color, 
+                  transform: isHovered ? 'scale(1.3)' : 'scale(1)', 
+                  transition: 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                  boxShadow: isHovered ? `0 0 10px ${r.color}80` : 'none'
+                }} />
+                <span style={{ fontSize: '14px', fontWeight: isHovered ? '600' : '500', color: isHovered ? 'var(--text-h)' : 'var(--admin-text-secondary)' }}>
+                  {r.name}
+                </span>
+              </div>
+              <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-h)' }}>
+                {r.count} <span style={{ fontSize: '13px', color: 'var(--admin-text-muted)', fontWeight: '400', marginLeft: '4px' }}>({r.count === 0 ? '0' : pct}%)</span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 function StatIcon({ type }) {
@@ -41,6 +168,8 @@ function StatIcon({ type }) {
     case 'revenue': return <svg {...props}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
     case 'banned': return <svg {...props}><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
     case 'report': return <svg {...props}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    case 'heart': return <svg {...props}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+    case 'star': return <svg {...props}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
     default: return null
   }
 }
@@ -71,7 +200,9 @@ function StatisticsDashboard() {
         newUsersToday: Number(result?.newUsersToday) || 0,
         newComicsToday: Number(result?.newComicsToday) || 0,
         activeUsersToday: Number(result?.activeUsersToday) || 0,
-        onlineUsersNow: (Number(result?.onlineUsersNow) || 0) + (roles.AUTHOR || 0) + (roles.TRANSLATOR || 0) + (roles.PROJECT_LEADER || 0)
+        onlineUsersNow: (Number(result?.onlineUsersNow) || 0) + (roles.AUTHOR || 0) + (roles.TRANSLATOR || 0) + (roles.PROJECT_LEADER || 0),
+        newLikesToday: Number(result?.newLikesToday) || 0,
+        newBookmarksToday: Number(result?.newBookmarksToday) || 0
       })
     } catch (err) {
       console.error('Failed to load system statistics from API:', err)
@@ -94,9 +225,10 @@ function StatisticsDashboard() {
     { label: 'Translators', value: statsData.roleCounts.TRANSLATOR, change: 'Localization', trend: 'up', icon: 'roles', color: 'cyan' },
     { label: 'Project Leaders', value: statsData.roleCounts.PROJECT_LEADER, change: 'Team managers', trend: 'up', icon: 'roles', color: 'purple' },
     { label: 'Moderators', value: statsData.roleCounts.MODERATOR, change: 'Content reviewers', trend: 'up', icon: 'roles', color: 'blue' },
-    { label: 'System Admins', value: statsData.roleCounts.ADMIN, change: 'System officers', trend: 'up', icon: 'revenue', color: 'red' },
     { label: 'Pending Review Submissions', value: statsData.pendingSubmissions, change: 'Awaiting moderation', trend: 'warning', icon: 'report', color: 'orange' },
-    { label: 'Banned Accounts', value: statsData.bannedUsers, change: 'Restricted users', trend: 'neutral', icon: 'banned', color: 'red' }
+    { label: 'Banned Accounts', value: statsData.bannedUsers, change: 'Restricted users', trend: 'neutral', icon: 'banned', color: 'red' },
+    { label: 'New Bookmarks Today', value: statsData.newBookmarksToday, change: 'Library additions', trend: 'up', icon: 'star', color: 'green' },
+    { label: 'New Likes Today', value: statsData.newLikesToday, change: 'Comic interactions', trend: 'up', icon: 'heart', color: 'pink' }
   ]
 
   const totalRoleSum = Math.max(1, Object.values(statsData.roleCounts).reduce((a, b) => a + b, 0))
@@ -181,31 +313,17 @@ function StatisticsDashboard() {
                 <p className="stats-chart-subtitle">Live proportion of platform user roles</p>
               </div>
             </div>
-            <div className="stats-genres-list" style={{ marginTop: '16px' }}>
-              {[
-                { name: 'Readers', count: statsData.roleCounts.READER, color: '#a855f7' },
-                { name: 'Translators', count: statsData.roleCounts.TRANSLATOR, color: '#3b82f6' },
-                { name: 'Authors', count: statsData.roleCounts.AUTHOR, color: '#ec4899' },
-                { name: 'Project Leaders', count: statsData.roleCounts.PROJECT_LEADER, color: '#14b8a6' },
-                { name: 'Moderators', count: statsData.roleCounts.MODERATOR, color: '#f97316' },
-                { name: 'Admins', count: statsData.roleCounts.ADMIN, color: '#10b981' }
-              ].map((r) => {
-                const pct = ((r.count / totalRoleSum) * 100).toFixed(1)
-                return (
-                  <div key={r.name} className="stats-genre-row">
-                    <div className="stats-genre-info">
-                      <span className="stats-genre-name">{r.name}</span>
-                      <span className="stats-genre-count">{r.count} account{r.count !== 1 ? 's' : ''} ({pct}%)</span>
-                    </div>
-                    <div className="stats-genre-bar-track">
-                      <div
-                        className="stats-genre-bar-fill"
-                        style={{ width: `${Math.max(4, pct)}%`, background: r.color }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
+            <div style={{ marginTop: '16px' }}>
+              <InteractiveDonutChart 
+                total={totalRoleSum}
+                data={[
+                  { name: 'Readers', count: statsData.roleCounts.READER, color: '#a855f7' },
+                  { name: 'Translators', count: statsData.roleCounts.TRANSLATOR, color: '#3b82f6' },
+                  { name: 'Authors', count: statsData.roleCounts.AUTHOR, color: '#ec4899' },
+                  { name: 'Project Leaders', count: statsData.roleCounts.PROJECT_LEADER, color: '#14b8a6' },
+                  { name: 'Moderators', count: statsData.roleCounts.MODERATOR, color: '#f97316' }
+                ]} 
+              />
             </div>
           </div>
 
