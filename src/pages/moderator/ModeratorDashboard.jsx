@@ -877,6 +877,24 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     });
   }
 
+  // Helper: Check if a submission item represents a real chapter (mirrors ReviewQueue logic)
+  const isRealChapterSubmission = (item) => {
+    if (!item) return false;
+    if (Array.isArray(item.pages) && item.pages.length > 0) return true;
+    if (Array.isArray(item.images) && item.images.length > 0) return true;
+    if (Array.isArray(item.chapterImages) && item.chapterImages.length > 0) return true;
+    if (Array.isArray(item.chapter_images) && item.chapter_images.length > 0) return true;
+    if (Array.isArray(item.chapters) && item.chapters.length > 0) return true;
+    if (Array.isArray(item.allChapters) && item.allChapters.length > 0) return true;
+    const chapTitle = String(item.chapter || item.chapterTitle || '').trim().toLowerCase();
+    if (chapTitle && chapTitle !== 'raw draft' && chapTitle !== 'comic profile' && chapTitle !== 'chapter comic profile' && chapTitle !== 'none') {
+      return true;
+    }
+    if (item.chapterNumber && item.chapterNumber > 0) return true;
+    if (item.type === 'chapter' || item.submissionType === 'chapter') return true;
+    return false;
+  };
+
   const getPendingComicsCount = () => {
     const authUser = getAuth()?.user;
     const scopedSubmissions = (submissions || []).filter(item => {
@@ -885,24 +903,26 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
     });
     const itemsInTab = scopedSubmissions.filter(item => {
       if (item.status !== 'pending' && item.status) return false;
-      
-      // Filter out items with 0 pending chapters to match ReviewQueue logic
-      const chaps = item.allChapters || item.chaptersData || item.chapters || [];
-      const pendingChaps = (Array.isArray(chaps) ? chaps : []).filter(c => {
-        const s = (c.status || c.moderationStatus || '').toLowerCase();
-        return s.includes('pending') || s.includes('submitted') || s === 'new' || !s;
-      });
-      
-      return pendingChaps.length > 0;
+      return true;
     });
-    const uniqueKeys = new Set();
+    // Group by comic key (same as ReviewQueue)
+    const groupedByKey = new Map();
     itemsInTab.forEach(item => {
       const titleClean = (item.title || item.comicTitle || item.comicName || '').toLowerCase().trim();
       const submitterClean = (item.submittedBy || item.author || '').toLowerCase().trim();
       const key = item.comicId ? `comic-${item.comicId}` : `group-${titleClean}_${submitterClean}`;
-      uniqueKeys.add(key);
+      if (!groupedByKey.has(key)) {
+        groupedByKey.set(key, []);
+      }
+      groupedByKey.get(key).push(item);
     });
-    return uniqueKeys.size;
+    // Only count groups that have at least one real chapter submission (matching ReviewQueue)
+    let count = 0;
+    groupedByKey.forEach((items) => {
+      const hasRealChapter = items.some(isRealChapterSubmission);
+      if (hasRealChapter) count++;
+    });
+    return count;
   };
 
   const getNavBadges = () => {
