@@ -441,9 +441,9 @@ function Explore() {
                       style={{
                         padding: '10px 12px',
                         borderRadius: '6px',
-                        color: selectedGenres.includes('All') ? 'var(--text-h)' : 'var(--text)',
-                        background: selectedGenres.includes('All') ? 'var(--accent-bg)' : 'transparent',
-                        border: selectedGenres.includes('All') ? '1px solid var(--accent-border)' : '1px solid transparent',
+                        color: selectedGenres.includes('All') ? '#ffffff' : 'var(--text)',
+                        background: selectedGenres.includes('All') ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)' : 'transparent',
+                        border: selectedGenres.includes('All') ? '1px solid transparent' : '1px solid transparent',
                         fontSize: '13px',
                         fontWeight: selectedGenres.includes('All') ? '600' : '500',
                         cursor: 'pointer',
@@ -456,8 +456,8 @@ function Explore() {
                       }}
                       onMouseEnter={(e) => {
                         if (!selectedGenres.includes('All')) {
-                          e.currentTarget.style.background = 'var(--accent-bg)'
-                          e.currentTarget.style.color = 'var(--accent)'
+                          e.currentTarget.style.background = 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)'
+                          e.currentTarget.style.color = '#ffffff'
                         }
                       }}
                       onMouseLeave={(e) => {
@@ -484,10 +484,9 @@ function Explore() {
                           onClick={() => handleToggleGenre(g.name)}
                           style={{
                             padding: '10px 12px',
-                            borderRadius: '6px',
-                            color: isSelected ? 'var(--text-h)' : 'var(--text)',
-                            background: isSelected ? 'var(--accent-bg)' : 'transparent',
-                            border: isSelected ? '1px solid var(--accent-border)' : '1px solid transparent',
+                            color: isSelected ? '#ffffff' : 'var(--text)',
+                            background: isSelected ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)' : 'transparent',
+                            border: isSelected ? '1px solid transparent' : '1px solid transparent',
                             fontSize: '13px',
                             fontWeight: isSelected ? '600' : '500',
                             cursor: 'pointer',
@@ -616,9 +615,9 @@ function Explore() {
                           style={{
                             padding: '10px 12px',
                             borderRadius: '6px',
-                            color: isSelected ? 'var(--text-h)' : 'var(--text)',
-                            background: isSelected ? 'var(--accent-bg)' : 'transparent',
-                            border: isSelected ? '1px solid var(--accent-border)' : '1px solid transparent',
+                            color: isSelected ? '#ffffff' : 'var(--text)',
+                            background: isSelected ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)' : 'transparent',
+                            border: isSelected ? '1px solid transparent' : '1px solid transparent',
                             fontSize: '13px',
                             fontWeight: isSelected ? '600' : '500',
                             cursor: 'pointer',
@@ -747,9 +746,9 @@ function Explore() {
                           style={{
                             padding: '10px 12px',
                             borderRadius: '6px',
-                            color: isSelected ? 'var(--text-h)' : 'var(--text)',
-                            background: isSelected ? 'var(--accent-bg)' : 'transparent',
-                            border: isSelected ? '1px solid var(--accent-border)' : '1px solid transparent',
+                            color: isSelected ? '#ffffff' : 'var(--text)',
+                            background: isSelected ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)' : 'transparent',
+                            border: isSelected ? '1px solid transparent' : '1px solid transparent',
                             fontSize: '13px',
                             fontWeight: isSelected ? '600' : '400',
                             cursor: 'pointer',
@@ -762,8 +761,8 @@ function Explore() {
                           }}
                           onMouseEnter={(e) => {
                             if (!isSelected) {
-                              e.currentTarget.style.background = 'var(--accent-bg)'
-                              e.currentTarget.style.color = 'var(--text-h)'
+                              e.currentTarget.style.background = 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)'
+                              e.currentTarget.style.color = '#ffffff'
                               e.currentTarget.style.paddingLeft = '14px'
                             }
                           }}
