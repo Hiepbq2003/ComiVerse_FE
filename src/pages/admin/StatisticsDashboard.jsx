@@ -165,35 +165,113 @@ function InteractiveDonutChart({ data, total }) {
   )
 }
 
-function StackedProgressBar({ data, total }) {
+function InteractiveHalfDonutChart({ data, total }) {
+  const [hoverIndex, setHoverIndex] = useState(null)
+
+  const getCoordinatesForPercent = (percent) => {
+    const x = Math.cos(Math.PI - percent * Math.PI)
+    const y = -Math.sin(Math.PI - percent * Math.PI)
+    return [x, y]
+  }
+
+  let cumulativePercent = 0
+  const slices = data.map((slice, index) => {
+    if (slice.count === 0) return { ...slice, pathData: '', index, pct: 0 }
+    
+    const slicePercent = slice.count / Math.max(1, total)
+    const [startX, startY] = getCoordinatesForPercent(cumulativePercent)
+    cumulativePercent += slicePercent
+    const [endX, endY] = getCoordinatesForPercent(cumulativePercent)
+    
+    const pathData = [
+      `M ${startX} ${startY}`,
+      `A 1 1 0 0 1 ${endX} ${endY}`,
+      `L 0 0 Z`
+    ].join(' ')
+    
+    return { ...slice, pathData, index, pct: (slicePercent * 100).toFixed(1) }
+  })
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '10px 20px', height: '100%', justifyContent: 'center' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontSize: '13px', color: 'var(--admin-text-secondary)', fontWeight: '500' }}>Total Catalog</div>
-          <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--text-h)', lineHeight: 1, marginTop: '4px' }}>{total}</div>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '10px 0' }}>
+      <div style={{ position: 'relative', width: '280px', height: '140px', overflow: 'visible', marginTop: '10px' }}>
+        <svg viewBox="-1.1 -1.1 2.2 1.1" style={{ width: '100%', height: '100%', overflow: 'visible', filter: 'drop-shadow(0px -4px 10px rgba(0,0,0,0.1))' }}>
+          <path d="M -1 0 A 1 1 0 0 1 1 0 L 0 0 Z" fill="rgba(150,150,150,0.05)" />
+          {slices.map((slice) => {
+            if (!slice.pathData) return null
+            const isHovered = hoverIndex === slice.index
+            return (
+              <path
+                key={slice.name}
+                d={slice.pathData}
+                fill={slice.color}
+                onMouseEnter={() => setHoverIndex(slice.index)}
+                onMouseLeave={() => setHoverIndex(null)}
+                style={{
+                  transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+                  transformOrigin: '0 0',
+                  transition: 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                  cursor: 'pointer',
+                  filter: isHovered ? 'brightness(1.15)' : 'brightness(1)'
+                }}
+              />
+            )
+          })}
+          <circle cx="0" cy="0" r="0.65" fill="var(--bg)" style={{ pointerEvents: 'none' }} />
+        </svg>
+        
+        <div style={{ position: 'absolute', bottom: '0', left: '50%', transform: 'translate(-50%, 0)', textAlign: 'center', pointerEvents: 'none', width: '100%' }}>
+          {hoverIndex !== null ? (
+            <div style={{ animation: 'fadeIn 0.2s ease-out' }}>
+              <div style={{ fontSize: '12px', color: 'var(--admin-text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {slices.find(s => s.index === hoverIndex)?.name}
+              </div>
+              <div style={{ fontSize: '32px', fontWeight: 'bold', color: slices.find(s => s.index === hoverIndex)?.color, marginTop: '2px', lineHeight: 1 }}>
+                {slices.find(s => s.index === hoverIndex)?.count}
+              </div>
+            </div>
+          ) : (
+            <div style={{ animation: 'fadeIn 0.2s ease-out' }}>
+              <div style={{ fontSize: '13px', color: 'var(--admin-text-secondary)', fontWeight: '500' }}>Total Catalog</div>
+              <div style={{ fontSize: '36px', fontWeight: 'bold', color: 'var(--text-h)', marginTop: '2px', lineHeight: 1 }}>{total}</div>
+            </div>
+          )}
         </div>
       </div>
-
-      <div style={{ display: 'flex', height: '24px', borderRadius: '12px', overflow: 'hidden', width: '100%', filter: 'drop-shadow(0px 4px 8px rgba(0,0,0,0.15))' }}>
-        {data.map((item) => {
-          const w = total > 0 ? (item.count / total * 100) : 0
-          if (w === 0) return null
+      
+      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '24px' }}>
+        {data.map((r, index) => {
+          const pct = ((r.count / Math.max(1, total)) * 100).toFixed(1)
+          const isHovered = hoverIndex === index
           return (
-            <div key={item.name} style={{ width: `${w}%`, background: item.color, transition: 'width 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275)', height: '100%' }} title={`${item.name}: ${item.count}`} />
-          )
-        })}
-      </div>
-
-      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '8px' }}>
-        {data.map(item => {
-          const pct = total > 0 ? ((item.count / total) * 100).toFixed(1) : 0
-          return (
-            <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 auto', background: 'rgba(255,255,255,0.03)', padding: '10px 14px', borderRadius: '8px' }}>
-              <div style={{ width: '14px', height: '14px', borderRadius: '4px', background: item.color }} />
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-h)' }}>{item.name}</div>
-                <div style={{ fontSize: '13px', color: 'var(--admin-text-secondary)' }}>{item.count} <span style={{fontSize: '12px', opacity: 0.7}}>({pct}%)</span></div>
+            <div 
+              key={r.name} 
+              onMouseEnter={() => setHoverIndex(index)}
+              onMouseLeave={() => setHoverIndex(null)}
+              style={{ 
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '8px 14px', borderRadius: '20px',
+                background: isHovered ? 'var(--admin-hover)' : 'rgba(150,150,150,0.05)',
+                transition: 'all 0.2s ease',
+                cursor: 'pointer',
+                border: '1px solid',
+                borderColor: isHovered ? r.color + '50' : 'transparent',
+                transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
+                boxShadow: isHovered ? `0 4px 12px ${r.color}20` : 'none'
+              }}
+            >
+              <div style={{ 
+                width: '12px', height: '12px', borderRadius: '50%', 
+                background: r.color, 
+                boxShadow: isHovered ? `0 0 8px ${r.color}80` : 'none'
+              }} />
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '13px', fontWeight: '600', color: isHovered ? 'var(--text-h)' : 'var(--admin-text-secondary)' }}>
+                  {r.name}
+                </span>
+                <span style={{ fontSize: '11px', color: 'var(--admin-text-muted)' }}>
+                  {r.count} ({pct}%)
+                </span>
               </div>
             </div>
           )
@@ -422,7 +500,7 @@ function StatisticsDashboard() {
                 </div>
               </div>
               <div style={{ marginTop: '16px', height: 'calc(100% - 60px)' }}>
-                <StackedProgressBar 
+                <InteractiveHalfDonutChart 
                   total={(statsData.comicStatusCounts.ONGOING || 0) + (statsData.comicStatusCounts.COMPLETED || 0) + (statsData.comicStatusCounts.HIATUS || 0) + (statsData.comicStatusCounts.CANCEL || 0)}
                   data={[
                     { name: 'Ongoing', count: statsData.comicStatusCounts.ONGOING || 0, color: '#3b82f6' },
