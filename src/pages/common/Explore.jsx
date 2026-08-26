@@ -335,12 +335,45 @@ function Explore() {
     <HomeLayout>
       <div className="home-sections-container" style={{ paddingTop: '40px' }}>
         <div className="home-section">
-          {/* Header */}
-          <div className="section-header" style={{ borderLeftColor: '#a855f7', marginBottom: '24px' }}>
-            <div className="section-title-group">
-              <h2 className="section-title">Explore Comics</h2>
-              <span className="section-subtitle">Discover your next favorite story by filters and genres</span>
-            </div>
+          {/* Rich Hero Banner */}
+          <div className="explore-hero-banner" style={{ 
+            background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.08) 0%, rgba(236, 72, 153, 0.03) 100%)',
+            border: '1px solid var(--accent-bg)',
+            borderRadius: '24px',
+            padding: '56px 32px',
+            marginBottom: '40px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Decorative background blobs for vibrant aesthetic */}
+            <div style={{ position: 'absolute', top: '-30%', left: '-5%', width: '300px', height: '300px', background: 'var(--accent)', filter: 'blur(120px)', opacity: '0.25', borderRadius: '50%', pointerEvents: 'none' }}></div>
+            <div style={{ position: 'absolute', bottom: '-30%', right: '-5%', width: '250px', height: '250px', background: '#06b6d4', filter: 'blur(100px)', opacity: '0.2', borderRadius: '50%', pointerEvents: 'none' }}></div>
+            
+            <h1 style={{ 
+              fontSize: '46px', 
+              fontWeight: '800', 
+              margin: '0 0 16px 0',
+              letterSpacing: '-0.5px',
+              background: 'linear-gradient(135deg, var(--text-h) 0%, var(--accent) 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              position: 'relative',
+              zIndex: 1
+            }}>Explore the Universe</h1>
+            <p style={{ 
+              fontSize: '18px', 
+              color: 'var(--text)', 
+              maxWidth: '560px', 
+              lineHeight: '1.6', 
+              margin: '0',
+              position: 'relative',
+              zIndex: 1
+            }}>Dive into thousands of captivating stories, vibrant artwork, and diverse genres. Your next adventure awaits.</p>
           </div>
 
           <div className="explore-layout" style={{ display: 'flex', gap: '32px', marginTop: '10px' }}>

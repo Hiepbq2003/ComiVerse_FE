@@ -280,6 +280,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
   
   const [sortFilter, setSortFilter] = useState('date_desc')
   const [searchQuery, setSearchQuery] = useState('')
+  const [languageFilter, setLanguageFilter] = useState('ALL')
 
   const [selectedReview, setSelectedReview] = useState(null)
   const [simpleEvidenceView, setSimpleEvidenceView] = useState(null)
@@ -914,6 +915,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
 
       return allAppealed
         .filter(item => {
+          if (languageFilter !== 'ALL' && item.language?.toLowerCase() !== languageFilter.toLowerCase()) return false;
           if (!query) return true;
           return ((item.title || '').toLowerCase().includes(query) || (item.submittedBy || '').toLowerCase().includes(query));
         });
@@ -929,6 +931,10 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         return true;
       })
       .filter(item => {
+        if (languageFilter === 'ALL') return true;
+        return getSubmissionLanguage(item).toLowerCase() === languageFilter.toLowerCase();
+      })
+      .filter(item => {
         if (!query) return true;
         return (
           item.title?.toLowerCase().includes(query) ||
@@ -937,7 +943,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           item.chapter?.toLowerCase().includes(query)
         );
       });
-  }, [submissions, comics, activeTab, searchQuery]);
+  }, [submissions, comics, activeTab, searchQuery, languageFilter]);
 
   // 3. Smart Comic Grouping: Consolidate multiple chapter submissions of the same comic into 1 card
   const groupedItems = useMemo(() => {
@@ -1972,6 +1978,19 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+
+        <select 
+          className="mod-search-input" 
+          value={languageFilter} 
+          onChange={(e) => setLanguageFilter(e.target.value)}
+          style={{ minWidth: '150px', background: 'rgba(255, 255, 255, 0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 16px', borderRadius: '12px' }}
+        >
+          <option value="ALL">All Languages</option>
+          <option value="Japanese">Japanese</option>
+          <option value="Korean">Korean</option>
+          <option value="Chinese">Chinese</option>
+          <option value="English">English</option>
+        </select>
 
         <CustomSortDropdown value={sortFilter} onChange={setSortFilter} />
       </div>

@@ -75,6 +75,7 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
   const [comicGenreFilter, setComicGenreFilter] = useState('All Genres')
   const [comicAuthorFilter, setComicAuthorFilter] = useState('All Authors')
   const [comicTeamFilter, setComicTeamFilter] = useState('All Project Teams')
+  const [comicLanguageFilter, setComicLanguageFilter] = useState('All Languages')
   const [viewsSort, setViewsSort] = useState('All Views')
   const [comicTimeFilter, setComicTimeFilter] = useState('All Time')
   const [chapterUpdateSort, setChapterUpdateSort] = useState('Sort by Update Time')
@@ -84,7 +85,7 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [deferredSearch, comicStatusFilter, comicGenreFilter, comicAuthorFilter, comicTeamFilter, viewsSort, comicTimeFilter, chapterUpdateSort]);
+  }, [deferredSearch, comicStatusFilter, comicGenreFilter, comicAuthorFilter, comicTeamFilter, comicLanguageFilter, viewsSort, comicTimeFilter, chapterUpdateSort]);
 
   const filteredAndSortedComics = useMemo(() => {
     const authUser = getAuth()?.user;
@@ -111,6 +112,9 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
         const matchesGenre = comicGenreFilter === 'All Genres' || (c.genres || []).some(g => (typeof g === 'object' && g !== null ? g.name : g) === comicGenreFilter);
         const matchesAuthor = comicAuthorFilter === 'All Authors' || c.authorName === comicAuthorFilter || c.author === comicAuthorFilter;
         const matchesTeam = comicTeamFilter === 'All Project Teams' || c.projectTeam === comicTeamFilter;
+        
+        const cLang = c.language || c.originalLanguage || c.rawLanguage || 'Japanese';
+        const matchesLang = comicLanguageFilter === 'All Languages' || cLang.toLowerCase() === comicLanguageFilter.toLowerCase();
 
         let matchesTime = true;
         if (comicTimeFilter !== 'All Time') {
@@ -133,7 +137,7 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
           }
         }
 
-        return matchesSearch && matchesStatus && matchesGenre && matchesAuthor && matchesTeam && matchesTime;
+        return matchesSearch && matchesStatus && matchesGenre && matchesAuthor && matchesTeam && matchesLang && matchesTime;
       })
       .sort((a, b) => {
         if (chapterUpdateSort === 'Newest Chapters First') {
@@ -563,6 +567,17 @@ function ComicManagement({ loading = false, comics, projectTeams, genres, handle
               {value: 'All Project Teams', label: 'All Project Teams'}, 
               ...Array.from(new Set(comics.map(c => c.projectTeam).filter(t => t !== '-'))).map(team => ({ value: team, label: team }))
             ]} 
+          />
+          <CustomDropdown 
+            value={comicLanguageFilter} 
+            onChange={setComicLanguageFilter} 
+            options={[
+              {value: 'All Languages', label: 'All Languages'}, 
+              {value: 'Japanese', label: 'Japanese'}, 
+              {value: 'Korean', label: 'Korean'}, 
+              {value: 'Chinese', label: 'Chinese'}, 
+              {value: 'English', label: 'English'}
+            ]}
           />
           <CustomDropdown 
             value={viewsSort} 
