@@ -2422,9 +2422,6 @@ const withTimeout = (promise, fallbackValue = [], ms = 15000) => {
                                 {s.chapter || s.chapterNumber ? `Chapter ${s.chapter || s.chapterNumber}` : 'New Comic Upload'} · {formatSubmitterName(s.submittedBy || s.author || 'Author')}
                               </div>
                             </div>
-                            <span className={`priority-badge ${(s.priority || 'Medium').toLowerCase()}`}>
-                              {s.priority || 'Medium'}
-                            </span>
                           </div>
                         );
                       })}
