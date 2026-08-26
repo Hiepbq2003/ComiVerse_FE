@@ -448,8 +448,7 @@ function StatisticsDashboard() {
                     { name: 'Translators', count: statsData.roleCounts.TRANSLATOR, color: '#3b82f6' },
                     { name: 'Authors', count: statsData.roleCounts.AUTHOR, color: '#ec4899' },
                     { name: 'Project Leaders', count: statsData.roleCounts.PROJECT_LEADER, color: '#14b8a6' },
-                    { name: 'Moderators', count: statsData.roleCounts.MODERATOR, color: '#f97316' },
-                    { name: 'Admins', count: statsData.roleCounts.ADMIN, color: '#10b981' }
+                    { name: 'Moderators', count: statsData.roleCounts.MODERATOR, color: '#f97316' }
                   ]} 
                 />
               </div>
