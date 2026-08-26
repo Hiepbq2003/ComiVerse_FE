@@ -449,7 +449,7 @@ export default function ModeratorReports() {
             <span style={{ fontSize: '13px', color: 'var(--rep-text-secondary)' }}>
               Showing {reports.length} of {totalCount} reports
             </span>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <button
                 className="rep-btn rep-btn-ghost"
                 disabled={page <= 1}
@@ -457,6 +457,34 @@ export default function ModeratorReports() {
               >
                 <ChevronLeft size={16} /> Previous
               </button>
+              
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {[...Array(Math.ceil(totalCount / limit))].map((_, i) => {
+                  const pNum = i + 1;
+                  // Basic ellipsis logic: show first, last, current, and adjacent
+                  const totalPages = Math.ceil(totalCount / limit);
+                  if (totalPages > 7) {
+                    if (pNum !== 1 && pNum !== totalPages && Math.abs(page - pNum) > 1) {
+                      if (pNum === 2 || pNum === totalPages - 1) {
+                        return <span key={pNum} style={{ padding: '4px 8px', color: 'var(--rep-text-muted)' }}>...</span>;
+                      }
+                      return null;
+                    }
+                  }
+                  
+                  return (
+                    <button
+                      key={pNum}
+                      className={`rep-btn ${page === pNum ? 'rep-btn-primary' : 'rep-btn-ghost'}`}
+                      style={{ padding: '6px 12px', minWidth: '32px' }}
+                      onClick={() => setPage(pNum)}
+                    >
+                      {pNum}
+                    </button>
+                  );
+                })}
+              </div>
+
               <button
                 className="rep-btn rep-btn-ghost"
                 disabled={page * limit >= totalCount}
