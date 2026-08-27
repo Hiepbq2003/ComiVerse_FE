@@ -450,21 +450,235 @@
   text-align: center;
 }
 
-html.light .broadcast-audience-note,
-html.light .broadcast-preview-grid > div {
-  background: #f8fafc;
+/* ─── Light Mode Theme Enhancements ─── */
+html.light .broadcast-card,
+html.light .broadcast-history {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05) !important;
 }
 
+html.light .broadcast-card-title,
+html.light .broadcast-label {
+  color: #0f172a !important;
+}
+
+html.light .broadcast-hint {
+  color: #64748b !important;
+}
+
+/* Audience Tabs in Light Mode */
+html.light .broadcast-audience-tab {
+  background: #f8fafc !important;
+  border: 1.5px solid #e2e8f0 !important;
+  color: #475569 !important;
+  transition: all 0.2s ease;
+}
+
+html.light .broadcast-audience-tab svg {
+  color: #64748b !important;
+  transition: color 0.2s ease;
+}
+
+html.light .broadcast-audience-tab strong {
+  color: #1e293b !important;
+}
+
+html.light .broadcast-audience-tab small {
+  color: #64748b !important;
+}
+
+html.light .broadcast-audience-tab:hover:not(:disabled) {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html.light .broadcast-audience-tab:hover:not(:disabled) svg {
+  color: #7c3aed !important;
+}
+
+html.light .broadcast-audience-tab.is-active {
+  background: #f5f3ff !important;
+  border: 1.5px solid #8b5cf6 !important;
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.14) !important;
+}
+
+html.light .broadcast-audience-tab.is-active svg {
+  color: #7c3aed !important;
+}
+
+html.light .broadcast-audience-tab.is-active strong {
+  color: #6d28d9 !important;
+  font-weight: 700 !important;
+}
+
+html.light .broadcast-audience-tab.is-active small {
+  color: #7c3aed !important;
+}
+
+/* Audience Note / Info Box in Light Mode */
+html.light .broadcast-audience-note {
+  background: #f5f3ff !important;
+  border: 1px solid #ddd6fe !important;
+  color: #5b21b6 !important;
+  font-weight: 500 !important;
+}
+
+html.light .broadcast-audience-note svg {
+  color: #7c3aed !important;
+}
+
+/* Type Chips in Light Mode */
+html.light .broadcast-chip {
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #475569 !important;
+  font-weight: 500 !important;
+}
+
+html.light .broadcast-chip:hover {
+  background: #f1f5f9 !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+html.light .broadcast-chip.type-chip.info.active {
+  background: #eff6ff !important;
+  border: 1.5px solid #3b82f6 !important;
+  color: #1d4ed8 !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.15) !important;
+}
+
+html.light .broadcast-chip.type-chip.warning.active {
+  background: #fff7ed !important;
+  border: 1.5px solid #f97316 !important;
+  color: #c2410c !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 6px rgba(249, 115, 22, 0.15) !important;
+}
+
+html.light .broadcast-chip.type-chip.update.active {
+  background: #ecfdf5 !important;
+  border: 1.5px solid #10b981 !important;
+  color: #047857 !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.15) !important;
+}
+
+html.light .broadcast-chip.type-chip.maintenance.active {
+  background: #fdf4ff !important;
+  border: 1.5px solid #a855f7 !important;
+  color: #7e22ce !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 6px rgba(168, 85, 247, 0.15) !important;
+}
+
+html.light .broadcast-chip.role-chip.active {
+  background: #f5f3ff !important;
+  border: 1.5px solid #8b5cf6 !important;
+  color: #6d28d9 !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.15) !important;
+}
+
+/* Inputs & Search */
+html.light .broadcast-input,
+html.light .broadcast-textarea,
 html.light .broadcast-search-box {
-  background: #ffffff;
+  background: #ffffff !important;
+  border: 1.5px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  border-radius: 8px !important;
 }
 
+html.light .broadcast-input::placeholder,
+html.light .broadcast-textarea::placeholder,
+html.light .broadcast-search-box input::placeholder {
+  color: #94a3b8 !important;
+}
+
+html.light .broadcast-input:focus,
+html.light .broadcast-textarea:focus,
+html.light .broadcast-search-box:focus-within {
+  background: #ffffff !important;
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15) !important;
+}
+
+/* Selected Chips in Light Mode */
 html.light .broadcast-selected-chip {
-  background: rgba(168, 85, 247, 0.08);
+  background: #f5f3ff !important;
+  border: 1px solid #ddd6fe !important;
+  color: #5b21b6 !important;
 }
 
+html.light .broadcast-selected-chip-label {
+  color: #4c1d95 !important;
+  font-weight: 600 !important;
+}
+
+/* Search Results dropdown */
 html.light .broadcast-search-results {
-  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.15);
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12) !important;
+}
+
+html.light .broadcast-search-result:hover,
+html.light .broadcast-search-result.is-active {
+  background: #f8fafc !important;
+}
+
+html.light .broadcast-search-result-copy strong {
+  color: #0f172a !important;
+}
+
+html.light .broadcast-search-result-copy span,
+html.light .broadcast-search-result-meta {
+  color: #64748b !important;
+}
+
+/* History Feed in Light Mode */
+html.light .broadcast-history-item {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+html.light .broadcast-history-item:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04) !important;
+}
+
+html.light .broadcast-history-title {
+  color: #0f172a !important;
+}
+
+html.light .broadcast-history-message {
+  color: #475569 !important;
+}
+
+html.light .broadcast-history-meta-item {
+  color: #64748b !important;
+}
+
+/* Modal in Light Mode */
+html.light .broadcast-preview-grid > div {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+html.light .broadcast-preview-grid strong {
+  color: #0f172a !important;
+}
+
+html.light .broadcast-preview-grid span {
+  color: #64748b !important;
+}
+
+html.light .broadcast-preview-note {
+  color: #475569 !important;
 }
 
 @keyframes broadcast-spin {
