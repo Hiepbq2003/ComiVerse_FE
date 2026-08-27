@@ -260,7 +260,9 @@ const loadPlans = useCallback(async () => {
                   <p className="subscription-admin-interval">
                     Every {plan.intervalCount || 1} {plan.billingInterval === 'YEAR' ? 'year' : 'month'}{Number(plan.intervalCount || 1) > 1 ? 's' : ''}
                   </p>
-                  {plan.badge && <span className="subscription-admin-badge">{plan.badge}</span>}
+                  <div className="subscription-admin-badge-wrap">
+                    {plan.badge ? <span className="subscription-admin-badge">{plan.badge}</span> : null}
+                  </div>
                   <ul>
                     {(plan.features || []).slice(0, 5).map((feature) => <li key={feature}>{feature}</li>)}
                   </ul>

@@ -38,6 +38,9 @@
 }
 
 .subscription-admin-plan {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   padding: 22px;
   border: 1px solid var(--admin-border);
   border-radius: 14px;
@@ -106,6 +109,13 @@ html.light .subscription-admin-price {
   font-size: 12px;
 }
 
+.subscription-admin-badge-wrap {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  margin: 4px 0 8px;
+}
+
 .subscription-admin-badge {
   display: inline-flex;
   padding: 5px 12px;
@@ -122,8 +132,9 @@ html.light .subscription-admin-badge {
 }
 
 .subscription-admin-plan ul {
+  flex: 1;
   min-height: 100px;
-  margin: 20px 0;
+  margin: 10px 0 20px;
   padding-left: 20px;
   color: var(--admin-text-secondary);
   font-size: 13px;
@@ -138,6 +149,7 @@ html.light .subscription-admin-plan ul {
 .subscription-admin-plan-actions {
   display: flex;
   gap: 9px;
+  margin-top: auto;
 }
 
 .subscription-admin-plan-actions button {
