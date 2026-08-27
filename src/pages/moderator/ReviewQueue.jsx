@@ -1097,7 +1097,25 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     }
     setSelectedReview(null);
     setSelectedChapter(null);
-  }, [selectedReview])
+  }, [selectedReview]);
+
+  const handleForceRelease = async (item) => {
+    const submissionIds = item.subItems
+      ? item.subItems.map(si => si.id || si.submissionId).filter(Boolean)
+      : [item.id || item.submissionId].filter(Boolean);
+    const firstValidId = submissionIds.find(sid => sid && !String(sid).startsWith('comic-') && !String(sid).startsWith('group-'));
+    if (firstValidId) {
+      try {
+        await releaseSubmissionApi(firstValidId);
+        toast.success('Successfully unlocked submission');
+        if (typeof fetchAllData === 'function') {
+          await fetchAllData();
+        }
+      } catch (err) {
+        toast.error(err?.response?.data?.message || err?.message || 'Failed to unlock submission');
+      }
+    }
+  };
 
   const onApproveClick = (groupOrItem) => {
     const targetId = typeof groupOrItem === 'string' ? groupOrItem : (groupOrItem.id || groupOrItem);
@@ -2126,15 +2144,44 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                 <div className="submission-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   {(() => {
                     const currentUser = getAuth()?.user;
-                    // Note: If reviewerId exists and is not the current user, it's claimed by someone else.
-                    // We assume it's valid if it's returned by the backend (backend handles the 30min expiry).
-                    const isClaimedByOther = item.reviewerId && item.reviewerId !== currentUser?.id;
-                    const isClaimedByMe = item.reviewerId && item.reviewerId === currentUser?.id;
+                    const currentUserId = currentUser?.id || currentUser?.userId;
+                    const currentUserName = currentUser?.fullName || currentUser?.username;
+
+                    const isClaimedByMe = Boolean(
+                      (item.reviewerId && currentUserId && String(item.reviewerId).toLowerCase() === String(currentUserId).toLowerCase()) ||
+                      (item.reviewerName && currentUserName && item.reviewerName.trim().toLowerCase() === currentUserName.trim().toLowerCase())
+                    );
+
+                    const isClaimedByOther = Boolean(
+                      item.reviewerId && !isClaimedByMe
+                    );
 
                     if (isClaimedByOther && item.status === 'pending') {
                       return (
-                        <div style={{ padding: '8px 12px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#f59e0b', borderRadius: '8px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '16px' }}>🔒</span> Reviewing: {item.reviewerName || 'Another Mod'}
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <div style={{ padding: '8px 12px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#f59e0b', borderRadius: '8px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '16px' }}>🔒</span> Reviewing: {item.reviewerName || 'Another Mod'}
+                          </div>
+                          <button
+                            type="button"
+                            title="Force unlock this submission"
+                            onClick={() => handleForceRelease(item)}
+                            style={{
+                              padding: '8px 12px',
+                              background: 'rgba(239, 68, 68, 0.1)',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              color: '#ef4444',
+                              borderRadius: '8px',
+                              fontSize: '13px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            🔓 Unlock
+                          </button>
                         </div>
                       );
                     }
@@ -2142,8 +2189,28 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                     return (
                       <>
                         {isClaimedByMe && item.status === 'pending' && (
-                          <div style={{ padding: '6px 10px', background: 'rgba(139, 92, 246, 0.1)', color: 'var(--author-primary, #8b5cf6)', borderRadius: '6px', fontSize: '12px', fontWeight: '700', marginRight: '4px' }}>
-                            Your Claim
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ padding: '6px 10px', background: 'rgba(139, 92, 246, 0.1)', color: 'var(--author-primary, #8b5cf6)', borderRadius: '6px', fontSize: '12px', fontWeight: '700' }}>
+                              Your Claim
+                            </div>
+                            <button
+                              type="button"
+                              title="Release your claim"
+                              onClick={() => handleForceRelease(item)}
+                              style={{
+                                padding: '6px 10px',
+                                background: 'rgba(156, 163, 175, 0.1)',
+                                border: '1px solid rgba(156, 163, 175, 0.3)',
+                                color: 'var(--text-secondary, #94a3b8)',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                marginRight: '4px'
+                              }}
+                            >
+                              🔓 Release
+                            </button>
                           </div>
                         )}
                         <ModernButton 
