@@ -124,128 +124,6 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
       setFailedAttempts(0);
       setLockoutTimer(0);
 
-import { useAuth } from '../../context/AuthContext'
-import { setAuth, clearAuth } from '../../utils/Auth'
-import { getGoogleAuthUrl } from '../../config/apiConfig'
-
-function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, loading, setLoading }) {
-  const { login } = useAuth()
-  const [form, setForm] = useState({ username: '', password: '' })
-  const [showPassword, setShowPassword] = useState(false)
-  const [fieldErrors, setFieldErrors] = useState({ username: '', password: '' })
-
-  const [failedAttempts, setFailedAttempts] = useState(() => {
-    try {
-      const stored = localStorage.getItem('comiverse_login_attempts');
-      if (stored) {
-        const data = JSON.parse(stored);
-        return data.count || 0;
-      }
-    } catch (e) {}
-    return 0;
-  });
-
-  const [lockoutTimer, setLockoutTimer] = useState(() => {
-    try {
-      const stored = localStorage.getItem('comiverse_login_attempts');
-      if (stored) {
-        const data = JSON.parse(stored);
-        if (data.lockoutUntil && Date.now() < data.lockoutUntil) {
-          return Math.ceil((data.lockoutUntil - Date.now()) / 1000);
-        }
-      }
-    } catch (e) {}
-    return 0;
-  });
-
-  useEffect(() => {
-    if (lockoutTimer <= 0) return;
-    const interval = setInterval(() => {
-      setLockoutTimer((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          try {
-            localStorage.removeItem('comiverse_login_attempts');
-          } catch (e) {}
-          setFailedAttempts(0);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [lockoutTimer]);
-
-  const updateField = (field, value) => {
-    setForm({ ...form, [field]: value })
-    if (fieldErrors[field]) {
-      setFieldErrors({ ...fieldErrors, [field]: '' })
-    }
-  }
-
-  const handleSignin = async (e) => {
-    e.preventDefault()
-    if (lockoutTimer > 0) {
-      const minutes = Math.floor(lockoutTimer / 60);
-      const seconds = lockoutTimer % 60;
-      const msg = `Too many failed attempts. Please wait ${minutes}m ${seconds}s before trying again to prevent spam.`;
-      toast.error(msg);
-      setFieldErrors({ username: '', password: msg });
-      return;
-    }
-    const nextErrors = {
-      username: form.username.trim() ? '' : 'Email or username is required.',
-      password: form.password ? '' : 'Password is required.'
-    }
-
-    setFieldErrors(nextErrors)
-    if (nextErrors.username || nextErrors.password) {
-      return
-    }
-
-    setLoading(true)
-    try {
-      const response = await loginApi(form.username.trim(), form.password)
-      const data = response.data || response
-
-      // Temporarily store token for getMeApi authentication
-      setAuth(data.token, '', data.refreshToken)
-
-      // Fetch user profile info
-      const meResponse = await getMeApi()
-      const meData = meResponse.data || meResponse
-
-      // Check if account is banned/inactive
-      const userStatus = (meData.status || '').toUpperCase()
-      if (userStatus === 'INACTIVE' || userStatus === 'BANNED' || meData.banned) {
-        clearAuth()
-        setFieldErrors({
-          username: 'Your account has been banned.',
-          password: ''
-        })
-        toast.error('Your account has been banned. Please contact administration for support.')
-        if (typeof showAlert === 'function') {
-          showAlert('error', 'Your account has been banned. Please contact administration for support.')
-        }
-        return
-      }
-
-      const userData = {
-        ...meData,
-        userId: meData.userId,
-        username: meData.username,
-        fullName: meData.fullName,
-        email: meData.email,
-        role: meData.role,
-        avatarUrl: meData.avatarUrl
-      }
-
-      try {
-        localStorage.removeItem('comiverse_login_attempts');
-      } catch (e) {}
-      setFailedAttempts(0);
-      setLockoutTimer(0);
-
       login(data.token, userData, data.refreshToken)
       onLoginSuccess(userData)
       toast.success('Welcome back to ComiVerse!')
@@ -313,6 +191,28 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
           ? loginIdentifier
           : ''
         onVerificationRequired(verificationEmail)
+        if (typeof showAlert === 'function') {
+          showAlert('info', 'Please verify your email before signing in.')
+        } else {
+          toast.info('Please verify your email before signing in.')
+        }
+        return
+      }
+
+      toast.error(errMessage)
+      if (typeof showAlert === 'function') {
+        showAlert('error', errMessage)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+
+  const handleGoogleLogin = () => {
+    window.location.href = getGoogleAuthUrl();
+  }
+
   return (
     <div className="auth-form-card fade-in">
       <div className="border-beam-wrapper" />

@@ -134,7 +134,7 @@ describe('Login Component Unit & Security Tests (Login.test.jsx)', () => {
 
     await waitFor(() => {
       expect(mockOnVerificationRequired).toHaveBeenCalledWith('unverified@example.com');
-      expect(mockShowAlert).toHaveBeenCalledWith('error', 'Please verify your email before logging in.');
+      expect(mockShowAlert).toHaveBeenCalledWith('info', 'Please verify your email before signing in.');
     });
   });
 
@@ -161,7 +161,7 @@ describe('Login Component Unit & Security Tests (Login.test.jsx)', () => {
 
     await waitFor(() => {
       expect(mockOnVerificationRequired).toHaveBeenCalledWith('');
-      expect(mockShowAlert).toHaveBeenCalledWith('error', 'Account action required.');
+      expect(mockShowAlert).toHaveBeenCalledWith('info', 'Please verify your email before signing in.');
     });
   });
 

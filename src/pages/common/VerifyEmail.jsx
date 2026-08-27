@@ -1,34 +1,51 @@
 import { useEffect, useRef, useState } from 'react'
 import { resendVerificationOtpApi, verifyEmailApi } from '../../services/api/AuthApi'
 
-function VerifyEmail({ email, onNavigate, showAlert, loading, setLoading }) {
+function VerifyEmail({ email, autoSendOtp = false, onNavigate, showAlert, loading, setLoading }) {
   const [otp, setOtp] = useState('')
   const [verificationEmail, setVerificationEmail] = useState(email || '')
-  const autoSentRef = useRef(false)
+  const [autoSending, setAutoSending] = useState(false)
+  const autoSentEmailRef = useRef('')
 
   useEffect(() => {
     setVerificationEmail(email || '')
   }, [email])
 
-  // Automatically send an OTP when the page opens with a known email
-  // (e.g. redirected here after trying to sign in with an unverified account).
-  // Guard with a ref so it only fires once even in StrictMode double-invocations.
+  // Signup already sends an OTP. Only a later login attempt should request a
+  // fresh code, otherwise the signup code can be invalidated immediately.
   useEffect(() => {
     const normalized = (email || '').trim().toLowerCase()
     const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)
-    if (!isValid || autoSentRef.current) return
-    autoSentRef.current = true
+    if (!autoSendOtp || !isValid || autoSentEmailRef.current === normalized) return
+    autoSentEmailRef.current = normalized
+    let active = true
+    setAutoSending(true)
     resendVerificationOtpApi(normalized)
-      .then(() => showAlert('success', 'A verification OTP has been sent to your email.'))
-      .catch(() => {/* throttle or already sent – silent, user can tap Resend */})
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+      .then(() => {
+        if (active) showAlert('success', 'A verification OTP has been sent to your email.')
+      })
+      .catch((err) => {
+        if (!active) return
+        if (err.response?.status === 429) {
+          showAlert('info', 'Your most recent OTP is still valid. Please wait before requesting another code.')
+          return
+        }
+        showAlert('error', err.response?.data?.message || 'Could not send a verification OTP. Please use Resend OTP Code.')
+      })
+      .finally(() => {
+        if (active) setAutoSending(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [autoSendOtp, email, showAlert])
 
   const normalizedEmail = verificationEmail.trim().toLowerCase()
   const hasValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)
 
   const handleVerify = async (e) => {
     e.preventDefault()
-    if (loading) return
+    if (loading || autoSending) return
     if (!hasValidEmail) {
       showAlert('error', 'Enter the email address used for this account.')
       return
@@ -52,7 +69,7 @@ function VerifyEmail({ email, onNavigate, showAlert, loading, setLoading }) {
       showAlert('error', 'Enter the email address used for this account.')
       return
     }
-    if (loading) return
+    if (loading || autoSending) return
 
     setLoading(true)
     try {
@@ -120,12 +137,12 @@ function VerifyEmail({ email, onNavigate, showAlert, loading, setLoading }) {
           />
         </div>
 
-        <button type="submit" className="btn-primary auth-margin-top-20" disabled={loading || !hasValidEmail || otp.length !== 6}>
+        <button type="submit" className="btn-primary auth-margin-top-20" disabled={loading || autoSending || !hasValidEmail || otp.length !== 6}>
           <span>{loading ? 'Verifying...' : 'Verify Email'}</span> <span className="btn-arrow-icon">&gt;</span>
         </button>
 
-        <button type="button" className="btn-secondary auth-margin-top-12" onClick={handleResend} disabled={loading}>
-          {loading ? 'Sending OTP...' : 'Resend OTP Code'}
+        <button type="button" className="btn-secondary auth-margin-top-12" onClick={handleResend} disabled={loading || autoSending}>
+          {loading || autoSending ? 'Sending OTP...' : 'Resend OTP Code'}
         </button>
 
         <button type="button" className="link-text-btn auth-margin-top-16" onClick={() => onNavigate('signin')}>
