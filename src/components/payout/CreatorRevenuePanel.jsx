@@ -197,7 +197,6 @@ function CreatorRevenuePanel({ heading = 'Monthly Revenue' }) {
             className="author-secondary-btn" 
             onClick={handleExport} 
             disabled={loading || !overview}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', height: '40px' }}
           >
             <Download size={16} /> Export CSV
           </button>

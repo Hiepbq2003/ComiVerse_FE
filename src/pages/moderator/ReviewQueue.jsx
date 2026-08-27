@@ -16,6 +16,7 @@ import {
 import { useTheme } from '../../context/ThemeContext'
 import { SkeletonLoader } from '../../components/common/SkeletonLoader'
 import { exportToCsv } from '../../utils/exportToCsv'
+import { COMIC_LANGUAGE_OPTIONS } from '../../constants/comicLanguages'
 import { toast } from 'react-toastify'
 import { getAuth } from '../../utils/Auth'
 import { isLanguageInModeratorScope } from '../../utils/moderatorScope'
@@ -280,6 +281,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
   
   const [sortFilter, setSortFilter] = useState('date_desc')
   const [searchQuery, setSearchQuery] = useState('')
+  const [languageFilter, setLanguageFilter] = useState('ALL')
 
   const [selectedReview, setSelectedReview] = useState(null)
   const [simpleEvidenceView, setSimpleEvidenceView] = useState(null)
@@ -914,6 +916,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
 
       return allAppealed
         .filter(item => {
+          if (languageFilter !== 'ALL' && item.language?.toLowerCase() !== languageFilter.toLowerCase()) return false;
           if (!query) return true;
           return ((item.title || '').toLowerCase().includes(query) || (item.submittedBy || '').toLowerCase().includes(query));
         });
@@ -929,6 +932,10 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
         return true;
       })
       .filter(item => {
+        if (languageFilter === 'ALL') return true;
+        return getSubmissionLanguage(item).toLowerCase() === languageFilter.toLowerCase();
+      })
+      .filter(item => {
         if (!query) return true;
         return (
           item.title?.toLowerCase().includes(query) ||
@@ -937,7 +944,7 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           item.chapter?.toLowerCase().includes(query)
         );
       });
-  }, [submissions, comics, activeTab, searchQuery]);
+  }, [submissions, comics, activeTab, searchQuery, languageFilter]);
 
   // 3. Smart Comic Grouping: Consolidate multiple chapter submissions of the same comic into 1 card
   const groupedItems = useMemo(() => {
@@ -1090,7 +1097,25 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
     }
     setSelectedReview(null);
     setSelectedChapter(null);
-  }, [selectedReview])
+  }, [selectedReview]);
+
+  const handleForceRelease = async (item) => {
+    const submissionIds = item.subItems
+      ? item.subItems.map(si => si.id || si.submissionId).filter(Boolean)
+      : [item.id || item.submissionId].filter(Boolean);
+    const firstValidId = submissionIds.find(sid => sid && !String(sid).startsWith('comic-') && !String(sid).startsWith('group-'));
+    if (firstValidId) {
+      try {
+        await releaseSubmissionApi(firstValidId);
+        toast.success('Successfully unlocked submission');
+        if (typeof fetchAllData === 'function') {
+          await fetchAllData();
+        }
+      } catch (err) {
+        toast.error(err?.response?.data?.message || err?.message || 'Failed to unlock submission');
+      }
+    }
+  };
 
   const onApproveClick = (groupOrItem) => {
     const targetId = typeof groupOrItem === 'string' ? groupOrItem : (groupOrItem.id || groupOrItem);
@@ -1881,14 +1906,6 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           <h1>Raw Content Review Queue</h1>
           <p>Review and verify author submission inputs (Title, Language, Min Age, Description, Genres, Cover & Chapters), inspect raw chapter manuscripts, and approve catalog publication.</p>
         </div>
-        <button
-          type="button"
-          className="mod-export-btn"
-          onClick={handleExportReviewQueue}
-          title="Export current review queue items as CSV"
-        >
-          <span>📥 Export Queue ({activeTab.toUpperCase()})</span>
-        </button>
       </div>
 
       {/* Dynamic Statistics Ribbon */}
@@ -1926,8 +1943,9 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
       })()}
 
       {/* Main Status Tabs */}
-      <div className="moderator-tabs">
-        <button 
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid var(--mod-border)', marginBottom: '20px' }}>
+        <div className="moderator-tabs" style={{ borderBottom: 'none', marginBottom: 0 }}>
+          <button 
           className={`moderator-tab-btn ${activeTab === 'pending' ? 'active' : ''}`}
           onClick={() => setActiveTab('pending')}
         >
@@ -1956,10 +1974,20 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
           <span className="moderator-tab-btn-badge appealed" style={{ background: '#f59e0b', color: '#fff' }}>{tabCounts.appealed}</span>
         </button>
       </div>
+      <button
+        type="button"
+        className="mod-export-btn"
+        onClick={handleExportReviewQueue}
+        title="Export current review queue items as CSV"
+        style={{ margin: 0 }}
+      >
+        <span>📥 Export Queue ({activeTab.toUpperCase()})</span>
+      </button>
+    </div>
 
       {/* Filter and Sort bar */}
-      <div className="moderator-filter-bar" style={{ display: 'flex', gap: '12px', alignItems: 'center', width: '100%', flexWrap: 'wrap', marginBottom: '20px' }}>
-        <div className="mod-search-wrapper">
+      <div className="moderator-filter-bar" style={{ display: 'flex', gap: '16px', alignItems: 'center', width: '100%', marginBottom: '24px' }}>
+        <div className="mod-search-wrapper" style={{ flex: 1 }}>
           <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -1970,10 +1998,34 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
             placeholder="Search comics by title, author name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ width: '100%' }}
           />
         </div>
 
-        <CustomSortDropdown value={sortFilter} onChange={setSortFilter} />
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
+          <select 
+            className="mod-search-input" 
+            value={languageFilter} 
+            onChange={(e) => setLanguageFilter(e.target.value)}
+            style={{ 
+              minWidth: '160px', 
+              background: 'rgba(255, 255, 255, 0.03)', 
+              color: 'var(--text-h)', 
+              border: '1px solid var(--border)', 
+              padding: '10px 16px', 
+              borderRadius: '12px',
+              outline: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            <option value="ALL">All Languages</option>
+            {COMIC_LANGUAGE_OPTIONS.map(lang => (
+              <option key={lang} value={lang}>{lang}</option>
+            ))}
+          </select>
+
+          <CustomSortDropdown value={sortFilter} onChange={setSortFilter} />
+        </div>
       </div>
 
       {/* Submissions List Grid */}
@@ -2092,15 +2144,44 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                 <div className="submission-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   {(() => {
                     const currentUser = getAuth()?.user;
-                    // Note: If reviewerId exists and is not the current user, it's claimed by someone else.
-                    // We assume it's valid if it's returned by the backend (backend handles the 30min expiry).
-                    const isClaimedByOther = item.reviewerId && item.reviewerId !== currentUser?.id;
-                    const isClaimedByMe = item.reviewerId && item.reviewerId === currentUser?.id;
+                    const currentUserId = currentUser?.id || currentUser?.userId;
+                    const currentUserName = currentUser?.fullName || currentUser?.username;
+
+                    const isClaimedByMe = Boolean(
+                      (item.reviewerId && currentUserId && String(item.reviewerId).toLowerCase() === String(currentUserId).toLowerCase()) ||
+                      (item.reviewerName && currentUserName && item.reviewerName.trim().toLowerCase() === currentUserName.trim().toLowerCase())
+                    );
+
+                    const isClaimedByOther = Boolean(
+                      item.reviewerId && !isClaimedByMe
+                    );
 
                     if (isClaimedByOther && item.status === 'pending') {
                       return (
-                        <div style={{ padding: '8px 12px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#f59e0b', borderRadius: '8px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '16px' }}>🔒</span> Reviewing: {item.reviewerName || 'Another Mod'}
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <div style={{ padding: '8px 12px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#f59e0b', borderRadius: '8px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '16px' }}>🔒</span> Reviewing: {item.reviewerName || 'Another Mod'}
+                          </div>
+                          <button
+                            type="button"
+                            title="Force unlock this submission"
+                            onClick={() => handleForceRelease(item)}
+                            style={{
+                              padding: '8px 12px',
+                              background: 'rgba(239, 68, 68, 0.1)',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              color: '#ef4444',
+                              borderRadius: '8px',
+                              fontSize: '13px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            🔓 Unlock
+                          </button>
                         </div>
                       );
                     }
@@ -2108,8 +2189,28 @@ function ReviewQueue({ loading = false, submissions = [], comics = [], handleApp
                     return (
                       <>
                         {isClaimedByMe && item.status === 'pending' && (
-                          <div style={{ padding: '6px 10px', background: 'rgba(139, 92, 246, 0.1)', color: 'var(--author-primary, #8b5cf6)', borderRadius: '6px', fontSize: '12px', fontWeight: '700', marginRight: '4px' }}>
-                            Your Claim
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ padding: '6px 10px', background: 'rgba(139, 92, 246, 0.1)', color: 'var(--author-primary, #8b5cf6)', borderRadius: '6px', fontSize: '12px', fontWeight: '700' }}>
+                              Your Claim
+                            </div>
+                            <button
+                              type="button"
+                              title="Release your claim"
+                              onClick={() => handleForceRelease(item)}
+                              style={{
+                                padding: '6px 10px',
+                                background: 'rgba(156, 163, 175, 0.1)',
+                                border: '1px solid rgba(156, 163, 175, 0.3)',
+                                color: 'var(--text-secondary, #94a3b8)',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                marginRight: '4px'
+                              }}
+                            >
+                              🔓 Release
+                            </button>
                           </div>
                         )}
                         <ModernButton 

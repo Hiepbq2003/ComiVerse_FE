@@ -9,7 +9,9 @@ import {
   Download,
   RefreshCw,
   RotateCcw,
-  Users
+  Users,
+  Feather,
+  Languages
 } from 'lucide-react'
 import AdminLayout from '../../components/layout/AdminLayout'
 import {
@@ -245,15 +247,20 @@ function RevenueManagement() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  const [periodStats, setPeriodStats] = useState({ week: null, month: null, year: null })
+
   const loadStatistics = useCallback(async () => {
     setLoading(true)
     setError('')
 
-    const params = { days, zoneId: 'Asia/Ho_Chi_Minh', currency }
+    const params = { zoneId: 'Asia/Ho_Chi_Minh', currency }
 
-    const [statisticsResult, logsResult] = await Promise.allSettled([
-      getAdminPaymentStatisticsApi(params),
-      getAdminPaymentLogsApi({ page: 0, size: 6 })
+    const [statisticsResult, logsResult, weekResult, monthResult, yearResult] = await Promise.allSettled([
+      getAdminPaymentStatisticsApi({ ...params, days }),
+      getAdminPaymentLogsApi({ page: 0, size: 6 }),
+      getAdminPaymentStatisticsApi({ ...params, days: 7 }),
+      getAdminPaymentStatisticsApi({ ...params, days: 30 }),
+      getAdminPaymentStatisticsApi({ ...params, days: 365 })
     ])
 
     if (statisticsResult.status === 'rejected') {
@@ -269,6 +276,13 @@ function RevenueManagement() {
         ? logsResult.value.content
         : []
     )
+    
+    setPeriodStats({
+      week: weekResult.status === 'fulfilled' ? weekResult.value?.summary : null,
+      month: monthResult.status === 'fulfilled' ? monthResult.value?.summary : null,
+      year: yearResult.status === 'fulfilled' ? yearResult.value?.summary : null
+    })
+    
     setLoading(false)
   }, [days, currency])
 
@@ -279,12 +293,12 @@ function RevenueManagement() {
   const summary = statistics?.summary || EMPTY_SUMMARY
   const selectedCurrency = currency
   const dailySeries = Array.isArray(statistics?.dailySeries) ? statistics.dailySeries : []
+
   const statusBreakdown = Array.isArray(statistics?.statusBreakdown) ? statistics.statusBreakdown : []
   const planBreakdown = Array.isArray(statistics?.planBreakdown) ? statistics.planBreakdown : []
 
   const revenueDelta = deltaMeta(summary.revenueChangePercent, 'revenue')
   const paymentsDelta = deltaMeta(summary.paidPaymentsChangePercent, 'paid payments')
-
   const cards = useMemo(() => [
     {
       label: 'Collected revenue',
@@ -292,22 +306,32 @@ function RevenueManagement() {
       detail: revenueDelta.text,
       tone: revenueDelta.tone,
       icon: CircleDollarSign,
-      color: 'purple'
+      color: 'purple',
+      extraStats: [
+        { label: 'Week', value: formatMoney(periodStats.week?.grossRevenue || 0, selectedCurrency) },
+        { label: 'Month', value: formatMoney(periodStats.month?.grossRevenue || 0, selectedCurrency) },
+        { label: 'Year', value: formatMoney(periodStats.year?.grossRevenue || 0, selectedCurrency) },
+      ]
     },
     {
       label: 'Paid payments',
       value: Number(summary.paidPayments || 0).toLocaleString('en-US'),
       detail: paymentsDelta.text,
       tone: paymentsDelta.tone,
-      icon: BadgeCheck,
-      color: 'green'
+      icon: CreditCard,
+      color: 'green',
+      extraStats: [
+        { label: 'Week', value: Number(periodStats.week?.paidPayments || 0).toLocaleString('en-US') },
+        { label: 'Month', value: Number(periodStats.month?.paidPayments || 0).toLocaleString('en-US') },
+        { label: 'Year', value: Number(periodStats.year?.paidPayments || 0).toLocaleString('en-US') },
+      ]
     },
     {
       label: 'Payment success rate',
       value: formatPercent(summary.successRate),
       detail: 'Pending attempts are excluded',
       tone: 'neutral',
-      icon: CreditCard,
+      icon: BadgeCheck,
       color: 'blue'
     },
     {
@@ -317,8 +341,34 @@ function RevenueManagement() {
       tone: 'neutral',
       icon: Users,
       color: 'orange'
+    },
+    {
+      label: 'Author payouts',
+      value: formatMoney(summary.authorPayouts || (summary.grossRevenue * 0.3), selectedCurrency),
+      detail: 'Earnings distributed to authors (30%)',
+      tone: 'neutral',
+      icon: Feather,
+      color: 'blue',
+      extraStats: [
+        { label: 'Week', value: formatMoney((periodStats.week?.grossRevenue || 0) * 0.3, selectedCurrency) },
+        { label: 'Month', value: formatMoney((periodStats.month?.grossRevenue || 0) * 0.3, selectedCurrency) },
+        { label: 'Year', value: formatMoney((periodStats.year?.grossRevenue || 0) * 0.3, selectedCurrency) },
+      ]
+    },
+    {
+      label: 'Translator payouts',
+      value: formatMoney(summary.translatorPayouts || (summary.grossRevenue * 0.1), selectedCurrency),
+      detail: 'Earnings distributed to translators (10%)',
+      tone: 'neutral',
+      icon: Languages,
+      color: 'purple',
+      extraStats: [
+        { label: 'Week', value: formatMoney((periodStats.week?.grossRevenue || 0) * 0.1, selectedCurrency) },
+        { label: 'Month', value: formatMoney((periodStats.month?.grossRevenue || 0) * 0.1, selectedCurrency) },
+        { label: 'Year', value: formatMoney((periodStats.year?.grossRevenue || 0) * 0.1, selectedCurrency) },
+      ]
     }
-  ], [paymentsDelta, revenueDelta, selectedCurrency, summary])
+  ], [summary, selectedCurrency, revenueDelta, paymentsDelta, periodStats])
 
   const handleExport = () => {
     const period = statistics?.period
@@ -420,6 +470,17 @@ function RevenueManagement() {
                     </div>
                     <strong>{card.value}</strong>
                     <small className={`payment-kpi-delta payment-kpi-delta--${card.tone}`}>{card.detail}</small>
+                    
+                    {card.extraStats && (
+                      <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                        {card.extraStats.map((stat, i) => (
+                          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span style={{ color: 'var(--text)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</span>
+                            <span style={{ fontWeight: 600, color: 'var(--text-h)' }}>{stat.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </article>
                 )
               })}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AuthLayout from '../../components/layout/AuthLayout'
 import Login from './Login'
@@ -23,6 +23,7 @@ function AuthPage() {
   const [loading, setLoading] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [verificationEmail, setVerificationEmail] = useState('')
+  const [autoSendVerificationOtp, setAutoSendVerificationOtp] = useState(false)
   const [user, setUser] = useState(null)
   const [activeModal, setActiveModal] = useState('none') // 'none' | 'terms' | 'privacy'
 
@@ -99,12 +100,12 @@ function AuthPage() {
     }
   }, [navigate, window.location.search, isLoggedIn, authUser]);
 
-  const showAlert = (type, message) => {
+  const showAlert = useCallback((type, message) => {
     setAlert({ type, message })
     setTimeout(() => {
       setAlert({ type: '', message: '' })
     }, 4000)
-  }
+  }, [])
 
   const handleLogout = () => {
     logout();
@@ -154,6 +155,7 @@ function AuthPage() {
           onNavigate={setView} 
           onVerificationRequired={(email) => {
             setVerificationEmail(email);
+            setAutoSendVerificationOtp(true);
             setView('verify-email');
           }}
           onLoginSuccess={(userData) => {
@@ -170,6 +172,7 @@ function AuthPage() {
           onNavigate={setView} 
           onVerificationRequired={(email) => {
             setVerificationEmail(email);
+            setAutoSendVerificationOtp(false);
             setView('verify-email');
           }}
           showAlert={showAlert} 
@@ -182,6 +185,7 @@ function AuthPage() {
       {view === 'verify-email' && (
         <VerifyEmail
           email={verificationEmail}
+          autoSendOtp={autoSendVerificationOtp}
           onNavigate={setView}
           showAlert={showAlert}
           loading={loading}

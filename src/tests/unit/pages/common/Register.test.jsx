@@ -70,11 +70,11 @@ describe('User Registration Component Unit & Security Tests (Register.jsx)', () 
     const formElement = screen.getByRole('button', { name: /create account/i }).closest('form');
     fireEvent.submit(formElement);
 
-    expect(mockShowAlert).toHaveBeenCalledWith('error', 'Passwords do not match!');
+    expect(mockShowAlert).toHaveBeenCalledWith('error', 'Passwords do not match');
     expect(AuthApi.registerApi).not.toHaveBeenCalled();
   });
 
-  it('should validate username constraints (must be lowercase 3-20 chars)', async () => {
+  it('should validate username constraints (3-20 supported characters)', async () => {
     renderRegister();
 
     const termsCheckbox = document.querySelector('.terms-checkbox-container input');
@@ -92,7 +92,7 @@ describe('User Registration Component Unit & Security Tests (Register.jsx)', () 
 
     expect(mockShowAlert).toHaveBeenCalledWith(
       'error',
-      'Username must be 3-20 characters, lowercase, numbers, and underscores only.'
+      'Username must be 3-20 characters and contain only letters, numbers, dots, or underscores.'
     );
     expect(AuthApi.registerApi).not.toHaveBeenCalled();
   });
@@ -103,6 +103,8 @@ describe('User Registration Component Unit & Security Tests (Register.jsx)', () 
     const termsCheckbox = document.querySelector('.terms-checkbox-container input');
     fireEvent.click(termsCheckbox);
 
+    fireEvent.change(screen.getByPlaceholderText(/enter first name/i), { target: { value: 'Young' } });
+    fireEvent.change(screen.getByPlaceholderText(/enter last name/i), { target: { value: 'Reader' } });
     fireEvent.change(screen.getByPlaceholderText(/choose a username/i), { target: { value: 'young_user' } });
     fireEvent.change(screen.getByPlaceholderText(/enter email address/i), { target: { value: 'kid@example.com' } });
 
@@ -198,7 +200,7 @@ describe('User Registration Component Unit & Security Tests (Register.jsx)', () 
 
     expect(mockShowAlert).toHaveBeenCalledWith(
       'error',
-      'Username must be 3-20 characters, lowercase, numbers, and underscores only.'
+      'Username must be 3-20 characters and contain only letters, numbers, dots, or underscores.'
     );
     expect(AuthApi.registerApi).not.toHaveBeenCalled();
   });

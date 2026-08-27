@@ -28,6 +28,12 @@ export default function ModeratorReports() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+  const [globalStats, setGlobalStats] = useState({
+    PENDING: 0,
+    IN_PROGRESS: 0,
+    ACCEPTED: 0,
+    REJECTED: 0
+  });
 
   // Filters
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -37,7 +43,7 @@ export default function ModeratorReports() {
   const [endDate, setEndDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
-  const limit = 10;
+  const limit = 7; // Temporarily changed from 10 to 7 for testing
 
   // Content Inspection Modal
   const [inspectingReport, setInspectingReport] = useState(null);
@@ -85,21 +91,43 @@ export default function ModeratorReports() {
     fetchReports();
   }, [fetchReports]);
 
-  // Handle process report
+  const fetchGlobalStats = useCallback(async () => {
+    try {
+      const [pendingRes, progressRes, acceptedRes, rejectedRes] = await Promise.all([
+        getAdminReportsApi({ status: 'PENDING', limit: 1 }),
+        getAdminReportsApi({ status: 'IN_PROGRESS', limit: 1 }),
+        getAdminReportsApi({ status: 'ACCEPTED', limit: 1 }),
+        getAdminReportsApi({ status: 'REJECTED', limit: 1 })
+      ]);
+      setGlobalStats({
+        PENDING: pendingRes.total || 0,
+        IN_PROGRESS: progressRes.total || 0,
+        ACCEPTED: acceptedRes.total || 0,
+        REJECTED: rejectedRes.total || 0
+      });
+    } catch (err) {
+      console.error('Failed to fetch global report stats', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchGlobalStats();
+  }, [fetchGlobalStats]);
+
   const handleProcessReport = async (reportId, { action, resolution_note }) => {
     const result = await processReportApi(reportId, {
       action,
       resolution_note
     });
     await fetchReports();
+    await fetchGlobalStats();
     return result;
   };
 
-  const pendingCount = reports.filter(r => r.status === 'PENDING').length;
-  const progressCount = reports.filter(r => r.status === 'IN_PROGRESS').length;
-  const acceptedCount = reports.filter(r => r.status === 'ACCEPTED').length;
-  const rejectedCount = reports.filter(r => r.status === 'REJECTED').length;
-
+  const pendingCount = globalStats.PENDING;
+  const progressCount = globalStats.IN_PROGRESS;
+  const acceptedCount = globalStats.ACCEPTED;
+  const rejectedCount = globalStats.REJECTED;
   const handleExportReports = () => {
     try {
       const headers = [
@@ -449,7 +477,7 @@ export default function ModeratorReports() {
             <span style={{ fontSize: '13px', color: 'var(--rep-text-secondary)' }}>
               Showing {reports.length} of {totalCount} reports
             </span>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <button
                 className="rep-btn rep-btn-ghost"
                 disabled={page <= 1}
@@ -457,6 +485,34 @@ export default function ModeratorReports() {
               >
                 <ChevronLeft size={16} /> Previous
               </button>
+              
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {[...Array(Math.ceil(totalCount / limit))].map((_, i) => {
+                  const pNum = i + 1;
+                  // Basic ellipsis logic: show first, last, current, and adjacent
+                  const totalPages = Math.ceil(totalCount / limit);
+                  if (totalPages > 7) {
+                    if (pNum !== 1 && pNum !== totalPages && Math.abs(page - pNum) > 1) {
+                      if (pNum === 2 || pNum === totalPages - 1) {
+                        return <span key={pNum} style={{ padding: '4px 8px', color: 'var(--rep-text-muted)' }}>...</span>;
+                      }
+                      return null;
+                    }
+                  }
+                  
+                  return (
+                    <button
+                      key={pNum}
+                      className={`rep-btn ${page === pNum ? 'rep-btn-primary' : 'rep-btn-ghost'}`}
+                      style={{ padding: '6px 12px', minWidth: '32px' }}
+                      onClick={() => setPage(pNum)}
+                    >
+                      {pNum}
+                    </button>
+                  );
+                })}
+              </div>
+
               <button
                 className="rep-btn rep-btn-ghost"
                 disabled={page * limit >= totalCount}

@@ -1,0 +1,2647 @@
+
+
+Software Testing Documentation
+
+ComiVerse - A Digital Comic Platform with Integrated Translation and Content Distribution Tools
+
+CVP  - Report 5
+
+
+
+Project Name
+
+ComiVerse
+
+Architecture Style
+
+Plugin-Driven Layered Monolith 
+
+Date Created
+
+25/5/2026
+
+Last Updated
+
+25/5/2026
+
+Authors
+
+Bùi Quang Hiệp - HE171337
+
+Bùi Việt Hùng - HE163146
+
+Chu Tuấn Ngọc - HE186006
+
+Nguyễn Xuân Hanh - HE180944
+
+Đặng Ngọc Thành - HE186611
+
+Reviewer
+
+Lê Thị Tú Kiên - Instructor
+
+Status
+
+Approved
+
+
+
+
+Change Log
+
+
+
+Version
+
+Date
+
+Author
+
+Summary
+
+1.0
+
+14/07/2026 
+
+HiepBQ
+
+Updated the testing scope, including functional requirements FT-01–FT-18, non-functional requirements NFR-01–NFR-24, out-of-scope items, testing constraints, and assumptions.
+
+1.0
+
+16/07/2026 
+
+HiepBQ
+
+Completed the Test Strategy section, including Functional Testing, UI Testing, Input Validation Testing, Background Job Testing, Performance Testing, and Security Testing.
+
+1.0
+
+17/07/2026 
+
+NgocCT
+
+Defined the four test levels: Unit Testing, Integration Testing, System Testing, and User Acceptance Testing; added the Test Type × Level Matrix and acceptance criteria for each level.
+
+1.0
+
+18/07/2026 
+
+ThanhDN
+
+Added supporting testing tools, test environments, minimum test accounts, minimum domain data, test milestones, and test case workbook definitions.
+
+1.0
+
+03/08/2026
+
+HiepBQ
+
+Edit part 2 and part 3 
+
+1.0
+
+08/08/2026
+
+HiepBQ
+
+Edit part 4 and part 5
+
+
+
+
+Table of Contents
+
+ TOC \h \u \z \t &quot;Heading 1,1,Heading 2,2,Heading 3,3,&quot;Change Log1
+
+Table of Contents3
+
+1. Scope of Testing4
+
+1.1 In Scope - Functional Requirements4
+
+1.2 In Scope - Non-Functional Requirements6
+
+1.3 Out of Scope9
+
+1.4 Constraints10
+
+1.5 Assumptions11
+
+2. Test Strategy12
+
+2.1 Testing Types12
+
+a. Functional Testing12
+
+b. UI Testing12
+
+c. Input Validation Testing13
+
+d. Background Job Testing14
+
+e. Performance Testing15
+
+f. Security Testing17
+
+2.2 Test Levels19
+
+a. Test Type × Level Matrix19
+
+b. Level 1 - Unit Test19
+
+c. Level 2 - Integration Test20
+
+d. Level 3 - System Test21
+
+e. Level 4 - UAT22
+
+2.3 Supporting Tools23
+
+3. Test Plan23
+
+3.1 Test Environment23
+
+3.2 Test Data24
+
+a. Minimum Test Accounts24
+
+b. Minimum Domain Data24
+
+3.3 Test Milestones25
+
+4. Test Cases25
+
+4.1 Test Case Workbooks25
+
+4.2 Requirements Coverage Matrix26
+
+5. Test Reports27
+
+5.1 Summary Table27
+
+5.2 Defect Register28
+
+a. Test Levels’s Defects28
+
+b. Work Product’s Defects28
+
+
+
+
+1. Scope of Testing
+
+
+1.1 In Scope - Functional Requirements
+
+
+
+Code
+
+Feature Name
+
+Description
+
+Priority
+
+FT-01
+
+User Authentication &amp; Access
+
+Authenticate user credentials, handle OAuth logins, terminate sessions, process account registrations, and enforce MFA.
+
+Must
+
+FT-02
+
+Account Settings &amp; Assets
+
+Update user profile metadata, manage avatars, change secure passwords, and configure notification preferences.
+
+Must
+
+FT-03
+
+Comic Submission Pipeline
+
+Enable authors to construct comic profiles, upload cover art, and submit raw chapter assets into the production pipeline.
+
+Must
+
+FT-04
+
+Content Moderation Gate
+
+Empower moderators to review the chapter publish queue, approve content for public rendering, or reject submissions with feedback.
+
+Must
+
+FT-05
+
+Translator Onboarding
+
+Manage translator applications, assign roles, and administer project teams within the workspace.
+
+Must
+
+FT-06
+
+Translation &amp; Localization Portal
+
+Initialize translation projects and facilitate real-time internal communication among project team members.
+
+Must
+
+FT-07
+
+Chapter Production Tracker
+
+Manage chapter production workflows using a Kanban board system overseen by Project Leaders.
+
+Should
+
+FT-08
+
+Creator Cloud Studio
+
+Provide a cloud-based canvas for translators and Project Leaders to edit raw images, map text layers, and manage glossaries.
+
+Should
+
+FT-09
+
+Search &amp; Recommendation Engine
+
+Search comics by keywords, filter by taxonomy (genres/tags), and view comic metadata, synopses, and chapter lists.
+
+Must
+
+FT-10
+
+Comic Reader &amp; Version Switcher
+
+Render image assets sequentially, allow users to switch between vertical/horizontal reading modes, and select translation forks.
+
+Must
+
+FT-11
+
+Cross-Platform Progress Sync
+
+Track real-time reading coordinates, manage bookmarks, follow series, and compile personalized dashboards based on user history.
+
+Must
+
+FT-12
+
+User Engagement &amp; Ranking System
+
+Collect reader star ratings, calculate aggregate scores, and manage user comments on specific chapters.
+
+Must
+
+FT-13
+
+Community Forums &amp; Messaging
+
+Facilitate public discussions through forum threads and operate the global real-time chat infrastructure.
+
+Must
+
+FT-14
+
+Notification &amp; User Center
+
+Broadcast global announcements, maintenance banners, and automated system alerts to target user bases.
+
+Must
+
+FT-15
+
+Policy &amp; Content Audit
+
+Process user report tickets, hide toxic comments, and lock violating forum content to enforce safety guidelines.
+
+Must
+
+FT-16
+
+Monetization &amp; Token Management
+
+Process direct payments for premium chapter unlocks, track transaction histories, and execute payout requests.
+
+Must
+
+FT-17
+
+Analytics &amp; Dashboards
+
+Generate graphical reports for reader engagement, chapter performance, revenue statistics, and export data locally.
+
+Must
+
+FT-18
+
+Global Admin Control Panel
+
+Manage taxonomy (genres/tags), user accounts, subscription pricing schemas, and system-wide comic visibility.
+
+Must
+
+
+
+
+
+
+1.2 In Scope - Non-Functional Requirements
+
+
+
+
+
+Code
+
+Category
+
+NFR Description
+
+Target
+
+NFR-01
+
+Performance
+
+Comic chapter pages load efficiently.
+
+When a user clicks to open a chapter, the page must load within &lt; 3 seconds.
+
+NFR-02
+
+Scalability
+
+The system supports large chapter volumes.
+
+Searching or fetching data with 1,000+ chapters stored in the DB must cause no system lag.
+
+NFR-03
+
+Security
+
+Premium content protection.
+
+Unauthorized access attempts via direct URL must be 100% blocked (Redirect or 403 error).
+
+NFR-04
+
+Usability
+
+Intuitive navigation.
+
+A first-time user must be able to find a target chapter within 3 clicks.
+
+NFR-05
+
+Reliability
+
+Offline draft protection.
+
+If connection is lost, translation progress is cached locally and synced upon reconnection without data loss.
+
+NFR-06
+
+Availability
+
+System stability.
+
+Comic services must remain active during regular browsing without any system crashes.
+
+NFR-07
+
+Maintainability
+
+Modular codebase.
+
+Adding new features or fixing bugs must not break or affect unrelated modules.
+
+NFR-08
+
+Compatibility
+
+Cross-browser support.
+
+The comic reader functions correctly with no broken layouts across Chrome, Edge, and Safari .
+
+NFR-09
+
+Performance
+
+Fast search execution.
+
+Search results for comics via keyword query must return in &lt; 2 seconds.
+
+NFR-10
+
+Security
+
+Moderator approval workflow.
+
+Translators attempting to bypass publishing workflows must be 100% blocked .
+
+NFR-11
+
+Scalability
+
+API Concurrency.
+
+The system handles multiple rapid API calls simultaneously with no data corruption or duplicate rows.
+
+NFR-12
+
+Usability
+
+Reader customizations.
+
+User adjustments to dark mode and font sizes must be applied instantly in the browser.
+
+NFR-13
+
+Performance
+
+Image asset optimization.
+
+Comic page images must be correctly compressed and optimized for fast loading.
+
+NFR-14
+
+Reliability
+
+Database recovery.
+
+A manual database backup triggered by an admin must result in a successful export of a .sql file.
+
+NFR-15
+
+Security
+
+Password encryption at rest.
+
+User passwords must be stored as secure hashes (e.g., BCrypt/Argon2), never in plain text.
+
+NFR-16
+
+Usability
+
+Multi-language support (i18n).
+
+When a user switches language preferences, the UI text must update instantly.
+
+NFR-17
+
+Maintainability
+
+Unit Test coverage.
+
+Core logic and key business functions must pass test suites successfully when run locally.
+
+NFR-18
+
+Performance
+
+Static asset delivery.
+
+Initial page render and static assets (images, CSS) must load in &lt; 1.5 seconds.
+
+NFR-19
+
+Performance
+
+Progress sync debouncing.
+
+Continuous user scrolling must be debounced on the client side to prevent flooding the database.
+
+NFR-20
+
+Security
+
+Token validation.
+
+API requests made with expired or cleared tokens must return a strict 401 Unauthorized response.
+
+NFR-21
+
+Reliability
+
+Atomic financial transactions.
+
+A failed DB step during purchase triggers a complete rollback, ensuring no partial deduction.
+
+NFR-22
+
+Usability
+
+Global theme toggling.
+
+Dashboard layouts toggle theme contexts (e.g., dark/light) smoothly globally without requiring a page reload.
+
+NFR-23
+
+Security
+
+Strict File Upload Constraints.
+
+Any author attempting to upload a chapter file &gt;50MB must be rejected instantly by the system.
+
+NFR-24
+
+Security
+
+API Rate Limiting.
+
+A user posting 5 comments within 5 seconds must be blocked to prevent spam.
+
+
+
+
+
+
+1.3 Out of Scope
+
+
+
+
+
+
+
+Item
+
+
+
+Reason
+
+
+
+Performance and load testing for the built-in translation tool 
+
+
+
+The built-in translation tool is primarily used by internal translation teams, including Translators, Translator Leaders, Proofreaders, and Quality Checkers. The expected number of concurrent users for this feature is relatively low. Therefore, large-scale load scenarios, such as more than 1,000 translators using the tool simultaneously, are not considered representative of normal system usage and will not be tested in this cycle. Functional testing of translation creation, editing, submission, review, and approval workflows remains in scope.
+
+
+
+In-depth security penetration testing for the multi-role authorization system 
+
+
+
+ComiVerse contains a complex authorization structure involving Guest, Reader, Translator, Project Leader, Author, Moderator, and Admin roles. This testing cycle focuses on functional authorization testing, including verifying that users can access only the pages, APIs, and actions permitted for their assigned roles. Advanced penetration testing, such as JWT manipulation, authentication bypass, SQL injection, cross-site scripting, privilege escalation, and session hijacking, is deferred to a dedicated security assessment.
+
+
+
+Content and copyright compliance audit 
+
+
+
+The testing team will not verify the legal ownership, copyright status, licensing rights, or appropriateness of comics and translation content uploaded by Authors or Translators. These matters belong to the platform's operational moderation and legal compliance processes. Testing is limited to verifying that content can be submitted, reviewed, approved, rejected, hidden, or removed by authorized Moderators and Admins.
+
+
+
+Third-party service infrastructure testing
+
+
+
+The internal infrastructure, availability, performance, and security of external services such as Cloudinary, Resend, payment gateways, OAuth providers, and Firebase services are outside the control of the ComiVerse development team. Testing will cover only the integration points, request handling, response processing, error handling, timeout handling, and fallback behavior implemented within ComiVerse.
+
+
+
+Production payment settlement and real-money transactions
+
+
+
+Real bank transfers, real payment settlements, chargebacks, tax processing, and actual revenue payouts will not be performed during this testing cycle. Payment-related features will be tested using sandbox environments, mock callbacks, or test transaction data to avoid financial risk and unintended charges.
+
+
+
+Testing on unsupported devices, browsers, and operating systems
+
+
+
+The system will be tested only on the browsers, screen sizes, Android versions, and devices defined in the test environment. Compatibility with outdated browsers, rooted or jailbroken devices, unsupported operating-system versions, smart televisions, gaming consoles, and other unspecified platforms is excluded from this cycle.
+
+
+
+Disaster recovery and full infrastructure failover testing
+
+
+
+Large-scale infrastructure failure scenarios, such as complete database loss, regional cloud outages, long-term network disruption, and full production disaster recovery, require a dedicated production-like environment and operational recovery plan. This cycle will verify application-level error handling and backup-related configurations where possible, but it will not execute a complete disaster recovery exercise.
+
+
+
+User acceptance testing by the general public
+
+
+
+Public beta testing and large-scale user acceptance testing involving real Authors, Translators, Readers, or commercial partners are not included in this cycle. Acceptance testing will be conducted only by the project team, supervisors, and designated evaluators using predefined business scenarios and test accounts.
+
+
+1.4 Constraints
+
+
+
+
+
+Category
+
+
+
+Constraint
+
+
+
+Database
+
+
+
+L1 and L2 automated tests run against an H2 in-memory database with spring.jpa.hibernate.ddl-auto=create-drop. Since no database migration tools are used, any SQL dialect mismatches or custom raw SQL queries designed for the local PostgreSQL/MySQL database must be verified manually. 
+
+
+
+Data Safety &amp; Privacy 
+
+
+
+No production or real-user data can be used in any testing environment. All testing datasets must be mocked or clean-seeded locally using custom seeders or static data.sql files. 
+
+
+
+Recommendation Engine 
+
+
+
+The recommendation algorithm relies on static pre-calculated vector data stored in the database during testing. Because there is no live user traffic or streaming event pipeline in the test environment, real-time dynamic recommendation updates based on live session behavior cannot be automated in test suites. 
+
+
+1.5 Assumptions
+
+
+
+
+
+#
+
+Assumption
+
+1
+
+The Development environment is stable, and test seed data can be wiped or reset at any time without affecting system integrity.
+
+2
+
+Bcrypt with a fixed standard salt is used for test passwords. Any modification to the authentication hashing logic will invalidate existing seed data and cause test failures.
+
+3
+
+Testing personnel have access to accounts with all required roles (Admin, Moderator, Translator, Project Leader, Author, Reader, Guest) to verify functional boundary access across the Moderation Gate and Workspace.
+
+4
+
+All copyright violation scenarios are simulated using dummy comic assets, ensuring no actual protected intellectual property is involved during testing.
+
+5
+
+All developers strictly adhere to the naming convention test {FT-ID}_{ScenarioName}_{ExpectedResult} for all automated test modules to ensure full traceability.
+
+6
+
+Third-party payment gateways are pre-configured in Sandbox/Test Mode, enabling valid token simulation for premiums and payouts without real monetary transactions.
+
+7
+
+Cloud storage buckets are available in a staging environment, or local filesystem mock paths are write-accessible to handle high-resolution image uploads.
+
+8
+
+Mail services are routed to a test mail trap (e.g., Mailtrap, MailHog) to verify system notifications without triggering production email dispatch.
+
+9
+
+Application server and database timezones are synchronized to prevent flaky test failures on time-sensitive business logic .
+
+
+2. Test Strategy
+
+
+2.1 Testing Types
+
+
+a. Functional Testing
+
+
+
+
+
+Field
+
+
+
+Content
+
+
+
+Objective
+
+
+
+Verify that every system feature, business rule, validation rule, and access control rule behaves according to the PRD, SRS, and UCS specifications. Functional Testing covers authentication, account management, comic discovery, comic reading, library management, author publishing, translation projects, translation team management, moderation, forum and chat, notifications, premium plans, wallet and payout functions, and administrative management.
+
+
+
+Technique
+
+
+
+State Transition Testing for account status, comic moderation status, chapter publishing status, translation project status, translation task status, payout status, and premium access state · Equivalence Partitioning for login, registration, profile update, comic search, comic submission, translation request, chapter upload, forum post, and administrative forms · Boundary Value Analysis for numeric and length constraints such as file size, image count, character limits, OTP length, pagination size, premium price, payout amount, and upload limits · Branch Coverage for compound conditions such as role-based access, comic ownership, premium chapter access, translation team permissions, moderation decisions, publication rules, and Project Leader authorization.
+
+
+
+Completion Criteria
+
+
+
+All P1 or Must-priority test cases pass. No open Critical or Major defects remain. 100% of FT-IDs defined in the SRS have at least one corresponding test case at L1 or L2. Branch coverage reaches the target defined in §2.2. All access control rules for Guest, Reader, Author, Translator, Project Leader, Moderator, and Admin are verified.
+
+
+
+
+
+
+b. UI Testing
+
+
+
+
+
+Field
+
+
+
+Content
+
+
+
+Objective
+
+
+
+Verify that each screen identified by an SCR-ID renders the correct content, controls, data, visible states, validation messages, and navigation options according to the FDS and UCS. UI Testing also verifies that role-specific elements are shown or hidden correctly and that user interactions produce the expected rendered result, redirect, notification, or error message.
+
+
+
+Technique
+
+
+
+React page and component testing using React Testing Library where applicable · SPA end-to-end testing using Playwright, Cypress, or an equivalent tool · API-driven UI checks for rendered data, loading states, empty states, error states, validation messages, route changes, and redirects · Display-condition checks for each supported role and system state based on FDS §3 · Navigation outcome checks against the FDS Navigation Map · Browser-based manual testing for visual layout, responsive behavior, and usability.
+
+
+
+Completion Criteria
+
+
+
+Every main SCR-ID defined in FDS §3 has at least one L2 test or equivalent frontend page test verifying the correct render result, role-based display conditions, and navigation or redirect outcome. Critical multi-screen workflows are verified at L3 System or E2E level and spot-checked at L4 UAT. No open Critical or Major UI defects remain.
+
+
+
+
+
+
+c. Input Validation Testing
+
+
+
+
+
+Field
+
+
+
+Content
+
+
+
+Objective
+
+
+
+Verify that invalid, incomplete, malformed, duplicated, unauthorized, or unsafe input is rejected at both the React form layer and the Spring Boot API layer. Client-side validation must provide immediate feedback, while server-side validation must remain effective when the frontend is bypassed. 
+
+
+
+Technique
+
+
+
+Apply Equivalence Partitioning and Boundary Value Analysis to required fields, text lengths, date values, password rules, numeric ranges, enum values, file sizes, archive formats, duplicate records, and resource identifiers. At L1, test Jakarta Bean Validation annotations and custom Service validation directly without sending HTTP requests. At L2, submit the same invalid value through the React form and directly through MockMvc or Postman to confirm that backend validation cannot be bypassed. Compare frontend and backend behavior to identify inconsistent rules. 
+
+
+
+Completion Criteria
+
+
+
+Every Must-priority field has at least one valid test, one invalid test, and boundary tests where applicable. The frontend and backend must enforce the same rule for the same field. Invalid input must not modify PostgreSQL, Redis, Cloudinary, or local authentication state. All identified frontend/backend validation inconsistencies must be resolved or formally documented before Input Validation Testing is signed off. 
+
+
+
+The validation scope includes:
+
+Password Policy: Minimum 8 characters, requiring at least one uppercase letter, one lowercase letter, one numeric digit, and one special character (e.g., @, #, $, %, ^, &amp;, +).
+
+Text Length Constraints:
+
+Comic Title: max 100 characters.
+
+Comic Description : max 2000 characters.
+
+Chapter Title: max 100 characters.
+
+Comment: max 500 characters.
+
+Forum Post: max 2000 characters.
+
+Chat Message: max 255 characters.
+
+Translation Content: max 5000 characters per text chunk.
+
+Age &amp; Date of Birth Validation: The registration process requires the Date of Birth (DOB) field. The backend validates that the user is at least 13 years old to comply with digital content regulations.
+
+File &amp; Media Limits: The final avatar image size limit is set to 5 MB. Chapter archive uploads are strictly limited to 100 MB per file.
+
+Pagination Constraints: The default page size across API endpoints is 20 items per page, with a hard maximum limit of 50 items per page to prevent database strain.
+
+Translation Request Rules: A translator application or project request must include the target language, a valid portfolio/test URL, and an estimated completion date .
+
+
+d. Background Job Testing
+
+
+
+
+
+Field
+
+
+
+Content
+
+
+
+Objective
+
+
+
+Verify that scheduled and asynchronous background processes execute their business logic correctly. Confirm that they process only eligible records, handle empty datasets and individual-record failures safely, avoid duplicate updates, and leave PostgreSQL, Redis, Cloudinary, and upload-task state in the expected condition. 
+
+
+
+Technique
+
+
+
+Call scheduler or background Service methods directly instead of waiting for the actual cron or fixed-rate trigger. Use Spring Boot Test with a PostgreSQL test database and control Redis data. Prepare data using [To be provided: @Sql, data.sql, test fixture builders, or another seed mechanism]. Mock external services such as Cloudinary and the embedding provider where deterministic behavior is required. For asynchronous upload flows, invoke the upload service and verify task-state transitions from QUEUED to PROCESSING, followed by COMPLETED or FAILED. Manually set timestamps where time-based processing must be simulated.
+
+
+
+Completion Criteria
+
+
+
+All Scheduler test cases pass as part of L2 on a dedicated Scheduler sheet or test package. Every processing step and failure scenario in the Background Job Inventory has at least one test case. Repeated job execution must not apply Redis counters twice, duplicate database records, create duplicate chapters, or corrupt leaderboard and recommendation data. Asynchronous upload polling must stop when the task reaches a final state or the configured timeout. 
+
+The following background processes were identified in the project:
+
+Synchronize comic and chapter view counters from Redis to PostgreSQL.
+
+Synchronize queued reading-history records.
+
+Remove reading-history records older than the retention period.
+
+Synchronize comic like and save counters.
+
+Calculate and cache daily, weekly, and monthly comic leaderboards.
+
+Generate missing comic embedding vectors.
+
+Generate user-preference vectors.
+
+Process full comic ZIP uploads asynchronously.
+
+Process single chapter CBZ uploads asynchronously.
+
+Poll upload-task status from the frontend every 2.5 seconds.
+
+Minimum test scenarios include:
+
+Valid records are processed successfully.
+
+Ineligible or zero-value records are ignored.
+
+Empty datasets complete without errors.
+
+One failed record does not stop the entire batch.
+
+Existing daily counters are incremented rather than duplicated.
+
+Redis offsets are not applied twice.
+
+Invalid uploads produce a FAILED task with an error message.
+
+Valid uploads follow QUEUED → PROCESSING → COMPLETED.
+
+Multiple uploads are processed independently.
+
+An Author cannot access another Author’s upload task.
+
+A stuck upload task does not cause unlimited frontend polling.
+
+The following information still requires confirmation:
+
+@EnableScheduling: Configured centrally in SchedulerConfig.
+
+Upload polling duration: Polling every 2.5s, with a maximum timeout of 120s.
+
+L2 Redis Testing: Utilizes Testcontainers Redis for automated test isolation.
+
+
+e. Performance Testing
+
+
+
+
+
+Field
+
+
+
+Content
+
+
+
+Objective
+
+
+
+Verify that the application meets the response-time, rendering, data-volume, concurrency, and background-processing targets defined in the Non-Functional Requirements. 
+
+
+
+Technique
+
+
+
+Use Chrome DevTools Network and Performance panels to measure page rendering and image loading. Use Chrome Lighthouse to inspect static assets and image optimization. Use Postman and Postman Collection Runner to measure API response times and simulate rapid requests. Use pgAdmin or PostgreSQL EXPLAIN ANALYZE to inspect query performance and index usage. Inspect Redis to compare cold-cache and warm-cache behavior. Record upload-processing time from task creation until COMPLETED. Formal k6 or JMeter load testing is [Decision required: included in this release or deferred to a later version].
+
+
+
+Completion Criteria
+
+
+
+All measurable performance NFR targets pass in the agreed test environment. Test evidence records the dataset size, response time, cache state, number of concurrent requests, hardware configuration, network condition, and pass/fail result. No performance test may cause duplicate database rows, lost Redis increments, incorrect counters, corrupted chapter ordering, browser freezing, or infinite upload polling. 
+
+
+
+The current performance targets are:
+
+NFR
+
+Performance Target
+
+NFR-01
+
+A published chapter page loads within &lt; 3 seconds.
+
+NFR-02
+
+Search and fetch operations remain stable with at least 1,000 chapters stored. Target p95 response time is &lt; 2 seconds.
+
+NFR-09
+
+Comic keyword search returns results within &lt; 2 seconds.
+
+NFR-11
+
+Multiple rapid API calls cause no duplicate rows or data corruption.
+
+NFR-13
+
+Comic images are compressed and served in an optimized format (avg 500KB, max 2MB per page).
+
+NFR-18
+
+Initial page render and static assets load within &lt; 1.5 seconds.
+
+NFR-19
+
+Continuous reader scrolling does not flood the backend with progress-sync requests .
+
+NFR-23
+
+A chapter upload over 100 MB is rejected before archive processing.
+
+Async upload
+
+The initial upload request returns 202 Accepted without waiting for full Cloudinary processing. Maximum processing time for a 50MB chapter is 60 seconds.
+
+Scheduler processing
+
+Each scheduled process completes before its next scheduled execution.
+
+Current frontend performance behavior includes:
+
+Default Axios timeout: 10 seconds.
+
+Image upload timeout: 60 seconds.
+
+Chapter upload timeout: 120 seconds.
+
+Full comic upload timeout: 300 seconds.
+
+Upload-task polling interval: 2.5 seconds.
+
+Search suggestion debounce: 1 second.
+
+Like and bookmark debounce: 1 second.
+
+Some performance requirements cannot yet be formally verified:
+
+Comic search currently uses mock data in parts of the frontend.
+
+Comment submission is not fully integrated with the backend.
+
+Reading-progress synchronization and debounce are not fully implemented.
+
+The frontend production build currently has unresolved compilation errors.
+
+A complete production comic-reader flow is required to measure chapter rendering accurately.
+
+Test Environment &amp; Constraints:
+
+Simultaneous Users: Target load is 50 simultaneous Readers and 5 simultaneous Author uploads.
+
+Data Volume: Test environment pre-seeded with 1,000 comics, 10,000 chapters, 5,000 users, and 50,000 images.
+
+Test Environment Hardware: Local testing assumes a standard developer machine
+
+
+
+
+
+
+f. Security Testing
+
+
+
+
+
+Field
+
+
+
+Content
+
+
+
+Objective
+
+
+
+Verify that authentication, JWT validation, Google OAuth login, password protection, role-based access control, resource ownership, moderation workflow, premium-content protection, upload safety, and spam-prevention requirements are correctly enforced. Confirm that users cannot access functions, records, or assets outside the permissions defined by the Permission Matrix and Business Rules. 
+
+
+
+Technique
+
+
+
+At L2, call every protected endpoint with no token, a malformed token, an expired token, a valid token with the wrong role, and a valid token belonging to another resource owner. Use MockMvc and Postman for API authorization tests. Manipulate direct URLs, UUIDs, localStorage role values, and request payloads to verify that frontend restrictions cannot replace backend authorization. Inspect PostgreSQL to confirm that passwords are stored as BCrypt hashes. Test file uploads using unsupported extensions, fake MIME types, oversized files, corrupted archives, nested archives, and Zip Slip paths. Use Postman Runner for rate-limit tests after the rate-limiting implementation is completed. 
+
+
+
+Completion 
+
+
+
+Criteria
+
+
+
+Every applicable security Business Rule and Permission Matrix action has at least one positive and one negative L2 test. Missing, invalid, malformed, or expired authentication returns 401 Unauthorized. Authenticated users with insufficient permissions receive 403 Forbidden, or the agreed 404 Not Found response for ownership protection. Public APIs return only approved and published content. Premium assets are not exposed to unauthorized users. Passwords are never stored in plain text. Unsafe uploads are rejected. No Critical or Major security defect remains open. Automated OWASP ZAP and full penetration testing are deferred unless explicitly included in the current scope. 
+
+
+
+The following security controls were found in the project:
+
+Stateless Spring Security authentication.
+
+JWT access tokens signed with HS256.
+
+User UUID stored as the JWT subject.
+
+User role stored as a JWT claim.
+
+Access-token lifetime of approximately 24 hours.
+
+Refresh token generated with a seven-day lifetime.
+
+Bearer token sent in the Authorization header.
+
+Invalid or expired token returns 401 Unauthorized.
+
+Passwords are stored using BCrypt.
+
+Google OAuth2 login is supported.
+
+Google OAuth users are not required to provide a local password.
+
+The default OAuth account role is Reader.
+
+@PreAuthorize is used on selected Admin, Moderator, and Author functions.
+
+Author-owned comics and chapters are filtered using the authenticated Author UUID.
+
+Public comic and chapter APIs are expected to expose only Published content.
+
+Premium chapter images are hidden when the account does not have valid access.
+
+ZIP entries containing absolute paths or ../ are rejected.
+
+React layouts apply role checks for Admin, Moderator, Author, Translator, and authenticated-profile pages.
+
+Axios attaches the stored access token automatically.
+
+HTTP 401 clears authentication state and redirects the user.
+
+HTTP 403 displays an Access Denied message.
+
+Minimum security scenarios include:
+
+Valid login returns access and refresh tokens.
+
+Invalid credentials return 401.
+
+An inactive account returns 403.
+
+Password values are BCrypt hashes and never equal the raw password.
+
+The JWT object contains the immutable user UUID.
+
+A missing, malformed, invalid, or expired JWT returns 401.
+
+A Reader cannot access Author, Moderator, or Admin endpoints.
+
+An Author cannot access another Author’s comic, chapter, preview, or upload task.
+
+Only Moderator or Admin roles can perform moderation actions.
+
+Draft, Submitted, and Rejected content is not returned through public endpoints.
+
+A Guest or unauthorized Reader cannot receive premium chapter images.
+
+Modifying the role value in localStorage does not grant backend permission.
+
+Google OAuth login does not require a local password.
+
+Unsafe, oversized, corrupted, nested, or path-traversal archives are rejected.
+
+User history, notifications, transactions, and analytics cannot be accessed by another account.
+
+Rate-limited APIs return HTTP 429 Too Many Requests after the configured threshold.
+
+Logging out removes access token, refresh token, and user information from the frontend.
+
+OAuth callback parameters are removed from the browser URL after processing.
+
+The following code-level risks must receive dedicated security test cases:
+
+Publicly whitelisted upload endpoints must not allow unauthorized Cloudinary uploads.
+
+Publicly whitelisted synchronization endpoints must not allow unauthorized execution of Redis/database jobs.
+
+Generic inherited CRUD endpoints must enforce the Permission Matrix.
+
+Chat warning or moderation endpoints must reject non-Moderator roles.
+
+Chapter-detail cache misses must not expose Draft or Submitted content.
+
+OAuth tokens should not remain visible in redirect URLs longer than necessary.
+
+Database, mail, Cloudinary, JWT, and third-party API credentials must be loaded from environment variables rather than committed configuration files.
+
+
+2.2 Test Levels
+
+
+
+The ComiVerse testing strategy defines exactly 4 Test Levels: Unit (L1), Integration (L2), System (L3) and UAT (L4). 
+
+
+a. Test Type × Level Matrix
+
+
+
+
+
+Type of Tests
+
+
+
+L1 Unit
+
+
+
+L2 Integration
+
+
+
+L3 System
+
+
+
+L4 UAT
+
+
+
+Functional Testing
+
+✓
+
+✓
+
+
+
+✓
+
+
+
+✓
+
+
+
+UI Testing
+
+✓
+
+✓
+
+
+
+✓
+
+
+
+✓
+
+
+
+Input Validation Testing
+
+✓
+
+✓
+
+
+
+
+
+
+
+
+
+
+
+Background Job Testing
+
+
+
+
+
+✓
+
+
+
+
+
+
+
+
+
+
+
+Performance Testing
+
+
+
+
+
+
+
+
+
+
+
+✓ (manual)
+
+
+
+
+
+
+
+Security Testing
+
+
+
+
+
+
+
+✓
+
+
+
+✓
+
+
+
+
+
+
+b. Level 1 - Unit Test
+
+
+
+
+
+In-charge
+
+Developer
+
+When
+
+Per-feature - written alongside or before the Service method. Run automatically on every commit if CI is configured.
+
+Focus
+
+Method-level logic in Service/business-logic classes. All external dependencies (Repositories, other Services) are mocked with Mockito. No Spring context loaded. Tests cover: happy paths, alternate flows, boundary cases, and input validation logic.
+
+Structure
+
+One test class per Service class.
+
+Naming: test{UCID}_{ScenarioName}_{ExpectedResult}
+
+Format: Arrange / Act / Assert
+
+Files
+
+SEP490_G37_Report 5.1_UnitTests_L1
+
+Tools
+
+JUnit 5, Mockito, JaCoCo
+
+Acceptance Criteria
+
+All L1 tests pass. Service layer line coverage ≥ 80%. Branch coverage ≥ 75%. No open Critical/Major defects. Coverage report committed.
+
+
+
+
+
+
+c. Level 2 - Integration Test
+
+
+
+
+
+
+
+Field
+
+
+
+Content
+
+
+
+In-charge
+
+
+
+Developer + QA
+
+
+
+When
+
+
+
+Per-sprint - run before every PR merge to main.
+
+Focus
+
+Full application context: HTTP request → Auth/Security layer → Controller → Service → Repository → H2 Database → HTTP response. Tests verify: URL routing, JWT token-based authentication, role-based access control, redirect/response flows, response message content, and DB state after write operations. Also covers, per SCR-ID: UI Testing (correct view/render, display conditions per role, navigation outcome) and Input Validation Testing (two-directional - via the form/endpoint as a user would, and bypassing the UI to call the endpoint directly).
+
+Structure
+
+One test file/class per Controller.
+
+Spring Boot Test with a test configuration profile.
+
+@Sql scripts per test method for seed data and full rollback .
+
+Files
+
+SEP490_G37_Report 5.2_IntegrationTests_L2
+
+Tools
+
+JUnit 5 · Spring Boot Test / MockMvc · H2 Database
+
+Acceptance Criteria
+
+All L2 tests pass. Every URL in the UCS Endpoint Mapping table has ≥1 positive and ≥1 negative test. Every SCR-ID in FDS §3 has ≥1 test verifying render + display conditions per role (UI Testing). Every Must-priority field has ≥1 two-directional validation test, client-visible message AND server-side rejection (Input Validation Testing). All Global Business Rules tested at this level. Role guard tests confirm wrong-role → expected 401/403.
+
+
+
+
+
+
+Background Job Testing - within L2
+
+
+
+
+
+Field
+
+
+
+Content
+
+In-charge
+
+Developer
+
+When
+
+Per-sprint - run when JOB-type UCs or Scheduler classes are created or modified.
+
+Focus
+
+Direct invocation of Scheduler Service methods. Verify: correct records are processed, incorrect records are left untouched, DB state matches expected outcome, log output is correct. Time-sensitive logic (lockout expiry, retention period) is tested by manually setting timestamp values in DB before calling the method.
+
+Structure
+
+Spring Boot Test + @Sql scripts per test method. Arrange DB state → Act (call Service) → Assert DB state.
+
+Files
+
+Included in ComiVerse_IntegrationTests_L2.xlsx - on a dedicated &quot;Scheduler&quot; sheet
+
+Tools
+
+JUnit 5 · Spring Boot Test · H2 Database · @Sql scripts
+
+Acceptance Criteria
+
+All Scheduler test cases pass. Every processing step and failure scenario in FDS §5 Background Job Inventory has ≥1 test case.
+
+
+
+
+
+
+d. Level 3 - System Test
+
+
+3a. System / API Flow Testing
+
+
+
+
+
+Field
+
+
+
+Content
+
+In-charge
+
+QA Lead
+
+When
+
+Pre-release - before merge to main branch.
+
+Focus
+
+Multi-step HTTP flows that span multiple Controllers/Handlers. Verify that JWT session state, database state, and redirect chains are correct across a realistic user journey sequence. Performance NFR observation (manual, v1.0). Security review at system level (no Critical/High findings).
+
+Structure
+
+HTTP sequence tests: login → perform action → verify DB state + redirect/response message.
+
+Files
+
+SEP490_G37_Report 5.3_SystemTests_L3 - sheet &quot;HTTP Flows&quot;
+
+Tools
+
+Postman (Collection Runner) · Manual browser for performance observation
+
+Acceptance Criteria
+
+All P1 system flow tests pass. NFR-01 and NFR-02 verified by manual observation. No Critical or High security findings (manual review).
+
+
+3b. E2E Business Flow Testing 
+
+
+
+
+
+
+
+Field
+
+
+
+Content
+
+In-charge
+
+QA / Tester
+
+When
+
+Optional for v1.0 automated script, but required manually. Recommended: run before each release against the dev environment (PostgreSQL + seed data).
+
+Focus
+
+Full Business Flows from PRD §1 through a real browser. Nothing is mocked. Covers: critical path smoke tests (fast, &lt; 10 min), full user journeys (BF-01, BF-02, BF-03), RBAC verification on UI elements, session management (sign-out invalidates session).
+
+Structure
+
+Organized by Business Flow: BF-01 Reading &amp; Interaction Flow · BF-02 Comic Submission &amp; Moderation Flow · BF-03 Translation Workflow · Security spot-checks.
+
+Files
+
+SEP490_G37_Report 5.3_SystemTests_L3 - sheets E2E_BF
+
+Tools
+
+Manual Browser Walkthrough (no mocks)
+
+Acceptance Criteria
+
+All BF-01 / BF-02 / BF-03 critical path tests pass. RBAC boundary tests pass (Reader cannot reach Author screens; Translator denied Admin dashboard). Session invalidation confirmed post-sign-out.
+
+
+
+
+
+
+e. Level 4 - UAT 
+
+
+
+
+
+Field
+
+
+
+Content
+
+In-charge
+
+Product Owner / Capstone Committee / Selected Beta Readers
+
+When
+
+Pre-release or during project defense preparation.
+
+Focus
+
+Validating whether the ComiVerse platform meets the initial business requirements and is ready for public release from a user perspective.
+
+Files
+
+SEP490_G37_Report 5.4_UAT_Scripts_L4
+
+Acceptance Criteria
+
+Product Owner / Stakeholders sign off on all core features.
+
+
+2.3 Supporting Tools
+
+
+
+
+
+
+
+Purpose
+
+
+
+Tool
+
+
+
+Vendor
+
+
+
+Version
+
+Unit testing (backend)
+
+JUnit 5
+
+JUnit Team
+
+5.10.x
+
+Mocking (backend)
+
+Mockito
+
+Mockito
+
+5.x
+
+Integration testing
+
+Spring Boot Test
+
+VMware/Spring
+
+3.3.x
+
+HTTP testing
+
+MockMvc / Postman
+
+VMware / Postman
+
+3.3.x / Latest
+
+Test database
+
+H2 Database
+
+H2
+
+2.x
+
+Code coverage
+
+JaCoCo
+
+JaCoCo
+
+0.8.12
+
+Frontend Component Test
+
+React Testing Library
+
+RTL
+
+^16.0
+
+
+
+
+
+
+3. Test Plan
+
+
+3.1 Test Environment
+
+
+
+
+
+
+
+Level
+
+
+
+Environment
+
+
+
+Database
+
+
+
+Special Setup
+
+L1 Unit
+
+Developer machine (no server)
+
+None - all dependencies mocked
+
+None
+
+L2 Integration
+
+Developer machine / CI runner
+
+H2 Database 
+
+Spring test configuration profile active
+
+L3 System 
+
+Developer machine 
+
+PostgreSQL + seed data
+
+Run mvn spring-boot:run and npm run dev · Chrome browser
+
+L4 UAT
+
+Staging server 
+
+PostgreSQL
+
+Seed data loaded manually; staging env provisioned
+
+
+
+
+
+
+3.2 Test Data
+
+
+a. Minimum Test Accounts
+
+
+
+
+
+Username
+
+
+
+Role
+
+
+
+Password
+
+
+
+Account Status
+
+
+
+Purpose
+
+admin_test
+
+ADMIN
+
+Test@1234
+
+ACTIVE
+
+Test system configurations, account management, and admin dashboard features.
+
+mod_test
+
+MODERATOR
+
+Test@1234
+
+ACTIVE
+
+Test chapter review queue, content moderation, and comment bans.
+
+author_test
+
+AUTHOR
+
+Test@1234
+
+ACTIVE
+
+Test comic creation, chapter uploading, and revenue wallet.
+
+trans_test
+
+TRANSLATOR
+
+Test@1234
+
+ACTIVE
+
+Test translation team workspace and localization tools.
+
+reader_test
+
+READER
+
+Test@1234
+
+ACTIVE
+
+Test comic reading, bookmarks, comments, and premium purchases.
+
+
+
+
+
+
+b. Minimum Domain Data
+
+
+
+
+
+
+
+Entity
+
+
+
+Count
+
+
+
+Required State
+
+
+
+Purpose
+
+Comic
+
+2
+
+1 × DRAFT (id=1)
+
+1 × PUBLISHED (id=2)
+
+DRAFT: test comic submission pipeline.
+
+PUBLISHED: test reading and search functions.
+
+Chapter
+
+2
+
+1 × PENDING_REVIEW (linked to Comic 1)
+
+1 × PUBLISHED (linked to Comic 2)
+
+PENDING_REVIEW: test moderation workflow.
+
+PUBLISHED: test reading view and comment section.
+
+Translation Project
+
+1
+
+ACTIVE (Assigned to trans_test)
+
+Test Translator Workspace capabilities and job pool.
+
+
+
+
+
+
+3.3 Test Milestones
+
+
+
+
+
+
+
+Milestone
+
+
+
+Target Date
+
+
+
+In-charge
+
+
+
+Acceptance Criteria
+
+M1 - L1 Unit Complete
+
+04/08/2026
+
+Đặng Ngọc Thành , Bùi Quang Hiệp
+
+All L1 tests pass. Service coverage ≥ 80%. Branch coverage ≥ 75%. No open Critical defects. Coverage report committed.
+
+M2 - L2 Integration Complete
+
+06/08/2026
+
+Bùi Việt Hùng , Bùi Quang Hiệp
+
+All L2 tests pass. Every URL in Endpoint Mapping has ≥1 positive + ≥1 negative test. All security tests pass. No open Critical/Major defects.
+
+M3 - L3 System Complete
+
+08/08/2026
+
+Nguyễn Xuân Hanh
+
+All P1 system flow tests pass. NFR-01 and NFR-02 verified by observation. BF-01, BF-02, BF-03 manual E2E walkthroughs passed and documented. RBAC boundary tests pass. Session invalidation confirmed.
+
+M4 - UAT Complete
+
+08/08/2026
+
+Chu Tuấn Ngọc 
+
+All UAT scripts signed off by Capstone Committee / PO. No Critical business blockers. Written sign-off obtained.
+
+
+
+
+
+
+4. Test Cases
+
+
+4.1 Test Case Workbooks
+
+
+
+
+
+
+
+Test Level
+
+
+
+File
+
+
+
+Primary Tool
+
+
+
+Contents
+
+L1 – Unit Test
+
+SEP490_G37_Report 5.1_UnitTests_L1.xlsx 
+
+JUnit 5 + Mockito
+
+Sheets: AuthService, ComicService, ChapterService, AuthorService, ModeratorService (Method-level coverage)
+
+L2 – Integration Test
+
+SEP490_G37_Report 5.2_IntegrationTests_L2.xlsx 
+
+Spring Boot Test / Postman
+
+Sheets: AuthController, ComicController, ChapterController, Security, Scheduler (JOB-01, JOB-02)
+
+L3 – System Test
+
+SEP490_G37_Report 5.3_SystemTests_L3.xlsx 
+
+Postman + Browser
+
+Sheets: HTTP Flows, BF-01 E2E, BF-02 E2E, BF-03 E2E, Security Spot-Checks
+
+L4 - UAT
+
+
+
+SEP490_G37_Report 5.4_UAT_Scripts_L4.xlsx 
+
+Manual
+
+UAT Scripts for defense and presentation scenarios
+
+
+
+Total
+
+
+
+287
+
+
+
+
+
+
+4.2 Requirements Coverage Matrix
+
+
+
+
+
+FT-ID
+
+
+
+Feature Name
+
+
+
+L1 Unit
+
+
+
+L2 Integ.
+
+
+
+L3 System
+
+
+
+L4 UAT
+
+FT-01
+
+User Authentication &amp; Access
+
+✅
+
+✅
+
+✅
+
+✅
+
+FT-02
+
+Account Settings &amp; Assets
+
+✅
+
+✅
+
+✅
+
+✅
+
+FT-03
+
+Comic Submission Pipeline
+
+✅
+
+✅
+
+✅
+
+✅
+
+FT-04
+
+Content Moderation Gate
+
+✅
+
+✅
+
+✅
+
+✅
+
+FT-05
+
+Translator Onboarding
+
+✅
+
+✅
+
+✅
+
+✅
+
+FT-06
+
+Translation &amp; Localization Portal
+
+✅
+
+✅
+
+✅
+
+✅
+
+FT-07
+
+Chapter Production Tracker
+
+
+
+
+
+✅
+
+✅
+
+FT-08
+
+Creator Cloud Studio
+
+
+
+
+
+✅
+
+✅
+
+FT-09
+
+Search &amp; Recommendation Engine
+
+✅
+
+✅
+
+✅
+
+✅
+
+FT-10
+
+Comic Reader &amp; Version Switcher
+
+
+
+✅
+
+✅
+
+✅
+
+FT-11
+
+Cross-Platform Progress Sync
+
+✅
+
+✅
+
+✅
+
+✅
+
+FT-12
+
+User Engagement &amp; Ranking System
+
+✅
+
+✅
+
+✅
+
+✅
+
+FT-13
+
+Community Forums &amp; Messaging
+
+✅
+
+✅
+
+✅
+
+✅
+
+FT-14
+
+Notification &amp; User Center
+
+✅
+
+✅
+
+✅
+
+✅
+
+FT-15
+
+Policy &amp; Content Audit
+
+✅
+
+✅
+
+✅
+
+✅
+
+FT-16
+
+Monetization &amp; Token Management
+
+✅
+
+✅
+
+✅
+
+✅
+
+FT-17
+
+Analytics &amp; Dashboards
+
+
+
+✅
+
+✅
+
+✅
+
+FT-18
+
+Global Admin Control Panel
+
+✅
+
+✅
+
+✅
+
+✅
+
+
+
+
+
+
+5. Test Reports
+
+
+5.1 Summary Table
+
+
+
+
+
+
+
+Round
+
+
+
+Metrics
+
+
+
+L1 Unit
+
+
+
+L2 Integ.
+
+
+
+L3 System
+
+
+
+L4 UAT
+
+
+
+Total
+
+
+
+Round #1
+
+
+
+Total
+
+
+
+265
+
+
+
+45 
+
+
+
+86
+
+
+
+40 
+
+
+
+396
+
+
+
+
+
+
+
+Passed
+
+265
+
+
+
+45 
+
+86
+
+40 
+
+396
+
+
+
+
+
+
+
+Failed
+
+0
+
+0
+
+0
+
+0
+
+0
+
+
+
+
+
+
+
+Errors
+
+0
+
+0
+
+0
+
+0
+
+0
+
+
+
+
+
+
+
+Skipped / Blocked
+
+0
+
+0
+
+0
+
+0
+
+
+
+0
+
+
+
+
+
+
+
+Pass Rate
+
+100%
+
+100%
+
+100%
+
+100%
+
+
+
+100% 
+
+
+
+
+
+
+
+Execution Status
+
+Passed
+
+Passed
+
+Passed
+
+Passed
+
+Completed 
+
+
+5.2 Defect Register
+
+
+a. Test Levels’s Defects
+
+
+
+Metric
+
+
+
+Review
+
+
+
+L1 Unit
+
+
+
+L2 Integ.
+
+
+
+L3 System
+
+
+
+L4 UAT
+
+
+
+Total
+
+
+
+Total Defects
+
+
+
+Bùi Quang Hiệp
+
+
+
+45 
+
+
+
+5 
+
+
+
+5 
+
+
+
+19 
+
+
+
+74
+
+
+
+Open Defects (Critical)
+
+
+
+Chu Tuấn Ngọc
+
+0
+
+0 
+
+0 
+
+0 
+
+0 
+
+
+
+Open Defects (Major)
+
+
+
+Đặng Ngọc Thành
+
+5
+
+0 
+
+0 
+
+0 
+
+0 
+
+
+b. Work Product’s Defects
+
+
+
+Product
+
+
+
+Review
+
+
+
+L1 Unit
+
+
+
+L2 Integ.
+
+
+
+L3 System
+
+
+
+L4 UAT
+
+
+
+Total
+
+
+
+Software Package
+
+Nguyễn Xuân Hanh
+
+0
+
+0
+
+0
+
+0
+
+0
+
+
+
+
+
+— End of Report —
+
+

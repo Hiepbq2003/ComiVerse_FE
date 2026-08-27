@@ -1,0 +1,1556 @@
+
+
+Project Management Plan
+
+ComiVerse - A Digital Comic Platform with Integrated Translation and Content Distribution Tools
+
+CVP  - Report 2
+
+
+
+Project Name
+
+ComiVerse 
+
+Vision &amp; Scope Ref
+
+Vision &amp; Scope Document v2.0
+
+RTW Ref
+
+SEP490_G37_Report 3.1_RTW
+
+Plan Version
+
+v2.0
+
+Date Created
+
+22/5/2026
+
+Last Updated
+
+18/8/2026
+
+Authors
+
+Bùi Quang Hiệp - HE171337
+
+Bùi Việt Hùng - HE163146
+
+Chu Tuấn Ngọc - HE186006
+
+Nguyễn Xuân Hanh - HE180944
+
+Đặng Ngọc Thành - HE186611
+
+Reviewer
+
+Lê Thị Tú Kiên - Instructor
+
+Status
+
+Approved
+
+
+
+
+1. Overview
+
+
+1.1 Cost/Time Estimation
+
+
+
+
+No.
+
+Work Package
+
+Est. Effort (pds)
+
+Deadline
+
+1
+
+Phase 1: Project Initiating
+
+10
+
+Week 1
+
+1.1
+
+Project Brainstorming &amp; Idea Proposal
+
+5
+
+Week 1
+
+1.2
+
+Report 1: Vision &amp; Scope Document
+
+5
+
+Week 1
+
+2
+
+Phase 2: Project Planning
+
+15
+
+Week 2
+
+2.1
+
+Project Repository &amp; Workspace Setup
+
+3
+
+Week 2
+
+2.2
+
+Report 2: Project Management Plan
+
+6
+
+Week 2
+
+2.3
+
+Report 2.1: Project Tracking 
+
+6
+
+Week 2
+
+3
+
+Phase 3: Requirements Analysis
+
+30
+
+Week 3
+
+3.1
+
+Report 3.0: Software Requirements Specification
+
+15
+
+Week 3
+
+3.2
+
+Report 3.1: Requirement Traceability Workflow (RTW)
+
+5
+
+Week 3
+
+3.3
+
+Report 3.2: Use Case Specifications (UCS)
+
+10
+
+Week 3
+
+4
+
+Phase 4: System Design
+
+35
+
+Week 5
+
+4.1
+
+Report 4.0: Technical Design Specification (TDS)
+
+10
+
+Week 4
+
+4.2
+
+Report 4.1: Functional Design Specification (FDS)
+
+10
+
+Week 4
+
+4.3
+
+Report 4.2: Screen Specification (UI/UX Mockups)
+
+15
+
+Week 5
+
+5
+
+Phase 5: Development - Iteration 1 (Core Platform)
+
+60
+
+Week 8
+
+5.1
+
+Code Base Setup (Java Spring Boot &amp; React Vite)
+
+5
+
+Week 6
+
+5.2
+
+Feature: JWT Authentication &amp; User Management
+
+15
+
+Week 7
+
+5.3
+
+Feature: Comic Catalog &amp; Chapter Reader
+
+20
+
+Week 8
+
+5.4
+
+Feature: Comic Upload &amp; Publishing
+
+20
+
+Week 8
+
+6
+
+Phase 6: Development - Iteration 2 (Advanced Tools)
+
+65
+
+Week 11
+
+6.1
+
+Feature: Translation Project Workspace &amp; Task Board
+
+15
+
+Week 9
+
+6.2
+
+Feature: Collaborative Submissions &amp; Handover
+
+20
+
+Week 10
+
+6.3
+
+Integration: AI OCR (Image Text Extraction API)
+
+15
+
+Week 11
+
+6.4
+
+Integration: Translation Memory &amp; Machine Translation
+
+15
+
+Week 11
+
+7
+
+Phase 7: Development - Iteration 3 (Monetization)
+
+55
+
+Week 13
+
+7.1
+
+Feature: Community Forum &amp; Discussion Threads
+
+15
+
+Week 12
+
+7.2
+
+Feature: Content Moderation &amp; Reporting Queue
+
+20
+
+Week 12
+
+7.3
+
+Feature: Payment Gateway &amp; Revenue Statistics
+
+20
+
+Week 13
+
+8
+
+Phase 8: Testing
+
+45
+
+Week 14
+
+8.1
+
+Report 5.1: Unit Tests Level 1
+
+10
+
+Week 13
+
+8.2
+
+Report 5.2: Integration Tests Level 2
+
+10
+
+Week 13
+
+8.3
+
+Report 5.3: System Tests Level 3
+
+15
+
+Week 14
+
+8.4
+
+Report 5.4: UAT Scripts Level 4
+
+10
+
+Week 14
+
+9
+
+Phase 9: Deployment &amp; Documentation
+
+25
+
+Week 14
+
+9.1
+
+Cloud Server Deployment &amp; DB Migration
+
+5
+
+Week 14
+
+9.2
+
+Report 6.1: Deployment Guide
+
+5
+
+Week 14
+
+9.3
+
+Report 6.2: User Manual
+
+15
+
+Week 14
+
+10
+
+Phase 10: Project Closure
+
+10
+
+Week 14
+
+10.1
+
+Final Project Report Compilation
+
+5
+
+Week 14
+
+10.2
+
+Defense Presentation &amp; Demo Preparation
+
+5
+
+Week 14
+
+TOTAL ESTIMATED EFFORT
+
+350
+
+
+
+
+
+1.2 Project Objectives
+
+#
+
+Metric
+
+Unit
+
+Planned
+
+Actual
+
+Notes / References
+
+1
+
+Effort Usage
+
+Person-day
+
+327
+
+400
+
+Total estimated effort for analysis, development, testing, and deployment 
+
+2
+
+Number of Defect 
+
+No. of defects
+
+15 - 20
+
+74
+
+Includes defects discovered during testing and user acceptance phases
+
+3
+
+Timeliness
+
+%
+
+92%-95%
+
+93%
+
+Percentage of milestones completed on schedule
+
+4
+
+Requirement Completeness
+
+%
+
+95%
+
+95%
+
+Percentage of functional and non-functional requirements successfully implemented
+
+5
+
+Mobile Application Stability
+
+Crash rate 
+
+3% - 5%
+
+90%
+
+Stability target for the Android APK application
+
+6
+
+Performance Response Time
+
+Second
+
+2-3s
+
+2-4s
+
+Average loading time for story chapters and forum pages
+
+7
+
+Forum Moderation Response Time 
+
+Hours 
+
+&lt;=24
+
+&lt;=24
+
+Average response time for handling reported forum content 
+
+
+1.3 Project Risks
+
+#
+
+Risk Description
+
+Impact
+
+Possibility
+
+Priority
+
+Response Plans (Mitigation / Contingency)
+
+1
+
+Lack of technical skills for Translation Tool 
+
+High 
+
+High 
+
+High 
+
+Mitigation: Dedicate the first 2 weeks to researching open-source translation APIs (Google Cloud Translate, DeepL) and NLP models. Build a simple Proof of Concept (PoC) early to test feasibility.
+
+Contingency: If custom integration fails, pivot immediately to integrating standard, pre-built third-party APIs to ensure the core feature works on time.
+
+2
+
+Image processing latency or system crash 
+
+High 
+
+Medium 
+
+High 
+
+Mitigation: Design an asynchronous background processing pipeline using Message Queues (e.g., BullMQ, RabbitMQ) and enforce automatic image conversion to WebP format upon upload.
+
+Contingency: Implement CDN caching (e.g., Cloudflare, Cloudinary) to offload the main server and provision temporary cloud storage scaling if server load peaks during testing.
+
+3
+
+Work progress is slow 
+
+High 
+
+Medium 
+
+High 
+
+Mitigation: Break down tasks into granular 2-day work items; track daily standups on GitHub 
+
+Contingency: Re-allocate secondary non-core tasks to later phases and authorize &quot;crunch time&quot; (overtime coding sessions) to secure critical project milestones.
+
+4
+
+Requirement changes or scope creep 
+
+Medium 
+
+High 
+
+Medium 
+
+Mitigation: Maintain weekly sync-ups with the supervisor to sign off on requirements. Document all agreed features in the SRS and strictly avoid adding &quot;nice-to-have&quot; features.
+
+Contingency: If new requirements are requested late, negotiate with the supervisor to push them into the &quot;Future Development&quot; section to protect the current scope.
+
+5
+
+Conflict or lack of communication within the team 
+
+High 
+
+Low
+
+Medium 
+
+Mitigation: Establish a clear team working agreement, transparent task assignments on the Kanban board, and fixed communication channels (Slack/Discord).
+
+Contingency: The team leader will immediately step in to mediate conflicts. If a member is incapacitated, their core tasks will be redistributed among remaining members to secure project delivery.
+
+6
+
+Payment &amp; financial ledger transaction security issues
+
+High
+
+Low
+
+Med
+
+Mitigation:Use idempotent transactional DB operations, audit logging, and sandbox gateways
+
+Contingency:Implement automatic transaction rollbacks and manual dispute resolution tools 
+
+
+2. Management Approach
+
+
+2.1 Project Processes
+
+2.1.1 Project Process: Iterative and Incremental Development Approach 
+
+For the ComiVerse project, the engineering team has decided to exclusively adopt the Iterative and Incremental Development model.
+
+Because the ComiVerse system encompasses multiple complex and relatively independent subsystems (Digital Comic Reading, Collaborative Translation Workspaces, Payment Gateway, and Forum), applying this model helps the project break down technical complexity, integrate continuously, and minimize system-wide risks at the end of the semester.
+
+Development Lifecycle Workflow: The project is divided into 3 Iterations. Each Iteration lasts for 2 to 3 weeks and strictly follows a standard, closed-loop 5-step management process:
+
+Iteration Planning: Extract requirements from the SRS Report to include in the current iteration. Decompose modules into granular tasks with an estimated completion time of no more than 16 hours per task.
+
+Detailed Design: Update the Screen design Report specifically for the modules in this iteration.
+
+Implementation: Team members proceed to write code for the assigned functionalities based on the detailed design.
+
+Testing &amp; Verification: Execute automated Unit Testing for backend business logic and Integration Testing to ensure smooth communication between micro-services , System test
+
+Increment Release: At the end of each iteration, the team must package a functional Software Package Version and demonstrate it directly to the Supervisor for acceptance testing before moving to the next iteration.
+
+
+2.1.2 Benefits of the Iterative–Incremental Approach for ComiVerse
+
+Adaptability to Changing Requirements: Allows the engineering team to adjust detailed workflows smoothly in response to supervisor feedback without destabilizing previously completed modules.
+
+Early Delivery of Core Functionalities: The foundational value proposition of ComiVerse—browsing, reading, and searching comics—is completed and verified early in Iteration 1 (Week 8). This guarantees a functioning system early in the semester, preventing end-of-project integration panic.
+
+Risk Reduction for High-Complexity Features: High-complexity subsystems (such as the Collaborative Translation Studio, OCR speech-bubble recognition, and Machine Translation APIs) carry significant technical uncertainty. Developing them across early POCs and dedicated iterations allows risks to be identified, isolated, and mitigated early.
+
+Continuous Testing and Quality Improvement: Each Software Package Increment must successfully pass Unit Testing, Integration Testing before subsequent subsystems are integrated, preventing defect accumulation across iteration boundaries.
+
+Phased Functional Expansion: Supports structured, step-by-step modular expansion. Each feature module is built, tested, and validated before dependent subsystems are attached.
+
+Stakeholder Engagement &amp; Alignment: Ensures the project supervisor is consistently informed of technical progress and actively involved in validating deliverables at every milestone.
+
+Enhanced Team Collaboration: Enforces structured collaboration and clear responsibility division across the 5 team members using GitHub feature branches, peer review workflows, and milestone tracking.
+
+Focused Resource Allocation: Allows the team to concentrate engineering resources on one coherent subsystem per iteration rather than spreading effort thinly across the entire system simultaneously.
+
+
+2.1.3 Iteration Breakdown for ComiVerse
+
+Instead of building the entire system at once, ComiVerse is systematically divided into 3 functional increments based on core priorities:
+
+
+
+Iteration 1 (Week 6 – Week 8): Core Platform
+
+
+
+Objective: Build the foundation of the system, ensuring the basic user flow is operational.
+
+Deployed Modules: Authentication System (JWT Auth), Account Management, Comic Reading (Comic Catalog, Chapter Reader), Basic Comic Upload flow for Authors.
+
+Output: Software Package Version 1 - Executable flow from user login to finishing reading a comic chapter.
+
+
+
+Iteration 2 (Week 9 – Week 11): Advanced Workspaces &amp; Tools
+
+
+
+Objective: Build the most complex features, creating a unique technical value proposition for the project.
+
+Deployed Modules: Translation Team Workspace, Task Assignment Workflow, Integration of Image Text Extraction Tool (AI OCR), and Machine Translation APIs.
+
+Output: Software Package Version 2 - Completed collaborative translation flow and submission approval system.
+
+
+
+Iteration 3 (Week 12 – Week 13): Community &amp; Monetization Ecosystem
+
+
+
+Objective: Finalize user interaction and revenue features.
+
+Deployed Modules: Community Forum, Content Moderation System for Moderators (Report Handling, Ban User), Payment Gateway, Revenue Statistics for Admins/Authors.
+
+Output: Software Package Version 3 - Complete product (Release Candidate) ready for the final capstone defense.
+
+
+2.2 Project Management Processes
+
+To ensure engineering rigor, traceability, and strict adherence to academic milestones, the ComiVerse team formalizes four core project management processes: Scope Management, Schedule Management, Change Control Management, and Issue/Defect Management.
+
+
+2.2.1 Scope &amp; Requirement Management Process
+
+Scope management governs the lifecycle of requirements from initial elicitation to technical delivery:
+
+Requirement Baseline: Functional and non-functional requirements agreed upon during Stage 1–2 are formalized in Report 3 (SRS). Requirements are decomposed hierarchically into System Modules, Features, and granular Functional Specifications with explicit Acceptance Criteria.
+
+Iteration Scope Partitioning: Requirements are categorized by functional domain and assigned to specific Development Iterations based on architectural dependencies (Core Comic Catalog &amp; Reader in Iteration 1 &gt; Creator &amp; Translation Studio in Iteration 2 &gt; Monetization, Moderation &amp; Mobile in Iteration 3).
+
+Iteration Scope Commitment: Prior to each development iteration, the team and supervisor conduct a Scope Review to confirm detailed design specifications and verify that all prerequisites are satisfied before coding begins.
+
+
+2.2.2 Time &amp; Schedule Management Process
+
+Schedule tracking relies on quantitative estimation and visual progress telemetry:
+
+Granular Task Estimation: Every work package is broken down into technical implementation tasks estimated in person-days / hours (maximum 16 hours per task item). Tasks exceeding 16 hours must be split to avoid hidden bottlenecks.
+
+Milestone &amp; Progress Tracking: Weekly progress is tracked against the WBS schedule on GitHub Projects. Milestone deadlines, deliverable completion dates, and team member workloads are monitored continuously.
+
+Schedule Slippage Protocol: If a work package falls behind schedule by more than 3 days, the Team Leader conducts an emergency review to reallocate team members for pair-programming or re-sequence non-critical tasks with Instructor approval.
+
+
+2.2.3 Change Control Management Process 
+
+In an academic project lifecycle, unmanaged requirement changes lead to scope creep and architecture instability. ComiVerse applies a formal 5-step Change Control Workflow:
+
+Step
+
+Phase Name
+
+Responsible
+
+Action Description &amp; Artifact Output
+
+Step 1
+
+Change Request Ingestion
+
+Team Members
+
+Log proposed modification into Sheet 'Change Log' of Report 2.1_Project_Tracking, stating technical rationale and source.
+
+Step 2
+
+Impact Analysis
+
+HiepBQ ,HanhNX , ThanhDN 
+
+Evaluate blast radius on Database Schema , Functional Flows/APIs , UI Screens and Effort/Schedule 
+
+Step 3
+
+Stakeholder Review &amp; Approval
+
+Instructor,
+
+HiepBQ
+
+Review Impact Analysis report during weekly meeting. Formally approve, reject, or defer the change request.
+
+Step 4
+
+Documentation &amp; Tracking Update
+
+HiepBQ,
+
+HungBV, NgocTC 
+
+Update Report 3.0 SRS, Report 3.1 RTW/UCS, Report 4.0 TDS, Report 4.1 FDS, Report 4.2 ScreenSpec with version increments . Update Sheet 'WBS' in Report 2.1 Tracking and creating tasks.
+
+Step 5
+
+Implementation &amp; Verification
+
+Team Members
+
+Implement a feature branch, execute peer review , run tests, verify criteria, update Report 2.1 Tracking status, and close the change item.
+
+
+
+
+2.2.4 Issue &amp; Defect Management Process
+
+All bugs, deviations, and technical blockers are tracked through GitHub Issues. Defects traverse a strict state transition lifecycle: New → Triaged → In Progress → In Review → Testing → Closed.
+
+Severity Level
+
+Definition &amp; Criteria
+
+Target SLA / Resolution Window
+
+Impact on Milestone
+
+Critical (Blocker)
+
+System crash, database corruption, auth failure, payment ledger inconsistency, or demo blocker.
+
+Resolve within 12 hours
+
+Blocks increment release &amp; demo
+
+Major
+
+Core feature malfunction without system crash.
+
+Resolve within 48 hours
+
+Must resolve before Release Candidate
+
+Minor
+
+UI cosmetic flaw, layout misalignment, non-critical translation string mismatch.
+
+Resolve within current iteration
+
+Non-blocking
+
+
+2.3 Quality Management
+
+ComiVerse enforces multi-tiered Quality Assurance practices spanning defect prevention, peer reviews, automated unit testing, integration verification, and system validation:
+
+2.3.1 Defect Prevention: Establish standardized coding conventions (Google Java Style for Spring Boot, ESLint/Prettier for React and Flutter). Implement strict API contracts (OpenAPI/Swagger) and database constraints prior to implementation.
+
+ 2.3.2 Review Process &amp; Peer Reviews: All source code modifications must pass through GitHub Pull Requests. Direct pushes to main and develop are blocked. Every PR requires at least one peer review approval, verifying code logic, security vulnerabilities, performance, and styling consistency.
+
+2.3.3 Unit Testing: Automated unit testing using JUnit 5 and Mockito for backend business logic, validation rules, and service layers. Component testing for frontend React components using Vitest and React Testing Library. Minimum target unit test code coverage: &gt;= 75% for critical business services.
+
+2.3.4 Integration Testing: API integration testing conducted via Postman / Newman test collections. Validates inter-service communication, JWT security filter chains, database transactional integrity, Firebase Cloud Storage image uploads, and translation external API integrations.
+
+2.3.5 System Testing &amp; Acceptance: Comprehensive end-to-end testing verifying all role journeys . Includes performance load testing, security penetration testing , and User Acceptance Testing conducted directly with the Project Supervisor.
+
+
+2.4 Project Training Plan
+
+Training Area
+
+Participants
+
+When / Duration
+
+Java Spring Boot Fundamentals 
+
+Entire Team 
+
+Week 4 – 2 weeks 
+
+React.js Fundamentals 
+
+Entire Team 
+
+Week 4 – 2 weeks
+
+Git &amp; GitHub Workflow 
+
+Entire Team
+
+Week 4 – 3 days
+
+Database Design &amp; SQL 
+
+Entire Team 
+
+Week 4 – 1 week
+
+JWT Authentication &amp; Authorization 
+
+Entire Team 
+
+Week 6 – 1 week
+
+Docker &amp; Containerization 
+
+Entire Team 
+
+Week 6 – 3 days
+
+WebSocket Communication 
+
+Assigned Feature Members 
+
+Week 6 – 3 days
+
+UI/UX Design Principles 
+
+Entire Team 
+
+Throughout project 
+
+Agile Scrum Practices 
+
+Entire Team 
+
+Throughout project 
+
+Testing &amp; Debugging Techniques 
+
+Entire Team 
+
+Throughout project 
+
+
+3. Responsibility Assignments
+
+
+
+Figure 3.1 Responsibility Structure 
+
+RACI Chart: R~Responsible, A~Accountable, C~Consulted, I~Informed
+
+Work Package / Document Deliverable
+
+HiepBQ
+
+HungBV
+
+TuanCN 
+
+HanhNX
+
+ThanhDN
+
+1. Planning, Requirements &amp; Design 
+
+Report 1: Vision &amp; Scope Document
+
+A, R
+
+R
+
+R
+
+R
+
+R
+
+Report 2: Project Management Plan
+
+A, R
+
+R
+
+R
+
+R
+
+R
+
+Report 2.1: Project Tracking 
+
+A, R
+
+R
+
+R
+
+R
+
+R
+
+Report 3.0: SRS
+
+A, R
+
+R
+
+R
+
+R
+
+R
+
+Report 3.1: RTW
+
+A, R
+
+R
+
+R
+
+R
+
+R
+
+Report 3.2: UCS
+
+A, R
+
+R
+
+R
+
+R
+
+R
+
+Report 4.1: FDS
+
+A, R
+
+R
+
+R
+
+R
+
+R
+
+Report 4.2: ScreenSpecification
+
+R
+
+R
+
+A, R
+
+R
+
+R
+
+2. Software Development
+
+Comic Catalog &amp; Reader Engine
+
+R
+
+R
+
+R
+
+A, R
+
+R
+
+Creator &amp; Author Publishing Studio
+
+R
+
+R
+
+R
+
+R
+
+A, R
+
+Translation Workspace &amp; Project Teams 
+
+R
+
+A, R
+
+R
+
+R
+
+R
+
+Payment, Wallet &amp; Payout Settlement
+
+R
+
+R
+
+R
+
+R
+
+A, R
+
+Content Moderation &amp; Flagged Triage
+
+A, R
+
+R
+
+R
+
+R
+
+R
+
+Admin Portal &amp; Community Forum 
+
+R
+
+R
+
+A, R
+
+R
+
+R
+
+Flutter Mobile Application
+
+I
+
+I
+
+A, R
+
+I
+
+I
+
+3. Testing &amp; Quality Assurance
+
+Unit Testing
+
+R
+
+R
+
+R
+
+R
+
+A, R
+
+Integration Testing
+
+R
+
+A, R
+
+R
+
+R
+
+R
+
+System Testing &amp; Security Penetration
+
+R
+
+R
+
+R
+
+A, R
+
+R
+
+User Acceptance Testing &amp; Supervisor Sign-off
+
+A, R
+
+R
+
+A, R
+
+R
+
+R
+
+4. Deployment, User Guides &amp; Final Defense
+
+Report 6.1: Deployment Guide &amp; Cloud DevOps
+
+R
+
+R
+
+R
+
+A, R
+
+R
+
+Report 6.2: User Manual
+
+R
+
+R
+
+A, R
+
+R
+
+R
+
+Report 7: Final Report &amp; Presentation Deck
+
+A, R
+
+R
+
+R
+
+R
+
+R
+
+
+4. Project Communications
+
+
+
+Communication Item
+
+Who / Target
+
+Owner
+
+Purpose
+
+When / Frequency
+
+Type / Tool
+
+Daily Meeting
+
+All Team Members
+
+All Team Members
+
+Update daily progress, discuss blockers, assign urgent tasks
+
+Every day - 15 minutes
+
+Google Meet
+
+Weekly Meeting
+
+Entire Project Team + Instructor
+
+All Team Members
+
+Review weekly progress, evaluate completed tasks, plan next sprint
+
+Every Saturday evening
+
+Google Meet
+
+Requirement Discussion
+
+All Team Members
+
+All Team Members
+
+
+
+Clarify feature requirements and system workflows
+
+When new feature is proposed
+
+Google Meet / Figma
+
+Bug Review Meeting
+
+Developers
+
+All Team Members
+
+
+
+Review critical bugs and prioritize fixes
+
+Twice per week
+
+Google Meet
+
+Progress Reporting
+
+All Team Members
+
+All Team Members
+
+
+
+Report completed tasks and current work status
+
+End of each working day
+
+Google Sheets / Messenger
+
+Team Iteration Planning &amp; Review
+
+All Team Members
+
+All Team Members
+
+Evaluate completed tasks, review progress in Report 2.1 Project Tracking, allocate workload for upcoming iteration 
+
+Weekly — Sunday 2:00 PM 
+
+Google Meet / Discord
+
+
+5. Configuration Management
+
+
+5.1 Document Management
+
+All official project documentation, architectural diagrams, spreadsheets, and presentation materials are managed centrally within the team's shared Google Drive directory structure. Google Docs, Sheets, and Slides are utilized for real-time collaboration, peer comments, and revision history tracking.
+
+Document / File Name on Google Drive
+
+Format / Tool
+
+Purpose &amp; Content Description
+
+SEP490_G37_Report 1_Vision_Scope
+
+Google Docs
+
+Project background, problem statement, business goals, scope limits
+
+SEP490_G37_Report 2_Project_Plan
+
+Google Docs
+
+Project Management Plan, Iterative-Incremental model, RACI, risks
+
+SEP490_G37_Report 2.1_Project_Tracking
+
+Google Sheets
+
+Worksheets: WBS, Risk , Defect Log, Change Log , Issues
+
+SEP490_G37_Report 3.0_SRS
+
+Google Docs
+
+Software Requirements Specification 
+
+SEP490_G37_Report 3.1_RTW
+
+Google Sheets
+
+Requirements Traceability Matrix mapping SRS items
+
+SEP490_G37_Report 3.2_UCS
+
+Google Docs
+
+Use Case Specifications with full main, alternative, and exception flows
+
+SEP490_G37_Report 4.0_TDS
+
+Google Docs
+
+Technical Design Specification
+
+SEP490_G37_Report 4.1_FDS
+
+Google Docs
+
+Functional Design Specification
+
+SEP490_G37_Report 4.2_ScreenSpecification
+
+Google Docs
+
+Screen Specification (UI Wireframes, Layouts, Design Tokens, Mockups)
+
+SEP490_G37_Report 6.1_DeploymentGuide
+
+Google Docs
+
+Production &amp; local deployment manual
+
+SEP490_G37_Report 6.2_UserManual
+
+Google Docs
+
+End-user manual for Readers, Authors, Translators, and Administrators
+
+
+
+
+5.2 Source Code Management
+
+All source code assets are managed through Git and hosted securely on GitHub. The team adheres to a structured feature-branch workflow to ensure codebase stability, continuous integration, and seamless peer reviews.
+
+
+5.2.1 Branching Strategy
+
+The project follows a simplified feature-branch workflow. 
+
+Branch
+
+Purpose
+
+main
+
+Contains the stable and approved source code. Only reviewed and tested code may be merged into this branch.
+
+develop
+
+Integration branch used to combine completed features before they are released to main.
+
+feature/&lt;feature-name&gt;
+
+Used by developers when implementing a new feature or module.
+
+fix/&lt;issue-name&gt;
+
+Used for fixing functional defects or implementation problems.
+
+hotfix/&lt;issue-name&gt;
+
+Used for urgent fixes affecting the stable version.
+
+
+
+Developers must create a separate branch for each assigned feature or bug instead of implementing changes directly on the main branch.
+
+Example:
+
+feature/translator-payout
+
+feature/comic-management
+
+fix/chapter-upload-validation
+
+hotfix/payment-error
+
+
+
+After the assigned work is completed and tested, the developer creates a Pull Request to merge the changes into the appropriate integration branch.
+
+
+5.2.2. Commit Convention 
+
+Commit messages must clearly describe the purpose of each change. The project uses the following convention:
+
+&lt;type&gt;: &lt;short description&gt;
+
+Common commit types include:
+
+Type
+
+Purpose
+
+feat
+
+Add a new feature
+
+fix
+
+Fix a bug or incorrect behavior
+
+refactor
+
+Improve code structure without changing functionality
+
+test
+
+Add or update test cases
+
+docs
+
+Update documentation
+
+style
+
+Change formatting or code style
+
+chore
+
+Maintenance or configuration changes
+
+
+
+Examples:
+
+feat: add translator payout request
+
+fix: validate duplicate chapter upload
+
+refactor: simplify comic moderation service
+
+test: add unit tests for payment service
+
+docs: update API documentation
+
+Commits should be small and focused on one logical change. Developers should avoid combining unrelated features or bug fixes in the same commit. 
+
+
+5.2.3. Pull Request and Code Review Process 
+
+Code changes must be reviewed through GitHub Pull Requests before being merged into the shared development branches. This supports the project's peer-review and quality-management process.
+
+The code review process is:
+
+The developer completes the assigned implementation and performs local testing.
+
+The developer pushes the working branch to GitHub.
+
+A Pull Request is created with a clear description of the implemented feature, affected modules, and relevant issue or task.
+
+At least one other team member reviews the code.
+
+The reviewer checks logic correctness, coding conventions, security, possible side effects, and compatibility with existing modules.
+
+If issues are detected, the developer updates the same branch and Pull Request.
+
+The Pull Request may be merged only after required corrections are completed and the code is considered stable.
+
+Direct commits to main should be avoided. Critical changes affecting shared entities, database structures, authentication, payment, or common components must receive additional review because they may affect multiple modules.
+
+
+5.2.4. Issue and Change Traceability 
+
+Bugs, implementation tasks, and blockers are tracked through GitHub issues and project-management functions. The existing project process already categorizes issues by priority and assigns them to responsible members.
+
+Where applicable, commits and Pull Requests should reference the corresponding issue or task so that source-code changes can be traced back to the work item.
+
+Example:
+
+fix: correct translator revenue calculation (#125)
+
+This process ensures that source code changes remain traceable, reviewable, and recoverable throughout all project iterations.
+
+
+5.3 Tools &amp; Infrastructure
+
+
+
+Category
+
+Tools / Infrastructure
+
+Technology
+
+React  (Front-End), Flutter(App), Java / Spring Boot (Back-End)
+
+Database
+
+PostgreSQL 16 , Firebase
+
+IDEs / Editors
+
+Intelij,  Android studio
+
+Diagramming
+
+draw.io
+
+Documentation
+
+MS Office, Google Docs / Sheets / Slides
+
+Version Control
+
+GitHub (Source Codes), Google Drive (Documents)
+
+Deployment Server
+
+Railway
+
+Project Management
+
+GitHub (tasks, time logs, defects, issues)
+
+
+
+

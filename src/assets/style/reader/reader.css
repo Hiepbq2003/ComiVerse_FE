@@ -35,22 +35,22 @@
 }
 
 html.light {
-  --reader-bg: #faf6f0;
+  --reader-bg: #f8fafc;
   --reader-sidebar-bg: #ffffff;
-  --reader-topbar-bg: rgba(255, 255, 255, 0.92);
+  --reader-topbar-bg: rgba(255, 255, 255, 0.95);
   --reader-card-bg: #ffffff;
   --reader-sidebar-text: #64748b;
-  --reader-sidebar-active: #182235;
-  --reader-text-primary: #182235;
+  --reader-sidebar-active: #0f172a;
+  --reader-text-primary: #0f172a;
   --reader-text-secondary: #475569;
-  --reader-text-muted: #64748b;
-  --reader-border: rgba(99, 87, 78, 0.13);
-  --reader-border-subtle: rgba(99, 87, 78, 0.09);
-  --reader-hover-bg: rgba(99, 87, 78, 0.06);
-  --reader-cover-icon: rgba(24, 34, 53, 0.16);
-  --reader-feed-divider: rgba(99, 87, 78, 0.1);
-  --reader-card-shadow: rgba(69, 57, 48, 0.1);
-  --reader-hero-heading-start: #182235;
+  --reader-text-muted: #94a3b8;
+  --reader-border: rgba(0, 0, 0, 0.08);
+  --reader-border-subtle: rgba(0, 0, 0, 0.04);
+  --reader-hover-bg: rgba(0, 0, 0, 0.03);
+  --reader-cover-icon: rgba(15, 23, 42, 0.12);
+  --reader-feed-divider: rgba(0, 0, 0, 0.05);
+  --reader-card-shadow: rgba(0, 0, 0, 0.06);
+  --reader-hero-heading-start: #0f172a;
 }
 
 /* ── LAYOUT ──────────────────────────────────────── */

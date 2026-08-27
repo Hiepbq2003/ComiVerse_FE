@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react';
-import { toast } from 'react-toastify';
 import { getAuth, getUserChatRestriction } from '../../utils/Auth';
 
 const EMOJI_CATEGORIES = [
@@ -27,10 +26,8 @@ const EMOJI_CATEGORIES = [
 
 function ChatInputBar({ onSendMessage, isSending, disabled }) {
   const [content, setContent] = useState('');
-  const [attachedImage, setAttachedImage] = useState(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [activeEmojiCategory, setActiveEmojiCategory] = useState(0);
-  const fileInputRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -49,16 +46,13 @@ function ChatInputBar({ onSendMessage, isSending, disabled }) {
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
-    if ((!content.trim() && !attachedImage) || isSending || disabled) return;
+    if (!content.trim() || isSending || disabled) return;
 
     const textToSend = content;
-    const imageToSend = attachedImage;
     try {
-      const success = await onSendMessage(textToSend, imageToSend);
+      const success = await onSendMessage(textToSend);
       if (success !== false) {
         setContent('');
-        setAttachedImage(null);
-        if (fileInputRef.current) fileInputRef.current.value = '';
       }
     } catch (err) {
       setContent(textToSend);
@@ -72,36 +66,12 @@ function ChatInputBar({ onSendMessage, isSending, disabled }) {
     }
   };
 
-  const handleImageSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please choose an image file.');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Chat images must be 5MB or smaller.');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setAttachedImage({ file, previewUrl: reader.result });
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleRemoveImage = () => {
-    setAttachedImage(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
   const handleEmojiClick = (emoji) => {
     setContent(prev => prev + emoji);
     inputRef.current?.focus();
   };
 
-  const canSend = (content.trim() || attachedImage) && !isSending && !disabled;
+  const canSend = content.trim() && !isSending && !disabled;
 
   // Check active user moderation restriction (BAN or MUTE)
   const auth = getAuth();
@@ -122,24 +92,6 @@ function ChatInputBar({ onSendMessage, isSending, disabled }) {
 
   return (
     <div className="cv-chat-input-wrapper">
-      {/* Image Preview Strip */}
-      {attachedImage && (
-        <div className="cv-chat-attachment-preview">
-          <div className="cv-chat-attachment-thumb">
-            <img src={attachedImage.previewUrl} alt="Attachment" />
-            <button
-              type="button"
-              className="cv-chat-attachment-remove"
-              onClick={handleRemoveImage}
-              title="Remove image"
-            >
-              ✕
-            </button>
-          </div>
-          <span className="cv-chat-attachment-label">Image attached</span>
-        </div>
-      )}
-
       <form className="cv-chat-input-bar" onSubmit={handleSubmit}>
         {/* Emoji Picker Button */}
         <div className="cv-chat-action-group" ref={emojiPickerRef}>
@@ -192,30 +144,6 @@ function ChatInputBar({ onSendMessage, isSending, disabled }) {
             </div>
           )}
         </div>
-
-        {/* Image Attach Button - Temporarily hidden 
-        <button
-          type="button"
-          className="cv-chat-action-btn"
-          onClick={() => fileInputRef.current?.click()}
-          title="Attach image"
-          disabled={isInputDisabled}
-        >
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-            <circle cx="8.5" cy="8.5" r="1.5" />
-            <polyline points="21 15 16 10 5 21" />
-          </svg>
-        </button>
-
-        <input
-          type="file"
-          ref={fileInputRef}
-          accept="image/*"
-          style={{ display: 'none' }}
-          onChange={handleImageSelect}
-        />
-        */}
 
         {/* Text Input */}
         <input

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { forgotPasswordApi } from '../../services/api/AuthApi'
+import { isValidEmail } from '../../utils/authValidation'
 
 function ForgotPassword({ onNavigate, onOTPSent, showAlert, loading, setLoading }) {
   const [email, setEmail] = useState('')
@@ -7,6 +8,10 @@ function ForgotPassword({ onNavigate, onOTPSent, showAlert, loading, setLoading 
   const handleForgot = async (e) => {
     e.preventDefault()
     if (loading) return
+    if (!isValidEmail(email)) {
+      showAlert('error', 'Enter a valid email address');
+      return
+    }
 
     setLoading(true)
     try {

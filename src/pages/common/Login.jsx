@@ -185,13 +185,16 @@ function Login({ onNavigate, onVerificationRequired, onLoginSuccess, showAlert, 
 
       if (needsEmailVerification) {
         const loginIdentifier = form.username.trim()
+        // If the user typed a valid email, pre-fill it on the verify page.
+        // Otherwise pass empty string so VerifyEmail shows the email input field.
         const verificationEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginIdentifier)
           ? loginIdentifier
           : ''
         onVerificationRequired(verificationEmail)
-        toast.error(errMessage)
         if (typeof showAlert === 'function') {
-          showAlert('error', errMessage)
+          showAlert('info', 'Please verify your email before signing in.')
+        } else {
+          toast.info('Please verify your email before signing in.')
         }
         return
       }

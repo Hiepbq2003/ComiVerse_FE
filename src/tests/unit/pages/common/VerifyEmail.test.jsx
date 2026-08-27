@@ -16,6 +16,7 @@ describe('VerifyEmail Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    AuthApi.resendVerificationOtpApi.mockResolvedValue({});
     mockOnNavigate = vi.fn();
     mockShowAlert = vi.fn();
     mockSetLoading = vi.fn();
@@ -39,6 +40,33 @@ describe('VerifyEmail Component', () => {
     expect(screen.getByText(/test@example.com/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Enter 6-digit code')).toBeInTheDocument();
     expect(screen.getByText('Verify Email')).toBeInTheDocument();
+    expect(AuthApi.resendVerificationOtpApi).not.toHaveBeenCalled();
+  });
+
+  it('Should request one fresh OTP when opened from a pending login', async () => {
+    renderComponent({ autoSendOtp: true });
+
+    await waitFor(() => {
+      expect(AuthApi.resendVerificationOtpApi).toHaveBeenCalledTimes(1);
+      expect(AuthApi.resendVerificationOtpApi).toHaveBeenCalledWith('test@example.com');
+      expect(mockShowAlert).toHaveBeenCalledWith(
+        'success',
+        'A verification OTP has been sent to your email.'
+      );
+    });
+  });
+
+  it('Should keep the latest OTP usable when automatic resend is throttled', async () => {
+    AuthApi.resendVerificationOtpApi.mockRejectedValueOnce({ response: { status: 429 } });
+
+    renderComponent({ autoSendOtp: true });
+
+    await waitFor(() => {
+      expect(mockShowAlert).toHaveBeenCalledWith(
+        'info',
+        'Your most recent OTP is still valid. Please wait before requesting another code.'
+      );
+    });
   });
 
   it('Should handle successful email verification', async () => {

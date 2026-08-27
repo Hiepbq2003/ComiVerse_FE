@@ -1,13 +1,27 @@
 import { useState } from 'react'
 import { forgotPasswordApi, resetPasswordApi } from '../../services/api/AuthApi'
+import { AUTH_LIMITS, isValidEmail, isValidOtp, isValidPassword } from '../../utils/authValidation'
 
 function ResetPassword({ email, onNavigate, showAlert, loading, setLoading }) {
   const [form, setForm] = useState({ otp: '', newPassword: '', confirmNewPassword: '' })
 
   const handleReset = async (e) => {
     e.preventDefault()
+    if (!isValidEmail(email)) {
+      showAlert('error', 'Enter a valid email address');
+      onNavigate('forgot');
+      return;
+    }
+    if (!isValidOtp(form.otp)) {
+      showAlert('error', 'Enter the 6-digit recovery code');
+      return;
+    }
+    if (!isValidPassword(form.newPassword)) {
+      showAlert('error', 'New password must be between 8 and 128 characters.');
+      return;
+    }
     if (form.newPassword !== form.confirmNewPassword) {
-      showAlert('error', 'New passwords do not match!');
+      showAlert('error', 'Passwords do not match');
       return;
     }
     setLoading(true)
@@ -77,6 +91,7 @@ function ResetPassword({ email, onNavigate, showAlert, loading, setLoading }) {
             onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
             className="glass-input-field"
             autoComplete="new-password"
+            maxLength={AUTH_LIMITS.passwordMax}
             required
           />
         </div>
@@ -91,6 +106,7 @@ function ResetPassword({ email, onNavigate, showAlert, loading, setLoading }) {
             onChange={(e) => setForm({ ...form, confirmNewPassword: e.target.value })}
             className="glass-input-field"
             autoComplete="new-password"
+            maxLength={AUTH_LIMITS.passwordMax}
             required
           />
         </div>
