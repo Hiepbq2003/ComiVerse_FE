@@ -32,6 +32,14 @@ export const incrementForumThreadViewApi = (id) => {
   return AxiosClient.post(`/forum-threads/${id}/view`)
 }
 
+export const toggleForumThreadLikeApi = (id) => {
+  return AxiosClient.post(`/forum-threads/${id}/like`)
+}
+
+export const toggleForumThreadFollowApi = (id) => {
+  return AxiosClient.post(`/forum-threads/${id}/follow`)
+}
+
 export const reportForumThreadApi = (id, reason) => {
   return AxiosClient.post(`/forum-threads/${id}/report`, { reason })
 }
