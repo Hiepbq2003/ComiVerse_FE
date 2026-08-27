@@ -328,15 +328,7 @@ function ComicPageCanvas({ src, pageIndex, isEncrypted = false, xorKey = 0x5A, f
           style={{
             position: 'relative',
             width: '100%',
-            lineHeight: 0,
-            maxWidth: '100%',
-            height: 'auto',
-            display: loading ? 'none' : 'block',
-            // Layer 2 requirements:
-            pointerEvents: 'none',
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-            msUserSelect: 'none'
+            lineHeight: 0
           }}
         >
           <canvas
