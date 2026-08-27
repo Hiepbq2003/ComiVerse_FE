@@ -150,6 +150,7 @@
 .forum-author-badge {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -531,6 +532,14 @@ html.light .forum-select-field option {
 
 .forum-card-subtitle-stv strong {
   color: #e2e8f0;
+}
+
+.forum-card-following-stv {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #facc15;
+  font-weight: 700;
 }
 
 .forum-card-right-stv {
@@ -987,6 +996,10 @@ html.light .forum-card-subtitle-stv strong {
   color: #1e293b;
 }
 
+html.light .forum-card-following-stv {
+  color: #a16207;
+}
+
 html.light .forum-card-badge-stv {
   background: rgba(168, 85, 247, 0.05);
   color: #7c3aed;
@@ -1233,6 +1246,12 @@ html.light .forum-sidebar-thread-card-stv.active .forum-sidebar-thread-title-stv
   color: white;
 }
 
+.forum-panel-btn.follow.is-following {
+  background: rgba(250, 204, 21, 0.14);
+  border-color: rgba(250, 204, 21, 0.45);
+  color: #fde047;
+}
+
 .forum-panel-btn.report {
   background: rgba(239, 68, 68, 0.1);
   color: #f87171;
@@ -1255,6 +1274,12 @@ html.light .forum-panel-btn.follow:hover {
   background: #e5e7eb;
   color: #111827;
   border-color: #9ca3af;
+}
+
+html.light .forum-panel-btn.follow.is-following {
+  background: #fef9c3;
+  border-color: #eab308;
+  color: #854d0e;
 }
 
 html.light .forum-panel-btn.report {

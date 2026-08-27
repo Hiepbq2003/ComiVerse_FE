@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import HomeLayout from '../../components/layout/HomeLayout'
-import { getForumThreadsPageApi, deleteForumThreadApi, createForumThreadApi, getAllForumThreadsApi, updateForumThreadApi, getForumThreadByIdApi, incrementForumThreadViewApi, reportForumThreadApi } from '../../services/api/ForumThreadApi'
+import { getForumThreadsPageApi, deleteForumThreadApi, createForumThreadApi, getAllForumThreadsApi, updateForumThreadApi, getForumThreadByIdApi, incrementForumThreadViewApi, toggleForumThreadLikeApi, toggleForumThreadFollowApi, reportForumThreadApi } from '../../services/api/ForumThreadApi'
 import { createForumCommentApi, getForumCommentsApi, toggleForumCommentLikeApi, updateForumCommentApi, deleteForumCommentApi } from '../../services/api/ForumCommentApi'
 import { getForumCategoriesApi } from '../../services/api/ForumCategoryApi'
 import { uploadImageApi } from '../../services/api/UploadApi'
@@ -391,15 +391,21 @@ function Forum() {
     }
   })
 
-  // Followed threads state (localStorage)
-  const [followedThreads, setFollowedThreads] = useState(() => {
-    const saved = localStorage.getItem('comiverse_followed_threads')
-    return saved ? JSON.parse(saved) : []
-  })
+  const [followedThreads, setFollowedThreads] = useState([])
+  const [pendingThreadFollows, setPendingThreadFollows] = useState(() => new Set())
 
-  useEffect(() => {
-    localStorage.setItem('comiverse_followed_threads', JSON.stringify(followedThreads))
-  }, [followedThreads])
+  const syncFollowedThreadsFromServer = useCallback((serverThreads) => {
+    const validThreads = (serverThreads || []).filter(thread => thread?.id)
+    const loadedIds = new Set(validThreads.map(thread => thread.id))
+    const serverFollowedIds = validThreads
+      .filter(thread => Boolean(thread.isFollowedByCurrentUser))
+      .map(thread => thread.id)
+
+    setFollowedThreads(previous => [
+      ...previous.filter(id => !loadedIds.has(id)),
+      ...serverFollowedIds,
+    ])
+  }, [])
 
   // Liking comments state (localStorage)
   const [likedComments, setLikedComments] = useState(() => {
@@ -411,15 +417,21 @@ function Forum() {
     localStorage.setItem('comiverse_liked_comments', JSON.stringify(likedComments))
   }, [likedComments])
 
-  // Liking threads state (localStorage)
-  const [likedThreads, setLikedThreads] = useState(() => {
-    const saved = localStorage.getItem('comiverse_liked_threads')
-    return saved ? JSON.parse(saved) : []
-  })
+  const [likedThreads, setLikedThreads] = useState([])
+  const [pendingThreadLikes, setPendingThreadLikes] = useState(() => new Set())
 
-  useEffect(() => {
-    localStorage.setItem('comiverse_liked_threads', JSON.stringify(likedThreads))
-  }, [likedThreads])
+  const syncLikedThreadsFromServer = useCallback((serverThreads) => {
+    const validThreads = (serverThreads || []).filter(thread => thread?.id)
+    const loadedIds = new Set(validThreads.map(thread => thread.id))
+    const serverLikedIds = validThreads
+      .filter(thread => Boolean(thread.isLikedByCurrentUser))
+      .map(thread => thread.id)
+
+    setLikedThreads(previous => [
+      ...previous.filter(id => !loadedIds.has(id)),
+      ...serverLikedIds,
+    ])
+  }, [])
 
   const incrementViews = async (thread) => {
     try {
@@ -467,10 +479,14 @@ function Forum() {
                 category: threadData.category || 'General',
                 views: threadData.views !== undefined && threadData.views !== null ? String(threadData.views) : '0',
                 replies: threadData.replies ?? 0,
-                likes: threadData.likes || 0,
+                likes: Number(threadData.likes) || 0,
+                isLikedByCurrentUser: Boolean(threadData.isLikedByCurrentUser),
+                isFollowedByCurrentUser: Boolean(threadData.isFollowedByCurrentUser),
                 timeAgo: formatTimeAgo(threadData.createdAt)
               }
               setSelectedThread(formattedThread)
+              syncLikedThreadsFromServer([formattedThread])
+              syncFollowedThreadsFromServer([formattedThread])
               incrementViews(formattedThread)
             } else {
               toast.error('Discussion thread not found.')
@@ -488,7 +504,7 @@ function Forum() {
       setSelectedThread(null)
       lastViewedThreadIdRef.current = null
     }
-  }, [threadId])
+  }, [threadId, syncFollowedThreadsFromServer, syncLikedThreadsFromServer])
 
   // Dismiss dropdowns on clicking outside
   useEffect(() => {
@@ -560,10 +576,15 @@ function Forum() {
       const list = response.data || response || []
       const mapped = list.map(t => ({
         ...t,
+        likes: Number(t.likes) || 0,
+        isLikedByCurrentUser: Boolean(t.isLikedByCurrentUser),
+        isFollowedByCurrentUser: Boolean(t.isFollowedByCurrentUser),
         isPinned: t.isPinned || false,
         isLocked: t.isLocked || false
       }))
       setAllThreadsForCounts(mapped)
+      syncLikedThreadsFromServer(mapped)
+      syncFollowedThreadsFromServer(mapped)
     } catch (err) {
       console.error('Failed to load thread counts:', err)
     }
@@ -599,14 +620,17 @@ function Forum() {
         category: t.category || 'General',
         views: t.views !== undefined && t.views !== null ? String(t.views) : '0',
         replies: t.replies ?? 0,
-        likes: t.likes || 0,
-        isLiked: false,
+        likes: Number(t.likes) || 0,
+        isLikedByCurrentUser: Boolean(t.isLikedByCurrentUser),
+        isFollowedByCurrentUser: Boolean(t.isFollowedByCurrentUser),
         isPinned: t.isPinned || false,
         isLocked: t.isLocked || false,
         timeAgo: formatTimeAgo(t.createdAt)
       }))
 
       setThreads(formattedDb)
+      syncLikedThreadsFromServer(formattedDb)
+      syncFollowedThreadsFromServer(formattedDb)
       if (response.metadata) {
         setTotalPages(response.metadata.totalPages || 1)
         setTotalElements(response.metadata.totalElements || 0)
@@ -619,23 +643,6 @@ function Forum() {
     } finally {
       setLoading(false)
     }
-  }
-
-  // Handle Likes locally
-  const handleToggleLike = (id, event) => {
-    event.stopPropagation()
-    setThreads(prev =>
-      prev.map(t => {
-        if (t.id === id) {
-          return {
-            ...t,
-            likes: t.isLiked ? t.likes - 1 : t.likes + 1,
-            isLiked: !t.isLiked
-          }
-        }
-        return t
-      })
-    )
   }
 
   // Publish new thread post
@@ -862,18 +869,38 @@ function Forum() {
     }
   }
 
-  // Follow thread toggle helper
-  const handleToggleFollow = (threadId, event) => {
+  const handleToggleFollow = async (threadId, event) => {
     if (event) event.stopPropagation()
-    setFollowedThreads(prev => {
-      const isFollowing = prev.includes(threadId)
-      const next = isFollowing 
-        ? prev.filter(id => id !== threadId)
-        : [...prev, threadId]
-      
-      toast.info(isFollowing ? 'Thread unfollowed.' : 'Thread followed!')
-      return next
-    })
+    if (!auth?.token) {
+      navigate('/auth?mode=signin', { state: { from: location.pathname } })
+      return
+    }
+    if (pendingThreadFollows.has(threadId)) return
+
+    const wasFollowing = followedThreads.includes(threadId)
+    const updateMembership = (following) => {
+      setFollowedThreads(previous => following
+        ? [...previous.filter(id => id !== threadId), threadId]
+        : previous.filter(id => id !== threadId))
+    }
+
+    setPendingThreadFollows(previous => new Set(previous).add(threadId))
+    updateMembership(!wasFollowing)
+    try {
+      const result = await toggleForumThreadFollowApi(threadId)
+      const confirmedFollowing = Boolean(result?.following)
+      updateMembership(confirmedFollowing)
+      toast.success(confirmedFollowing ? 'Thread is now being tracked.' : 'Thread tracking stopped.')
+    } catch (error) {
+      updateMembership(wasFollowing)
+      toast.error(error.response?.data?.message || 'Could not update thread tracking. Please try again.')
+    } finally {
+      setPendingThreadFollows(previous => {
+        const next = new Set(previous)
+        next.delete(threadId)
+        return next
+      })
+    }
   }
 
   // Direct moderator actions from Reader UI
@@ -1102,23 +1129,50 @@ function Forum() {
     if (event) event.stopPropagation()
     if (!threadToLike) return
     const targetId = threadToLike.id
-    const isLiked = likedThreads.includes(targetId)
-    const newLikedThreads = isLiked
-      ? likedThreads.filter(id => id !== targetId)
-      : [...likedThreads, targetId]
+    if (!auth?.token) {
+      navigate('/auth?mode=signin', { state: { from: location.pathname } })
+      return
+    }
+    if (pendingThreadLikes.has(targetId)) return
 
-    setLikedThreads(newLikedThreads)
-
+    const wasLiked = likedThreads.includes(targetId)
     const currentLikes = parseInt(threadToLike.likes || 0)
-    const nextLikes = isLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1
+    const optimisticLiked = !wasLiked
+    const optimisticLikes = wasLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1
 
-    if (selectedThread && selectedThread.id === targetId) {
-      setSelectedThread(prev => prev ? { ...prev, likes: nextLikes } : null)
+    const updateThreadLikeCount = (likes) => {
+      setSelectedThread(prev => prev?.id === targetId ? { ...prev, likes } : prev)
+      setThreads(prev => prev.map(t => t.id === targetId ? { ...t, likes } : t))
+      setAllThreadsForCounts(prev => prev.map(t => t.id === targetId ? { ...t, likes } : t))
+    }
+    const updateLikedMembership = (liked) => {
+      setLikedThreads(previous => liked
+        ? [...previous.filter(id => id !== targetId), targetId]
+        : previous.filter(id => id !== targetId))
     }
 
-    setThreads(prev => prev.map(t => t.id === targetId ? { ...t, likes: nextLikes } : t))
-    setAllThreadsForCounts(prev => prev.map(t => t.id === targetId ? { ...t, likes: nextLikes } : t))
+    setPendingThreadLikes(previous => new Set(previous).add(targetId))
+    updateLikedMembership(optimisticLiked)
+    updateThreadLikeCount(optimisticLikes)
 
+    try {
+      const result = await toggleForumThreadLikeApi(targetId)
+      const confirmedLiked = Boolean(result?.liked)
+      const parsedLikes = Number(result?.likes)
+      const confirmedLikes = Number.isFinite(parsedLikes) ? Math.max(0, parsedLikes) : optimisticLikes
+      updateLikedMembership(confirmedLiked)
+      updateThreadLikeCount(confirmedLikes)
+    } catch (error) {
+      updateLikedMembership(wasLiked)
+      updateThreadLikeCount(currentLikes)
+      toast.error(error.response?.data?.message || 'Could not update this thread like. Please try again.')
+    } finally {
+      setPendingThreadLikes(previous => {
+        const next = new Set(previous)
+        next.delete(targetId)
+        return next
+      })
+    }
   }
 
   // Count threads inside category
@@ -1301,6 +1355,7 @@ function Forum() {
                         <button 
                           className={`forum-card-action-btn ${likedThreads.includes(selectedThread.id) ? 'liked-active' : ''}`}
                           onClick={() => handleToggleThreadLike(selectedThread)}
+                          disabled={pendingThreadLikes.has(selectedThread.id)}
                           style={{ cursor: 'pointer' }}
                         >
                           <Heart size={15} aria-hidden="true" /> {selectedThread.likes || 0} likes
@@ -1606,20 +1661,22 @@ function Forum() {
                       <div className="forum-follow-control" onClick={(e) => e.stopPropagation()}>
                         <button 
                           type="button"
-                          className="forum-panel-btn follow" 
+                          className={`forum-panel-btn follow ${followedThreads.includes(selectedThread.id) ? 'is-following' : ''}`}
                           onClick={() => setShowDetailFollowDropdown(!showDetailFollowDropdown)}
+                          disabled={pendingThreadFollows.has(selectedThread.id)}
+                          aria-pressed={followedThreads.includes(selectedThread.id)}
                         >
-                          <Star size={16} aria-hidden="true" /> {followedThreads.includes(selectedThread.id) ? 'Following' : 'Not Tracking'}
+                          <Star size={16} fill={followedThreads.includes(selectedThread.id) ? 'currentColor' : 'none'} aria-hidden="true" /> {followedThreads.includes(selectedThread.id) ? 'Following' : 'Not Tracking'}
                         </button>
                         
                         {showDetailFollowDropdown && (
                           <div className="forum-threedots-dropdown" style={{ top: '100%', left: 0, width: '100%' }}>
                             <button 
                               className="forum-dropdown-item"
-                              onClick={() => {
+                              disabled={pendingThreadFollows.has(selectedThread.id)}
+                              onClick={async () => {
                                 if (!followedThreads.includes(selectedThread.id)) {
-                                  setFollowedThreads(prev => [...prev, selectedThread.id]);
-                                  toast.info('Thread followed!');
+                                  await handleToggleFollow(selectedThread.id);
                                 }
                                 setShowDetailFollowDropdown(false);
                               }}
@@ -1628,10 +1685,10 @@ function Forum() {
                             </button>
                             <button 
                               className="forum-dropdown-item"
-                              onClick={() => {
+                              disabled={pendingThreadFollows.has(selectedThread.id)}
+                              onClick={async () => {
                                 if (followedThreads.includes(selectedThread.id)) {
-                                  setFollowedThreads(prev => prev.filter(id => id !== selectedThread.id));
-                                  toast.info('Thread unfollowed.');
+                                  await handleToggleFollow(selectedThread.id);
                                 }
                                 setShowDetailFollowDropdown(false);
                               }}
@@ -1887,6 +1944,11 @@ function Forum() {
                                 <span>by <strong>{thread.author}</strong></span>
                                 <span>•</span>
                                 <span>{thread.timeAgo || 'recently'}</span>
+                                {followedThreads.includes(thread.id) && (
+                                  <span className="forum-card-following-stv">
+                                    <Star size={12} fill="currentColor" aria-hidden="true" /> Following
+                                  </span>
+                                )}
                               </div>
                             </div>
 
@@ -1896,6 +1958,7 @@ function Forum() {
                               <button 
                                 className={`forum-card-action-btn ${likedThreads.includes(thread.id) ? 'liked-active' : ''}`}
                                 onClick={(e) => handleToggleThreadLike(thread, e)}
+                                disabled={pendingThreadLikes.has(thread.id)}
                                 style={{ padding: '3px 8px', fontSize: '12px' }}
                               >
                                 <span>❤️</span> {thread.likes || 0}
@@ -1918,6 +1981,7 @@ function Forum() {
                                   <div className="forum-threedots-dropdown">
                                     <button 
                                       className="forum-dropdown-item" 
+                                      disabled={pendingThreadFollows.has(thread.id)}
                                       onClick={(e) => {
                                         handleToggleFollow(thread.id, e);
                                         setActiveDropdownThreadId(null);

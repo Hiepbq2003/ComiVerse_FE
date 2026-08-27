@@ -18,6 +18,8 @@ vi.mock('../../../../services/api/ForumThreadApi', () => ({
   updateForumThreadApi: vi.fn(),
   getForumThreadByIdApi: vi.fn(),
   incrementForumThreadViewApi: vi.fn(),
+  toggleForumThreadLikeApi: vi.fn(),
+  toggleForumThreadFollowApi: vi.fn(),
   reportForumThreadApi: vi.fn()
 }));
 vi.mock('../../../../services/api/ForumCommentApi', () => ({
@@ -55,9 +57,9 @@ const mockThreads = [
   }
 ];
 
-const renderForum = () => {
+const renderForum = (initialPath = '/forum') => {
   return render(
-    <MemoryRouter initialEntries={['/forum']}>
+    <MemoryRouter initialEntries={[initialPath]}>
       <AuthProvider>
         <ThemeProvider>
           <NotificationProvider>
@@ -79,11 +81,15 @@ describe('Reader - Forum Page Tests', () => {
     AuthUtils.getAuth.mockReturnValue({ token: 'test', user: { id: 'u1' } });
     ForumThreadApi.getAllForumThreadsApi.mockResolvedValue([]);
     ForumThreadApi.incrementForumThreadViewApi.mockResolvedValue({ success: true });
+    ForumThreadApi.toggleForumThreadLikeApi.mockResolvedValue({ liked: true, likes: 1 });
+    ForumThreadApi.toggleForumThreadFollowApi.mockResolvedValue({ following: true });
     ForumCommentApi.getForumCommentsApi.mockResolvedValue([]);
   });
 
   it('should load and display forum threads', async () => {
-    ForumThreadApi.getForumThreadsPageApi.mockResolvedValue({ data: mockThreads });
+    ForumThreadApi.getForumThreadsPageApi.mockResolvedValue({
+      data: [{ ...mockThreads[0], isFollowedByCurrentUser: true }],
+    });
     
     renderForum();
     
@@ -93,6 +99,88 @@ describe('Reader - Forum Page Tests', () => {
     
     const title = await screen.findByText('Discussing Solo Leveling', {}, { timeout: 3000 });
     expect(title).toBeInTheDocument();
+    expect(screen.getByText('Following')).toBeInTheDocument();
+  });
+
+  it('restores the persisted thread like count and user state after a direct reload', async () => {
+    ForumThreadApi.getForumThreadsPageApi.mockResolvedValue({ data: [], metadata: {} });
+    ForumThreadApi.getForumThreadByIdApi.mockResolvedValue({
+      ...mockThreads[0],
+      likes: 9,
+      isLikedByCurrentUser: true,
+    });
+
+    renderForum('/forum/thread/thread-1');
+
+    const likeButton = await screen.findByRole('button', { name: /9 likes/i });
+    expect(likeButton).toHaveClass('liked-active');
+  });
+
+  it('restores and persists thread tracking through the backend API', async () => {
+    ForumThreadApi.getForumThreadsPageApi.mockResolvedValue({ data: [], metadata: {} });
+    ForumThreadApi.getForumThreadByIdApi.mockResolvedValue({
+      ...mockThreads[0],
+      isFollowedByCurrentUser: true,
+    });
+    ForumThreadApi.toggleForumThreadFollowApi.mockResolvedValue({ following: false });
+
+    renderForum('/forum/thread/thread-1');
+
+    const followButton = await screen.findByRole('button', { name: 'Following' });
+    expect(followButton).toHaveClass('is-following');
+    expect(followButton).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(followButton);
+    fireEvent.click(await screen.findByRole('button', { name: /Not Tracking/i }));
+
+    await waitFor(() => {
+      expect(ForumThreadApi.toggleForumThreadFollowApi).toHaveBeenCalledWith('thread-1');
+      expect(screen.getByRole('button', { name: 'Not Tracking' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+    });
+  });
+
+  it('persists a thread like through the backend API', async () => {
+    ForumThreadApi.getForumThreadsPageApi.mockResolvedValue({
+      data: [{ ...mockThreads[0], likes: 4, isLikedByCurrentUser: false }],
+      metadata: {},
+    });
+    ForumThreadApi.toggleForumThreadLikeApi.mockResolvedValue({ liked: true, likes: 5 });
+
+    renderForum();
+
+    const threadTitle = await screen.findByText('Discussing Solo Leveling');
+    const threadCard = threadTitle.closest('.forum-thread-card-stv');
+    const likeButton = threadCard.querySelector('.forum-card-action-btn');
+    fireEvent.click(likeButton);
+
+    await waitFor(() => {
+      expect(ForumThreadApi.toggleForumThreadLikeApi).toHaveBeenCalledWith('thread-1');
+      expect(likeButton).toHaveTextContent('5');
+      expect(likeButton).toHaveClass('liked-active');
+    });
+  });
+
+  it('rolls back an optimistic thread like when the API request fails', async () => {
+    ForumThreadApi.getForumThreadsPageApi.mockResolvedValue({
+      data: [{ ...mockThreads[0], likes: 4, isLikedByCurrentUser: false }],
+      metadata: {},
+    });
+    ForumThreadApi.toggleForumThreadLikeApi.mockRejectedValue(new Error('network unavailable'));
+
+    renderForum();
+
+    const threadTitle = await screen.findByText('Discussing Solo Leveling');
+    const likeButton = threadTitle.closest('.forum-thread-card-stv').querySelector('.forum-card-action-btn');
+    fireEvent.click(likeButton);
+
+    await waitFor(() => {
+      expect(likeButton).toHaveTextContent('4');
+      expect(likeButton).not.toHaveClass('liked-active');
+      expect(likeButton).not.toBeDisabled();
+    });
   });
 
   it('uploads a post image and stores only its Cloudinary URL', async () => {
