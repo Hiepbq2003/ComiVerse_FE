@@ -186,19 +186,19 @@ function AuthorDashboard() {
     
     if (hasViewsHistory && hasFollowersHistory) return rawMetrics
 
-    const finalViews = numberValue(rawMetrics[rawMetrics.length - 1].views)
-    const finalFollowers = numberValue(rawMetrics[rawMetrics.length - 1].followers)
+    const finalViews = Math.max(numberValue(rawMetrics[rawMetrics.length - 1]?.views), numberValue(summary.totalViews))
+    const finalFollowers = Math.max(numberValue(rawMetrics[rawMetrics.length - 1]?.followers), numberValue(summary.totalFollowers))
 
     return rawMetrics.map((item, idx) => {
       const progress = (idx + 1) / rawMetrics.length
       const factor = 0.4 + 0.6 * Math.pow(progress, 2)
       return {
         ...item,
-        views: hasViewsHistory ? item.views : Math.floor(finalViews * factor),
-        followers: hasFollowersHistory ? item.followers : Math.floor(finalFollowers * factor)
+        views: hasViewsHistory ? item.views : (idx === rawMetrics.length - 1 ? finalViews : Math.floor(finalViews * factor)),
+        followers: hasFollowersHistory ? item.followers : (idx === rawMetrics.length - 1 ? finalFollowers : Math.floor(finalFollowers * factor))
       }
     })
-  }, [dashboard])
+  }, [dashboard, summary])
   const topComics = Array.isArray(dashboard?.topComics) ? dashboard.topComics : []
   const recentActivities = Array.isArray(dashboard?.recentActivities) ? dashboard.recentActivities : []
 
