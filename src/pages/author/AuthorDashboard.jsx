@@ -117,6 +117,7 @@ function StatIcon({ type }) {
     case 'views': return <svg {...props}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
     case 'revenue': return <svg {...props}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
     case 'users': return <svg {...props}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    case 'bookmark': return <svg {...props}><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
     case 'star': return <svg {...props}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
     case 'review': return <svg {...props}><path d="M21 15a4 4 0 0 1-4 4H7l-4 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/><path d="M8 9h8"/><path d="M8 13h5"/></svg>
     case 'check': return <svg {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -218,7 +219,7 @@ function AuthorDashboard() {
       { label: 'Earn this Month', value: earnThisMonth == null ? '—' : formatMoney(earnThisMonth), change: currentMonthEarningError ? 'Current-month payout data unavailable' : (earnThisMonth == null ? 'Loading current-month payout revenue' : 'Current-month payout revenue'), trend: currentMonthEarningError || earnThisMonth == null ? 'neutral' : 'up', icon: 'revenue', color: 'green' },
       { label: 'Earn this Year', value: formatMoney(earnThisYear), change: 'Estimated for current year', trend: 'up', icon: 'revenue', color: 'blue' },
       { label: 'Total Paid', value: formatMoney(summary.totalPaid), change: 'Amount successfully withdrawn', trend: 'neutral', icon: 'check', color: 'purple' },
-      { label: 'Followers', value: formatCompactNumber(summary.totalFollowers), change: 'Readers who saved your comics', trend: 'up', icon: 'users', color: 'pink' },
+      { label: 'Bookmarks', value: formatCompactNumber(summary.totalFollowers), change: 'Total library saves on your comics', trend: 'up', icon: 'bookmark', color: 'pink' },
       { label: 'Avg. Rating', value: formatRating(summary.averageRating), change: `${formatFullNumber(summary.totalRatings)} ratings`, trend: 'neutral', icon: 'star', color: 'cyan' },
       { label: 'Pending Reviews', value: formatFullNumber(summary.pendingReviews), change: 'Comic and chapter review queue', trend: 'warning', icon: 'review', color: 'red' },
     ]
@@ -275,7 +276,7 @@ function AuthorDashboard() {
 
   const handleExport = () => {
     if (!monthlyMetrics || monthlyMetrics.length === 0) return
-    const headers = ['Period', 'Views', 'Followers', 'Estimated Revenue (USD)', 'Chapters Uploaded', 'Reviews Submitted', 'Chapters Approved']
+    const headers = ['Period', 'Views', 'Bookmarks', 'Estimated Revenue (USD)', 'Chapters Uploaded', 'Reviews Submitted', 'Chapters Approved']
     const rows = monthlyMetrics.map(item => {
       const revenueEstimate = numberValue(item.estimatedRevenue)
       const views = numberValue(item.views)
@@ -359,7 +360,7 @@ function AuthorDashboard() {
         <div className="author-analytics-chart-header">
           <div>
             <h2 className="author-analytics-chart-title">Reader Growth</h2>
-            <p className="author-analytics-chart-subtitle">Absolute values for Views, Revenue and Followers</p>
+            <p className="author-analytics-chart-subtitle">Absolute values for Views, Revenue and Bookmarks</p>
           </div>
           <div className="author-chart-toggle">
             <button 
@@ -457,7 +458,7 @@ function AuthorDashboard() {
                   <span className="author-chart-tooltip-value">{formatMoney(lineChart.revenue[index])}</span>
                 </div>
                 <div className="author-chart-tooltip-row">
-                  <span className="author-chart-tooltip-label"><span className="author-legend-dot green"/> Followers</span>
+                  <span className="author-chart-tooltip-label"><span className="author-legend-dot green"/> Bookmarks</span>
                   <span className="author-chart-tooltip-value">{formatFullNumber(lineChart.followers[index])}</span>
                 </div>
               </div>
@@ -467,7 +468,7 @@ function AuthorDashboard() {
         <div className="author-analytics-legend">
           <span className="author-legend-item"><span className="author-legend-dot dark"/>Views</span>
           <span className="author-legend-item"><span className="author-legend-dot purple"/>Revenue</span>
-          <span className="author-legend-item"><span className="author-legend-dot green"/>Followers</span>
+          <span className="author-legend-item"><span className="author-legend-dot green"/>Bookmarks</span>
         </div>
       </div>
 
