@@ -54,6 +54,7 @@ function BubbleOverlay({ bubbles, displayedHeightPx }) {
               top: `${box.y}%`,
               width: `${box.width}%`,
               height: `${box.height}%`,
+              boxSizing: 'border-box',
               background: sel.textBgColor || '#ffffff',
               color: sel.textColor || '#000000',
               fontWeight: sel.isBold ? 700 : 400,
@@ -98,6 +99,7 @@ function ScrambledComicPageCanvas({
 }) {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
+  const pageFrameRef = useRef(null);
 
   const [isVisible, setIsVisible] = useState(false);
   const [displayedHeightPx, setDisplayedHeightPx] = useState(0);
@@ -111,17 +113,24 @@ function ScrambledComicPageCanvas({
     enabled: isVisible
   });
 
-  // Measure container height for overlay scaling
+  // Bubble coords are % of the displayed image, not the outer wrapper
+  // (which has minHeight + flex centering). Measure the canvas frame.
   useEffect(() => {
-    if (!containerRef.current || typeof ResizeObserver === 'undefined') return;
+    if (loading || error || !isRendered) return;
+    const el = pageFrameRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const update = (height) => {
+      if (height > 0) setDisplayedHeightPx(height);
+    };
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setDisplayedHeightPx(entry.contentRect.height);
+        update(entry.contentRect.height);
       }
     });
-    observer.observe(containerRef.current);
+    observer.observe(el);
+    update(el.clientHeight);
     return () => observer.disconnect();
-  }, []);
+  }, [loading, error, isRendered]);
 
   // Intersection Observer for lazy loading
   useEffect(() => {
@@ -167,9 +176,8 @@ function ScrambledComicPageCanvas({
       style={{
         position: 'relative',
         width: '100%',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
+        maxWidth: '100%',
+        minWidth: 0,
         minHeight: '400px',
         backgroundColor: 'var(--chapter-bg)',
         userSelect: 'none',
@@ -211,27 +219,36 @@ function ScrambledComicPageCanvas({
           <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>{error}</p>
         </div>
       ) : (
-        /* Protected HTML5 Canvas Element */
-        <canvas
-          ref={canvasRef}
-          className="chapter-page-canvas no-select no-pointer no-drag"
-          draggable="false"
-          onContextMenu={(e) => e.preventDefault()}
-          onDragStart={(e) => e.preventDefault()}
+        <div
+          ref={pageFrameRef}
+          className="chapter-page-frame"
           style={{
+            position: 'relative',
             width: '100%',
-            height: 'auto',
-            display: loading ? 'none' : 'block',
-            pointerEvents: 'none',
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-            msUserSelect: 'none',
+            lineHeight: 0,
           }}
-        />
-      )}
-
-      {!loading && !error && isRendered && (
-        <BubbleOverlay bubbles={bubbles} displayedHeightPx={displayedHeightPx} />
+        >
+          <canvas
+            ref={canvasRef}
+            className="chapter-page-canvas no-select no-pointer no-drag"
+            draggable="false"
+            onContextMenu={(e) => e.preventDefault()}
+            onDragStart={(e) => e.preventDefault()}
+            style={{
+              width: '100%',
+              maxWidth: '100%',
+              height: 'auto',
+              display: loading ? 'none' : 'block',
+              pointerEvents: 'none',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              msUserSelect: 'none',
+            }}
+          />
+          {!loading && isRendered && (
+            <BubbleOverlay bubbles={bubbles} displayedHeightPx={displayedHeightPx} />
+          )}
+        </div>
       )}
     </div>
   );

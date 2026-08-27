@@ -64,6 +64,7 @@ function BubbleOverlay({ bubbles, displayedHeightPx }) {
               top: `${box.y}%`,
               width: `${box.width}%`,
               height: `${box.height}%`,
+              boxSizing: 'border-box',
               background: sel.textBgColor || '#ffffff',
               color: sel.textColor || '#000000',
               fontWeight: sel.isBold ? 700 : 400,
@@ -106,28 +107,31 @@ function BubbleOverlay({ bubbles, displayedHeightPx }) {
 function ComicPageCanvas({ src, pageIndex, isEncrypted = false, xorKey = 0x5A, fallbackSrc, bubbles }) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
+  const pageFrameRef = useRef(null)
   
   const [isVisible, setIsVisible] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [displayedHeightPx, setDisplayedHeightPx] = useState(0)
 
-  // Measure the wrapper's real rendered pixel height (matches the canvas's
-  // displayed height once the image has loaded, since the canvas is
-  // width:100%/height:auto and the wrapper has no fixed height of its own).
-  // Used to convert bubble fontSize (stored as a % of displayed height)
-  // into real pixels — far more reliable across browsers than CSS
-  // container-query units.
+  // Bubble coords are % of the displayed image, not the outer wrapper
+  // (which has minHeight + flex centering). Measure the canvas frame.
   useEffect(() => {
-    if (!containerRef.current || typeof ResizeObserver === 'undefined') return
+    if (loading || error) return
+    const el = pageFrameRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const update = (height) => {
+      if (height > 0) setDisplayedHeightPx(height)
+    }
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setDisplayedHeightPx(entry.contentRect.height)
+        update(entry.contentRect.height)
       }
     })
-    observer.observe(containerRef.current)
+    observer.observe(el)
+    update(el.clientHeight)
     return () => observer.disconnect()
-  }, [])
+  }, [loading, error])
 
   // Intersection Observer for Lazy Loading
   useEffect(() => {
@@ -284,9 +288,8 @@ function ComicPageCanvas({ src, pageIndex, isEncrypted = false, xorKey = 0x5A, f
       style={{
         position: 'relative',
         width: '100%',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
+        maxWidth: '100%',
+        minWidth: 0,
         minHeight: '400px',
         backgroundColor: 'var(--chapter-bg)'
       }}
@@ -319,25 +322,33 @@ function ComicPageCanvas({ src, pageIndex, isEncrypted = false, xorKey = 0x5A, f
           <p style={{ fontSize: '13px' }}>Failed to load page {pageIndex + 1}</p>
         </div>
       ) : (
-        /* Protected Canvas element */
-        <canvas
-          ref={canvasRef}
-          className="chapter-page-canvas no-select no-pointer no-drag"
-          draggable="false"
+        <div
+          ref={pageFrameRef}
+          className="chapter-page-frame"
           style={{
+            position: 'relative',
             width: '100%',
-            height: 'auto',
-            display: loading ? 'none' : 'block',
-            // Layer 2 requirements:
-            pointerEvents: 'none',
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-            msUserSelect: 'none'
+            lineHeight: 0,
           }}
-        />
+        >
+          <canvas
+            ref={canvasRef}
+            className="chapter-page-canvas no-select no-pointer no-drag"
+            draggable="false"
+            style={{
+              width: '100%',
+              maxWidth: '100%',
+              height: 'auto',
+              display: loading ? 'none' : 'block',
+              pointerEvents: 'none',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              msUserSelect: 'none'
+            }}
+          />
+          {!loading && <BubbleOverlay bubbles={bubbles} displayedHeightPx={displayedHeightPx} />}
+        </div>
       )}
-
-      {!loading && !error && <BubbleOverlay bubbles={bubbles} displayedHeightPx={displayedHeightPx} />}
     </div>
   )
 }

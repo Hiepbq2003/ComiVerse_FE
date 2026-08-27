@@ -334,11 +334,23 @@ html.light {
 .chapter-page-image-wrapper {
   position: relative;
   width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  max-width: 100%;
+  min-width: 0;
   min-height: 400px;
   background-color: var(--chapter-bg);
+}
+
+.chapter-page-frame {
+  position: relative;
+  width: 100%;
+  line-height: 0;
+}
+
+.chapter-page-canvas {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  display: block;
 }
 
 .chapter-page-image-wrapper::after {
