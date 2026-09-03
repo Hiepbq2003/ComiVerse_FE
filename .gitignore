@@ -45,3 +45,7 @@ generate_l3_workbook.js
 
 # Reports & documentation (keep in separate repo)
 Progress Reports/
+
+# Nested repos (BE & FE submodule dirs)
+ComiVerse_FE/
+SEP490_G37_SUM26_JAVA/
