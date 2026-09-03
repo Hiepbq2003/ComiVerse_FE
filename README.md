@@ -251,19 +251,6 @@ src/
 
 ---
 
-## 👥 Team
-
-**SEP490 — Group G37** | FPT University — Summer 2026
-
-| Member | Role |
-|:--|:--|
-| **Bùi Quang Hiệp** | Frontend Lead, Full-stack Developer |
-| **Nguyễn Văn Hạnh** | Backend Lead |
-| **Bùi Hưng** | Backend Developer |
-| **Nguyễn Ngọc Thanh** | Backend Developer |
-| **Đào Tiến Đạt** | Backend Developer |
-
----
 
 ## 📝 License
 
